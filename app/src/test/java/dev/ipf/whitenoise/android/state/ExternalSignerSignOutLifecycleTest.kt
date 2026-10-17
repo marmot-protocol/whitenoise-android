@@ -9,13 +9,18 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SignOutOutcomeFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -164,6 +169,7 @@ class ExternalSignerSignOutLifecycleTest {
     private fun appState(
         ownerContext: Context = context,
         pushTokenStore: PushTokenStore? = null,
+        profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
     ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ownerContext,
@@ -172,6 +178,7 @@ class ExternalSignerSignOutLifecycleTest {
             accounts = listOf(externalSignerAccount()),
             activeAccountRef = ACCOUNT_REF,
             pushTokenStore = pushTokenStore,
+            profileReader = profileReader,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -304,6 +311,7 @@ class ExternalSignerSignOutLifecycleTest {
             val appState = appState()
             retainComposerExpansion(appState)
             val phaseBefore = appState.phase
+            val selectionBefore = appState.accountSession.handoff.capture()
 
             val completion = appState.signOutActiveAccount(deleteKeyPackages = true)
 
@@ -317,6 +325,10 @@ class ExternalSignerSignOutLifecycleTest {
                 appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
             )
             assertEquals(phaseBefore, appState.phase)
+            assertTrue(
+                "unfinished cleanup must retain the selection",
+                appState.accountSession.handoff.isCurrent(selectionBefore),
+            )
         }
 
     /**
@@ -334,6 +346,98 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(1, signOutCalls.get())
             assertNull(appState.activeAccountRef)
             assertTrue(appState.phase is AppPhase.Onboarding)
+        }
+
+    /** A failed native sign-out cannot let an older suspended selection undo completed local deactivation. */
+    @Test
+    fun localSignOutFallbackRejectsAnOlderSuspendedActivation() =
+        runBlocking {
+            signOutFailure = RuntimeException("relay unavailable")
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val state =
+                appState(
+                    profileReader = {
+                        entered.complete(Unit)
+                        release.await()
+                        null
+                    },
+                )
+            val activation =
+                async {
+                    state.setActiveAccount(
+                        ACCOUNT_REF,
+                        preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
+                    )
+                }
+            try {
+                withTimeout(3_000) { entered.await() }
+                assertEquals(SignOutCompletion.RelayCleanupIncomplete, state.signOutActiveAccount())
+                assertNull(state.activeAccountRef)
+                assertEquals(AppPhase.Onboarding, state.phase)
+
+                release.complete(Unit)
+                assertFalse("the retired activation must not restore the signed-out identity", activation.await())
+                assertNull(state.activeAccountRef)
+                assertEquals(AppPhase.Onboarding, state.phase)
+            } finally {
+                release.complete(Unit)
+                activation.cancel()
+            }
+        }
+
+    /** Selection retirement precedes suspended cleanup once local sign-out is admitted. */
+    @Test
+    fun localSignOutFallbackRejectsActivationDuringAccountRefresh() =
+        runBlocking {
+            signOutFailure = RuntimeException("relay unavailable")
+            val profileEntered = CompletableDeferred<Unit>()
+            val profileRelease = CompletableDeferred<Unit>()
+            val cleanupEntered = CompletableDeferred<Unit>()
+            val cleanupRelease = CompletableDeferred<Unit>()
+            val state =
+                appState(
+                    profileReader = {
+                        profileEntered.complete(Unit)
+                        profileRelease.await()
+                        null
+                    },
+                )
+            val activation =
+                async {
+                    state.setActiveAccount(
+                        ACCOUNT_REF,
+                        preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
+                    )
+                }
+            val signOut = async(start = CoroutineStart.LAZY) { state.signOutActiveAccount() }
+            try {
+                withTimeout(3_000) { profileEntered.await() }
+                beforeListAccounts = {
+                    cleanupEntered.complete(Unit)
+                    runBlocking { withTimeout(5_000) { cleanupRelease.await() } }
+                }
+                signOut.start()
+                withTimeout(3_000) { cleanupEntered.await() }
+                profileRelease.complete(Unit)
+                assertFalse(
+                    "cleanup must already fence the older selection",
+                    withTimeout(3_000) { activation.await() },
+                )
+                assertFalse("the account refresh remains held", signOut.isCompleted)
+                cleanupRelease.complete(Unit)
+                assertEquals(
+                    SignOutCompletion.RelayCleanupIncomplete,
+                    withTimeout(3_000) { signOut.await() },
+                )
+                assertNull(state.activeAccountRef)
+                assertEquals(AppPhase.Onboarding, state.phase)
+            } finally {
+                profileRelease.complete(Unit)
+                cleanupRelease.complete(Unit)
+                activation.cancel()
+                signOut.cancel()
+            }
         }
 
     /** A failed account refresh after native completion must not revive the removed active session. */

@@ -214,11 +214,12 @@
         ]
       },
       {
-        "surface": "Runtime-owned deferred activation refresh",
+        "surface": "Account-session native and platform activation adapters",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "private suspend fun refreshActivatedAccount(",
+        "anchor": "private inner class AccountSessionActivation",
         "test_ids": [
-          "INT-003"
+          "INT-003",
+          "NAV-006"
         ]
       },
       {
@@ -314,6 +315,15 @@
         "anchor": "R.string.dictation_send_blocked",
         "test_ids": [
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "R.string.toast_identity_imported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_identity_imported",
+        "test_ids": [
+          "ONB-006",
+          "NAV-006"
         ]
       }
     ]
