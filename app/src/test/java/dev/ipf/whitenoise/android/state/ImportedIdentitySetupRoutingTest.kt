@@ -95,7 +95,8 @@ class ImportedIdentitySetupRoutingTest {
                     }
                 }
                 assertFalse("setup reconnect errors must fail the fixture", controller.state.value.error)
-                assertEquals(fixture.imported.label, controller.state.value.snapshot?.accountIdHex)
+                val checkpoint = controller.state.value.snapshot
+                assertEquals(fixture.imported.label, checkpoint?.accountIdHex)
             }
         } finally {
             runWithMainLooperPumping { state.accountSetup.close() }
