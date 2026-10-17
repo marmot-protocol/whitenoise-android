@@ -151,7 +151,7 @@
         "anchor": "R.string.toast_couldnt_reset_group",
         "test_ids": [
           "GRP-021",
-          "GRP-031"
+          "GRP-033"
         ]
       },
       {
@@ -160,7 +160,7 @@
         "anchor": "R.string.toast_group_reset_already_waiting",
         "test_ids": [
           "GRP-021",
-          "GRP-031"
+          "GRP-033"
         ]
       },
       {
@@ -169,7 +169,7 @@
         "anchor": "R.string.toast_group_reset_done",
         "test_ids": [
           "GRP-021",
-          "GRP-031"
+          "GRP-033"
         ]
       },
       {
@@ -269,7 +269,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_chat_abandoned",
         "test_ids": [
-          "GRP-031"
+          "GRP-033"
         ]
       },
       {
@@ -277,7 +277,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_abandon_chat",
         "test_ids": [
-          "GRP-031"
+          "GRP-033"
         ]
       },
       {
@@ -285,7 +285,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_chat_already_abandoned",
         "test_ids": [
-          "GRP-031"
+          "GRP-033"
         ]
       }
     ],

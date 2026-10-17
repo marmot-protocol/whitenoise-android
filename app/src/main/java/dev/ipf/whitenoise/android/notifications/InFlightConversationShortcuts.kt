@@ -90,7 +90,9 @@ internal object InFlightConversationShortcuts {
         shortcut: ShortcutInfoCompat,
         retained: ShortcutInfoCompat = shortcut,
     ) {
-        synchronized(UserEventNotificationGroup.mutationLock) { published[shortcutId] = Publication(shortcut, retained) }
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            published[shortcutId] = Publication(shortcut, retained)
+        }
     }
 
     /** Forgets the kept publication of [shortcutId], when the presenter forgets or replaces its snapshot. */

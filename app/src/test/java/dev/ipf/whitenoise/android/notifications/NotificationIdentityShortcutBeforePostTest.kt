@@ -251,7 +251,10 @@ class NotificationIdentityShortcutBeforePostTest {
 
         val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
         val published = recorder.shortcuts.single()
-        assertTrue("A published its shortcut as a share target", CONVERSATION_SHARE_TARGET_CATEGORY in published.categories.orEmpty())
+        assertTrue(
+            "A published its shortcut as a share target",
+            CONVERSATION_SHARE_TARGET_CATEGORY in published.categories.orEmpty(),
+        )
         val kept = refreshed.single()
         assertEquals("B's refresh kept A's held shortcut", shortcutId, kept.id)
         assertFalse("but never as a share target", CONVERSATION_SHARE_TARGET_CATEGORY in kept.categories.orEmpty())
