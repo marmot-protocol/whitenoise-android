@@ -11,6 +11,8 @@ import androidx.work.Worker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.WorkManagerTestInitHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -20,8 +22,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Waiting automatic work queued on a narrowed network widens in place when a receipt or the policy allows more. */
 @RunWith(RobolectricTestRunner::class)
@@ -29,6 +33,8 @@ import java.util.concurrent.TimeUnit
 class AutomaticAttachmentNetworkWaitsTest {
     private lateinit var context: Context
     private val waits = AutomaticAttachmentNetworkWaits(VolatileAttachmentInstallerHandoffRecordStore())
+    private val settles = CountingExecutor()
+    private var enqueued = 0
 
     /** Starts from a clean test WorkManager, whose constraints keep enqueued work waiting, and a volatile registry. */
     @Before
@@ -36,22 +42,88 @@ class AutomaticAttachmentNetworkWaitsTest {
         context = ApplicationProvider.getApplicationContext()
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
         AutomaticAttachmentNetworkWaits.installForTest(waits)
+        AttachmentDownloadWorker.receiptSettleExecutor = settles
     }
 
     /** Restores the process registry so later tests never see this one. */
     @After
     fun tearDown() {
         AutomaticAttachmentNetworkWaits.installForTest(null)
+        AttachmentDownloadWorker.receiptSettleExecutor = Dispatchers.IO.asExecutor()
+        settles.shutdown()
+    }
+
+    /**
+     * A duplicate receipt for a download already running on Wi-Fi widens that running spec for its next run, so
+     * when Android interrupts it the retry waits on any network, and the receipt never drops the record before
+     * the spec itself was widened.
+     */
+    @Test
+    fun duplicateReceiptWidensRunningWorkSoAnInterruptionKeepsTheWiderNetwork() {
+        val running = holdNextRun()
+        receipt(NetworkType.UNMETERED)
+        val id = single().id
+        assertEquals(listOf(NetworkType.UNMETERED), waits.waiting(ACCOUNT).map { it.networkType })
+        checkNotNull(WorkManagerTestInitHelper.getTestDriver(context)).setAllConstraintsMet(id)
+        assertTrue("the download started", running.started.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+        awaitState(WorkInfo.State.RUNNING)
+
+        receipt(NetworkType.CONNECTED)
+        running.release.countDown()
+        awaitState(WorkInfo.State.ENQUEUED)
+
+        assertEquals(id, single().id)
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+        assertTrue("the widened spec needs no record", waits.waiting(ACCOUNT).isEmpty())
+    }
+
+    /**
+     * Enqueues one automatic image receipt on [networkType] and waits for its settle to finish, so the spec and
+     * the record can be read without racing the background widening.
+     */
+    private fun receipt(networkType: NetworkType) {
+        AttachmentDownloadWorker.enqueue(context, request, networkType = networkType, type = IMAGE)
+        enqueued += 1
+        settles.awaitCompleted(enqueued)
+    }
+
+    /** Runs each settle on a background thread and counts how many have finished. */
+    private class CountingExecutor : Executor {
+        private val pool = Executors.newSingleThreadExecutor()
+        private val completed = AtomicInteger()
+
+        /** Runs [command] on the pool and counts it once it has finished, failed or not. */
+        override fun execute(command: Runnable) {
+            pool.execute {
+                try {
+                    command.run()
+                } finally {
+                    completed.incrementAndGet()
+                }
+            }
+        }
+
+        /** Waits until at least [count] settles have finished, failing after the shared timeout. */
+        fun awaitCompleted(count: Int) {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)
+            while (completed.get() < count) {
+                check(System.nanoTime() < deadline) { "only ${completed.get()} of $count receipts settled" }
+                Thread.sleep(POLL_MILLIS)
+            }
+        }
+
+        /** Stops the pool. */
+        fun shutdown() = pool.shutdownNow()
     }
 
     /** A duplicate receipt asking for a wider network widens the waiting spec in place, keeping its id. */
     @Test
     fun duplicateReceiptWidensTheWaitingSpecInPlace() {
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
         val queued = single()
         assertEquals(NetworkType.UNMETERED, queued.constraints.requiredNetworkType)
 
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.NOT_ROAMING, type = IMAGE)
+        receipt(NetworkType.NOT_ROAMING)
 
         val widened = single()
         assertEquals(queued.id, widened.id)
@@ -62,9 +134,9 @@ class AutomaticAttachmentNetworkWaitsTest {
     /** A duplicate receipt never narrows a spec: a narrower request leaves the wider one waiting. */
     @Test
     fun duplicateReceiptNeverNarrowsTheWaitingSpec() {
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.CONNECTED, type = IMAGE)
+        receipt(NetworkType.CONNECTED)
 
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
 
         assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
     }
@@ -72,7 +144,7 @@ class AutomaticAttachmentNetworkWaitsTest {
     /** A policy that now allows a wider network widens the recorded spec without any new receipt. */
     @Test
     fun widerPolicyWidensTheRecordedSpecWithoutANewReceipt() {
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
         val queued = single()
         assertEquals(listOf(NetworkType.UNMETERED), waits.waiting(ACCOUNT).map { it.networkType })
 
@@ -91,7 +163,7 @@ class AutomaticAttachmentNetworkWaitsTest {
     /** A not-roaming wait takes an unmetered policy or receipt, which admits the unmetered roaming it refused. */
     @Test
     fun notRoamingWaitTakesAnUnmeteredPolicyOrReceipt() {
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.NOT_ROAMING, type = IMAGE)
+        receipt(NetworkType.NOT_ROAMING)
         val queued = single()
 
         assertEquals(1, waits.widen(manager(), ACCOUNT) { NetworkType.UNMETERED })
@@ -100,7 +172,7 @@ class AutomaticAttachmentNetworkWaitsTest {
 
         waits.widen(manager(), ACCOUNT) { NetworkType.NOT_ROAMING }
         assertEquals(NetworkType.NOT_ROAMING, single().constraints.requiredNetworkType)
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
 
         assertEquals(queued.id, single().id)
         assertEquals(NetworkType.UNMETERED, single().constraints.requiredNetworkType)
@@ -109,7 +181,7 @@ class AutomaticAttachmentNetworkWaitsTest {
     /** Another account's policy, and a policy that is no wider, leave the spec as it is. */
     @Test
     fun onlyAWiderPolicyForTheSameAccountWidens() {
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
 
         assertEquals(0, waits.widen(manager(), "account-b") { NetworkType.CONNECTED })
         assertEquals(0, waits.widen(manager(), ACCOUNT) { NetworkType.UNMETERED })
@@ -120,7 +192,7 @@ class AutomaticAttachmentNetworkWaitsTest {
     /** Retired work is never widened or resurrected, and its record is pruned once nothing waits. */
     @Test
     fun retiredWorkIsNeverWidenedAndItsRecordIsPruned() {
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
         AttachmentDownloadWorker.retireWork(context, request)
         manager().cancelUniqueWork(attachmentDownloadWorkName(request)).result.get()
 
@@ -133,7 +205,7 @@ class AutomaticAttachmentNetworkWaitsTest {
     /** The registry keeps narrowed waits only, so work queued on any network leaves nothing behind. */
     @Test
     fun workQueuedOnAnyNetworkIsNotRecorded() {
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.CONNECTED, type = IMAGE)
+        receipt(NetworkType.CONNECTED)
 
         assertTrue(waits.waiting(ACCOUNT).isEmpty())
     }
@@ -146,7 +218,7 @@ class AutomaticAttachmentNetworkWaitsTest {
     @Test
     fun runningWorkWidenedByThePolicyKeepsTheWiderNetworkAfterAnInterruption() {
         val running = holdNextRun()
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
         val id = single().id
         checkNotNull(WorkManagerTestInitHelper.getTestDriver(context)).setAllConstraintsMet(id)
         assertTrue("the download started", running.started.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -165,7 +237,7 @@ class AutomaticAttachmentNetworkWaitsTest {
     @Test
     fun runningWorkKeepsItsRecordAtTheNetworkItWasWidenedTo() {
         val running = holdNextRun()
-        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+        receipt(NetworkType.UNMETERED)
         checkNotNull(WorkManagerTestInitHelper.getTestDriver(context)).setAllConstraintsMet(single().id)
         assertTrue("the download started", running.started.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
         awaitState(WorkInfo.State.RUNNING)

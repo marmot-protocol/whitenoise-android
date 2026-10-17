@@ -17,7 +17,9 @@ class IncomingAttachmentSchedulingCoverageTest {
     /** The receipt scheduler applies the receiving account's per-type policy and singles out no type. */
     @Test
     fun receiptSchedulingExcludesNoAttachmentType() {
-        val body = appState().functionBody("scheduleIncomingAttachmentDownloads")
+        val body =
+            appState().functionBody("scheduleIncomingAttachmentDownloads") +
+                appState().functionBody("scheduleReceivedMessageAttachments")
 
         listOf(
             "isImageMedia",
@@ -32,11 +34,11 @@ class IncomingAttachmentSchedulingCoverageTest {
         }
         assertTrue(
             "receipt scheduling must use the receiving account's live per-type policy",
-            "automaticAttachmentPolicy(update.accountRef)" in body,
+            "automaticAttachmentPolicy(accountRef)" in body,
         )
         assertTrue(
             "receipt scheduling must read only the received message's slots",
-            "receivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex" in body,
+            "receivedMessageAttachments(accountRef, groupIdHex, messageIdHex" in body,
         )
         assertTrue("receipt scheduling must queue durable work", "enqueueAttachmentDownload(" in body)
         assertTrue(
@@ -148,7 +150,7 @@ class IncomingAttachmentSchedulingCoverageTest {
         assertTrue("the sweep must not wait for the native runtime", sweep < runtimeGuard)
         assertTrue(
             "a duplicate receipt must widen the spec it keeps",
-            "widenKeptAutomatic(manager, request, networkType)" in source("state/AttachmentDownloadWorker.kt"),
+            "waits.settleReceipt(manager, request, type, networkType)" in source("state/AttachmentDownloadWorker.kt"),
         )
     }
 

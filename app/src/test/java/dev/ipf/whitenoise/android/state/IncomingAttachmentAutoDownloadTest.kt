@@ -15,12 +15,16 @@ import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaAttachmentRejectionFfi
 import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.ReceivedMessageFfi
+import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -37,6 +41,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Receipt-side scheduling for every attachment type (#3308): an incoming message queues durable automatic
@@ -45,6 +50,8 @@ import org.robolectric.shadows.ShadowLog
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
+// Both receipt sources share one notification fixture and its history helpers, so they stay in one class.
+@Suppress("LargeClass")
 class IncomingAttachmentAutoDownloadTest {
     private lateinit var context: Application
 
@@ -169,6 +176,87 @@ class IncomingAttachmentAutoDownloadTest {
                 val expected = targetSlots().map { request(it.index) }
                 assertTrue(awaitQueued(expected))
                 expected.forEach { assertEquals(1, workInfos(it).size) }
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * A muted chat's media is scheduled although MDK sends no notification update for it: MarmotKit 0.13.0 drops
+     * ordinary traffic in a muted chat from the notification stream, so the receipt arrives only as the runtime's
+     * message event, which is all this test delivers.
+     */
+    @Test
+    fun mutedChatMediaIsScheduledFromTheRuntimeEventWithoutANotification() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory(), muted = true)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.ensureNotificationRuntimeStarted()
+
+                fixture.emitRuntimeEvent(receivedChatMessage())
+
+                val expected = targetSlots().map { request(it.index) }
+                assertTrue(
+                    "queued=${expected.map(::queued)}",
+                    fixture.runWithMainLooperPumping { awaitQueued(expected) },
+                )
+                assertEquals("no notification update was delivered", 0, fixture.consumedUpdateCount())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * With the account's local notifications off, MDK delivers no notification update for any message, so an
+     * unmuted chat's media is scheduled from the runtime event as a muted chat's is.
+     */
+    @Test
+    fun notificationsOffMediaIsScheduledFromTheRuntimeEvent() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory(), muted = false)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.ensureNotificationRuntimeStarted()
+                assertTrue("notifications turned off", fixture.appState.setLocalNotificationsEnabled(false))
+
+                fixture.emitRuntimeEvent(receivedChatMessage())
+
+                val expected = targetSlots().map { request(it.index) }
+                assertTrue(
+                    "queued=${expected.map(::queued)}",
+                    fixture.runWithMainLooperPumping { awaitQueued(expected) },
+                )
+                assertEquals("no notification update was delivered", 0, fixture.consumedUpdateCount())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** An unmuted chat's runtime event leaves scheduling to its notification update, so it reads no history. */
+    @Test
+    fun unmutedChatRuntimeEventLeavesSchedulingToTheNotification() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val muteReads = AtomicInteger(0)
+            val fixture = fixture(history = mixedHistory(), muted = false, onMuteRead = muteReads::incrementAndGet)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.ensureNotificationRuntimeStarted()
+                val readsBefore = muteReads.get()
+
+                fixture.emitRuntimeEvent(receivedChatMessage())
+                // The event's own mute read shows the stream reached it and decided.
+                assertTrue(fixture.runWithMainLooperPumping { awaitCount(muteReads, readsBefore + 1) })
+                fixture.runWithMainLooperPumping { delay(200L) }
+
+                assertEquals("no history read for an unmuted chat", 0, fixture.attachmentHistoryPageCalls.get())
+                assertEquals(0, queued(request(IMAGE_INDEX)))
             } finally {
                 fixture.close()
             }
@@ -502,12 +590,16 @@ class IncomingAttachmentAutoDownloadTest {
         assertEquals("a seen run is never stale", true to null, run.receiptPageEnd(MESSAGE, false, 2L))
     }
 
-    /** Builds the bootstrap fixture with two local accounts, either of which can be the receiver. */
+    /**
+     * Builds the bootstrap fixture with two local accounts, either of which can be the receiver; [onMuteRead] runs
+     * on every chat mute read.
+     */
     private fun fixture(
         history: List<AttachmentEntryFfi>,
         muted: Boolean = false,
         signedOutB: Boolean = false,
         historyRestarts: Int = 0,
+        onMuteRead: () -> Unit = {},
     ): NotificationBootstrapTestFixture {
         context.getSystemService(NotificationManager::class.java).cancelAll()
         return NotificationBootstrapTestFixture(
@@ -519,6 +611,7 @@ class IncomingAttachmentAutoDownloadTest {
             attachmentHistory = history,
             attachmentHistoryRestarts = historyRestarts,
             onChatNotificationSettings = { accountRef, groupIdHex ->
+                onMuteRead()
                 ChatNotificationSettingsFfi(accountRef, accountRef, groupIdHex, muted, null, 0L)
             },
         )
@@ -609,6 +702,41 @@ class IncomingAttachmentAutoDownloadTest {
     /** Every WorkManager row recorded under [request]'s unique identity. */
     private fun workInfos(request: AttachmentTransferRequest) =
         WorkManager.getInstance(context).getWorkInfosForUniqueWork(attachmentDownloadWorkName(request)).get()
+
+    /** The runtime event MDK emits for a chat message [message] from a peer in the target group. */
+    private fun receivedChatMessage(message: String = MESSAGE) =
+        MarmotEventFfi.MessageReceived(
+            RuntimeMessageReceivedFfi(
+                accountIdHex = ACCOUNT_A,
+                accountLabel = ACCOUNT_A,
+                message =
+                    ReceivedMessageFfi(
+                        messageIdHex = message,
+                        groupIdHex = GROUP,
+                        sender = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                        senderDisplayName = null,
+                        plaintext = "",
+                        contentTokens = MarkdownDocumentFfi(emptyList(), false, ByteArray(0)),
+                        kind = 9uL,
+                        tags = emptyList(),
+                        sourceEpoch = 1uL,
+                        retentionSeconds = null,
+                        retentionExpiresAt = null,
+                        recordedAt = System.currentTimeMillis().toULong() / 1_000uL,
+                        receivedAt = System.currentTimeMillis().toULong() / 1_000uL,
+                    ),
+            ),
+        )
+
+    /** Waits until [counter] reaches at least [atLeast]. */
+    private suspend fun awaitCount(
+        counter: AtomicInteger,
+        atLeast: Int,
+    ): Boolean =
+        withTimeoutOrNull(5_000L) {
+            while (counter.get() < atLeast) delay(10L)
+            true
+        } == true
 
     /** Waits for [request]'s live work to require [networkType]. */
     private suspend fun awaitConstraint(

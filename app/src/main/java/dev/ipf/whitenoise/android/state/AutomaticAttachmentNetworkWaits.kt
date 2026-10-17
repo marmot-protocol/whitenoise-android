@@ -75,46 +75,82 @@ internal class AutomaticAttachmentNetworkWaits(
 
     /**
      * Widens every live automatic spec of [accountRef] whose recorded type [networkTypeFor] now allows on a wider
-     * network, in place by id so its attempt count and backoff stay. A waiting spec takes the wider network at
-     * once, and a running one for its next run, so an interruption after the policy widened still waits on the
-     * wider network. Retired, explicit and finished work is left alone. A record moves to the new network only once
-     * every live spec is at least that wide, so a failed update keeps it for the next refresh, and a record whose
-     * work has finished is pruned. Blocks on WorkManager, so callers run it off the main thread. Returns how many
-     * specs were widened.
+     * network, through [settle], the rule a duplicate receipt follows too. Blocks on WorkManager, so callers run it
+     * off the main thread. Returns how many specs were widened.
      */
     fun widen(
         manager: WorkManager,
         accountRef: String,
         networkTypeFor: (MediaAutoDownloadType) -> NetworkType,
+    ): Int =
+        waiting(accountRef).sumOf { wait ->
+            settle(manager, wait.request, wait.type, networkTypeFor(wait.type), recorded = wait.networkType)
+        }
+
+    /**
+     * Records the outcome of a receipt for [request] once its KEEP enqueue has settled: the spec it kept, waiting or
+     * running, takes [networkType] when that is wider, through [settle]. A [type] of null only widens, since such a
+     * caller cannot name the policy row a record needs. Blocks on WorkManager, so it runs off WorkManager's threads.
+     */
+    fun settleReceipt(
+        manager: WorkManager,
+        request: AttachmentTransferRequest,
+        type: MediaAutoDownloadType?,
+        networkType: NetworkType,
+    ) {
+        val recorded = synchronized(this) { records.readAll()[attachmentDownloadWorkName(request)] }?.let(::decode)
+        settle(manager, request, type ?: recorded?.type, networkType, recorded?.networkType, recordable = type != null)
+    }
+
+    /**
+     * The one widening rule for a recorded wait or a receipt. Every live automatic spec of [request] narrower than
+     * [target] is updated in place by id, keeping its attempt count and backoff: a waiting spec takes the wider
+     * network at once and a running one for its next run, so an interruption still waits on the wider network.
+     * Retired, explicit and finished work is left alone. The record then follows the live specs: an existing one
+     * moves to [target] only once every one of them is at least that wide, so a failed or unapplied update keeps the
+     * [recorded] network for the next refresh; a new one records the narrowest network a live spec still waits on;
+     * and a record is pruned only when no unfinished work remains. Returns how many specs were widened.
+     */
+    @Suppress("LongParameterList") // Each input is one fact of the same settle decision.
+    private fun settle(
+        manager: WorkManager,
+        request: AttachmentTransferRequest,
+        type: MediaAutoDownloadType?,
+        target: NetworkType,
+        recorded: NetworkType?,
+        recordable: Boolean = true,
     ): Int {
-        var widened = 0
-        waiting(accountRef).forEach { wait ->
-            val infos = manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(wait.request)).get()
-            val target = networkTypeFor(wait.type)
-            val live = infos.filter { it.isLiveAutomatic(accountRef) }
-            var allWide = true
-            live.filter { it.constraints.requiredNetworkType.isNarrowerThan(target) }.forEach { info ->
-                val work =
-                    AttachmentDownloadWorker.buildRequest(
-                        wait.request,
-                        AttachmentDownloadPriority.Automatic,
-                        info.id,
-                        target,
-                    )
-                runCatching { manager.updateWork(work).get() }
-                    .onSuccess { result ->
-                        if (result == WorkManager.UpdateResult.NOT_APPLIED) allWide = false else widened += 1
-                    }.onFailure {
-                        allWide = false
-                        Log.w(TAG, "attachment_network_widening_failed")
-                    }
+        val infos = manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(request)).get()
+        val live = infos.filter { it.isLiveAutomatic(request.accountRef) }
+        // The network each live spec waits on once this pass is done: the target where the update applied.
+        val effective =
+            live.map { info ->
+                val current = info.constraints.requiredNetworkType
+                if (current.isNarrowerThan(target) && widenInPlace(manager, request, info, target)) target else current
             }
-            when {
-                infos.none { !it.state.isFinished } -> forget(wait.request)
-                allWide && wait.networkType.isNarrowerThan(target) -> record(wait.request, wait.type, target)
-            }
+        val widened = live.indices.count { effective[it] != live[it].constraints.requiredNetworkType }
+        val allWide = effective.none { it.isNarrowerThan(target) }
+        val waitsOn = effective.firstOrNull { it != NetworkType.CONNECTED }
+        when {
+            infos.none { !it.state.isFinished } -> forget(request)
+            type == null || !recordable && recorded == null -> Unit
+            recorded == null -> if (waitsOn != null) record(request, type, waitsOn)
+            allWide && recorded.isNarrowerThan(target) -> record(request, type, target)
         }
         return widened
+    }
+
+    /** Updates one live spec of [request] to [target] by id, reporting whether WorkManager applied it. */
+    private fun widenInPlace(
+        manager: WorkManager,
+        request: AttachmentTransferRequest,
+        info: WorkInfo,
+        target: NetworkType,
+    ): Boolean {
+        val work = AttachmentDownloadWorker.buildRequest(request, AttachmentDownloadPriority.Automatic, info.id, target)
+        return runCatching { manager.updateWork(work).get() != WorkManager.UpdateResult.NOT_APPLIED }
+            .onFailure { Log.w(TAG, "attachment_network_widening_failed") }
+            .getOrDefault(false)
     }
 
     /** Applies [change] to the sealed record under the process-wide lock. */

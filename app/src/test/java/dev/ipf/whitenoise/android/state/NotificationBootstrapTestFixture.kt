@@ -31,10 +31,12 @@ import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
+import dev.ipf.marmotkit.EventsSubscription
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
@@ -227,6 +229,14 @@ internal class NotificationBootstrapTestFixture(
     private val attachmentHistoryRestartsLeft = AtomicInteger(attachmentHistoryRestarts)
     val listMediaCalls = AtomicInteger(0)
 
+    /** Runtime events the fixture's firehose delivers, in order, to every subscriber. */
+    private val runtimeEvents = Channel<MarmotEventFfi>(Channel.UNLIMITED)
+
+    /** Emits one runtime event on the firehose, as MDK does for every delivered message. */
+    fun emitRuntimeEvent(event: MarmotEventFfi) {
+        check(runtimeEvents.trySend(event).isSuccess)
+    }
+
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
         private set
@@ -332,6 +342,8 @@ internal class NotificationBootstrapTestFixture(
                     AuditLogSettingsFfi(enabled = false)
                 }
                 "setAuditLogSettings" -> arguments?.first()
+                "subscribeEvents" ->
+                    allocateWithoutConstructor(FixtureEventsSubscription::class.java).apply { events = runtimeEvents }
                 "chatNotificationSettings" -> {
                     val accountRef = arguments?.get(0) as String
                     val groupIdHex = arguments[1] as String
@@ -751,6 +763,24 @@ internal class NotificationBootstrapTestFixture(
         override fun close() = Unit
     }
 
+    /**
+     * The runtime's event firehose, fed from [runtimeEvents]. MDK delivers every received message here, including
+     * those its notification stream suppresses, such as ordinary traffic in a muted chat. It is allocated without
+     * its constructor, like the other fakes here, because the UniFFI base registers a cleaner the JVM cannot open.
+     */
+    private class FixtureEventsSubscription : EventsSubscription(NoPointer) {
+        lateinit var events: Channel<MarmotEventFfi>
+
+        /** Waits for the next emitted runtime event. */
+        override suspend fun next(): MarmotEventFfi? = events.receive()
+
+        /** Holds no native handle. */
+        override fun destroy() = Unit
+
+        /** Holds no native handle. */
+        override fun close() = Unit
+    }
+
     private class EmptyChatsSubscription : ChatsSubscription(NoPointer) {
         lateinit var onSnapshot: () -> Unit
         lateinit var groups: List<AppGroupRecordFfi>
@@ -855,6 +885,9 @@ internal class NotificationBootstrapTestFixture(
             }
         }
     }
+
+    /** How many engine notification updates the notification subscription has consumed so far. */
+    fun consumedUpdateCount(): Int = consumedUpdates.get()
 
     /** Waits for the fake engine update to cross the subscription boundary, before Android posting is required. */
     suspend fun awaitUpdateConsumed() {
