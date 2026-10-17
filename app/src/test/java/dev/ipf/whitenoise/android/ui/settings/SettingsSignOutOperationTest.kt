@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SignOutOutcomeFfi
+import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -37,6 +38,9 @@ import kotlin.coroutines.resume
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class SettingsSignOutOperationTest {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 

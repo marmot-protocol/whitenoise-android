@@ -72,6 +72,10 @@ class StalenessGuardCoverageTest {
         val directChatResolution = productionSource("DirectChatResolution.kt")
         val guardedPaths =
             mapOf(
+                "AppState.kt:prepareSignOutPushCleanup" to
+                    listOf("marmotRuntime !== runtime", "activeAccountRef != account"),
+                "AppState.kt:drainPendingPushDisables" to
+                    listOf("runtime.marmot.setNativePushEnabled", "marmotRuntime !== runtime"),
                 "AppState.kt:refreshAccountUnreadCounts" to
                     listOf("accountListLifetime.capture", "accountListLifetime.isCurrent"),
                 "AppState.kt:refreshAccountSnapshot" to
@@ -238,6 +242,8 @@ class StalenessGuardCoverageTest {
                 // Both completion bodies run inside withRevokedPinnedTarget, retaining native command ownership.
                 "AppState.kt:finishRevokedAccountSignOut" to "durably fenced authoritative sign-out completion",
                 "AppState.kt:finishRevokedAccountWipe" to "durably fenced serialized native wipe completion",
+                // Busy is claimed before suspension; one retry owns this instance's busy flag until finally releases it.
+                "AppState.kt:retryPushStorageRecovery" to "single-flight push storage recovery command",
                 // Existing settings snapshot refresh is outside the audited stale-counter migration inventory.
                 "AppState.kt:refreshSecurityPrivacySettings" to "pre-existing settings snapshot path",
                 // Telemetry toggle completion is an authoritative engine command, not a replaceable cache read.

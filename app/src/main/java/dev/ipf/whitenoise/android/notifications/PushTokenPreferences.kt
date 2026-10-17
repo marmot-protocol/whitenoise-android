@@ -63,13 +63,11 @@ internal class PushTokenPreferences(
 
     override fun registerOnSharedPreferenceChangeListener(
         listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) =
-        error("Push state does not use preference listeners")
+    ) = error("Push state does not use preference listeners")
 
     override fun unregisterOnSharedPreferenceChangeListener(
         listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) =
-        error("Push state does not use preference listeners")
+    ) = error("Push state does not use preference listeners")
 
     /** A durable target receipt makes an unreadable leftover source irrelevant. */
     fun hasImported(source: String): Boolean =

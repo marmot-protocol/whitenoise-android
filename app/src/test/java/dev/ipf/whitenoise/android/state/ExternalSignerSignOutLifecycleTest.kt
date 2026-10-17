@@ -186,6 +186,7 @@ class ExternalSignerSignOutLifecycleTest {
     private fun appState(
         ownerContext: Context = context,
         pushTokenStore: PushTokenStore? = null,
+        marmotIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
     ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ownerContext,
@@ -194,6 +195,7 @@ class ExternalSignerSignOutLifecycleTest {
             accounts = listOf(externalSignerAccount()),
             activeAccountRef = ACCOUNT_REF,
             pushTokenStore = pushTokenStore,
+            marmotIoDispatcher = marmotIoDispatcher,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -427,19 +429,47 @@ class ExternalSignerSignOutLifecycleTest {
         }
 
     /** Models encrypted cleanup reads failing before and after native admission. */
-    private fun unavailablePushStore(): PushTokenStore {
+    private fun unavailablePushStore(beforeRead: () -> Unit = {}): PushTokenStore {
         val original = context.getSharedPreferences("sign-out-unavailable-push", Context.MODE_PRIVATE)
         return PushTokenStore(
             object : SharedPreferences by original {
                 override fun getStringSet(
                     key: String?,
                     defValues: MutableSet<String>?,
-                ): MutableSet<String>? =
-                    throw dev.ipf.whitenoise.android.notifications
-                        .PushTokenStorageException()
+                ): MutableSet<String>? {
+                    beforeRead()
+                    throw dev.ipf.whitenoise.android.notifications.PushTokenStorageException()
+                }
             },
         )
     }
+
+    /** Losing the runtime during a failed journal read cannot clear or disable the replacement session. */
+    @Test
+    fun replacementDuringJournalFailureKeepsItsSettingsAndSkipsNativeDisable() =
+        runBlocking {
+            lateinit var state: WhiteNoiseAppState
+            val replacement = AppMarmotRuntime(rootPath = "replacement", marmot = marmot)
+            val store =
+                unavailablePushStore {
+                    WhiteNoiseAppState::class.java
+                        .getDeclaredField("marmotRuntime")
+                        .apply { isAccessible = true }
+                        .set(state, replacement)
+                }
+            state = appState(pushTokenStore = store)
+            val settings = NotificationSettingsFfi(ACCOUNT_REF, ACCOUNT_HEX, true, true)
+            WhiteNoiseAppState::class.java
+                .getDeclaredMethod("setLocalNotificationSettings", NotificationSettingsFfi::class.java)
+                .apply { isAccessible = true }
+                .invoke(state, settings)
+
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(settings, state.localNotificationSettings)
+            assertEquals(0, nativeDisableCalls.get())
+            assertEquals(0, signOutCalls.get())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+        }
 
     /** A durable native disable admits sign-out when the encrypted cleanup journal cannot be written. */
     @Test
@@ -521,7 +551,8 @@ class ExternalSignerSignOutLifecycleTest {
     @Test
     fun lateSignOutSuccessClearsOnlyTheCapturedAccount() =
         runBlocking {
-            val state = appState()
+            // This native reply hook simulates a Main-thread account switch before delivering its result.
+            val state = appState(marmotIoDispatcher = kotlinx.coroutines.Dispatchers.Unconfined)
             retainComposerExpansion(state)
             retainContactPictures(state)
             val originalPhase = state.phase

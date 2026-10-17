@@ -4514,12 +4514,11 @@ class WhiteNoiseAppState private constructor(
         val pendingGeneration =
             withContext(pushWakeStorageDispatcher) {
                 observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-            }
+            } ?: 0L // Unknown storage must not acknowledge a saved generation.
         isForegroundCatchUpRunning = true
         try {
             catchUpAfterObservedPushWake(
-                // A missing observation runs ordinary catch-up without acknowledging unknown stored work.
-                pendingGeneration = pendingGeneration ?: 0L,
+                pendingGeneration = pendingGeneration,
                 trigger = PerformanceTrigger.FOREGROUND,
             )
         } finally {
@@ -6755,7 +6754,8 @@ class WhiteNoiseAppState private constructor(
                 withContext(pushWakeStorageDispatcher) {
                     runCatching { pushTokenStore.recordPendingDisable(account) }.getOrDefault(false)
                 }
-            if (recorded) return@withLock marmotRuntime === runtime && activeAccountRef == account
+            if (marmotRuntime !== runtime || activeAccountRef != account) return@withLock false
+            if (recorded) return@withLock true
             if (runtime == null) return@withLock false
             // An unknown/cancelled native reply invalidates the cache instead of displaying an enabled setting.
             perAccountSyncedFingerprints.remove(account)
@@ -8163,10 +8163,10 @@ class WhiteNoiseAppState private constructor(
                 val pendingGeneration =
                     withContext(pushWakeStorageDispatcher) {
                         observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-                    }
+                    } ?: 0L
                 // Unknown push storage cannot prevent ordinary relay catch-up or authorize marker acknowledgement.
                 catchUpAfterObservedPushWake(
-                    pendingGeneration = pendingGeneration ?: 0L,
+                    pendingGeneration = pendingGeneration,
                     trigger = PerformanceTrigger.NETWORK_RECONNECT,
                 )
             },
@@ -10128,12 +10128,15 @@ class WhiteNoiseAppState private constructor(
 
     // Retry sign-out push-disables that failed; on success the account leaves the pending set.
     private suspend fun drainPendingPushDisables() {
+        val runtime = marmotRuntime ?: return
         for (account in pushTokenStore.pendingDisables()) {
             val settings =
-                runCatchingCancellable { marmotIo { setNativePushEnabled(account, false) } }
-                    .onFailure {
-                        appStateDebug { "pending setNativePushEnabled(false) retry failed: ${it.readableMessage()}" }
-                    }.getOrNull()
+                runCatchingCancellable {
+                    withContext(marmotIoDispatcher) { runtime.marmot.setNativePushEnabled(account, false) }
+                }.onFailure {
+                    appStateDebug { "pending setNativePushEnabled(false) retry failed: ${it.readableMessage()}" }
+                }.getOrNull()
+            if (marmotRuntime !== runtime) return
             if (settings?.nativePushEnabled == false) {
                 perAccountSyncedFingerprints.remove(account)
                 if (account == activeAccountRef) localNotificationSettings = settings
