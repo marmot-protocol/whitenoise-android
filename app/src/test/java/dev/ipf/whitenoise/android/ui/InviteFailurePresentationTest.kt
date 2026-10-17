@@ -85,6 +85,7 @@ class InviteFailurePresentationTest {
         assertFalse(startProfileChatFailureCopyable(incomplete))
     }
 
+    /** A confirmed missing KeyPackage reads as missing setup, not as a native error. */
     @Test
     fun startProfileChatFailureMapsMissingSetupToHumanCopy() {
         val missing = MarmotKitException.MissingKeyPackage("deadbeef", MissingKeyPackageReasonFfi.NOT_FOUND)

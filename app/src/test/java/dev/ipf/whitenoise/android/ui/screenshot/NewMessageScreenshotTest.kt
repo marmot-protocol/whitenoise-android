@@ -117,6 +117,7 @@ class NewMessageScreenshotTest {
             lookupFailed = true,
         )
 
+    /** The new-message error for a recipient with no KeyPackage, in the light theme. */
     @Test fun missingKeyLight() =
         capture(
             "new_message_missing_key_light.png",

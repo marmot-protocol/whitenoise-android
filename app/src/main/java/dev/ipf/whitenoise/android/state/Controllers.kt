@@ -4797,6 +4797,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Steps down as admin, asking first if MDK holds that back, then leaves, even if the chat list goes away. */
     private suspend fun demoteAndLeaveChat(attempt: ChatListDepartureAttempt) =
         withContext(NonCancellable) {
             val demotion =
@@ -11318,6 +11319,7 @@ class ConversationController(
             }
         }
 
+    /** Steps [account] down as admin before leaving, asking first if MDK holds the change back. */
     private suspend fun selfDemoteBeforeLeave(account: String): GroupMutationResultFfi =
         appState.runGroupChange(account, group.groupIdHex) {
             appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
@@ -12013,6 +12015,7 @@ class ConversationController(
         }
     }
 
+    /** Removes [member] from the group, asking first if MDK holds the change back. True once they are gone. */
     suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
@@ -12059,6 +12062,7 @@ class ConversationController(
             }
         }
 
+    /** Promotes or demotes [member], asking first if MDK holds the change back. True once committed. */
     suspend fun setMemberAdmin(
         member: AppGroupMemberRecordFfi,
         admin: Boolean,
@@ -12245,6 +12249,7 @@ class ConversationController(
             }.getOrDefault(false)
         }
 
+    /** Steps this account down as admin while another admin remains, asking first if MDK holds it back. */
     suspend fun stepDownAsAdmin(): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null

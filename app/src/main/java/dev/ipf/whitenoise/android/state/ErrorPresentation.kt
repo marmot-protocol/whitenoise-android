@@ -80,6 +80,7 @@ fun WhiteNoiseAppState.presentFailure(
     presentFailure(AppText.Resource(titleRes), operationCode, throwable, detail, sendAttempt)
 }
 
+/** Shows [throwable] as a copyable, privacy-safe failure, except a group change the user chose to wait on. */
 fun WhiteNoiseAppState.presentFailure(
     title: AppText,
     operationCode: String,

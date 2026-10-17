@@ -57,6 +57,7 @@ class StartChatErrorCardTest {
         assertFalse(unknown.invitation)
     }
 
+    /** A missing KeyPackage keeps the failure title and optional share without claiming White Noise is missing. */
     @Test
     fun missingKeyKeepsFailureTitleAndOptionalShareWithoutAssumingInstallation() {
         val error =

@@ -261,6 +261,7 @@ class NewChatFlowTest {
             assertEquals("created-group", failure.error.retryGroupIdHex)
         }
 
+    /** Starting a chat with someone who has no KeyPackage explains it and offers the optional share link. */
     @Test
     fun sharedStartChatAttemptExplainsMissingKeyPackageWithOptionalShare() =
         runTest {

@@ -460,6 +460,7 @@ private fun cancellationTerminalState(stateBeforeDownload: AttachmentTransferSta
         else -> AttachmentTransferState.Remote
     }
 
+/** The state after an availability probe: a verified body wins, and a settled outcome stays until the user acts. */
 private fun refreshedState(
     previous: AttachmentTransferState,
     available: Boolean?,

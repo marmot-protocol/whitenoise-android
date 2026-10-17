@@ -2145,6 +2145,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+      "symbol": "GroupChangeConfirmationDialog",
+      "bindings": [],
+      "remaining": "Appears only after MDK refuses a group change as GroupCatchingUp or GroupCommitUndelivered, which no offline fixture can produce yet. Needs a runtime fixture that holds a group behind its relays (GRP-032). Wording, Wait and the error-role continue are pinned by GroupChangeConfirmationScreenshotTest, admission by GroupChangeAdmissionTest and the lock release by GroupChangeCommitLockTest."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "symbol": "DeveloperInfoPanel",
       "bindings": [

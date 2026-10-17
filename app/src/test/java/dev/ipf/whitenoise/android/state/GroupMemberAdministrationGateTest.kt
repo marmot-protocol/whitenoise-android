@@ -328,6 +328,7 @@ class GroupMemberAdministrationGateTest {
             assertEquals(AppText.Resource(R.string.error_invalid_key_package), state.toast?.detail)
         }
 
+    /** Each typed invite refusal paired with the per-recipient copy it must produce. */
     private fun inviteFailures(): List<Pair<Throwable, Int>> =
         listOf(
             MarmotKitException.MissingKeyPackage(invitee, MissingKeyPackageReasonFfi.NOT_FOUND) to

@@ -372,6 +372,7 @@ private data class FileTransferControlColors(
     val content: Color,
 )
 
+/** The control colors for [state]: the error role for a failed or storage-blocked body. */
 @Composable
 private fun fileTransferControlColors(state: AttachmentTransferState): FileTransferControlColors =
     when (state) {
@@ -394,6 +395,7 @@ private fun fileTransferControlColors(state: AttachmentTransferState): FileTrans
             )
     }
 
+/** What a screen reader hears for the file card's control in [state]. */
 @Composable
 private fun fileTransferStateDescription(
     state: AttachmentTransferState,
@@ -412,6 +414,7 @@ private fun fileTransferStateDescription(
         AttachmentTransferState.Available -> attachmentTypeDescription(category)
     }
 
+/** The file card's control glyph for [state] and [direction]. */
 @Composable
 private fun FileTransferIcon(
     presentation: AttachmentPresentation,
