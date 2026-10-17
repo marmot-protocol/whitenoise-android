@@ -198,7 +198,13 @@ class NostrEventReaderTest {
         clipboard: ClipboardManager,
         expected: String,
     ) {
-        assertEquals(expected, clipboard.primaryClip?.getItemAt(0)?.text.toString())
+        assertEquals(
+            expected,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                .toString(),
+        )
     }
 
     private fun readerLink(destination: String): MarkdownBlockFfi =
