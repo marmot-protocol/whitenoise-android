@@ -68,15 +68,23 @@ class PushWakeBookkeepingFailureTest {
             val context: Application = RuntimeEnvironment.getApplication()
             val unavailable = AtomicBoolean(false)
             val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
-            PushTokenStore.installKeyProvider(
-                object : SecureStoreKeyProvider {
-                    override fun secretKey(): SecretKey {
-                        if (unavailable.get()) throw GeneralSecurityException("scripted unavailable key")
-                        return key
-                    }
-                },
-            )
-            val store = PushTokenStore.create(context)
+            // Keep the scripted key separate from app startup's rule-owned encrypted store.
+            val store =
+                PushTokenStore(
+                    PushTokenPreferences(
+                        KeystoreSecureStore(
+                            context,
+                            "push-wake-unavailable-key",
+                            object : SecureStoreKeyProvider {
+                                override fun secretKey(): SecretKey {
+                                    if (unavailable.get()) throw GeneralSecurityException("scripted unavailable key")
+                                    return key
+                                }
+                            },
+                        ),
+                        Any(),
+                    ),
+                )
             val nativeCatchUps = AtomicInteger(0)
             val fixture =
                 NotificationBootstrapTestFixture(

@@ -1,40 +1,21 @@
 package dev.ipf.whitenoise.android.state
 
-import android.app.Application
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.SharedPreferences
 import androidx.core.content.pm.ShortcutManagerCompat
-import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
-import dev.ipf.marmotkit.MarmotInterface
-import dev.ipf.marmotkit.NotificationSettingsFfi
-import dev.ipf.marmotkit.SignOutOutcomeFfi
-import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
-import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
-import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
-import dev.ipf.whitenoise.android.share.ShareShortcutTarget
-import dev.ipf.whitenoise.android.share.buildShareShortcut
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.lang.reflect.Proxy
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-import kotlin.coroutines.resumeWithException
 
 /**
  * Android-side coverage for #2132 after MarmotKit 0.9.15 made external-signer
@@ -45,164 +26,7 @@ import kotlin.coroutines.resumeWithException
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34])
-class ExternalSignerSignOutLifecycleTest {
-    @get:Rule
-    val pushTokenKey = PushTokenKeyRule()
-
-    private val context: Application = RuntimeEnvironment.getApplication()
-    private val signOutCalls = AtomicInteger(0)
-    private val wipeCalls = AtomicInteger(0)
-    private val listAccountsCalls = AtomicInteger(0)
-
-    private var signOutOutcome =
-        SignOutOutcomeFfi(
-            keyPackagesDeleted = 1u,
-            keyPackageFailures = emptyList(),
-            localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
-        )
-    private var signOutFailure: Throwable? = null
-    private var nativeDisableFailure: Throwable? = null
-    private var nativePushEnabled = true
-    private var nativeDisableReturnsEnabled = false
-    private val nativeDisableCalls = AtomicInteger(0)
-    private val nativeCallOrder = mutableListOf<String>()
-    private var listAccountsFailure: Throwable? = null
-    private var engineSignedOut = false
-    private var wipeOutcome =
-        WipeOutcomeFfi(
-            groupsLeft = 1u,
-            groupLeaveFailures = emptyList(),
-            keyPackagesDeleted = 1u,
-            keyPackageFailures = emptyList(),
-            localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
-        )
-    private var engineWiped = false
-    private var beforeListAccounts: () -> Unit = {}
-    private var beforeSignOutReply: () -> Unit = {}
-
-    /** Builds a signed-in external-signer identity without private key material for the real teardown path. */
-    private fun externalSignerAccount(
-        signedOut: Boolean = false,
-        running: Boolean = !signedOut,
-    ) = AccountSummaryFfi(
-        label = ACCOUNT_REF,
-        accountIdHex = ACCOUNT_HEX,
-        localSigning = false,
-        externalSigning = true,
-        signedOut = signedOut,
-        running = running,
-    )
-
-    @Suppress("UNCHECKED_CAST")
-    private val marmot =
-        Proxy.newProxyInstance(
-            MarmotInterface::class.java.classLoader,
-            arrayOf(MarmotInterface::class.java),
-        ) { proxy, method, arguments ->
-            /** Creates a failed native future so lifecycle tests exercise their production error handling. */
-            fun suspendFailure(failure: Throwable): Any {
-                (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
-                return COROUTINE_SUSPENDED
-            }
-
-            when (method.name) {
-                "setNativePushEnabled" -> {
-                    nativeDisableCalls.incrementAndGet()
-                    nativeCallOrder += "disable"
-                    nativeDisableFailure?.let(::suspendFailure) ?: run {
-                        nativePushEnabled = nativeDisableReturnsEnabled
-                        NotificationSettingsFfi(ACCOUNT_REF, ACCOUNT_HEX, true, nativePushEnabled)
-                    }
-                }
-                "signOut" -> {
-                    signOutCalls.incrementAndGet()
-                    nativeCallOrder += "signOut"
-                    beforeSignOutReply()
-                    signOutFailure?.let(::suspendFailure)
-                        ?: signOutOutcome.also { engineSignedOut = it.localCleanup.completed }
-                }
-                "signOutAndWipe" -> {
-                    wipeCalls.incrementAndGet()
-                    wipeOutcome.also { engineWiped = it.localCleanup.completed }
-                }
-                "listAccounts" -> {
-                    beforeListAccounts()
-                    listAccountsCalls.incrementAndGet()
-                    listAccountsFailure?.let(::suspendFailure)
-                    if (engineWiped) emptyList() else listOf(externalSignerAccount(signedOut = engineSignedOut))
-                }
-                // Permit the authoritative refresh instead of silently taking cached-account fallback.
-                "attachmentDownloadPolicy" -> dev.ipf.marmotkit.AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
-                "onboardingRecoveryRequired" -> false
-                "onboardingSnapshot" -> null
-                "accountUnreadSummary", "chatList" -> emptyList<Any>()
-                "toString" -> "ExternalSignerSignOutMarmotFake"
-                "hashCode" -> System.identityHashCode(proxy)
-                "equals" -> proxy === arguments?.firstOrNull()
-                else ->
-                    if (arguments?.lastOrNull() is Continuation<*>) {
-                        suspendFailure(UnsupportedOperationException("Unexpected Marmot call: ${method.name}"))
-                    } else {
-                        throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
-                    }
-            }
-        } as MarmotInterface
-
-    /** Removes prior dynamic launcher inventory so each account-cleanup assertion owns its fixture state. */
-    @Before
-    fun setUp() {
-        ShortcutManagerCompat.removeAllDynamicShortcuts(context)
-    }
-
-    /** Seed distinct private records beside the existing lifecycle fixture's account state. */
-    private fun retainContactPictures(state: WhiteNoiseAppState) {
-        listOf(ACCOUNT_REF, OTHER_ACCOUNT_REF).forEach { account ->
-            state.contactPictureStore.save(
-                account,
-                "private-contact",
-                "",
-                "",
-                ContactPictureChange.Replace(contactPicturePng(android.graphics.Color.RED)),
-            ) { true }
-        }
-    }
-
-    /** Recreate the store to prove cleanup is durable and the other account's file remains readable. */
-    private fun assertContactPicturesRemovedOnlyForThisAccount(state: WhiteNoiseAppState) {
-        val recreated =
-            ContactPictureStore(
-                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE),
-                context.noBackupFilesDir.resolve("contact-pictures"),
-            )
-        assertNull(recreated.reference(ACCOUNT_REF, "private-contact"))
-        val retained = checkNotNull(state.contactPictureStore.reference(OTHER_ACCOUNT_REF, "private-contact"))
-        assertTrue(checkNotNull(recreated.read(retained)).isNotEmpty())
-    }
-
-    /**
-     * Installs the scripted native runtime into a real app state using the supplied preference-failure context
-     * and, when given, a scripted push token store in place of the Keystore-backed default.
-     */
-    private fun appState(
-        ownerContext: Context = context,
-        pushTokenStore: PushTokenStore? = null,
-        marmotIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
-    ): WhiteNoiseAppState =
-        WhiteNoiseAppState(
-            context = ownerContext,
-            draftStore = DraftStore.forContext(ownerContext),
-            accountIdHexResolver = { null },
-            accounts = listOf(externalSignerAccount()),
-            activeAccountRef = ACCOUNT_REF,
-            pushTokenStore = pushTokenStore,
-            marmotIoDispatcher = marmotIoDispatcher,
-        ).also { state ->
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("marmotRuntime")
-                .apply { isAccessible = true }
-                .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
-        }
-
+internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture() {
     /** Completed non-destructive sign-out clears geometry only after engine-owned teardown completes. */
     @Test
     fun successfulExternalSignerSignOutUsesTheNormalCompletionPath() =
@@ -216,10 +40,10 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(SignOutCompletion.Complete, completion)
             assertEquals(1, signOutCalls.get())
             assertTrue(listAccountsCalls.get() > 0)
-            assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertNull(appState.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
             assertEquals(
-                COMPOSER_EXPANSION,
-                appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
+                composerExpansion,
+                appState.composerExpansionStateRetention.preferenceFor(otherAccountRef, groupId),
             )
             assertNull(appState.activeAccountRef)
             assertContactPicturesRemovedOnlyForThisAccount(appState)
@@ -238,7 +62,7 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(state.phase is AppPhase.Onboarding)
             assertEquals(
                 dev.ipf.whitenoise.android.notifications.ProfileNotificationMode.DEFAULT,
-                state.profileNotificationOverrides.get(ACCOUNT_REF, ACCOUNT_HEX).mode,
+                state.profileNotificationOverrides.get(accountRef, accountHex).mode,
             )
         }
 
@@ -256,62 +80,9 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(state.phase is AppPhase.Onboarding)
             assertEquals(
                 dev.ipf.whitenoise.android.notifications.ProfileNotificationMode.DEFAULT,
-                state.profileNotificationOverrides.get(ACCOUNT_REF, ACCOUNT_HEX).mode,
+                state.profileNotificationOverrides.get(accountRef, accountHex).mode,
             )
         }
-
-    /** Commits fail only for the new alert store; all native/account persistence keeps its real behavior. */
-    private fun profileCleanupFailureContext(throws: Boolean): android.content.Context =
-        object : android.content.ContextWrapper(context) {
-            private var commitsToFail = if (throws) 1 else 2
-
-            override fun getApplicationContext(): android.content.Context = this
-
-            override fun getSharedPreferences(
-                name: String,
-                mode: Int,
-            ): android.content.SharedPreferences {
-                val delegate = super.getSharedPreferences(name, mode)
-                if (name != "whitenoise.profile_notification_overrides") return delegate
-                return object : android.content.SharedPreferences by delegate {
-                    override fun edit(): android.content.SharedPreferences.Editor {
-                        val editor = delegate.edit()
-                        return object : android.content.SharedPreferences.Editor by editor {
-                            override fun commit(): Boolean {
-                                org.junit.Assert.assertNotEquals(
-                                    android.os.Looper.getMainLooper(),
-                                    android.os.Looper.myLooper(),
-                                )
-                                if (commitsToFail > 0) {
-                                    commitsToFail -= 1
-                                    if (throws) throw IllegalStateException("injected preferences failure")
-                                    editor.commit()
-                                    return false
-                                }
-                                return editor.commit()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-    /** Preloads the real persisted key directly so only teardown encounters the failing commit adapter. */
-    private fun seedProfileAlertChoices(state: WhiteNoiseAppState) {
-        val key =
-            checkNotNull(
-                ProfileNotificationOverridePreferences.key(ACCOUNT_REF, ACCOUNT_HEX),
-            )
-        context
-            .getSharedPreferences("whitenoise.profile_notification_overrides", android.content.Context.MODE_PRIVATE)
-            .edit()
-            .putString(key, "MUTED|SYSTEM_DEFAULT")
-            .commit()
-        assertEquals(
-            dev.ipf.whitenoise.android.notifications.ProfileNotificationMode.MUTED,
-            state.profileNotificationOverrides.get(ACCOUNT_REF, ACCOUNT_HEX).mode,
-        )
-    }
 
     /** An unfinished engine teardown retains both the active session and its composer geometry. */
     @Test
@@ -334,11 +105,11 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(SignOutCompletion.AccountCleanupIncomplete, completion)
             assertEquals(1, signOutCalls.get())
             assertEquals(0, listAccountsCalls.get())
-            assertEquals(ACCOUNT_REF, appState.activeAccountRef)
-            assertEquals(listOf(ACCOUNT_REF), appState.accounts.map { it.label })
+            assertEquals(accountRef, appState.activeAccountRef)
+            assertEquals(listOf(accountRef), appState.accounts.map { it.label })
             assertEquals(
-                COMPOSER_EXPANSION,
-                appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                composerExpansion,
+                appState.composerExpansionStateRetention.preferenceFor(accountRef, groupId),
             )
             assertEquals(phaseBefore, appState.phase)
         }
@@ -393,10 +164,10 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(1, wipeCalls.get())
             assertTrue(listAccountsCalls.get() > 0)
             assertTrue(appState.accounts.isEmpty())
-            assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertNull(appState.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
             assertEquals(
-                COMPOSER_EXPANSION,
-                appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
+                composerExpansion,
+                appState.composerExpansionStateRetention.preferenceFor(otherAccountRef, groupId),
             )
             assertNull(appState.activeAccountRef)
             assertContactPicturesRemovedOnlyForThisAccount(appState)
@@ -416,135 +187,16 @@ class ExternalSignerSignOutLifecycleTest {
 
             assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
             assertEquals(0, signOutCalls.get())
-            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertEquals(accountRef, state.activeAccountRef)
             assertFalse(state.accounts.single().signedOut)
             assertEquals(phaseBefore, state.phase)
-            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(composerExpansion, state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
             assertTrue(owner.failedWrites > 0)
 
             failWrites = false
             assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
             assertEquals(1, signOutCalls.get())
             assertNull(state.activeAccountRef)
-        }
-
-    /** Models encrypted cleanup reads failing before and after native admission. */
-    private fun unavailablePushStore(beforeRead: () -> Unit = {}): PushTokenStore {
-        val original = context.getSharedPreferences("sign-out-unavailable-push", Context.MODE_PRIVATE)
-        return PushTokenStore(
-            object : SharedPreferences by original {
-                override fun getStringSet(
-                    key: String?,
-                    defValues: MutableSet<String>?,
-                ): MutableSet<String>? {
-                    beforeRead()
-                    throw dev.ipf.whitenoise.android.notifications.PushTokenStorageException()
-                }
-            },
-        )
-    }
-
-    /** Losing the runtime during a failed journal read cannot clear or disable the replacement session. */
-    @Test
-    fun replacementDuringJournalFailureKeepsItsSettingsAndSkipsNativeDisable() =
-        runBlocking {
-            lateinit var state: WhiteNoiseAppState
-            val replacement = AppMarmotRuntime(rootPath = "replacement", marmot = marmot)
-            val store =
-                unavailablePushStore {
-                    WhiteNoiseAppState::class.java
-                        .getDeclaredField("marmotRuntime")
-                        .apply { isAccessible = true }
-                        .set(state, replacement)
-                }
-            state = appState(pushTokenStore = store)
-            val settings = NotificationSettingsFfi(ACCOUNT_REF, ACCOUNT_HEX, true, true)
-            WhiteNoiseAppState::class.java
-                .getDeclaredMethod("setLocalNotificationSettings", NotificationSettingsFfi::class.java)
-                .apply { isAccessible = true }
-                .invoke(state, settings)
-
-            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(settings, state.localNotificationSettings)
-            assertEquals(0, nativeDisableCalls.get())
-            assertEquals(0, signOutCalls.get())
-            assertEquals(ACCOUNT_REF, state.activeAccountRef)
-        }
-
-    /** A durable native disable admits sign-out when the encrypted cleanup journal cannot be written. */
-    @Test
-    fun nativeDisableFallbackPreservesAuthoritativeSignOutCompletion() =
-        runBlocking {
-            val state = appState(pushTokenStore = unavailablePushStore())
-            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
-            assertEquals(1, nativeDisableCalls.get())
-            assertEquals(listOf("disable", "signOut"), nativeCallOrder)
-            assertFalse(nativePushEnabled)
-            assertEquals(1, signOutCalls.get())
-            assertTrue(state.accounts.single().signedOut)
-            assertNull(state.activeAccountRef)
-        }
-
-    /** The encrypted journal preserves the existing local fallback when no native runtime is available. */
-    @Test
-    fun committedJournalAllowsLocalFallbackWithoutNativeRuntime() =
-        runBlocking {
-            val state = appState()
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("marmotRuntime")
-                .apply { isAccessible = true }
-                .set(state, null)
-            assertEquals(SignOutCompletion.RelayCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(0, signOutCalls.get())
-            assertNull(state.activeAccountRef)
-            assertTrue(PushTokenStore.create(context).pendingDisables().contains(ACCOUNT_REF))
-        }
-
-    /** Total durable-storage failure retains the account, history owner, and native session. */
-    @Test
-    fun failedJournalAndNativeDisableDoNotAdmitSignOut() =
-        runBlocking {
-            nativeDisableFailure = java.io.IOException("scripted native failure")
-            val state = appState(pushTokenStore = unavailablePushStore())
-            retainComposerExpansion(state)
-            val phase = state.phase
-            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(0, signOutCalls.get())
-            assertEquals(1, nativeDisableCalls.get())
-            assertEquals(ACCOUNT_REF, state.activeAccountRef)
-            assertFalse(state.accounts.single().signedOut)
-            assertEquals(phase, state.phase)
-            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
-        }
-
-    /** An enabled response is not durable native cleanup authority. */
-    @Test
-    fun enabledNativeResponseCannotAdmitSignOut() =
-        runBlocking {
-            nativeDisableReturnsEnabled = true
-            val state = appState(pushTokenStore = unavailablePushStore())
-            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(0, signOutCalls.get())
-            assertEquals(ACCOUNT_REF, state.activeAccountRef)
-        }
-
-    /** Cancellation of an unknown native disable must not fall through into local teardown. */
-    @Test
-    fun cancelledNativeDisableRetainsSessionAndPropagatesCancellation() =
-        runBlocking {
-            nativeDisableFailure = kotlinx.coroutines.CancellationException("scripted cancellation")
-            val state = appState(pushTokenStore = unavailablePushStore())
-            var cancelled = false
-            try {
-                state.signOutActiveAccount()
-            } catch (_: kotlinx.coroutines.CancellationException) {
-                cancelled = true
-            }
-            assertTrue(cancelled)
-            assertNull(state.localNotificationSettings)
-            assertEquals(0, signOutCalls.get())
-            assertEquals(ACCOUNT_REF, state.activeAccountRef)
-            assertFalse(state.accounts.single().signedOut)
         }
 
     /** A late native success clears the old account's keyed state while preserving the replacement session. */
@@ -561,16 +213,16 @@ class ExternalSignerSignOutLifecycleTest {
                     .getDeclaredField("marmotRuntime")
                     .apply { isAccessible = true }
                     .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
-                state.switchMediaSessionForTest(OTHER_ACCOUNT_REF)
+                state.switchMediaSessionForTest(otherAccountRef)
             }
             assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
-            assertEquals(OTHER_ACCOUNT_REF, state.activeAccountRef)
+            assertEquals(otherAccountRef, state.activeAccountRef)
             assertEquals(originalPhase, state.phase)
             assertTrue(state.accounts.single().signedOut)
-            assertNull(state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertNull(state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
             assertEquals(
-                COMPOSER_EXPANSION,
-                state.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
+                composerExpansion,
+                state.composerExpansionStateRetention.preferenceFor(otherAccountRef, groupId),
             )
             assertContactPicturesRemovedOnlyForThisAccount(state)
         }
@@ -588,9 +240,9 @@ class ExternalSignerSignOutLifecycleTest {
                     .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
             }
             assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(ACCOUNT_REF, state.activeAccountRef)
-            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
-            assertTrue(PushTokenStore.create(context).pendingDisables().contains(ACCOUNT_REF))
+            assertEquals(accountRef, state.activeAccountRef)
+            assertEquals(composerExpansion, state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
+            assertTrue(PushTokenStore.create(context).pendingDisables().contains(accountRef))
         }
 
     /** A replaced runtime's failed reply cannot report sign-out or tear down the still-active session. */
@@ -607,10 +259,10 @@ class ExternalSignerSignOutLifecycleTest {
                     .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
             }
             assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertEquals(accountRef, state.activeAccountRef)
             assertFalse(state.accounts.single().signedOut)
-            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
-            assertTrue(PushTokenStore.create(context).pendingDisables().contains(ACCOUNT_REF))
+            assertEquals(composerExpansion, state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
+            assertTrue(PushTokenStore.create(context).pendingDisables().contains(accountRef))
         }
 
     /** Push bookkeeping failure preserves the completed native sign-out and local cleanup. */
@@ -649,7 +301,7 @@ class ExternalSignerSignOutLifecycleTest {
             val state = appState(owner)
             beforeListAccounts = {
                 assertTrue(state.accounts.single().signedOut)
-                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(16)))
+                assertNull(PinnedConversationTokens.create(owner).issue(accountRef, "ab".repeat(16)))
             }
             assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
             assertTrue(listAccountsCalls.get() > 0)
@@ -667,7 +319,7 @@ class ExternalSignerSignOutLifecycleTest {
             val state = appState(owner)
             beforeListAccounts = {
                 assertTrue(state.accounts.isEmpty())
-                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(16)))
+                assertNull(PinnedConversationTokens.create(owner).issue(accountRef, "ab".repeat(16)))
             }
             assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount())
             assertTrue(listAccountsCalls.get() > 0)
@@ -703,43 +355,6 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(state.accounts.isEmpty())
         }
 
-    /** Fails only credential commits at the scripted boundary while keeping other stores operational. */
-    private class CredentialFailureContext(
-        base: Context,
-        private val shouldFail: () -> Boolean,
-    ) : ContextWrapper(base) {
-        var failedWrites = 0
-            private set
-
-        override fun getApplicationContext(): Context = this
-
-        override fun getSharedPreferences(
-            name: String,
-            mode: Int,
-        ): SharedPreferences {
-            val original = super.getSharedPreferences(name, mode)
-            if (!name.startsWith("pinned_conversation_token")) return original
-            return object : SharedPreferences by original {
-                override fun edit(): SharedPreferences.Editor {
-                    val editor = original.edit()
-                    return object : SharedPreferences.Editor by editor {
-                        override fun remove(key: String?): SharedPreferences.Editor = apply { editor.remove(key) }
-
-                        override fun clear(): SharedPreferences.Editor = apply { editor.clear() }
-
-                        override fun commit(): Boolean {
-                            if (shouldFail()) {
-                                failedWrites++
-                                return false
-                            }
-                            return editor.commit()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /** An unfinished destructive wipe restores the active session without dropping its geometry. */
     @Test
     fun unfinishedExternalSignerWipeRestoresTheActiveSession() =
@@ -762,50 +377,14 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(wipeOutcome, outcome)
             assertEquals(1, wipeCalls.get())
             assertEquals(0, listAccountsCalls.get())
-            assertEquals(listOf(ACCOUNT_REF), appState.accounts.map { it.label })
-            assertEquals(ACCOUNT_REF, appState.activeAccountRef)
+            assertEquals(listOf(accountRef), appState.accounts.map { it.label })
+            assertEquals(accountRef, appState.activeAccountRef)
             assertEquals(
-                COMPOSER_EXPANSION,
-                appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                composerExpansion,
+                appState.composerExpansionStateRetention.preferenceFor(accountRef, groupId),
             )
             assertEquals(phaseBefore, appState.phase)
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId })
         }
 
-    /** Seeds real Android shortcut extras so account-scoped cleanup can be verified through the platform adapter. */
-    private fun publishConversationShortcut(): String {
-        val shortcut =
-            checkNotNull(
-                buildShareShortcut(
-                    context = context,
-                    target = ShareShortcutTarget(ACCOUNT_REF, "group-a", "Test conversation"),
-                ),
-            )
-        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
-        return shortcut.id
-    }
-
-    /** Seeds the exact account/conversation geometry whose destructive lifecycle is under test. */
-    private fun retainComposerExpansion(appState: WhiteNoiseAppState) {
-        appState.composerExpansionStateRetention.update(
-            accountRef = ACCOUNT_REF,
-            groupIdHex = GROUP_ID,
-            preference = COMPOSER_EXPANSION,
-            draftGeneration = 1L,
-        )
-        appState.composerExpansionStateRetention.update(
-            accountRef = OTHER_ACCOUNT_REF,
-            groupIdHex = GROUP_ID,
-            preference = COMPOSER_EXPANSION,
-            draftGeneration = 1L,
-        )
-    }
-
-    private companion object {
-        const val ACCOUNT_REF = "external-account"
-        const val OTHER_ACCOUNT_REF = "other-account"
-        const val ACCOUNT_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-        const val GROUP_ID = "group-a"
-        val COMPOSER_EXPANSION = RetainedComposerExpansion(RetainedComposerExpansionMode.Manual, 240f)
-    }
 }

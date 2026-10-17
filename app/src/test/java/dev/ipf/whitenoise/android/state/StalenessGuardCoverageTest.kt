@@ -242,7 +242,7 @@ class StalenessGuardCoverageTest {
                 // Both completion bodies run inside withRevokedPinnedTarget, retaining native command ownership.
                 "AppState.kt:finishRevokedAccountSignOut" to "durably fenced authoritative sign-out completion",
                 "AppState.kt:finishRevokedAccountWipe" to "durably fenced serialized native wipe completion",
-                // Busy is claimed before suspension; one retry owns this instance's busy flag until finally releases it.
+                // Busy is claimed before suspension; one retry owns this instance's flag until finally releases it.
                 "AppState.kt:retryPushStorageRecovery" to "single-flight push storage recovery command",
                 // Existing settings snapshot refresh is outside the audited stale-counter migration inventory.
                 "AppState.kt:refreshSecurityPrivacySettings" to "pre-existing settings snapshot path",

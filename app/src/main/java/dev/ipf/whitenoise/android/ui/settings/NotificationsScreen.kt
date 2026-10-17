@@ -107,7 +107,10 @@ internal fun NotificationsScreen(
                     onSelect = { mode -> appState.launchMutation { appState.setNotificationDeliveryMode(mode) } },
                 )
             }
-            if (appState.pushStorageRecovery != PushStorageRecovery.Checking && appState.pushStorageRecovery != PushStorageRecovery.Ready) {
+            if (
+                appState.pushStorageRecovery != PushStorageRecovery.Checking &&
+                appState.pushStorageRecovery != PushStorageRecovery.Ready
+            ) {
                 item {
                     PushStorageRecoveryControl(
                         state = appState.pushStorageRecovery,
