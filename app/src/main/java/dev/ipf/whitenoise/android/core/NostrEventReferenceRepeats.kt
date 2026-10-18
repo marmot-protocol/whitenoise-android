@@ -41,23 +41,26 @@ internal fun MarkdownDocumentFfi.onlyRepeatsRepresentedEvents(represented: Set<S
     blocks.isNotEmpty() &&
         blocks.all { it is MarkdownBlockFfi.Paragraph && it.inlines.onlyRepeatsRepresentedEvents(represented) }
 
-/** The repeat check, bounded by [depth] against a peer-crafted deep emphasis tree. */
+/** The repeat check, bounded by [depth] against a deep emphasis or link tree; past the bound nothing repeats. */
 private fun MarkdownInlineFfi.repeats(
     represented: Set<String>,
     depth: Int,
 ): Boolean =
-    when (this) {
-        is MarkdownInlineFfi.NostrMention -> entity.isRepresentedEvent(represented)
-        is MarkdownInlineFfi.NostrUri -> entity.isRepresentedEvent(represented)
-        is MarkdownInlineFfi.Autolink -> nostrEventStableId(url) in represented
-        is MarkdownInlineFfi.Link ->
-            nostrEventStableId(dest) in represented &&
-                children.all { child -> child.repeats(represented, depth + 1) || child.isLabelRepeat(represented) }
-        is MarkdownInlineFfi.Emph -> children.onlyWraps(represented, depth)
-        is MarkdownInlineFfi.Strong -> children.onlyWraps(represented, depth)
-        is MarkdownInlineFfi.Strikethrough -> children.onlyWraps(represented, depth)
-        else -> false
-    }
+    depth < MAX_REPEAT_WRAPPER_DEPTH &&
+        when (this) {
+            is MarkdownInlineFfi.NostrMention -> entity.isRepresentedEvent(represented)
+            is MarkdownInlineFfi.NostrUri -> entity.isRepresentedEvent(represented)
+            is MarkdownInlineFfi.Autolink -> nostrEventStableId(url) in represented
+            is MarkdownInlineFfi.Link ->
+                nostrEventStableId(dest) in represented &&
+                    children.all { child ->
+                        child.repeats(represented, depth + 1) || child.isLabelRepeat(represented)
+                    }
+            is MarkdownInlineFfi.Emph -> children.onlyWraps(represented, depth)
+            is MarkdownInlineFfi.Strong -> children.onlyWraps(represented, depth)
+            is MarkdownInlineFfi.Strikethrough -> children.onlyWraps(represented, depth)
+            else -> false
+        }
 
 /** Whether emphasis children are a repeat with nothing but whitespace around it. */
 private fun List<MarkdownInlineFfi>.onlyWraps(

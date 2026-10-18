@@ -31,11 +31,12 @@ internal fun List<MarkdownInlineFfi>.withoutRepeatsOf(represented: Set<String>):
     return kept
 }
 
-/** Trims the spaces that end the last kept text, returning whether there were any. */
+/** Trims the spaces that end the last kept text that is not empty, returning whether there were any. */
 private fun MutableList<MarkdownInlineFfi>.trimTrailingSpace(): Boolean {
-    val previous = lastOrNull() as? MarkdownInlineFfi.Text ?: return false
+    val index = indexOfLast { it !is MarkdownInlineFfi.Text || it.content.isNotEmpty() }
+    val previous = getOrNull(index) as? MarkdownInlineFfi.Text ?: return false
     val trimmed = previous.content.trimEnd(' ', '\t')
-    this[lastIndex] = MarkdownInlineFfi.Text(trimmed)
+    this[index] = MarkdownInlineFfi.Text(trimmed)
     return trimmed.length != previous.content.length
 }
 
@@ -74,6 +75,8 @@ private fun MutableList<MarkdownInlineFfi>.closeUp(
         val after = rest.drop(1)
         rest = after.trimStart(' ', '\t')
         hadSpace = trimmedBefore.length != before.length || rest.length != after.length
+        // A pair that was its own text leaves the space before it in the text before that.
+        if (trimmedBefore.isEmpty()) hadSpace = trimTrailingSpace() || hadSpace
     }
     val lineStart = isAtLineStart()
     rest = rest.withoutRepeatedSeparator(lineStart, (lastOrNull() as? MarkdownInlineFfi.Text)?.content)

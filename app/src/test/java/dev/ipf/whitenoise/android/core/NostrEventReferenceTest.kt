@@ -235,6 +235,7 @@ class NostrEventReferenceTest {
             nostrLink("nostr:$NOTE"),
             MarkdownInlineFfi.Strong(listOf(uri(NOTE))),
             MarkdownInlineFfi.Emph(listOf(MarkdownInlineFfi.Text(" "), uri(NEVENT, NEVENT_HRP))),
+            nestedBold(3),
         ).forEach { inline -> assertTrue("$inline repeats the card", inline.repeatsRepresentedEvent(REPRESENTED)) }
     }
 
@@ -256,7 +257,10 @@ class NostrEventReferenceTest {
             MarkdownInlineFfi.Code(NOTE),
             MarkdownInlineFfi.Text(NOTE),
             MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Read "), uri(NOTE))),
+            nestedBold(DEEPER_THAN_THE_BOUND),
+            nestedLinks(DEEPER_THAN_THE_BOUND),
         ).forEach { inline -> assertFalse("$inline is not a repeat", inline.repeatsRepresentedEvent(REPRESENTED)) }
+        assertTrue("a shallow chain still repeats", nestedLinks(2).repeatsRepresentedEvent(REPRESENTED))
         assertFalse(uri(NOTE).repeatsRepresentedEvent(emptySet()))
     }
 
@@ -285,6 +289,7 @@ class NostrEventReferenceTest {
                 listOf(text("the users' "), uri(NOTE), text(" 'best' post")) to "the users' 'best' post",
                 listOf(text("say \""), uri(NOTE), text("\" now")) to "say now",
                 listOf(text("options ( "), uri(NOTE), text(" ) here")) to "options here",
+                listOf(text("hello "), text("("), uri(NOTE), text(") next")) to "hello next",
                 listOf(text("Look at the"), uri(NOTE), text("")) to "Look at the",
                 listOf(text("Hello, "), uri(NOTE), text(", goodbye")) to "Hello, goodbye",
                 listOf(uri(NOTE), text(": details")) to "details",
@@ -367,6 +372,14 @@ class NostrEventReferenceTest {
         kind: MarkdownLinkDestinationKindFfi,
     ) = MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI, kind)
 
+    /** [NOTE] wrapped in [levels] of bold, deeper than any authored message nests. */
+    private fun nestedBold(levels: Int): MarkdownInlineFfi =
+        (1..levels).fold<Int, MarkdownInlineFfi>(uri(NOTE)) { inner, _ -> MarkdownInlineFfi.Strong(listOf(inner)) }
+
+    /** [NOTE] inside [levels] of links to itself, which no parser nests but a crafted tree could. */
+    private fun nestedLinks(levels: Int): MarkdownInlineFfi =
+        (1..levels).fold<Int, MarkdownInlineFfi>(uri(NOTE)) { inner, _ -> nostrLink("nostr:$NOTE", inner) }
+
     /** Bold [text]. */
     private fun bold(text: String) = MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text(text)))
 
@@ -395,5 +408,6 @@ class NostrEventReferenceTest {
         val REPRESENTED = setOf("event:${EVENT_ID.hexString()}")
         val NEVENT_HRP = MarkdownNostrHrpFfi.NEVENT
         val SOFT = MarkdownInlineFfi.SoftBreak
+        const val DEEPER_THAN_THE_BOUND = 12
     }
 }
