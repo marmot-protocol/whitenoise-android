@@ -94,9 +94,11 @@ internal fun relaysConnectedFromHealth(
 ): Boolean = totalRelays == 0 || connectedRelays > 0
 
 /**
- * The clamp applied to every relay-signal write: no validated internet means
- * no connected relays, whatever an optimistic default or stale health snapshot
- * claims. A restore therefore keeps the signal false until a fresh
+ * The clamp applied to every relay-signal write: [isOnline] is the supplied
+ * active-default-route availability, not OS internet validation. Foreground
+ * relay sampling can report connected on an unvalidated route. Without an active
+ * route, no relays are connected, whatever a stale health snapshot claims.
+ * Restoring a route therefore keeps the signal false until a fresh
  * [relaysConnectedFromHealth] sample proves recovery — a quick offline/online
  * bounce, an offline startup seed, or a poll racing the transition can never
  * flash success off stale state.
@@ -268,7 +270,7 @@ internal fun rememberChatListConnectivityState(
         refreshRelayConnectivity = appState::refreshRelayConnectivity,
         revalidateConnectionReadiness = controller::revalidateConnectionReadinessOnRelaySample,
     )
-    ValidatedInternetRefreshEffect(appState, controller, activeAccountRef, runtimeGeneration)
+    ActiveNetworkRefreshEffect(appState, controller, activeAccountRef, runtimeGeneration)
     ConnectivityEdgeRefreshEffects(
         effectOwner = controller,
         activeAccountRef = activeAccountRef,

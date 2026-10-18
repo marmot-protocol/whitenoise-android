@@ -340,11 +340,20 @@ class NostrEventReaderLinkInteractionTest {
     }
 
     private fun triggerReaderCopyFailure(failure: Exception) {
+        val writes = mutableListOf<String>()
         val clipboard =
             object : Clipboard {
                 override suspend fun getClipEntry(): ClipEntry? = null
 
-                override suspend fun setClipEntry(clipEntry: ClipEntry?): Unit = throw failure
+                override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+                    writes +=
+                        requireNotNull(clipEntry)
+                            .clipData
+                            .getItemAt(0)
+                            .text
+                            .toString()
+                    throw failure
+                }
             }
         val url = "https://example.com/clipboard"
         composeRule.setContent {
@@ -370,6 +379,7 @@ class NostrEventReaderLinkInteractionTest {
         val actions = composeRule.onNodeWithText(url).fetchSemanticsNode().config[SemanticsActions.CustomActions]
         composeRule.runOnIdle { assertTrue(actions.single().action()) }
         composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(listOf(url), writes) }
     }
 
     /** Builds the exact kind-1 event shown by the reader fixture. */
