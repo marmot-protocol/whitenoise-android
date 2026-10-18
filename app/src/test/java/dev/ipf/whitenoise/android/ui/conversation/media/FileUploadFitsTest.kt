@@ -3,8 +3,11 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * A forward uses MDK's file path only for a message one native file batch can take with the disk it needs, and keeps
@@ -52,10 +55,43 @@ class FileUploadFitsTest {
         val claims = StagedDiskClaims()
 
         assertEquals(BYTES * FILE_BACKED_DISK_COPIES, copies)
-        assertTrue(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
-        assertFalse(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
-        claims.release(copies)
-        assertTrue(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
+        val first = claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) }
+        assertNotNull(first)
+        assertNull(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
+        first?.release()
+        assertNotNull(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
+    }
+
+    /**
+     * Once a destination's own snapshot is written, free space already counts it, so its claim gives that copy back:
+     * a second destination is judged on the copies still to come, not on the snapshot counted twice.
+     */
+    @Test
+    fun aWrittenSnapshotIsNotCountedTwice() {
+        val attachments = listOf(item(BYTES))
+        val copies = fileUploadCopyBytes(attachments)
+        val snapshot = fileUploadSnapshotBytes(attachments)
+        val claims = StagedDiskClaims()
+        // Room for both destinations' copies, as long as the first one's snapshot is counted only once.
+        val usableBefore = 2 * copies + FILE_BACKED_DISK_RESERVE_BYTES
+        val usableAfterSnapshot = usableBefore - snapshot
+        val first = requireNotNull(claims.claimIf(copies, usableBefore) { fileUploadFits(attachments, BATCH, it) })
+
+        assertEquals(BYTES.toLong(), snapshot)
+        assertNull(claims.claimIf(copies, usableAfterSnapshot) { fileUploadFits(attachments, BATCH, it) })
+        first.shrinkBy(snapshot)
+        assertNotNull(claims.claimIf(copies, usableAfterSnapshot) { fileUploadFits(attachments, BATCH, it) })
+    }
+
+    /** An item already in a private file is not copied again by this app, so only MDK's two copies are claimed. */
+    @Test
+    fun aFileBackedItemClaimsOnlyMdksCopies() {
+        val file = File.createTempFile("forward", ".bin").apply { deleteOnExit() }
+        val source = StagedUploadSource(file, 1_000L)
+        val fileBacked = PendingAttachment(ByteArray(0), "text/plain", "notes.txt", sourceFile = source)
+
+        assertEquals(1_000L * (FILE_BACKED_DISK_COPIES - 1), fileUploadCopyBytes(listOf(fileBacked)))
+        assertEquals(0L, fileUploadSnapshotBytes(listOf(fileBacked)))
     }
 
     /** An empty message or an empty item never takes the file path. */

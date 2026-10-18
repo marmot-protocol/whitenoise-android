@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.media.readWithin
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedDiskClaims
 import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadCopyBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadFits
+import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadSnapshotBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
@@ -98,13 +99,17 @@ internal fun WhiteNoiseAppState.forwardTransport(
         ): List<MediaAttachmentReferenceFfi> {
             requireDestinationAccount()
             val copyBytes = fileUploadCopyBytes(message.attachments)
+            val snapshotBytes = fileUploadSnapshotBytes(message.attachments)
+            var claim: StagedDiskClaims.Claim? = null
             val batchCiphertextBytes =
                 withContext(Dispatchers.IO) {
                     nativeFileBackedSendLimits()?.batchCiphertextBytes?.takeIf { batch ->
                         val usableBytes = usableSpaceFor(uploadSourcesDirectory(appContext.cacheDir))
-                        diskClaims.claimIf(copyBytes, usableBytes) { available ->
-                            fileUploadFits(message.attachments, batch, available)
-                        }
+                        claim =
+                            diskClaims.claimIf(copyBytes, usableBytes) { available ->
+                                fileUploadFits(message.attachments, batch, available)
+                            }
+                        claim != null
                     }
                 }
             val uploaded =
@@ -113,18 +118,22 @@ internal fun WhiteNoiseAppState.forwardTransport(
                         if (batchCiphertextBytes == null) {
                             uploadInMemory(targetGroupIdHex, message)
                         } else {
-                            uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes)
+                            // The staged snapshots now sit on disk, where free space counts them.
+                            uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes) {
+                                claim?.shrinkBy(snapshotBytes)
+                            }
                         }
                     }
                 } finally {
-                    if (batchCiphertextBytes != null) diskClaims.release(copyBytes)
+                    claim?.release()
                 }
             requireDestinationAccount()
             return uploaded
         }
 
         /**
-         * Stages the bytes as private snapshots for one native file upload that must start within a bound. Abandoning
+         * Stages the bytes as private snapshots for one native file upload that must start within a bound, calling
+         * [onStaged] once the snapshots are written and before MDK starts. Abandoning
          * a call that never started is safe even while MDK still has it queued. The queued command holds its own
          * reference to the transfer control, so closing this handle does not free it. It checks the cancel before it
          * opens any source and on every chunk, so it never reads the deleted snapshots. With `send = false`, it
@@ -134,6 +143,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
             batchCiphertextBytes: Long,
+            onStaged: () -> Unit,
         ): List<MediaAttachmentReferenceFfi> =
             withFileUploadRequest(
                 message.attachments,
@@ -141,6 +151,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
                 uploadSourcesDirectory(appContext.cacheDir),
                 batchCiphertextBytes,
             ) { request ->
+                onStaged()
                 withNativeTransferControl(register = {}) { control ->
                     withUploadStartWatchdog(
                         startMillis = FORWARD_UPLOAD_START_MILLIS,

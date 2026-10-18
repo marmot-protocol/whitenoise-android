@@ -43,7 +43,8 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes)" in body)
         assertTrue("fileUploadFits(message.attachments, batch, available)" in body)
         assertTrue("diskClaims.claimIf(copyBytes, usableBytes)" in body)
-        assertTrue("diskClaims.release(copyBytes)" in body)
+        assertTrue("claim?.shrinkBy(snapshotBytes)" in body)
+        assertTrue("claim?.release()" in body)
         assertTrue("uploadInMemory(targetGroupIdHex, message)" in body)
     }
 

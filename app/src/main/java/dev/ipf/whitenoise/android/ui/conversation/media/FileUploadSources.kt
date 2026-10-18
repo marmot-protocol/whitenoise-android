@@ -57,35 +57,58 @@ internal fun fileUploadFits(
         usableBytes >= diskBytes
 }
 
-/** The disk the copies of one staged upload of [attachments] hold at once, before the app's reserve. */
-internal fun fileUploadCopyBytes(attachments: List<PendingAttachment>): Long {
-    val plaintextBytes = attachments.sumOf { it.byteCount }
-    return plaintextBytes * FILE_BACKED_DISK_COPIES
+/**
+ * The disk one staged upload of [attachments] adds while it runs, before the app's reserve: for an item held in
+ * memory, this app's snapshot, MDK's snapshot and its ciphertext; for an item already in a private file, only
+ * MDK's two copies.
+ */
+internal fun fileUploadCopyBytes(attachments: List<PendingAttachment>): Long =
+    attachments.sumOf { item ->
+        val copies = if (item.sourceFile == null) FILE_BACKED_DISK_COPIES else FILE_BACKED_DISK_COPIES - 1
+        item.byteCount * copies
+    }
+
+/** The part of [fileUploadCopyBytes] this app writes before MDK starts: snapshots of the items held in memory. */
+internal fun fileUploadSnapshotBytes(attachments: List<PendingAttachment>): Long {
+    val inMemory = attachments.filter { it.sourceFile == null }
+    return inMemory.sumOf { it.byteCount }
 }
 
 /**
- * The disk that concurrent staged uploads have claimed for their copies, so two destinations of one forward never
- * both count on the same free space (#2556). Each claim is released once its upload ends.
+ * The disk that concurrent staged uploads have claimed for copies not yet written, so two destinations of one
+ * forward never both count on the same free space (#2556). A claim shrinks as its copies land on disk, where free
+ * space already counts them, and is released once its upload ends.
  */
 internal class StagedDiskClaims {
     private var claimedBytes = 0L
 
-    /** Claims [bytes] if [fits] accepts what [usableBytes] leaves after earlier claims, and says whether it did. */
+    /** One upload's claim on disk for copies it has not written yet. */
+    inner class Claim internal constructor(
+        private var heldBytes: Long,
+    ) {
+        /** Gives back [bytes] of this claim that are now written to disk, at most what it still holds. */
+        fun shrinkBy(bytes: Long) {
+            synchronized(this@StagedDiskClaims) {
+                val given = bytes.coerceIn(0L, heldBytes)
+                heldBytes -= given
+                claimedBytes -= given
+            }
+        }
+
+        /** Releases what is left of this claim once its upload ends. */
+        fun release() = shrinkBy(Long.MAX_VALUE)
+    }
+
+    /** Claims [bytes] if [fits] accepts what [usableBytes] leaves after earlier claims, returning the claim or null. */
     @Synchronized
     fun claimIf(
         bytes: Long,
         usableBytes: Long,
         fits: (availableBytes: Long) -> Boolean,
-    ): Boolean {
-        val accepted = fits(usableBytes - claimedBytes)
-        if (accepted) claimedBytes += bytes
-        return accepted
-    }
-
-    /** Releases a claim of [bytes] that [claimIf] accepted. */
-    @Synchronized
-    fun release(bytes: Long) {
-        claimedBytes -= bytes
+    ): Claim? {
+        if (!fits(usableBytes - claimedBytes)) return null
+        claimedBytes += bytes
+        return Claim(bytes)
     }
 }
 
