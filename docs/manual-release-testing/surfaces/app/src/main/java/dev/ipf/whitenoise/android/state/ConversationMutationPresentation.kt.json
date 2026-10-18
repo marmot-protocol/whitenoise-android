@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMutationPresentation.kt",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Transient archive overlay and action admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMutationPresentation.kt",
+        "anchor": "fun beginArchive(",
+        "test_ids": [
+          "CHL-007"
+        ]
+      },
+      {
+        "surface": "Mutation single-flight releases on failure and cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMutationPresentation.kt",
+        "anchor": "suspend fun <T> runIfIdle(",
+        "test_ids": [
+          "CHL-007",
+          "MSG-007"
+        ]
+      }
+    ]
+  },
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "discovery_exceptions": []
+}
