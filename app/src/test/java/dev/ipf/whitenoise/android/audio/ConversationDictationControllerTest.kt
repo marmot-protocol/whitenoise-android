@@ -9007,7 +9007,10 @@ class ConversationDictationControllerTest {
         fun scheduledTaskCount(delayMillis: Long): Int = tasks.count { it.delayMillis == delayMillis }
 
         /** Counts active timers for a specific production delay. */
-        fun liveTaskCount(delayMillis: Long): Int = tasks.count { it.delayMillis == delayMillis && !it.cancelled && !it.ran }
+        fun liveTaskCount(delayMillis: Long): Int =
+            tasks.count {
+                it.delayMillis == delayMillis && !it.cancelled && !it.ran
+            }
 
         private data class Task(
             val delayMillis: Long,
