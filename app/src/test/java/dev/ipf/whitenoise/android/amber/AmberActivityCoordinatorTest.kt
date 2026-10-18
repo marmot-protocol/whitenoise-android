@@ -831,17 +831,18 @@ class AmberActivityCoordinatorTest {
         val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
         val done = CountDownLatch(1)
 
-        worker = Thread {
-            outcome.set(
-                AmberActivityCoordinator.awaitApproval(
-                    groupedCryptoIntent("slow-launch", currentUser = "slow-launch-account"),
-                    timeoutMs = 5_000,
-                    requestId = "slow-launch",
-                    allowGrouping = true,
-                ),
-            )
-            done.countDown()
-        }
+        worker =
+            Thread {
+                outcome.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        groupedCryptoIntent("slow-launch", currentUser = "slow-launch-account"),
+                        timeoutMs = 5_000,
+                        requestId = "slow-launch",
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }
         worker.start()
 
         val launchDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
