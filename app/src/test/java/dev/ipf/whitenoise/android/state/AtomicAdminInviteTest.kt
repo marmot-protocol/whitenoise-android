@@ -93,6 +93,27 @@ class AtomicAdminInviteTest {
         }
 
     @Test
+    fun newerAuthoritativeRosterWinsOverTheInvitationReply() =
+        runTest {
+            val fixture = Fixture()
+            try {
+                fixture.controller.refreshManagementState()
+                fixture.afterCommit = {
+                    fixture.publishNewerRoster()
+                    fixture.controller.refreshManagementState()
+                }
+                assertTrue(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(PEER)))
+                assertEquals(1, fixture.invocations.size)
+                assertEquals(listOf(SELF, PEER, OTHER), fixture.controller.members.map { it.memberIdHex })
+                assertEquals(listOf(SELF, PEER), fixture.controller.group.admins)
+                assertNull(fixture.controller.pendingMembershipActivity)
+                assertDiagnosticTerminal("success")
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
+    @Test
     fun failedNativeCommitReportsFailureWithoutChangingTheAuthoritativeRoster() =
         runTest {
             val fixture = Fixture(failBeforeCommit = true)
@@ -167,7 +188,8 @@ class AtomicAdminInviteTest {
                     assertTrue(fixture.invocations.isEmpty())
                     assertNull(fixture.controller.pendingMembershipActivity)
                     val outcomes =
-                        ShadowLog.getLogsForTag("GroupCreation")
+                        ShadowLog
+                            .getLogsForTag("GroupCreation")
                             .filter { it.msg.contains("phase=recipients") }
                             .map { it.msg.substringAfter("outcome=").substringBefore(" ") }
                     assertEquals(listOf("start", if (cancelled) "cancelled" else "failure"), outcomes)
@@ -209,6 +231,12 @@ class AtomicAdminInviteTest {
         var snapshotReads = 0
         var revokeOnRecipientResolution = false
         var onPeerResolution: () -> Unit = {}
+        var afterCommit: suspend () -> Unit = {}
+
+        fun publishNewerRoster() {
+            current = snapshot(listOf(SELF, PEER, OTHER), listOf(SELF, PEER))
+        }
+
         private var current = snapshot(listOf(SELF), listOf(SELF))
         private val state: WhiteNoiseAppState =
             WhiteNoiseAppState(
@@ -243,16 +271,19 @@ class AtomicAdminInviteTest {
                     if (failBeforeCommit) error("native commit rejected")
                     current = snapshot(listOf(SELF) + members, listOf(SELF) + admins)
                     if (loseReply) error("native response lost after commit")
-                    GroupMutationResultFfi(
-                        SendSummaryFfi(
-                            1u,
-                            emptyList(),
-                            SendAcceptDispositionFfi.PUBLISHED,
-                            SendMaintenanceDispositionFfi.READY,
-                        ),
-                        current.details,
-                        current.managementState,
-                    )
+                    val result =
+                        GroupMutationResultFfi(
+                            SendSummaryFfi(
+                                1u,
+                                emptyList(),
+                                SendAcceptDispositionFfi.PUBLISHED,
+                                SendMaintenanceDispositionFfi.READY,
+                            ),
+                            current.details,
+                            current.managementState,
+                        )
+                    afterCommit()
+                    result
                 },
             )
     }

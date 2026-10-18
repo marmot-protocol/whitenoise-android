@@ -6269,12 +6269,14 @@ class ConversationController(
 
     private var pendingArchiveIntent by mutableStateOf<ConversationArchiveIntent?>(null)
 
-    // Main-confined count of authoritative group applications (subscription
-    // updates and details/rebind round-trips). A mutation captures it before
-    // suspending in engine I/O and applies its returned record only while the
-    // count is unchanged, so a newer authoritative update always wins over a
-    // late completion.
-    private var groupAuthorityEpoch = 0L
+    private val mutationPresentation =
+        ConversationMutationPresentation(
+            ownsPresentation = {
+                !controllerCleared &&
+                    !isAccountTeardownRequested() &&
+                    appState.runtimeGeneration == conversationRuntimeGeneration
+            },
+        )
 
     // A typed native refusal proves only that this Welcome is no longer
     // pending. Keep its action retired until an authoritative roster resolves
@@ -7600,7 +7602,7 @@ class ConversationController(
         val previousGroup = group
         groupRecoveryLifetime.advance()
         val previousRetention = group.disappearingMessageSecs
-        groupAuthorityEpoch += 1L
+        mutationPresentation.authoritativeGroupApplied()
         val reconciled =
             reconcileTerminalSelfMembership(
                 update = update,
@@ -11365,7 +11367,7 @@ class ConversationController(
             ) {
                 return@withMutationLockResult false
             }
-            val authorityEpochBefore = groupAuthorityEpoch
+            val authorityEpochBefore = mutationPresentation.groupAuthorityEpoch
             inviteConfirmationAuthority.begin(previousGroup)
             val optimisticGroup = optimisticAcceptedInvite(previousGroup)
             group = optimisticGroup
@@ -11466,7 +11468,11 @@ class ConversationController(
         authorityEpochBefore: Long,
     ) {
         val confirmed =
-            if (groupAuthorityEpoch == authorityEpochBefore) acceptedGroup else group.copy(pendingConfirmation = false)
+            if (mutationPresentation.groupAuthorityEpoch == authorityEpochBefore) {
+                acceptedGroup
+            } else {
+                group.copy(pendingConfirmation = false)
+            }
         group = inviteConfirmationAuthority.reconcile(confirmed)
         inviteConfirmationAuthority.finish()
     }
@@ -11509,7 +11515,7 @@ class ConversationController(
             val intent = ConversationArchiveIntent(archived)
             pendingArchiveIntent = intent
             val chatListIntent = appState.beginChatListArchiveIntent(account, groupIdHex, archived)
-            val authorityEpochBefore = groupAuthorityEpoch
+            val authorityEpochBefore = mutationPresentation.groupAuthorityEpoch
             try {
                 runCatchingCancellable {
                     appState.withGroupCommitLock(account, groupIdHex) {
@@ -11518,7 +11524,7 @@ class ConversationController(
                         // or details round-trip) that landed while this commit
                         // was in flight wins over the late success; the engine's
                         // own archive-change event reconverges the projection.
-                        if (groupAuthorityEpoch == authorityEpochBefore) {
+                        if (mutationPresentation.groupAuthorityEpoch == authorityEpochBefore) {
                             group = updated
                             appState.applyLocalGroupUpdate(updated)
                         }
@@ -11968,7 +11974,7 @@ class ConversationController(
                                 if (!canAdministerMembersFromAuthoritativeRoster()) {
                                     return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                                 }
-                                val authorityEpoch = groupAuthorityEpoch
+                                val authorityEpoch = mutationPresentation.groupAuthorityEpoch
                                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
                                 nativeInvoked = true
                                 val inviteResult =
@@ -12082,7 +12088,7 @@ class ConversationController(
         runtimeGeneration: Int,
     ) {
         if (appState.runtimeGeneration != runtimeGeneration || controllerCleared || isAccountTeardownRequested()) return
-        if (groupAuthorityEpoch == authorityEpoch) {
+        if (mutationPresentation.groupAuthorityEpoch == authorityEpoch) {
             applyManagementSnapshot(account, result.details, result.managementState)
         } else {
             refreshManagementState()
@@ -12119,12 +12125,12 @@ class ConversationController(
     ): Boolean {
         val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
         if (!eligible) return false
-        val beforeRead = groupAuthorityEpoch
+        val beforeRead = mutationPresentation.groupAuthorityEpoch
         refreshManagementState()
         val observedMembers =
             membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
         val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
-        return groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
+        return mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
     }
 
     /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */
@@ -12294,7 +12300,7 @@ class ConversationController(
     suspend fun refreshManagementState() {
         val account = conversationAccountRef ?: return
         val requestToken = managementStateLifetime.advance()
-        val authorityEpoch = groupAuthorityEpoch
+        val authorityEpoch = mutationPresentation.groupAuthorityEpoch
         val rosterGeneration = memberRosterRefreshGeneration.capture()
         val runtimeGeneration = appState.runtimeGeneration
         val groupId = group.groupIdHex
@@ -12305,7 +12311,8 @@ class ConversationController(
         }.onSuccess { refreshed ->
             managementStateLifetime.runIfCurrent(requestToken) {
                 val staleRead =
-                    !ownsCurrentMemberRead(rosterGeneration, runtimeGeneration) || groupAuthorityEpoch != authorityEpoch
+                    !ownsCurrentMemberRead(rosterGeneration, runtimeGeneration) ||
+                        mutationPresentation.groupAuthorityEpoch != authorityEpoch
                 val changedOwner = group != startingGroup || appState.activeAccountRef != activeAccount
                 val wrongTarget =
                     !refreshed.details.group.groupIdHex
@@ -14285,7 +14292,7 @@ class ConversationController(
         refreshGeneration: Long,
     ): Boolean {
         if (!inviteConfirmationUnresolved) return true
-        val epoch = groupAuthorityEpoch
+        val epoch = mutationPresentation.groupAuthorityEpoch
         val runtimeGeneration = appState.runtimeGeneration
         val canonical =
             try {
@@ -14297,7 +14304,7 @@ class ConversationController(
         val currentRead = memberRosterRefreshGeneration.isCurrent(refreshGeneration)
         val ownsRead =
             ownsInviteAcceptanceResult &&
-                epoch == groupAuthorityEpoch &&
+                epoch == mutationPresentation.groupAuthorityEpoch &&
                 currentRead &&
                 appState.runtimeGeneration == runtimeGeneration
         if (ownsRead) applyGroupState(canonical)
@@ -14363,7 +14370,7 @@ class ConversationController(
     ) {
         val resolvingConflict = inviteConfirmationUnresolved
         if (!resolveInitialInviteConfirmation(account, generation)) return
-        val authorityEpoch = groupAuthorityEpoch
+        val authorityEpoch = mutationPresentation.groupAuthorityEpoch
         // A prefetched roster can predate the consent check and must not settle that check.
         val roster =
             if (resolvingConflict) {
@@ -14373,7 +14380,7 @@ class ConversationController(
             }
         memberRosterRefreshGeneration.runIfCurrent(generation) {
             if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                if (authorityEpoch != groupAuthorityEpoch) throw SupersededGroupRosterRead()
+                if (authorityEpoch != mutationPresentation.groupAuthorityEpoch) throw SupersededGroupRosterRead()
                 val applied = applyGroupRoster(account, roster)
                 if (applied != null) appState.applyLocalGroupDetails(account, applied.group, applied.members)
             }
@@ -14472,7 +14479,7 @@ class ConversationController(
     /** Applies the engine's eviction proof and invalidates any in-flight group mutation result. */
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = conversationAccountIdHex ?: return
-        groupAuthorityEpoch += 1L
+        mutationPresentation.authoritativeGroupApplied()
         inviteConfirmationAuthority.invalidate()
         // Engine-confirmed removal (UseAfterEviction). Record the same
         // authoritative local-left marker the leaveGroup() success path sets so
@@ -14569,7 +14576,7 @@ class ConversationController(
             return null
         }
         val applied = resolution.applied
-        groupAuthorityEpoch += 1L
+        mutationPresentation.authoritativeGroupApplied()
         group =
             inviteConfirmationAuthority.reconcile(
                 reconcileTerminalSelfMembership(update = applied.group, previous = previousGroup),
