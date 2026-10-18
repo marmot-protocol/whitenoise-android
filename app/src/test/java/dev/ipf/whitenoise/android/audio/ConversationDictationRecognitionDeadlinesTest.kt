@@ -5,6 +5,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Exercises handle ownership; factories here do not choose scheduler delays.
+ * [ConversationDictationDeadlineCoverageTest] verifies those delays through the production controller.
+ */
 class ConversationDictationRecognitionDeadlinesTest {
     /** Cancels an older processing timer and prevents replacements during the same drain. */
     @Test

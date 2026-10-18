@@ -3,10 +3,27 @@ package dev.ipf.whitenoise.android.audio
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 /** Keeps every generation timer behind the same drain-aware production policy. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class ConversationDictationDeadlineCoverageTest {
+    /** Observes the production scheduler: one 90-second drain and no replacement 20-second timer. */
+    @Test
+    fun acceptedCallerAudioDrainSchedulesItsOwnBoundAndSuppressesProcessing() {
+        ConversationDictationControllerTest().slowCallerAudioSendSurvivesProcessingAndBackgrounding()
+    }
+
+    /** Observes the production scheduler and expiry for the provider-owned 20-second bound. */
+    @Test
+    fun providerOwnedProcessingKeepsItsTwentySecondBound() {
+        ConversationDictationControllerTest().providerOwnedSendStillTimesOutAfterTwentySeconds()
+    }
+
     /** Keeps controller and generation timer routing behind the shared deadline policy. */
     @Test
     fun controllerRoutesGenerationAndDrainTimersThroughTheirSharedOwner() {
