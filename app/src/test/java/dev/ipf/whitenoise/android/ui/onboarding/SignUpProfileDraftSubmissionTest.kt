@@ -71,7 +71,16 @@ class SignUpProfileDraftSubmissionTest {
 
     /** The real Welcome/form wiring reaches native creation once after an offline retry. */
     @Test fun welcomeSignupRetriesMissingRouteThroughActualCreationAdapter() {
-        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
+        assertWelcomeSignupReachesCreationAdapter(hasDefaultRoute = false)
+    }
+
+    /** An initially active unvalidated route reaches the same production adapter without a retry. */
+    @Test fun welcomeSignupWithUnvalidatedRouteReachesActualCreationAdapter() {
+        assertWelcomeSignupReachesCreationAdapter(hasDefaultRoute = true)
+    }
+
+    private fun assertWelcomeSignupReachesCreationAdapter(hasDefaultRoute: Boolean) {
+        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute)
         val creations =
             java.util.concurrent.atomic
                 .AtomicInteger()
@@ -100,13 +109,16 @@ class SignUpProfileDraftSubmissionTest {
         composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Retained name")
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
-        composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
-        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
-        composeRule.runOnIdle {
-            assertEquals(0, creations.get())
-            availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
+        if (!hasDefaultRoute) {
+            composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
+            composeRule.runOnIdle { assertEquals(0, creations.get()) }
+            composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+            composeRule.runOnIdle {
+                assertEquals(0, creations.get())
+                availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
+            }
+            composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
         }
-        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
         composeRule.waitUntil(5_000) { creations.get() == 1 }
         // The process-owned adapter resumes on Main after native IO, outside the Compose test clock.
         composeRule.waitUntil(5_000) {
