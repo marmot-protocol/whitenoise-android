@@ -2353,4 +2353,7 @@
     <string name="group_change_invite_anyway">Yine de davet et</string>
     <string name="starting_as">Şu hesapla başlat</string>
     <string name="starting_as_account">Şu hesapla başlat: %1$s</string>
+    <string name="notification_push_storage_unavailable">Kayıtlı anlık bildirim ayarları okunamadı. Ayarlar korundu ve anlık bildirim kaydı duraklatıldı. Cihazın kilidi açıldığında yeniden deneyin.</string>
+    <string name="notification_push_import_pending">Önceki anlık bildirim ayarlarından bazıları kurtarılamadı. Ayarlar korundu ve anlık bildirim kaydı duraklatıldı. Tekrar kontrol etmek için yeniden deneyin.</string>
+    <string name="notification_push_cleanup_unknown">Önceki bir anlık bildirim temizliği doğrulanamıyor. Anlık bildirim kaydı duraklatıldı. Yeniden denemek, kayıtlı durumu silmeden veya sıfırlamadan tekrar kontrol eder.</string>
 </resources>

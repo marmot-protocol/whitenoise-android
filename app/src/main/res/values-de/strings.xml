@@ -2372,4 +2372,7 @@
     <string name="group_change_invite_anyway">Trotzdem einladen</string>
     <string name="starting_as">Starten als</string>
     <string name="starting_as_account">Starten als %1$s</string>
+    <string name="notification_push_storage_unavailable">Gespeicherte Push-Einstellungen konnten nicht gelesen werden. Sie wurden beibehalten, und die Push-Registrierung ist pausiert. Versuche es erneut, wenn das Gerät entsperrt ist.</string>
+    <string name="notification_push_import_pending">Einige frühere Push-Einstellungen konnten nicht wiederhergestellt werden. Sie wurden beibehalten, und die Push-Registrierung ist pausiert. Versuche es erneut, um sie nochmals zu prüfen.</string>
+    <string name="notification_push_cleanup_unknown">Eine frühere Push-Bereinigung kann nicht bestätigt werden. Die Push-Registrierung ist pausiert. Ein erneuter Versuch prüft den gespeicherten Zustand nochmals, ohne ihn zu löschen oder zurückzusetzen.</string>
 </resources>

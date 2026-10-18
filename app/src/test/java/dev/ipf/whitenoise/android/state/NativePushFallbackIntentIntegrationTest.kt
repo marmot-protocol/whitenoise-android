@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
+import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -19,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -32,6 +34,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class NativePushFallbackIntentIntegrationTest {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     private val context: Context
         get() = RuntimeEnvironment.getApplication().applicationContext
 

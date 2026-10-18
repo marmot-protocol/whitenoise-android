@@ -2322,4 +2322,7 @@
     <string name="group_change_invite_anyway">仍要邀請</string>
     <string name="starting_as">以此身分發起</string>
     <string name="starting_as_account">以 %1$s 的身分發起</string>
+    <string name="notification_push_storage_unavailable">無法讀取已儲存的推播設定。設定已保留，推播註冊已暫停。請在裝置解鎖後重試。</string>
+    <string name="notification_push_import_pending">部分舊有推播設定無法復原。設定已保留，推播註冊已暫停。請重試以再次檢查。</string>
+    <string name="notification_push_cleanup_unknown">無法確認先前的推播清理是否完成。推播註冊已暫停。重試會再次檢查已儲存的狀態，不會清除或重設。</string>
 </resources>

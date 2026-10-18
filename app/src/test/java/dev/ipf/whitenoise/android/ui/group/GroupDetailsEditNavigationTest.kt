@@ -581,6 +581,10 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
         val successor = testController.controller.transferAdminCandidates().first()
         val successorName = testController.controller.memberDisplayName(successor)
+        // Leave routing awaits a native roster read outside Compose's idle tracking.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasText(successorName) and hasClickAction()).fetchSemanticsNodes().size == 1
+        }
         composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
         composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
         composeRule
@@ -599,6 +603,10 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("confirmation.confirm").assertDoesNotExist()
         assertEquals(emptyList<String>(), mutations)
         composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
+        // Leave routing awaits a native roster read outside Compose's idle tracking.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasText(successorName) and hasClickAction()).fetchSemanticsNodes().size == 1
+        }
         composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
         composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
         try {

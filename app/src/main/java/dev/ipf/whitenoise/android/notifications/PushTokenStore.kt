@@ -3,8 +3,11 @@ package dev.ipf.whitenoise.android.notifications
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import androidx.annotation.VisibleForTesting
+import dev.ipf.whitenoise.android.state.AndroidKeystoreSecretKeyProvider
+import dev.ipf.whitenoise.android.state.KeystoreSecureStore
+import dev.ipf.whitenoise.android.state.LegacySecurePreferences
+import dev.ipf.whitenoise.android.state.SecureStoreKeyProvider
 
 private const val PREFS_NAME = "whitenoise.push.tokens"
 private const val SECURE_PREFS_NAME = "whitenoise.push.tokens.secure"
@@ -12,18 +15,18 @@ private const val SECURE_PREFS_NAME = "whitenoise.push.tokens.secure"
 // Plaintext prefs used only when the keystore-backed store can't be opened on
 // this device. Distinct file so it never aliases the encrypted store's bytes.
 private const val FALLBACK_PREFS_NAME = "whitenoise.push.tokens.fallback"
-private const val KEY_FCM_TOKEN = "fcm_token"
-private const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC = "pending_native_push_registration_sync"
-private const val KEY_PENDING_PUSH_WAKE_CATCH_UP = "pending_push_wake_catch_up"
-private const val KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = "pending_push_wake_catch_up_generation"
-private const val KEY_PUSH_WAKE_CATCH_UP_SEQUENCE = "push_wake_catch_up_sequence"
-private const val KEY_WAKE_ATTEMPTS = "push_wake_attempts"
-private const val KEY_WAKE_RETRY_AT = "push_wake_retry_at"
+internal const val KEY_FCM_TOKEN = "fcm_token"
+internal const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC = "pending_native_push_registration_sync"
+internal const val KEY_PENDING_PUSH_WAKE_CATCH_UP = "pending_push_wake_catch_up"
+internal const val KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = "pending_push_wake_catch_up_generation"
+internal const val KEY_PUSH_WAKE_CATCH_UP_SEQUENCE = "push_wake_catch_up_sequence"
+internal const val KEY_WAKE_ATTEMPTS = "push_wake_attempts"
+internal const val KEY_WAKE_RETRY_AT = "push_wake_retry_at"
 internal const val PUSH_WAKE_MAX_ATTEMPTS = 4
 internal const val PUSH_WAKE_BACKOFF_MS = 30_000L
 private const val PUSH_WAKE_MAX_BACKOFF_MS = 240_000L
-private const val KEY_PENDING_CLEARS = "pending_clears"
-private const val KEY_PENDING_DISABLES = "pending_native_push_disables"
+internal const val KEY_PENDING_CLEARS = "pending_clears"
+internal const val KEY_PENDING_DISABLES = "pending_native_push_disables"
 private const val NO_PENDING_PUSH_WAKE_CATCH_UP = 0L
 private const val LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = 1L
 
@@ -50,7 +53,24 @@ internal data class PushWakeAttemptClaim(
  */
 class PushTokenStore(
     private val preferences: SharedPreferences,
+    private val recoveryStatus: () -> PushStorageRecovery = { PushStorageRecovery.Ready },
+    private val retryImport: () -> Unit = {},
 ) {
+    /** Observes retained storage without interpreting unavailable data as an empty cleanup queue. */
+    internal fun recoveryState(retry: Boolean = false): PushStorageRecovery =
+        synchronized(LOCK) {
+            try {
+                if (retry) retryImport()
+                preferences.all // Resolve lazy migration before inspecting durable safety state.
+                recoveryStatus()
+            } catch (_: Exception) {
+                PushStorageRecovery.StorageUnavailable
+            }
+        }
+
+    /** Unknown legacy cleanup or an orphaned historical fence holds every native registration path. */
+    internal fun registrationAllowed(): Boolean = recoveryState() == PushStorageRecovery.Ready
+
     /** Returns only a non-blank cached FCM token; absence requires fresh token acquisition. */
     fun lastToken(): String? = preferences.getString(KEY_FCM_TOKEN, null)?.takeIf { it.isNotBlank() }
 
@@ -82,7 +102,9 @@ class PushTokenStore(
     @SuppressLint("ApplySharedPref")
     fun recordPendingNativePushRegistrationSync() {
         synchronized(LOCK) {
-            preferences.edit().putBoolean(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, true).commit()
+            if (!preferences.edit().putBoolean(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, true).commit()) {
+                throw PushTokenStorageException()
+            }
         }
     }
 
@@ -343,13 +365,13 @@ class PushTokenStore(
     /** Returns account refs whose failed sign-out disable must be retried before registration is allowed. */
     fun pendingDisables(): Set<String> = preferences.getStringSet(KEY_PENDING_DISABLES, emptySet())?.toSet() ?: emptySet()
 
-    /** Idempotently queues an account's failed native-push disable for the next synchronization. */
-    fun recordPendingDisable(account: String) {
-        if (account.isBlank()) return
-        synchronized(LOCK) {
+    /** Commits an account-specific disable obligation before sign-out admission, even after a failed prior commit. */
+    @SuppressLint("ApplySharedPref")
+    fun recordPendingDisable(account: String): Boolean {
+        if (account.isBlank()) return false
+        return synchronized(LOCK) {
             val current = pendingDisables()
-            if (account in current) return
-            preferences.edit().putStringSet(KEY_PENDING_DISABLES, current + account).apply()
+            preferences.edit().putStringSet(KEY_PENDING_DISABLES, current + account).commit()
         }
     }
 
@@ -370,126 +392,121 @@ class PushTokenStore(
         // Firebase background thread while sign-out uses another instance), so
         // an instance lock would serialize nothing across them. See #167.
         private val LOCK = Any()
+        private const val KEYSTORE_ALIAS = "whitenoise.push.tokens.keystore.key"
+        private var keyProvider: SecureStoreKeyProvider = AndroidKeystoreSecretKeyProvider(KEYSTORE_ALIAS)
 
-        /** Opens the existing secure-or-fallback store and best-effort migrates legacy push state. */
-        fun create(context: Context): PushTokenStore {
-            val appContext = context.applicationContext
-            val secure = openSecure(appContext)
-            val legacy = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            // Migration reads/writes the (possibly encrypted) store, which can
-            // throw on a corrupted value; a migration failure just defers the
-            // copy to a later launch (legacy is left intact), so never let it
-            // crash construction.
-            runCatching { migrateLegacyPushTokenPreferences(legacy, secure) }
-            return PushTokenStore(secure)
-        }
-
-        private fun openSecure(context: Context): SharedPreferences =
-            try {
-                createSecure(context)
-            } catch (primary: Exception) {
-                // A GeneralSecurityException/IOException is usually a corrupted
-                // store that one delete-and-recreate clears. But keystore-level
-                // faults — MasterKey build failing, a missing/broken
-                // AndroidKeyStore provider on some OEM/old/rooted devices, or
-                // master-key invalidation — throw again on recreate. create()
-                // runs in an AppState field initializer, so an uncaught throw
-                // here crashes app launch (the old plaintext prefs never threw,
-                // so this would be a regression). Degrade to plaintext prefs
-                // (pre-encryption behavior, the LOW risk this store accepted
-                // before) rather than taking the app down.
-                runCatching { recreateAfterCorruption(context) }
-                    .getOrElse { context.getSharedPreferences(FALLBACK_PREFS_NAME, Context.MODE_PRIVATE) }
+        /** JVM fixtures supply an AES key; null restores the production Keystore boundary. */
+        @VisibleForTesting
+        internal fun installKeyProvider(provider: SecureStoreKeyProvider?) {
+            synchronized(LOCK) {
+                keyProvider = provider ?: AndroidKeystoreSecretKeyProvider(KEYSTORE_ALIAS)
             }
-
-        private fun recreateAfterCorruption(context: Context): SharedPreferences {
-            context.deleteSharedPreferences(SECURE_PREFS_NAME)
-            return createSecure(context)
         }
 
-        private fun createSecure(context: Context): SharedPreferences {
-            val masterKey =
-                MasterKey
-                    .Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-            return EncryptedSharedPreferences.create(
-                context,
-                SECURE_PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-            )
+        private enum class LegacyImportResult(
+            val quarantined: Boolean = false,
+        ) {
+            IMPORTED,
+            PENDING,
+            QUARANTINED(true),
+            BLOCKED(true),
         }
+
+        /** Quarantine never writes a receipt or removes source keys; target failures remain retryable. */
+        private fun importSource(
+            context: Context,
+            source: String,
+            secure: PushTokenPreferences,
+        ): LegacyImportResult {
+            val receipt = secure.hasImported(source)
+            val legacy =
+                runCatching {
+                    if (source == SECURE_PREFS_NAME) {
+                        LegacySecurePreferences.openForImport(context, source)
+                    } else {
+                        context.getSharedPreferences(source, Context.MODE_PRIVATE)
+                    }
+                }
+            return when {
+                receipt -> {
+                    // Cleanup failure cannot invalidate a durable target receipt.
+                    runCatching { legacy.getOrNull()?.let(secure::cleanupImportedSource) }
+                    LegacyImportResult.IMPORTED
+                }
+                legacy.isFailure -> LegacyImportResult.BLOCKED
+                else ->
+                    try {
+                        legacy.getOrNull()?.let { secure.importLegacy(source, it) }
+                        LegacyImportResult.IMPORTED
+                    } catch (malformed: MalformedLegacyPushSource) {
+                        if (malformed.cleanupRequired) LegacyImportResult.BLOCKED else LegacyImportResult.QUARANTINED
+                    }
+            }
+        }
+
+        /** Constructs lazily so a locked Keystore cannot crash AppState initialization. */
+        @Suppress("LongMethod") // One serialized import and registration-safety boundary for three legacy sources.
+        fun create(context: Context): PushTokenStore =
+            synchronized(LOCK) {
+                val appContext = context.applicationContext
+                val safety = appContext.getSharedPreferences("whitenoise.push.safety", Context.MODE_PRIVATE)
+                var initialized = false
+                var nextImportAttemptMs = 0L
+                lateinit var secure: PushTokenPreferences
+                secure =
+                    PushTokenPreferences(
+                        KeystoreSecureStore(
+                            appContext,
+                            "whitenoise.push.tokens.keystore",
+                            keyProvider,
+                        ),
+                        LOCK,
+                        prepare = {
+                            if (!initialized && android.os.SystemClock.elapsedRealtime() >= nextImportAttemptMs) {
+                                val results =
+                                    listOf(SECURE_PREFS_NAME, FALLBACK_PREFS_NAME, PREFS_NAME)
+                                        .associateWith { source ->
+                                            runCatching { importSource(appContext, source, secure) }
+                                                .getOrDefault(LegacyImportResult.PENDING)
+                                        }
+                                val pending = results.containsValue(LegacyImportResult.PENDING)
+                                val quarantined = results.filterValues { it.quarantined }.keys
+                                check(
+                                    safety.edit()
+                                        .putBoolean("migration_unknown", pending)
+                                        .putStringSet("quarantined_sources", quarantined)
+                                        .putBoolean(
+                                            "quarantine_cleanup_unknown",
+                                            results.containsValue(LegacyImportResult.BLOCKED),
+                                        )
+                                        .commit(),
+                                )
+                                initialized = !pending && quarantined.isEmpty()
+                                if (!initialized) {
+                                    android.util.Log.w("PushTokenStorage", "legacy_import_deferred")
+                                    nextImportAttemptMs = android.os.SystemClock.elapsedRealtime() + 30_000L
+                                }
+                            }
+                        },
+                    )
+                // Initialization happens at the first operation, under LOCK. Any unread legacy
+                // cleanup or unavailable Keystore fails closed instead of appearing empty.
+                PushTokenStore(
+                    secure,
+                    recoveryStatus = {
+                        when {
+                            safety.getBoolean("cleanup_unknown", false) ||
+                                safety.getBoolean("quarantine_cleanup_unknown", false) ->
+                                PushStorageRecovery.CleanupReconciliationRequired
+                            safety.getBoolean("migration_unknown", true) -> PushStorageRecovery.LegacyImportPending
+                            else -> PushStorageRecovery.Ready
+                        }
+                    },
+                    retryImport = {
+                        initialized = false
+                        nextImportAttemptMs = 0L
+                    },
+                )
+            }
     }
-}
-
-/** Copies legacy push state into secure storage without overwriting newer values. */
-internal fun migrateLegacyPushTokenPreferences(
-    legacy: SharedPreferences,
-    secure: SharedPreferences,
-) {
-    val legacyValues = legacy.all
-    if (legacyValues.isEmpty()) return
-    val editor = secure.edit()
-    var wrote = false
-    copyStringIfMissing(legacyValues, secure, editor, KEY_FCM_TOKEN).also { wrote = wrote || it }
-    copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).also { wrote = wrote || it }
-    copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_PUSH_WAKE_CATCH_UP).also { wrote = wrote || it }
-    copyLongIfMissing(legacyValues, secure, editor, KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION).also { wrote = wrote || it }
-    copyLongIfMissing(legacyValues, secure, editor, KEY_PUSH_WAKE_CATCH_UP_SEQUENCE).also { wrote = wrote || it }
-    copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_CLEARS).also { wrote = wrote || it }
-    copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_DISABLES).also { wrote = wrote || it }
-    if (!wrote || editor.commit()) {
-        legacy.edit().clear().apply()
-    }
-}
-
-private fun copyStringIfMissing(
-    values: Map<String, *>,
-    secure: SharedPreferences,
-    editor: SharedPreferences.Editor,
-    key: String,
-): Boolean {
-    if (secure.contains(key)) return false
-    val value = values[key] as? String ?: return false
-    editor.putString(key, value)
-    return true
-}
-
-private fun copyBooleanIfMissing(
-    values: Map<String, *>,
-    secure: SharedPreferences,
-    editor: SharedPreferences.Editor,
-    key: String,
-): Boolean {
-    if (secure.contains(key)) return false
-    val value = values[key] as? Boolean ?: return false
-    editor.putBoolean(key, value)
-    return true
-}
-
-private fun copyLongIfMissing(
-    values: Map<String, *>,
-    secure: SharedPreferences,
-    editor: SharedPreferences.Editor,
-    key: String,
-): Boolean {
-    if (secure.contains(key)) return false
-    val value = values[key] as? Long ?: return false
-    editor.putLong(key, value)
-    return true
-}
-
-private fun copyStringSetIfMissing(
-    values: Map<String, *>,
-    secure: SharedPreferences,
-    editor: SharedPreferences.Editor,
-    key: String,
-): Boolean {
-    if (secure.contains(key)) return false
-    @Suppress("UNCHECKED_CAST")
-    val value = values[key] as? Set<String> ?: return false
-    editor.putStringSet(key, value)
-    return true
 }

@@ -299,6 +299,57 @@ class GroupMemberAdministrationGateTest {
             }
         }
 
+    /** One canonicalization failure retains its typed cause instead of emitting a second unknown failure. */
+    @Test
+    fun recipientResolutionEmitsExactlyOneTypedFailure() =
+        runBlocking {
+            val state = appState(accountIdHexResolver = { throw MarmotKitException.InvalidIdentity("synthetic") })
+            val controller = readyController(state)
+            org.robolectric.shadows.ShadowLog
+                .clear()
+            try {
+                assertFalse(controller.inviteMembers(listOf("carol")))
+                val failures =
+                    org.robolectric.shadows.ShadowLog
+                        .getLogsForTag("GroupCreation")
+                        .map { it.msg }
+                        .filter { "phase=recipients" in it && "outcome=failure" in it }
+                assertEquals(1, failures.size)
+                assertTrue("failure=invalid_identity" in failures.single())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** Recipient cancellation propagates with one cancelled diagnostic and no generic mutation failure. */
+    @Test
+    fun recipientResolutionCancellationDoesNotEmitASecondFailure() =
+        runBlocking {
+            val state = appState(accountIdHexResolver = { throw kotlinx.coroutines.CancellationException("synthetic") })
+            val controller = readyController(state)
+            org.robolectric.shadows.ShadowLog
+                .clear()
+            var cancelled = false
+            try {
+                try {
+                    controller.inviteMembers(listOf("carol"))
+                } catch (_: kotlinx.coroutines.CancellationException) {
+                    cancelled = true
+                }
+                assertTrue(cancelled)
+                val events =
+                    org.robolectric.shadows.ShadowLog
+                        .getLogsForTag("GroupCreation")
+                        .map { it.msg }
+                        .filter { "phase=recipients" in it }
+                assertEquals(1, events.count { "outcome=cancelled" in it })
+                assertTrue(events.none { "outcome=failure" in it })
+                assertNull(controller.lastMutationError)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** A retired controller keeps its diagnostic without overwriting another account's current notice. */
     @Test
     fun retiredConversationFailurePreservesCurrentAccountsNotice() {
@@ -466,10 +517,11 @@ class GroupMemberAdministrationGateTest {
     private fun appState(
         runtimeAccess: RuntimeAccessRecorder? = null,
         marmotAccessObserver: (() -> Unit)? = runtimeAccess?.let { it::record },
+        accountIdHexResolver: suspend (String) -> String? = { it },
     ) = WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext(),
         draftStore = DraftStore(GroupMemberAdministrationDraftPersistence()),
-        accountIdHexResolver = { it },
+        accountIdHexResolver = accountIdHexResolver,
         accounts =
             listOf(
                 AccountSummaryFfi(
