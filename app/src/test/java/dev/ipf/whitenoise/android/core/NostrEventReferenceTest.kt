@@ -290,6 +290,7 @@ class NostrEventReferenceTest {
                 listOf(text("say \""), uri(NOTE), text("\" now")) to "say now",
                 listOf(text("options ( "), uri(NOTE), text(" ) here")) to "options here",
                 listOf(text("hello "), text("("), uri(NOTE), text(") next")) to "hello next",
+                listOf(text("Hello, "), text("("), uri(NOTE), text("), goodbye")) to "Hello, goodbye",
                 listOf(text("Look at the"), uri(NOTE), text("")) to "Look at the",
                 listOf(text("Hello, "), uri(NOTE), text(", goodbye")) to "Hello, goodbye",
                 listOf(uri(NOTE), text(": details")) to "details",

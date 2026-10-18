@@ -79,7 +79,8 @@ private fun MutableList<MarkdownInlineFfi>.closeUp(
         if (trimmedBefore.isEmpty()) hadSpace = trimTrailingSpace() || hadSpace
     }
     val lineStart = isAtLineStart()
-    rest = rest.withoutRepeatedSeparator(lineStart, (lastOrNull() as? MarkdownInlineFfi.Text)?.content)
+    val textBefore = lastOrNull { it !is MarkdownInlineFfi.Text || it.content.isNotEmpty() } as? MarkdownInlineFfi.Text
+    rest = rest.withoutRepeatedSeparator(lineStart, textBefore?.content)
     val continues = rest.firstOrNull()?.let { it !in CLOSING_PUNCTUATION } == true
     return if (hadSpace && continues && !lineStart) " $rest" else rest
 }
