@@ -232,6 +232,16 @@ internal class NotificationBootstrapTestFixture(
     /** Runtime events the fixture's firehose delivers, in order, to every subscriber. */
     private val runtimeEvents = Channel<MarmotEventFfi>(Channel.UNLIMITED)
 
+    /** How many runtime event subscriptions the app opened. */
+    val eventsSubscriptions =
+        java.util.concurrent.atomic
+            .AtomicInteger()
+
+    /** Whether the first runtime event subscription was opened before the runtime started. */
+    @Volatile
+    var firstEventsSubscriptionBeforeStart: Boolean? = null
+        private set
+
     /** How many of the next runtime event-stream opens fail, as an unavailable binding would. */
     val eventOpenFailures =
         java.util.concurrent.atomic
@@ -348,6 +358,9 @@ internal class NotificationBootstrapTestFixture(
                 }
                 "setAuditLogSettings" -> arguments?.first()
                 "subscribeEvents" -> {
+                    if (eventsSubscriptions.getAndIncrement() == 0) {
+                        firstEventsSubscriptionBeforeStart = !runtimeStarted.get()
+                    }
                     if (eventOpenFailures.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0) {
                         error("fixture event stream unavailable")
                     }

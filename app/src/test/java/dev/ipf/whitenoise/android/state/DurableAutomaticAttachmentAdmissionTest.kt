@@ -110,6 +110,24 @@ class DurableAutomaticAttachmentAdmissionTest {
             assertEquals(0, fixture.automaticDemands.get())
         }
 
+    /**
+     * Once an account list has loaded, an empty one means the last account is gone: legacy work for it ends rather
+     * than retrying forever as if the list had not loaded yet.
+     */
+    @Test
+    fun aLoadedEmptyAccountListEndsTheWork() =
+        runTest(dispatcher) {
+            fixture.close()
+            fixture = MediaDownloadIntegrationFixture(accounts = emptyList())
+            fixture.markAccountListLoaded()
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+
+            expectDeferred(type = null, hold = AutomaticAttachmentHold.UnknownAccount)
+
+            assertFalse("a removed account's work ends", AutomaticAttachmentHold.UnknownAccount.waits)
+            assertEquals(0, fixture.automaticDemands.get())
+        }
+
     /** A connection without validated internet holds the type for the network only, so the work waits for one. */
     @Test
     fun automaticWorkWaitsForTheNetworkWithoutValidatedInternet() =

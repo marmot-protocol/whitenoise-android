@@ -263,20 +263,45 @@ class IncomingAttachmentAutoDownloadTest {
         }
 
     /**
-     * When the suppression reads fail, the message is scheduled anyway: scheduling is idempotent, and treating it
-     * as notified would leave the media of a muted chat unscheduled for good.
+     * The receipt event subscription is opened before the runtime starts and is the one the receipt loop reads, so
+     * a muted message delivered between start and the listener's subscriptions still reaches a receipt scheduler.
      */
     @Test
-    fun aFailedSuppressionReadStillSchedulesTheMedia() =
+    fun theReceiptSubscriptionOpensBeforeTheRuntimeStarts() =
         runBlocking {
             persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
-            var failing = false
-            val fixture = fixture(history = mixedHistory(), muted = true, failSuppressionReads = { failing })
+            val fixture = fixture(history = mixedHistory(), muted = true)
             try {
                 fixture.bootstrap()
                 setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
                 fixture.ensureNotificationRuntimeStarted()
-                failing = true
+
+                fixture.emitRuntimeEvent(receivedChatMessage())
+                val expected = targetSlots().map { request(it.index) }
+                assertTrue(
+                    "queued=${expected.map(::queued)}",
+                    fixture.runWithMainLooperPumping { awaitQueued(expected) },
+                )
+                assertEquals("opened before start", true, fixture.firstEventsSubscriptionBeforeStart)
+                assertEquals("the receipt loop reads that same subscription", 1, fixture.eventsSubscriptions.get())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * A chat unmuted after MDK suppressed its message is still scheduled: the runtime event schedules every received
+     * chat message, rather than inferring the earlier notification outcome from the settings as they are now.
+     */
+    @Test
+    fun aMessageSuppressedBeforeAnUnmuteIsStillScheduled() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory(), muted = false)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.ensureNotificationRuntimeStarted()
 
                 fixture.emitRuntimeEvent(receivedChatMessage())
 
@@ -285,56 +310,35 @@ class IncomingAttachmentAutoDownloadTest {
                     "queued=${expected.map(::queued)}",
                     fixture.runWithMainLooperPumping { awaitQueued(expected) },
                 )
+                assertEquals("no notification update was delivered", 0, fixture.consumedUpdateCount())
             } finally {
                 fixture.close()
             }
         }
 
-    /** A failed read of the account's notification settings schedules the media too, rather than dropping it. */
+    /** A message both receipt sources report runs its bounded history lookup once, whichever source is first. */
     @Test
-    fun aFailedNotificationSettingsReadStillSchedulesTheMedia() =
+    fun bothReceiptSourcesLookUpAMessageOnce() =
         runBlocking {
             persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
-            var failing = false
-            val fixture = fixture(history = mixedHistory(), muted = false, failNotificationSettingsReads = { failing })
+            val fixture = fixture(history = mixedHistory(), muted = false)
             try {
                 fixture.bootstrap()
                 setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
                 fixture.ensureNotificationRuntimeStarted()
-                failing = true
 
-                fixture.emitRuntimeEvent(receivedChatMessage())
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+                val pagesAfterNotification = fixture.attachmentHistoryPageCalls.get()
+                fixture.emitRuntimeEvent(receivedChatMessage(fixture.update.messageIdHex!!))
+                fixture.runWithMainLooperPumping { delay(300L) }
 
-                val expected = targetSlots().map { request(it.index) }
-                assertTrue(
-                    "queued=${expected.map(::queued)}",
-                    fixture.runWithMainLooperPumping { awaitQueued(expected) },
+                assertTrue("the notification looked the message up", pagesAfterNotification > 0)
+                assertEquals(
+                    "the event did not look it up again",
+                    pagesAfterNotification,
+                    fixture.attachmentHistoryPageCalls.get(),
                 )
-            } finally {
-                fixture.close()
-            }
-        }
-
-    /** An unmuted chat's runtime event leaves scheduling to its notification update, so it reads no history. */
-    @Test
-    fun unmutedChatRuntimeEventLeavesSchedulingToTheNotification() =
-        runBlocking {
-            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
-            val muteReads = AtomicInteger(0)
-            val fixture = fixture(history = mixedHistory(), muted = false, onMuteRead = muteReads::incrementAndGet)
-            try {
-                fixture.bootstrap()
-                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
-                fixture.ensureNotificationRuntimeStarted()
-                val readsBefore = muteReads.get()
-
-                fixture.emitRuntimeEvent(receivedChatMessage())
-                // The event's own mute read shows the stream reached it and decided.
-                assertTrue(fixture.runWithMainLooperPumping { awaitCount(muteReads, readsBefore + 1) })
-                fixture.runWithMainLooperPumping { delay(200L) }
-
-                assertEquals("no history read for an unmuted chat", 0, fixture.attachmentHistoryPageCalls.get())
-                assertEquals(0, queued(request(IMAGE_INDEX)))
+                targetSlots().forEach { assertEquals(1, workInfos(request(it.index)).size) }
             } finally {
                 fixture.close()
             }

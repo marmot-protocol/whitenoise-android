@@ -451,6 +451,11 @@ internal class MediaDownloadIntegrationFixture(
         ) = Unit
     }
 
+    /** Marks the account list as successfully loaded, as an account read that returned no accounts does. */
+    fun markAccountListLoaded() {
+        field("accountListLoaded").setBoolean(state, true)
+    }
+
     companion object {
         const val ACCOUNT = "synthetic-account"
         val GROUP = "01".repeat(16)

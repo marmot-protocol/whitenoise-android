@@ -367,6 +367,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 Result.retry()
             } else {
                 intentStore.resetTransientRetry(request)
+                // Work that ends here, for example for an account a loaded list no longer has, keeps no wait record,
+                // since only signed-in accounts are ever swept again.
+                runCatching { AutomaticAttachmentNetworkWaits.get(applicationContext).forget(request) }
                 Result.success()
             }
         } catch (_: AttachmentPermissionPendingException) {
