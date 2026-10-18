@@ -21,9 +21,10 @@ internal fun List<MarkdownInlineFfi>.withoutRepeatsOf(represented: Set<String>):
             !afterRepeat -> kept += inline
             inline.isSpaceOnly() -> gap = true
             else -> {
-                kept.appendAfterRepeat(inline, gap)
-                afterRepeat = false
-                gap = false
+                // Until something visible follows, closing up continues and carries any space still owed.
+                val owed = kept.appendAfterRepeat(inline, gap)
+                afterRepeat = owed != null
+                gap = owed == true
             }
         }
     }
@@ -40,20 +41,38 @@ private fun MutableList<MarkdownInlineFfi>.trimTrailingSpace(): Boolean {
     return trimmed.length != previous.content.length
 }
 
-/** Appends the inline that follows a removed repeat, dropping a break that would leave its line empty. */
+/**
+ * Appends the inline that follows a removed repeat. While that adds nothing visible, because a break would leave its
+ * line empty or the removal emptied the text, nothing is appended and the result says whether a space is still owed.
+ * Once something visible is appended the result is null.
+ */
 private fun MutableList<MarkdownInlineFfi>.appendAfterRepeat(
     inline: MarkdownInlineFfi,
     gap: Boolean,
-) {
+): Boolean? =
     when {
-        inline.isSoftOrHardBreak() -> if (!isAtLineStart()) add(inline)
-        inline is MarkdownInlineFfi.Text -> add(MarkdownInlineFfi.Text(closeUp(inline.content, gap)))
+        inline.isSoftOrHardBreak() ->
+            if (isAtLineStart()) {
+                false
+            } else {
+                add(inline)
+                null
+            }
+        inline is MarkdownInlineFfi.Text -> {
+            val text = closeUp(inline.content, gap)
+            if (text.isBlank()) {
+                text.isNotEmpty()
+            } else {
+                add(MarkdownInlineFfi.Text(text))
+                null
+            }
+        }
         else -> {
             if (gap && !isAtLineStart()) add(MarkdownInlineFfi.Text(" "))
             add(inline)
+            null
         }
     }
-}
 
 /**
  * [next] with the gap before it closed up. A bracket or quote pair left empty around the removed repeat goes with it,
@@ -69,19 +88,19 @@ private fun MutableList<MarkdownInlineFfi>.closeUp(
     val previousIndex = indexOfLast { it !is MarkdownInlineFfi.Text || it.content.isNotEmpty() }
     val previous = getOrNull(previousIndex) as? MarkdownInlineFfi.Text
     if (previous != null && closesEmptyPair(previous.content, rest)) {
-        val before = previous.content.dropLast(1)
-        val trimmedBefore = before.trimEnd(' ', '\t')
+        val trimmedBefore = previous.content.dropLast(1).trimEnd(' ', '\t')
         this[previousIndex] = MarkdownInlineFfi.Text(trimmedBefore)
-        val after = rest.drop(1)
-        rest = after.trimStart(' ', '\t')
-        hadSpace = trimmedBefore.length != before.length || rest.length != after.length
         // A pair that was its own text leaves the space before it in the text before that.
-        if (trimmedBefore.isEmpty()) hadSpace = trimTrailingSpace() || hadSpace
+        if (trimmedBefore.isEmpty()) trimTrailingSpace()
+        rest = rest.drop(1).trimStart(' ', '\t')
+        // The pair stood between what came before and after it, so words on either side stay apart.
+        hadSpace = true
     }
     val lineStart = isAtLineStart()
     val textBefore = lastOrNull { it !is MarkdownInlineFfi.Text || it.content.isNotEmpty() } as? MarkdownInlineFfi.Text
     rest = rest.withoutRepeatedSeparator(lineStart, textBefore?.content)
-    val continues = rest.firstOrNull()?.let { it !in CLOSING_PUNCTUATION } == true
+    // An empty rest owes its space to whatever visible content follows.
+    val continues = rest.firstOrNull()?.let { it !in CLOSING_PUNCTUATION } != false
     return if (hadSpace && continues && !lineStart) " $rest" else rest
 }
 
