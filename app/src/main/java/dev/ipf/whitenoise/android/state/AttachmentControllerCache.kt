@@ -5,11 +5,17 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** One slot identity shared by the attachment presentation and its facade adapters. */
+internal fun attachmentTransferSlotKey(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): String = "$messageIdHex#$attachmentIndex"
+
 /** Returns the conversation-local coordinator key for one attachment slot. */
 internal fun ConversationController.attachmentTransferKey(
     messageIdHex: String,
     attachmentIndex: Int,
-): String = "$messageIdHex#$attachmentIndex"
+): String = attachmentTransferSlotKey(messageIdHex, attachmentIndex)
 
 /**
  * Drops decrypted bytes after a decoder or playback failure so the next open

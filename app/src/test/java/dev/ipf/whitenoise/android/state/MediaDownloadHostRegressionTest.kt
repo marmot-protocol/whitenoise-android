@@ -169,6 +169,65 @@ class MediaDownloadHostRegressionTest {
             assertEquals(1, fixture.calls.size)
         }
 
+    /** The extracted request entry retires its UI waiter without cancelling the app's native acquisition. */
+    @Test
+    fun attachmentPresentationReplacementJoinsTheNativeAcquisitionAfterDisposal() =
+        runTest(dispatcher) {
+            val request = qualifiedRequest()
+            val presentation = attachmentPresentation(request)
+            val replacement = attachmentPresentation(request)
+            try {
+                val observed =
+                    presentation.attachmentTransferState(request.messageIdHex, 0, initiallyAvailable = false)
+                val departing =
+                    presentation.requestAttachmentTransfer(
+                        request.messageIdHex,
+                        0,
+                        reference(0),
+                        priority = AttachmentDownloadPriority.Automatic,
+                    )
+                val nativeCall = fixture.entered.receive()
+                assertEquals(AttachmentTransferState.Downloading, observed.value)
+
+                presentation.releaseAttachmentTransferState(request.messageIdHex, 0)
+                presentation.dispose()
+                runCurrent()
+                assertTrue(departing.isCancelled)
+                assertFalse(nativeCall.result.isCancelled)
+                assertFalse(fixture.cancellationObserved.isCompleted)
+
+                val replacementState =
+                    replacement.attachmentTransferState(request.messageIdHex, 0, initiallyAvailable = false)
+                val returning =
+                    replacement.requestAttachmentTransfer(
+                        request.messageIdHex,
+                        0,
+                        reference(0),
+                        priority = AttachmentDownloadPriority.Automatic,
+                    )
+                runCurrent()
+                val expected = bytes(reference(0).fileName)
+                nativeCall.succeed(expected)
+                assertArrayEquals(expected, returning.await())
+                assertEquals(AttachmentTransferState.Available, replacementState.value)
+                assertEquals(1, fixture.calls.size)
+                assertEquals(1, fixture.automaticDemands.get())
+                assertFalse(fixture.cancellationObserved.isCompleted)
+            } finally {
+                presentation.dispose()
+                replacement.dispose()
+            }
+        }
+
+    /** Uses the shipping owner and existing native fixture without adding a production test seam. */
+    private fun attachmentPresentation(request: AttachmentTransferRequest) =
+        ConversationAttachmentPresentation(
+            appState = fixture.state,
+            accountRef = request.accountRef,
+            groupIdHex = request.groupIdHex,
+            sourceMessageId = { request.sourceMessageIdHex },
+        )
+
     /** A deliberate tap upgrades native demand while retaining the one shared acquisition owner. */
     @Test
     fun interactiveTapJoinsSuspendedAutomaticNativeAcquisition() =
