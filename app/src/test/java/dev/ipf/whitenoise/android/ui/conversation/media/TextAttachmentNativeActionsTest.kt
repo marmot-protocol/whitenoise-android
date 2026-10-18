@@ -112,7 +112,7 @@ class TextAttachmentNativeActionsTest {
             assertFalse(actions.sharing)
         }
 
-    /** Dismissing the share sheet cancels quietly and never leaves Share stuck busy. */
+    /** A share abandoned while it is prepared, as when the reader closes, cancels quietly and never sticks busy. */
     @Test
     fun aCancelledShareDoesNotStickTheBusyState() =
         runTest {
@@ -122,7 +122,7 @@ class TextAttachmentNativeActionsTest {
                     sourceIsCurrent = { true },
                     shareSource = {
                         shares += 1
-                        if (shares == 1) throw CancellationException("chooser dismissed")
+                        if (shares == 1) throw CancellationException("reader closed")
                     },
                 ) {}
 
