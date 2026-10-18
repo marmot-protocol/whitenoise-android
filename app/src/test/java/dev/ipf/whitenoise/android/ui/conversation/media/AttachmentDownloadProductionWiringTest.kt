@@ -133,12 +133,15 @@ class AttachmentDownloadProductionWiringTest {
     @Test
     fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
         val controller = projectSource("state/Controllers.kt").normalized()
+        val presentation = projectSource("state/ConversationAttachmentPresentation.kt").normalized()
         val sourceController = projectSource("state/AttachmentControllerCache.kt").normalized()
         val appState = projectSource("state/AppState.kt").normalized()
         val worker = projectSource("state/AttachmentDownloadWorker.kt").normalized()
 
-        assertTrue("appState.enqueueAttachmentDownload(request, priority)" in controller)
-        assertTrue("return appState.downloadAttachmentPlaintext(" in controller)
+        assertTrue("attachmentPresentation.requestAttachmentTransfer(" in controller)
+        assertTrue("attachmentPresentation.downloadAttachment(" in controller)
+        assertTrue("appState.enqueueAttachmentDownload(request, priority)" in presentation)
+        assertTrue("return appState.downloadAttachmentPlaintext(" in presentation)
         val resolver = projectSource("state/AttachmentPlaintextResolver.kt").normalized()
         val byteDownload =
             resolver

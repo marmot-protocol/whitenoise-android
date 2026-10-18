@@ -11,7 +11,7 @@ internal suspend fun clearAndAwaitConversationTestFixture(vararg controllers: Co
                 listOf(
                     fixtureScopeJob(controller, "controllerScope"),
                     fixtureScopeJob(controller, "inviteStreamScope"),
-                    fixtureScopeJob(controller, "attachmentTransferScope"),
+                    fixtureScopeJob(fixtureField(controller, "attachmentPresentation"), "scope"),
                     requireNotNull(controller.appState.mutationsScope.coroutineContext[Job]),
                     fixtureScopeJob(controller.appState, "profileScope"),
                 )
@@ -28,7 +28,18 @@ private fun fixtureScopeJob(
     owner: Any,
     name: String,
 ): Job {
-    val field = owner.javaClass.getDeclaredField(name).apply { isAccessible = true }
-    val scope = field.get(owner) as CoroutineScope
+    val scope = fixtureField(owner, name) as CoroutineScope
     return requireNotNull(scope.coroutineContext[Job])
 }
+
+/** Follows the production owner when a scope moves out of the facade. */
+private fun fixtureField(
+    owner: Any,
+    name: String,
+): Any =
+    requireNotNull(
+        owner.javaClass
+            .getDeclaredField(name)
+            .apply { isAccessible = true }
+            .get(owner),
+    )
