@@ -111,7 +111,13 @@ internal fun WhiteNoiseAppState.forwardTransport(
             return uploaded
         }
 
-        /** Stages the bytes as private snapshots for one native file upload that must start within a bound. */
+        /**
+         * Stages the bytes as private snapshots for one native file upload that must start within a bound. Abandoning
+         * a call that never started is safe even while MDK still has it queued. The queued command holds its own
+         * reference to the transfer control, so closing this handle does not free it. It checks the cancel before it
+         * opens any source and on every chunk, so it never reads the deleted snapshots. With `send = false`, it
+         * publishes nothing.
+         */
         private suspend fun uploadFileBacked(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
