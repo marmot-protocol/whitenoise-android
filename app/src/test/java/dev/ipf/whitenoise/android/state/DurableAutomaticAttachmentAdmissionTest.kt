@@ -128,6 +128,22 @@ class DurableAutomaticAttachmentAdmissionTest {
             assertEquals(0, fixture.automaticDemands.get())
         }
 
+    /**
+     * After an account was wiped, a failed account read leaves an empty list that is not authoritative, so a
+     * surviving account's queued work waits for the next read instead of finishing without downloading.
+     */
+    @Test
+    fun aFailedRefreshAfterAWipeKeepsSurvivingWorkWaiting() =
+        runTest(dispatcher) {
+            fixture.markAccountListLoaded()
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+
+            fixture.state.publishRefreshedAccountList(Result.failure(IllegalStateException("read failed")))
+
+            expectDeferred(type = null, hold = AutomaticAttachmentHold.AccountsUnloaded)
+            assertEquals(0, fixture.automaticDemands.get())
+        }
+
     /** A connection without validated internet holds the type for the network only, so the work waits for one. */
     @Test
     fun automaticWorkWaitsForTheNetworkWithoutValidatedInternet() =

@@ -2055,9 +2055,10 @@ class WhiteNoiseAppState private constructor(
         private set
 
     /**
-     * Whether an account list has loaded, from the process's initial accounts or a successful account read, so an
-     * empty [accounts] can tell "no account left" (loaded) from "not read yet" (unloaded). Automatic work for an
-     * account a loaded list lacks ends, while work that runs before any list loaded waits (#3308).
+     * Whether the current [accounts] came from a successful account read (or the process's initial accounts), so a
+     * missing account can tell "removed" from "not read". Automatic work for an account an authoritative list lacks
+     * ends; any other waits (#3308). A failed read clears it, since the list it leaves behind says nothing about
+     * which accounts survive, so a surviving account's work is never ended by a refresh that did not complete.
      */
     @Volatile
     private var accountListLoaded = initialAccounts.isNotEmpty()
@@ -7109,9 +7110,7 @@ class WhiteNoiseAppState private constructor(
             val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
             val retainedAccountGeneration =
                 accountListLifetime.advance {
-                    accounts = refreshedAccounts
-                    // A failed read leaves an empty list, which must not count as "no account left".
-                    if (refreshedAccountsResult.isSuccess) accountListLoaded = true
+                    publishRefreshedAccountList(refreshedAccountsResult)
                     releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
                     // An empty list here can mean "no accounts left" or "the read failed" -- retention
                     // is an allow-list, so only prune member mutes on a genuine successful read. A
@@ -11661,9 +11660,19 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
+     * Publishes the account list a post-wipe read produced. A failed read leaves an empty list that is not
+     * authoritative, so surviving accounts' automatic work waits for the next successful read instead of ending.
+     */
+    internal fun publishRefreshedAccountList(result: Result<List<AccountSummaryFfi>>) {
+        accounts = result.getOrDefault(emptyList())
+        accountListLoaded = result.isSuccess
+    }
+
+    /**
      * [accountRef]'s automatic-download inputs right now. Receipt scheduling and durable work both decide with
      * this, and [AutomaticAttachmentPolicy.allowedNow] matches the native permission exactly.
      */
+
     internal fun automaticAttachmentPolicy(accountRef: String): AutomaticAttachmentPolicy {
         val account = accounts.firstOrNull { it.label == accountRef }
         return AutomaticAttachmentPolicy(
