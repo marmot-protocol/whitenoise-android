@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,6 +38,24 @@ class FileUploadFitsTest {
 
         assertTrue(fileUploadFits(listOf(item(BYTES)), BATCH, needed))
         assertFalse(fileUploadFits(listOf(item(BYTES)), BATCH, needed - 1))
+    }
+
+    /**
+     * Two destinations uploading at once claim their staged copies in turn: when the disk holds one set, the second
+     * keeps the in-memory upload instead of failing to stage, and gets the file path again once the first releases.
+     */
+    @Test
+    fun concurrentDestinationsNeverCountOnTheSameDisk() {
+        val attachments = listOf(item(BYTES))
+        val copies = fileUploadCopyBytes(attachments)
+        val oneSet = copies + FILE_BACKED_DISK_RESERVE_BYTES
+        val claims = StagedDiskClaims()
+
+        assertEquals(BYTES * FILE_BACKED_DISK_COPIES, copies)
+        assertTrue(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
+        assertFalse(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
+        claims.release(copies)
+        assertTrue(claims.claimIf(copies, oneSet) { fileUploadFits(attachments, BATCH, it) })
     }
 
     /** An empty message or an empty item never takes the file path. */

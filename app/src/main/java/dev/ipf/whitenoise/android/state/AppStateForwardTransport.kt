@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedDiskClaims
+import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadCopyBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadFits
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
@@ -45,6 +47,9 @@ internal fun WhiteNoiseAppState.forwardTransport(
     fun requireDestinationAccount() {
         if (!isForwardOwnerSignedIn(account)) throw ForwardSessionInvalidatedException()
     }
+
+    // Disk this forward's concurrent destination uploads hold for staged copies, so they never count on the same space.
+    val diskClaims = StagedDiskClaims()
 
     return object : ForwardTransport {
         /** Resolves and decrypts one attachment strictly through the source account. */
@@ -85,27 +90,34 @@ internal fun WhiteNoiseAppState.forwardTransport(
          * transfer that never starts fails at the upload stage instead of looking stalled for minutes (#2556).
          * The in-memory upload stays for runtimes without the native library, as in JVM tests, and for messages
          * the file path cannot take: more items or bytes than one native file batch, or too little free disk for
-         * the staged copies.
+         * the staged copies once the other destinations of this forward have claimed theirs.
          */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
         ): List<MediaAttachmentReferenceFfi> {
             requireDestinationAccount()
+            val copyBytes = fileUploadCopyBytes(message.attachments)
             val batchCiphertextBytes =
                 withContext(Dispatchers.IO) {
                     nativeFileBackedSendLimits()?.batchCiphertextBytes?.takeIf { batch ->
                         val usableBytes = usableSpaceFor(uploadSourcesDirectory(appContext.cacheDir))
-                        fileUploadFits(message.attachments, batch, usableBytes)
+                        diskClaims.claimIf(copyBytes, usableBytes) { available ->
+                            fileUploadFits(message.attachments, batch, available)
+                        }
                     }
                 }
             val uploaded =
-                diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
-                    if (batchCiphertextBytes == null) {
-                        uploadInMemory(targetGroupIdHex, message)
-                    } else {
-                        uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes)
+                try {
+                    diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
+                        if (batchCiphertextBytes == null) {
+                            uploadInMemory(targetGroupIdHex, message)
+                        } else {
+                            uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes)
+                        }
                     }
+                } finally {
+                    if (batchCiphertextBytes != null) diskClaims.release(copyBytes)
                 }
             requireDestinationAccount()
             return uploaded

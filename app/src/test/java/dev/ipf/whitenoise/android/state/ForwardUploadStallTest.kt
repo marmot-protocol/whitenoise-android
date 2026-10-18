@@ -2,14 +2,17 @@ package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,6 +40,25 @@ class ForwardUploadStallTest {
             assertEquals(1, cancels)
             assertEquals(FORWARD_UPLOAD_START_MILLIS, testScheduler.currentTime)
             assertTrue("the caller was never cancelled", coroutineContext.isActive)
+        }
+
+    /**
+     * The production shape, a queued binding call that suspends between polls on the I/O dispatcher as UniFFI's async
+     * calls do, is abandoned at the bound: the watchdog reports the stall without waiting for MDK to answer.
+     */
+    @Test
+    fun aQueuedBindingCallOnTheIoDispatcherIsAbandonedAtTheBound() =
+        runTest {
+            val failure =
+                runCatching {
+                    watch(progress = { 0L }) {
+                        withContext(Dispatchers.IO) { suspendCancellableCoroutine<Unit> { } }
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is ForwardUploadStalledException)
+            assertEquals(1, cancels)
+            assertEquals(FORWARD_UPLOAD_START_MILLIS, testScheduler.currentTime)
         }
 
     /** A native call that answers the cancel with its own error still reports the stall. */

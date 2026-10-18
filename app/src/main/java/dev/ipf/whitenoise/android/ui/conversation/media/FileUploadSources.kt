@@ -50,11 +50,43 @@ internal fun fileUploadFits(
 ): Boolean {
     val countFits = attachments.isNotEmpty() && attachments.size <= MAX_FILE_UPLOAD_ITEMS
     val ciphertextBytes = attachments.sumOf { it.byteCount + FILE_AUTH_TAG_BYTES }
-    val diskBytes = attachments.sumOf { it.byteCount } * FILE_BACKED_DISK_COPIES + FILE_BACKED_DISK_RESERVE_BYTES
+    val diskBytes = fileUploadCopyBytes(attachments) + FILE_BACKED_DISK_RESERVE_BYTES
     return countFits &&
         attachments.all { it.byteCount > 0 } &&
         ciphertextBytes <= maxCiphertextBytes &&
         usableBytes >= diskBytes
+}
+
+/** The disk the copies of one staged upload of [attachments] hold at once, before the app's reserve. */
+internal fun fileUploadCopyBytes(attachments: List<PendingAttachment>): Long {
+    val plaintextBytes = attachments.sumOf { it.byteCount }
+    return plaintextBytes * FILE_BACKED_DISK_COPIES
+}
+
+/**
+ * The disk that concurrent staged uploads have claimed for their copies, so two destinations of one forward never
+ * both count on the same free space (#2556). Each claim is released once its upload ends.
+ */
+internal class StagedDiskClaims {
+    private var claimedBytes = 0L
+
+    /** Claims [bytes] if [fits] accepts what [usableBytes] leaves after earlier claims, and says whether it did. */
+    @Synchronized
+    fun claimIf(
+        bytes: Long,
+        usableBytes: Long,
+        fits: (availableBytes: Long) -> Boolean,
+    ): Boolean {
+        val accepted = fits(usableBytes - claimedBytes)
+        if (accepted) claimedBytes += bytes
+        return accepted
+    }
+
+    /** Releases a claim of [bytes] that [claimIf] accepted. */
+    @Synchronized
+    fun release(bytes: Long) {
+        claimedBytes -= bytes
+    }
 }
 
 /**
