@@ -12166,8 +12166,9 @@ class WhiteNoiseAppState private constructor(
                 // Only once the notification subscription is open, so start's no-replay window stays unwidened, and
                 // as a child of this listener on IO, so it stops with notifications without delaying them.
                 // Started again whenever an earlier one ended, for example after its event stream kept failing to open.
+                val listenerScope = CoroutineScope(currentCoroutineContext())
                 receiptLoop =
-                    receiptLoop?.takeIf { it.isActive } ?: CoroutineScope(currentCoroutineContext()).launch(Dispatchers.IO) {
+                    receiptLoop?.takeIf { it.isActive } ?: listenerScope.launch(Dispatchers.IO) {
                         runMutedChatReceiptLoop(marmot)
                     }
                 runtimeListenerTeardownOwner.withNotificationSubscription(subscription) {

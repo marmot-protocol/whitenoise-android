@@ -57,8 +57,6 @@ internal class NativeAttachmentPermissions {
     /** How many callers are waiting in [awaitApplied], so a test can act exactly while work is held. */
     internal fun waitersForTest(): StateFlow<Int> = applied.subscriptionCount
 
-    /** Whether a retry still belongs to both the latest host inputs and native runtime. */
-
     /** Marks [revision]'s refresh as applying, so a settle timeout does not supersede it with a new one. */
     fun beginRefresh(revision: Long) = inFlight.set(revision)
 
@@ -76,6 +74,7 @@ internal class NativeAttachmentPermissions {
         return pending != 0L && pending == revision.get() && runtimeOwner.get() === owner
     }
 
+    /** Whether a retry still belongs to both the latest host inputs and native runtime. */
     fun isCurrent(
         expectedRevision: Long,
         expectedOwner: Any,

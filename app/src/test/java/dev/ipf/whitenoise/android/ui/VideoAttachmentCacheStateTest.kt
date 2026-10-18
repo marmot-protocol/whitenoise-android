@@ -408,8 +408,8 @@ class VideoAttachmentCacheStateTest {
         val bubble = source.substringAfter("internal fun MediaVideoBubble(").substringBefore("@VisibleForTesting")
         assertTrue(
             "the bubble's probe must re-key on the source epoch",
-            "rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, Pair(pillKey, epoch))" in bubble,
+            "rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, Pair(pillKey, epoch))" in
+                bubble,
         )
     }
-
 }

@@ -103,7 +103,10 @@ class DurableAutomaticAttachmentAdmissionTest {
             expectDeferred(type = null, hold = AutomaticAttachmentHold.AccountsUnloaded)
 
             assertTrue("an unloaded account list is waited out", AutomaticAttachmentHold.AccountsUnloaded.waits)
-            assertFalse("a loaded list lacking the account still ends the work", AutomaticAttachmentHold.UnknownAccount.waits)
+            assertFalse(
+                "a loaded list lacking the account still ends the work",
+                AutomaticAttachmentHold.UnknownAccount.waits,
+            )
             assertEquals(0, fixture.automaticDemands.get())
         }
 
