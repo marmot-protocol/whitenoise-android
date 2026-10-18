@@ -11943,9 +11943,14 @@ class ConversationController(
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.START)
                 val refs =
                     resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: return@withMutationLockResult false
-                diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
-                if (refs.isEmpty()) return@withMutationLockResult false
+                if (refs.isEmpty()) {
+                    diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
+                    return@withMutationLockResult false
+                }
                 optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
+                    val adminTargets =
+                        resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false
+                    diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
                     val activityId = pendingMembershipActivity?.id
                     var nativeInvoked = false
                     var nativeAccepted = false
@@ -11954,8 +11959,6 @@ class ConversationController(
                     val absentBefore =
                         refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
                     try {
-                        val adminTargets =
-                            resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false
                         canonicalAdmins = adminTargets
                         check(adminTargets.all { admin -> refs.any { it.equals(admin, ignoreCase = true) } }) {
                             "Initial admin selection contains an unselected recipient"

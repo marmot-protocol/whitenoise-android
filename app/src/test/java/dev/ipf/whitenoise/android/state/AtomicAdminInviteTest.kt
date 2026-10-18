@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -126,7 +127,8 @@ class AtomicAdminInviteTest {
     @Test
     fun typedPreCommitRejectionDoesNotStartReconciliation() =
         runTest {
-            val fixture = Fixture(rejection = MarmotKitException.MissingKeyPackage(PEER, MissingKeyPackageReasonFfi.NOT_FOUND))
+            val fixture =
+                Fixture(rejection = MarmotKitException.MissingKeyPackage(PEER, MissingKeyPackageReasonFfi.NOT_FOUND))
             try {
                 fixture.controller.refreshManagementState()
                 assertFalse(fixture.controller.inviteMembers(listOf(PEER)))
@@ -134,6 +136,45 @@ class AtomicAdminInviteTest {
                 assertReconciliationOutcomes(emptyList())
             } finally {
                 fixture.controller.onCleared()
+            }
+        }
+
+    @Test
+    fun adminResolutionFailureHasOneRecipientOutcomeAndClearsPendingActivity() =
+        runTest {
+            val failures = listOf(MarmotKitException.InvalidIdentity("synthetic"), CancellationException("synthetic"))
+            for (failure in failures) {
+                val fixture = Fixture()
+                try {
+                    fixture.controller.refreshManagementState()
+                    var resolutions = 0
+                    fixture.onPeerResolution = {
+                        resolutions++
+                        if (resolutions == 2) {
+                            assertTrue(fixture.controller.pendingMembershipActivity != null)
+                            throw failure
+                        }
+                    }
+                    var cancelled = false
+                    try {
+                        assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(PEER)))
+                    } catch (caught: CancellationException) {
+                        assertTrue(caught === failure)
+                        cancelled = true
+                    }
+                    assertEquals(failure is CancellationException, cancelled)
+                    assertEquals(2, resolutions)
+                    assertTrue(fixture.invocations.isEmpty())
+                    assertNull(fixture.controller.pendingMembershipActivity)
+                    val outcomes =
+                        ShadowLog.getLogsForTag("GroupCreation")
+                            .filter { it.msg.contains("phase=recipients") }
+                            .map { it.msg.substringAfter("outcome=").substringBefore(" ") }
+                    assertEquals(listOf("start", if (cancelled) "cancelled" else "failure"), outcomes)
+                    if (cancelled) assertNull(fixture.controller.lastMutationError)
+                } finally {
+                    fixture.controller.onCleared()
+                }
             }
         }
 
@@ -167,12 +208,14 @@ class AtomicAdminInviteTest {
         val invocations = mutableListOf<Pair<List<String>, List<String>>>()
         var snapshotReads = 0
         var revokeOnRecipientResolution = false
+        var onPeerResolution: () -> Unit = {}
         private var current = snapshot(listOf(SELF), listOf(SELF))
         private val state: WhiteNoiseAppState =
             WhiteNoiseAppState(
                 context = ApplicationProvider.getApplicationContext(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
                 accountIdHexResolver = { ref ->
+                    if (ref == PEER) onPeerResolution()
                     if (ref == PEER && revokeOnRecipientResolution) {
                         revokeOnRecipientResolution = false
                         current = snapshot(listOf(SELF), emptyList())
