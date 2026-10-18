@@ -261,8 +261,8 @@ class NostrEventReferenceTest {
     }
 
     /**
-     * Removing a repeat closes up the space it leaves, removes brackets it leaves empty, keeps words apart and drops a
-     * line it empties.
+     * Removing a repeat closes up the space it leaves, removes a bracket or quote pair it leaves empty, keeps words,
+     * quotes and separators apart without doubling them, and drops a line it empties, at the end as well.
      */
     @Test
     fun removingRepeatsClosesUpTheProseAroundThem() {
@@ -279,6 +279,16 @@ class NostrEventReferenceTest {
                 listOf(text("I wrote this ("), uri(NOTE), text(") last week")) to "I wrote this last week",
                 listOf(text("("), uri(NOTE), text(") hello")) to "hello",
                 listOf(text("Look: "), uri(NOTE), text(" — fine")) to "Look: — fine",
+                listOf(text("Check this out:"), SOFT, uri(NOTE)) to "Check this out:",
+                listOf(text("a"), SOFT, uri(NOTE), SOFT, uri(NEVENT, NEVENT_HRP)) to "a",
+                listOf(text("He said \"hi\" "), uri(NOTE), text(" \"bye\"")) to "He said \"hi\" \"bye\"",
+                listOf(text("the users' "), uri(NOTE), text(" 'best' post")) to "the users' 'best' post",
+                listOf(text("say \""), uri(NOTE), text("\" now")) to "say now",
+                listOf(text("options ( "), uri(NOTE), text(" ) here")) to "options here",
+                listOf(text("Look at the"), uri(NOTE), text("")) to "Look at the",
+                listOf(text("Hello, "), uri(NOTE), text(", goodbye")) to "Hello, goodbye",
+                listOf(uri(NOTE), text(": details")) to "details",
+                listOf(text("Wow! "), uri(NOTE), text(".")) to "Wow!",
             )
 
         vectors.forEach { (inlines, expected) ->
@@ -296,6 +306,8 @@ class NostrEventReferenceTest {
         assertTrue(listOf(text("("), uri(NOTE), text(")")).onlyRepeatsRepresentedEvents(REPRESENTED))
         assertTrue(listOf(uri(NOTE), SOFT, nostrLink("nostr:$NEVENT")).onlyRepeatsRepresentedEvents(REPRESENTED))
         assertFalse(listOf(text("Look: "), uri(NOTE)).onlyRepeatsRepresentedEvents(REPRESENTED))
+        val reaction = listOf(uri(NOTE), text(" ???"))
+        assertFalse("the author's own reaction stays", reaction.onlyRepeatsRepresentedEvents(REPRESENTED))
         assertFalse(listOf(uri(NOTE), MarkdownInlineFfi.Code("x")).onlyRepeatsRepresentedEvents(REPRESENTED))
         assertFalse(listOf(text(" ")).onlyRepeatsRepresentedEvents(REPRESENTED))
         assertFalse(listOf(uri(NOTE)).onlyRepeatsRepresentedEvents(emptySet()))

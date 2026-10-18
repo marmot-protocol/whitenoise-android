@@ -92,6 +92,7 @@ internal fun MarkdownInlineFfi.isSoftOrHardBreak(): Boolean =
 
 private const val NOSTR_SCHEME = "nostr:"
 
-// Punctuation that can wrap or trail a reference, so a paragraph of only these and repeats reads as empty.
-private const val WRAPPING_PUNCTUATION = ".,;:!?()[]{}<>\"'«»“”‘’…—–-"
+// Brackets, quotes and separators that only wrap or trail a reference, so a paragraph of only these and repeats
+// reads as empty. Expressive punctuation such as "!!!" or "??" is the author's own and keeps the paragraph.
+private const val WRAPPING_PUNCTUATION = ".,;:()[]{}<>\"'«»“”‘’"
 private const val MAX_REPEAT_WRAPPER_DEPTH = 8

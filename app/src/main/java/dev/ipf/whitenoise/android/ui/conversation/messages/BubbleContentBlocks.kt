@@ -79,6 +79,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.RemoteGiphyMediaBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberPendingUploadProgress
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoicePresentationOwner
+import dev.ipf.whitenoise.android.ui.conversation.nostr.MAX_CARDS_PER_MESSAGE
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCards
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationMessageBubble
@@ -598,7 +599,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
         // that only repeat them, and a body of nothing else is hidden (#3317).
         // References past the card cap are not represented and stay visible.
         val representedEventIds =
-            remember(eventReferences) { eventReferences.mapTo(HashSet()) { it.reference.stableId } }
+            remember(eventReferences) {
+                eventReferences.take(MAX_CARDS_PER_MESSAGE).mapTo(HashSet()) { it.reference.stableId }
+            }
         val bodyOnlyRepeatsCards =
             remember(markdownDocument, representedEventIds) {
                 markdownDocument?.onlyRepeatsRepresentedEvents(representedEventIds) == true

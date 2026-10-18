@@ -27,6 +27,7 @@ internal fun List<MarkdownInlineFfi>.withoutRepeatsOf(represented: Set<String>):
             }
         }
     }
+    if (afterRepeat) kept.dropTrailingBreaks()
     return kept
 }
 
@@ -54,8 +55,9 @@ private fun MutableList<MarkdownInlineFfi>.appendAfterRepeat(
 }
 
 /**
- * [next] with the gap before it closed up. A bracket or quote opened just before the removed repeat and closed just
- * after it is removed from both sides, and one space is kept when words continue on the same line.
+ * [next] with the gap before it closed up. A bracket or quote pair left empty around the removed repeat goes with it,
+ * a separator the text before already ends with is not repeated, and one space is kept when words continue on the
+ * same line.
  */
 private fun MutableList<MarkdownInlineFfi>.closeUp(
     next: String,
@@ -65,8 +67,7 @@ private fun MutableList<MarkdownInlineFfi>.closeUp(
     var hadSpace = gap || rest.length != next.length
     val previousIndex = indexOfLast { it !is MarkdownInlineFfi.Text || it.content.isNotEmpty() }
     val previous = getOrNull(previousIndex) as? MarkdownInlineFfi.Text
-    val opener = previous?.content?.lastOrNull()
-    if (previous != null && opener != null && rest.firstOrNull() == BRACKET_PAIRS[opener]) {
+    if (previous != null && closesEmptyPair(previous.content, rest)) {
         val before = previous.content.dropLast(1)
         val trimmedBefore = before.trimEnd(' ', '\t')
         this[previousIndex] = MarkdownInlineFfi.Text(trimmedBefore)
@@ -74,8 +75,51 @@ private fun MutableList<MarkdownInlineFfi>.closeUp(
         rest = after.trimStart(' ', '\t')
         hadSpace = trimmedBefore.length != before.length || rest.length != after.length
     }
+    val lineStart = isAtLineStart()
+    rest = rest.withoutRepeatedSeparator(lineStart, (lastOrNull() as? MarkdownInlineFfi.Text)?.content)
     val continues = rest.firstOrNull()?.let { it !in CLOSING_PUNCTUATION } == true
-    return if (hadSpace && continues && !isAtLineStart()) " $rest" else rest
+    return if (hadSpace && continues && !lineStart) " $rest" else rest
+}
+
+/**
+ * Whether [before] ends with an opening bracket or quote that [rest] closes at once, leaving an empty pair. A quote
+ * that is its own closer opens a pair only at the start of a word, never as an apostrophe or a closing quote.
+ */
+private fun closesEmptyPair(
+    before: String,
+    rest: String,
+): Boolean {
+    val opener = before.lastOrNull()
+    val closer = opener?.let(BRACKET_PAIRS::get)
+    val opensHere = opener != closer || before.length == 1 || before[before.length - 2].isWhitespace()
+    return closer != null && rest.firstOrNull() == closer && opensHere
+}
+
+/**
+ * [this] without a leading separator that only followed the removed repeat: nothing is left for it to separate at the
+ * start of a line, and the text before already ends with its own punctuation.
+ */
+private fun String.withoutRepeatedSeparator(
+    lineStart: Boolean,
+    textBefore: String?,
+): String {
+    val alreadyPunctuated = textBefore?.lastOrNull()?.let { it in ENDING_PUNCTUATION } == true
+    return if ((lineStart || alreadyPunctuated) && firstOrNull()?.let { it in SEPARATORS } == true) {
+        drop(1).trimStart(' ', '\t')
+    } else {
+        this
+    }
+}
+
+/** Drops the line breaks and blank text a removed final repeat leaves at the end, so no blank last line remains. */
+private fun MutableList<MarkdownInlineFfi>.dropTrailingBreaks() {
+    while (lastOrNull()?.isBlankTail() == true) removeAt(lastIndex)
+}
+
+/** Whether [this] adds nothing visible at the end of a line: a line break or blank text. */
+private fun MarkdownInlineFfi.isBlankTail(): Boolean {
+    if (this is MarkdownInlineFfi.Text) return content.isBlank()
+    return isSoftOrHardBreak()
 }
 
 /** Whether nothing but empty text has been kept since the start or the last line break. */
@@ -96,3 +140,9 @@ private val BRACKET_PAIRS =
 
 // Punctuation that attaches to the word before it, so no space is kept ahead of it.
 private const val CLOSING_PUNCTUATION = ".,;:!?)]}»”’…"
+
+// Separators a removed reference can leave stranded at the start of a line or after the text's own punctuation.
+private const val SEPARATORS = ".,;:"
+
+// Punctuation that already ends the text before a removed reference.
+private const val ENDING_PUNCTUATION = ".,;:!?"

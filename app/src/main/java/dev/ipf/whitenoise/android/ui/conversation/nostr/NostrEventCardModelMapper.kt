@@ -25,8 +25,23 @@ internal fun NostrEvent.toCardModel(): NostrEventCardModel {
     )
 }
 
-/** The `published_at` tag as Unix seconds, or null when it is absent, malformed or not after the epoch. */
-private fun NostrEvent.publishedAtSeconds(): Long? = firstSafeTag("published_at")?.toLongOrNull()?.takeIf { it > 0 }
+/**
+ * The `published_at` tag as Unix seconds, or null when it is absent, malformed, not after the epoch or later than the
+ * signed event itself allows, as a millisecond value would be. An article is published no later than its latest
+ * revision, so a day of clock skew past `created_at` is the most it may claim.
+ */
+private fun NostrEvent.publishedAtSeconds(): Long? =
+    firstSafeTag("published_at")
+        ?.toLongOrNull()
+        ?.takeIf { it in 1..createdAt.saturatingPlus(PUBLISHED_AT_SKEW_SECONDS) }
+
+/** [this] plus [seconds], held at [Long.MAX_VALUE] instead of overflowing. */
+private fun Long.saturatingPlus(seconds: Long): Long {
+    val headroom = Long.MAX_VALUE - seconds
+    return if (this > headroom) Long.MAX_VALUE else this + seconds
+}
+
+private const val PUBLISHED_AT_SKEW_SECONDS = 24L * 60L * 60L
 
 private fun NostrEvent.cardKind(): NostrEventCardKind =
     when (kind) {

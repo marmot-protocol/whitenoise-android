@@ -139,6 +139,25 @@ class NostrReferencePresentationCoverageTest {
         assertTrue(rendered.contains(WEB_NEVENT))
     }
 
+    /** A web link labelled with a carded reference keeps its label, so the link never vanishes from the prose. */
+    @Test
+    fun aWebLinkLabelledWithACardedReferenceKeepsItsLabel() {
+        val link = MarkdownInlineFfi.Link(WEB_LINK, null, listOf(uri(NOTE)), LINK_WEB)
+        val represented = nostrEventReferences(document(paragraph(link))).mapTo(HashSet()) { it.reference.stableId }
+
+        val rendered =
+            markdownInlinesToAnnotatedString(
+                listOf(text("Read "), link),
+                codeStyle = SpanStyle(),
+                linkStyle = SpanStyle(),
+                hiddenEventIds = represented,
+            )
+
+        assertEquals("the label's event gets a card", 1, represented.size)
+        assertEquals("Read ${shortenedBech32(NOTE)}", rendered.text)
+        assertTrue(rendered.getLinkAnnotations(0, rendered.length).isNotEmpty())
+    }
+
     /** The bubble hides exactly the events its cards show, and no other surface hides references. */
     @Test
     fun onlyTheBubbleHidesReferencesAndOnlyThoseItsCardsShow() {
@@ -149,6 +168,7 @@ class NostrReferencePresentationCoverageTest {
             Regex("""representedEventIds\s*=\s*remember\(eventReferences\)""").containsMatchIn(bubble),
         )
         assertTrue("the bubble must pass them to its body", "hiddenEventIds = representedEventIds" in bubble)
+        assertTrue("only the references the cards render", "eventReferences.take(MAX_CARDS_PER_MESSAGE)" in bubble)
         assertTrue("the cards must render the same references", "references = eventReferences" in bubble)
         val hidingCallers =
             mainSources()

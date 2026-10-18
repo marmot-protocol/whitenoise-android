@@ -463,7 +463,8 @@ internal fun compactEventReference(authoredReference: String): String {
 internal const val NOSTR_NOTE_PREVIEW_ACTION_TAG = "nostr-note-preview-action"
 internal const val NOSTR_EVENT_CARD_BOUNDS_TAG = "nostr-event-card-bounds"
 
-private const val MAX_CARDS_PER_MESSAGE = 3
+/** Cards one message shows; references past this stay in the message prose (#3317). */
+internal const val MAX_CARDS_PER_MESSAGE = 3
 private const val COMPACT_REFERENCE_LENGTH = 28
 private const val COMPACT_REFERENCE_PREFIX = 14
 private const val COMPACT_REFERENCE_SUFFIX = 7
