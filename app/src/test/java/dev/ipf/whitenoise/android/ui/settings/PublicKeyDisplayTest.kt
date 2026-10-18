@@ -34,7 +34,7 @@ class PublicKeyDisplayTest {
         assertTrue(groups.dropLast(1).all { it.length == PUBLIC_KEY_GROUP_LENGTH })
         assertEquals(NPUB.length % PUBLIC_KEY_GROUP_LENGTH, groups.last().length)
         assertEquals("the prefix stays whole", "npub1", groups.first())
-        assertEquals("the checksum stays whole", NPUB.takeLast(NPUB.length % PUBLIC_KEY_GROUP_LENGTH), groups.last())
+        assertEquals("the last group ends the key", NPUB.takeLast(NPUB.length % PUBLIC_KEY_GROUP_LENGTH), groups.last())
     }
 
     /** Keys that share their beginning and end differ visibly in the middle, where an abbreviation hides them. */

@@ -651,7 +651,10 @@ private fun PrivateKeyValueRow(
     }
 }
 
-/** 64 dp row with a monospace, middle-ellipsized key value and one trailing icon action at the 4 dp edge. */
+/**
+ * 64 dp row with a monospace key value and one trailing icon action at the 4 dp edge. A secret value stays on one
+ * middle-ellipsized line; with [fullPublicKey] the public key shows in full, grouped for comparison (#3321).
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
