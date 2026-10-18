@@ -96,7 +96,9 @@ class PushTokenStore(
      * sync trigger can still drain the work instead of silently falling back to
      * "persist only". See #755.
      */
-    fun nativePushRegistrationSyncPending(): Boolean = preferences.getBoolean(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, false)
+    fun nativePushRegistrationSyncPending(): Boolean {
+        return preferences.getBoolean(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, false)
+    }
 
     /** Commits the retry marker before a token-rotation service nudge can be rejected or killed. */
     @SuppressLint("ApplySharedPref")
@@ -363,7 +365,9 @@ class PushTokenStore(
     }
 
     /** Returns account refs whose failed sign-out disable must be retried before registration is allowed. */
-    fun pendingDisables(): Set<String> = preferences.getStringSet(KEY_PENDING_DISABLES, emptySet())?.toSet() ?: emptySet()
+    fun pendingDisables(): Set<String> {
+        return preferences.getStringSet(KEY_PENDING_DISABLES, emptySet())?.toSet() ?: emptySet()
+    }
 
     /** Commits an account-specific disable obligation before sign-out admission, even after a failed prior commit. */
     @SuppressLint("ApplySharedPref")
