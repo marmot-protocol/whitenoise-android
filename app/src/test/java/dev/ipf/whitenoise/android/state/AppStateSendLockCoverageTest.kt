@@ -494,11 +494,14 @@ class AppStateSendLockCoverageTest {
         val controllers = controllersSource().readText()
         val olderPage = functionBodyIn(paging, "pageOlderIfActive", includeDeclaration = true)
         val newerPage = functionBodyIn(paging, "pageNewerIfActive", includeDeclaration = true)
+        val mutexProxy =
+            "internal val timelineSubscriptionActiveCallMutex: Mutex " +
+                "get() = timelineSession.activeCallMutex"
         assertTrue(
             "both paging directions must acquire the session's actual retirement mutex",
             "timelineSubscriptionActiveCallMutex.withLock" in olderPage &&
                 "timelineSubscriptionActiveCallMutex.withLock" in newerPage &&
-                "internal val timelineSubscriptionActiveCallMutex: Mutex get() = timelineSession.activeCallMutex" in controllers,
+                mutexProxy in controllers,
         )
 
         assertTrue(
