@@ -76,6 +76,20 @@ class ForwardUploadStallTest {
             assertEquals(0, cancels)
         }
 
+    /** A transfer MDK began before the watchdog's first reading has started, however long its counter then stays. */
+    @Test
+    fun aTransferAlreadyUnderWayAtTheFirstReadingIsNeverCancelled() =
+        runTest {
+            val result =
+                watch(progress = { LARGE_ITEM_BYTES }) {
+                    delay(FORWARD_UPLOAD_START_MILLIS * 5)
+                    "uploaded"
+                }
+
+            assertEquals("uploaded", result)
+            assertEquals(0, cancels)
+        }
+
     /** An upload that finishes inside the bound returns its value and stops the watchdog. */
     @Test
     fun aFinishedUploadStopsTheWatchdog() =

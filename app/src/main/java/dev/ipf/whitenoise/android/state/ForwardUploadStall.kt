@@ -71,15 +71,16 @@ internal suspend fun <T> withUploadStartWatchdog(
 }
 
 /**
- * Whether [progress] moves away from its first reading within [limitMillis]. A counter that cannot be read counts
- * as started, so the watchdog never fails a transfer it cannot observe.
+ * Whether the transfer starts within [limitMillis]: its counter is already above zero at the first reading, because
+ * MDK has begun before the watchdog looked, or moves away from that reading in time. A counter that cannot be read
+ * counts as started, so the watchdog never fails a transfer it cannot observe.
  */
 private suspend fun startsWithin(
     limitMillis: Long,
     progress: () -> Long,
 ): Boolean {
     val first = runCatching(progress).getOrNull()
-    var started = first == null
+    var started = first == null || first > 0L
     var waitedMillis = 0L
     while (!started && waitedMillis < limitMillis) {
         delay(FORWARD_UPLOAD_START_CHECK_MILLIS)
