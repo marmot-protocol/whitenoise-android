@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -125,7 +126,7 @@ class AtomicAdminInviteTest {
     @Test
     fun typedPreCommitRejectionDoesNotStartReconciliation() =
         runTest {
-            val fixture = Fixture(rejection = MarmotKitException.MissingKeyPackage(PEER))
+            val fixture = Fixture(rejection = MarmotKitException.MissingKeyPackage(PEER, MissingKeyPackageReasonFfi.NOT_FOUND))
             try {
                 fixture.controller.refreshManagementState()
                 assertFalse(fixture.controller.inviteMembers(listOf(PEER)))

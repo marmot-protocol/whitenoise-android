@@ -9103,6 +9103,7 @@ class WhiteNoiseAppState private constructor(
             pushStorageRecoveryBusy = false
         }
     }
+
     /** Publishes native settings only for the same account selection and runtime that requested them. */
     suspend fun refreshLocalNotificationSettings() {
         refreshPushStorageRecovery()

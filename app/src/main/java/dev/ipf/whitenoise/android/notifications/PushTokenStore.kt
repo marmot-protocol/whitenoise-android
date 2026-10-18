@@ -472,14 +472,14 @@ class PushTokenStore(
                                 val pending = results.containsValue(LegacyImportResult.PENDING)
                                 val quarantined = results.filterValues { it.quarantined }.keys
                                 check(
-                                    safety.edit()
+                                    safety
+                                        .edit()
                                         .putBoolean("migration_unknown", pending)
                                         .putStringSet("quarantined_sources", quarantined)
                                         .putBoolean(
                                             "quarantine_cleanup_unknown",
                                             results.containsValue(LegacyImportResult.BLOCKED),
-                                        )
-                                        .commit(),
+                                        ).commit(),
                                 )
                                 initialized = !pending && quarantined.isEmpty()
                                 if (!initialized) {
