@@ -90,7 +90,9 @@ class ChatListConnectivityLifecycleTest {
                     effectOwner = Unit,
                     displayed = ConnectivityBannerState.Hidden,
                     foregroundEpoch = foregroundEpoch,
-                    connectivitySignals = { ConnectivitySignals(hasValidatedInternet = true, relaysConnected = true, hasActiveNetwork = true) },
+                    connectivitySignals = {
+                        ConnectivitySignals(hasValidatedInternet = true, relaysConnected = true, hasActiveNetwork = true)
+                    },
                     relaysConnectedFlow = relaysConnectedFlow,
                     refreshRelayConnectivity = { refreshCount += 1 },
                     revalidateConnectionReadiness = {},
@@ -212,7 +214,9 @@ class ChatListConnectivityLifecycleTest {
                     effectOwner = owner,
                     displayed = ConnectivityBannerState.Hidden,
                     foregroundEpoch = foregroundEpoch,
-                    connectivitySignals = { ConnectivitySignals(hasValidatedInternet = true, relaysConnected = true, hasActiveNetwork = true) },
+                    connectivitySignals = {
+                        ConnectivitySignals(hasValidatedInternet = true, relaysConnected = true, hasActiveNetwork = true)
+                    },
                     relaysConnectedFlow = relaysConnectedFlow,
                     refreshRelayConnectivity = { refreshCount += 1 },
                     revalidateConnectionReadiness = {},

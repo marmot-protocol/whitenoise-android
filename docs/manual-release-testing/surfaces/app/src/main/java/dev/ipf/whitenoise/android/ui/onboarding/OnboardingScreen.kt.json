@@ -166,9 +166,9 @@
     ],
     "source_coverage": [
       {
-        "surface": "Offline identity-only import and creation connectivity gate",
+        "surface": "Offline identity-only sign-in entry point",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
-        "anchor": "val identityOnly = requestedAction != OnboardingAction.Creating",
+        "anchor": "fun startSignInAction(action: OnboardingAction)",
         "test_ids": [
           "ONB-022"
         ]

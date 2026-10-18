@@ -25,33 +25,6 @@ import kotlinx.coroutines.launch
 // disables the other while one runs.
 internal enum class OnboardingAction { Idle, Creating, Importing, AmberLogin }
 
-internal enum class OnboardingActionDecision { Start, ShowOffline, IgnoreBusy }
-
-internal fun onboardingActionDecision(
-    inFlightAction: OnboardingAction,
-    hasActiveNetwork: Boolean,
-): OnboardingActionDecision =
-    when {
-        inFlightAction != OnboardingAction.Idle -> OnboardingActionDecision.IgnoreBusy
-        !hasActiveNetwork -> OnboardingActionDecision.ShowOffline
-        else -> OnboardingActionDecision.Start
-    }
-
-internal fun dispatchOnboardingAction(
-    inFlightAction: OnboardingAction,
-    hasActiveNetwork: Boolean,
-    requestedAction: OnboardingAction,
-    onOffline: (OnboardingAction) -> Unit,
-    onStart: () -> Unit,
-) {
-    val identityOnly = requestedAction != OnboardingAction.Creating
-    when (onboardingActionDecision(inFlightAction, hasActiveNetwork || identityOnly)) {
-        OnboardingActionDecision.IgnoreBusy -> Unit
-        OnboardingActionDecision.ShowOffline -> onOffline(requestedAction)
-        OnboardingActionDecision.Start -> onStart()
-    }
-}
-
 internal const val ONBOARDING_OFFLINE_NOTICE_TAG = "onboarding-offline-notice"
 
 // Adaptive cap for the onboarding + sign-in surfaces: on a phone the hero and
@@ -74,7 +47,6 @@ internal fun OnboardingScreen(
     val identity = privateKeyState.text.toString()
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
-    var offlineRetryAction by remember { mutableStateOf<OnboardingAction?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
     // The key an acknowledged recovery already ran for, cleared as soon as the
     // field changes, so it never outlives the attempt it belongs to. It stops a
@@ -119,45 +91,26 @@ internal fun OnboardingScreen(
         }
     }
 
-    /** Starts a network setup action unless a retained reactivation is pending. */
-    fun startNetworkSetupAction(action: OnboardingAction) {
-        if (appState.retainedAccountReactivationRef != null) return
-        dispatchOnboardingAction(
-            inFlightAction = inFlightAction,
-            hasActiveNetwork = hasActiveNetwork(),
-            requestedAction = action,
-            onOffline = { offlineRetryAction = it },
-            onStart = {
-                offlineRetryAction = null
-                when (action) {
-                    OnboardingAction.Creating -> {
-                        inFlightAction = OnboardingAction.Creating
-                        scope.launch {
-                            try {
-                                appState.createIdentity()
-                            } finally {
-                                inFlightAction = OnboardingAction.Idle
-                            }
-                        }
+    /** Starts sign-in unless another action or retained reactivation is pending. */
+    fun startSignInAction(action: OnboardingAction) {
+        if (inFlightAction != OnboardingAction.Idle || appState.retainedAccountReactivationRef != null) return
+        when (action) {
+            OnboardingAction.Importing -> {
+                val value = privateKeyState.text.toString().trim()
+                runStep { signInStepFor(appState.importIdentity(value), value, recoveryConsentedFor) }
+            }
+            OnboardingAction.AmberLogin -> {
+                inFlightAction = OnboardingAction.AmberLogin
+                scope.launch {
+                    try {
+                        appState.loginWithAmber()
+                    } finally {
+                        inFlightAction = OnboardingAction.Idle
                     }
-                    OnboardingAction.Importing -> {
-                        val value = privateKeyState.text.toString().trim()
-                        runStep { signInStepFor(appState.importIdentity(value), value, recoveryConsentedFor) }
-                    }
-                    OnboardingAction.AmberLogin -> {
-                        inFlightAction = OnboardingAction.AmberLogin
-                        scope.launch {
-                            try {
-                                appState.loginWithAmber()
-                            } finally {
-                                inFlightAction = OnboardingAction.Idle
-                            }
-                        }
-                    }
-                    OnboardingAction.Idle -> Unit
                 }
-            },
-        )
+            }
+            OnboardingAction.Idle, OnboardingAction.Creating -> Unit
+        }
     }
 
     val signUp = appState.profileSignUpForPresentation
@@ -174,18 +127,12 @@ internal fun OnboardingScreen(
     OnboardingContent(
         identity = identity,
         privateKeyState = privateKeyState,
-        creatingIdentity = inFlightAction == OnboardingAction.Creating,
+        creatingIdentity = false,
         signingInBusy = inFlightAction == OnboardingAction.Importing,
         importErrorRes = importErrorRes,
-        offlineErrorVisible = offlineRetryAction != null,
-        onOfflineRetry = {
-            offlineRetryAction?.let(::startNetworkSetupAction)
-        },
-        onOfflineErrorDismiss = { offlineRetryAction = null },
         onIdentityChange = {
             if (privateKeyState.text.toString() != it) privateKeyState.setTextAndPlaceCursorAtEnd(it)
             importErrorRes = null
-            offlineRetryAction = null
             // Editing the field ends the attempt the acknowledgement belonged to,
             // so the key it held must not outlive it.
             recoveryConsentedFor = null
@@ -196,7 +143,7 @@ internal fun OnboardingScreen(
                 appState.beginProfileSignUp()
             }
         },
-        onImportIdentity = { _ -> startNetworkSetupAction(OnboardingAction.Importing) },
+        onImportIdentity = { _ -> startSignInAction(OnboardingAction.Importing) },
         recoveryConsentVisible = recoveryConsentVisible,
         // The engine needs the same nsec again, so the already-entered value is
         // reused from the field rather than stashed anywhere new — it leaves
@@ -216,7 +163,7 @@ internal fun OnboardingScreen(
         loggingInWithAmber = inFlightAction == OnboardingAction.AmberLogin,
         amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
-        onLoginWithAmber = { startNetworkSetupAction(OnboardingAction.AmberLogin) },
+        onLoginWithAmber = { startSignInAction(OnboardingAction.AmberLogin) },
         savedAccounts = savedAccounts,
         reactivatingAccountLabel = appState.retainedAccountReactivationRef,
         onContinueWithSavedAccount = appState::reactivateRetainedAccount,
