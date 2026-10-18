@@ -22,6 +22,15 @@ class ValidatedInternetNetworkTrackerTest {
     }
 
     @Test
+    fun validationAloneDoesNotSupplyAForegroundRoute() {
+        val owner = ConnectivitySignalOwner()
+        owner.update(hasValidatedInternet = true)
+        assertTrue(owner.signals.value.hasValidatedInternet)
+        assertFalse(owner.signals.value.hasAppNetwork)
+        assertFalse(owner.signals.value.relaysConnected)
+    }
+
+    @Test
     fun usableRecoveryWakesOnlyAfterBothRouteAndValidatedUpstreamRecover() {
         val tracker = UsableValidatedInternetRecoveryTracker()
         tracker.seed(

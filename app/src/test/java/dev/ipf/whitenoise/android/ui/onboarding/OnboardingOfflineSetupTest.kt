@@ -7,11 +7,16 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.RecordingIdentityLoginCalls
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.signInTestAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -92,16 +97,51 @@ class OnboardingOfflineSetupTest {
 
     @Test
     fun explicitCreateStartsWithAnActiveRouteWithoutAnOsValidationVeto() {
-        val availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
-        var starts = 0
-        dispatchOnboardingAction(
-            inFlightAction = OnboardingAction.Idle,
-            hasActiveNetwork = availability.hasActiveNetwork(),
-            requestedAction = OnboardingAction.Creating,
-            onOffline = { error("An active route must permit an explicit operation") },
-            onStart = { starts++ },
-        )
-        assertEquals(1, starts)
+        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
+        var creations = 0
+        val native =
+            java.lang.reflect.Proxy
+                .newProxyInstance(
+                    MarmotInterface::class.java.classLoader,
+                    arrayOf(MarmotInterface::class.java),
+                ) { _, method, _ ->
+                    check(method.name == "createIdentity") { "Unexpected native call: ${method.name}" }
+                    creations++
+                    error("Synthetic creation failure")
+                } as MarmotInterface
+        val app =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = DraftStore.forContext(context),
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = "",
+                initialMarmotRuntime =
+                    AppMarmotRuntime(
+                        context.cacheDir.resolve("legacy-route-test").path,
+                        native,
+                    ),
+            )
+        var pending: OnboardingAction? = null
+        fun dispatch() {
+            dispatchOnboardingAction(
+                inFlightAction = OnboardingAction.Idle,
+                hasActiveNetwork = availability.hasActiveNetwork(),
+                requestedAction = OnboardingAction.Creating,
+                onOffline = { pending = it },
+                onStart = {
+                    pending = null
+                    runBlocking { app.createIdentity() }
+                },
+            )
+        }
+        dispatch()
+        assertEquals(OnboardingAction.Creating, pending)
+        assertEquals(0, creations)
+        availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
+        dispatch()
+        assertEquals(null, pending)
+        assertEquals(1, creations)
     }
 
     /** Valid nsec reaches identity acceptance even while offline. */

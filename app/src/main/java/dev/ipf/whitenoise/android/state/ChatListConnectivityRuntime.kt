@@ -15,10 +15,10 @@ internal const val CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS = 3
 data class ConnectivitySignals(
     val hasValidatedInternet: Boolean = false,
     val relaysConnected: Boolean = true,
-    val hasActiveNetwork: Boolean? = null,
+    val hasActiveNetwork: Boolean = false,
 ) {
     /** Foreground requests can work when the OS validation endpoint is blocked. */
-    val hasAppNetwork: Boolean get() = hasActiveNetwork ?: hasValidatedInternet
+    val hasAppNetwork: Boolean get() = hasActiveNetwork
 }
 
 internal class ConnectivitySignalOwner {
@@ -54,7 +54,7 @@ internal class ConnectivitySignalOwner {
                     hasActiveNetwork = nextHasActiveNetwork,
                     relaysConnected =
                         relaysConnectedOnNetworkChange(
-                            isOnline = nextHasActiveNetwork ?: nextHasValidatedInternet,
+                            isOnline = nextHasActiveNetwork,
                             cached = relaysConnected ?: current.relaysConnected,
                         ),
                 )

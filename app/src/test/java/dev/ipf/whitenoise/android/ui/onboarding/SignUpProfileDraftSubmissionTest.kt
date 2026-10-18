@@ -79,8 +79,15 @@ class SignUpProfileDraftSubmissionTest {
         assertWelcomeSignupReachesCreationAdapter(hasDefaultRoute = true)
     }
 
-    private fun assertWelcomeSignupReachesCreationAdapter(hasDefaultRoute: Boolean) {
-        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute)
+    @Test fun welcomeSignupWithUnvalidatedNonVpnRouteReachesActualCreationAdapter() {
+        assertWelcomeSignupReachesCreationAdapter(hasDefaultRoute = true, isVpn = false)
+    }
+
+    private fun assertWelcomeSignupReachesCreationAdapter(
+        hasDefaultRoute: Boolean,
+        isVpn: Boolean = true,
+    ) {
+        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute, isVpn)
         val creations =
             java.util.concurrent.atomic
                 .AtomicInteger()
@@ -260,10 +267,11 @@ class SignUpProfileDraftSubmissionTest {
     }
 }
 
-/** Seed the production listener from an Android default route lacking VALIDATED and NOT_VPN. */
+/** Seed the production listener from an unvalidated VPN or non-VPN default route. */
 internal fun unvalidatedSignUpAvailability(
     context: Context,
     hasDefaultRoute: Boolean,
+    isVpn: Boolean = true,
 ): WhiteNoiseAppState {
     val app =
         WhiteNoiseAppState(
@@ -292,7 +300,11 @@ internal fun unvalidatedSignUpAvailability(
             ShadowNetworkCapabilities.newInstance().apply {
                 shadowOf(this).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 shadowOf(this).removeCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                shadowOf(this).removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                if (isVpn) {
+                    shadowOf(this).removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                } else {
+                    shadowOf(this).addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                }
             }
         shadowOf(connectivity).setNetworkCapabilities(network, capabilities)
     }
@@ -302,5 +314,7 @@ internal fun unvalidatedSignUpAvailability(
         .invoke(app)
     assertFalse(app.hasValidatedInternet())
     assertEquals(hasDefaultRoute, app.hasActiveNetwork())
+    assertEquals(hasDefaultRoute, app.connectivitySignals.value.hasAppNetwork)
+    assertFalse(app.connectivitySignals.value.hasValidatedInternet)
     return app
 }
