@@ -993,7 +993,7 @@ class MessageForwardingTest {
             if (failMaterializationCleanup) error("cleanup failed")
         }
 
-        /** Records the upload and waits on its gate, then fails or never starts once per configured target, or uploads. */
+        /** Records the upload and waits on its gate, then fails or never starts once per chosen target, or uploads. */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
