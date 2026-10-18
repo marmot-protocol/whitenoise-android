@@ -132,15 +132,12 @@ internal fun rememberTextAttachmentNativeActions(
                         // The original file, so a preview truncated for display never narrows what is shared.
                         runCatchingCancellable {
                             shareAttachmentExternally(
-                                context,
-                                controller,
-                                messageIdHex,
-                                attachmentIndex,
-                                reference,
-                                mine,
-                                shareTitle,
-                                owned::isCurrent,
-                            )
+                                context = context,
+                                attachmentIndex = attachmentIndex,
+                                reference = reference,
+                                chooserTitle = shareTitle,
+                                isCurrent = owned::isCurrent,
+                            ) { attachmentSource(controller, messageIdHex, attachmentIndex, reference, mine) }
                         }.onFailure { failure ->
                             if (owned.isCurrent()) appState.presentOutboundShareFailure("TEXT_READER_SHARE", failure)
                         }
