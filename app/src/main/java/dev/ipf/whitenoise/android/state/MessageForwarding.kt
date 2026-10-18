@@ -510,6 +510,7 @@ internal class ForwardSession(
             prepared
         }
 
+    /** Uploads and publishes every destination in parallel, at most [targetFanout] at a time. */
     private suspend fun runTargets(
         targetIds: List<String>,
         prepared: List<PreparedForwardMessage>,
@@ -785,6 +786,7 @@ internal class ForwardOperationOwner(
             false
         }
 
+    /** Stops observing the active forward, releases its session and clears the published state. */
     private fun clearActiveSession() {
         monitor?.cancel()
         stateCollector?.cancel()

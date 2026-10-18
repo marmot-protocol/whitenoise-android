@@ -24,6 +24,7 @@ internal class FileUploadSources(
     val inputs: List<FileUploadSource>,
     private val resources: List<AutoCloseable>,
 ) : AutoCloseable {
+    /** Closes every staged source, newest first, rethrowing the first failure with the later ones suppressed. */
     override fun close() {
         var failure: Exception? = null
         resources.asReversed().forEach { resource ->

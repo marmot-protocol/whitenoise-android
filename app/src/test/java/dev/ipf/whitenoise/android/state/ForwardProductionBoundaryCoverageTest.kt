@@ -7,6 +7,7 @@ import org.junit.Test
 import java.io.File
 
 class ForwardProductionBoundaryCoverageTest {
+    /** Production forwarding reads plaintext under the source account and publishes only destination references. */
     @Test
     fun productionTransportMaterializesFromSourceAndPublishesOnlyDestinationReferences() {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")

@@ -229,6 +229,7 @@ class MessageForwardingTest {
             assertEquals(listOf("target" to 0, "target" to 1), transport.published)
         }
 
+    /** A failed materialization on retry keeps the evidence of an uncertain earlier publish for recovery. */
     @Test
     fun materializationRetryFailurePreservesAmbiguousPublishEvidence() =
         runTest {
@@ -911,6 +912,7 @@ class MessageForwardingTest {
             owner.release()
         }
 
+    /** Once a destination is sending, the forward can no longer be cancelled. */
     @Test
     fun operationCannotBeCancelledAfterPublishingBegins() =
         runTest {
@@ -991,6 +993,7 @@ class MessageForwardingTest {
             if (failMaterializationCleanup) error("cleanup failed")
         }
 
+        /** Records the upload and waits on its gate, then fails or never starts once per configured target, or uploads. */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
