@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Stalled forward upload fails at the upload stage",
+        "surface": "Forward upload that never starts fails at the upload stage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ForwardUploadStall.kt",
-        "anchor": "internal suspend fun <T> withUploadStallWatchdog(",
+        "anchor": "internal suspend fun <T> withUploadStartWatchdog(",
         "test_ids": [
           "MSG-011"
         ]

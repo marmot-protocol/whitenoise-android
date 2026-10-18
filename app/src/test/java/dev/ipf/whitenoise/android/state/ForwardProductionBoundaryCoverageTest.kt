@@ -22,7 +22,10 @@ class ForwardProductionBoundaryCoverageTest {
         )
     }
 
-    /** The destination upload runs on MDK's file path under a stall watchdog, so it cannot hang for minutes (#2556). */
+    /**
+     * The destination upload runs on MDK's file path under the start watchdog, so a transfer that never starts cannot
+     * hang for minutes (#2556), and messages the file path cannot take keep the in-memory upload.
+     */
     @Test
     fun productionUploadIsWatchedForStalls() {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
@@ -32,10 +35,13 @@ class ForwardProductionBoundaryCoverageTest {
                 .substringBefore("private suspend fun uploadInMemory(")
 
         assertTrue("uploadMediaFiles(account, targetGroupIdHex, request, control)" in fileBacked)
-        assertTrue("withUploadStallWatchdog(" in fileBacked)
+        assertTrue("withUploadStartWatchdog(" in fileBacked)
+        assertTrue("startMillis = FORWARD_UPLOAD_START_MILLIS" in fileBacked)
         assertTrue("cancel = control::cancel" in fileBacked)
         assertTrue("withNativeTransferControl(" in fileBacked)
         assertTrue("uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes)" in body)
+        assertTrue("fileUploadFits(message.attachments, batch, usableBytes)" in body)
+        assertTrue("uploadInMemory(targetGroupIdHex, message)" in body)
     }
 
     /** The transport declares both owner guards and batch serialization. */

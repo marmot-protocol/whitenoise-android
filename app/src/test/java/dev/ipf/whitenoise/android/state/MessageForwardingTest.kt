@@ -272,8 +272,8 @@ class MessageForwardingTest {
         }
 
     /**
-     * A destination upload that stalls fails that target at the upload stage instead of looking stuck (#2556), and
-     * Retry uploads again and publishes the message exactly once.
+     * A destination upload that never starts fails that target as an upload timeout instead of looking stuck
+     * (#2556), offers Retry without retrying by itself, and Retry uploads again and publishes the message once.
      */
     @Test
     fun aStalledUploadFailsAtTheUploadStageAndRetryPublishesOnce() =
@@ -294,7 +294,9 @@ class MessageForwardingTest {
             val failed =
                 session.state.value.targets
                     .single()
-            assertEquals(ForwardFailureStage.Upload, failed.failureStage)
+            assertEquals(ForwardFailureStage.UploadTimeout, failed.failureStage)
+            assertTrue(session.state.value.canRetry)
+            assertFalse(session.state.value.canAutomaticallyRetry)
             assertEquals(emptyList<Pair<String, Int>>(), transport.published)
 
             session.retryFailed()
@@ -596,6 +598,38 @@ class MessageForwardingTest {
             assertEquals(ForwardOperationPhase.Failed, owner.state.value?.phase)
             assertTrue(owner.state.value?.canRetry == true)
             assertEquals(listOf(0), transport.materializedIndices)
+            assertEquals(listOf(ForwardOperationPhase.Failed), terminalSnapshots.map { it.phase })
+            assertTrue(transport.published.isEmpty())
+            owner.release()
+        }
+
+    /** The app owner surfaces an upload that never started once, instead of going back to in progress (#2556). */
+    @Test
+    fun ownerDoesNotAutomaticallyRetryAnUploadThatNeverStarted() =
+        runTest {
+            val terminalSnapshots = mutableListOf<ForwardOperationSnapshot>()
+            val transport = RecordingForwardTransport(stallUploadOnceFor = mutableSetOf("target"))
+            val owner =
+                ForwardOperationOwner(
+                    scope = this,
+                    automaticRetryAttempts = 3,
+                    retryDelayMillis = { 1L },
+                    onTerminal = terminalSnapshots::add,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "notes.txt")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            assertTrue(owner.start(session))
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, owner.state.value?.phase)
+            assertTrue(owner.state.value?.canRetry == true)
+            assertEquals(listOf("target"), transport.uploadTargets)
             assertEquals(listOf(ForwardOperationPhase.Failed), terminalSnapshots.map { it.phase })
             assertTrue(transport.published.isEmpty())
             owner.release()

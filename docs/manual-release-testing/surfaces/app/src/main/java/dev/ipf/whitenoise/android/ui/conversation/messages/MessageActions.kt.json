@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+  "legacy_sha256": "bbade857e96664b9995d9670dbccf1c819cb3eeed16cf48af44a5965f4e597e6",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: MessageActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ForwardMessageSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "fun ForwardMessageSheet(",
+        "test_ids": [
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "ForwardProgressContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "fun ForwardProgressContent(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "ForwardTargetProgressRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "fun ForwardTargetProgressRow(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "MessageActionIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "fun MessageActionIcon(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "MessageActionMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "fun MessageActionMenu(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "RestoredForwardRequestHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "fun RestoredForwardRequestHost(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: MessageActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Forward upload failure, including an upload that never started: R.string.forward_failed_upload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_failed_upload",
+        "test_ids": [
+          "MSG-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

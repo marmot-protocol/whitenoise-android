@@ -38,6 +38,25 @@ internal class FileUploadSources(
 }
 
 /**
+ * Whether [attachments] can go to MDK as one native file batch: at most the batch's item count, each item and the
+ * batch within [maxCiphertextBytes] with one tag per item, and [usableBytes] of free disk for the copies a staged
+ * upload holds at once plus the app's reserve. A caller that cannot use the file path keeps the in-memory upload.
+ */
+internal fun fileUploadFits(
+    attachments: List<PendingAttachment>,
+    maxCiphertextBytes: Long,
+    usableBytes: Long,
+): Boolean {
+    val countFits = attachments.isNotEmpty() && attachments.size <= MAX_FILE_UPLOAD_ITEMS
+    val ciphertextBytes = attachments.sumOf { it.byteCount + FILE_AUTH_TAG_BYTES }
+    val diskBytes = attachments.sumOf { it.byteCount } * FILE_BACKED_DISK_COPIES + FILE_BACKED_DISK_RESERVE_BYTES
+    return countFits &&
+        attachments.all { it.byteCount > 0 } &&
+        ciphertextBytes <= maxCiphertextBytes &&
+        usableBytes >= diskBytes
+}
+
+/**
  * Converts a mixed album to file inputs without growing the byte-array cache.
  * Supply the matching native ciphertext ceiling, including one 16-byte tag per item.
  * Call off the UI thread. Close this batch after the native call has returned.

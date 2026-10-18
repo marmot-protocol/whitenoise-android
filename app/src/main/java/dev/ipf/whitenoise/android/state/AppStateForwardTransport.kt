@@ -8,8 +8,10 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
+import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadFits
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
+import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -79,9 +81,11 @@ internal fun WhiteNoiseAppState.forwardTransport(
 
         /**
          * Uploads already-materialized bytes strictly through the destination account. The upload goes through
-         * MDK's file-backed path, so a transfer whose byte counter stops moving is cancelled and fails at the
-         * upload stage instead of looking stalled for minutes (#2556), and the user's Cancel stops it natively.
-         * Without the native library, as in JVM tests, the in-memory upload is used unchanged.
+         * MDK's file-backed path, which bounds every transfer attempt and stops when the user cancels, and a
+         * transfer that never starts fails at the upload stage instead of looking stalled for minutes (#2556).
+         * The in-memory upload stays for runtimes without the native library, as in JVM tests, and for messages
+         * the file path cannot take: more items or bytes than one native file batch, or too little free disk for
+         * the staged copies.
          */
         override suspend fun upload(
             targetGroupIdHex: String,
@@ -89,7 +93,12 @@ internal fun WhiteNoiseAppState.forwardTransport(
         ): List<MediaAttachmentReferenceFfi> {
             requireDestinationAccount()
             val batchCiphertextBytes =
-                withContext(Dispatchers.IO) { nativeFileBackedSendLimits()?.batchCiphertextBytes }
+                withContext(Dispatchers.IO) {
+                    nativeFileBackedSendLimits()?.batchCiphertextBytes?.takeIf { batch ->
+                        val usableBytes = usableSpaceFor(uploadSourcesDirectory(appContext.cacheDir))
+                        fileUploadFits(message.attachments, batch, usableBytes)
+                    }
+                }
             val uploaded =
                 diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
                     if (batchCiphertextBytes == null) {
@@ -102,7 +111,7 @@ internal fun WhiteNoiseAppState.forwardTransport(
             return uploaded
         }
 
-        /** Stages the bytes as private snapshots for one native file upload watched for stalls. */
+        /** Stages the bytes as private snapshots for one native file upload that must start within a bound. */
         private suspend fun uploadFileBacked(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
@@ -115,8 +124,8 @@ internal fun WhiteNoiseAppState.forwardTransport(
                 batchCiphertextBytes,
             ) { request ->
                 withNativeTransferControl(register = {}) { control ->
-                    withUploadStallWatchdog(
-                        stallMillis = FORWARD_UPLOAD_STALL_MILLIS,
+                    withUploadStartWatchdog(
+                        startMillis = FORWARD_UPLOAD_START_MILLIS,
                         progress = { control.processedBytes().toLong() },
                         cancel = control::cancel,
                     ) {
