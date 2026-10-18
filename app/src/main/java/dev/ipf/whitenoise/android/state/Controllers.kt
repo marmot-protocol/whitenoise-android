@@ -6562,7 +6562,7 @@ class ConversationController(
     var lastMutationError: ErrorPresentation?
         get() = mutationPresentation.error
         private set(value) {
-            mutationPresentation.error = value
+            if (value == null) mutationPresentation.clearError() else mutationPresentation.recordFailure(value)
         }
     private var subscriptionError by mutableStateOf<ErrorPresentation?>(null)
     internal var pageError by mutableStateOf<ErrorPresentation?>(null)
@@ -6737,7 +6737,9 @@ class ConversationController(
     private val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
     private val reactionIntentConflator = ReactionIntentConflator()
 
-    private val timelineSession = ConversationTimelineSession()
+    internal val window = ConversationWindowState()
+    private val timelineSession =
+        ConversationTimelineSession(onTimelineRetired = { window.readySubscription = null })
     private val controllerScope = timelineSession.scope
     private val initialPresentationWarmCoordinator =
         ConversationInitialPresentationWarmCoordinator(
@@ -6759,16 +6761,11 @@ class ConversationController(
     /** The installed native handle; paging and commits share the session's retirement authorities. */
     internal val timelineSubscription: ConversationTimelineSubscriptionHandle?
         get() = timelineSession.timelineSubscription
-    internal val window = ConversationWindowState()
     internal val liveSubscriptionLock: Any get() = timelineSession.lock
     internal val timelineSubscriptionActiveCallMutex: Mutex get() = timelineSession.activeCallMutex
     private val conversationScope: CoroutineScope? get() = timelineSession.currentScope
     internal val accountTeardownRequested: Boolean get() = timelineSession.accountTeardownRequested
     private val controllerCleared: Boolean get() = timelineSession.cleared
-
-    init {
-        timelineSession.onTimelineRetired = { window.readySubscription = null }
-    }
 
     internal val inboundVisibleHostAttempt = HostPerformanceAttemptSlot()
     internal var inboundVisibleHostGeneration by mutableLongStateOf(0L)
@@ -7041,7 +7038,7 @@ class ConversationController(
         pageError = null
         terminalLoadFailure = false
         try {
-            coroutineScope {
+            timelineSession.runReadScope {
                 // Global relay catch-up is owned by the chat-list/foreground
                 // lifecycle. The timeline and group handles below subscribe to
                 // local projections, so opening them does not need another
@@ -10307,21 +10304,7 @@ class ConversationController(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
-    ): String = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
-
-    /** Builds a durable identity without guessing when display and source message ids differ. */
-    private fun attachmentRequest(
-        account: String,
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): AttachmentTransferRequest =
-        AttachmentTransferRequest(
-            accountRef = account,
-            groupIdHex = group.groupIdHex,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
-        )
+    ): String = attachmentPresentation.mediaCacheKey(account, messageIdHex, attachmentIndex)
 
     private fun mediaUploadSessionStillCurrent(account: String): Boolean =
         shouldAcceptMediaUploadForAccount(
@@ -11123,7 +11106,7 @@ class ConversationController(
             ) {
                 return@withMutationLockResult false
             }
-            val authorityEpochBefore = mutationPresentation.authorityEpoch
+            val authorityEpochBefore = mutationPresentation.groupAuthorityEpoch
             inviteConfirmationAuthority.begin(previousGroup)
             val optimisticGroup = optimisticAcceptedInvite(previousGroup)
             group = optimisticGroup
@@ -11224,7 +11207,7 @@ class ConversationController(
         authorityEpochBefore: Long,
     ) {
         val confirmed =
-            if (mutationPresentation.authorityEpoch == authorityEpochBefore) {
+            if (mutationPresentation.groupAuthorityEpoch == authorityEpochBefore) {
                 acceptedGroup
             } else {
                 group.copy(pendingConfirmation = false)
@@ -11265,13 +11248,12 @@ class ConversationController(
      */
     suspend fun setArchived(archived: Boolean): Boolean =
         withMutationLockResult(false) {
-            if (!mutationPresentation.ownsCurrentPresentation()) return@withMutationLockResult false
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val groupIdHex = group.groupIdHex
             val intent = mutationPresentation.beginArchive(archived)
             val chatListIntent = appState.beginChatListArchiveIntent(account, groupIdHex, archived)
-            val authorityEpochBefore = mutationPresentation.authorityEpoch
+            val authorityEpochBefore = mutationPresentation.groupAuthorityEpoch
             try {
                 runCatchingCancellable {
                     appState.withGroupCommitLock(account, groupIdHex) {
@@ -11280,21 +11262,17 @@ class ConversationController(
                         // or details round-trip) that landed while this commit
                         // was in flight wins over the late success; the engine's
                         // own archive-change event reconverges the projection.
-                        mutationPresentation.applyIfCurrent(authorityEpochBefore) {
-                            group = updated
+                        if (mutationPresentation.groupAuthorityEpoch == authorityEpochBefore) {
+                            if (mutationPresentation.ownsCurrentPresentation()) group = updated
                             appState.applyLocalGroupUpdate(updated, account)
                         }
                     }
-                    if (mutationPresentation.ownsCurrentPresentation()) {
-                        presentConversationTransient(
-                            if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
-                        )
-                    }
+                    presentConversationTransient(
+                        if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
+                    )
                     true
                 }.onFailure {
-                    if (mutationPresentation.ownsCurrentPresentation()) {
-                        recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
-                    }
+                    recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
                 }.getOrDefault(false)
             } finally {
                 // Identity-compared so a newer action's intent is never cleared
@@ -11714,7 +11692,7 @@ class ConversationController(
                             if (!canAdministerMembersFromAuthoritativeRoster()) {
                                 return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             }
-                            val authorityEpoch = mutationPresentation.authorityEpoch
+                            val authorityEpoch = mutationPresentation.groupAuthorityEpoch
                             nativeInvoked = true
                             val inviteResult = initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
                             publishInitialAdminInviteResult(account, inviteResult, authorityEpoch, runtimeGeneration)
@@ -11780,7 +11758,7 @@ class ConversationController(
         runtimeGeneration: Int,
     ) {
         if (appState.runtimeGeneration != runtimeGeneration || controllerCleared || isAccountTeardownRequested()) return
-        if (mutationPresentation.authorityEpoch == authorityEpoch) {
+        if (mutationPresentation.groupAuthorityEpoch == authorityEpoch) {
             applyManagementSnapshot(account, result.details, result.managementState)
         } else {
             refreshManagementState()
@@ -11810,12 +11788,12 @@ class ConversationController(
     ): Boolean {
         val eligible = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
         if (!eligible) return false
-        val beforeRead = mutationPresentation.authorityEpoch
+        val beforeRead = mutationPresentation.groupAuthorityEpoch
         refreshManagementState()
         val observedMembers =
             membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
         val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
-        return mutationPresentation.authorityEpoch != beforeRead && observedMembers && observedAdmins
+        return mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
     }
 
     /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */
@@ -11985,7 +11963,7 @@ class ConversationController(
     suspend fun refreshManagementState() {
         val account = conversationAccountRef ?: return
         val requestToken = managementStateLifetime.advance()
-        val authorityEpoch = mutationPresentation.authorityEpoch
+        val authorityEpoch = mutationPresentation.groupAuthorityEpoch
         val rosterGeneration = memberRosterRefreshGeneration.capture()
         val runtimeGeneration = appState.runtimeGeneration
         val groupId = group.groupIdHex
@@ -11997,7 +11975,7 @@ class ConversationController(
             managementStateLifetime.runIfCurrent(requestToken) {
                 val staleRead =
                     !ownsCurrentMemberRead(rosterGeneration, runtimeGeneration) ||
-                        mutationPresentation.authorityEpoch != authorityEpoch
+                        mutationPresentation.groupAuthorityEpoch != authorityEpoch
                 val changedOwner = group != startingGroup || appState.activeAccountRef != activeAccount
                 val wrongTarget =
                     !refreshed.details.group.groupIdHex
@@ -13977,7 +13955,7 @@ class ConversationController(
         refreshGeneration: Long,
     ): Boolean {
         if (!inviteConfirmationUnresolved) return true
-        val epoch = mutationPresentation.authorityEpoch
+        val epoch = mutationPresentation.groupAuthorityEpoch
         val runtimeGeneration = appState.runtimeGeneration
         val canonical =
             try {
@@ -13989,7 +13967,7 @@ class ConversationController(
         val currentRead = memberRosterRefreshGeneration.isCurrent(refreshGeneration)
         val ownsRead =
             ownsInviteAcceptanceResult &&
-                epoch == mutationPresentation.authorityEpoch &&
+                epoch == mutationPresentation.groupAuthorityEpoch &&
                 currentRead &&
                 appState.runtimeGeneration == runtimeGeneration
         if (ownsRead) applyGroupState(canonical)
@@ -14055,7 +14033,7 @@ class ConversationController(
     ) {
         val resolvingConflict = inviteConfirmationUnresolved
         if (!resolveInitialInviteConfirmation(account, generation)) return
-        val authorityEpoch = mutationPresentation.authorityEpoch
+        val authorityEpoch = mutationPresentation.groupAuthorityEpoch
         // A prefetched roster can predate the consent check and must not settle that check.
         val roster =
             if (resolvingConflict) {
@@ -14065,7 +14043,7 @@ class ConversationController(
             }
         memberRosterRefreshGeneration.runIfCurrent(generation) {
             if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                if (authorityEpoch != mutationPresentation.authorityEpoch) throw SupersededGroupRosterRead()
+                if (authorityEpoch != mutationPresentation.groupAuthorityEpoch) throw SupersededGroupRosterRead()
                 val applied = applyGroupRoster(account, roster)
                 if (applied != null) appState.applyLocalGroupDetails(account, applied.group, applied.members)
             }

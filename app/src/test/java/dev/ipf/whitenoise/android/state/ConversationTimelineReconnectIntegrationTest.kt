@@ -7,6 +7,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -264,6 +265,32 @@ class ConversationTimelineReconnectIntegrationTest {
                 pageReply.complete(Unit)
                 controller.onCleared()
                 awaitOpenedTimelineSubscriptionsClosed(scripts)
+            }
+        }
+
+    /** A launched read child belongs to runStart's catch, so its failure becomes a recoverable load error. */
+    @Test
+    fun conversationReadChildFailureIsPresentedInsteadOfEscapingTheSession() =
+        runBlocking {
+            val fixtures = conversationTimelineReconnectFixtures()
+            val controller = conversationController(fixtures.scriptedSubscriptions.subscriptions)
+            try {
+                awaitConversationCondition { fixtures.firstSubscription.nextWindowCallCount == 1 }
+                val session =
+                    controller.javaClass
+                        .getDeclaredField("timelineSession")
+                        .apply { isAccessible = true }
+                        .get(controller) as ConversationTimelineSession
+                requireNotNull(session.currentScope).launch { error("controlled conversation read child failure") }
+                awaitConversationCondition { controller.error != null }
+                assertTrue(controller.error!!.report.contains("CONVERSATION_LOAD"))
+                assertFalse(controller.isLoading)
+                awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
+                assertEquals(1, fixtures.firstSubscription.closeCallCount)
+                assertEquals(null, session.currentScope)
+            } finally {
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
             }
         }
 

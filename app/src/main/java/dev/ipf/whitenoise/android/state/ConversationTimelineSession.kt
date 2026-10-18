@@ -27,10 +27,13 @@ import kotlin.coroutines.coroutineContext
  * Pages still commit through the controller's existing atomic window boundary. Its monitor and
  * active-call mutex are the same authorities used by that boundary and by paging: retiring a
  * timeline cannot close a handle under an admitted page or detach a replacement handle.
- * App/native-owned commands are deliberately absent from this scope.
+ * App-owned mutation commands retain their own lifetime. The existing foreground timer still
+ * requests MDK-owned retention sweeps from this read scope; MDK owns their policy and persistence.
  */
 @Suppress("TooManyFunctions") // One lifecycle owner exposes admission, reads and retirement to the facade.
-internal class ConversationTimelineSession {
+internal class ConversationTimelineSession(
+    private val onTimelineRetired: () -> Unit,
+) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val lock = Any()
     val activeCallMutex = Mutex()
@@ -64,18 +67,14 @@ internal class ConversationTimelineSession {
     /** Admits one start per explicit retry generation; repeated composition calls do no work. */
     fun start(
         generation: Long,
-        run: suspend CoroutineScope.() -> Unit,
+        run: suspend () -> Unit,
     ) {
         val candidate =
             scope.launch(start = CoroutineStart.LAZY) {
                 val currentJob = coroutineContext[Job]
                 try {
-                    coroutineScope {
-                        currentScope = this
-                        run()
-                    }
+                    run()
                 } finally {
-                    currentScope = null
                     closeTimeline(timelineSubscription)
                     synchronized(lock) {
                         if (startJob === currentJob) startJob = null
@@ -96,6 +95,17 @@ internal class ConversationTimelineSession {
             }
         if (admitted) candidate.start() else candidate.cancel()
     }
+
+    /** Keeps launched read children inside the caller's load-error boundary and clears the retired scope. */
+    suspend fun runReadScope(block: suspend CoroutineScope.() -> Unit) =
+        coroutineScope {
+            currentScope = this
+            try {
+                block()
+            } finally {
+                currentScope = null
+            }
+        }
 
     /** Reconnects local projections with the existing backoff and explicit retry signal. */
     suspend fun runReconnectLoop(attempt: suspend () -> Pair<Boolean, Boolean>) {
@@ -225,9 +235,6 @@ internal class ConversationTimelineSession {
             }
         }
     }
-
-    /** The window sidecar retires atomically with its handle under [lock]. */
-    var onTimelineRetired: () -> Unit = {}
 
     /** Revokes admission before closing handles and awaiting the old start, avoiding self-join. */
     suspend fun closeForAccountTeardown(invalidate: () -> Unit) {

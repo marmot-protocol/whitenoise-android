@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -25,7 +26,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -263,43 +263,55 @@ class ConversationArchiveOptimisticAcceptanceTest {
             chats.onCleared()
         }
 
-    /** A committed command survives disposal while its late record and feedback cannot reach the new route. */
+    /** Disposal fences only the old group field; accepted archive results still settle the list and feedback. */
     @Test
-    fun disposedArchiveOwnerFinishesNativeWorkWithoutReplacingNewerPresentation() =
+    fun disposedArchiveSettlesTheCapturedAccountListAndKeepsCommandAcceptance() =
         runBlocking {
             val state = testAppState()
+            val chats =
+                ChatsController(
+                    appState = state,
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                )
+            state.attachChatsController(chats)
+            seed(chats)
             val releaseCommit = CompletableDeferred<Unit>()
             var commits = 0
             val controller =
                 conversationController(appState = state) { _, _, archived ->
                     commits += 1
                     releaseCommit.await()
-                    group(archived).copy(name = "stale completion")
+                    group(archived).copy(name = "completed archive")
                 }
             val action = async(start = CoroutineStart.UNDISPATCHED) { controller.setArchived(true) }
             try {
                 assertTrue(controller.presentedArchived)
                 controller.onCleared()
-                state.presentTransient(AppText.Plain("replacement route notice"))
-                val newerNotice = state.transientNotice
                 releaseCommit.complete(Unit)
                 assertTrue("native commitment still succeeds", action.await())
                 assertEquals(1, commits)
-                assertFalse(controller.group.archived)
-                assertFalse(controller.presentedArchived)
+                assertFalse("the retired controller's field stays fenced", controller.group.archived)
                 assertEquals("Archive group", controller.group.name)
-                assertSame(newerNotice, state.transientNotice)
-                assertFalse("a disposed UI cannot admit another command", controller.setArchived(false))
-                assertEquals(1, commits)
+                assertTrue("finishing the overlay must not resurrect the main-list row", chats.items.isEmpty())
+                assertEquals(GROUP_ID, chats.archivedItems.single().id)
+                assertEquals(AppText.Resource(R.string.toast_chat_archived), state.transientNotice?.title)
+                assertTrue(state.transientNotice!!.isForConversation(ACCOUNT_REF, GROUP_ID))
+                assertTrue("screen disposal must not add a new command rejection", controller.setArchived(false))
+                assertEquals(2, commits)
+                assertEquals(GROUP_ID, chats.items.single().id)
+                assertTrue(chats.archivedItems.isEmpty())
+                assertEquals(AppText.Resource(R.string.toast_chat_restored), state.transientNotice?.title)
             } finally {
                 releaseCommit.complete(Unit)
                 controller.onCleared()
+                chats.onCleared()
             }
         }
 
-    /** A late archive refusal cannot replace feedback already owned by a replacement conversation. */
+    /** An archive refusal still reports the accepted command's failure after its screen leaves. */
     @Test
-    fun disposedArchiveFailureLeavesTheReplacementNoticeAlone() =
+    fun disposedArchiveFailureKeepsItsExistingRecoveryFeedback() =
         runBlocking {
             val state = testAppState()
             val releaseCommit = CompletableDeferred<Unit>()
@@ -311,13 +323,13 @@ class ConversationArchiveOptimisticAcceptanceTest {
             val action = async(start = CoroutineStart.UNDISPATCHED) { controller.setArchived(true) }
             try {
                 controller.onCleared()
-                state.presentTransient(AppText.Plain("replacement route notice"))
-                val newerNotice = state.transientNotice
                 releaseCommit.complete(Unit)
                 assertFalse(action.await())
-                assertSame(newerNotice, state.transientNotice)
-                assertNull(controller.lastMutationError)
+                assertNotNull(controller.lastMutationError)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_update_chat), state.toast?.title)
+                assertTrue(state.toast?.diagnosticReport?.contains("GROUP_ARCHIVE_UPDATE") == true)
                 assertFalse(controller.mutationInFlight)
+                assertFalse(controller.presentedArchived)
             } finally {
                 releaseCommit.complete(Unit)
                 controller.onCleared()

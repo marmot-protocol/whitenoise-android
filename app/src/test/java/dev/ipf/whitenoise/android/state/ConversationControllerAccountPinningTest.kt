@@ -230,9 +230,9 @@ class ConversationControllerAccountPinningTest {
             }
         }
 
-    /** Observer disposal cannot revoke an app-owned Retry whose native acknowledgement has not returned. */
+    /** Complementary app-owner coverage: a pending Retry acknowledgement is independent of controller disposal. */
     @Test
-    fun attachmentObserverDisposalLeavesPendingNativeAdmissionWithTheAppOwner() =
+    fun appOwnedRetryAdmissionSurvivesControllerDisposal() =
         runTest {
             val state = appState(activeAccountRef = TARGET_REF)
             val controller = ConversationController(state, group(), targetMemberSnapshot())

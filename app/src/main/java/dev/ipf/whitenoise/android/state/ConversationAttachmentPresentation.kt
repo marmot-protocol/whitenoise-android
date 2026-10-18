@@ -29,14 +29,8 @@ internal class ConversationAttachmentPresentation(
     /** Releases UI waiters; explicit native cancellation is a separate user action. */
     fun dispose() = scope.cancel()
 
-    /** Controller-local slot key; durable/native keys additionally include account and group. */
-    private fun transferKey(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): String = "$messageIdHex#$attachmentIndex"
-
     /** Cache identity is fixed to the account/group captured when this controller was constructed. */
-    private fun mediaCacheKey(
+    fun mediaCacheKey(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
@@ -90,7 +84,7 @@ internal class ConversationAttachmentPresentation(
         initiallyAvailable: Boolean,
     ): StateFlow<AttachmentTransferState> =
         transfers.acquireState(
-            key = transferKey(messageIdHex, attachmentIndex),
+            key = attachmentTransferKey(messageIdHex, attachmentIndex),
             initiallyAvailable = initiallyAvailable,
         )
 
@@ -99,7 +93,7 @@ internal class ConversationAttachmentPresentation(
         messageIdHex: String,
         attachmentIndex: Int,
     ) {
-        transfers.releaseState(transferKey(messageIdHex, attachmentIndex))
+        transfers.releaseState(attachmentTransferKey(messageIdHex, attachmentIndex))
     }
 
     /** Suspends until this attachment, rather than any process-wide cache key, becomes available. */
@@ -107,7 +101,7 @@ internal class ConversationAttachmentPresentation(
         messageIdHex: String,
         attachmentIndex: Int,
     ) {
-        transfers.awaitNextAvailability(transferKey(messageIdHex, attachmentIndex))
+        transfers.awaitNextAvailability(attachmentTransferKey(messageIdHex, attachmentIndex))
     }
 
     /**
@@ -130,7 +124,7 @@ internal class ConversationAttachmentPresentation(
             )
         }
         return transfers.request(
-            key = transferKey(messageIdHex, attachmentIndex),
+            key = attachmentTransferKey(messageIdHex, attachmentIndex),
             load = {
                 retainedPlaintext
                     ?: downloadAttachment(messageIdHex, attachmentIndex, reference, priority)

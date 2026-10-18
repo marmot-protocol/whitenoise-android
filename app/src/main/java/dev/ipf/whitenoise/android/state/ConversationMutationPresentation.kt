@@ -7,8 +7,8 @@ import androidx.compose.runtime.setValue
 /**
  * Main-confined, transient action presentation for one pinned conversation.
  *
- * This owns admission and overlays, not native commands or their durable lifetime. Timeline
- * updates advance the existing authority receipt so a late command cannot replace newer state.
+ * This owns admission and overlays, not native commands or their durable lifetime. Group
+ * applications advance the existing authority receipt so a late command cannot replace newer state.
  * Disposing a timeline never cancels an admitted command or removes an app-owned optimistic send.
  */
 internal class ConversationMutationPresentation(
@@ -23,23 +23,26 @@ internal class ConversationMutationPresentation(
     var inFlight by mutableStateOf(false)
         private set
     var error by mutableStateOf<ErrorPresentation?>(null)
-    var authorityEpoch = 0L
+        private set
+    var groupAuthorityEpoch = 0L
         private set
 
-    /** A retired controller may finish its command, but cannot publish into the replacement route. */
+    /** Whether the controller still owns assignment to its visible group field. */
     fun ownsCurrentPresentation(): Boolean = ownsPresentation()
 
-    /** Applies a command result only while its original controller and authoritative receipt still own it. */
-    fun applyIfCurrent(
-        receipt: Long,
-        apply: () -> Unit,
-    ) {
-        if (ownsCurrentPresentation() && authorityEpoch == receipt) apply()
+    /** Clears the prior action's failure when the facade admits a new command or the user dismisses it. */
+    fun clearError() {
+        error = null
+    }
+
+    /** Retains a cause-accurate action failure independently of subscription retries. */
+    fun recordFailure(failure: ErrorPresentation) {
+        error = failure
     }
 
     /** Records an authoritative group application without creating a second generation owner. */
     fun authoritativeGroupApplied() {
-        authorityEpoch += 1L
+        groupAuthorityEpoch += 1L
     }
 
     /** Shows an admitted archive intent over the latest native group value. */
