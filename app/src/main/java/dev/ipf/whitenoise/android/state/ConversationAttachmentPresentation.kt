@@ -84,7 +84,7 @@ internal class ConversationAttachmentPresentation(
         initiallyAvailable: Boolean,
     ): StateFlow<AttachmentTransferState> =
         transfers.acquireState(
-            key = attachmentTransferKey(messageIdHex, attachmentIndex),
+            key = attachmentTransferSlotKey(messageIdHex, attachmentIndex),
             initiallyAvailable = initiallyAvailable,
         )
 
@@ -93,7 +93,7 @@ internal class ConversationAttachmentPresentation(
         messageIdHex: String,
         attachmentIndex: Int,
     ) {
-        transfers.releaseState(attachmentTransferKey(messageIdHex, attachmentIndex))
+        transfers.releaseState(attachmentTransferSlotKey(messageIdHex, attachmentIndex))
     }
 
     /** Suspends until this attachment, rather than any process-wide cache key, becomes available. */
@@ -101,7 +101,7 @@ internal class ConversationAttachmentPresentation(
         messageIdHex: String,
         attachmentIndex: Int,
     ) {
-        transfers.awaitNextAvailability(attachmentTransferKey(messageIdHex, attachmentIndex))
+        transfers.awaitNextAvailability(attachmentTransferSlotKey(messageIdHex, attachmentIndex))
     }
 
     /**
@@ -124,7 +124,7 @@ internal class ConversationAttachmentPresentation(
             )
         }
         return transfers.request(
-            key = attachmentTransferKey(messageIdHex, attachmentIndex),
+            key = attachmentTransferSlotKey(messageIdHex, attachmentIndex),
             load = {
                 retainedPlaintext
                     ?: downloadAttachment(messageIdHex, attachmentIndex, reference, priority)

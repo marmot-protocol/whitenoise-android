@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** One slot identity shared by the attachment presentation and its facade adapters. */
-internal fun attachmentTransferKey(
+internal fun attachmentTransferSlotKey(
     messageIdHex: String,
     attachmentIndex: Int,
 ): String = "$messageIdHex#$attachmentIndex"
@@ -15,7 +15,7 @@ internal fun attachmentTransferKey(
 internal fun ConversationController.attachmentTransferKey(
     messageIdHex: String,
     attachmentIndex: Int,
-): String = dev.ipf.whitenoise.android.state.attachmentTransferKey(messageIdHex, attachmentIndex)
+): String = attachmentTransferSlotKey(messageIdHex, attachmentIndex)
 
 /**
  * Drops decrypted bytes after a decoder or playback failure so the next open
