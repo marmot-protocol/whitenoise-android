@@ -3,6 +3,11 @@ package dev.ipf.whitenoise.android.state
 import android.os.Looper
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -212,6 +217,80 @@ class ConversationTimelineReconnectIntegrationTest {
             } finally {
                 controller.onCleared()
                 awaitOpenedTimelineSubscriptionsClosed(scriptedSubscriptions)
+            }
+        }
+
+    /** Retirement waits for an admitted page, rejects its stale result, and closes the handle only once. */
+    @Test
+    fun accountTeardownDuringPagingWaitsForTheCommandAndClosesOnce() =
+        runBlocking {
+            val message = timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)
+            val timeline =
+                ScriptedConversationTimelineSubscription(
+                    snapshotPage = timelinePageWithFlags(listOf(message), hasMoreBefore = true),
+                    backwardsPage = timelinePage(timelineRecord(MESSAGE_OLD, 0uL), message),
+                )
+            val pageEntered = CompletableDeferred<Unit>()
+            val pageReply = CompletableDeferred<Unit>()
+            timeline.beforeBackwardsReply = {
+                pageEntered.complete(Unit)
+                pageReply.await()
+            }
+            val scripts = ScriptedConversationLiveSubscriptions(listOf(timeline), conversationTimelineTestGroup())
+            val controller = conversationController(scripts.subscriptions)
+            try {
+                awaitConversationCondition { controller.hasMoreBefore && !controller.isLoading }
+                val page =
+                    async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                        controller.loadOlderTimelinePage()
+                    }
+                awaitConversationCondition { pageEntered.isCompleted }
+                val teardown =
+                    async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                        controller.closeLiveSubscriptionsForAccountTeardown(ConversationTimelineTestIds.ACCOUNT_REF)
+                    }
+                awaitConversationCondition { controller.accountTeardownRequested }
+                assertFalse(teardown.isCompleted)
+                assertEquals(0, timeline.closeCallCount)
+                pageReply.complete(Unit)
+                awaitConversationCondition { page.isCompleted && teardown.isCompleted }
+                assertFalse(page.await())
+                teardown.await()
+                controller.onCleared()
+                assertEquals(1, timeline.closeCallCount)
+                assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_A), timelineMessageIds(controller))
+                assertEquals(null, controller.timelineSubscription)
+                assertEquals(null, controller.window.readySubscription)
+            } finally {
+                pageReply.complete(Unit)
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(scripts)
+            }
+        }
+
+    /** A launched read child belongs to runStart's catch, so its failure becomes a recoverable load error. */
+    @Test
+    fun conversationReadChildFailureIsPresentedInsteadOfEscapingTheSession() =
+        runBlocking {
+            val fixtures = conversationTimelineReconnectFixtures()
+            val controller = conversationController(fixtures.scriptedSubscriptions.subscriptions)
+            try {
+                awaitConversationCondition { fixtures.firstSubscription.nextWindowCallCount == 1 }
+                val session =
+                    controller.javaClass
+                        .getDeclaredField("timelineSession")
+                        .apply { isAccessible = true }
+                        .get(controller) as ConversationTimelineSession
+                requireNotNull(session.currentScope).launch { error("controlled conversation read child failure") }
+                awaitConversationCondition { controller.error != null }
+                assertTrue(controller.error!!.report.contains("CONVERSATION_LOAD"))
+                assertFalse(controller.isLoading)
+                awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
+                assertEquals(1, fixtures.firstSubscription.closeCallCount)
+                assertEquals(null, session.currentScope)
+            } finally {
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(fixtures.scriptedSubscriptions)
             }
         }
 

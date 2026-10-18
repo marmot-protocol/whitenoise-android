@@ -70,6 +70,8 @@ class StalenessGuardCoverageTest {
         val controllers = productionSource("Controllers.kt")
         val nativePushFallback = productionSource("NativePushFallbackRuntime.kt")
         val directChatResolution = productionSource("DirectChatResolution.kt")
+        val timelineSession = productionSource("ConversationTimelineSession.kt")
+        val mutationPresentation = productionSource("ConversationMutationPresentation.kt")
         val guardedPaths =
             mapOf(
                 "AppState.kt:refreshAccountUnreadCounts" to
@@ -273,7 +275,7 @@ class StalenessGuardCoverageTest {
                 // One admitted timeline subscription consumes and publishes its ordered windows serially.
                 "Controllers.kt:runTimelineSubscriptionPipeline" to "single-owner ordered subscription pipeline",
                 // Handle identity is compared under the subscription monitor before clearing.
-                "Controllers.kt:closeTimelineSubscriptionSafely" to "identity-checked handle teardown",
+                "ConversationTimelineSession.kt:closeTimeline" to "identity-checked handle teardown",
                 // Delete rollback is conditional on its optimistic tombstone and the commit is group-serialized.
                 "Controllers.kt:deleteMessageResult" to "serialized optimistic command with conditional rollback",
                 // Retry resumes one retained optimistic mutation; media retries also recheck the account session.
@@ -306,7 +308,9 @@ class StalenessGuardCoverageTest {
         val candidates =
             asyncPublicationCandidates("AppState.kt", appState) +
                 asyncPublicationCandidates("Controllers.kt", controllers) +
-                asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution)
+                asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution) +
+                asyncPublicationCandidates("ConversationTimelineSession.kt", timelineSession) +
+                asyncPublicationCandidates("ConversationMutationPresentation.kt", mutationPresentation)
         val unclassified = candidates - guardedNames - exemptions.keys
         assertTrue(
             "suspend-then-publish paths need a StalenessGuard or a commented exemption: $unclassified",
@@ -340,9 +344,9 @@ class StalenessGuardCoverageTest {
                         "forwardTargetsRevision",
                         "memberSnapshotsRevision",
                         "nextActivitySequence",
-                        "lastStartedGeneration",
                         "streamDebugEventSequence",
                     ),
+                "ConversationTimelineSession.kt" to listOf("lastStartedGeneration"),
                 "TtsPlaybackQueue.kt" to
                     listOf("messageProgressGeneration", "edgeRequestGeneration", "parkedTerminalGeneration"),
                 "NotificationStreamForegroundService.kt" to
@@ -449,6 +453,8 @@ class StalenessGuardCoverageTest {
             "StalenessGuard.kt",
             "AppState.kt",
             "Controllers.kt",
+            "ConversationTimelineSession.kt",
+            "ConversationMutationPresentation.kt",
             "AccountUnreadStore.kt",
             "AttachmentOpenCoordinator.kt",
             "AttachmentTransferCoordinator.kt",

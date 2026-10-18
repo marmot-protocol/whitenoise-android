@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelineSession.kt",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Timeline startup, retry and retirement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelineSession.kt",
+        "anchor": "fun start(",
+        "test_ids": [
+          "CON-015",
+          "CON-033"
+        ]
+      },
+      {
+        "surface": "Paging and subscription retirement share one mutex",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelineSession.kt",
+        "anchor": "private suspend fun closeTimeline(",
+        "test_ids": [
+          "MSG-021",
+          "CON-033"
+        ]
+      }
+    ]
+  },
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "discovery_exceptions": []
+}

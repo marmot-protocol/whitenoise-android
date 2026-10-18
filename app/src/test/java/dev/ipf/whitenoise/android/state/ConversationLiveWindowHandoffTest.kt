@@ -71,6 +71,41 @@ class ConversationLiveWindowHandoffTest {
             }
         }
 
+    /** Recomposition cannot open a second native window while independent roster initialization is held. */
+    @Test
+    fun repeatedStartKeepsOneFirstFrameOwnerAndDisposalClosesIt() =
+        runBlocking {
+            val rosterReply = CompletableDeferred<GroupRosterFfi>()
+            val timeline =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)),
+                )
+            val scripts = ScriptedConversationLiveSubscriptions(listOf(timeline), conversationTimelineTestGroup())
+            val controller =
+                ConversationController(
+                    appState = conversationTimelineTestAppState(scripts.subscriptions),
+                    initialGroup = conversationTimelineTestGroup(),
+                    initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                    groupRosterReader = { _, _ -> rosterReply.await() },
+                    startOnConstruction = true,
+                )
+            try {
+                awaitConversationCondition { timeline.nextWindowCallCount > 0 }
+                repeat(5) { controller.start() }
+                assertEquals(1, scripts.timelineSubscriptionOpenCount)
+                assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_A), timelineMessageIds(controller))
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(scripts)
+                controller.start()
+                assertEquals(1, scripts.timelineSubscriptionOpenCount)
+                assertEquals(1, timeline.closeCallCount)
+            } finally {
+                rosterReply.complete(conversationTimelineGroupRoster())
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(scripts)
+            }
+        }
+
     /** Early live consumption does not bypass an unverified notification transcript's roster gate. */
     @Test
     fun pendingRosterStillGatesDisclosureWhileLiveWindowsAreConsumed() =

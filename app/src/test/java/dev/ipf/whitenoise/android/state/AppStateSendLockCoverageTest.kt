@@ -488,13 +488,27 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun closeTimelineSubscriptionWaitsNonCancellablyForActiveCallMutex() {
-        val close = controllerFunctionBody("closeTimelineSubscriptionSafely")
+        val session = controllersSource().resolveSibling("ConversationTimelineSession.kt").readText()
+        val close = functionBodyIn(session, "closeTimeline")
+        val paging = pagingSource().readText()
+        val controllers = controllersSource().readText()
+        val olderPage = functionBodyIn(paging, "pageOlderIfActive", includeDeclaration = true)
+        val newerPage = functionBodyIn(paging, "pageNewerIfActive", includeDeclaration = true)
+        val mutexProxy =
+            "internal val timelineSubscriptionActiveCallMutex: Mutex " +
+                "get() = timelineSession.activeCallMutex"
+        assertTrue(
+            "both paging directions must acquire the session's actual retirement mutex",
+            "timelineSubscriptionActiveCallMutex.withLock" in olderPage &&
+                "timelineSubscriptionActiveCallMutex.withLock" in newerPage &&
+                mutexProxy in controllers,
+        )
 
         assertTrue(
             "timeline subscription close must wrap mutex acquisition and close in NonCancellable",
             "withContext(NonCancellable)" in close &&
-                close.indexOf("withContext(NonCancellable)") < close.indexOf("timelineSubscriptionActiveCallMutex.withLock") &&
-                close.indexOf("timelineSubscriptionActiveCallMutex.withLock") < close.indexOf("timelineStream.close()"),
+                close.indexOf("withContext(NonCancellable)") < close.indexOf("activeCallMutex.withLock") &&
+                close.indexOf("activeCallMutex.withLock") < close.indexOf("stream.close()"),
         )
     }
 
@@ -607,10 +621,11 @@ class AppStateSendLockCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing ConversationTimelinePaging.kt source file")
 
-    /** The body of [functionName] within an already-read source file. */
+    /** Extracts a function body, optionally retaining its declaration to check expression-body guards. */
     private fun functionBodyIn(
         source: String,
         functionName: String,
+        includeDeclaration: Boolean = false,
     ): String {
         val start =
             // Extensions declare a receiver between `fun` and the name.
@@ -621,7 +636,8 @@ class AppStateSendLockCoverageTest {
                 ?: error("Missing function $functionName")
         val braceStart = source.indexOf('{', start)
         require(braceStart >= 0) { "Missing body for $functionName" }
-        return source.kotlinBlockFrom(braceStart, "function $functionName")
+        val body = source.kotlinBlockFrom(braceStart, "function $functionName")
+        return if (includeDeclaration) source.substring(start, braceStart) + body else body
     }
 
     internal fun controllerFunctionBody(functionName: String): String {

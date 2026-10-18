@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -260,6 +261,106 @@ class ConversationArchiveOptimisticAcceptanceTest {
             assertTrue(chats.items.single().hasUnread)
             assertEquals(3uL, chats.items.single().unreadCount)
             chats.onCleared()
+        }
+
+    /** Disposal fences only the old group field; accepted archive results still settle the list and feedback. */
+    @Test
+    fun disposedArchiveSettlesTheCapturedAccountListAndKeepsCommandAcceptance() =
+        runBlocking {
+            val state = testAppState()
+            val chats =
+                ChatsController(
+                    appState = state,
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                )
+            state.attachChatsController(chats)
+            seed(chats)
+            val releaseCommit = CompletableDeferred<Unit>()
+            var commits = 0
+            val controller =
+                conversationController(appState = state) { _, _, archived ->
+                    commits += 1
+                    releaseCommit.await()
+                    group(archived).copy(name = "completed archive")
+                }
+            val action = async(start = CoroutineStart.UNDISPATCHED) { controller.setArchived(true) }
+            try {
+                assertTrue(controller.presentedArchived)
+                controller.onCleared()
+                releaseCommit.complete(Unit)
+                assertTrue("native commitment still succeeds", action.await())
+                assertEquals(1, commits)
+                assertFalse("the retired controller's field stays fenced", controller.group.archived)
+                assertEquals("Archive group", controller.group.name)
+                assertTrue("finishing the overlay must not resurrect the main-list row", chats.items.isEmpty())
+                assertEquals(GROUP_ID, chats.archivedItems.single().id)
+                assertEquals(AppText.Resource(R.string.toast_chat_archived), state.transientNotice?.title)
+                assertTrue(state.transientNotice!!.isForConversation(ACCOUNT_REF, GROUP_ID))
+                assertTrue("screen disposal must not add a new command rejection", controller.setArchived(false))
+                assertEquals(2, commits)
+                assertEquals(GROUP_ID, chats.items.single().id)
+                assertTrue(chats.archivedItems.isEmpty())
+                assertEquals(AppText.Resource(R.string.toast_chat_restored), state.transientNotice?.title)
+            } finally {
+                releaseCommit.complete(Unit)
+                controller.onCleared()
+                chats.onCleared()
+            }
+        }
+
+    /** An archive refusal still reports the accepted command's failure after its screen leaves. */
+    @Test
+    fun disposedArchiveFailureKeepsItsExistingRecoveryFeedback() =
+        runBlocking {
+            val state = testAppState()
+            val releaseCommit = CompletableDeferred<Unit>()
+            val controller =
+                conversationController(appState = state) { _, _, _ ->
+                    releaseCommit.await()
+                    throw MarmotKitException.Publish("refused archive")
+                }
+            val action = async(start = CoroutineStart.UNDISPATCHED) { controller.setArchived(true) }
+            try {
+                controller.onCleared()
+                releaseCommit.complete(Unit)
+                assertFalse(action.await())
+                assertNotNull(controller.lastMutationError)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_update_chat), state.toast?.title)
+                assertTrue(state.toast?.diagnosticReport?.contains("GROUP_ARCHIVE_UPDATE") == true)
+                assertFalse(controller.mutationInFlight)
+                assertFalse(controller.presentedArchived)
+            } finally {
+                releaseCommit.complete(Unit)
+                controller.onCleared()
+            }
+        }
+
+    /** A notification-pinned controller cannot publish an archive record into another account's attached list. */
+    @Test
+    fun archiveCompletionRoutesItsLocalRecordOnlyToThePinnedAccount() =
+        runBlocking {
+            val state = testAppState()
+            val chats =
+                ChatsController(
+                    appState = state,
+                    initialAccountRef = "other-profile",
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                )
+            state.attachChatsController(chats)
+            seed(chats)
+            val controller =
+                conversationController(appState = state) { _, _, archived -> group(archived) }
+            try {
+                assertEquals(listOf(GROUP_ID), chats.items.map { it.id })
+                assertTrue(controller.setArchived(true))
+                assertTrue(controller.group.archived)
+                assertEquals(listOf(GROUP_ID), chats.items.map { it.id })
+                assertTrue(chats.archivedItems.isEmpty())
+            } finally {
+                controller.onCleared()
+                chats.onCleared()
+            }
         }
 
     private fun conversationController(
