@@ -1,5 +1,6 @@
 """Runner contracts: only an emulator with the isolated package reaches the instrumentation."""
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -67,6 +68,56 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
         self.assertFalse(runner.held_request_ended(events))
         self.assertTrue(runner.held_request_ended(events + [{"seq": 4, "request": 7, "kind": "hold_timeout"}]))
         self.assertFalse(runner.held_request_ended([{"seq": 1, "request": 7, "kind": "disconnect"}]))
+
+
+    def test_an_interrupted_request_still_open_stops_the_attempt_before_resume(self):
+        """A resume must not overlap the interrupted request, so an unseen disconnect ends the attempt as failed."""
+
+        class Service:
+            """A stand-in for the fixture server and relay: no sockets, an empty ledger."""
+
+            server_port = 4001
+            port = 4002
+
+            def __init__(self, *_):
+                self.ledger = mock.Mock(snapshot=mock.Mock(return_value=[]))
+
+            def serve_forever(self):
+                """Returns at once, as a stopped server would."""
+
+            def shutdown(self):
+                """Nothing to stop."""
+
+            def server_close(self):
+                """Nothing to close."""
+
+        def adb(_adb, _serial, *args):
+            """Answers the emulator, package and property probes the runner makes."""
+            if "ro.kernel.qemu" in args:
+                return "1\n"
+            if "list" in args:
+                return f"package:{runner.APP}\n"
+            return ""
+
+        stages = []
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(runner, "adb_command", side_effect=adb), \
+                mock.patch.object(runner, "FixtureServer", Service), \
+                mock.patch.object(runner, "FixtureRelay", Service), \
+                mock.patch.object(runner, "instrument", side_effect=lambda *a: stages.append(a[3]) or "out"), \
+                mock.patch.object(runner, "ended_abruptly", return_value=True), \
+                mock.patch.object(runner, "release_held_body"), \
+                mock.patch.object(runner, "await_held_disconnect", return_value=False), \
+                mock.patch.object(runner, "metrics_of", return_value=[]), \
+                mock.patch.object(runner, "result_lines", return_value=[]), \
+                mock.patch.object(runner.time, "sleep"):
+            output = Path(directory) / "out.json"
+            with self.assertRaises(RuntimeError):
+                runner.run("adb", "emulator-5554", Path(directory), output)
+            report = json.loads(output.read_text())
+        self.assertEqual(["main"], stages, "resume was never launched")
+        self.assertFalse(report["instrumentation_passed"])
+        self.assertEqual("held_request_still_open", report["stages"][-1]["skipped"])
 
 
 if __name__ == "__main__":

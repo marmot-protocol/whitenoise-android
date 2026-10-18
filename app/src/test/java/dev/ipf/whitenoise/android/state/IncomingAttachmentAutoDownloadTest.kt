@@ -344,6 +344,38 @@ class IncomingAttachmentAutoDownloadTest {
             }
         }
 
+    /**
+     * A receipt that held a type does not stand as settled: once the policy allows that type, a later receipt for
+     * the same message looks it up again and queues the held slot, as the controlled fixture's replay does.
+     */
+    @Test
+    fun aHeldTypeIsQueuedByALaterReceiptOnceThePolicyAllowsIt() =
+        runBlocking {
+            val imagesOnly =
+                MediaAutoDownloadMatrix(emptySet()).withToggle(
+                    MediaAutoDownloadType.Image,
+                    MediaAutoDownloadNetwork.WiFi,
+                    on = true,
+                )
+            persistMatrix(ACCOUNT_A, imagesOnly)
+            val fixture = fixture(history = mixedHistory(), muted = false)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+                assertEquals(1, queued(request(IMAGE_INDEX)))
+                assertEquals("video held by policy", 0, queued(request(VIDEO_INDEX)))
+
+                persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                assertEquals("the replayed receipt queues the held video", 1, queued(request(VIDEO_INDEX)))
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** The receiving account's own policy applies even while another account is active. */
     @Test
     fun receivingAccountPolicyAppliesWhenItIsNotActive() =

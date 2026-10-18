@@ -588,13 +588,23 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 val manager = WorkManager.getInstance(context.applicationContext)
                 val waits = AutomaticAttachmentNetworkWaits.get(context.applicationContext)
                 // Registered before the enqueue, so no window leaves a narrowed spec without a record to widen.
-                val registered =
-                    type != null &&
-                        runCatching { waits.register(request, type, networkType) }
+                val registration =
+                    type?.let {
+                        runCatching { waits.register(request, it, networkType) }
                             .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
-                            .getOrDefault(false)
+                            .getOrDefault(AutomaticAttachmentNetworkWaits.Registration.Failed)
+                    }
+                val registered = registration == AutomaticAttachmentNetworkWaits.Registration.Created
+                // Narrowed work whose record could not be saved is queued on any network instead: its run re-checks
+                // the live policy and narrows itself through the registry, so it can never wait without a record.
+                val queued =
+                    if (registration == AutomaticAttachmentNetworkWaits.Registration.Failed) {
+                        buildRequest(request, priority, networkType = NetworkType.CONNECTED)
+                    } else {
+                        work
+                    }
                 runCatching {
-                    manager.enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.KEEP, work)
+                    manager.enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.KEEP, queued)
                 }.onSuccess { operation ->
                     val settle = Runnable { settleReceipt(waits, manager, request, type, networkType) }
                     operation.result.addListener(settle, receiptSettleExecutor)

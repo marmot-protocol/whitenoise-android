@@ -131,9 +131,12 @@ class AttachmentDownloadWorkerTest {
         )
     }
 
-    /** A pending approval spends the single transient follow-up, and the spent budget stops it (#3308). */
+    /**
+     * The generic classifier treats a pending approval as a transient failure. The worker catches it before that path
+     * and retries without spending the budget, which AttachmentDownloadWorkerTransferTest locks (#3308).
+     */
     @Test
-    fun pendingPermissionSpendsTheSingleTransientRetry() {
+    fun pendingPermissionIsClassifiedAsTransient() {
         assertTrue(shouldRetryAttachmentDownloadWork(false, AttachmentPermissionPendingException()))
         assertFalse(shouldRetryAttachmentDownloadWork(true, AttachmentPermissionPendingException()))
     }

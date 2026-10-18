@@ -70,30 +70,50 @@ internal class AutomaticAttachmentNetworkWaits(
         }
     }
 
+    /** How a write-ahead registration went, so the caller never queues narrowed work without a durable record. */
+    enum class Registration {
+        /** The work waits on any network and needs no record. */
+        NotNeeded,
+
+        /** A record already existed and was kept. */
+        Existing,
+
+        /** This call created the record, so a failed enqueue withdraws it. */
+        Created,
+
+        /** The record could not be saved, so the work must not be queued on the narrowed network. */
+        Failed,
+    }
+
     /**
      * Registers [request] before its automatic work is enqueued on the narrowed [networkType], so a policy that
      * widens while the enqueue is still landing, or a process that dies before it lands, always leaves a record for
      * a later sweep to reconcile. An existing record is kept, since its spec's network is settled after the
-     * enqueue. Returns whether this call created the record, so a failed enqueue can withdraw it.
+     * enqueue. [Registration.Failed] means the sealed record did not reach disk.
      */
     fun register(
         request: AttachmentTransferRequest,
         type: MediaAutoDownloadType,
         networkType: NetworkType,
         nowMs: Long = System.currentTimeMillis(),
-    ): Boolean {
-        if (networkType == NetworkType.CONNECTED) return false
+    ): Registration {
+        if (networkType == NetworkType.CONNECTED) return Registration.NotNeeded
         val name = attachmentDownloadWorkName(request)
         var created = false
-        update { current ->
-            if (name in current) {
-                current
-            } else {
-                created = true
-                current + (name to encode(Wait(request, type, networkType, nowMs)))
+        val saved =
+            update { current ->
+                if (name in current) {
+                    current
+                } else {
+                    created = true
+                    current + (name to encode(Wait(request, type, networkType, nowMs)))
+                }
             }
+        return when {
+            !saved -> Registration.Failed
+            created -> Registration.Created
+            else -> Registration.Existing
         }
-        return created
     }
 
     /** Drops [request]'s record, once its work finished or no longer waits on a narrowed network. */
@@ -153,8 +173,11 @@ internal class AutomaticAttachmentNetworkWaits(
         val recorded = synchronized(this) { records.readAll()[attachmentDownloadWorkName(request)] }?.let(::decode)
         val settledType = type ?: recorded?.type
         // Reconcile against the policy as it is now, not as it was when the receipt was read: a policy that widened
-        // while this enqueue was landing must not leave the spec on the older, narrower network.
-        val current = settledType?.let { policyNetworkType?.invoke(request.accountRef, it) }
+        // while this enqueue was landing must not leave the spec on the older, narrower network. An installed hook
+        // that cannot answer, for an unloaded or signed-out account, means nothing may widen, as in a sweep.
+        val hook = policyNetworkType
+        val current = settledType?.let { hook?.invoke(request.accountRef, it) }
+        if (hook != null && settledType != null && current == null) return
         settle(
             manager,
             request,
@@ -189,7 +212,11 @@ internal class AutomaticAttachmentNetworkWaits(
         synchronized(constraintLock) {
             // Under the one constraint lock, the live policy wins over the target the caller read earlier, so an
             // older sweep or receipt that finishes after a newer one can never write back an outdated network.
-            val live = type?.let { policyNetworkType?.invoke(request.accountRef, it) } ?: target
+            val hook = policyNetworkType
+            val answer = type?.let { hook?.invoke(request.accountRef, it) }
+            // An installed hook with no answer is an unloaded or signed-out account, which never widens.
+            if (hook != null && type != null && answer == null) return@synchronized 0
+            val live = answer ?: target
             val stored = synchronized(this) { records.readAll()[attachmentDownloadWorkName(request)] }?.let(::decode)
             settleLocked(
                 manager,
@@ -218,10 +245,19 @@ internal class AutomaticAttachmentNetworkWaits(
     ) {
         synchronized(constraintLock) {
             val target = type?.let { policyNetworkType?.invoke(request.accountRef, it) } ?: captured
-            // Recorded before the update, so any sweep that follows this lock always finds the narrowed wait.
-            if (type != null) record(request, type, target)
             val priority = AttachmentDownloadPriority.Automatic
-            manager.updateWork(AttachmentDownloadWorker.buildRequest(request, priority, workId, target)).get()
+            val work = AttachmentDownloadWorker.buildRequest(request, priority, workId, target)
+            val update = { manager.updateWork(work).get() }
+            if (target == NetworkType.CONNECTED) {
+                // Any network needs no record, but the old one is dropped only once the spec really waits on any
+                // network: a failed update keeps it, so a later sweep can still widen the spec.
+                update()
+                if (type != null) forget(request)
+            } else {
+                // Recorded before the update, so any sweep that follows this lock always finds the narrowed wait.
+                if (type != null) record(request, type, target)
+                update()
+            }
         }
     }
 
@@ -263,14 +299,15 @@ internal class AutomaticAttachmentNetworkWaits(
     /** Serialises every constraint write, widening or narrowing, so overlapping updates apply in order. */
     private val constraintLock = Any()
 
-    /** Applies [change] to the sealed record under the process-wide lock. */
-    private fun update(change: (Map<String, String>) -> Map<String, String>) {
+    /** Applies [change] to the sealed record under the process-wide lock, reporting whether it reached disk. */
+    private fun update(change: (Map<String, String>) -> Map<String, String>): Boolean =
         synchronized(this) {
             val current = records.readAll()
             val next = change(current)
-            if (next != current && !records.replaceAllDurably(next)) Log.w(TAG, "attachment_network_wait_unsaved")
+            val saved = next == current || records.replaceAllDurably(next)
+            if (!saved) Log.w(TAG, "attachment_network_wait_unsaved")
+            saved
         }
-    }
 
     companion object {
         private const val TAG = "DMAttachmentWorker"

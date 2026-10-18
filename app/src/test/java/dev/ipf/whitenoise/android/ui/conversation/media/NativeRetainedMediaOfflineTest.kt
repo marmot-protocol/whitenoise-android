@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Before
@@ -45,6 +46,14 @@ class NativeRetainedMediaOfflineTest {
     private lateinit var fixture: MediaDownloadIntegrationFixture
     private lateinit var controller: ConversationController
     private val materializations = AtomicInteger()
+
+    /** Whether the surfaces use the production materializers, which read MDK's retained bytes, instead of a stub. */
+    private var productionMaterializer = false
+
+    /** The last file a materializer handed to a surface. */
+    private val materializedFile =
+        java.util.concurrent.atomic
+            .AtomicReference<java.io.File?>()
 
     /** Uses the real controller with only its native boundary replaced, and no network at all. */
     @Before
@@ -142,6 +151,31 @@ class NativeRetainedMediaOfflineTest {
         assertNoTransfer()
     }
 
+    /** The production video materializer behind the tile reads MDK's retained bytes, with no transfer request. */
+    @Test
+    fun theTileMaterializerReadsTheRetainedBytesOffline() = assertProductionReadsRetainedBytes { VideoTile() }
+
+    /** The production video materializer behind the in-chat bubble reads MDK's retained bytes, with no transfer. */
+    @Test
+    fun theBubbleMaterializerReadsTheRetainedBytesOffline() = assertProductionReadsRetainedBytes { VideoBubble() }
+
+    /** The production voice materializer reads MDK's retained bytes, with no transfer request. */
+    @Test
+    fun theVoiceMaterializerReadsTheRetainedBytesOffline() = assertProductionReadsRetainedBytes { VoiceBubble() }
+
+    /** Composes [surface] with the production materializers offline and checks it ends with the retained bytes. */
+    private fun assertProductionReadsRetainedBytes(surface: @androidx.compose.runtime.Composable () -> Unit) {
+        productionMaterializer = true
+        fixture.retainNatively(0, VIDEO_BYTES)
+        composeRule.setContent { WhiteNoiseTheme { surface() } }
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.waitForIdle()
+            materializations.get() >= 1
+        }
+        assertArrayEquals(VIDEO_BYTES, checkNotNull(materializedFile.get()).readBytes())
+        assertNoTransfer()
+    }
+
     /** The production video tile, with its file materialization counted instead of decoded. */
     @androidx.compose.runtime.Composable
     private fun VideoTile() {
@@ -155,7 +189,13 @@ class NativeRetainedMediaOfflineTest {
             onTap = {},
             overflowCount = 0,
             modifier = Modifier.size(160.dp),
-            videoFileResolver = { _, _, _, _, _, _, _ -> materialized() },
+            videoFileResolver = { context, owner, message, index, ref, mine, priority ->
+                if (productionMaterializer) {
+                    counted(resolveVideoViewerFile(context, owner, message, index, ref, mine, priority))
+                } else {
+                    materialized()
+                }
+            },
         )
     }
 
@@ -171,7 +211,13 @@ class NativeRetainedMediaOfflineTest {
             onOpenConversationMedia = {},
             mine = false,
             modifier = Modifier.size(160.dp),
-            videoFileResolver = { _, _, _, _, _, _, _ -> materialized() },
+            videoFileResolver = { context, owner, message, index, ref, mine, priority ->
+                if (productionMaterializer) {
+                    counted(resolveVideoViewerFile(context, owner, message, index, ref, mine, priority))
+                } else {
+                    materialized()
+                }
+            },
         )
     }
 
@@ -189,6 +235,13 @@ class NativeRetainedMediaOfflineTest {
                 mine = false,
             )
         }
+    }
+
+    /** Counts one production materialization and remembers its file. */
+    private fun counted(file: java.io.File): java.io.File {
+        materializedFile.set(file)
+        materializations.incrementAndGet()
+        return file
     }
 
     /** Counts one materialization and hands back a throwaway local file. */
@@ -220,8 +273,24 @@ class NativeRetainedMediaOfflineTest {
         override val playbackState = VoicePlaybackController.state
         override val playbackFailures = VoicePlaybackController.failures
 
-        /** Counts the materialization instead of publishing a cache file. */
-        override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File = materialized()
+        /** Counts the materialization, through the production materializer when that mode is on. */
+        override suspend fun materialize(request: VoiceAttachmentMaterializationRequest): java.io.File =
+            if (productionMaterializer) {
+                counted(
+                    materializeVoiceAttachment(
+                        context = request.context,
+                        controller = request.controller,
+                        messageIdHex = request.messageIdHex,
+                        attachmentIndex = request.attachmentIndex,
+                        reference = request.reference,
+                        mine = request.mine,
+                        priority = request.priority,
+                        materializationOwner = request.presentationOwner,
+                    ),
+                )
+            } else {
+                materialized()
+            }
 
         /** Reports a fixed duration for the throwaway file. */
         override suspend fun durationMs(file: java.io.File): Int = 1_000

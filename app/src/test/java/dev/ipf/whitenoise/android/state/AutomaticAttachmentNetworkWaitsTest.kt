@@ -126,6 +126,49 @@ class AutomaticAttachmentNetworkWaitsTest {
         assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
     }
 
+    /**
+     * A registration that cannot reach disk never leaves narrowed work without a record: the work is queued on any
+     * network instead, so its own run re-checks the policy and narrows itself through the registry.
+     */
+    @Test
+    fun anUnsavedRegistrationQueuesTheWorkOnAnyNetwork() {
+        val rejecting =
+            object : AttachmentInstallerHandoffRecordStore {
+                override fun readAll(): Map<String, String> = emptyMap()
+
+                override fun replaceAllDurably(values: Map<String, String>): Boolean = false
+            }
+        AutomaticAttachmentNetworkWaits.installForTest(AutomaticAttachmentNetworkWaits(rejecting))
+
+        receipt(NetworkType.UNMETERED)
+
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+    }
+
+    /** An installed policy hook that cannot answer, for an unloaded account, never lets a receipt widen the spec. */
+    @Test
+    fun aReceiptNeverWidensForAnAccountThePolicyCannotAnswer() {
+        receipt(NetworkType.UNMETERED)
+        AutomaticAttachmentNetworkWaits.policyNetworkType = { _, _ -> null }
+
+        receipt(NetworkType.CONNECTED)
+
+        assertEquals(NetworkType.UNMETERED, single().constraints.requiredNetworkType)
+        assertEquals(listOf(NetworkType.UNMETERED), waits.waiting(ACCOUNT).map { it.networkType })
+    }
+
+    /** A narrowing to any network that fails to update the spec keeps its record, so a later sweep can widen it. */
+    @Test
+    fun aFailedNarrowingToAnyNetworkKeepsItsRecord() {
+        receipt(NetworkType.UNMETERED)
+
+        runCatching {
+            waits.narrow(manager(), request, IMAGE, java.util.UUID.randomUUID(), captured = NetworkType.CONNECTED)
+        }
+
+        assertEquals(listOf(NetworkType.UNMETERED), waits.waiting(ACCOUNT).map { it.networkType })
+    }
+
     /** A registration whose work never landed survives a sweep within its grace period and is pruned after it. */
     @Test
     fun aRegistrationWithoutWorkIsKeptForItsGraceAndThenPruned() {

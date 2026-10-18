@@ -176,10 +176,37 @@ class IncomingAttachmentSchedulingCoverageTest {
         val waits = source("state/AutomaticAttachmentNetworkWaits.kt")
         val narrow = waits.functionBody("narrow")
         assertTrue("the narrowing holds the constraint lock", "synchronized(constraintLock)" in narrow)
-        val recorded = narrow.indexOf("record(request, type, target)")
-        assertTrue("the wait is recorded before the update", recorded in 0 until narrow.indexOf("updateWork("))
+        // A narrowed target is recorded before the spec changes; any network drops the record only after it.
+        val narrowed = narrow.substringAfter("} else {")
+        val recorded = narrowed.indexOf("record(request, type, target)")
+        assertTrue("the wait is recorded before the update", recorded in 0 until narrowed.indexOf("update()"))
+        val widened = narrow.substringAfter("if (target == NetworkType.CONNECTED) {").substringBefore("} else {")
+        val forgets = widened.indexOf("forget(")
+        assertTrue("any network forgets only after the update", widened.indexOf("update()") in 0 until forgets)
         val sweep = waits.functionBody("widenAll")
         val lock = sweep.indexOf("synchronized(constraintLock)")
         assertTrue("the sweep reads the registry under the lock", lock in 0 until sweep.indexOf("records.readAll()"))
+    }
+
+    /**
+     * The receipt loop is the only receipt source for muted chats and notifications-off accounts, so it keeps
+     * retrying a failed open for as long as the listener runs, and no receipt failure can cancel it or, through it,
+     * the notification listener.
+     */
+    @Test
+    fun theReceiptLoopRetriesAndContainsItsFailures() {
+        val loop = appState().functionBody("runMutedChatReceiptLoop")
+        val declaration = appState().substringAfter("fun runMutedChatReceiptLoop(").substringBefore("{\n")
+        assertTrue("children are supervised", ") = supervisorScope" in declaration)
+        assertFalse("a failing open never ends the loop", "return@" in loop)
+        assertTrue(
+            "one receipt's failure is contained",
+            "runCatchingCancellable { scheduleRuntimeEventReceipt(received) }" in loop,
+        )
+        val listener = appState().functionBody("runNotificationListenerLoop")
+        assertTrue(
+            "the loop itself is contained under the listener",
+            "runCatchingCancellable { runMutedChatReceiptLoop(" in listener,
+        )
     }
 }

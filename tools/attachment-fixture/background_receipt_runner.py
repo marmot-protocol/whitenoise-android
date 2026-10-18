@@ -101,10 +101,15 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         if report["process_ended_abruptly"]:
             release_held_body(server)
             report["interrupted_acquisition_ended"] = await_held_disconnect(server, start)
-            resume_output = instrument(adb, serial, ports, "resume", session)
-            report["metrics"] += metrics_of(resume_output)
-            report["stages"].append({"stage": "resume", "passed": passed(resume_output),
-                                     "instrumentation": result_lines(resume_output)})
+            if report["interrupted_acquisition_ended"]:
+                resume_output = instrument(adb, serial, ports, "resume", session)
+                report["metrics"] += metrics_of(resume_output)
+                report["stages"].append({"stage": "resume", "passed": passed(resume_output),
+                                         "instrumentation": result_lines(resume_output)})
+            else:
+                # A resume that overlapped the still-open interrupted request would contaminate the restart
+                # experiment, so the attempt stops here and keeps its failed report.
+                report["stages"].append({"stage": "resume", "passed": False, "skipped": "held_request_still_open"})
         report["instrumentation_passed"] = (len(report["stages"]) == 2 and all(s["passed"] for s in report["stages"])
                                             and report.get("interrupted_acquisition_ended", False))
         report["environment"] = {

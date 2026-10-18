@@ -222,6 +222,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -1443,10 +1444,18 @@ class WhiteNoiseAppState private constructor(
     /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
     internal val groupChangeConfirmations = GroupChangeConfirmations()
 
-    /** Whether a coalesced network-triggered permission refresh is queued and has not started yet. */
-    private val networkPermissionRefreshPending =
+    /** Whether a network callback asked for a permission refresh that has not started applying yet. */
+    private val networkPermissionRefreshRequested =
         java.util.concurrent.atomic
             .AtomicBoolean(false)
+
+    /** Whether the coalesced network refresh is running, from its start until its apply has finished. */
+    private val networkPermissionRefreshRunning =
+        java.util.concurrent.atomic
+            .AtomicBoolean(false)
+
+    /** Makes a refresh's invalidate and in-flight mark, and a settle timeout's check before it, one step. */
+    private val permissionRefreshLock = Any()
 
     /** Bounds concurrent receipt history lookups across the notification and runtime-event receipt sources. */
     private val receiptLookupGate = Semaphore(RECEIPT_LOOKUP_CONCURRENCY)
@@ -1466,16 +1475,20 @@ class WhiteNoiseAppState private constructor(
      * Network callbacks pass false: the widening target comes from the matrix and account state, which a network
      * edge cannot change, and those callbacks arrive often.
      */
-    internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true) {
-        val runtime = marmotRuntime
-        val revision = nativeAttachmentPermissions.invalidate(runtime)
+    internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true): Job? {
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
         AutomaticAttachmentNetworkWaits.policyNetworkType = ::liveAutomaticNetworkType
         if (widenWaiting) widenWaitingAutomaticDownloads(accountRefs)
-        val engine = runtime?.marmot ?: return
+        val runtime: AppMarmotRuntime?
+        val revision: Long
+        synchronized(permissionRefreshLock) {
+            runtime = marmotRuntime
+            revision = nativeAttachmentPermissions.invalidate(runtime)
+            if (runtime != null) nativeAttachmentPermissions.beginRefresh(revision)
+        }
+        val engine = runtime?.marmot ?: return null
         // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
-        nativeAttachmentPermissions.beginRefresh(revision)
-        mutationsScope.launch {
+        return mutationsScope.launch {
             try {
                 applyNativeAttachmentPermissions(revision, runtime, engine, accountRefs)
             } finally {
@@ -1485,15 +1498,37 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Coalesces refreshes requested by network callbacks, which can arrive in bursts: callbacks made before the
-     * pending refresh runs join it, and it reads the network when it runs, so the latest state applies. Such
-     * refreshes never widen waiting work, since a network edge cannot change its target.
+     * Coalesces refreshes requested by network callbacks, which can arrive in bursts. One refresh runs at a time and
+     * stays running until its apply has finished; callbacks that arrive meanwhile fold into a single follow-up that
+     * reads the network when it starts, so the latest state applies without invalidating the generation still
+     * applying. Such refreshes never widen waiting work, since a network edge cannot change its target.
      */
     private fun requestNetworkPermissionRefresh() {
-        if (!networkPermissionRefreshPending.compareAndSet(false, true)) return
+        networkPermissionRefreshRequested.set(true)
+        if (!networkPermissionRefreshRunning.compareAndSet(false, true)) return
         mutationsScope.launch {
-            networkPermissionRefreshPending.set(false)
-            refreshNativeAttachmentPermissions(widenWaiting = false)
+            try {
+                while (networkPermissionRefreshRequested.getAndSet(false)) {
+                    refreshNativeAttachmentPermissions(widenWaiting = false)?.join()
+                }
+            } finally {
+                networkPermissionRefreshRunning.set(false)
+                // A callback that landed after the last check but before the flag cleared still gets its refresh.
+                if (networkPermissionRefreshRequested.get()) requestNetworkPermissionRefresh()
+            }
+        }
+    }
+
+    /**
+     * Starts a refresh for a settle timeout unless one under the latest revision is already applying. The check and
+     * the refresh's invalidate share [permissionRefreshLock], so album workers that time out together start at
+     * most one refresh instead of each superseding the generation another just began.
+     */
+    private fun refreshAfterSettleTimeout() {
+        synchronized(permissionRefreshLock) {
+            if (!nativeAttachmentPermissions.refreshInFlight(marmotRuntime)) {
+                refreshNativeAttachmentPermissions(widenWaiting = false)
+            }
         }
     }
 
@@ -5049,9 +5084,7 @@ class WhiteNoiseAppState private constructor(
         } ?: run {
             // A refresh still applying under the latest revision is left to land: starting another would revoke and
             // supersede it, and every album worker that timed out together would keep superseding the others.
-            if (!nativeAttachmentPermissions.refreshInFlight(marmotRuntime)) {
-                refreshNativeAttachmentPermissions(widenWaiting = false)
-            }
+            refreshAfterSettleTimeout()
             throw AttachmentPermissionPendingException()
         }
     }
@@ -11594,6 +11627,10 @@ class WhiteNoiseAppState private constructor(
         eligible.forEach {
             enqueueAttachmentDownload(it.request, networkType = policy.networkType(it.type), type = it.type)
         }
+        // The claim only stands for a lookup that settled every slot. A held type, or a read the budget cut short,
+        // leaves work a later receipt may still schedule once the policy allows it, so that receipt must look again.
+        val incomplete = lookup.end == ReceiptLookupEnd.Exhausted || lookup.end == ReceiptLookupEnd.Unavailable
+        if (held.isNotEmpty() || incomplete) receiptClaims.release(accountRef, messageIdHex)
         logReceiptScheduling(policy, lookup, eligible, held)
     }
 
@@ -12105,16 +12142,15 @@ class WhiteNoiseAppState private constructor(
      * suppressed cannot be read back later from current settings, so every message is scheduled here, idempotently,
      * and the first of the two sources runs its bounded lookup. [initial] is the subscription the startup listener
      * opened before the runtime started, so no message delivered after start is missed. A stream that ends or
-     * fails is reopened with backoff, and a failed open is retried with backoff too; after
-     * [MUTED_RECEIPT_OPEN_ATTEMPTS] failures in a row the loop ends and the listener starts it again on its next
-     * subscription. Lookups run as children of this loop, so they end with it.
+     * fails, and a failed open, are retried with the capped backoff for as long as the listener runs. Lookups run
+     * as supervised children of this loop, so they end with it, and a failing one is logged without cancelling the
+     * loop or the notification listener above it.
      */
     internal suspend fun runMutedChatReceiptLoop(
         marmot: MarmotInterface,
         initial: EventsSubscription? = null,
-    ) = coroutineScope {
+    ) = supervisorScope {
         var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-        var failedOpens = 0
         var preopened = initial
         while (isActive) {
             val subscription =
@@ -12123,12 +12159,9 @@ class WhiteNoiseAppState private constructor(
                         val type = it.javaClass.simpleName
                         Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_stream_unavailable type=$type")
                     }.getOrNull()
-            if (subscription == null) {
-                // A failed open is retried with backoff; one that keeps failing ends this loop, and the listener
-                // starts it again on its next subscription.
-                if (++failedOpens >= MUTED_RECEIPT_OPEN_ATTEMPTS) return@coroutineScope
-            } else {
-                failedOpens = 0
+            // A failed open is retried with the capped backoff for as long as the listener runs: muted chats and
+            // notifications-off accounts get no notification update, so this loop is their only receipt source.
+            if (subscription != null) {
                 try {
                     runCatchingCancellable {
                         var event = subscription.next()
@@ -12138,7 +12171,12 @@ class WhiteNoiseAppState private constructor(
                             // Only the cheap kind and sender check runs here; the suppression reads run with the
                             // lookup, as a child of this loop, so they never delay the next event.
                             if (received != null && received.isChatFromOthers()) {
-                                launch(notificationDispatcher) { scheduleRuntimeEventReceipt(received) }
+                                // A supervised child whose failure is logged, so one receipt can never cancel the
+                                // loop or, through it, the notification listener.
+                                launch(notificationDispatcher) {
+                                    runCatchingCancellable { scheduleRuntimeEventReceipt(received) }
+                                        .onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_schedule_failed") }
+                                }
                             }
                             event = subscription.next()
                         }
@@ -12212,7 +12250,10 @@ class WhiteNoiseAppState private constructor(
                 val listenerScope = CoroutineScope(currentCoroutineContext())
                 receiptLoop =
                     receiptLoop?.takeIf { it.isActive } ?: listenerScope.launch(Dispatchers.IO) {
-                        runMutedChatReceiptLoop(marmot, takeStartupReceiptSubscription(marmot))
+                        // Contained, so a receipt failure is logged and never cancels notification delivery.
+                        val startup = takeStartupReceiptSubscription(marmot)
+                        runCatchingCancellable { runMutedChatReceiptLoop(marmot, startup) }
+                            .onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_loop_failed") }
                     }
                 runtimeListenerTeardownOwner.withNotificationSubscription(subscription) {
                     while (currentCoroutineContext().isActive) {
@@ -12794,9 +12835,6 @@ class WhiteNoiseAppState private constructor(
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
-
-        /** Consecutive failed event-stream opens before the muted receipt loop waits for the listener to restart it. */
-        private const val MUTED_RECEIPT_OPEN_ATTEMPTS = 5
 
         /** How many receipt history lookups run at once; more wait their turn rather than fan out. */
         private const val RECEIPT_LOOKUP_CONCURRENCY = 4

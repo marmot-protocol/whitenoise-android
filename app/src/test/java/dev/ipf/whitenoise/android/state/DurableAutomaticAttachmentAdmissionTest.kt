@@ -246,6 +246,52 @@ class DurableAutomaticAttachmentAdmissionTest {
             assertEquals("the refresh in flight applied", 1, fixture.permissionApplications.get())
         }
 
+    /**
+     * Network callbacks that arrive while a coalesced refresh is still applying join one follow-up instead of
+     * invalidating the generation in flight: the first refresh stays the only one until its apply has finished.
+     */
+    @Test
+    fun networkRefreshesDuringAnApplyFoldIntoOneFollowUp() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            val commits = hostPreferenceCommits()
+            commits.lock()
+            requestNetworkRefresh()
+            advanceUntilIdle()
+            assertEquals("the first refresh began and waits on the settings save", 1, fixture.permissionBegins.get())
+
+            requestNetworkRefresh()
+            requestNetworkRefresh()
+            advanceUntilIdle()
+
+            commits.unlock()
+            advanceUntilIdle()
+            assertEquals("they folded into one follow-up", 2, fixture.permissionBegins.get())
+            assertEquals(
+                "the first generation was not superseded and applied, then the follow-up",
+                2,
+                fixture.permissionApplications.get(),
+            )
+        }
+
+    /** A settle timeout's in-flight check and its refresh share one lock, so concurrent timeouts start one. */
+    @Test
+    fun aSettleTimeoutChecksAndStartsItsRefreshUnderOneLock() {
+        val source =
+            listOf(
+                java.io.File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+                java.io.File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            ).first(java.io.File::isFile).readText()
+        val timeout = source.substringAfter("private fun refreshAfterSettleTimeout()").substringBefore("\n    }\n")
+        assertTrue("the check holds the refresh lock", "synchronized(permissionRefreshLock)" in timeout)
+        val refresh =
+            source
+                .substringAfter("internal fun refreshNativeAttachmentPermissions(")
+                .substringBefore("return mutationsScope")
+        val lock = refresh.indexOf("synchronized(permissionRefreshLock)")
+        assertTrue("the refresh invalidates under the same lock", lock in 0 until refresh.indexOf(".invalidate("))
+    }
+
     /** A refusal from a revocation window is asked again once the host's approval has moved on. */
     @Test
     fun policyBlockedRequestIsAskedAgainOnceTheApprovalMovesOn() =
@@ -454,6 +500,14 @@ class DurableAutomaticAttachmentAdmissionTest {
                 .apply { isAccessible = true }
                 .get(state) as ValidatedInternetNetworkTracker
         tracker.update(1L, available = validated)
+    }
+
+    /** Asks for a coalesced network-triggered permission refresh, as a network callback does. */
+    private fun requestNetworkRefresh() {
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("requestNetworkPermissionRefresh")
+            .apply { isAccessible = true }
+            .invoke(fixture.state)
     }
 
     /** Writes one private AppState field. */
