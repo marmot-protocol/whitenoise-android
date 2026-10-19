@@ -266,7 +266,6 @@ private fun EventCardBody(
             LoadedEventCard(
                 card = state.card,
                 authorDisplayName = authorDisplayName,
-                referenceLabel = referenceLabel,
                 contentColor = contentColor,
                 copyDescription = copyDescription,
                 onCopy = onCopy,
@@ -277,12 +276,14 @@ private fun EventCardBody(
     }
 }
 
-/** Renders the verified event summary and keeps its header actions separate from note reading. */
+/**
+ * Renders the verified event summary and keeps its header actions separate from note reading. The card represents
+ * its event, so the encoded reference is not repeated beneath it (#3317); Copy reference still returns it in full.
+ */
 @Composable
 private fun LoadedEventCard(
     card: NostrEventCardModel,
     authorDisplayName: (String) -> String,
-    referenceLabel: String?,
     contentColor: Color,
     copyDescription: String,
     onCopy: () -> Unit,
@@ -319,7 +320,6 @@ private fun LoadedEventCard(
             onReadNote = onReadNote,
         )
         LoadedEventMetadata(card.metadata, contentColor)
-        EventReferenceLabel(referenceLabel, contentColor)
         card.imageUrls.firstOrNull()?.let { url ->
             NostrEventImagePane(url = url, compact = true)
         }
@@ -331,6 +331,7 @@ private fun LoadedEventCard(
     }
 }
 
+/** The author, kind and one date of a loaded card beside its copy and open actions. */
 @Composable
 private fun LoadedEventHeader(
     card: NostrEventCardModel,
@@ -343,7 +344,8 @@ private fun LoadedEventHeader(
     onOpen: () -> Unit,
 ) {
     val author = eventAuthorLabel(card, authorDisplayName)
-    val kindAndDate = listOf(card.kind.label(card.eventKind), eventDateLabel(card.createdAt)).filter(String::isNotBlank)
+    val kindAndDate =
+        listOf(card.kind.label(card.eventKind), eventDateLabel(card.displayEpochSeconds())).filter(String::isNotBlank)
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -461,7 +463,8 @@ internal fun compactEventReference(authoredReference: String): String {
 internal const val NOSTR_NOTE_PREVIEW_ACTION_TAG = "nostr-note-preview-action"
 internal const val NOSTR_EVENT_CARD_BOUNDS_TAG = "nostr-event-card-bounds"
 
-private const val MAX_CARDS_PER_MESSAGE = 3
+/** Cards one message shows; references past this stay in the message prose (#3317). */
+internal const val MAX_CARDS_PER_MESSAGE = 3
 private const val COMPACT_REFERENCE_LENGTH = 28
 private const val COMPACT_REFERENCE_PREFIX = 14
 private const val COMPACT_REFERENCE_SUFFIX = 7
