@@ -14,31 +14,32 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NostrEventReferenceTest {
+    /** Note, nevent and naddr values decode through one strict path into their typed references. */
     @Test
     fun decodesNoteNeventAndNaddrThroughOneStrictPath() {
         val id = List(32) { it }
         val author = List(32) { 0xa0 + it }
-        val note = encode("note", id)
+        val note = nip19("note", id)
         val nevent =
-            encode(
+            nip19(
                 "nevent",
-                tlv(1, "wss://ignored.example".bytes()) +
-                    tlv(0, id) +
-                    tlv(2, author) +
-                    tlv(3, uintBytes(1u)) +
-                    tlv(9, listOf(7, 8)),
+                nip19Tlv(1, "wss://ignored.example".utf8Ints()) +
+                    nip19Tlv(0, id) +
+                    nip19Tlv(2, author) +
+                    nip19Tlv(3, nip19Uint(1u)) +
+                    nip19Tlv(9, listOf(7, 8)),
             )
         val naddr =
-            encode(
+            nip19(
                 "naddr",
-                tlv(0, "article-id".bytes()) +
-                    tlv(1, "wss://ignored.example".bytes()) +
-                    tlv(2, author) +
-                    tlv(3, uintBytes(30_023u)),
+                nip19Tlv(0, "article-id".utf8Ints()) +
+                    nip19Tlv(1, "wss://ignored.example".utf8Ints()) +
+                    nip19Tlv(2, author) +
+                    nip19Tlv(3, nip19Uint(30_023u)),
             )
 
-        val expectedId = id.hex()
-        val expectedAuthor = author.hex()
+        val expectedId = id.hexString()
+        val expectedAuthor = author.hexString()
         assertEquals(NostrEventReference.Event(expectedId), NostrEventReferenceDecoder.eventReference(note))
         assertEquals(
             NostrEventReference.Event(
@@ -60,29 +61,30 @@ class NostrEventReferenceTest {
         )
     }
 
+    /** Private, profile, oversized, malformed and conflicting pointers never decode as event references. */
     @Test
     fun rejectsPrivateProfileOversizeMalformedAndConflictingPointers() {
         val id = List(32) { 0x42 }
         val author = List(32) { 0x24 }
-        val missingId = encode("nevent", tlv(1, "wss://ignored.example".bytes()))
-        val duplicateId = encode("nevent", tlv(0, id) + tlv(0, id))
-        val duplicateAuthor = encode("nevent", tlv(0, id) + tlv(2, author) + tlv(2, author))
-        val missingCoordinate = encode("naddr", tlv(0, "slug".bytes()) + tlv(2, author))
+        val missingId = nip19("nevent", nip19Tlv(1, "wss://ignored.example".utf8Ints()))
+        val duplicateId = nip19("nevent", nip19Tlv(0, id) + nip19Tlv(0, id))
+        val duplicateAuthor = nip19("nevent", nip19Tlv(0, id) + nip19Tlv(2, author) + nip19Tlv(2, author))
+        val missingCoordinate = nip19("naddr", nip19Tlv(0, "slug".utf8Ints()) + nip19Tlv(2, author))
         val controlCoordinate =
-            encode(
+            nip19(
                 "naddr",
-                tlv(0, "bad\u0000slug".bytes()) + tlv(2, author) + tlv(3, uintBytes(1u)),
+                nip19Tlv(0, "bad\u0000slug".utf8Ints()) + nip19Tlv(2, author) + nip19Tlv(3, nip19Uint(1u)),
             )
-        val unsupportedKind = encode("nevent", tlv(0, id) + tlv(3, uintBytes(UInt.MAX_VALUE)))
-        val truncated = encode("nevent", listOf(0, 32, 1, 2, 3))
+        val unsupportedKind = nip19("nevent", nip19Tlv(0, id) + nip19Tlv(3, nip19Uint(UInt.MAX_VALUE)))
+        val truncated = nip19("nevent", listOf(0, 32, 1, 2, 3))
         val validOversized =
-            encode(
+            nip19(
                 "nevent",
-                tlv(0, id) + List(20) { index -> tlv(9, List(255) { index }) }.flatten(),
+                nip19Tlv(0, id) + List(20) { index -> nip19Tlv(9, List(255) { index }) }.flatten(),
             )
 
-        assertNull(NostrEventReferenceDecoder.eventReference(encode("nsec", id)))
-        assertNull(NostrEventReferenceDecoder.eventReference(encode("npub", id)))
+        assertNull(NostrEventReferenceDecoder.eventReference(nip19("nsec", id)))
+        assertNull(NostrEventReferenceDecoder.eventReference(nip19("npub", id)))
         assertNull(NostrEventReferenceDecoder.eventReference(missingId))
         assertNull(NostrEventReferenceDecoder.eventReference(duplicateId))
         assertNull(NostrEventReferenceDecoder.eventReference(duplicateAuthor))
@@ -94,15 +96,16 @@ class NostrEventReferenceTest {
         assertNull(NostrEventReferenceDecoder.eventReference(validOversized))
     }
 
+    /** The document walk finds typed and HTTPS references once each, in order, and never inside code. */
     @Test
     fun documentWalkFindsTypedAndHttpsReferencesAndDeduplicatesThem() {
-        val note = encode("note", List(32) { 1 })
-        val nevent = encode("nevent", tlv(0, List(32) { 2 }))
-        val fourth = encode("note", List(32) { 4 })
+        val note = nip19("note", List(32) { 1 })
+        val nevent = nip19("nevent", nip19Tlv(0, List(32) { 2 }))
+        val fourth = nip19("note", List(32) { 4 })
         val naddr =
-            encode(
+            nip19(
                 "naddr",
-                tlv(0, "entry".bytes()) + tlv(2, List(32) { 3 }) + tlv(3, uintBytes(30_023u)),
+                nip19Tlv(0, "entry".utf8Ints()) + nip19Tlv(2, List(32) { 3 }) + nip19Tlv(3, nip19Uint(30_023u)),
             )
         val document =
             MarkdownDocumentFfi(
@@ -141,9 +144,9 @@ class NostrEventReferenceTest {
 
         assertEquals(
             listOf(
-                "event:${List(32) { 1 }.hex()}",
-                "event:${List(32) { 2 }.hex()}",
-                "address:30023:${List(32) { 3 }.hex()}:entry",
+                "event:${List(32) { 1 }.hexString()}",
+                "event:${List(32) { 2 }.hexString()}",
+                "address:30023:${List(32) { 3 }.hexString()}:entry",
             ),
             nostrEventReferences(document).map { it.reference.stableId },
         )
@@ -152,8 +155,8 @@ class NostrEventReferenceTest {
     /** Typed disclosure summaries and bodies both retain their embedded event references. */
     @Test
     fun documentWalkFindsDetailsReferences() {
-        val summary = encode("note", List(32) { 1 })
-        val body = encode("note", List(32) { 2 })
+        val summary = nip19("note", List(32) { 1 })
+        val body = nip19("note", List(32) { 2 })
         val summaryEntity = MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, summary)
         val bodyEntity = MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, body)
         val document =
@@ -176,14 +179,15 @@ class NostrEventReferenceTest {
                 blankLinesBefore = byteArrayOf(),
             )
         assertEquals(
-            listOf("event:${List(32) { 1 }.hex()}", "event:${List(32) { 2 }.hex()}"),
+            listOf("event:${List(32) { 1 }.hexString()}", "event:${List(32) { 2 }.hexString()}"),
             nostrEventReferences(document).map { it.reference.stableId },
         )
     }
 
+    /** A reference inside a fenced code block stays literal and gets no card. */
     @Test
     fun documentWalkDoesNotScanCodeBlocks() {
-        val nevent = encode("nevent", tlv(0, List(32) { 5 }))
+        val nevent = nip19("nevent", nip19Tlv(0, List(32) { 5 }))
         val document =
             MarkdownDocumentFfi(
                 blocks =
@@ -219,80 +223,196 @@ class NostrEventReferenceTest {
         assertFalse(messageContainsOnlyNostrEventReferences("[$nevent](https://example.com)", references))
     }
 
-    private fun tlv(
-        type: Int,
-        value: List<Int>,
-    ): List<Int> = listOf(type, value.size) + value
-
-    private fun String.bytes(): List<Int> = encodeToByteArray().map { it.toInt() and 0xff }
-
-    private fun uintBytes(value: UInt): List<Int> =
+    /** Every alias and wrapper of an event a card represents counts as a repeat of it. */
+    @Test
+    fun aliasesAndWrappersOfARepresentedEventAreRepeats() {
         listOf(
-            (value shr 24).toInt() and 0xff,
-            (value shr 16).toInt() and 0xff,
-            (value shr 8).toInt() and 0xff,
-            value.toInt() and 0xff,
-        )
-
-    private fun List<Int>.hex(): String = joinToString("") { "%02x".format(it) }
-
-    private fun encode(
-        hrp: String,
-        bytes: List<Int>,
-    ): String {
-        val data = convertBits(bytes, fromBits = 8, toBits = 5, pad = true)
-        val checksum = createChecksum(hrp, data)
-        return hrp + "1" + (data + checksum).joinToString("") { BECH32_CHARSET[it].toString() }
+            uri(NOTE),
+            MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(NEVENT_HRP, NEVENT)),
+            autolink("nostr:$NEVENT", MarkdownLinkDestinationKindFfi.NOSTR),
+            nostrLink("nostr:$NOTE", MarkdownInlineFfi.Text("nostr:$NOTE")),
+            nostrLink("nostr:$NEVENT", uri(NOTE)),
+            nostrLink("nostr:$NOTE"),
+            MarkdownInlineFfi.Strong(listOf(uri(NOTE))),
+            MarkdownInlineFfi.Emph(listOf(MarkdownInlineFfi.Text(" "), uri(NEVENT, NEVENT_HRP))),
+            nestedBold(3),
+        ).forEach { inline -> assertTrue("$inline repeats the card", inline.repeatsRepresentedEvent(REPRESENTED)) }
     }
 
-    private fun createChecksum(
-        hrp: String,
-        data: List<Int>,
-    ): List<Int> {
-        val values = hrpExpand(hrp) + data + List(6) { 0 }
-        val polymod = bech32Polymod(values) xor 1
-        return (0 until 6).map { i -> (polymod ushr (5 * (5 - i))) and 31 }
+    /** A meaningful label, a web link, a profile, another event, code and literal text are never repeats. */
+    @Test
+    fun unrelatedContentIsNeverARepeat() {
+        val npub = nip19("npub", List(32) { 9 })
+        listOf(
+            nostrLink("nostr:$NOTE", MarkdownInlineFfi.Text("the whole thread")),
+            autolink("https://njump.me/$NEVENT", MarkdownLinkDestinationKindFfi.WEB),
+            MarkdownInlineFfi.Link(
+                "https://njump.me/$NEVENT",
+                null,
+                listOf(MarkdownInlineFfi.Text(NEVENT)),
+                MarkdownLinkDestinationKindFfi.WEB,
+            ),
+            MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub)),
+            uri(nip19("note", List(32) { 8 })),
+            MarkdownInlineFfi.Code(NOTE),
+            MarkdownInlineFfi.Text(NOTE),
+            MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Read "), uri(NOTE))),
+            nestedBold(DEEPER_THAN_THE_BOUND),
+            nestedLinks(DEEPER_THAN_THE_BOUND),
+        ).forEach { inline -> assertFalse("$inline is not a repeat", inline.repeatsRepresentedEvent(REPRESENTED)) }
+        assertTrue("a shallow chain still repeats", nestedLinks(2).repeatsRepresentedEvent(REPRESENTED))
+        assertFalse(uri(NOTE).repeatsRepresentedEvent(emptySet()))
     }
 
-    private fun hrpExpand(hrp: String): List<Int> = hrp.map { it.code shr 5 } + listOf(0) + hrp.map { it.code and 31 }
+    /**
+     * Removing a repeat closes up the space it leaves, removes a bracket or quote pair it leaves empty, keeps words,
+     * quotes and separators apart without doubling them, and drops a line it empties, at the end as well.
+     */
+    @Test
+    fun removingRepeatsClosesUpTheProseAroundThem() {
+        val text = MarkdownInlineFfi::Text
+        val vectors =
+            listOf(
+                listOf(text("Look at "), uri(NOTE), text(" now")) to "Look at now",
+                listOf(text("See "), uri(NOTE), text(".")) to "See.",
+                listOf(uri(NOTE), MarkdownInlineFfi.SoftBreak, text("Hello")) to "Hello",
+                listOf(text("a"), SOFT, uri(NOTE), MarkdownInlineFfi.HardBreak, text("b")) to "a\nb",
+                listOf(text("x "), uri(NOTE), text(" "), uri(NEVENT, NEVENT_HRP), text(" y")) to "x y",
+                listOf(bold("Read"), text(" "), uri(NOTE), text(" "), bold("this")) to "Read this",
+                listOf(text("Keep "), nostrLink("nostr:$NOTE", text("this thread"))) to "Keep this thread",
+                listOf(text("I wrote this ("), uri(NOTE), text(") last week")) to "I wrote this last week",
+                listOf(text("("), uri(NOTE), text(") hello")) to "hello",
+                listOf(text("Look: "), uri(NOTE), text(" — fine")) to "Look: — fine",
+                listOf(text("Check this out:"), SOFT, uri(NOTE)) to "Check this out:",
+                listOf(text("a"), SOFT, uri(NOTE), SOFT, uri(NEVENT, NEVENT_HRP)) to "a",
+                listOf(text("He said \"hi\" "), uri(NOTE), text(" \"bye\"")) to "He said \"hi\" \"bye\"",
+                listOf(text("the users' "), uri(NOTE), text(" 'best' post")) to "the users' 'best' post",
+                listOf(text("say \""), uri(NOTE), text("\" now")) to "say now",
+                listOf(text("options ( "), uri(NOTE), text(" ) here")) to "options here",
+                listOf(text("hello "), text("("), uri(NOTE), text(") next")) to "hello next",
+                listOf(text("Hello, "), text("("), uri(NOTE), text("), goodbye")) to "Hello, goodbye",
+                listOf(text("hello"), SOFT, text("("), uri(NOTE), text(")"), SOFT, text("world")) to "hello\nworld",
+                listOf(text("hello"), SOFT, text("("), uri(NOTE), text(")")) to "hello",
+                listOf(text("first("), uri(NOTE), text(" )second")) to "first second",
+                listOf(text("a ("), uri(NOTE), text(") "), bold("b")) to "a b",
+                listOf(text("Look at the"), uri(NOTE), text("")) to "Look at the",
+                listOf(text("Hello, "), uri(NOTE), text(", goodbye")) to "Hello, goodbye",
+                listOf(uri(NOTE), text(": details")) to "details",
+                listOf(text("Wow! "), uri(NOTE), text(".")) to "Wow!",
+            )
 
-    private fun bech32Polymod(values: List<Int>): Int {
-        var checksum = 1
-        for (value in values) {
-            val top = checksum ushr 25
-            checksum = ((checksum and 0x1ffffff) shl 5) xor value
-            for (i in BECH32_GENERATORS.indices) {
-                if (((top ushr i) and 1) != 0) checksum = checksum xor BECH32_GENERATORS[i]
+        vectors.forEach { (inlines, expected) ->
+            assertEquals(expected, inlines.withoutRepeatsOf(REPRESENTED).plainText())
+        }
+        val untouched = listOf(text("No repeats "), uri(nip19("note", List(32) { 8 })))
+        assertTrue(untouched.withoutRepeatsOf(REPRESENTED) === untouched)
+    }
+
+    /** Only a paragraph of repeats, whitespace and wrapping punctuation counts as saying nothing of its own. */
+    @Test
+    fun aParagraphOfOnlyRepeatsAndPunctuationSaysNothingOfItsOwn() {
+        val text = MarkdownInlineFfi::Text
+
+        assertTrue(listOf(text("("), uri(NOTE), text(")")).onlyRepeatsRepresentedEvents(REPRESENTED))
+        assertTrue(listOf(uri(NOTE), SOFT, nostrLink("nostr:$NEVENT")).onlyRepeatsRepresentedEvents(REPRESENTED))
+        assertFalse(listOf(text("Look: "), uri(NOTE)).onlyRepeatsRepresentedEvents(REPRESENTED))
+        val reaction = listOf(uri(NOTE), text(" ???"))
+        assertFalse("the author's own reaction stays", reaction.onlyRepeatsRepresentedEvents(REPRESENTED))
+        assertFalse(listOf(uri(NOTE), MarkdownInlineFfi.Code("x")).onlyRepeatsRepresentedEvents(REPRESENTED))
+        assertFalse(listOf(text(" ")).onlyRepeatsRepresentedEvents(REPRESENTED))
+        assertFalse(listOf(uri(NOTE)).onlyRepeatsRepresentedEvents(emptySet()))
+    }
+
+    /** The cards stand alone only when every block is such a paragraph, never with headings, lists or extra cards. */
+    @Test
+    fun aDocumentOfOnlyRepeatsLetsTheCardsStandAlone() {
+        val repeat = MarkdownBlockFfi.Paragraph(listOf(uri(NOTE)))
+        val alias = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(" "), uri(NEVENT, NEVENT_HRP)))
+        val heading = MarkdownBlockFfi.Heading(1u, listOf(uri(NOTE)))
+
+        assertTrue(document(repeat, alias).onlyRepeatsRepresentedEvents(REPRESENTED))
+        assertFalse(document(repeat, heading).onlyRepeatsRepresentedEvents(REPRESENTED))
+        assertFalse(document().onlyRepeatsRepresentedEvents(REPRESENTED))
+    }
+
+    /** A reference past the three-card cap has no card, so it stays in the prose and the body stays visible. */
+    @Test
+    fun referencesPastTheCardCapStayVisible() {
+        val notes = (1..4).map { fill -> nip19("note", List(32) { fill }) }
+        val inlines = notes.flatMap { listOf(uri(it), MarkdownInlineFfi.Text(" ")) }.dropLast(1)
+        val document = document(MarkdownBlockFfi.Paragraph(inlines))
+        val represented = nostrEventReferences(document).mapTo(HashSet()) { it.reference.stableId }
+
+        assertEquals(3, represented.size)
+        val kept = inlines.withoutRepeatsOf(represented).filterNot { it is MarkdownInlineFfi.Text }
+        assertEquals(listOf(uri(notes.last())), kept)
+        assertFalse(document.onlyRepeatsRepresentedEvents(represented))
+    }
+
+    /** A `nostr:` URI or bare value of one event decodes to the same stable id; a web address decodes to none. */
+    @Test
+    fun stableIdsIgnoreTheNostrSchemeButNeverDecodeWebAddresses() {
+        val stableId = REPRESENTED.single()
+
+        assertEquals(stableId, nostrEventStableId(NOTE))
+        assertEquals(stableId, nostrEventStableId(" NOSTR:$NEVENT "))
+        assertNull(nostrEventStableId("https://njump.me/$NEVENT"))
+    }
+
+    /** A parsed `nostr:` URI of [bech32] under [hrp]. */
+    private fun uri(
+        bech32: String,
+        hrp: MarkdownNostrHrpFfi = MarkdownNostrHrpFfi.NOTE,
+    ) = MarkdownInlineFfi.NostrUri(MarkdownNostrEntityFfi(hrp, bech32))
+
+    /** A Markdown link to [dest] with [label] as its children. */
+    private fun nostrLink(
+        dest: String,
+        vararg label: MarkdownInlineFfi,
+    ) = MarkdownInlineFfi.Link(dest, null, label.toList(), MarkdownLinkDestinationKindFfi.NOSTR)
+
+    /** An autolink to [url] classified as [kind]. */
+    private fun autolink(
+        url: String,
+        kind: MarkdownLinkDestinationKindFfi,
+    ) = MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI, kind)
+
+    /** [NOTE] wrapped in [levels] of bold, deeper than any authored message nests. */
+    private fun nestedBold(levels: Int): MarkdownInlineFfi =
+        (1..levels).fold<Int, MarkdownInlineFfi>(uri(NOTE)) { inner, _ -> MarkdownInlineFfi.Strong(listOf(inner)) }
+
+    /** [NOTE] inside [levels] of links to itself, which no parser nests but a crafted tree could. */
+    private fun nestedLinks(levels: Int): MarkdownInlineFfi =
+        (1..levels).fold<Int, MarkdownInlineFfi>(uri(NOTE)) { inner, _ -> nostrLink("nostr:$NOTE", inner) }
+
+    /** Bold [text]. */
+    private fun bold(text: String) = MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text(text)))
+
+    /** A document of [blocks] with no authored blank lines. */
+    private fun document(vararg blocks: MarkdownBlockFfi): MarkdownDocumentFfi {
+        val blankLines = ByteArray(blocks.size)
+        return MarkdownDocumentFfi(blocks.toList(), truncated = false, blankLinesBefore = blankLines)
+    }
+
+    /** The words a reader sees, with breaks as newlines and emphasis flattened. */
+    private fun List<MarkdownInlineFfi>.plainText(): String =
+        joinToString("") { inline ->
+            when (inline) {
+                is MarkdownInlineFfi.Text -> inline.content
+                is MarkdownInlineFfi.Strong -> inline.children.plainText()
+                is MarkdownInlineFfi.Link -> inline.children.plainText()
+                MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> "\n"
+                else -> "<$inline>"
             }
         }
-        return checksum
-    }
-
-    private fun convertBits(
-        values: List<Int>,
-        fromBits: Int,
-        toBits: Int,
-        pad: Boolean,
-    ): List<Int> {
-        var accumulator = 0
-        var bits = 0
-        val maxValue = (1 shl toBits) - 1
-        val maxAccumulator = (1 shl (fromBits + toBits - 1)) - 1
-        val result = mutableListOf<Int>()
-        for (value in values) {
-            accumulator = ((accumulator shl fromBits) or value) and maxAccumulator
-            bits += fromBits
-            while (bits >= toBits) {
-                bits -= toBits
-                result += (accumulator ushr bits) and maxValue
-            }
-        }
-        if (pad && bits > 0) result += (accumulator shl (toBits - bits)) and maxValue
-        return result
-    }
 
     private companion object {
-        const val BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
-        val BECH32_GENERATORS = intArrayOf(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+        val EVENT_ID = List(32) { 7 }
+        val NOTE = nip19("note", EVENT_ID)
+        val NEVENT = nip19("nevent", nip19Tlv(0, EVENT_ID) + nip19Tlv(2, List(32) { 6 }))
+        val REPRESENTED = setOf("event:${EVENT_ID.hexString()}")
+        val NEVENT_HRP = MarkdownNostrHrpFfi.NEVENT
+        val SOFT = MarkdownInlineFfi.SoftBreak
+        const val DEEPER_THAN_THE_BOUND = 12
     }
 }
