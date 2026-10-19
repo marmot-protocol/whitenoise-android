@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 
-/** Explicit viewer intent may promote an admitted still; timeline rendering never selects animation. */
+/** Animation admission stays closed by default; a granted inline owner or explicit viewer may promote it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
@@ -32,6 +32,20 @@ class AttachmentAnimationIntentTest {
                 (animated.drawable as? AnimatedImageDrawable)?.stop()
             } finally {
                 still.bitmap.recycle()
+            }
+        }
+
+    /** An inline grant uses the bounded animated path; malformed input cannot reach either fallback. */
+    @Test
+    fun inlineGrantPromotesOnlyAnAdmittedAnimation() =
+        runBlocking<Unit> {
+            val animation = decodeInlineAttachmentAnimation(twoFrameGif())
+            try {
+                assertTrue(animation is android.graphics.drawable.Animatable)
+                org.junit.Assert.assertNull(decodeInlineAttachmentAnimation(twoFrameGif() + byteArrayOf(0)))
+            } finally {
+                (animation as? android.graphics.drawable.Animatable)?.stop()
+                (animation as? java.io.Closeable)?.close()
             }
         }
 

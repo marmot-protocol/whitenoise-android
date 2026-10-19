@@ -1,0 +1,39 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+  "legacy_sha256": "b70ae08c0f076977d8e41db61887e34867ecbe3e1d3034e48f35704130f680d2",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ColumnScope.BubbleBodyFooterAndRetry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "fun ColumnScope.BubbleBodyFooterAndRetry(",
+        "test_ids": [
+          "CON-006",
+          "MED-003",
+          "MED-007",
+          "MSG-019"
+        ]
+      },
+      {
+        "surface": "ColumnScope.BubbleMediaBlocks",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "fun ColumnScope.BubbleMediaBlocks(",
+        "test_ids": [
+          "MED-003",
+          "MED-007",
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "VisualMediaFooterFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "fun VisualMediaFooterFrame(",
+        "test_ids": [
+          "MED-003",
+          "MED-007"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

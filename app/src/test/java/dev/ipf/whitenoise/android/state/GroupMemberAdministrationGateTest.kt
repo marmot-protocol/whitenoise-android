@@ -321,6 +321,49 @@ class GroupMemberAdministrationGateTest {
             }
         }
 
+    /** Admin canonicalization failure clears the optimistic invite before any native membership call. */
+    @Test
+    fun initialAdminResolutionFailureClearsPendingInviteWithoutCallingRuntime() =
+        runBlocking {
+            val runtimeAccess = RuntimeAccessRecorder()
+            val resolutions = mutableListOf<String>()
+            lateinit var controller: ConversationController
+            val state =
+                appState(
+                    runtimeAccess = runtimeAccess,
+                    accountIdHexResolver = { ref ->
+                        resolutions += ref
+                        if (ref == "admin-alias") {
+                            assertTrue(
+                                controller.pendingMembershipActivity?.mutation is OptimisticGroupRosterMutation.Invite,
+                            )
+                            throw MarmotKitException.InvalidIdentity("synthetic")
+                        }
+                        invitee
+                    },
+                )
+            controller = readyController(state)
+            org.robolectric.shadows.ShadowLog
+                .clear()
+            try {
+                assertFalse(controller.inviteMembers(listOf("carol"), initialAdminRefs = listOf("admin-alias")))
+                assertEquals(listOf("carol", "admin-alias"), resolutions)
+                assertEquals(0, runtimeAccess.callCount)
+                assertNull(controller.pendingMembershipActivity)
+                val events =
+                    org.robolectric.shadows.ShadowLog
+                        .getLogsForTag("GroupCreation")
+                        .map { it.msg }
+                        .filter { "phase=recipients" in it }
+                val failures = events.filter { "outcome=failure" in it }
+                assertEquals(1, failures.size)
+                assertTrue("failure=invalid_identity" in failures.single())
+                assertTrue(events.none { "outcome=success" in it })
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** Recipient cancellation propagates with one cancelled diagnostic and no generic mutation failure. */
     @Test
     fun recipientResolutionCancellationDoesNotEmitASecondFailure() =
