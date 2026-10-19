@@ -582,16 +582,10 @@ internal fun GroupDetailsScreen(
             // The refreshMembers() + appState.present(toast) inside each
             // ConversationController.* method then always run, regardless of
             // whether this composable is still on screen.
-            if (activeMutation != null ||
-                controller.mutationInFlight ||
-                controller.boundAccountRef == null ||
-                controller.boundAccountRef != appState.activeAccountRef ||
-                reviewRuntime != appState.runtimeGeneration ||
-                appState.signOutInProgress ||
-                appState.wipeInProgress
-            ) {
-                return
-            }
+            if (activeMutation != null || controller.mutationInFlight) return
+            if (controller.boundAccountRef == null || controller.boundAccountRef != appState.activeAccountRef) return
+            if (reviewRuntime != appState.runtimeGeneration) return
+            if (appState.signOutInProgress || appState.wipeInProgress) return
             activeMutation = ActiveGroupMutation(action, target)
             controller.clearLastMutationError()
             appState.launchMutation {
@@ -1075,33 +1069,13 @@ internal fun GroupDetailsScreen(
                     controller.group.admins
                         .map { it.lowercase(Locale.ROOT) }
                         .toSet()
-                if (pendingReview.ticket !== reviewTicket ||
-                    pendingConfirm == null ||
-                    controller.boundAccountRef != appState.activeAccountRef ||
-                    reviewRuntime != appState.runtimeGeneration ||
-                    reviewedRoster != (liveMembers to liveAdmins) ||
-                    !controller.isSelfMember ||
-                    (
-                        administration &&
-                            (
-                                !controller.isSelfAdmin ||
-                                    controller.isDm ||
-                                    controller.group.pendingConfirmation ||
-                                    controller.group.disbanding ||
-                                    controller.group.disbanded ||
-                                    !memberAdministrationPresentable(
-                                        controller.memberRosterState,
-                                        controller.seededSelfMember,
-                                    )
-                            )
-                    ) ||
-                    activeMutation != null ||
-                    controller.mutationInFlight ||
-                    appState.signOutInProgress ||
-                    appState.wipeInProgress
-                ) {
-                    return false
-                }
+                if (pendingReview.ticket !== reviewTicket || pendingConfirm == null) return false
+                if (controller.boundAccountRef != appState.activeAccountRef) return false
+                if (reviewRuntime != appState.runtimeGeneration) return false
+                if (reviewedRoster != (liveMembers to liveAdmins) || !controller.isSelfMember) return false
+                if (administration && !controller.canClaimAdministrationReview()) return false
+                if (activeMutation != null || controller.mutationInFlight) return false
+                if (appState.signOutInProgress || appState.wipeInProgress) return false
                 pendingConfirm = null
                 return true
             }
@@ -2811,4 +2785,11 @@ private class DetailsReviewSlot {
 
 private class GroupInviteWarningTicket {
     var active: Boolean = true
+}
+
+/** Re-read each authority fence when claiming an administration confirmation. */
+private fun ConversationController.canClaimAdministrationReview(): Boolean {
+    if (!isSelfAdmin || isDm) return false
+    if (group.pendingConfirmation || group.disbanding || group.disbanded) return false
+    return memberAdministrationPresentable(memberRosterState, seededSelfMember)
 }

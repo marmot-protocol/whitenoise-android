@@ -44,6 +44,17 @@
           "CHL-026",
           "GRP-034"
         ]
+      },
+      {
+        "surface": "ChatDepartureReviewTargets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "fun ChatDepartureReviewTargets(",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028",
+          "GRP-034"
+        ]
       }
     ],
     "settings_controls": [

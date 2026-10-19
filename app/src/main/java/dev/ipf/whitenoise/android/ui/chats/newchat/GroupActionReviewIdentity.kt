@@ -122,6 +122,9 @@ internal fun groupReviewPublicIdentifier(
     ).ifBlank {
         (appState.profileReferenceAccountIdHex(member.accountIdHex) ?: member.accountIdHex)
             .takeIf { value ->
-                value.length == 64 && value.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+                value.length == GROUP_REVIEW_PUBLIC_KEY_HEX_LENGTH &&
+                    value.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
             }.orEmpty()
     }
+
+private const val GROUP_REVIEW_PUBLIC_KEY_HEX_LENGTH = 64

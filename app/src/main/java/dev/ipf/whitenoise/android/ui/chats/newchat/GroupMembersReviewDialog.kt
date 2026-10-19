@@ -88,13 +88,8 @@ internal fun GroupMembersReviewDialog(
     val reviewedMembers = members.map { it.accountIdHex }.toList()
     val reviewedGroups = groups.map { it.id }.toList()
     DisposableEffect(ticket) { onDispose { ticket.active = false } }
-    val current =
-        actingAccount != null &&
-            actingAccount == appState.activeAccountRef &&
-            runtime == appState.runtimeGeneration &&
-            !appState.signOutInProgress &&
-            !appState.wipeInProgress &&
-            appState.retainedAccountReactivationRef == null
+    val current = groupMembersReviewOwnerCurrent(appState, actingAccount, runtime)
+
     LaunchedEffect(current) {
         if (!current) {
             ticket.active = false
@@ -113,19 +108,16 @@ internal fun GroupMembersReviewDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (actingAccount != null &&
-                        actingAccount == appState.activeAccountRef &&
-                        runtime == appState.runtimeGeneration &&
-                        !appState.signOutInProgress &&
-                        !appState.wipeInProgress &&
-                        appState.retainedAccountReactivationRef == null &&
-                        ticket.active &&
-                        !liveBusy.value &&
-                        reviewedMembers == liveMembers.value.map { it.accountIdHex } &&
-                        reviewedGroups == liveGroups.value.map { it.id } &&
-                        reviewedAdmins == liveAdmins.value
+                    if (ticket.claim(
+                            ownerCurrent = { groupMembersReviewOwnerCurrent(appState, actingAccount, runtime) },
+                            busy = { liveBusy.value },
+                            selectionCurrent = {
+                                reviewedMembers == liveMembers.value.map { it.accountIdHex } &&
+                                    reviewedGroups == liveGroups.value.map { it.id } &&
+                                    reviewedAdmins == liveAdmins.value
+                            },
+                        )
                     ) {
-                        ticket.active = false
                         onConfirm()
                     }
                 },
@@ -134,7 +126,7 @@ internal fun GroupMembersReviewDialog(
                         contentColor =
                             if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     ),
-                enabled = current && !busy && members.isNotEmpty() && groups.isNotEmpty(),
+                enabled = groupMembersReviewConfirmEnabled(current, busy, members.isNotEmpty(), groups.isNotEmpty()),
                 modifier = Modifier.testTag(SELECTED_MEMBERS_CONFIRM_TAG),
             ) {
                 if (showProgress) {
@@ -276,4 +268,38 @@ internal fun reviewMemberPublicName(value: String?): String? {
 
 private class GroupMembersReviewTicket {
     var active: Boolean = true
+
+    fun claim(
+        ownerCurrent: () -> Boolean,
+        busy: () -> Boolean,
+        selectionCurrent: () -> Boolean,
+    ): Boolean {
+        if (!ownerCurrent()) return false
+        if (!active || busy()) return false
+        if (!selectionCurrent()) return false
+        active = false
+        return true
+    }
+}
+
+private fun groupMembersReviewConfirmEnabled(
+    current: Boolean,
+    busy: Boolean,
+    hasMembers: Boolean,
+    hasGroups: Boolean,
+): Boolean {
+    if (!current || busy || !hasMembers) return false
+    return hasGroups
+}
+
+/** The frozen review belongs to one active account and runtime. */
+private fun groupMembersReviewOwnerCurrent(
+    appState: WhiteNoiseAppState,
+    actingAccount: String?,
+    runtime: Int,
+): Boolean {
+    if (actingAccount == null || actingAccount != appState.activeAccountRef) return false
+    if (runtime != appState.runtimeGeneration) return false
+    if (appState.signOutInProgress || appState.wipeInProgress) return false
+    return appState.retainedAccountReactivationRef == null
 }

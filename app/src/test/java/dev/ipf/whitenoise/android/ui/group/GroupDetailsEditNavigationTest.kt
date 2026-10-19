@@ -494,6 +494,168 @@ class GroupDetailsEditNavigationTest {
         return overviewScrollOffset() + node.fetchSemanticsNode().boundsInRoot.top
     }
 
+    /** Picking a successor opens review; cancel does not enter the native mutation path. */
+    @Test
+    fun soleAdminLeaveReviewsChosenSuccessorBeforeMutation() {
+        val mutations = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val nativeCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val promotionTargets = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val testController =
+            controller(
+                group(),
+                verifiedRoster = true,
+                identity =
+                    GroupDetailsIdentityFixture(
+                        memberNames = mapOf("member-b" to "Bob", "member-c" to "Carol"),
+                        marmotRuntime = rejectingGroupAdminRuntime(mutations, nativeCalls, promotionTargets),
+                    ),
+            )
+        val visibleController = androidx.compose.runtime.mutableStateOf(testController.controller)
+        render(testController, controllerState = visibleController)
+        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
+        val successor = testController.controller.transferAdminCandidates().first()
+        val successorName = testController.controller.memberDisplayName(successor)
+        pickLeaveSuccessor(successorName)
+        composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
+        val oldConfirmation =
+            composeRule
+                .onNodeWithTag("confirmation.confirm")
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        assertSuccessorReviewIdentity(successorName)
+        assertEquals(emptyList<String>(), mutations)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_leave_successor_review.png")
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        composeRule.onNodeWithTag("confirmation.confirm").assertDoesNotExist()
+        composeRule.runOnIdle { invokeDetachedReviewClick(oldConfirmation) }
+        assertEquals(emptyList<String>(), mutations)
+        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
+        pickLeaveSuccessor(successorName)
+        composeRule.runOnIdle { invokeDetachedReviewClick(oldConfirmation) }
+        assertEquals(emptyList<String>(), mutations)
+        val currentConfirmation =
+            composeRule
+                .onNodeWithTag("confirmation.confirm")
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
+        awaitPromotion(testController, nativeCalls, mutations)
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertFalse(testController.controller.mutationInFlight) }
+        // The fixture rejects promotion: confirm reaches that boundary, but never
+        // demotes or leaves after rejection. Successful transfer/leave needs device evidence.
+        assertEquals(listOf("promoteAdminDetailed"), mutations)
+        assertEquals(listOf("member-b"), promotionTargets)
+        composeRule.runOnIdle {
+            invokeDetachedReviewClick(currentConfirmation)
+            invokeDetachedReviewClick(oldConfirmation)
+        }
+        composeRule.waitForIdle()
+        assertEquals(listOf("promoteAdminDetailed"), mutations)
+        verifyReplacementReview(testController, visibleController, mutations, promotionTargets)
+    }
+
+    private fun assertSuccessorReviewIdentity(successorName: String) {
+        composeRule
+            .onNode(
+                hasText(successorName) and hasAnyAncestor(hasTestTag("group.members.review.member")),
+                useUnmergedTree = true,
+            ).assertIsDisplayed()
+        composeRule
+            .onNode(
+                hasText(GROUP_NAME) and hasAnyAncestor(hasTestTag("group.members.review.destination")),
+                useUnmergedTree = true,
+            ).assertIsDisplayed()
+    }
+
+    private fun awaitPromotion(
+        testController: GroupDetailsTestController,
+        nativeCalls: List<String>,
+        mutations: List<String>,
+    ) {
+        try {
+            composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
+        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError(
+                "Native calls: $nativeCalls; " +
+                    "roster=${testController.controller.memberRosterState}; " +
+                    "error=${testController.controller.lastMutationError}",
+                failure,
+            )
+        }
+    }
+
+    private fun verifyReplacementReview(
+        testController: GroupDetailsTestController,
+        visibleController: androidx.compose.runtime.MutableState<ConversationController>,
+        mutations: java.util.concurrent.CopyOnWriteArrayList<String>,
+        promotionTargets: java.util.concurrent.CopyOnWriteArrayList<String>,
+    ) {
+        composeRule.runOnIdle {
+            mutations.clear()
+            promotionTargets.clear()
+            testController.appState.advanceLocalDeleteTestRuntime()
+        }
+        // MainShell replaces its runtime-keyed controller; the old controller remains invalid.
+        val replacement = controller(group(), verifiedRoster = true, appStateOverride = testController.appState)
+        composeRule.runOnIdle { visibleController.value = replacement.controller }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
+        val replacementSuccessor = replacement.controller.transferAdminCandidates().first()
+        pickLeaveSuccessor(replacement.controller.memberDisplayName(replacementSuccessor))
+        composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
+        assertEquals(listOf("promoteAdminDetailed"), mutations)
+        assertEquals(listOf("member-b"), promotionTargets)
+    }
+
+    private fun pickLeaveSuccessor(name: String) {
+        val matcher = hasText(name) and hasClickAction()
+        // Leave resolves the live roster on IO before opening the picker.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(matcher).fetchSemanticsNodes().size == 1
+        }
+        composeRule.onNode(matcher).performClick()
+    }
+
+    private fun render(
+        testController: GroupDetailsTestController,
+        onOpenSearch: (() -> Unit)? = null,
+        onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
+        controllerState: androidx.compose.runtime.State<ConversationController>? = null,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupDetailsScreen(
+                    appState = testController.appState,
+                    controller = controllerState?.value ?: testController.controller,
+                    onBack = {},
+                    onLeft = {},
+                    onOpenSearch = onOpenSearch,
+                    onStartGroupWithPeer = onStartGroupWithPeer,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    /** Asserts editor is open. */
+    private fun assertEditorIsOpen() {
+        composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+class GroupDetailsConfirmationNavigationTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+    private val context: Context = ApplicationProvider.getApplicationContext()
+
     /** Management edit row and add description open the same editor. */
     @Test
     fun managementEditRowAndAddDescriptionOpenTheSameEditor() {
@@ -636,102 +798,6 @@ class GroupDetailsEditNavigationTest {
         composeRule.waitForIdle()
         assertEquals(listOf("promoteAdminDetailed"), mutations)
         assertEquals(listOf("member-b"), promotions)
-    }
-
-    /** Picking a successor opens review; cancel does not enter the native mutation path. */
-    @Test
-    fun soleAdminLeaveReviewsChosenSuccessorBeforeMutation() {
-        val mutations = java.util.concurrent.CopyOnWriteArrayList<String>()
-        val nativeCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
-        val promotionTargets = java.util.concurrent.CopyOnWriteArrayList<String>()
-        val testController =
-            controller(
-                group(),
-                verifiedRoster = true,
-                identity =
-                    GroupDetailsIdentityFixture(
-                        memberNames = mapOf("member-b" to "Bob", "member-c" to "Carol"),
-                        marmotRuntime = rejectingGroupAdminRuntime(mutations, nativeCalls, promotionTargets),
-                    ),
-            )
-        val visibleController = androidx.compose.runtime.mutableStateOf(testController.controller)
-        render(testController, controllerState = visibleController)
-        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
-        val successor = testController.controller.transferAdminCandidates().first()
-        val successorName = testController.controller.memberDisplayName(successor)
-        pickLeaveSuccessor(successorName)
-        composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
-        val oldConfirmation =
-            composeRule
-                .onNodeWithTag("confirmation.confirm")
-                .fetchSemanticsNode()
-                .config[SemanticsActions.OnClick]
-                .action!!
-        composeRule
-            .onNode(
-                hasText(successorName) and hasAnyAncestor(hasTestTag("group.members.review.member")),
-                useUnmergedTree = true,
-            ).assertIsDisplayed()
-        composeRule
-            .onNode(
-                hasText(GROUP_NAME) and hasAnyAncestor(hasTestTag("group.members.review.destination")),
-                useUnmergedTree = true,
-            ).assertIsDisplayed()
-        assertEquals(emptyList<String>(), mutations)
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_leave_successor_review.png")
-        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
-        composeRule.onNodeWithTag("confirmation.confirm").assertDoesNotExist()
-        composeRule.runOnIdle { invokeDetachedReviewClick(oldConfirmation) }
-        assertEquals(emptyList<String>(), mutations)
-        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
-        pickLeaveSuccessor(successorName)
-        composeRule.runOnIdle { invokeDetachedReviewClick(oldConfirmation) }
-        assertEquals(emptyList<String>(), mutations)
-        val currentConfirmation =
-            composeRule
-                .onNodeWithTag("confirmation.confirm")
-                .fetchSemanticsNode()
-                .config[SemanticsActions.OnClick]
-                .action!!
-        composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
-        try {
-            composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
-        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
-            throw AssertionError(
-                "Native calls: $nativeCalls; " +
-                    "roster=${testController.controller.memberRosterState}; " +
-                    "error=${testController.controller.lastMutationError}",
-                failure,
-            )
-        }
-        composeRule.waitForIdle()
-        composeRule.runOnIdle { assertFalse(testController.controller.mutationInFlight) }
-        // The fixture rejects promotion: confirm reaches that boundary, but never
-        // demotes or leaves after rejection. Successful transfer/leave needs device evidence.
-        assertEquals(listOf("promoteAdminDetailed"), mutations)
-        assertEquals(listOf("member-b"), promotionTargets)
-        composeRule.runOnIdle {
-            invokeDetachedReviewClick(currentConfirmation)
-            invokeDetachedReviewClick(oldConfirmation)
-        }
-        composeRule.waitForIdle()
-        assertEquals(listOf("promoteAdminDetailed"), mutations)
-        composeRule.runOnIdle {
-            mutations.clear()
-            promotionTargets.clear()
-            testController.appState.advanceLocalDeleteTestRuntime()
-        }
-        // MainShell replaces its runtime-keyed controller; the old controller remains invalid.
-        val replacement = controller(group(), verifiedRoster = true, appStateOverride = testController.appState)
-        composeRule.runOnIdle { visibleController.value = replacement.controller }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
-        val replacementSuccessor = replacement.controller.transferAdminCandidates().first()
-        pickLeaveSuccessor(replacement.controller.memberDisplayName(replacementSuccessor))
-        composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
-        assertEquals(listOf("promoteAdminDetailed"), mutations)
-        assertEquals(listOf("member-b"), promotionTargets)
     }
 
     private fun pickLeaveSuccessor(name: String) {

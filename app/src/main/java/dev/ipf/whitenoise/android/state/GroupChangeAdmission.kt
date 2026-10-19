@@ -200,13 +200,7 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
             },
             // MDK checks catching up first, so an owed commit's refusal hides behind it until the retry. A read that
             // fails counts as owed: asking once too often costs a question, asking too rarely leaves consent behind.
-            hiddenBehind = { caution ->
-                val owed =
-                    caution == GroupChangeCaution.CatchingUp &&
-                        runCatchingCancellable { marmotIo { groupCommitDelivery(accountRef, groupIdHex) } }
-                            .fold(onSuccess = { it != null }, onFailure = { true })
-                if (owed) listOf(GroupChangeCaution.Undelivered) else emptyList()
-            },
+            hiddenBehind = { caution -> hiddenGroupChangeCautions(caution, accountRef, groupIdHex) },
             stillWanted = wanted,
             change = change,
         )
@@ -326,4 +320,17 @@ private fun GroupChangeAnswer.requireContinue(refusal: MarmotKitException) {
         GroupChangeAnswer.Wait -> throw GroupChangeDeclinedException(refusal)
         GroupChangeAnswer.Unavailable -> throw refusal
     }
+}
+
+/** A failed delivery read keeps the existing conservative confirmation behavior. */
+private suspend fun WhiteNoiseAppState.hiddenGroupChangeCautions(
+    caution: GroupChangeCaution,
+    accountRef: String,
+    groupIdHex: String,
+): List<GroupChangeCaution> {
+    val owed =
+        caution == GroupChangeCaution.CatchingUp &&
+            runCatchingCancellable { marmotIo { groupCommitDelivery(accountRef, groupIdHex) } }
+                .fold(onSuccess = { it != null }, onFailure = { true })
+    return if (owed) listOf(GroupChangeCaution.Undelivered) else emptyList()
 }

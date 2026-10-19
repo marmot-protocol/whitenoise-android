@@ -153,21 +153,7 @@ internal fun ChatDepartureBatchDialog(
             confirmEnabled = isCurrent(),
             identity = {
                 GroupActingAccountIdentity(appState, request.actingAccountRef)
-                request.targets.forEach { target ->
-                    val item = request.reviewItems.first { it.group.groupIdHex == target.groupId }
-                    val avatar = rememberChatListGroupAvatar(appState, item)
-                    GroupReviewDestinationIdentity(
-                        MemberReviewGroup(target.groupId, target.title, avatar.pictureUrl, avatar.image),
-                        actionLabel =
-                            stringResource(
-                                when {
-                                    request.abandon -> groupAbandonmentActionLabel(target.isDm)
-                                    target.isDm -> R.string.delete_from_device
-                                    else -> R.string.leave_and_delete
-                                },
-                            ),
-                    )
-                }
+                ChatDepartureReviewTargets(request, appState)
             },
         )
     } else if (ui.decision != null) {
@@ -414,3 +400,26 @@ private fun departureOutcomeDetail(
         target.isDm -> R.string.toast_couldnt_delete_chat
         else -> R.string.toast_leave_not_confirmed_history_kept
     }
+
+@Composable
+@Suppress("FunctionNaming")
+private fun ChatDepartureReviewTargets(
+    request: PendingChatDeparture,
+    appState: WhiteNoiseAppState,
+) {
+    request.targets.forEach { target ->
+        val item = request.reviewItems.first { it.group.groupIdHex == target.groupId }
+        val avatar = rememberChatListGroupAvatar(appState, item)
+        GroupReviewDestinationIdentity(
+            MemberReviewGroup(target.groupId, target.title, avatar.pictureUrl, avatar.image),
+            actionLabel =
+                stringResource(
+                    when {
+                        request.abandon -> groupAbandonmentActionLabel(target.isDm)
+                        target.isDm -> R.string.delete_from_device
+                        else -> R.string.leave_and_delete
+                    },
+                ),
+        )
+    }
+}

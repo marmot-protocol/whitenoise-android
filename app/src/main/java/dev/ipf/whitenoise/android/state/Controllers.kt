@@ -12201,25 +12201,7 @@ class ConversationController(
                         // cancelled now, skipping the demote would strand both accounts as
                         // admin without telling the caller (runCatchingCancellable propagates
                         // cancellation past the partial-state branch). Run it to completion.
-                        withContext(NonCancellable) {
-                            val demoteResult =
-                                try {
-                                    appState.runGroupChange(
-                                        account,
-                                        group.groupIdHex,
-                                        actionLabel = R.string.transfer_admin,
-                                        affectedMemberIds = listOf(target),
-                                    ) {
-                                        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                            selfDemoteAdminDetailed(account, group.groupIdHex)
-                                        }
-                                    }
-                                } catch (declined: GroupChangeDeclinedException) {
-                                    // Waiting leaves both admins: report the partial transfer, not a quiet cancel.
-                                    throw declined.refusal
-                                }
-                            applyMutationDetails(account, demoteResult.details)
-                        }
+                        completeAdminTransfer(account, target)
                         true
                     }
                 if (!transferCommitted) {
@@ -12242,6 +12224,32 @@ class ConversationController(
                 }
             }.getOrDefault(false)
         }
+
+    /** Finish the already-granted transfer even if its caller is cancelled. */
+    private suspend fun completeAdminTransfer(
+        account: String,
+        target: String,
+    ) {
+        withContext(NonCancellable) {
+            val demoteResult =
+                try {
+                    appState.runGroupChange(
+                        account,
+                        group.groupIdHex,
+                        actionLabel = R.string.transfer_admin,
+                        affectedMemberIds = listOf(target),
+                    ) {
+                        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                            selfDemoteAdminDetailed(account, group.groupIdHex)
+                        }
+                    }
+                } catch (declined: GroupChangeDeclinedException) {
+                    // Waiting leaves both admins: report the partial transfer, not a quiet cancel.
+                    throw declined.refusal
+                }
+            applyMutationDetails(account, demoteResult.details)
+        }
+    }
 
     fun isAdmin(member: AppGroupMemberRecordFfi): Boolean =
         projectedGroupAdmin(
