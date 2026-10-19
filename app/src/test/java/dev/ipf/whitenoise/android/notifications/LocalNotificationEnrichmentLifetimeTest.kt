@@ -146,15 +146,73 @@ class LocalNotificationEnrichmentLifetimeTest {
             }
         }
 
-    /** Keeps real formatter/write ownership while controlling only the existing launch and picture effects. */
+    /** Dismissing during a held avatar read cannot restore its card or shortcut, or cancel another account. */
+    @Test
+    fun dismissalDuringAvatarReadKeepsOtherAccountAndPreventsResurrection() =
+        runBlocking {
+            var pending: (suspend () -> Unit)? = null
+            val avatarStarted = CompletableDeferred<Unit>()
+            val avatarReady = CompletableDeferred<Bitmap>()
+            val posts = mutableListOf<Notification>()
+            var shortcutWrites = 0
+            val presenter =
+                presenter(
+                    launcher = { pending = it },
+                    resolveAvatar = { url ->
+                        if (url == null) {
+                            null
+                        } else {
+                            avatarStarted.complete(Unit)
+                            avatarReady.await()
+                        }
+                    },
+                    posts = posts,
+                    onShortcutPublished = { shortcutWrites++ },
+                )
+            presenter.ensureChannels()
+            assertTrue(
+                presenter.show(
+                    alertBudgetUpdate("first", 1_000),
+                    senderAvatarUrl = "https://example.com/fixture.png",
+                    shortNpub = { "npub1fixture" },
+                ),
+            )
+            val enrichment = async(start = CoroutineStart.UNDISPATCHED) { checkNotNull(pending).invoke() }
+            try {
+                withTimeout(5_000) { avatarStarted.await() }
+                assertTrue(
+                    presenter.show(
+                        alertBudgetUpdate("other", 2_000, accountRef = "account-b"),
+                        shortNpub = { "npub1fixture" },
+                    ),
+                )
+                assertTrue(presenter.dismissConversationMessages("account-a", "group-a"))
+                assertEquals("other", conversationCardMessageIdHex(manager.activeNotifications.single().notification))
+                assertTrue(shortcutWrites > 0)
+                val shortcutsBeforeAvatarCompletes = shortcutWrites
+
+                avatarReady.complete(picture())
+                withTimeout(5_000) { enrichment.await() }
+                assertEquals(2, posts.size)
+                assertEquals(shortcutsBeforeAvatarCompletes, shortcutWrites)
+                val remaining = manager.activeNotifications.single().notification
+                assertEquals("other", conversationCardMessageIdHex(remaining))
+            } finally {
+                avatarReady.complete(picture())
+                enrichment.cancelAndJoin()
+            }
+        }
+
+    /** Keeps real formatter/write ownership while controlling launch and picture effects and observing shortcuts. */
     private fun presenter(
         launcher: (suspend () -> Unit) -> Unit,
         resolveAvatar: suspend (String?) -> Bitmap?,
         posts: MutableList<Notification>,
+        onShortcutPublished: () -> Unit = {},
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context = context,
-            shortcutPublisher = {},
+            shortcutPublisher = { onShortcutPublished() },
             notificationPoster = { notificationManager, tag, id, notification ->
                 notificationManager.notify(tag, id, notification)
                 posts += notification

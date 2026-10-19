@@ -65,6 +65,8 @@ settlement, including a launcher that throws after executing the body.
 the initial registration returns while its picture work is pending, the detached
 reference retires after the rewrite, and an eligibility change during suspended
 picture resolution prevents an old-account write while another account survives.
+It also dismisses a card during the held picture read: completing that read cannot
+restore the card or shortcut, and the other account's card survives.
 
 The existing conversation, enrichment-race, dismissal, heads-up, identity-image,
 shortcut, preview-privacy, artwork and alert-budget suites retain their contracts.
