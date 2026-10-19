@@ -125,7 +125,7 @@ internal fun shouldLoadRemoteGiphyMedia(
 
 /** Loads and renders one iOS-originated GIPHY envelope through Android's media policy. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // One row owns policy, still decode and its animation source.
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // One row owns decoding and playback policy.
 internal fun RemoteGiphyMediaBubble(
     media: RemoteGiphyMedia,
     footer: GiphyMessageFooter,
@@ -194,7 +194,7 @@ internal fun RemoteGiphyMediaBubble(
 
 /** Stateless GIPHY card used by production state ownership and deterministic screenshot tests. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Stateless card inputs include an optional local playback source.
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Stateless inputs include a local playback source.
 internal fun RemoteGiphyMediaCard(
     media: RemoteGiphyMedia,
     footer: GiphyMessageFooter,

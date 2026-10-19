@@ -234,7 +234,10 @@ class InlineAttachmentImageTest {
         showInlineTestConversation(fixture.state, "group")
         try {
             composeRule.setContent {
-                source = rememberInlineAnimationSource("row", fixture.state, fixture.state.activeAccountRef, "group") { byteArrayOf(1) }
+                source =
+                    rememberInlineAnimationSource("row", fixture.state, fixture.state.activeAccountRef, "group") {
+                        byteArrayOf(1)
+                    }
             }
             composeRule.runOnIdle {
                 assertTrue(requireNotNull(source).enabled)
@@ -334,12 +337,18 @@ class InlineAttachmentImageTest {
     }
 
     /** Generates a bounded raw frame with an unmistakably different colour. */
-    private fun pixels(color: Int): Bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
+    private fun pixels(color: Int): Bitmap {
+        return Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
+    }
 
     /** Changes the same setting observed by the production layer. */
     private fun setMotion(enabled: Boolean) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        Settings.Global.putFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, if (enabled) 1f else 0f)
+        Settings.Global.putFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            if (enabled) 1f else 0f,
+        )
     }
 
     /** Drives lifecycle edges independently of window focus and row visibility. */

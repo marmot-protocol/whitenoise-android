@@ -191,7 +191,12 @@ internal fun MediaImageBubble(
         )
     }
     val animationSource =
-        rememberInlineAnimationSource(listOf(controller, key, attachmentIndex, epoch), appState, controller.boundAccountRef, controller.group.groupIdHex) {
+        rememberInlineAnimationSource(
+            listOf(controller, key, attachmentIndex, epoch),
+            appState,
+            controller.boundAccountRef,
+            controller.group.groupIdHex,
+        ) {
             localAttachmentBytes(controller, key, attachmentIndex, mine)
         }
     val mediaApplyHostAttempt = remember(key, attachmentIndex, epoch) { HostPerformanceAttemptSlot() }
@@ -712,7 +717,12 @@ internal fun MediaImageGridTile(
         )
     }
     val animationSource =
-        rememberInlineAnimationSource(controller to decodeKey, appState, controller.boundAccountRef, controller.group.groupIdHex) {
+        rememberInlineAnimationSource(
+            controller to decodeKey,
+            appState,
+            controller.boundAccountRef,
+            controller.group.groupIdHex,
+        ) {
             localAttachmentBytes(controller, messageIdHex, attachmentIndex, mine)
         }
     val mediaApplyHostAttempt = remember(decodeKey) { HostPerformanceAttemptSlot() }

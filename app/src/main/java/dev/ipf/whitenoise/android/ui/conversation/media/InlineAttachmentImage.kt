@@ -59,7 +59,9 @@ internal fun rememberInlineAnimationSource(
     val account = remember(identity) { accountRef }
     val runtime = remember(identity) { appState.runtimeGeneration }
     val sameOwner = account != null && account == appState.activeAccountRef && runtime == appState.runtimeGeneration
-    val visibleOwner = account?.let { appState.isConversationReadVisible(it, groupIdHex) } == true && appState.pendingProfileNpub == null
+    val visibleOwner =
+        account?.let { appState.isConversationReadVisible(it, groupIdHex) } == true &&
+            appState.pendingProfileNpub == null
     return InlineAnimationSource(
         identity = identity,
         enabled = sameOwner && visibleOwner && !appState.automaticAttachmentDownloadsPaused(),
@@ -133,7 +135,7 @@ internal fun InlineAttachmentImage(
                 currentCoroutineContext().ensureActive()
                 owned = decode(bytes)
                 currentCoroutineContext().ensureActive()
-                // staleness-exempt: this state belongs to the exact row/eligibility effect; cancellation fences publication.
+                // staleness-exempt: row/eligibility owns this state; cancellation fences publication.
                 drawableState.value = owned
                 if (owned != null) awaitCancellation()
             } catch (cancelled: CancellationException) {
@@ -146,7 +148,8 @@ internal fun InlineAttachmentImage(
             }
         }
     }
-    val visibilityModifier = modifier.onVisibilityChanged(minFractionVisible = INLINE_ANIMATION_VISIBLE_FRACTION) { visible = it }
+    val visibilityModifier =
+        modifier.onVisibilityChanged(minFractionVisible = INLINE_ANIMATION_VISIBLE_FRACTION) { visible = it }
     val drawable = drawableState.value
     Box(visibilityModifier.clipToBounds()) {
         if (drawable == null) {
