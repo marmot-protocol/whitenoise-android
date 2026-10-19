@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.graphics.Bitmap
+import android.widget.ImageView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -22,6 +23,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -38,6 +44,7 @@ import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.hamcrest.CoreMatchers.allOf
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -133,10 +140,7 @@ class MediaImageBubbleLatencyTest {
                     }
                 }
             }
-            composeRule.waitUntil(10_000) {
-                composeRule.waitForIdle()
-                transport.animations.size == 1
-            }
+            awaitInlinePlayback(transport, expectedAnimations = 1)
             composeRule.runOnIdle {
                 assertTrue(transport.animations.single().isRunning)
                 assertEquals(0, fixture.calls.size)
@@ -147,11 +151,7 @@ class MediaImageBubbleLatencyTest {
                 assertTrue(!transport.animations.single().isRunning)
                 shown = true
             }
-            awaitLoaded()
-            composeRule.waitUntil(10_000) {
-                composeRule.waitForIdle()
-                transport.animations.size == 2
-            }
+            awaitInlinePlayback(transport, expectedAnimations = 2)
             composeRule.runOnIdle {
                 assertTrue(transport.animations.last().isRunning)
                 assertEquals(0, fixture.calls.size)
@@ -162,6 +162,23 @@ class MediaImageBubbleLatencyTest {
                 dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport,
             )
         }
+    }
+
+    /** Playback replaces Compose's still semantics with a native ImageView, which Espresso must inspect. */
+    private fun awaitInlinePlayback(
+        transport: InlineAnimationTestTransport,
+        expectedAnimations: Int,
+    ) {
+        composeRule.waitUntil(10_000) {
+            composeRule.runOnIdle {
+                transport.animations.size == expectedAnimations && transport.animations.last().isRunning
+            }
+        }
+        onView(allOf(isAssignableFrom(ImageView::class.java), withContentDescription(reference(0).fileName)))
+            .check(matches(isDisplayed()))
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.media_tap_to_download)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.media_tap_to_retry)).assertDoesNotExist()
     }
 
     /** A genuine miss must still respect a disabled automatic-download policy after index hydration. */
