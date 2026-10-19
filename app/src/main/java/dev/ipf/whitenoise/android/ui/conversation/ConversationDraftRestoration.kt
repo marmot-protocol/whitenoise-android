@@ -102,7 +102,7 @@ internal fun planDraftRestoration(
     attachments: List<MessageDraftAttachmentFfi>,
     removedAttachmentIds: Set<String>,
 ): DraftRestorationPlan {
-    val nativeIds = attachments.mapTo(mutableSetOf()) { it.id }
+    val nativeIds = attachments.mapTo(mutableSetOf()) { it.id } - removedAttachmentIds
     val removedPhotos = restoredPhotosMissingFrom(inputs.slots, inputs.preparedPhotos, inputs.backedPhotos, nativeIds)
     val removedDocuments = restoredDocumentsMissingFrom(inputs.documents, inputs.preparedDocuments, nativeIds)
     val retainedSlots = inputs.slots.filterNot { it.id in removedPhotos }
