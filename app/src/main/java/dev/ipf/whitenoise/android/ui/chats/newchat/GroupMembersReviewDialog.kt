@@ -273,13 +273,16 @@ private class GroupMembersReviewTicket {
         ownerCurrent: () -> Boolean,
         busy: () -> Boolean,
         selectionCurrent: () -> Boolean,
-    ): Boolean {
-        if (!ownerCurrent()) return false
-        if (!active || busy()) return false
-        if (!selectionCurrent()) return false
-        active = false
-        return true
-    }
+    ): Boolean =
+        when {
+            !ownerCurrent() -> false
+            !active || busy() -> false
+            !selectionCurrent() -> false
+            else -> {
+                active = false
+                true
+            }
+        }
 }
 
 private fun groupMembersReviewConfirmEnabled(
@@ -297,9 +300,10 @@ private fun groupMembersReviewOwnerCurrent(
     appState: WhiteNoiseAppState,
     actingAccount: String?,
     runtime: Int,
-): Boolean {
-    if (actingAccount == null || actingAccount != appState.activeAccountRef) return false
-    if (runtime != appState.runtimeGeneration) return false
-    if (appState.signOutInProgress || appState.wipeInProgress) return false
-    return appState.retainedAccountReactivationRef == null
-}
+): Boolean =
+    when {
+        actingAccount == null || actingAccount != appState.activeAccountRef -> false
+        runtime != appState.runtimeGeneration -> false
+        appState.signOutInProgress || appState.wipeInProgress -> false
+        else -> appState.retainedAccountReactivationRef == null
+    }

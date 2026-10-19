@@ -2322,4 +2322,15 @@
     <string name="group_change_invite_anyway">仍然邀请</string>
     <string name="starting_as">以此身份发起</string>
     <string name="starting_as_account">以 %1$s 的身份发起</string>
+    <string name="group_action_acting_account">操作账号</string>
+    <string name="group_action_local_nickname">本地昵称：%1$s</string>
+    <string name="group_action_public_key_hex">公钥（十六进制）</string>
+    <string name="group_action_account_label">本地账号标签：%1$s</string>
+    <string name="group_action_revoke_explanation">这将移除管理员权限。该用户仍是成员。</string>
+    <string name="group_action_add_members">添加成员</string>
+    <string name="group_action_transfer_and_leave">转让管理员权限并退出</string>
+    <string name="group_action_step_down_and_leave">放弃管理员权限并退出</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="other">%1$d 个群组</item>
+    </plurals>
 </resources>

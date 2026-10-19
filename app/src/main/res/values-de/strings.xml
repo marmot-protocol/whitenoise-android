@@ -2373,4 +2373,16 @@
     <string name="group_change_invite_anyway">Trotzdem einladen</string>
     <string name="starting_as">Starten als</string>
     <string name="starting_as_account">Starten als %1$s</string>
+    <string name="group_action_acting_account">Ausführendes Konto</string>
+    <string name="group_action_local_nickname">Lokaler Spitzname: %1$s</string>
+    <string name="group_action_public_key_hex">Öffentlicher Schlüssel (Hex)</string>
+    <string name="group_action_account_label">Lokale Kontobezeichnung: %1$s</string>
+    <string name="group_action_revoke_explanation">Dadurch werden die Administratorrechte entzogen. Die Person bleibt Mitglied.</string>
+    <string name="group_action_add_members">Mitglieder hinzufügen</string>
+    <string name="group_action_transfer_and_leave">Administratorrechte übertragen und verlassen</string>
+    <string name="group_action_step_down_and_leave">Administratorrechte abgeben und verlassen</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d Gruppe</item>
+        <item quantity="other">%1$d Gruppen</item>
+    </plurals>
 </resources>

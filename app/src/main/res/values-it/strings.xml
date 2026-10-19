@@ -2356,4 +2356,16 @@
     <string name="group_change_invite_anyway">Invita comunque</string>
     <string name="starting_as">Avvio come</string>
     <string name="starting_as_account">Avvio come %1$s</string>
+    <string name="group_action_acting_account">Account utilizzato</string>
+    <string name="group_action_local_nickname">Soprannome locale: %1$s</string>
+    <string name="group_action_public_key_hex">Chiave pubblica (esadecimale)</string>
+    <string name="group_action_account_label">Etichetta locale dell’account: %1$s</string>
+    <string name="group_action_revoke_explanation">Questa azione rimuove i diritti di amministratore. La persona rimane membro.</string>
+    <string name="group_action_add_members">Aggiungi membri</string>
+    <string name="group_action_transfer_and_leave">Trasferisci i diritti di amministratore ed esci</string>
+    <string name="group_action_step_down_and_leave">Rinuncia ai diritti di amministratore ed esci</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d gruppo</item>
+        <item quantity="other">%1$d gruppi</item>
+    </plurals>
 </resources>
