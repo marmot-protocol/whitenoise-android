@@ -30,9 +30,9 @@
         ]
       },
       {
-        "surface": "ValidatedInternetRefreshEffect",
+        "surface": "ActiveNetworkRefreshEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
-        "anchor": "fun ValidatedInternetRefreshEffect(",
+        "anchor": "fun ActiveNetworkRefreshEffect(",
         "test_ids": [
           "INT-008"
         ]

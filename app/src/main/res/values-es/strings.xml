@@ -2236,6 +2236,7 @@
     <string name="local_reset_retry_detail">\u2068El restablecimiento se detuvo. Vuelve a elegir Restablecer y esperar una nueva invitación; primero se comprobará el resultado anterior. Si sigue fallando, reinicia la aplicación.\u2069</string>
     <string name="chat_list_delete_stopped">Borrado detenido</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d de %2$d eliminaciones confirmadas. Reintenta Eliminar de este dispositivo para comprobar el resultado. Si sigue fallando, reinicia la aplicación.\u2069</string>
+    <string name="group_image_destination_refused_detail">Las reglas de seguridad de la red bloquearon el destino de la subida. Revisa el servidor de subida y la configuración de red e inténtalo de nuevo.</string>
     <string name="group_svg_rejected_detail">No se pudo preparar este SVG. Elige un SVG sencillo, PNG o JPEG.</string>
     <string name="error_invalid_key_package">No se pudo validar la clave de chat publicada de esta persona. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>
     <string name="error_invalid_key_package_for">No se pudo validar la clave de chat publicada de %1$s. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>

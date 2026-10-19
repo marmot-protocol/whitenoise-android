@@ -15,7 +15,11 @@ internal const val CATCH_UP_MAX_SUPERSEDED_REPLACEMENTS = 3
 data class ConnectivitySignals(
     val hasValidatedInternet: Boolean = false,
     val relaysConnected: Boolean = true,
-)
+    val hasActiveNetwork: Boolean = false,
+) {
+    /** Foreground requests can work when the OS validation endpoint is blocked. */
+    val hasAppNetwork: Boolean get() = hasActiveNetwork
+}
 
 internal class ConnectivitySignalOwner {
     private val mutableSignals = MutableStateFlow(ConnectivitySignals())
@@ -29,21 +33,28 @@ internal class ConnectivitySignalOwner {
     /** Reports whether a captured probe still belongs to the active network identity. */
     fun isNetworkGenerationCurrent(captured: Long): Boolean = networkLifetime.isCurrent(captured)
 
-    /** Publishes connectivity changes and invalidates probes when validation identity changes. */
+    /** Publishes validation/foreground-route changes and invalidates stale network probes. */
     fun update(
         hasValidatedInternet: Boolean? = null,
         relaysConnected: Boolean? = null,
+        hasActiveNetwork: Boolean? = null,
     ) {
         synchronized(lock) {
             val current = mutableSignals.value
             val nextHasValidatedInternet = hasValidatedInternet ?: current.hasValidatedInternet
-            if (nextHasValidatedInternet != current.hasValidatedInternet) networkLifetime.advance()
+            val nextHasActiveNetwork = hasActiveNetwork ?: current.hasActiveNetwork
+            if (nextHasValidatedInternet != current.hasValidatedInternet ||
+                nextHasActiveNetwork != current.hasActiveNetwork
+            ) {
+                networkLifetime.advance()
+            }
             mutableSignals.value =
                 current.copy(
                     hasValidatedInternet = nextHasValidatedInternet,
+                    hasActiveNetwork = nextHasActiveNetwork,
                     relaysConnected =
                         relaysConnectedOnNetworkChange(
-                            isOnline = nextHasValidatedInternet,
+                            isOnline = nextHasActiveNetwork,
                             cached = relaysConnected ?: current.relaysConnected,
                         ),
                 )
