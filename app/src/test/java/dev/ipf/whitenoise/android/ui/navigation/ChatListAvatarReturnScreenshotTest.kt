@@ -75,8 +75,10 @@ class ChatListAvatarReturnScreenshotTest {
     @Test
     fun staleReturnSettlesAfterTheLocalRefreshCompletes() = verifyReturn(dark = false, stale = true)
 
-    /** Holds every post-eviction local read so a late decode cannot disguise a missing returning avatar. */
-    // One navigation fixture owns both read gates, the retained shell, and cleanup throughout the case.
+    /**
+     * Holds every post-eviction local read so a late decode cannot disguise a missing returning avatar.
+     * One navigation fixture owns both read gates, the retained shell, and cleanup throughout the case.
+     */
     @Suppress("LongMethod")
     private fun verifyReturn(
         dark: Boolean,

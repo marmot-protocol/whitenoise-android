@@ -158,7 +158,11 @@ class RetainedAvatarNavigationCoverageTest {
         assertTrue(owner.pixels.images.isEmpty())
         seed(assets.take(1))
         select(assets.take(1))
-        assertSame(image, owner.pixels.images.values.single())
+        assertSame(
+            image,
+            owner.pixels.images.values
+                .single(),
+        )
 
         rule.runOnIdle { AvatarImageLoader.clearStoredAvatars() }
         rule.waitForIdle()

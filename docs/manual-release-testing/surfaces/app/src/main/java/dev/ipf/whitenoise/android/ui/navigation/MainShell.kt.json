@@ -20,6 +20,14 @@
         "test_ids": [
           "NAV-001"
         ]
+      },
+      {
+        "surface": "Opening conversation source-group identity handoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "initialGroup = appState.conversationSourceGroup(openChat, accountRef)",
+        "test_ids": [
+          "CHL-017"
+        ]
       }
     ],
     "source_coverage": [

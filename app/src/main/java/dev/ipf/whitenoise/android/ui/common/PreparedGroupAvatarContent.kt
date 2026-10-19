@@ -135,9 +135,10 @@ private class RetainedAvatarWindow(
     }
 
     /** Existing exact pins need neither a new preparation read nor a second retained bitmap map. */
-    fun hasExactRevision(asset: AvatarAssetFfi): Boolean {
-        return retained.any { sameSelection(it.asset, asset) && it.asset.contentRevision == asset.contentRevision }
-    }
+    fun hasExactRevision(selectedAsset: AvatarAssetFfi): Boolean =
+        retained.any { known ->
+            sameSelection(known.asset, selectedAsset) && known.asset.contentRevision == selectedAsset.contentRevision
+        }
 
     /** Accepts exact loaded pixels only for a still-selected revision, with at most one image per selection. */
     fun recordLoaded(
@@ -152,11 +153,10 @@ private class RetainedAvatarWindow(
     }
 
     /** Seeds only the revision these pixels actually depict; revision fallback remains a separate lookup. */
-    fun exactImages(): Map<String, ImageBitmap> {
-        return retained
+    fun exactImages(): Map<String, ImageBitmap> =
+        retained
             .mapNotNull { known -> accountRef?.let(known.asset::cacheKey)?.let { it to known.image } }
             .toMap()
-    }
 
     /** Target and selected reference jointly identify a drawable picture independently of content refresh. */
     private fun sameSelection(

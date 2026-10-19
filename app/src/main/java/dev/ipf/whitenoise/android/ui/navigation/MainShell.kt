@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
+import dev.ipf.whitenoise.android.state.conversationSourceGroup
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
@@ -1454,7 +1455,7 @@ internal fun MainShell(
                 ) {
                     ConversationController(
                         appState = appState,
-                        initialGroup = openChat.group,
+                        initialGroup = appState.conversationSourceGroup(openChat, accountRef),
                         initialMemberSnapshot =
                             openChat.memberSnapshot
                                 ?: appState.cachedGroupMemberSnapshot(
