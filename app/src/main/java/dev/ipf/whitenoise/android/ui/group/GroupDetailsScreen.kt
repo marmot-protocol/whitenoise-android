@@ -2806,15 +2806,3 @@ private fun ConversationController.canClaimAdministrationReview(allowDmDeparture
         group.pendingConfirmation || group.disbanding || group.disbanded -> false
         else -> memberAdministrationPresentable(memberRosterState, seededSelfMember)
     }
-
-/** Shared presentation/admission ownership, with the same ordered account and runtime fences. */
-private fun ConversationController.isCurrentGroupMutationOwner(
-    appState: WhiteNoiseAppState,
-    reviewedRuntime: Int,
-): Boolean =
-    when {
-        boundAccountRef == null || boundAccountRef != appState.activeAccountRef -> false
-        reviewedRuntime != appState.runtimeGeneration -> false
-        appState.signOutInProgress || appState.wipeInProgress -> false
-        else -> true
-    }
