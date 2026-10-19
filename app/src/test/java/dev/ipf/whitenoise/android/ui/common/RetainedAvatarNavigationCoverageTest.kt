@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +52,31 @@ class RetainedAvatarNavigationCoverageTest {
 
     /** Removes only synthetic process pixels after each fixture. */
     @After fun clearPixels() = AvatarImageLoader.clear()
+
+    /** Measured-window and late decode changes update their child content without restarting the shell owner. */
+    @Test
+    fun windowAndLatePixelUpdatesDoNotRecomposeTheOwner() {
+        var ownerCommits = 0
+        var shown: ImageBitmap? = null
+        rule.setContent {
+            owner = rememberRetainedGroupAvatarPreparation(state, account, surface)
+            SideEffect { ownerCommits++ }
+            ObserveRetainedAvatarPixels(owner) { shown = it.images.values.singleOrNull() }
+        }
+        rule.waitForIdle()
+        val initialCommits = ownerCommits
+        seed(assets.take(1))
+        select(assets.take(1))
+        assertSame(image, shown)
+        assertEquals("selecting a measured window must not restart the shell", initialCommits, ownerCommits)
+
+        select(assets.subList(1, 2))
+        assertNull(shown)
+        rule.runOnIdle { checkNotNull(owner.pixels.recordLoaded)(assets[1], image) }
+        rule.waitForIdle()
+        assertSame("late pixels still reach the consuming content", image, shown)
+        assertEquals("late decoding must not restart the shell", initialCommits, ownerCommits)
+    }
 
     /** A scrolled list remount sees its previous bounded window before the new LazyColumn has a layout. */
     @Test
@@ -235,4 +261,15 @@ class RetainedAvatarNavigationCoverageTest {
     private companion object {
         const val ACCOUNT = ConversationTimelineTestIds.ACCOUNT_REF
     }
+}
+
+/** Observes retained pixels in a separate restart scope, matching the production list content. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ObserveRetainedAvatarPixels(
+    owner: RetainedGroupAvatarPreparation,
+    onCommit: (PreparedGroupAvatarPixels) -> Unit,
+) {
+    val pixels = owner.pixels
+    SideEffect { onCommit(pixels) }
 }

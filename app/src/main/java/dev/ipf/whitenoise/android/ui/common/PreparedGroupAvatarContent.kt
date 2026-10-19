@@ -73,9 +73,12 @@ private data class VisibleGroupAvatarAssets(
 
 /** Transfers the existing bounded preparation between a shell and its disposable chat-list slot. */
 internal class RetainedGroupAvatarPreparation(
-    val pixels: PreparedGroupAvatarPixels,
+    private val readPixels: () -> PreparedGroupAvatarPixels,
     val updateVisible: (List<AvatarAssetFfi>) -> Unit,
-)
+) {
+    /** Pixel changes belong to the consuming content's restart scope, never the shell owner factory. */
+    val pixels: PreparedGroupAvatarPixels get() = readPixels()
+}
 
 /**
  * Keeps one list's existing sixteen-image preparation alive during conversation navigation. Replacement
@@ -89,10 +92,37 @@ internal fun rememberRetainedGroupAvatarPreparation(
     surfaceIdentity: Any,
 ): RetainedGroupAvatarPreparation {
     val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val runtimeGeneration = appState.runtimeGeneration
     val window =
-        remember(appState, accountRef, appState.runtimeGeneration, lifetime, surfaceIdentity) {
+        remember(appState, accountRef, runtimeGeneration, lifetime, surfaceIdentity) {
             RetainedAvatarWindow(accountRef)
         }
+    PrepareRetainedAvatarWindow(appState, accountRef, window)
+    return remember(window) {
+        RetainedGroupAvatarPreparation(
+            readPixels = {
+                PreparedGroupAvatarPixels(
+                    accountRef,
+                    runtimeGeneration,
+                    lifetime,
+                    images = window.exactImages(),
+                    retained = window.retained,
+                    recordLoaded = window::recordLoaded,
+                )
+            },
+            updateVisible = window::select,
+        )
+    }
+}
+
+/** Window changes restart only local preparation; the shell does not observe selection or decode state. */
+@Composable
+@Suppress("FunctionNaming")
+private fun PrepareRetainedAvatarWindow(
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    window: RetainedAvatarWindow,
+) {
     val selected = window.assets.filter { it.isRenderable() }
     LaunchedEffect(window, selected) {
         if (accountRef == null) return@LaunchedEffect
@@ -106,17 +136,6 @@ internal fun rememberRetainedGroupAvatarPreparation(
             }
         }
     }
-    return RetainedGroupAvatarPreparation(
-        PreparedGroupAvatarPixels(
-            accountRef,
-            appState.runtimeGeneration,
-            lifetime,
-            images = window.exactImages(),
-            retained = window.retained,
-            recordLoaded = window::recordLoaded,
-        ),
-        window::select,
-    )
 }
 
 /** One owner retains only its latest measured window, including row loads that outlive preparation. */

@@ -18,6 +18,14 @@
         "test_ids": [
           "CHL-017"
         ]
+      },
+      {
+        "surface": "PrepareRetainedAvatarWindow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "anchor": "fun PrepareRetainedAvatarWindow(",
+        "test_ids": [
+          "CHL-017"
+        ]
       }
     ],
     "source_coverage": [
