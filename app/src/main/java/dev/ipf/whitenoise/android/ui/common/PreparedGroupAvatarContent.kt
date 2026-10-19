@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
@@ -31,15 +33,66 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
     assetForRow: (T) -> AvatarAssetFfi?,
     accountRef: String? = appState.activeAccountRef,
     surfaceIdentity: Any? = null,
+    retainedPreparation: RetainedGroupAvatarPreparation? = null,
     content: @Composable () -> Unit,
 ) {
-    val assets by remember(rows, listState, rowKey, assetForRow) {
+    val window by remember(rows, listState, rowKey, assetForRow) {
         derivedStateOf {
-            visibleGroupAvatarWindow(rows, listState.layoutInfo.visibleItemsInfo.map { it.key }, rowKey)
-                .mapNotNull(assetForRow)
+            val visibleKeys = listState.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
+            val visibleRows = visibleGroupAvatarWindow(rows, visibleKeys, rowKey)
+            VisibleGroupAvatarAssets(
+                assets = visibleRows.mapNotNull(assetForRow),
+                hasVisibleRows = visibleRows.any { rowKey(it) in visibleKeys },
+            )
         }
     }
-    PreparedGroupAvatarContent(appState, assets, accountRef, surfaceIdentity, content)
+    if (retainedPreparation == null) {
+        PreparedGroupAvatarContent(appState, window.assets, accountRef, surfaceIdentity, content)
+    } else {
+        // A returning LazyColumn has no layout yet. Keep its last real viewport until layout restores it.
+        if (window.hasVisibleRows) SideEffect { retainedPreparation.updateVisible(window.assets) }
+        key(accountRef) {
+            CompositionLocalProvider(LocalPreparedGroupAvatarPixels provides retainedPreparation.pixels, content = content)
+        }
+    }
+}
+
+/** The actual row window distinguishes a restored viewport from a not-yet-measured lazy list. */
+private data class VisibleGroupAvatarAssets(
+    val assets: List<AvatarAssetFfi>,
+    val hasVisibleRows: Boolean,
+)
+
+/** Transfers the existing bounded preparation between a shell and its disposable chat-list slot. */
+internal class RetainedGroupAvatarPreparation(
+    val pixels: PreparedGroupAvatarPixels,
+    val updateVisible: (List<AvatarAssetFfi>) -> Unit,
+)
+
+/**
+ * Keeps one list's existing sixteen-image preparation alive during conversation navigation. Replacement
+ * owners get an empty selection; callbacks from an outgoing account/runtime/cache lifetime own only the
+ * retired state. The selected descriptors and pixels are presentation-only and never enter saved state.
+ */
+@Composable
+internal fun rememberRetainedGroupAvatarPreparation(
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    surfaceIdentity: Any,
+): RetainedGroupAvatarPreparation {
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val selected =
+        remember(appState, accountRef, appState.runtimeGeneration, lifetime, surfaceIdentity) {
+            mutableStateOf<List<AvatarAssetFfi>>(emptyList())
+        }
+    val updateVisible =
+        remember(selected) {
+            { assets: List<AvatarAssetFfi> -> selected.value = assets.take(VISIBLE_GROUP_AVATAR_LIMIT).map { it.copy() } }
+        }
+    return RetainedGroupAvatarPreparation(
+        rememberPreparedGroupAvatarPixels(appState, selected.value, accountRef, surfaceIdentity),
+        updateVisible,
+    )
 }
 
 /**
@@ -56,6 +109,21 @@ internal fun PreparedGroupAvatarContent(
     surfaceIdentity: Any? = null,
     content: @Composable () -> Unit,
 ) {
+    val pixels = rememberPreparedGroupAvatarPixels(appState, assets, accountRef, surfaceIdentity)
+    // Pixel owners may be recreated; the stable account key preserves restored editable screen state.
+    key(accountRef) {
+        CompositionLocalProvider(LocalPreparedGroupAvatarPixels provides pixels, content = content)
+    }
+}
+
+/** Shares the same local-only decode stage between mounted surfaces and a retained navigation owner. */
+@Composable
+private fun rememberPreparedGroupAvatarPixels(
+    appState: WhiteNoiseAppState,
+    assets: List<AvatarAssetFfi>,
+    accountRef: String?,
+    surfaceIdentity: Any?,
+): PreparedGroupAvatarPixels {
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val selected =
         assets
@@ -66,14 +134,7 @@ internal fun PreparedGroupAvatarContent(
             .take(VISIBLE_GROUP_AVATAR_LIMIT)
             .toList()
     val preparation = rememberAvatarPixelPreparation(appState, selected, accountRef, lifetime, surfaceIdentity)
-    // Pixel owners may be recreated; the stable account key preserves restored editable screen state.
-    key(accountRef) {
-        CompositionLocalProvider(
-            LocalPreparedGroupAvatarPixels provides
-                PreparedGroupAvatarPixels(accountRef, appState.runtimeGeneration, lifetime, preparation.images),
-            content = content,
-        )
-    }
+    return PreparedGroupAvatarPixels(accountRef, appState.runtimeGeneration, lifetime, preparation.images)
 }
 
 /** The bounded local decode stage is canceled and discarded with its immutable owner/asset keys. */

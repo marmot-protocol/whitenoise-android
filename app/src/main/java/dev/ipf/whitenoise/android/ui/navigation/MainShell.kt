@@ -74,6 +74,7 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
+import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
@@ -366,6 +367,12 @@ internal fun MainShell(
         shellStateHolder.chatsController(
             accountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
+        )
+    val retainedAvatarPreparation =
+        rememberRetainedGroupAvatarPreparation(
+            appState,
+            appState.activeAccountRef,
+            chatsController,
         )
     var quickAccountSwitchTransition by remember {
         mutableStateOf<QuickAccountSwitchTransition?>(null)
@@ -2005,6 +2012,7 @@ internal fun MainShell(
                                 ChatsScreen(
                                     appState = appState,
                                     controller = chatsController,
+                                    retainedAvatarPreparation = retainedAvatarPreparation,
                                     diagnosticsPrompt = {
                                         val chatsSettled =
                                             selectedChat == null &&

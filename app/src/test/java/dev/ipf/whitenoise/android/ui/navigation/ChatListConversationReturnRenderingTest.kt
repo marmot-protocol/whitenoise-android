@@ -14,6 +14,8 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarBytesFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -22,6 +24,7 @@ import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatListWindowHandle
@@ -50,6 +53,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.startCoroutine
 
 /** Layout control through the production Back route; pixel/alpha visibility requires separate qualification. */
 @RunWith(RobolectricTestRunner::class)
@@ -141,7 +148,12 @@ class ChatListConversationReturnRenderingTest {
 }
 
 /** Local authoritative rows and a real conversation controller; no keys, relay, or native persistence. */
-private class ReturnFixture {
+internal class ReturnFixture(
+    avatarAssetForRow: (ChatListRowFfi) -> AvatarAssetFfi? = { null },
+    private val readAvatars: suspend (List<String>) -> List<AvatarBytesFfi> = { emptyList() },
+) {
+    val avatarReads = AtomicInteger()
+    val avatarRequests = AtomicInteger()
     val rows =
         (0..5).map { index ->
             notificationChatListRow().copy(
@@ -155,7 +167,7 @@ private class ReturnFixture {
             )
         }
     val target = rows.last()
-    val activeWindow = ReturnWindow(ChatListViewFfi.CHATS, rows)
+    val activeWindow = ReturnWindow(ChatListViewFfi.CHATS, rows, avatarAssetForRow)
     private val timelines =
         ScriptedConversationLiveSubscriptions(
             listOf(ScriptedConversationTimelineSubscription(emptyTimelinePage())),
@@ -199,6 +211,16 @@ private class ReturnFixture {
                     )
                 "groupDetails" -> groupDetails()
                 "chatListRow" -> rows.first { it.groupIdHex == args?.getOrNull(1) }
+                "readAvatarAssets" -> {
+                    avatarReads.incrementAndGet()
+                    @Suppress("UNCHECKED_CAST")
+                    val references = args!![1] as List<String>
+                    val operation: suspend () -> List<AvatarBytesFfi> = { readAvatars(references) }
+                    @Suppress("UNCHECKED_CAST")
+                    operation.startCoroutine(args.last() as Continuation<List<AvatarBytesFfi>>)
+                    COROUTINE_SUSPENDED
+                }
+                "requestAvatarAssets" -> avatarRequests.incrementAndGet().let { emptyList<AvatarAssetFfi>() }
                 "toString" -> "ChatListReturnRuntime"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === args?.firstOrNull()
@@ -229,16 +251,40 @@ private class ReturnFixture {
 }
 
 /** A complete retained list whose viewport commands do not introduce extra source changes. */
-private class ReturnWindow(
+internal class ReturnWindow(
     view: ChatListViewFfi,
     rows: List<ChatListRowFfi>,
+    private val avatarAssetForRow: (ChatListRowFfi) -> AvatarAssetFfi? = { null },
 ) : ChatListWindowHandle {
-    @Volatile private var frame = MarmotWindowTestFakes.windowSnapshot(view, rows)
+    @Volatile private var frame = window(view, rows)
     private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
+
+    /** Gives selected stored avatars to the real row mapper without substituting a presentation renderer. */
+    private fun window(
+        view: ChatListViewFfi,
+        rows: List<ChatListRowFfi>,
+        sequence: ULong = 0uL,
+    ): ChatListWindowSnapshotFfi {
+        val snapshot = MarmotWindowTestFakes.windowSnapshot(view, rows, sequence)
+        return snapshot.copy(
+            rows =
+                snapshot.rows.map { presented ->
+                    val asset = avatarAssetForRow(presented.row) ?: return@map presented
+                    presented.copy(
+                        avatarAsset = asset,
+                        presentation =
+                            presented.presentation.copy(
+                                avatar =
+                                    SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", presented.row.title),
+                            ),
+                    )
+                },
+        )
+    }
 
     /** Advances the authoritative source together with its stream, so viewport commands cannot undo a promotion. */
     fun replaceRows(rows: List<ChatListRowFfi>) {
-        frame = MarmotWindowTestFakes.windowSnapshot(frame.view, rows, frame.sequence + 1uL)
+        frame = window(frame.view, rows, frame.sequence + 1uL)
         check(updates.trySend(frame).isSuccess)
     }
 

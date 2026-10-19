@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+  "legacy_sha256": "296c90a71f82df7c5969c4c1a1486a39539146b61fd074525485c9533d63da06",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PreparedVisibleGroupAvatarContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "anchor": "fun <T> PreparedVisibleGroupAvatarContent(",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "PreparedGroupAvatarContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "anchor": "fun PreparedGroupAvatarContent(",
+        "test_ids": [
+          "CHL-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Bounded avatar preparation retained across conversation navigation",
+        "anchor": "fun rememberRetainedGroupAvatarPreparation(",
+        "test_ids": [
+          "CHL-017"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt"
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
