@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
+import dev.ipf.whitenoise.android.state.AccountCatchUpResult
 import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import dev.ipf.whitenoise.android.state.SecureStoreKeyProvider
@@ -144,9 +145,7 @@ class PushWakeBookkeepingFailureTest {
     }
 
     /** Invokes the production push-wake admission path without another lifecycle trigger. */
-    private suspend fun launchRejectedPushWake(
-        fixture: NotificationBootstrapTestFixture,
-    ): dev.ipf.whitenoise.android.state.AccountCatchUpResult {
+    private suspend fun launchRejectedPushWake(fixture: NotificationBootstrapTestFixture): AccountCatchUpResult {
         val launch =
             fixture.appState.javaClass
                 .getDeclaredMethod(
