@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
 import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -177,6 +178,35 @@ class IncomingAttachmentAutoDownloadTest {
                 assertTrue(awaitQueued(expected))
                 expected.forEach { assertEquals(1, workInfos(it).size) }
             } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * A receipt whose durable enqueue failed releases its claim, so the other source's duplicate receipt looks the
+     * message up again and queues its slots instead of finding it already handled.
+     */
+    @Test
+    fun aFailedEnqueueLetsADuplicateReceiptScheduleAgain() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory())
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                AttachmentDownloadWorker.uniqueWorkEnqueuer = { _, _, _ -> error("enqueue failed") }
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+                val expected = targetSlots().map { request(it.index) }
+                expected.forEach { assertEquals("nothing queued", 0, queued(it)) }
+
+                AttachmentDownloadWorker.uniqueWorkEnqueuer =
+                    { manager, name, work -> manager.enqueueUniqueWork(name, ExistingWorkPolicy.KEEP, work) }
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                assertTrue(awaitQueued(expected))
+            } finally {
+                AttachmentDownloadWorker.uniqueWorkEnqueuer =
+                    { manager, name, work -> manager.enqueueUniqueWork(name, ExistingWorkPolicy.KEEP, work) }
                 fixture.close()
             }
         }

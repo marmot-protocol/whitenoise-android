@@ -11,6 +11,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.Operation
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -473,6 +474,11 @@ class AttachmentDownloadWorker : CoroutineWorker {
          */
         @Volatile
         internal var receiptSettleExecutor: Executor = Dispatchers.IO.asExecutor()
+
+        /** Queues one automatic spec as KEEP unique work. Tests replace it to fail the enqueue. */
+        @Volatile
+        internal var uniqueWorkEnqueuer: (WorkManager, String, OneTimeWorkRequest) -> Operation =
+            { manager, name, work -> manager.enqueueUniqueWork(name, ExistingWorkPolicy.KEEP, work) }
         private val explicitFence = ExplicitEnqueueFence()
 
         /**
@@ -552,6 +558,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
          * waiting work queued on a narrower network widens it in place, and work of a known [type] queued on a
          * narrowed network is recorded so a later policy can widen it. An explicit request replaces waiting
          * automatic work instead, and on Android 14 or later a visible one runs as a user-initiated job.
+         * [onAutomaticNotQueued] runs when automatic work queues nothing: paused or cancelled by the reader, a
+         * synchronous enqueue failure, or an enqueue operation that completes as failed.
          */
         internal fun enqueue(
             context: Context,
@@ -560,12 +568,14 @@ class AttachmentDownloadWorker : CoroutineWorker {
             userVisible: Boolean = false,
             networkType: NetworkType = NetworkType.CONNECTED,
             type: MediaAutoDownloadType? = null,
+            onAutomaticNotQueued: (() -> Unit)? = null,
         ) {
             val intentStore = attachmentIntentStore(context.applicationContext)
             if (
                 priority == AttachmentDownloadPriority.Automatic &&
                 (intentStore.isAutomaticPaused(request.accountRef) || intentStore.isAutomaticSuppressed(request))
             ) {
+                onAutomaticNotQueued?.invoke()
                 return
             }
             if (priority == AttachmentDownloadPriority.Interactive) {
@@ -585,34 +595,61 @@ class AttachmentDownloadWorker : CoroutineWorker {
             if (priority == AttachmentDownloadPriority.Interactive) {
                 enqueueExplicit(context.applicationContext, request, work, intentStore)
             } else {
-                val manager = WorkManager.getInstance(context.applicationContext)
-                val waits = AutomaticAttachmentNetworkWaits.get(context.applicationContext)
-                // Registered before the enqueue, so no window leaves a narrowed spec without a record to widen.
-                val registration =
-                    type?.let {
-                        runCatching { waits.register(request, it, networkType) }
-                            .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
-                            .getOrDefault(AutomaticAttachmentNetworkWaits.Registration.Failed)
-                    }
-                val registered = registration == AutomaticAttachmentNetworkWaits.Registration.Created
-                // Narrowed work whose record could not be saved is queued on any network instead: its run re-checks
-                // the live policy and narrows itself through the registry, so it can never wait without a record.
-                val queued =
-                    if (registration == AutomaticAttachmentNetworkWaits.Registration.Failed) {
-                        buildRequest(request, priority, networkType = NetworkType.CONNECTED)
-                    } else {
-                        work
-                    }
-                runCatching {
-                    manager.enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.KEEP, queued)
-                }.onSuccess { operation ->
-                    val settle = Runnable { settleReceipt(waits, manager, request, type, networkType) }
-                    operation.result.addListener(settle, receiptSettleExecutor)
-                }.onFailure {
-                    if (registered) runCatching { waits.forget(request) }
-                    Log.w(TAG, "attachment_download_enqueue_failed")
-                }
+                enqueueAutomatic(context, request, priority, networkType, type, onAutomaticNotQueued)
             }
+        }
+
+        /**
+         * Queues [request] as KEEP automatic work on [networkType], registering a narrowed wait first and settling
+         * the kept spec once the enqueue completes. [onAutomaticNotQueued] runs when nothing was queued.
+         */
+        @Suppress("LongParameterList") // The same inputs [enqueue] received for the automatic branch.
+        private fun enqueueAutomatic(
+            context: Context,
+            request: AttachmentTransferRequest,
+            priority: AttachmentDownloadPriority,
+            networkType: NetworkType,
+            type: MediaAutoDownloadType?,
+            onAutomaticNotQueued: (() -> Unit)?,
+        ) {
+            val work = buildRequest(request, priority, networkType = networkType)
+            val manager = WorkManager.getInstance(context.applicationContext)
+            val waits = AutomaticAttachmentNetworkWaits.get(context.applicationContext)
+            // Registered before the enqueue, so no window leaves a narrowed spec without a record to widen.
+            val registration =
+                type?.let {
+                    runCatching { waits.register(request, it, networkType) }
+                        .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
+                        .getOrDefault(AutomaticAttachmentNetworkWaits.Registration.Failed)
+                }
+            val registered = registration == AutomaticAttachmentNetworkWaits.Registration.Created
+            // Narrowed work whose record could not be saved is queued on any network instead: its run re-checks
+            // the live policy and narrows itself through the registry, so it can never wait without a record.
+            val queued =
+                if (registration == AutomaticAttachmentNetworkWaits.Registration.Failed) {
+                    buildRequest(request, priority, networkType = NetworkType.CONNECTED)
+                } else {
+                    work
+                }
+            val notQueued = {
+                if (registered) runCatching { waits.forget(request) }
+                onAutomaticNotQueued?.invoke()
+                Log.w(TAG, "attachment_download_enqueue_failed")
+            }
+            runCatching {
+                uniqueWorkEnqueuer(manager, attachmentDownloadWorkName(request), queued)
+            }.onSuccess { operation ->
+                // A failed operation queued nothing, so it withdraws like a synchronous failure instead of settling.
+                val settle =
+                    Runnable {
+                        if (runCatching { operation.result.get() }.isFailure) {
+                            notQueued()
+                        } else {
+                            settleReceipt(waits, manager, request, type, networkType)
+                        }
+                    }
+                operation.result.addListener(settle, receiptSettleExecutor)
+            }.onFailure { notQueued() }
         }
 
         /**

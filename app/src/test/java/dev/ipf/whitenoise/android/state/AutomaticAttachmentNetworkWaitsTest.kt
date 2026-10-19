@@ -1,16 +1,22 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
 import androidx.work.NetworkType
+import androidx.work.Operation
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import org.junit.After
@@ -50,6 +56,8 @@ class AutomaticAttachmentNetworkWaitsTest {
     fun tearDown() {
         AutomaticAttachmentNetworkWaits.installForTest(null)
         AutomaticAttachmentNetworkWaits.policyNetworkType = null
+        AttachmentDownloadWorker.uniqueWorkEnqueuer =
+            { manager, name, work -> manager.enqueueUniqueWork(name, ExistingWorkPolicy.KEEP, work) }
         AttachmentDownloadWorker.receiptSettleExecutor = Dispatchers.IO.asExecutor()
         settles.shutdown()
     }
@@ -428,6 +436,75 @@ class AutomaticAttachmentNetworkWaitsTest {
             held.started.countDown()
             held.release.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             return Result.retry()
+        }
+    }
+
+    /**
+     * A narrowing whose wait record cannot be saved keeps the wider spec, so no job ever waits on Wi-Fi without a
+     * record; once the store recovers, a later narrowing records it and a widened policy can find and widen it.
+     */
+    @Test
+    fun aFailedNarrowingWriteKeepsTheWideSpecUntilTheStoreRecovers() {
+        val store = FlakyStore()
+        val flaky = AutomaticAttachmentNetworkWaits(store)
+        AutomaticAttachmentNetworkWaits.installForTest(flaky)
+        receipt(NetworkType.CONNECTED)
+        val id = single().id
+
+        store.failing = true
+        flaky.narrow(manager(), request, IMAGE, id, captured = NetworkType.UNMETERED)
+        assertEquals("the wide spec is kept", NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+
+        store.failing = false
+        flaky.narrow(manager(), request, IMAGE, id, captured = NetworkType.UNMETERED)
+        assertEquals(NetworkType.UNMETERED, single().constraints.requiredNetworkType)
+        assertEquals(1, flaky.widen(manager(), ACCOUNT) { NetworkType.CONNECTED })
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+    }
+
+    /** A synchronous enqueue failure, and an operation that completes as failed, both report nothing was queued. */
+    @Test
+    fun aFailedEnqueueReportsThatNothingWasQueued() {
+        var notQueued = 0
+        AttachmentDownloadWorker.uniqueWorkEnqueuer = { _, _, _ -> error("enqueue failed") }
+        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE) {
+            notQueued += 1
+        }
+        assertEquals(1, notQueued)
+
+        AttachmentDownloadWorker.uniqueWorkEnqueuer = { _, _, _ -> FailedOperation() }
+        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE) {
+            notQueued += 1
+        }
+        settles.awaitCompleted(++enqueued)
+        assertEquals(2, notQueued)
+        assertTrue("a withdrawn registration leaves no record", waits.waiting(ACCOUNT).isEmpty())
+    }
+
+    /** A sealed store whose durable writes can be made to fail. */
+    private class FlakyStore : AttachmentInstallerHandoffRecordStore {
+        var failing = false
+        private val delegate = VolatileAttachmentInstallerHandoffRecordStore()
+
+        /** Reads the current records. */
+        override fun readAll(): Map<String, String> = delegate.readAll()
+
+        /** Saves [values] unless writes are failing. */
+        override fun replaceAllDurably(values: Map<String, String>): Boolean {
+            if (failing) return false
+            return delegate.replaceAllDurably(values)
+        }
+    }
+
+    /** An enqueue operation that completes as failed. */
+    private class FailedOperation : Operation {
+        /** Never observed by the enqueue path. */
+        override fun getState(): LiveData<Operation.State> = MutableLiveData()
+
+        /** Completes with the enqueue failure. */
+        override fun getResult(): ListenableFuture<Operation.State.SUCCESS> {
+            val failure = IllegalStateException("enqueue failed")
+            return Futures.immediateFailedFuture(failure)
         }
     }
 

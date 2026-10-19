@@ -4881,21 +4881,32 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Persists durable work and promotes explicit requests above automatic-download policy. Automatic work waits
-     * for [networkType], the narrowest network its policy could allow it on.
+     * for [networkType], the narrowest network its policy could allow it on, and [onAutomaticNotQueued] runs when
+     * automatic work queues nothing, so a receipt can release its claim and be scheduled again.
      */
     internal fun enqueueAttachmentDownload(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
         networkType: NetworkType = NetworkType.CONNECTED,
         type: MediaAutoDownloadType? = null,
+        onAutomaticNotQueued: (() -> Unit)? = null,
     ) {
         if (priority == AttachmentDownloadPriority.Interactive) {
             attachmentDownloadIntents.setInteractive(request, interactive = true)
             attachmentDownloadGate.promote(request.cacheKey())
         } else if (attachmentDownloadIntents.isAutomaticSuppressed(request)) {
+            onAutomaticNotQueued?.invoke()
             return
         }
-        AttachmentDownloadWorker.enqueue(appContext, request, priority, appInForeground, networkType, type)
+        AttachmentDownloadWorker.enqueue(
+            appContext,
+            request,
+            priority,
+            appInForeground,
+            networkType,
+            type,
+            onAutomaticNotQueued,
+        )
     }
 
     /** Clears a completed foreground request without changing its automatic-download policy. */
@@ -11623,8 +11634,16 @@ class WhiteNoiseAppState private constructor(
                 Log.w(INCOMING_ATTACHMENT_TAG, "attachment_receipt_lookup_failed type=${it.javaClass.simpleName}")
             }.getOrNull() ?: return
         val (eligible, held) = lookup.attachments.partition { it.type in wanted }
+        // A slot whose durable enqueue fails, now or when its operation completes, releases the claim, so the other
+        // source or a later receipt schedules it again rather than finding the message already handled.
+        val releaseClaim = { receiptClaims.release(accountRef, messageIdHex) }
         eligible.forEach {
-            enqueueAttachmentDownload(it.request, networkType = policy.networkType(it.type), type = it.type)
+            enqueueAttachmentDownload(
+                it.request,
+                networkType = policy.networkType(it.type),
+                type = it.type,
+                onAutomaticNotQueued = releaseClaim,
+            )
         }
         // The claim only stands for a lookup that settled every slot. A held type, or a read the budget cut short,
         // leaves work a later receipt may still schedule once the policy allows it, so that receipt must look again.

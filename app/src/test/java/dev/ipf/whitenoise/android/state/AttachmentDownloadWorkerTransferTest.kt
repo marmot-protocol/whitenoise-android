@@ -47,12 +47,17 @@ class AttachmentDownloadWorkerTransferTest {
         appContext = application.applicationContext
         WorkManagerTestInitHelper.initializeTestWorkManager(application)
         AttachmentTransfers.installForTest(ledger)
+        // The Keystore-sealed registry cannot save under Robolectric, and a narrowing needs its wait recorded.
+        AutomaticAttachmentNetworkWaits.installForTest(
+            AutomaticAttachmentNetworkWaits(VolatileAttachmentInstallerHandoffRecordStore()),
+        )
     }
 
     /** Restores the inert ledger so later tests never see this one. */
     @After
     fun tearDown() {
         AttachmentTransfers.installForTest(null)
+        AutomaticAttachmentNetworkWaits.installForTest(null)
     }
 
     /** The endings recorded so far as outcome labels, in order. */

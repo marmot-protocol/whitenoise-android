@@ -55,16 +55,19 @@ internal class AutomaticAttachmentNetworkWaits(
         val registeredAtMs: Long = 0L,
     )
 
-    /** Records [request] as automatic work of [type] waiting on [networkType], or forgets it on any network. */
+    /**
+     * Records [request] as automatic work of [type] waiting on [networkType], or forgets it on any network. Returns
+     * whether the sealed record was saved, so a caller never narrows a spec whose wait a later sweep could not find.
+     */
     fun record(
         request: AttachmentTransferRequest,
         type: MediaAutoDownloadType,
         networkType: NetworkType,
         nowMs: Long = System.currentTimeMillis(),
-    ) {
+    ): Boolean {
         if (networkType == NetworkType.CONNECTED) return forget(request)
         val name = attachmentDownloadWorkName(request)
-        update { current ->
+        return update { current ->
             val since = current[name]?.let(::decode)?.registeredAtMs ?: nowMs
             current + (name to encode(Wait(request, type, networkType, since)))
         }
@@ -117,9 +120,9 @@ internal class AutomaticAttachmentNetworkWaits(
     }
 
     /** Drops [request]'s record, once its work finished or no longer waits on a narrowed network. */
-    fun forget(request: AttachmentTransferRequest) {
+    fun forget(request: AttachmentTransferRequest): Boolean {
         val name = attachmentDownloadWorkName(request)
-        update { if (name in it) it - name else it }
+        return update { if (name in it) it - name else it }
     }
 
     /** The recorded waits for [accountRef]. */
@@ -254,9 +257,13 @@ internal class AutomaticAttachmentNetworkWaits(
                 update()
                 if (type != null) forget(request)
             } else {
-                // Recorded before the update, so any sweep that follows this lock always finds the narrowed wait.
-                if (type != null) record(request, type, target)
-                update()
+                // Recorded before the update, so any sweep that follows this lock always finds the narrowed wait. A
+                // record that could not be saved keeps the wider spec, which a later run narrows again once it can.
+                if (type == null || record(request, type, target)) {
+                    update()
+                } else {
+                    Log.w(TAG, "attachment_network_narrowing_unsaved")
+                }
             }
         }
     }
