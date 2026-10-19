@@ -442,11 +442,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             withContext(Dispatchers.Main.immediate) { requireNotNull(state).setAppInForeground(false) }
             val backoffEnds = manifest.getLong("stopped_at_ms") + AttachmentDownloadWorker.BACKOFF_SECONDS * 1_000L
             val marginMillis = backoffEnds - System.currentTimeMillis()
-            withTimeout(RESUME_TIMEOUT_MILLIS) {
-                while (manager.getWorkInfosForUniqueWork(name).get().none { it.state == WorkInfo.State.SUCCEEDED }) {
-                    delay(50L)
-                }
-            }
+            awaitResumedWork(receiver, request)
             val visible = visibleActivities()
             assertEquals("an Activity came to the foreground", 0, visible)
             requireNotNull(state).openNativeAttachment(request).use { local ->
@@ -467,6 +463,25 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             )
         } finally {
             cleanUp()
+        }
+    }
+
+    /** Waits for the stopped owner without changing its deadline, retaining closed state evidence on a timeout. */
+    private suspend fun awaitResumedWork(
+        receiver: AccountSummaryFfi,
+        request: AttachmentTransferRequest,
+    ) {
+        val manager = WorkManager.getInstance(context)
+        val name = attachmentDownloadWorkName(request)
+        try {
+            withTimeout(RESUME_TIMEOUT_MILLIS) {
+                while (manager.getWorkInfosForUniqueWork(name).get().none { it.state == WorkInfo.State.SUCCEEDED }) {
+                    delay(50L)
+                }
+            }
+        } catch (stalled: kotlinx.coroutines.TimeoutCancellationException) {
+            reportStall(context, requireNotNull(state), requireNotNull(marmot), receiver, request.groupIdHex, listOf(request))
+            throw stalled
         }
     }
 

@@ -4,6 +4,7 @@ stay in the report."""
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 import threading
 import time
@@ -14,7 +15,7 @@ from budget_checker import PROFILES
 from device_runner import APP, adb_command
 from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
-from media_lifecycle_runner import metrics_of, passed
+from media_lifecycle_runner import failure_kind, metrics_of, passed
 from background_receipt_checker import check_background_receipt
 
 TEST = ("dev.ipf.whitenoise.android.media.IncomingAttachmentBackgroundDownloadAndroidTest"
@@ -37,6 +38,17 @@ def instrument(adb, serial, ports, stage, session):
     ]
     return subprocess.run(command, check=False, capture_output=True, text=True,
                           timeout=INSTRUMENT_TIMEOUT_SECONDS).stdout
+
+
+def failure_diagnostics(output):
+    """Keep a closed failure category and allowlisted fixture line numbers, never stack messages or identities."""
+    frames = re.findall(
+        r"^\s*at dev\.ipf\.whitenoise\.android\.media\."
+        r"IncomingAttachmentBackgroundDownloadAndroidTest(?:\$[\w$]+)?\.[\w$]+"
+        r"\(IncomingAttachmentBackgroundDownloadAndroidTest\.kt:(\d{1,5})\)$",
+        output, re.MULTILINE,
+    )
+    return {"kind": failure_kind(output), "fixture_lines": sorted({int(line) for line in frames})[:6]}
 
 
 def ended_abruptly(output):
@@ -97,7 +109,9 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         report["metrics"] += metrics_of(main_output)
         report["process_ended_abruptly"] = ended_abruptly(main_output)
         report["stages"].append({"stage": "main", "passed": report["process_ended_abruptly"],
-                                 "instrumentation": result_lines(main_output)})
+                                 "instrumentation": result_lines(main_output),
+                                 "failure": (None if report["process_ended_abruptly"]
+                                             else failure_diagnostics(main_output))})
         if report["process_ended_abruptly"]:
             release_held_body(server)
             report["interrupted_acquisition_ended"] = await_held_disconnect(server, start)
@@ -105,7 +119,8 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
                 resume_output = instrument(adb, serial, ports, "resume", session)
                 report["metrics"] += metrics_of(resume_output)
                 report["stages"].append({"stage": "resume", "passed": passed(resume_output),
-                                         "instrumentation": result_lines(resume_output)})
+                                         "instrumentation": result_lines(resume_output),
+                                         "failure": None if passed(resume_output) else failure_diagnostics(resume_output)})
             else:
                 # A resume that overlapped the still-open interrupted request would contaminate the restart
                 # experiment, so the attempt stops here and keeps its failed report.

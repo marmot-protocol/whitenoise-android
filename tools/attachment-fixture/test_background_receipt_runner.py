@@ -58,6 +58,26 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
             self.assertFalse(runner.ended_abruptly(crash))
 
 
+    def test_failure_diagnostics_retains_only_a_category_and_fixture_line_numbers(self):
+        """A failed resume names its source assertion without retaining exception text, accounts or foreign frames."""
+        output = (
+            "INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: private-account\n"
+            "    at dev.ipf.whitenoise.android.media.IncomingAttachmentBackgroundDownloadAndroidTest"
+            "$runResume$2.invokeSuspend(IncomingAttachmentBackgroundDownloadAndroidTest.kt:445)\n"
+            "    at dev.ipf.whitenoise.android.media.IncomingAttachmentBackgroundDownloadAndroidTest"
+            ".runResume(IncomingAttachmentBackgroundDownloadAndroidTest.kt:447)\n"
+            "    at private.Account.read(Private.kt:123)\n"
+            "INSTRUMENTATION_RESULT: stream=private-account\nINSTRUMENTATION_CODE: -1\n"
+        )
+        diagnostic = runner.failure_diagnostics(output)
+        self.assertEqual({"kind": "timeout", "fixture_lines": [445, 447]}, diagnostic)
+        self.assertNotIn("private", json.dumps(diagnostic))
+
+    def test_failure_diagnostics_does_not_infer_a_reason_without_a_stack_header(self):
+        """A timeout mentioned in arbitrary output cannot stand in for the instrumentation's real exception."""
+        diagnostic = runner.failure_diagnostics("private text says TimeoutException\nINSTRUMENTATION_CODE: -1\n")
+        self.assertEqual({"kind": "instrumentation-failure", "fixture_lines": []}, diagnostic)
+
     def test_only_the_held_request_ending_releases_the_hand_off(self):
         """An unrelated disconnect after the stop does not end the wait; the held request's own disconnect does."""
         events = [
