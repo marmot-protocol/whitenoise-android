@@ -480,7 +480,14 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 }
             }
         } catch (stalled: kotlinx.coroutines.TimeoutCancellationException) {
-            reportStall(context, requireNotNull(state), requireNotNull(marmot), receiver, request.groupIdHex, listOf(request))
+            reportStall(
+                context,
+                requireNotNull(state),
+                requireNotNull(marmot),
+                receiver,
+                request.groupIdHex,
+                listOf(request),
+            )
             throw stalled
         }
     }
