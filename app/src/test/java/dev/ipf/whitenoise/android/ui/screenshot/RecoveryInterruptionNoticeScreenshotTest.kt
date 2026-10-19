@@ -111,6 +111,7 @@ class RecoveryInterruptionNoticeScreenshotTest {
         }
         composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/recovery_interruption_$suffix.png")
         try {
             composeRule.onNodeWithText(message).assertIsDisplayed()
             composeRule.onNodeWithContentDescription(context.getString(R.string.dismiss)).assertIsDisplayed()
@@ -122,7 +123,6 @@ class RecoveryInterruptionNoticeScreenshotTest {
             )
             throw failure
         }
-        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/recovery_interruption_$suffix.png")
     }
 
     private companion object {

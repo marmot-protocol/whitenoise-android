@@ -3541,6 +3541,18 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+      "symbol": "ConfirmEmojiRemoval",
+      "bindings": [],
+      "remaining": "Removal confirmation requires direct rendered coverage. Opening the dialog must expose its controls. Exercise Cancel and verify retained artwork, then exercise Remove and verify its dispatch. The current destination case stops before this dialog."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+      "symbol": "StagedEmojiDialog",
+      "bindings": [],
+      "remaining": "The staged-selection wrapper requires direct rendered coverage. Exercise dismissal, then verify accepted save dispatch. Current presentation fixtures render CustomEmojiNameDialog directly. They leave wrapper behavior and persistence unproven."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
       "symbol": "DataUsageScreen",
       "bindings": [
