@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.notifications
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 
+private const val NOTIFICATION_TAG_LOG_LENGTH = 16
+
 /**
  * Runs optional card-picture work inline or through the presenter's existing process-owned launcher.
  *
@@ -46,7 +48,7 @@ internal class NotificationEnrichmentRunner(
                     throw cancellation
                 } catch (failure: Exception) {
                     notificationDebug {
-                        "enrichment failed tag=${showToken.notificationTag.take(16)} " +
+                        "enrichment failed tag=${showToken.notificationTag.take(NOTIFICATION_TAG_LOG_LENGTH)} " +
                             "type=${failure.javaClass.simpleName}"
                     }
                 } finally {
@@ -59,7 +61,7 @@ internal class NotificationEnrichmentRunner(
         } catch (failure: RuntimeException) {
             releaseShowReferenceOnce()
             notificationDebug {
-                "enrichment launch failed tag=${showToken.notificationTag.take(16)} " +
+                "enrichment launch failed tag=${showToken.notificationTag.take(NOTIFICATION_TAG_LOG_LENGTH)} " +
                     "type=${failure.javaClass.simpleName}"
             }
         }
