@@ -133,7 +133,10 @@ class MediaImageBubbleLatencyTest {
                     }
                 }
             }
-            composeRule.waitUntil(10_000) { transport.animations.size == 1 }
+            composeRule.waitUntil(10_000) {
+                composeRule.waitForIdle()
+                transport.animations.size == 1
+            }
             composeRule.runOnIdle {
                 assertTrue(transport.animations.single().isRunning)
                 assertEquals(0, fixture.calls.size)
@@ -144,7 +147,11 @@ class MediaImageBubbleLatencyTest {
                 assertTrue(!transport.animations.single().isRunning)
                 shown = true
             }
-            composeRule.waitUntil(10_000) { transport.animations.size == 2 }
+            awaitLoaded()
+            composeRule.waitUntil(10_000) {
+                composeRule.waitForIdle()
+                transport.animations.size == 2
+            }
             composeRule.runOnIdle {
                 assertTrue(transport.animations.last().isRunning)
                 assertEquals(0, fixture.calls.size)
