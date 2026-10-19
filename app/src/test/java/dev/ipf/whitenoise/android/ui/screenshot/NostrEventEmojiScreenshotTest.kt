@@ -66,6 +66,7 @@ class NostrEventEmojiScreenshotTest {
         )
     }
 
+    /** Captures the event card and reader with emoji artwork under one theme, direction and parse state. */
     private fun capture(
         dark: Boolean,
         rtl: Boolean,
@@ -95,7 +96,6 @@ class NostrEventEmojiScreenshotTest {
                             )
                             NostrEventReaderScreen(
                                 card = card("Reader $CODES"),
-                                authoredReference = "nevent1fixture",
                                 document = if (parsed) bodyDocument() else null,
                                 parsing = false,
                                 authorDisplayName = { CODES },
