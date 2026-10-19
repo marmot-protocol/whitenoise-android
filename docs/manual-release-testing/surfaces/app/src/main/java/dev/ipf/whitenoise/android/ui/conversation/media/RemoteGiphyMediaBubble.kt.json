@@ -1,0 +1,84 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+  "legacy_sha256": "6fdff0d65fe1dfd78a00c3b2963bc6f0c54be6d0c276f9c3b34c925e1b9bddc0",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RemoteGiphyMediaBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RemoteGiphyMediaBubble(",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "RemoteGiphyMediaCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RemoteGiphyMediaCard(",
+        "test_ids": [
+          "MED-021",
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "GIPHY attribution and message metadata footer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "MessageInlineFooter(",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "GiphyCardFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun GiphyCardFooter(",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "RowScope.GiphyMetadataRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "fun RowScope.GiphyMetadataRow(",
+        "test_ids": [
+          "MED-021"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "R.string.giphy_attribution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.giphy_attribution",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "R.string.media_tap_to_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "R.string.media_tap_to_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "R.string.media_tap_to_retry",
+        "test_ids": [
+          "MED-021"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

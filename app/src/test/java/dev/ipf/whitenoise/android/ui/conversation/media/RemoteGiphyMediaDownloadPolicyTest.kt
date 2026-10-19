@@ -62,6 +62,23 @@ class RemoteGiphyMediaDownloadPolicyTest {
         )
     }
 
+    /** Cached/manual download permission does not override the independent global playback pause. */
+    @Test
+    fun cachedOrManuallyLoadedMediaStaysStillWhilePlaybackIsPaused() {
+        assertTrue(shouldLoadRemoteGiphyMedia(true, false, true, cachedAvailable = true))
+        assertFalse(inlineAnimationEligible(false, true, true, true, true, true))
+    }
+
+    /** Each eligibility input independently withdraws a row's animation grant. */
+    @Test
+    fun inlinePlaybackNeedsEveryMotionAndLifetimeGate() {
+        assertTrue(inlineAnimationEligible(true, true, true, true, true, true))
+        for (missing in 0 until 6) {
+            val flags = BooleanArray(6) { it != missing }
+            assertFalse(inlineAnimationEligible(flags[0], flags[1], flags[2], flags[3], flags[4], flags[5]))
+        }
+    }
+
     @Test
     fun byteCacheRetainsRecentMediaAndEvictsLeastRecentlyUsedBytes() {
         val cache = RemoteGiphyByteCache(maxBytes = 5)
