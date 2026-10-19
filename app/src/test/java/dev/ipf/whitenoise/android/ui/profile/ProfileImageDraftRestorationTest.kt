@@ -37,6 +37,38 @@ class ProfileImageDraftRestorationTest {
         exercise(edited = ProfileImageTarget.Picture, resetEdit = true)
     }
 
+    @Test fun restoredDraftWithACacheMissRefreshesOnlyUntouchedFields() {
+        val locked = mutableStateOf(false)
+        val native = mutableStateOf<String?>("picture-A")
+        var visible = ProfileImageDrafts()
+        var remove: (() -> Unit)? = null
+        composeRule.setContent {
+            val protected = rememberProtectedShellSavedState("account", 1, suspended = locked.value)
+            if (!locked.value) {
+                protected.holder.SaveableStateProvider(protected.key) {
+                    var images by rememberProfileImageDrafts("account", native.value, native.value)
+                    remove = { images = images.without(ProfileImageTarget.Picture) }
+                    visible = images
+                }
+            }
+        }
+        composeRule.runOnIdle { checkNotNull(remove).invoke() }
+        composeRule.runOnIdle { locked.value = true }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            native.value = null
+            locked.value = false
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { native.value = "picture-B" }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals("", visible.picture)
+            assertEquals("picture-B", visible.banner)
+            assertEquals("picture-B", visible.baselinePicture)
+        }
+    }
+
     private fun exercise(
         edited: ProfileImageTarget? = null,
         settleEdit: Boolean = false,
@@ -50,7 +82,7 @@ class ProfileImageDraftRestorationTest {
         var settle: (() -> Unit)? = null
         var reset: (() -> Unit)? = null
         composeRule.setContent {
-            val protected = rememberProtectedShellSavedState("account", 1)
+            val protected = rememberProtectedShellSavedState("account", 1, suspended = locked.value)
             if (!locked.value) {
                 protected.holder.SaveableStateProvider(protected.key) {
                     var images by rememberProfileImageDrafts("account", nativePicture.value, nativeBanner.value)

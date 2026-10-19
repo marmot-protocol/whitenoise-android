@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -20,6 +21,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -95,7 +98,7 @@ class RecoveryInterruptionNoticeScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
-                    Surface(modifier = Modifier.width(if (largeRtl) 320.dp else 360.dp)) {
+                    Surface(modifier = Modifier.width(if (largeRtl) 320.dp else 360.dp).height(780.dp)) {
                         Box(Modifier.fillMaxSize()) {
                             WhiteNoiseSnackbarHost(
                                 hostState = host,
@@ -106,9 +109,19 @@ class RecoveryInterruptionNoticeScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithText(message).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.dismiss)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.copy)).assertDoesNotExist()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        try {
+            composeRule.onNodeWithText(message).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.dismiss)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.copy)).assertDoesNotExist()
+        } catch (failure: AssertionError) {
+            println("Merged recovery notice semantics:\n${composeRule.onRoot().printToString()}")
+            println(
+                "Unmerged recovery notice semantics:\n${composeRule.onRoot(useUnmergedTree = true).printToString()}",
+            )
+            throw failure
+        }
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/recovery_interruption_$suffix.png")
     }
 

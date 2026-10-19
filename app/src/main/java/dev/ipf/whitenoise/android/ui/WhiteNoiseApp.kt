@@ -220,7 +220,6 @@ internal fun WhiteNoiseApp(
     onAppUpdateTapHandled: (Int) -> Unit = {},
     onRequestAppUnlock: () -> Unit = {},
 ) {
-    val protectedShell = rememberProtectedShellSavedState(appState.activeAccountRef, appState.runtimeGeneration)
     SideEffect {
         mainShellStateHolder.pendingCameraCaptureFiles.retainOwner(
             "${appState.runtimeGeneration}:${appState.activeAccountRef}",
@@ -314,6 +313,25 @@ internal fun WhiteNoiseApp(
             activeAccountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
             appLockScreenVisible = appState.appLockScreenVisible,
+        )
+    val protectedFirstUsefulSurface =
+        warmResumeFirstUsefulSurface(
+            appLockScreenVisible = false,
+            inboundRoutePending = inboundRoutePending || notificationRouteOwnsShell,
+            shellReady = firstUsefulFrameReady,
+        )
+    val protectedPhaseReady =
+        appState.phase == AppPhase.Ready &&
+            appState.accountSetup.controller == null &&
+            appState.profileSignUpForPresentation == null
+    val protectedStartupVisible =
+        inboundProfilePayload != null ||
+            !shouldComposeProtectedMainShell(protectedFirstUsefulSurface)
+    val protectedShell =
+        rememberProtectedShellSavedState(
+            appState.activeAccountRef,
+            appState.runtimeGeneration,
+            suspended = appState.appLockScreenVisible || !protectedPhaseReady || protectedStartupVisible,
         )
     val lockDecision =
         when {
@@ -593,12 +611,7 @@ internal fun WhiteNoiseApp(
                                         WarmResumeUsefulSurface { OnboardingScreen(appState) }
                                     }
                                 AppPhase.Ready -> {
-                                    val firstUsefulSurface =
-                                        warmResumeFirstUsefulSurface(
-                                            appLockScreenVisible = false,
-                                            inboundRoutePending = inboundRoutePending || notificationRouteOwnsShell,
-                                            shellReady = firstUsefulFrameReady,
-                                        )
+                                    val firstUsefulSurface = protectedFirstUsefulSurface
                                     LaunchedEffect(firstUsefulSurface, warmResumeTraceToken, warmResumeEpoch) {
                                         val foregroundCanRecord =
                                             !firstUsefulFrameRecorded && warmResumeEpoch > 0

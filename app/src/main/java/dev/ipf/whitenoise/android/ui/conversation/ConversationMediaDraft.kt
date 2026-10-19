@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStager
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
@@ -231,14 +232,11 @@ internal class ConversationMediaDraftState(
         appState.launchMutation {
             try {
                 val result =
-                    committer.commit(
-                        accountRef = accountRef,
-                        groupIdHex = controller.group.groupIdHex,
-                        currentAttachment = photo.attachment,
-                        expectedDigest = photo.attachmentDigest,
-                        sourceLeaseId = photo.sourceLeaseId,
-                        recipe = photo.recipe,
-                        quality = quality,
+                    committer.commitPhoto(
+                        accountRef,
+                        controller.group.groupIdHex,
+                        photo,
+                        DraftPhotoEdit(photo.recipe, quality),
                     )
                 if (result is PhotoEditorCommitResult.Success) {
                     val updated =
@@ -305,14 +303,11 @@ internal class ConversationMediaDraftState(
             }
             when (
                 val result =
-                    committer.commit(
-                        accountRef = accountRef,
-                        groupIdHex = controller.group.groupIdHex,
-                        currentAttachment = editor.photo.attachment,
-                        expectedDigest = editor.photo.attachmentDigest,
-                        sourceLeaseId = editor.photo.sourceLeaseId,
-                        recipe = recipe,
-                        quality = quality,
+                    committer.commitPhoto(
+                        accountRef,
+                        controller.group.groupIdHex,
+                        editor.photo,
+                        DraftPhotoEdit(recipe, quality),
                     )
             ) {
                 is PhotoEditorCommitResult.Success -> {
@@ -340,10 +335,7 @@ internal class ConversationMediaDraftState(
             preparedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() }
 
     /** Returns native-owned document bytes in the URI order used by the shelf. */
-    fun preparedDocumentAttachments(): Map<Uri, PendingAttachment> {
-        val documents = preparedDocuments
-        return documents.mapValues { (_, document) -> document.pendingAttachment() }
-    }
+    fun preparedDocumentAttachments() = preparedDocuments.mapValues { (_, document) -> document.pendingAttachment() }
 
     /**
      * Captures picker occurrences and explicit edits for a later durable send completion. Background
@@ -442,26 +434,17 @@ internal class ConversationMediaDraftState(
             // Reconcile against picks/removals made while the native read was suspended.
             // A later change during materialization still invalidates the publication below.
             val version = requested.copy(inputsRevision = inputsRevision)
-            val nativeIds = attachments.mapTo(mutableSetOf()) { it.id }
-            // Only bytes restored from native state are reconciled away. Freshly
-            // prepared picker occurrences survive an older send's cleanup.
-            val removedPhotos = restoredPhotosMissingFrom(currentSlots, preparedPhotos, backedPhotos, nativeIds)
-            val removedDocuments =
-                restoredDocumentsMissingFrom(currentDocumentUris, preparedDocuments, nativeIds)
-            val retainedSlots = currentSlots.filterNot { it.id in removedPhotos }
-            val retainedDocuments = currentDocumentUris.filterNot { it in removedDocuments }
-            val reconciliation =
-                reconcilePersistedDraftAttachments(
-                    accountRef = accountRef,
-                    groupIdHex = controller.group.groupIdHex,
-                    mediaSlotIds = retainedSlots.map(PendingMediaSlot::id),
-                    documentUriStrings = retainedDocuments.map(Uri::toString),
-                    attachments = attachments,
-                    removedAttachmentIds = removedDraftAttachmentIds(accountRef),
+            val plan =
+                planDraftRestoration(
+                    restorationInputs(),
+                    accountRef,
+                    controller.group.groupIdHex,
+                    attachments,
+                    removedDraftAttachmentIds(accountRef),
                 )
             val materialized =
                 withContext(Dispatchers.IO) {
-                    reconciliation.unmatched.mapNotNull { attachment ->
+                    plan.reconciliation.unmatched.mapNotNull { attachment ->
                         materializeDraftAttachment(context, attachment)?.let { attachment to it }
                     }
                 }
@@ -479,50 +462,31 @@ internal class ConversationMediaDraftState(
             // The caller applies the result on the main thread without another suspension.
             if (!canPublish()) return@withLock null
             restoredDraftRevision = version
-            val restoredPhotos =
-                nativePhotosNeedingRestoration(reconciliation.mediaBySlotId, backedPhotos.keys, preparedPhotos)
-            preparedPhotos =
-                preparedPhotos.filterKeys { it !in removedPhotos } +
-                restoredPhotos.mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
-            preparedDocuments =
-                preparedDocuments.filterKeys { it !in removedDocuments } +
-                nativeDocumentsNeedingRestoration(reconciliation.documentsByUriString, preparedDocuments)
-                    .mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
-            activeEditor?.takeIf { it.slot.id in removedPhotos }?.let(::dismissEditor)
-            backedPhotos = backedPhotos.filterKeys { it !in removedPhotos }
-            nonEditableDescriptions = nonEditableDescriptions.filterKeys { it !in removedPhotos }
-            restoredPhotos.forEach { (slotId, attachment) ->
-                if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
-                    nonEditableDescriptions += slotId to messages.sourceUnavailable
-                }
-            }
-            val media = retainedSlots.toMutableList()
-            val documents = retainedDocuments.toMutableList()
-            appendRestoredAttachments(accountRef, materialized, media, documents)
-            RestoredConversationAttachments(media, documents)
+            val projection =
+                projectDraftRestoration(
+                    restorationInputs(),
+                    plan,
+                    materialized,
+                    removedDraftAttachmentIds(accountRef),
+                    messages.sourceUnavailable,
+                )
+            preparedPhotos = projection.inputs.preparedPhotos
+            preparedDocuments = projection.inputs.preparedDocuments
+            activeEditor?.takeIf { it.slot.id in plan.removedPhotos }?.let(::dismissEditor)
+            backedPhotos = projection.inputs.backedPhotos
+            nonEditableDescriptions = projection.inputs.descriptions
+            RestoredConversationAttachments(projection.media, projection.documents)
         }
 
-    private fun appendRestoredAttachments(
-        accountRef: String,
-        materialized: List<Pair<MessageDraftAttachmentFfi, Uri>>,
-        media: MutableList<PendingMediaSlot>,
-        documents: MutableList<Uri>,
-    ) {
-        materialized.forEach { (attachment, uri) ->
-            if (attachment.id in removedDraftAttachmentIds(accountRef)) return@forEach
-            val prepared = attachment.asRestoredPhoto()
-            if (attachment.isComposerVisual() && !attachment.isComposerDocument()) {
-                media += PendingMediaSlot(attachment.id, uri)
-                preparedPhotos += attachment.id to prepared
-                if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
-                    nonEditableDescriptions += attachment.id to messages.sourceUnavailable
-                }
-            } else {
-                if (uri !in documents) documents += uri
-                preparedDocuments += uri to prepared
-            }
-        }
-    }
+    private fun restorationInputs() =
+        DraftRestorationInputs(
+            currentSlots,
+            currentDocumentUris,
+            preparedPhotos,
+            preparedDocuments,
+            backedPhotos,
+            nonEditableDescriptions,
+        )
 
     /** Combines this composer's fences with process-owned cleanup still running for the account. */
     private fun removedDraftAttachmentIds(accountRef: String): Set<String> =
@@ -532,11 +496,7 @@ internal class ConversationMediaDraftState(
     /** Releases presentation resources without deleting the native attachment draft. */
     fun dispose() {
         activeEditor?.previewBitmap?.recycle()
-        if (currentSlots.isEmpty() && currentDocumentUris.isEmpty()) {
-            clearMediaTempFiles(context)
-        } else {
-            runCatching { File(context.cacheDir, "composer_paste/native_drafts").deleteRecursively() }
-        }
+        releaseDraftPresentationFiles(context, currentSlots.isEmpty() && currentDocumentUris.isEmpty())
         controller.clearRetainedUploads()
     }
 
@@ -602,18 +562,12 @@ internal class ConversationMediaDraftState(
         accountRef: String,
     ) {
         val pending = attachmentReader.readVisualDraft(slot.uri) ?: return
-        val attachmentId =
-            stagedPhotoAttachmentId(
-                accountRef,
-                controller.group.groupIdHex,
-                slot.id,
-            )
         val prepared =
-            stageGenericAttachment(
+            stageVisualDraft(
                 appState.messageDraftRepository,
                 controller.group.groupIdHex,
                 accountRef,
-                attachmentId,
+                slot,
                 pending,
             ) ?: return
         pendingCameraFiles?.releasePersisted(slot.uri)
@@ -711,12 +665,7 @@ internal class ConversationMediaDraftState(
         slotId: String,
         result: PhotoDraftStageResult.NotEditable,
     ) {
-        val description =
-            if (result.reason == PhotoEditorSourceFailure.Animated) {
-                messages.animationNotEditable
-            } else {
-                messages.sourceNotEditable
-            }
+        val description = nonEditablePhotoDescription(result, messages)
         nonEditableDescriptions += slotId to description
         if (requestedEditorSlotId == slotId) {
             requestedEditorSlotId = null
@@ -1035,3 +984,157 @@ internal fun ConversationMediaDraftContent(
         )
     }
 }
+
+private data class DraftRestorationInputs(
+    val slots: List<PendingMediaSlot>,
+    val documents: List<Uri>,
+    val preparedPhotos: Map<String, DraftPreparedPhoto>,
+    val preparedDocuments: Map<Uri, DraftPreparedPhoto>,
+    val backedPhotos: Map<String, DraftBackedPhoto>,
+    val descriptions: Map<String, String>,
+)
+
+private data class DraftRestorationPlan(
+    val removedPhotos: Set<String>,
+    val removedDocuments: Set<Uri>,
+    val retainedSlots: List<PendingMediaSlot>,
+    val retainedDocuments: List<Uri>,
+    val reconciliation: PersistedDraftAttachmentReconciliation,
+)
+
+private data class DraftRestorationProjection(
+    val inputs: DraftRestorationInputs,
+    val media: List<PendingMediaSlot>,
+    val documents: List<Uri>,
+)
+
+private fun planDraftRestoration(
+    inputs: DraftRestorationInputs,
+    accountRef: String,
+    groupIdHex: String,
+    attachments: List<MessageDraftAttachmentFfi>,
+    removedAttachmentIds: Set<String>,
+): DraftRestorationPlan {
+    val nativeIds = attachments.mapTo(mutableSetOf()) { it.id }
+    val removedPhotos = restoredPhotosMissingFrom(inputs.slots, inputs.preparedPhotos, inputs.backedPhotos, nativeIds)
+    val removedDocuments = restoredDocumentsMissingFrom(inputs.documents, inputs.preparedDocuments, nativeIds)
+    val retainedSlots = inputs.slots.filterNot { it.id in removedPhotos }
+    val retainedDocuments = inputs.documents.filterNot { it in removedDocuments }
+    val reconciliation =
+        reconcilePersistedDraftAttachments(
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+            mediaSlotIds = retainedSlots.map(PendingMediaSlot::id),
+            documentUriStrings = retainedDocuments.map(Uri::toString),
+            attachments = attachments,
+            removedAttachmentIds = removedAttachmentIds,
+        )
+    return DraftRestorationPlan(removedPhotos, removedDocuments, retainedSlots, retainedDocuments, reconciliation)
+}
+
+private fun projectDraftRestoration(
+    inputs: DraftRestorationInputs,
+    plan: DraftRestorationPlan,
+    materialized: List<Pair<MessageDraftAttachmentFfi, Uri>>,
+    removedAttachmentIds: Set<String>,
+    sourceUnavailable: String,
+): DraftRestorationProjection {
+    val restoredPhotos =
+        nativePhotosNeedingRestoration(
+            plan.reconciliation.mediaBySlotId,
+            inputs.backedPhotos.keys,
+            inputs.preparedPhotos,
+        )
+    var photos =
+        inputs.preparedPhotos.filterKeys { it !in plan.removedPhotos } +
+            restoredPhotos.mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
+    var documents =
+        inputs.preparedDocuments.filterKeys { it !in plan.removedDocuments } +
+            nativeDocumentsNeedingRestoration(plan.reconciliation.documentsByUriString, inputs.preparedDocuments)
+                .mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
+    var descriptions = inputs.descriptions.filterKeys { it !in plan.removedPhotos }
+    restoredPhotos.forEach { (slotId, attachment) ->
+        if (attachment.mediaType.startsWith("image/", ignoreCase = true)) descriptions += slotId to sourceUnavailable
+    }
+    val media = plan.retainedSlots.toMutableList()
+    val documentUris = plan.retainedDocuments.toMutableList()
+    materialized.forEach { (attachment, uri) ->
+        if (attachment.id in removedAttachmentIds) return@forEach
+        val prepared = attachment.asRestoredPhoto()
+        if (attachment.isComposerVisual() && !attachment.isComposerDocument()) {
+            media += PendingMediaSlot(attachment.id, uri)
+            photos += attachment.id to prepared
+            if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
+                descriptions += attachment.id to sourceUnavailable
+            }
+        } else {
+            if (uri !in documentUris) documentUris += uri
+            documents += uri to prepared
+        }
+    }
+    val projected =
+        inputs.copy(
+            preparedPhotos = photos,
+            preparedDocuments = documents,
+            backedPhotos = inputs.backedPhotos.filterKeys { it !in plan.removedPhotos },
+            descriptions = descriptions,
+        )
+    return DraftRestorationProjection(projected, media, documentUris)
+}
+
+private data class DraftPhotoEdit(
+    val recipe: PhotoEditRecipe,
+    val quality: MediaQuality,
+)
+
+private suspend fun PhotoEditorCommitter.commitPhoto(
+    accountRef: String,
+    groupIdHex: String,
+    photo: DraftBackedPhoto,
+    edit: DraftPhotoEdit,
+): PhotoEditorCommitResult =
+    commit(
+        accountRef = accountRef,
+        groupIdHex = groupIdHex,
+        currentAttachment = photo.attachment,
+        expectedDigest = photo.attachmentDigest,
+        sourceLeaseId = photo.sourceLeaseId,
+        recipe = edit.recipe,
+        quality = edit.quality,
+    )
+
+private fun releaseDraftPresentationFiles(
+    context: Context,
+    empty: Boolean,
+) {
+    if (empty) {
+        clearMediaTempFiles(context)
+    } else {
+        runCatching { File(context.cacheDir, "composer_paste/native_drafts").deleteRecursively() }
+    }
+}
+
+private suspend fun stageVisualDraft(
+    drafts: MessageDraftRepository,
+    groupIdHex: String,
+    accountRef: String,
+    slot: PendingMediaSlot,
+    pending: PendingAttachment,
+): DraftPreparedPhoto? =
+    stageGenericAttachment(
+        drafts,
+        groupIdHex,
+        accountRef,
+        stagedPhotoAttachmentId(accountRef, groupIdHex, slot.id),
+        pending,
+    )
+
+private fun nonEditablePhotoDescription(
+    result: PhotoDraftStageResult.NotEditable,
+    messages: PhotoEditorMessages,
+): String =
+    if (result.reason == PhotoEditorSourceFailure.Animated) {
+        messages.animationNotEditable
+    } else {
+        messages.sourceNotEditable
+    }

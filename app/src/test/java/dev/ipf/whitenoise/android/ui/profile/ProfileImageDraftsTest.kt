@@ -5,6 +5,26 @@ import org.junit.Test
 
 class ProfileImageDraftsTest {
     @Test
+    fun unavailableNativeCachePreservesOriginalBaselinesUntilAuthoritativeRefresh() {
+        val untouched = ProfileImageDrafts("old-picture", "old-banner")
+        val cacheMiss = untouched.rebased(null, null)
+        assertEquals(untouched, cacheMiss)
+        assertEquals(
+            ProfileImageDrafts("new-picture", "new-banner"),
+            cacheMiss.rebased("new-picture", "new-banner"),
+        )
+    }
+
+    @Test
+    fun unavailableCacheDoesNotConvertAnExplicitRemovalIntoAnUntouchedField() {
+        val removed = ProfileImageDrafts("old-picture", "old-banner").without(ProfileImageTarget.Picture)
+        val refreshed = removed.rebased(null, null).rebased("new-picture", "")
+        assertEquals("", refreshed.picture)
+        assertEquals("new-picture", refreshed.baselinePicture)
+        assertEquals("", refreshed.banner)
+    }
+
+    @Test
     fun restoredUploadedPictureRemainsAnEditAgainstTheNativeRefreshBaseline() {
         val native = ProfileEditDraft(picture = "https://example.com/previous.jpg")
         val restored = native.copy(picture = "https://example.com/uploaded.jpg")

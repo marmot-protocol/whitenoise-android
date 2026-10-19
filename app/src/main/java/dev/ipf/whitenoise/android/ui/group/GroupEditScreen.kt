@@ -318,12 +318,7 @@ internal fun GroupEditScreen(
                     if (acceptedCrop) cropRecovery.settled()
                     val uploadFailure = error as? GroupAvatarUploadFailure
                     appState.presentFailure(
-                        titleRes =
-                            if (uploadFailure?.stage != GroupAvatarUploadStage.Prepare) {
-                                R.string.toast_couldnt_upload_group_image
-                            } else {
-                                R.string.toast_couldnt_prepare_image
-                            },
+                        titleRes = groupAvatarFailureTitle(uploadFailure?.stage),
                         operationCode = uploadFailure?.stage?.operationCode ?: "GROUP_IMAGE_UPLOAD",
                         throwable = error,
                         detail = groupImageFailureDetail(error),

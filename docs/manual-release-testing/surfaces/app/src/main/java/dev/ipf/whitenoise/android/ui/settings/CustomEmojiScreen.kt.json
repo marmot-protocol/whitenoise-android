@@ -26,6 +26,30 @@
         "test_ids": [
           "SET-030"
         ]
+      },
+      {
+        "surface": "PrepareSelectedEmoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun PrepareSelectedEmoji(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "ConfirmEmojiRemoval",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun ConfirmEmojiRemoval(",
+        "test_ids": [
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "StagedEmojiDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun StagedEmojiDialog(",
+        "test_ids": [
+          "SET-030"
+        ]
       }
     ],
     "settings_controls": [

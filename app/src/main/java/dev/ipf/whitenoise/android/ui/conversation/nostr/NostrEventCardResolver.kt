@@ -102,6 +102,10 @@ internal class NostrEventCardResolver(
     private val states = LinkedHashMap<String, MutableStateFlow<NostrEventCardState>>(16, 0.75f, true)
     private val jobs = HashMap<String, Job>()
     private var cachedRelays: List<String>? = null
+    private val nativeResolver =
+        nativePreview?.let { read ->
+            NativeEventCardResolver(read, nativeAuthor, ::publishResolvedState)
+        }
 
     fun state(
         reference: NostrEventReference,
@@ -150,65 +154,11 @@ internal class NostrEventCardResolver(
                 if (nativePreview == null) {
                     resolve(reference, state, refreshRelays)
                 } else {
-                    resolveNative(reference, authoredReference, state)
+                    checkNotNull(nativeResolver).resolve(reference, authoredReference, state)
                 }
             }
         jobs[reference.stableId] = job
         job.start()
-    }
-
-    private suspend fun resolveNative(
-        reference: NostrEventReference,
-        authoredReference: String,
-        state: MutableStateFlow<NostrEventCardState>,
-    ) {
-        val currentJob = coroutineContext[Job]
-        val read = checkNotNull(nativePreview)
-        try {
-            val cached =
-                try {
-                    read(authoredReference, false)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    // A failed projection read is not proof that the event is absent.
-                    // Let MDK perform its normal resolve/recovery path.
-                    NostrEventCardState.NotFound
-                }
-            coroutineContext.ensureActive()
-            if (cached != NostrEventCardState.NotFound &&
-                !(cached is NostrEventCardState.Loaded && state.value is NostrEventCardState.Loaded) &&
-                !publishResolvedState(reference, state, currentJob, cached, complete = false)
-            ) {
-                return
-            }
-            val refreshed = read(authoredReference, true)
-            val previous = state.value as? NostrEventCardState.Loaded
-            val resolved =
-                if (refreshed is NostrEventCardState.Loaded &&
-                    refreshed.card.authorMetadata == null &&
-                    previous?.card?.authorPubkeyHex == refreshed.card.authorPubkeyHex
-                ) {
-                    refreshed.copy(card = refreshed.card.copy(authorMetadata = previous?.card?.authorMetadata))
-                } else {
-                    refreshed
-                }
-            coroutineContext.ensureActive()
-            if (resolved is NostrEventCardState.Loaded && nativeAuthor != null) {
-                if (!publishResolvedState(reference, state, currentJob, resolved, complete = false)) return
-                val enriched = nativeAuthor(resolved)
-                coroutineContext.ensureActive()
-                publishResolvedState(reference, state, currentJob, enriched, complete = true)
-            } else {
-                publishResolvedState(reference, state, currentJob, resolved, complete = true)
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            // A refresh failure must not discard a cached, verified card.
-            val result = state.value.takeIf { it is NostrEventCardState.Loaded } ?: NostrEventCardState.Failed
-            publishResolvedState(reference, state, currentJob, result, complete = true)
-        }
     }
 
     private suspend fun resolve(
@@ -452,3 +402,71 @@ private const val EXACT_EVENT_QUERY_LIMIT = 1
 private const val EVENT_CARD_QUERY_LIMIT = 8
 private const val PROFILE_METADATA_QUERY_LIMIT = 1
 private const val KIND_PROFILE_METADATA = 0
+
+private typealias NativeCardPublication = (
+    NostrEventReference,
+    MutableStateFlow<NostrEventCardState>,
+    Job?,
+    NostrEventCardState,
+    Boolean,
+) -> Boolean
+
+private class NativeEventCardResolver(
+    private val read: suspend (String, Boolean) -> NostrEventCardState,
+    private val nativeAuthor: (suspend (NostrEventCardState.Loaded) -> NostrEventCardState.Loaded)?,
+    private val publish: NativeCardPublication,
+) {
+    suspend fun resolve(
+        reference: NostrEventReference,
+        authoredReference: String,
+        state: MutableStateFlow<NostrEventCardState>,
+    ) {
+        val currentJob = coroutineContext[Job]
+        try {
+            val cached = cached(authoredReference)
+            coroutineContext.ensureActive()
+            val publishCached =
+                cached != NostrEventCardState.NotFound &&
+                    !(cached is NostrEventCardState.Loaded && state.value is NostrEventCardState.Loaded)
+            if (publishCached && !publish(reference, state, currentJob, cached, false)) {
+                return
+            }
+            val refreshed = read(authoredReference, true)
+            val previous = state.value as? NostrEventCardState.Loaded
+            val resolved =
+                if (refreshed is NostrEventCardState.Loaded &&
+                    refreshed.card.authorMetadata == null &&
+                    previous?.card?.authorPubkeyHex == refreshed.card.authorPubkeyHex
+                ) {
+                    refreshed.copy(card = refreshed.card.copy(authorMetadata = previous?.card?.authorMetadata))
+                } else {
+                    refreshed
+                }
+            coroutineContext.ensureActive()
+            if (resolved is NostrEventCardState.Loaded && nativeAuthor != null) {
+                if (!publish(reference, state, currentJob, resolved, false)) return
+                val enriched = nativeAuthor(resolved)
+                coroutineContext.ensureActive()
+                publish(reference, state, currentJob, enriched, true)
+            } else {
+                publish(reference, state, currentJob, resolved, true)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A refresh failure must not discard a cached, verified card.
+            val result = state.value.takeIf { it is NostrEventCardState.Loaded } ?: NostrEventCardState.Failed
+            publish(reference, state, currentJob, result, true)
+        }
+    }
+
+    private suspend fun cached(authoredReference: String): NostrEventCardState =
+        try {
+            read(authoredReference, false)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A failed projection read is not proof that the event is absent.
+            NostrEventCardState.NotFound
+        }
+}

@@ -8,6 +8,7 @@ import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -24,6 +25,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,28 +72,36 @@ class CustomEmojiSelectionRetryTest {
         }
         val app = WhiteNoiseAppState(context, DraftStore(EmptyDrafts), { null }, emptyList(), "emoji-account")
         val picker = Picker()
-        composeRule.setContent {
-            CompositionLocalProvider(LocalActivityResultRegistryOwner provides picker) {
-                WhiteNoiseTheme { CustomEmojiScreen(app) {} }
+        try {
+            composeRule.setContent {
+                CompositionLocalProvider(LocalActivityResultRegistryOwner provides picker) {
+                    WhiteNoiseTheme { CustomEmojiScreen(app) {} }
+                }
             }
+            composeRule.onNodeWithText(context.getString(R.string.choose_files)).performClick()
+            composeRule.runOnIdle {
+                assertEquals("the file chooser must launch before its result is delivered", 1, picker.launches)
+                picker.deliver(uri)
+            }
+            composeRule.waitForIdle()
+            waitForSelection("first provider read", reads, app) { reads.get() == 1 }
+            composeRule.runOnIdle {
+                app.clearToast()
+                app.switchMediaSessionForTest("replacement-account")
+            }
+            composeRule.waitForIdle()
+            unblock.countDown()
+            composeRule.waitUntil { closed.get() }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("custom_emoji.name").assertDoesNotExist()
+            composeRule.runOnIdle {
+                assertEquals("old URI must not restart under its replacement owner", 1, reads.get())
+                assertNull(app.toast)
+            }
+        } finally {
+            unblock.countDown()
+            app.mutationsScope.cancel()
         }
-        composeRule.onNodeWithText(context.getString(R.string.choose_files)).performClick()
-        composeRule.runOnIdle { picker.deliver(uri) }
-        composeRule.waitUntil { reads.get() == 1 }
-        composeRule.runOnIdle {
-            app.clearToast()
-            app.switchMediaSessionForTest("replacement-account")
-        }
-        composeRule.waitForIdle()
-        unblock.countDown()
-        composeRule.waitUntil { closed.get() }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("custom_emoji.name").assertDoesNotExist()
-        composeRule.runOnIdle {
-            assertEquals("old URI must not restart under its replacement owner", 1, reads.get())
-            assertNull(app.toast)
-        }
-        app.mutationsScope.cancel()
     }
 
     private fun exercise(unreadable: Boolean) {
@@ -111,27 +121,57 @@ class CustomEmojiSelectionRetryTest {
         }
         val app = WhiteNoiseAppState(context, DraftStore(EmptyDrafts), { null }, emptyList(), "emoji-account")
         val picker = Picker()
-        composeRule.setContent {
-            CompositionLocalProvider(LocalActivityResultRegistryOwner provides picker) {
-                WhiteNoiseTheme { CustomEmojiScreen(app) {} }
+        try {
+            composeRule.setContent {
+                CompositionLocalProvider(LocalActivityResultRegistryOwner provides picker) {
+                    WhiteNoiseTheme { CustomEmojiScreen(app) {} }
+                }
             }
+            val files = context.getString(R.string.choose_files)
+            composeRule.onNodeWithText(files).performClick()
+            composeRule.runOnIdle {
+                assertEquals("the file chooser must launch before its result is delivered", 1, picker.launches)
+                picker.deliver(uri)
+            }
+            composeRule.waitForIdle()
+            waitForSelection("first provider read", reads, app) { reads.get() == 1 }
+            waitForSelection("failed-selection notice", reads, app) {
+                app.toast?.title == AppText.Resource(R.string.custom_emoji_not_image)
+            }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("custom_emoji.name").assertDoesNotExist()
+            composeRule.runOnIdle { available.set(true) }
+            composeRule.onNodeWithText(files).performClick()
+            composeRule.runOnIdle {
+                assertEquals("retry must launch the chooser again", 2, picker.launches)
+                picker.deliver(uri)
+            }
+            composeRule.waitForIdle()
+            composeRule.waitUntil {
+                reads.get() == 2 &&
+                    composeRule.onAllNodesWithTag("custom_emoji.name").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.runOnIdle { assertEquals(2, picker.launches) }
+        } finally {
+            app.mutationsScope.cancel()
         }
-        val files = context.getString(R.string.choose_files)
-        composeRule.onNodeWithText(files).performClick()
-        composeRule.runOnIdle { picker.deliver(uri) }
-        composeRule.waitUntil {
-            reads.get() == 1 && app.toast?.title == AppText.Resource(R.string.custom_emoji_not_image)
+    }
+
+    private fun waitForSelection(
+        boundary: String,
+        reads: AtomicInteger,
+        app: WhiteNoiseAppState,
+        condition: () -> Boolean,
+    ) {
+        try {
+            composeRule.waitUntil(condition = condition)
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError(
+                "$boundary: reads=${reads.get()}, account=${app.activeAccountRef}, " +
+                    "runtime=${app.runtimeGeneration}, toast=${app.toast}",
+                timeout,
+            )
         }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("custom_emoji.name").assertDoesNotExist()
-        composeRule.runOnIdle { available.set(true) }
-        composeRule.onNodeWithText(files).performClick()
-        composeRule.runOnIdle { picker.deliver(uri) }
-        composeRule.waitUntil {
-            reads.get() == 2 && composeRule.onAllNodesWithTag("custom_emoji.name").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.runOnIdle { assertEquals(2, picker.launches) }
-        app.mutationsScope.cancel()
     }
 
     private fun imageBytes(): ByteArray =
@@ -169,7 +209,7 @@ class CustomEmojiSelectionRetryTest {
         }
 
         fun deliver(uri: Uri) {
-            dispatchResult(requestCode, uri)
+            assertTrue("the launched file chooser must accept its delivered result", dispatchResult(requestCode, uri))
         }
     }
 }

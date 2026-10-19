@@ -1983,11 +1983,10 @@ internal fun ConversationScreen(
         ) { uris ->
             val origin = photoRequestOrigin
             photoRequestOrigin = null
-            if (origin != attachmentOrigin ||
-                appState.activeAccountRef != conversationAccountRef ||
-                appState.runtimeGeneration != attachmentRuntime ||
-                uris.isEmpty()
-            ) {
+            val currentAccount =
+                appState.activeAccountRef == conversationAccountRef &&
+                    appState.runtimeGeneration == attachmentRuntime
+            if (origin != attachmentOrigin || !currentAccount || uris.isEmpty()) {
                 return@rememberLauncherForActivityResult
             }
             // Append rather than replace so a follow-up "Add more" tile-pick
@@ -2023,11 +2022,10 @@ internal fun ConversationScreen(
         ) { granted ->
             val owner = cameraRequestOrigin
             cameraRequestOrigin = null
-            if (granted &&
-                owner == attachmentOrigin &&
+            val currentAccount =
                 appState.activeAccountRef == conversationAccountRef &&
-                appState.runtimeGeneration == attachmentRuntime
-            ) {
+                    appState.runtimeGeneration == attachmentRuntime
+            if (granted && owner == attachmentOrigin && currentAccount) {
                 launchCameraCapture()
             }
         }
@@ -2055,11 +2053,10 @@ internal fun ConversationScreen(
         rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
             val origin = contactRequestOrigin
             contactRequestOrigin = null
-            if (origin != attachmentOrigin ||
-                appState.activeAccountRef != conversationAccountRef ||
-                appState.runtimeGeneration != attachmentRuntime ||
-                contactUri == null
-            ) {
+            val currentAccount =
+                appState.activeAccountRef == conversationAccountRef &&
+                    appState.runtimeGeneration == attachmentRuntime
+            if (origin != attachmentOrigin || !currentAccount || contactUri == null) {
                 return@rememberLauncherForActivityResult
             }
             pendingContactUri = contactUri.toString()
@@ -2304,11 +2301,10 @@ internal fun ConversationScreen(
         ) { uris ->
             val origin = documentRequestOrigin
             documentRequestOrigin = null
-            if (origin != attachmentOrigin ||
-                appState.activeAccountRef != conversationAccountRef ||
-                appState.runtimeGeneration != attachmentRuntime ||
-                uris.isEmpty()
-            ) {
+            val currentAccount =
+                appState.activeAccountRef == conversationAccountRef &&
+                    appState.runtimeGeneration == attachmentRuntime
+            if (origin != attachmentOrigin || !currentAccount || uris.isEmpty()) {
                 return@rememberLauncherForActivityResult
             }
             // Append into the document side of the staging shelf rather than

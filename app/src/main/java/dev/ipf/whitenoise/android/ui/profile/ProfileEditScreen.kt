@@ -108,14 +108,14 @@ internal data class ProfileImageDrafts(
 ) {
     /** Rebase only untouched fields; uploaded URLs/removals remain transient authored edits. */
     fun rebased(
-        nativePicture: String,
-        nativeBanner: String,
+        nativePicture: String?,
+        nativeBanner: String?,
     ): ProfileImageDrafts =
         copy(
-            picture = if (picture == baselinePicture) nativePicture else picture,
-            banner = if (banner == baselineBanner) nativeBanner else banner,
-            baselinePicture = nativePicture,
-            baselineBanner = nativeBanner,
+            picture = if (picture == baselinePicture) nativePicture ?: picture else picture,
+            banner = if (banner == baselineBanner) nativeBanner ?: banner else banner,
+            baselinePicture = nativePicture ?: baselinePicture,
+            baselineBanner = nativeBanner ?: baselineBanner,
         )
 
     fun without(target: ProfileImageTarget): ProfileImageDrafts =
@@ -149,14 +149,14 @@ internal val ProfileImageDraftsSaver =
 @Composable
 internal fun rememberProfileImageDrafts(
     accountId: String?,
-    nativePicture: String,
-    nativeBanner: String,
+    nativePicture: String?,
+    nativeBanner: String?,
 ): androidx.compose.runtime.MutableState<ProfileImageDrafts> {
     val state =
         rememberSaveable(accountId, stateSaver = ProfileImageDraftsSaver) {
-            mutableStateOf(ProfileImageDrafts(nativePicture, nativeBanner))
+            mutableStateOf(ProfileImageDrafts(nativePicture.orEmpty(), nativeBanner.orEmpty()))
         }
-    return remember(accountId) {
+    return remember(accountId, nativePicture, nativeBanner) {
         state.apply { value = value.rebased(nativePicture, nativeBanner) }
     }
 }
@@ -554,7 +554,7 @@ internal fun ProfileEditScreen(
             cachedProfile,
             loadProfile,
         )
-    var imageDrafts by rememberProfileImageDrafts(activeAccountId, initialDraft.picture, initialDraft.banner)
+    var imageDrafts by rememberProfileImageDrafts(activeAccountId, cachedDraft?.picture, cachedDraft?.banner)
     val picture = imageDrafts.picture
     val banner = imageDrafts.banner
     val nip05 = fields.address.text.toString()
@@ -777,10 +777,8 @@ internal fun ProfileEditScreen(
                         ProfileSanitizer.androidOwnedHttpsImageUrl(uploaded)
                             ?: throw IllegalStateException("profile image upload returned an unsafe URL")
                     val activeAccountRef = appState.activeAccountRef
-                    if (capturedRevision != editRevision ||
-                        !isEditing ||
-                        (acceptedCrop && appState.runtimeGeneration != imageRuntime)
-                    ) {
+                    val staleCrop = acceptedCrop && appState.runtimeGeneration != imageRuntime
+                    if (capturedRevision != editRevision || !isEditing || staleCrop) {
                         return@launch
                     }
                     imageDrafts =
@@ -800,11 +798,10 @@ internal fun ProfileEditScreen(
                     throw cancelled
                 } catch (error: Exception) {
                     if (acceptedCrop) {
-                        if (capturedRevision != editRevision ||
-                            !isEditing ||
-                            appState.activeAccountRef != accountRef ||
-                            appState.runtimeGeneration != imageRuntime
-                        ) {
+                        val currentOwner =
+                            appState.activeAccountRef == accountRef &&
+                                appState.runtimeGeneration == imageRuntime
+                        if (capturedRevision != editRevision || !isEditing || !currentOwner) {
                             return@launch
                         }
                         cropRecovery.settled()

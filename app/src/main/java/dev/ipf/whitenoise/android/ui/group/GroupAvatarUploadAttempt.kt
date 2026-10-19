@@ -70,3 +70,10 @@ internal class GroupAvatarUploadAttempt(
         }
     }
 }
+
+internal fun groupAvatarFailureTitle(stage: GroupAvatarUploadStage?): Int =
+    if (stage == GroupAvatarUploadStage.Prepare) {
+        dev.ipf.whitenoise.android.R.string.toast_couldnt_prepare_image
+    } else {
+        dev.ipf.whitenoise.android.R.string.toast_couldnt_upload_group_image
+    }

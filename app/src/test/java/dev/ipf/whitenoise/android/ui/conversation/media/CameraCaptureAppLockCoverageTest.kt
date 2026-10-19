@@ -7,6 +7,7 @@ import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -16,10 +17,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.core.app.ActivityOptionsCompat
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -44,6 +47,8 @@ import java.io.File
 @Config(sdk = [36])
 class CameraCaptureAppLockCoverageTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @get:Rule val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
@@ -54,7 +59,7 @@ class CameraCaptureAppLockCoverageTest {
                 File("app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
             ).first(File::isFile).readText()
         assertTrue(
-            source.indexOf("val protectedShell = rememberProtectedShellSavedState") <
+            source.indexOf("val protectedShell =") <
                 source.indexOf("if (appState.appLockScreenVisible) {"),
         )
         assertTrue(source.contains("protectedShell.holder.SaveableStateProvider(protectedShell.key)"))
@@ -93,7 +98,7 @@ class CameraCaptureAppLockCoverageTest {
     @Test fun changingRuntimeWhileLockedRejectsTheOldResult() = exercise(replaceRuntime = true)
 
     // Each parameter selects one lifecycle ordering in this focused matrix.
-    @Suppress("LongMethod", "LongParameterList")
+    @Suppress("LongParameterList")
     private fun exercise(
         resultBeforeLock: Boolean = false,
         cancelCapture: Boolean = false,
@@ -107,40 +112,108 @@ class CameraCaptureAppLockCoverageTest {
         writeAfterLock: Boolean = false,
         resultAndLockTogether: Boolean = false,
     ) {
-        val registry = Camera()
-        var captures = PendingCameraCaptureFiles()
-        val app =
-            WhiteNoiseAppState(
-                context,
-                DraftStore(EmptyDrafts),
-                { null },
-                emptyList(),
-                "capture-account",
-            )
-        val controller = ConversationController(appState = app, initialGroup = conversationTimelineTestGroup())
-        var draftDisposals = 0
-        val locked = mutableStateOf(false)
-        val account = mutableStateOf("capture-account")
-        val runtime = mutableStateOf(4)
-        val existing = Uri.parse("content://fixture/existing")
-        val initialUris =
-            when {
-                emptyComposer -> emptyList()
-                fullComposer -> List(10) { Uri.parse("content://fixture/existing/$it") }
-                else -> listOf(existing)
-            }
-        var launch: (() -> Unit)? = null
-        var visibleUris = emptyList<Uri>()
-        var composed = false
-        var failures = 0
-        val restoration = StateRestorationTester(composeRule)
+        CameraCaptureFixture(
+            composeRule,
+            context,
+            CameraCaptureScenario(
+                resultBeforeLock,
+                cancelCapture,
+                cancelAuthentication,
+                restore,
+                replaceAccount,
+                replaceRuntime,
+                replaceBeforeCallback,
+                emptyComposer,
+                fullComposer,
+                writeAfterLock,
+                resultAndLockTogether,
+            ),
+        ).exercise()
+    }
+}
+
+private data class CameraCaptureScenario(
+    val resultBeforeLock: Boolean,
+    val cancelCapture: Boolean,
+    val cancelAuthentication: Boolean,
+    val restore: Boolean,
+    val replaceAccount: Boolean,
+    val replaceRuntime: Boolean,
+    val replaceBeforeCallback: Boolean,
+    val emptyComposer: Boolean,
+    val fullComposer: Boolean,
+    val writeAfterLock: Boolean,
+    val resultAndLockTogether: Boolean,
+)
+
+private class CameraCaptureFixture(
+    private val composeRule: ComposeContentTestRule,
+    private val context: Context,
+    private val scenario: CameraCaptureScenario,
+) {
+    private val resultBeforeLock get() = scenario.resultBeforeLock
+    private val cancelCapture get() = scenario.cancelCapture
+    private val cancelAuthentication get() = scenario.cancelAuthentication
+    private val restore get() = scenario.restore
+    private val replaceAccount get() = scenario.replaceAccount
+    private val replaceRuntime get() = scenario.replaceRuntime
+    private val replaceBeforeCallback get() = scenario.replaceBeforeCallback
+    private val emptyComposer get() = scenario.emptyComposer
+    private val fullComposer get() = scenario.fullComposer
+    private val writeAfterLock get() = scenario.writeAfterLock
+    private val resultAndLockTogether get() = scenario.resultAndLockTogether
+    private val ownerReplaced get() = replaceAccount || replaceRuntime
+    private val captureRejected get() = cancelCapture || fullComposer
+    private val registry = Camera()
+    private var captures = PendingCameraCaptureFiles()
+    private val app =
+        WhiteNoiseAppState(
+            context,
+            DraftStore(EmptyDrafts),
+            { null },
+            emptyList(),
+            "capture-account",
+        )
+    private val controller = ConversationController(appState = app, initialGroup = conversationTimelineTestGroup())
+    private var draftDisposals = 0
+    private val locked = mutableStateOf(false)
+    private val account = mutableStateOf("capture-account")
+    private val runtime = mutableStateOf(4)
+    private val existing = Uri.parse("content://fixture/existing")
+    private val initialUris =
+        when {
+            emptyComposer -> emptyList()
+            fullComposer -> List(10) { Uri.parse("content://fixture/existing/$it") }
+            else -> listOf(existing)
+        }
+    private var launch: (() -> Unit)? = null
+    private var visibleUris = emptyList<Uri>()
+    private var composed = false
+    private var failures = 0
+    private val restoration = StateRestorationTester(composeRule)
+    private lateinit var captured: Uri
+    private lateinit var abandoned: File
+
+    fun exercise() {
+        try {
+            mount()
+            captureAndSuspend()
+            deliverWhileSuspended()
+            assertVisibleShelf()
+            assertOutputOwnership()
+        } finally {
+            cleanUp()
+        }
+    }
+
+    private fun mount() {
         restoration.setContent {
             CompositionLocalProvider(
                 LocalActivityResultRegistryOwner provides registry,
                 LocalPendingCameraCaptureFiles provides captures,
             ) {
                 SideEffect { captures.retainOwner("${runtime.value}:${account.value}") }
-                val state = rememberProtectedShellSavedState(account.value, runtime.value)
+                val state = rememberProtectedShellSavedState(account.value, runtime.value, suspended = locked.value)
                 if (!locked.value) {
                     state.holder.SaveableStateProvider(state.key) {
                         DisposableEffect(Unit) {
@@ -164,39 +237,48 @@ class CameraCaptureAppLockCoverageTest {
                                 onFailure = { failures++ },
                                 isCurrent = { account.value == captureAccount && runtime.value == captureRuntime },
                             )
-                        val scope = rememberCoroutineScope()
-                        val draft =
-                            remember(account.value, runtime.value) {
-                                ConversationMediaDraftState(
-                                    app,
-                                    controller,
-                                    context,
-                                    scope,
-                                    PhotoEditorMessages("", "", "", ""),
-                                    captures,
-                                )
-                            }
-                        SideEffect { draft.updateInputs(slots, emptyList(), account.value) }
-                        DisposableEffect(draft) {
-                            onDispose {
-                                draft.dispose()
-                                draftDisposals++
-                            }
-                        }
+                        trackDraft(slots)
                         visibleUris = slots.map { it.uri }
                     }
                 }
             }
         }
+    }
+
+    @Composable
+    private fun trackDraft(slots: List<PendingMediaSlot>) {
+        val scope = rememberCoroutineScope()
+        val draft =
+            remember(account.value, runtime.value) {
+                ConversationMediaDraftState(
+                    app,
+                    controller,
+                    context,
+                    scope,
+                    PhotoEditorMessages("", "", "", ""),
+                    captures,
+                )
+            }
+        SideEffect { draft.updateInputs(slots, emptyList(), account.value) }
+        DisposableEffect(draft) {
+            onDispose {
+                draft.dispose()
+                draftDisposals++
+            }
+        }
+    }
+
+    private fun writeCapture() {
+        context.contentResolver.openOutputStream(captured)!!.use { it.write(byteArrayOf(3, 5, 7)) }
+    }
+
+    private fun captureAndSuspend() {
         composeRule.runOnIdle { checkNotNull(launch).invoke() }
         composeRule.waitForIdle()
-        val captured = checkNotNull(registry.uri)
+        captured = checkNotNull(registry.uri)
 
-        fun writeCapture() {
-            context.contentResolver.openOutputStream(captured)!!.use { it.write(byteArrayOf(3, 5, 7)) }
-        }
         if (!writeAfterLock) writeCapture()
-        val abandoned = File(context.cacheDir, "camera/abandoned.jpg").apply { writeText("abandoned") }
+        abandoned = File(context.cacheDir, "camera/abandoned.jpg").apply { writeText("abandoned") }
         if (resultBeforeLock) {
             composeRule.runOnIdle {
                 if (replaceBeforeCallback) account.value = "different-account"
@@ -214,6 +296,9 @@ class CameraCaptureAppLockCoverageTest {
             assertTrue("production draft cleanup must execute", draftDisposals > 0)
             if (emptyComposer) assertFalse("unrelated abandoned camera files still clean up", abandoned.exists())
         }
+    }
+
+    private fun deliverWhileSuspended() {
         if (writeAfterLock) writeCapture()
         if (cancelAuthentication) {
             // A failed/cancelled prompt leaves the lock mounted; retry does not recreate its saved owner.
@@ -236,13 +321,16 @@ class CameraCaptureAppLockCoverageTest {
         if (!resultBeforeLock && !cancelAuthentication && !resultAndLockTogether) {
             composeRule.runOnIdle { registry.deliver(success = !cancelCapture) }
         }
+    }
+
+    private fun assertVisibleShelf() {
         composeRule.runOnIdle { locked.value = false }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             assertTrue(composed)
             assertEquals(0, failures)
             assertEquals(
-                if (replaceAccount || replaceRuntime || cancelCapture || fullComposer) {
+                if (ownerReplaced || captureRejected) {
                     initialUris
                 } else {
                     initialUris + captured
@@ -250,12 +338,15 @@ class CameraCaptureAppLockCoverageTest {
                 visibleUris,
             )
         }
-        if (cancelCapture || replaceBeforeCallback || replaceAccount || replaceRuntime || fullComposer) {
+    }
+
+    private fun assertOutputOwnership() {
+        if (captureRejected || ownerReplaced || replaceBeforeCallback) {
             org.junit.Assert.assertThrows(java.io.FileNotFoundException::class.java) {
                 context.contentResolver.openInputStream(captured)?.close()
             }
         }
-        if (!replaceAccount && !replaceRuntime && !cancelCapture && !fullComposer) {
+        if (!ownerReplaced && !captureRejected) {
             composeRule.runOnIdle { registry.deliver() }
             composeRule.waitForIdle()
             composeRule.runOnIdle { assertEquals(initialUris + captured, visibleUris) }
@@ -269,6 +360,9 @@ class CameraCaptureAppLockCoverageTest {
                 .clearUnheldFiles(reused.parentFile!!)
             assertFalse("a rejected result must release its exact cache hold", reused.exists())
         }
+    }
+
+    private fun cleanUp() {
         composeRule.runOnIdle {
             locked.value = true
             captures.releaseAll()
@@ -276,37 +370,37 @@ class CameraCaptureAppLockCoverageTest {
         composeRule.waitForIdle()
         controller.onCleared()
         app.mutationsScope.cancel()
-        File(context.cacheDir, "camera/${captured.lastPathSegment}").delete()
+        if (::captured.isInitialized) File(context.cacheDir, "camera/${captured.lastPathSegment}").delete()
+    }
+}
+
+private object EmptyDrafts : DraftPersistence {
+    override fun read(): Map<String, String> = emptyMap()
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
+}
+
+private class Camera :
+    ActivityResultRegistry(),
+    ActivityResultRegistryOwner {
+    override val activityResultRegistry: ActivityResultRegistry get() = this
+    private var requestCode = 0
+    var uri: Uri? = null
+
+    override fun <I, O> onLaunch(
+        requestCode: Int,
+        contract: ActivityResultContract<I, O>,
+        input: I,
+        options: ActivityOptionsCompat?,
+    ) {
+        this.requestCode = requestCode
+        uri = input as Uri
     }
 
-    private object EmptyDrafts : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
-
-    private class Camera :
-        ActivityResultRegistry(),
-        ActivityResultRegistryOwner {
-        override val activityResultRegistry: ActivityResultRegistry get() = this
-        private var requestCode = 0
-        var uri: Uri? = null
-
-        override fun <I, O> onLaunch(
-            requestCode: Int,
-            contract: ActivityResultContract<I, O>,
-            input: I,
-            options: ActivityOptionsCompat?,
-        ) {
-            this.requestCode = requestCode
-            uri = input as Uri
-        }
-
-        fun deliver(success: Boolean = true) {
-            dispatchResult(requestCode, if (success) Activity.RESULT_OK else Activity.RESULT_CANCELED, null)
-        }
+    fun deliver(success: Boolean = true) {
+        dispatchResult(requestCode, if (success) Activity.RESULT_OK else Activity.RESULT_CANCELED, null)
     }
 }

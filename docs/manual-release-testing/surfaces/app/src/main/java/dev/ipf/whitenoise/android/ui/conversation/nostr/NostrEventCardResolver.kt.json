@@ -14,7 +14,7 @@
       {
         "surface": "Account-scoped native cached public event card resolution and refresh",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
-        "anchor": "    private suspend fun resolveNative(",
+        "anchor": "private class NativeEventCardResolver(",
         "test_ids": [
           "STB-002"
         ]
