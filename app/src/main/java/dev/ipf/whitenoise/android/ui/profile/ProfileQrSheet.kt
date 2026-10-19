@@ -59,10 +59,15 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.settings.FullPublicKey
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 internal fun profileQrContentForNpub(npub: String): String? = ProfileLink.parse(npub)?.qrUri
 
+/**
+ * The account's profile code sheet: its QR code, the abbreviated key that copies it, the whole key for comparison
+ * (#3321) and a scanner for another profile's code.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod") // One account-owned sheet and scanner receipt.
 @Composable
@@ -142,6 +147,12 @@ internal fun ProfileQrSheet(
                     Spacer(Modifier.width(8.dp))
                     Text(if (copied) stringResource(R.string.copied) else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
                 }
+                // The button abbreviates; the whole key stays readable beside the code (#3321).
+                FullPublicKey(
+                    npub = npub,
+                    testTag = "profile_qr.full_public_key",
+                    label = stringResource(R.string.public_key),
+                )
             }
             link?.let { QrCodeImage(content = it.qrUri) }
             scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }

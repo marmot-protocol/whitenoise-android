@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -99,7 +100,18 @@ class ShareConnectScreenBehaviorTest {
         mount()
         composeRule.onNodeWithText("Alice").assertIsDisplayed()
         composeRule.onNodeWithText("alice@example.com").assertIsDisplayed()
-        composeRule.onNodeWithText("Scan to connect.").assertIsDisplayed()
+        composeRule.onNodeWithText("Scan to connect.").performScrollTo().assertIsDisplayed()
+    }
+
+    /** The whole public key shows below the capsule for comparison, read as its contiguous value (#3321). */
+    @Test
+    fun theWholePublicKeyShowsBelowTheCapsule() {
+        mount()
+        composeRule
+            .onNodeWithTag("share_connect.full_public_key", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertTextEquals(shareConnectFixture.npub)
     }
 
     /** Save to Gallery is the Share menu's last entry, and the toolbar carries no separate save action. */
