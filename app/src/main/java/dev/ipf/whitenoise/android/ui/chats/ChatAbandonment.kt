@@ -10,7 +10,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.abandonChatFromList
 import dev.ipf.whitenoise.android.state.isNonMember
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.reviewMemberPublicName
+import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentDialog
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentStatus
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
@@ -130,5 +134,18 @@ internal fun ChatAbandonmentHost(
             }
         },
         onDismiss = onDismiss,
+        identity = {
+            GroupActingAccountIdentity(appState, request.target.accountRef)
+            val item = request.owner.reviewItems.single()
+            val avatar = rememberChatListGroupAvatar(appState, item)
+            GroupReviewDestinationIdentity(
+                MemberReviewGroup(
+                    groupId,
+                    request.target.conversationTitle,
+                    avatar.pictureUrl,
+                    avatar.image,
+                ),
+            )
+        },
     )
 }

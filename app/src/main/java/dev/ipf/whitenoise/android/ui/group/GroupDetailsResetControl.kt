@@ -175,7 +175,8 @@ internal fun GroupAbandonmentDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     error: ErrorPresentation? = null,
-) = GroupAbandonmentReviewDialog(listOf(target), status, onConfirm, onDismiss, error)
+    identity: (@Composable () -> Unit)? = null,
+) = GroupAbandonmentReviewDialog(listOf(target), status, onConfirm, onDismiss, error, identity)
 
 /**
  * The same confirmation for the chat list's bulk action: every reviewed chat of the one acting account, captured
@@ -188,7 +189,16 @@ internal fun GroupAbandonmentDialog(
     targets: List<GroupAbandonmentTarget>,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-) = GroupAbandonmentReviewDialog(targets, GroupAbandonmentStatus.Review, onConfirm, onDismiss)
+    identity: (@Composable () -> Unit)? = null,
+    confirmEnabled: Boolean = true,
+) = GroupAbandonmentReviewDialog(
+    targets,
+    GroupAbandonmentStatus.Review,
+    onConfirm,
+    onDismiss,
+    identity = identity,
+    confirmEnabled = confirmEnabled,
+)
 
 /** The review for one or several chats, where a single chat keeps its own title and confirm wording. */
 @Suppress("FunctionNaming")
@@ -199,6 +209,8 @@ private fun GroupAbandonmentReviewDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     error: ErrorPresentation? = null,
+    identity: (@Composable () -> Unit)? = null,
+    confirmEnabled: Boolean = true,
 ) {
     val running = status == GroupAbandonmentStatus.Running
     val failed = status == GroupAbandonmentStatus.Failed
@@ -220,12 +232,12 @@ private fun GroupAbandonmentReviewDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("group.abandon.dialog"),
         title = { Text(stringResource(titleRes)) },
-        text = { GroupAbandonmentBody(targets, failed, error) },
+        text = { GroupAbandonmentBody(targets, failed, error, identity) },
         icon = if (running) ({ CircularProgressIndicator() }) else null,
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
-                enabled = !running,
+                enabled = !running && confirmEnabled,
                 modifier = Modifier.testTag("group.abandon.confirm"),
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) { Text(stringResource(confirmLabel)) }
@@ -245,6 +257,7 @@ private fun GroupAbandonmentBody(
     targets: List<GroupAbandonmentTarget>,
     failed: Boolean,
     error: ErrorPresentation?,
+    identity: (@Composable () -> Unit)?,
 ) {
     val style = MaterialTheme.typography.bodyMedium
     val color = MaterialTheme.colorScheme.onSurface
@@ -261,6 +274,7 @@ private fun GroupAbandonmentBody(
                 Text(stringResource(R.string.abandon_identity_account, first.accountName), style = style, color = color)
             }
         }
+        identity?.invoke()
         if (targets.any { it.isDm }) Text(stringResource(R.string.chat_abandon_dialog_message))
         if (targets.any { !it.isDm }) Text(stringResource(R.string.group_reset_dialog_message))
         if (failed) GroupAbandonmentFailure(targets.all { it.isDm }, error)

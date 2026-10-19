@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
         "anchor": "fun GroupMembersReviewDialog(",
         "test_ids": [
-          "GRP-030"
+          "GRP-030",
+          "GRP-034"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
         "anchor": "fun GroupMemberReviewPair(",
         "test_ids": [
-          "GRP-030"
+          "GRP-030",
+          "GRP-034"
         ]
       }
     ],
@@ -102,6 +104,24 @@
         "anchor": "R.string.remove_member",
         "test_ids": [
           "GRP-030"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Reviewed group action context: R.plurals.selected_members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "R.plurals.selected_members_count",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.plurals.group_action_groups_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "R.plurals.group_action_groups_count",
+        "test_ids": [
+          "GRP-034"
         ]
       }
     ]

@@ -1,14 +1,23 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.GroupChangeCaution
 import dev.ipf.whitenoise.android.state.GroupChangeConfirmation
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.ownsGroupChange
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 
 /**
@@ -18,28 +27,64 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
  */
 @Suppress("FunctionNaming")
 @Composable
-internal fun GroupChangeConfirmationDialog(question: GroupChangeConfirmation) {
+internal fun GroupChangeConfirmationDialog(
+    question: GroupChangeConfirmation,
+    appState: WhiteNoiseAppState? = null,
+) {
     val (title, message, confirm) = groupChangeConfirmationText(question.caution, question.invite)
     val chat = question.target.title
     ConfirmDialog(
         title = stringResource(title),
         message = stringResource(message),
         confirmLabel = stringResource(confirm),
-        onConfirm = { question.answer(proceed = true) },
+        onConfirm = { question.answer(proceed = appState?.ownsGroupChange(question.target) != false) },
         onDismiss = { question.answer(proceed = false) },
         destructive = true,
         dismissLabel = stringResource(R.string.group_change_wait),
-        identity =
-            chat?.let {
-                {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.testTag(GROUP_CHANGE_TARGET_TAG),
-                    )
+        identity = {
+            Column(Modifier.testTag(GROUP_CHANGE_TARGET_TAG)) {
+                if (appState == null) {
+                    chat?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+                } else {
+                    val target = question.target
+                    val group = MemberReviewGroup(target.groupIdHex, chat.orEmpty())
+                    GroupActingAccountIdentity(appState, target.accountRef)
+                    target.actionLabel?.let { Text(stringResource(it)) }
+                    if (target.actionLabel == R.string.remove_admin) {
+                        Text(stringResource(R.string.group_action_revoke_explanation))
+                    }
+                    target.retentionSeconds?.let {
+                        Text(
+                            stringResource(
+                                R.string.disappearing_confirm_message,
+                                disappearingMessagesLabel(it.toLong()),
+                            ),
+                        )
+                    }
+                    if (target.affectedMemberIds.isEmpty()) {
+                        GroupReviewDestinationIdentity(group)
+                    } else {
+                        Text(
+                            pluralStringResource(
+                                R.plurals.selected_members_count,
+                                target.affectedMemberIds.size,
+                                target.affectedMemberIds.size,
+                            ),
+                        )
+                        target.affectedMemberIds.forEach { memberId ->
+                            GroupMemberReviewPair(
+                                appState = appState,
+                                group = group,
+                                member = RecipientSearch.Candidate(memberId, "", appState.npubForDisplay(memberId)),
+                                busy = true,
+                                initialAdminIds = target.initialAdminIds,
+                                onInitialAdminChange = if (target.initialAdminIds.isEmpty()) null else ({ _, _ -> }),
+                            )
+                        }
+                    }
                 }
-            },
+            }
+        },
     )
 }
 

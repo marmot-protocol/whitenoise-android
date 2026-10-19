@@ -2521,4 +2521,16 @@
     <string name="group_change_wait">Wait</string>
     <string name="group_change_continue_anyway">Continue anyway</string>
     <string name="group_change_invite_anyway">Invite anyway</string>
+    <string name="group_action_acting_account">Acting account</string>
+    <string name="group_action_local_nickname">Local nickname: %1$s</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d group</item>
+        <item quantity="other">%1$d groups</item>
+    </plurals>
+    <string name="group_action_public_key_hex">Public key (hex)</string>
+    <string name="group_action_account_label">Local account label: %1$s</string>
+    <string name="group_action_revoke_explanation">This removes admin rights. The person stays a member.</string>
+    <string name="group_action_add_members">Add members</string>
+    <string name="group_action_transfer_and_leave">Transfer admin and leave</string>
+    <string name="group_action_step_down_and_leave">Step down and leave</string>
 </resources>

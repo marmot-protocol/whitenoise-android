@@ -56,7 +56,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileAddToGroupsContent(",
         "test_ids": [
-          "ACC-008"
+          "ACC-008",
+          "GRP-034"
         ]
       },
       {
@@ -80,7 +81,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileMakeAdminContent(",
         "test_ids": [
-          "GRP-007"
+          "GRP-007",
+          "GRP-034"
         ]
       },
       {
@@ -121,7 +123,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileSheetModerationConfirmDialog(",
         "test_ids": [
-          "ACC-007"
+          "ACC-007",
+          "GRP-034"
         ]
       },
       {
@@ -145,7 +148,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileAddToGroupsContent(",
         "test_ids": [
-          "ACC-002"
+          "ACC-002",
+          "GRP-034"
         ]
       },
       {
@@ -222,6 +226,14 @@
         "test_ids": [
           "ACC-003",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_revoke_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.group_action_revoke_explanation",
+        "test_ids": [
+          "GRP-034"
         ]
       }
     ],

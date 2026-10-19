@@ -17,9 +17,11 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
+import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -70,6 +72,12 @@ class GroupActionIdentityScreenshotTest {
     /** Captures the same context in dark mode. */
     @Test fun transferIdentityDark() = capture("dark", dark = true)
 
+    /** Removal retains both the affected person and the acting account. */
+    @Test fun removalIdentityLight() = capture("remove_light", remove = true)
+
+    /** AMOLED uses the same identity and transfer consequences. */
+    @Test fun transferIdentityAmoled() = capture("amoled", dark = true, amoled = true)
+
     /** Keeps warning, identity and buttons reachable with large RTL text. */
     @Test fun transferIdentityLargeRtl() = capture("large_rtl", rtl = true)
 
@@ -78,8 +86,10 @@ class GroupActionIdentityScreenshotTest {
         name: String,
         dark: Boolean = false,
         rtl: Boolean = false,
+        amoled: Boolean = false,
+        remove: Boolean = false,
     ) {
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         val hex = "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
         val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
         var submitted = 0
@@ -87,11 +97,17 @@ class GroupActionIdentityScreenshotTest {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, fontScale = if (rtl) 2f else 1f) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
                     GroupDetailsConfirmation(
-                        model = GroupDetailsConfirmationState.TransferAdmin("Private alias") { submitted += 1 },
+                        model =
+                            if (remove) {
+                                GroupDetailsConfirmationState.RemoveMember("Private alias") { submitted += 1 }
+                            } else {
+                                GroupDetailsConfirmationState.TransferAdmin("Private alias") { submitted += 1 }
+                            },
                         onDismiss = {},
                         identity = {
+                            GroupActingAccountIdentity(state)
                             GroupMemberReviewPair(
                                 appState = state,
                                 group = MemberReviewGroup("garden", "Garden club"),
@@ -109,6 +125,7 @@ class GroupActionIdentityScreenshotTest {
                 }
             }
         }
+        rule.onNodeWithTag("group.action.acting_account").assertExists()
         rule.onNodeWithText("Public Alice").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Garden club").assertIsDisplayed()
         rule.onNodeWithText("Private alias").assertDoesNotExist()

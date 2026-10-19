@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatDepartureStage
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -27,13 +28,19 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.LocalRemovalWording
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentDialog
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
+import dev.ipf.whitenoise.android.ui.group.groupAbandonmentActionLabel
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import kotlinx.coroutines.CompletableDeferred
 
@@ -50,6 +57,8 @@ internal class PendingChatDeparture(
     val abandon: Boolean = false,
 ) {
     val owner = PendingLocalChatDelete.capture(items, controller, appState)
+    val actingAccountRef = controller.accountRef
+    val reviewItems = items.toList()
     val targets =
         items.distinctBy { it.group.groupIdHex.lowercase() }.map {
             ChatDepartureTarget(it.group.groupIdHex, chatListItemDisplayTitle(it, appState, titleCopy), it.isDm())
@@ -141,9 +150,28 @@ internal fun ChatDepartureBatchDialog(
             actionLabel = actionLabel,
             onConfirm = { start(request.targets) },
             onDismiss = actions.onDismiss,
+            confirmEnabled = isCurrent(),
+            identity = {
+                GroupActingAccountIdentity(appState, request.actingAccountRef)
+                request.targets.forEach { target ->
+                    val item = request.reviewItems.first { it.group.groupIdHex == target.groupId }
+                    val avatar = rememberChatListGroupAvatar(appState, item)
+                    GroupReviewDestinationIdentity(
+                        MemberReviewGroup(target.groupId, target.title, avatar.pictureUrl, avatar.image),
+                        actionLabel =
+                            stringResource(
+                                when {
+                                    request.abandon -> groupAbandonmentActionLabel(target.isDm)
+                                    target.isDm -> R.string.delete_from_device
+                                    else -> R.string.leave_and_delete
+                                },
+                            ),
+                    )
+                }
+            },
         )
     } else if (ui.decision != null) {
-        ChatDepartureSuccessor(ui, appState)
+        ChatDepartureSuccessor(ui, appState, request.actingAccountRef, isCurrent)
     } else {
         WhiteNoiseAlertDialog(
             onDismissRequest = actions.onDismiss,
@@ -192,19 +220,29 @@ internal fun ChatDepartureReview(
     actionLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    identity: (@Composable () -> Unit)? = null,
+    confirmEnabled: Boolean = true,
 ) {
     if (abandonmentTargets != null) {
         // Never review an abandonment without its acting account and chats, captured with the request.
         if (abandonmentTargets.isEmpty()) {
             LaunchedEffect(abandonmentTargets) { onDismiss() }
         } else {
-            GroupAbandonmentDialog(targets = abandonmentTargets, onConfirm = onConfirm, onDismiss = onDismiss)
+            GroupAbandonmentDialog(
+                targets = abandonmentTargets,
+                onConfirm = onConfirm,
+                onDismiss = onDismiss,
+                identity = identity,
+                confirmEnabled = confirmEnabled,
+            )
         }
     } else {
         ConfirmDialog(
             title = actionLabel,
             message = stringResource(R.string.chat_departure_confirm, targetCount),
             confirmLabel = actionLabel,
+            identity = identity,
+            confirmEnabled = confirmEnabled,
             destructive = true,
             onConfirm = onConfirm,
             onDismiss = onDismiss,
@@ -288,6 +326,8 @@ private suspend fun removeChatDepartureTarget(
 internal fun ChatDepartureSuccessor(
     ui: ChatDepartureUi,
     appState: WhiteNoiseAppState,
+    actingAccountRef: String? = appState.activeAccountRef,
+    isCurrent: () -> Boolean = { true },
 ) {
     val decision = ui.decision ?: return
     val selected = ui.selected
@@ -303,16 +343,35 @@ internal fun ChatDepartureSuccessor(
             onDismiss = { decision.answer.complete(null) },
         )
     } else {
+        val selectedName = appState.displayName(selected.memberIdHex).ifBlank { stringResource(R.string.member) }
         ConfirmDialog(
             title = stringResource(R.string.confirm_transfer_admin_title),
             message =
                 stringResource(
                     R.string.confirm_sole_admin_transfer_then_leave_message,
-                    appState.displayName(selected.memberIdHex),
+                    selectedName,
                 ),
-            confirmLabel = stringResource(R.string.leave_and_delete),
+            confirmLabel = stringResource(R.string.group_action_transfer_and_leave),
             destructive = true,
-            onConfirm = { decision.answer.complete(selected) },
+            confirmEnabled = isCurrent(),
+            identity = {
+                GroupActingAccountIdentity(appState, actingAccountRef)
+                GroupMemberReviewPair(
+                    appState = appState,
+                    group = MemberReviewGroup(decision.target.groupId, decision.target.title),
+                    member =
+                        RecipientSearch.Candidate(
+                            selected.memberIdHex,
+                            appState.displayName(selected.memberIdHex),
+                            appState.npubForDisplay(selected.memberIdHex),
+                        ),
+                )
+            },
+            onConfirm = {
+                if (isCurrent() && ui.decision === decision && ui.selected == selected) {
+                    decision.answer.complete(selected)
+                }
+            },
             onDismiss = { decision.answer.complete(null) },
         )
     }

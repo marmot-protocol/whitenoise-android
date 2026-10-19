@@ -132,7 +132,10 @@ internal fun ContactPickerScreen(
             members = selected,
             busy = busy,
             onDismiss = { reviewingSelection = false },
-            onConfirm = onConfirm,
+            onConfirm = {
+                reviewingSelection = false
+                onConfirm()
+            },
             confirmLabel = confirmLabel,
             onRemove = { member ->
                 onInitialAdminChange?.invoke(member, false)

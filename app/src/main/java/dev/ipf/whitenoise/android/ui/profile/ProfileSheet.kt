@@ -1832,6 +1832,7 @@ private fun ProfileSheetAdminActions(
             busy = busy,
             title = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
             confirmLabel = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
+            description = if (promoting) null else stringResource(R.string.group_action_revoke_explanation),
             onConfirm = {
                 confirmRoleChange = null
                 runMutation(roleChange) {
@@ -1875,6 +1876,7 @@ private fun ProfileSheetModerationConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
+    description: String? = null,
 ) {
     GroupMembersReviewDialog(
         appState = appState,
@@ -1882,7 +1884,7 @@ private fun ProfileSheetModerationConfirmDialog(
         members = listOf(member),
         busy = busy,
         title = title,
-        description = null,
+        description = description,
         invitation = false,
         dismissEnabled = true,
         showProgress = false,

@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -23,10 +26,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -62,7 +67,7 @@ class GroupMembersReviewScreenshotTest {
     fun busyConfirmationCannotSubmitOrDismiss() {
         var submits = 0
         var dismisses = 0
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         rule.setContent {
             WhiteNoiseTheme {
                 GroupMembersReviewDialog(
@@ -82,10 +87,219 @@ class GroupMembersReviewScreenshotTest {
         assertEquals(0, dismisses)
     }
 
+    /** A callback retained by the old dialog cannot submit after the same account gets a new runtime. */
+    @Test
+    fun retainedReviewCallbackRejectsRuntimeReplacement() {
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+        var submitted = 0
+        rule.setContent {
+            WhiteNoiseTheme {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members = listOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "")),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = { submitted++ },
+                    confirmLabel = "Add members",
+                )
+            }
+        }
+        val retained =
+            rule
+                .onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        rule.runOnIdle {
+            state.advanceLocalDeleteTestRuntime()
+            retained()
+        }
+        assertEquals(0, submitted)
+    }
+
+    /** Even a retained semantics callback can claim its review only once. */
+    @Test
+    fun retainedCallbackCannotRepeatCompletedSubmission() {
+        retainedCallbackIsInvalidated(submitFirst = true)
+    }
+
+    /** Dismissal and an identical reopening never revive the old presentation. */
+    @Test
+    fun retainedCallbackCannotSubmitIdenticallyReopenedReview() {
+        retainedCallbackIsInvalidated(submitFirst = false)
+    }
+
+    private fun retainedCallbackIsInvalidated(submitFirst: Boolean) {
+        val state = emptyAppState()
+        val visible = mutableStateOf(true)
+        var submitted = 0
+        rule.setContent {
+            WhiteNoiseTheme {
+                if (visible.value) {
+                    GroupMembersReviewDialog(
+                        appState = state,
+                        groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                        members = listOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "")),
+                        busy = false,
+                        onDismiss = { visible.value = false },
+                        onConfirm = { submitted++ },
+                        confirmLabel = "Add members",
+                    )
+                }
+            }
+        }
+        val retained =
+            rule
+                .onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        if (submitFirst) {
+            rule.runOnIdle {
+                retained()
+                retained()
+            }
+            assertEquals(1, submitted)
+        } else {
+            rule.onNodeWithText("Cancel").performClick()
+            rule.waitForIdle()
+            rule.runOnIdle { visible.value = true }
+            rule.waitForIdle()
+            rule.runOnIdle { invokeDetachedReviewClick(retained) }
+            assertEquals(0, submitted)
+            rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+            assertEquals(1, submitted)
+        }
+    }
+
+    /** Valid public hex remains identifiable and copyable without a profile or native npub formatter. */
+    @Test
+    fun missingMetadataKeepsActorAndMemberPublicHexCopyable() {
+        val actor = "a".repeat(64)
+        val member = "b".repeat(64)
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", actor)), activeAccountRef = "Owner")
+        rule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members = listOf(RecipientSearch.Candidate(member, "", "")),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add members",
+                )
+            }
+        }
+        rule.onNodeWithContentDescription("Public key (hex), $actor").assertExists()
+        rule.onNodeWithContentDescription("Public key (hex), $member").performScrollTo().performClick()
+        val clipboard =
+            ApplicationProvider
+                .getApplicationContext<Context>()
+                .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        assertEquals(
+            member,
+            clipboard.primaryClip!!
+                .getItemAt(0)
+                .text
+                .toString(),
+        )
+        rule.onNodeWithText("1 group").assertExists()
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_action_missing_public_metadata_dark.png")
+    }
+
+    /** An opaque runtime reference never becomes a public key; its local account label stays explicit. */
+    @Test
+    fun opaqueActorReferenceUsesExplicitLocalLabel() {
+        val state =
+            emptyAppState(
+                accounts = listOf(testAccount("Owner", "private-runtime-reference")),
+                activeAccountRef = "Owner",
+            )
+        rule.setContent {
+            WhiteNoiseTheme { GroupActingAccountIdentity(state, "Owner") }
+        }
+        rule.onNodeWithText("Local account label: Owner").assertIsDisplayed()
+        rule.onAllNodesWithText("private-runtime-reference").assertCountEquals(0)
+        rule.onAllNodesWithText("Public key (hex)").assertCountEquals(0)
+    }
+
+    /** Revoking admin rights explicitly keeps membership and identifies the account performing it. */
+    @Test
+    fun revokeReviewExplainsMembershipAndActorDark() {
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+        rule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members =
+                        listOf(
+                            RecipientSearch.Candidate(
+                                "b".repeat(64),
+                                "Private Alice",
+                                "",
+                                searchProfile =
+                                    UserProfileMetadataFfi("Public Alice", null, null, null, null, null, null),
+                            ),
+                        ),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Remove admin",
+                    title = "Remove admin",
+                    description = "This removes admin rights. The person stays a member.",
+                    invitation = false,
+                )
+            }
+        }
+        rule.onNodeWithTag("group.action.acting_account").assertExists()
+        rule.onNodeWithText("This removes admin rights. The person stays a member.").assertIsDisplayed()
+        rule.onNodeWithText("Public Alice").performScrollTo().assertIsDisplayed()
+        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_action_revoke_review_dark.png")
+    }
+
+    /** Public identifiers distinguish same-named destinations and copy complete bytes rather than an abbreviation. */
+    @Test
+    fun duplicateGroupNamesKeepDistinctCopyableIdentifiers() {
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+        rule.setContent {
+            WhiteNoiseTheme {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups =
+                        listOf(
+                            MemberReviewGroup("garden-one", "Garden club"),
+                            MemberReviewGroup("garden-two", "Garden club"),
+                        ),
+                    members = listOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "")),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add members",
+                )
+            }
+        }
+        rule.onNodeWithContentDescription("Group ID, garden-one").assertExists()
+        rule.onNodeWithContentDescription("Group ID, garden-two").performScrollTo().performClick()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        assertEquals(
+            "garden-two",
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+    }
+
     /** Keeps review actions and the final member reachable when the list overflows. */
     @Test
     fun overflowingReviewKeepsActionsAndLastMemberReachable() {
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         val members =
             (1..8).map {
                 RecipientSearch.Candidate(
@@ -122,7 +336,7 @@ class GroupMembersReviewScreenshotTest {
     /** Retains selection on cancellation and closes review when its destination changes. */
     @Test
     fun cancellingPreservesSelectionAndChangingGroupClosesReview() {
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         val selected = mutableStateListOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "npub1alice"))
         val group = mutableStateOf(MemberReviewGroup("garden", "Garden club"))
         var submits = 0
@@ -153,7 +367,7 @@ class GroupMembersReviewScreenshotTest {
     /** Changing one member's role never transfers that privilege to another person after removal. */
     @Test
     fun removingMemberDoesNotMoveTheirAdminRoleToAnotherPerson() {
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
 
         /** Creates a stable public member identity for the role-menu ownership check. */
         fun member(
@@ -195,7 +409,7 @@ class GroupMembersReviewScreenshotTest {
     @Test
     fun unrelatedWorkStillAllowsCancellingRoleReview() {
         var dismisses = 0
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         rule.setContent {
             WhiteNoiseTheme {
                 GroupMembersReviewDialog(
@@ -229,7 +443,7 @@ class GroupMembersReviewScreenshotTest {
     /** An unresolved public name shows exactly one shortened npub, with person before destination. */
     @Test
     fun unnamedMemberHasOneAbbreviatedIdentity() {
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
         rule.setContent {
             WhiteNoiseTheme {
@@ -280,7 +494,7 @@ class GroupMembersReviewScreenshotTest {
     fun multipleMembersLargeRtl() = captureMultipleMembers(true)
 
     private fun captureMultipleMembers(rtl: Boolean) {
-        val state = emptyAppState()
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
         val members =
             listOf("Alice", "Bob").mapIndexed { index, name ->
                 RecipientSearch.Candidate(
@@ -363,6 +577,7 @@ class GroupMembersReviewScreenshotTest {
         }
         rule.onNodeWithContentDescription("Review selected members").performClick()
         rule.onNode(isDialog()).assertExists()
+        rule.onNodeWithTag("group.action.acting_account").assertExists()
         assertPublicReviewIdentity(npub, rtl)
         rule
             .onNodeWithTag("group.members.review.dialog")
@@ -390,5 +605,16 @@ class GroupMembersReviewScreenshotTest {
         val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
         val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
         assertTrue(if (rtl) person.center.x > group.center.x else person.center.x < group.center.x)
+    }
+}
+
+/** A disposed UI node rejects the saved semantics action before invoking application code. */
+private fun invokeDetachedReviewClick(action: () -> Boolean) {
+    try {
+        action()
+    } catch (failure: IllegalStateException) {
+        if (failure.message != "Cannot read CompositionLocal because the Modifier node is not currently attached.") {
+            throw failure
+        }
     }
 }

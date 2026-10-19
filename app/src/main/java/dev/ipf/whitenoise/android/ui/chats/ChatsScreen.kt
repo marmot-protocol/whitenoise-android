@@ -104,6 +104,9 @@ import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
@@ -116,6 +119,7 @@ import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
+import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
@@ -2154,6 +2158,22 @@ internal fun ChatsScreen(
         val isCurrent = { request.isCurrent(appState, controller) }
         ChatDeleteConfirmationDialog(
             count = request.groupIds.size,
+            confirmEnabled = isCurrent(),
+            identity = {
+                GroupActingAccountIdentity(appState, request.actingAccountRef)
+                request.reviewItems.forEach { item ->
+                    val avatar = rememberChatListGroupAvatar(appState, item)
+                    GroupReviewDestinationIdentity(
+                        MemberReviewGroup(
+                            item.group.groupIdHex,
+                            chatListItemDisplayTitle(item, appState, groupTitleCopy),
+                            avatar.pictureUrl,
+                            avatar.image,
+                        ),
+                        actionLabel = stringResource(R.string.delete_from_device),
+                    )
+                }
+            },
             onConfirm = {
                 pendingBulkDelete = null
                 if (!isCurrent()) return@ChatDeleteConfirmationDialog

@@ -8,16 +8,27 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.group.LARGE_GROUP_INVITE_CONFIRMATION_TAG
 import dev.ipf.whitenoise.android.ui.group.LARGE_GROUP_INVITE_WARNING_TAG
 import dev.ipf.whitenoise.android.ui.group.LargeGroupInviteConfirmationDialog
 import dev.ipf.whitenoise.android.ui.group.LargeGroupInviteWarningBanner
+import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -62,6 +73,7 @@ class LargeGroupInviteWarningScreenshotTest {
     /** Verifies the explicit confirmation remains readable with large fallback text in RTL AMOLED mode. */
     @Test
     fun confirmationAmoledLargeRtl() {
+        val state = emptyAppState()
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 2f) {
@@ -69,6 +81,17 @@ class LargeGroupInviteWarningScreenshotTest {
                         LargeGroupInviteConfirmationDialog(
                             onContinue = {},
                             onDismiss = {},
+                            identity = {
+                                GroupActingAccountIdentity(state, state.activeAccountRef)
+                                GroupMemberReviewPair(
+                                    state,
+                                    MemberReviewGroup("garden", "Garden club"),
+                                    RecipientSearch.Candidate("b".repeat(64), "Alice", ""),
+                                    busy = true,
+                                    initialAdminIds = setOf("b".repeat(64)),
+                                    onInitialAdminChange = { _, _ -> },
+                                )
+                            },
                         )
                     }
                 }
@@ -77,6 +100,16 @@ class LargeGroupInviteWarningScreenshotTest {
         composeRule
             .onNodeWithTag(LARGE_GROUP_INVITE_CONFIRMATION_TAG)
             .captureRoboImage("src/test/snapshots/large_group_invite_confirmation_amoled_large_rtl.png")
+        val admin = "Admin, ${IdentityFormatter.short("b".repeat(64), prefix = 10, suffix = 8)}"
+        composeRule
+            .onNodeWithContentDescription(admin)
+            .performScrollTo()
+            .assertIsOn()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("Group ID, garden").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(LARGE_GROUP_INVITE_CONFIRMATION_TAG)
+            .captureRoboImage("src/test/snapshots/large_group_invite_review_amoled_large_rtl.png")
     }
 
     /** Renders a bounded warning fixture with the requested theme for deterministic baseline capture. */

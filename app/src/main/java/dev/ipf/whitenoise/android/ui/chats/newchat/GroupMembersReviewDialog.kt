@@ -18,25 +18,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -76,19 +77,64 @@ internal fun GroupMembersReviewDialog(
     showProgress: Boolean = busy,
     destructive: Boolean = false,
 ) {
+    val actingAccount = remember(appState) { appState.activeAccountRef }
+    val runtime = remember(appState) { appState.runtimeGeneration }
+    val ticket = remember { GroupMembersReviewTicket() }
+    val liveBusy = rememberUpdatedState(busy)
+    val liveMembers = rememberUpdatedState(members)
+    val liveGroups = rememberUpdatedState(groups)
+    val liveAdmins = rememberUpdatedState(initialAdminIds)
+    val reviewedAdmins = initialAdminIds.toSet()
+    val reviewedMembers = members.map { it.accountIdHex }.toList()
+    val reviewedGroups = groups.map { it.id }.toList()
+    DisposableEffect(ticket) { onDispose { ticket.active = false } }
+    val current =
+        actingAccount != null &&
+            actingAccount == appState.activeAccountRef &&
+            runtime == appState.runtimeGeneration &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress &&
+            appState.retainedAccountReactivationRef == null
+    LaunchedEffect(current) {
+        if (!current) {
+            ticket.active = false
+            onDismiss()
+        }
+    }
     WhiteNoiseAlertDialog(
         modifier = Modifier.testTag("group.members.review.dialog"),
-        onDismissRequest = { if (dismissEnabled) onDismiss() },
+        onDismissRequest = {
+            if (dismissEnabled && ticket.active) {
+                ticket.active = false
+                onDismiss()
+            }
+        },
         title = { Text(title) },
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
+                onClick = {
+                    if (actingAccount != null &&
+                        actingAccount == appState.activeAccountRef &&
+                        runtime == appState.runtimeGeneration &&
+                        !appState.signOutInProgress &&
+                        !appState.wipeInProgress &&
+                        appState.retainedAccountReactivationRef == null &&
+                        ticket.active &&
+                        !liveBusy.value &&
+                        reviewedMembers == liveMembers.value.map { it.accountIdHex } &&
+                        reviewedGroups == liveGroups.value.map { it.id } &&
+                        reviewedAdmins == liveAdmins.value
+                    ) {
+                        ticket.active = false
+                        onConfirm()
+                    }
+                },
                 colors =
                     ButtonDefaults.textButtonColors(
                         contentColor =
                             if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     ),
-                enabled = !busy && members.isNotEmpty() && groups.isNotEmpty(),
+                enabled = current && !busy && members.isNotEmpty() && groups.isNotEmpty(),
                 modifier = Modifier.testTag(SELECTED_MEMBERS_CONFIRM_TAG),
             ) {
                 if (showProgress) {
@@ -99,7 +145,12 @@ internal fun GroupMembersReviewDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = dismissEnabled) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = {
+                if (ticket.active) {
+                    ticket.active = false
+                    onDismiss()
+                }
+            }, enabled = dismissEnabled) { Text(stringResource(R.string.cancel)) }
         },
         text = {
             Column(
@@ -107,6 +158,9 @@ internal fun GroupMembersReviewDialog(
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 description?.let { EmojiLabel(it) }
+                GroupActingAccountIdentity(appState, actingAccount)
+                Text(pluralStringResource(R.plurals.selected_members_count, members.size, members.size))
+                Text(pluralStringResource(R.plurals.group_action_groups_count, groups.size, groups.size))
                 groups.firstOrNull()?.let { firstGroup ->
                     members.forEachIndexed { index, member ->
                         key(member.accountIdHex) {
@@ -146,7 +200,7 @@ internal fun GroupMemberReviewPair(
 ) {
     val revision = appState.profileRevisionForCompose
     val profile = remember(appState, member.accountIdHex, revision) { appState.userProfile(member.accountIdHex) }
-    val identifier = presentationNpubFromReference(member.npub, member.accountIdHex, appState::npubForDisplay)
+    val identifier = groupReviewPublicIdentifier(appState, member)
     val name =
         reviewMemberPublicName(profile?.name)
             ?: reviewMemberPublicName(profile?.displayName)
@@ -154,28 +208,18 @@ internal fun GroupMemberReviewPair(
             ?: reviewMemberPublicName(member.searchProfile?.displayName)
     val shortIdentifier = IdentityFormatter.short(identifier, prefix = 10, suffix = 8)
     val label = name ?: shortIdentifier
-    val picture = ProfileSanitizer.protocolImageUrl(profile?.picture ?: member.searchProfile?.picture)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Column(
-                Modifier.weight(1f).testTag("group.members.review.member"),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(stringResource(R.string.member), style = MaterialTheme.typography.labelMedium)
-                Avatar(label, member.accountIdHex, 48.dp, pictureUrl = picture)
-                name?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-                if (shortIdentifier.isNotBlank()) {
-                    Text(
-                        shortIdentifier,
-                        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Ltr),
-                    )
-                }
-            }
+            GroupReviewPersonIdentity(
+                appState = appState,
+                member = member,
+                role = stringResource(R.string.member),
+                modifier = Modifier.weight(1f).testTag("group.members.review.member"),
+            )
             if (showDirection) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowForward,
@@ -198,14 +242,7 @@ internal fun GroupMemberReviewPair(
                 )
                 (listOf(group) + otherGroups).forEach { destination ->
                     key(destination.id) {
-                        Avatar(
-                            destination.name,
-                            destination.id,
-                            48.dp,
-                            pictureUrl = destination.pictureUrl,
-                            picture = destination.image,
-                        )
-                        EmojiLabel(destination.name, style = MaterialTheme.typography.titleSmall)
+                        GroupReviewDestinationIdentity(destination)
                     }
                 }
             }
@@ -235,4 +272,8 @@ internal fun GroupMemberReviewPair(
 internal fun reviewMemberPublicName(value: String?): String? {
     val publicName = ProfileSanitizer.displayName(value) ?: return null
     return publicName.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+}
+
+private class GroupMembersReviewTicket {
+    var active: Boolean = true
 }

@@ -4184,7 +4184,12 @@ class WhiteNoiseAppState private constructor(
         return runCatchingCancellable {
             // The lock is released only while the user decides, and held again for the acknowledgement and retry.
             withGroupCommitLock(account, groupId) {
-                runGroupChange(account, groupId) {
+                runGroupChange(
+                    account,
+                    groupId,
+                    actionLabel = R.string.make_admin,
+                    affectedMemberIds = listOf(target),
+                ) {
                     val result =
                         marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
                             promoteAdminDetailed(account, groupId, target)
@@ -4295,7 +4300,13 @@ class WhiteNoiseAppState private constructor(
         try {
             runCatchingCancellable {
                 withGroupCommitLock(account, groupIdHex) {
-                    runGroupChange(account, groupIdHex, invite = true) {
+                    runGroupChange(
+                        account,
+                        groupIdHex,
+                        invite = true,
+                        actionLabel = R.string.group_action_add_members,
+                        affectedMemberIds = listOf(ref),
+                    ) {
                         val result =
                             marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                                 inviteMembersDetailed(account, groupIdHex, listOf(ref))

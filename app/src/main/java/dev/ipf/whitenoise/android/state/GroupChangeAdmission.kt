@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -67,6 +68,10 @@ internal data class GroupChangeTarget(
     val groupIdHex: String,
     val runtimeGeneration: Int,
     val title: String?,
+    @StringRes val actionLabel: Int? = null,
+    val affectedMemberIds: List<String> = emptyList(),
+    val initialAdminIds: Set<String> = emptySet(),
+    val retentionSeconds: ULong? = null,
 )
 
 /** One question to the user: wait, or let this one group change to [target] through despite [caution]. */
@@ -151,14 +156,30 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
     invite: Boolean = false,
     askUser: Boolean = true,
     stillWanted: () -> Boolean = { true },
+    @StringRes actionLabel: Int? = null,
+    affectedMemberIds: List<String> = emptyList(),
+    initialAdminIds: Set<String> = emptySet(),
+    retentionSeconds: ULong? = null,
     change: suspend () -> T,
 ): T {
     val generation = runtimeGeneration
+    val reviewedMembers = affectedMemberIds.map { profileReferenceAccountIdHex(it) ?: it }
+    val reviewedAdmins = initialAdminIds.map { profileReferenceAccountIdHex(it) ?: it }.toSet()
     val wanted = { activeAccountRef == accountRef && runtimeGeneration == generation && stillWanted() }
     return withGroupCommitLockHeld(accountRef, groupIdHex) {
         admitGroupChange(
             ask = { cautions ->
-                val target = GroupChangeTarget(accountRef, groupIdHex, generation, chatTitle(accountRef, groupIdHex))
+                val target =
+                    GroupChangeTarget(
+                        accountRef,
+                        groupIdHex,
+                        generation,
+                        chatTitle(accountRef, groupIdHex),
+                        actionLabel,
+                        reviewedMembers,
+                        reviewedAdmins,
+                        retentionSeconds,
+                    )
                 when {
                     !askUser || !ownsGroupChange(target) -> GroupChangeAnswer.Unavailable
                     !wanted() -> GroupChangeAnswer.Wait

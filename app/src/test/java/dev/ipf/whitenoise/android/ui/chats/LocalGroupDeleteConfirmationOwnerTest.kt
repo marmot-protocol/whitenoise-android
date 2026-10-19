@@ -76,6 +76,8 @@ class LocalGroupDeleteConfirmationOwnerTest {
             )
         val retry = request.remaining(1)
         assertEquals(listOf("failed", "unattempted"), retry.groupIds)
+        assertEquals(listOf("failed", "unattempted"), retry.reviewItems.map { it.group.groupIdHex })
+        assertEquals(ACCOUNT_REF, retry.actingAccountRef)
         assertTrue(retry.isCurrent(state, controller))
         state.advanceLocalDeleteTestRuntime()
         assertFalse(retry.isCurrent(state, controller))
@@ -89,5 +91,6 @@ class LocalGroupDeleteConfirmationOwnerTest {
         val request = PendingLocalChatDelete.capture(items, controller, state)
         items.clear()
         assertEquals(listOf("Aa"), request.groupIds)
+        assertEquals(listOf("Aa"), request.reviewItems.map { it.group.groupIdHex })
     }
 }
