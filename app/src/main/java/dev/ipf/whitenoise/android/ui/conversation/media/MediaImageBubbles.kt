@@ -190,6 +190,10 @@ internal fun MediaImageBubble(
             cached?.let { DecodedAttachmentPresentation.Static(it) },
         )
     }
+    val animationSource =
+        rememberInlineAnimationSource(listOf(controller, key, attachmentIndex, epoch), appState, controller.boundAccountRef, controller.group.groupIdHex) {
+            localAttachmentBytes(controller, key, attachmentIndex, mine)
+        }
     val mediaApplyHostAttempt = remember(key, attachmentIndex, epoch) { HostPerformanceAttemptSlot() }
     DisposableEffect(mediaApplyHostAttempt) {
         onDispose(mediaApplyHostAttempt::cancel)
@@ -303,7 +307,7 @@ internal fun MediaImageBubble(
                     )
                 }
             if (decoded != null) {
-                if (decoded is DecodedAttachmentPresentation.Static) {
+                if (decoded is DecodedAttachmentPresentation.Static && !decoded.animationDeferred) {
                     controller.cacheThumbnail(key, attachmentIndex, decoded.bitmap)
                 }
                 mediaApplyHostAttempt.replace(
@@ -385,8 +389,9 @@ internal fun MediaImageBubble(
             }
             when (current) {
                 is DecodedAttachmentPresentation.Static ->
-                    Image(
-                        bitmap = current.toImageBitmap(),
+                    InlineAttachmentImage(
+                        still = current,
+                        source = animationSource,
                         contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                         contentScale = ContentScale.Crop,
                         modifier =
@@ -706,6 +711,10 @@ internal fun MediaImageGridTile(
             cached?.let { DecodedAttachmentPresentation.Static(it) },
         )
     }
+    val animationSource =
+        rememberInlineAnimationSource(controller to decodeKey, appState, controller.boundAccountRef, controller.group.groupIdHex) {
+            localAttachmentBytes(controller, messageIdHex, attachmentIndex, mine)
+        }
     val mediaApplyHostAttempt = remember(decodeKey) { HostPerformanceAttemptSlot() }
     DisposableEffect(mediaApplyHostAttempt) {
         onDispose(mediaApplyHostAttempt::cancel)
@@ -819,7 +828,7 @@ internal fun MediaImageGridTile(
                     )
                 }
             if (decoded != null) {
-                if (decoded is DecodedAttachmentPresentation.Static) {
+                if (decoded is DecodedAttachmentPresentation.Static && !decoded.animationDeferred) {
                     controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap)
                 }
                 mediaApplyHostAttempt.replace(
@@ -899,8 +908,9 @@ internal fun MediaImageGridTile(
         }
         when (current) {
             is DecodedAttachmentPresentation.Static ->
-                Image(
-                    bitmap = current.toImageBitmap(),
+                InlineAttachmentImage(
+                    still = current,
+                    source = animationSource,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().reportMediaApplyAfterDraw(mediaApplyHostAttempt),

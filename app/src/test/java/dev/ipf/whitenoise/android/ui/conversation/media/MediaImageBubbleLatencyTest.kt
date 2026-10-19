@@ -108,6 +108,55 @@ class MediaImageBubbleLatencyTest {
         verifyColdDiskRendering(true, LayoutDirection.Rtl, "media_image_cold_cache_dark_rtl.png")
     }
 
+    /** Cached GIF bytes animate inline without a download, including a still MIME and conversation reentry. */
+    @Test
+    fun encryptedCachedGifPlaysAfterReopeningWithoutAStaticThumbnailTrap() {
+        val transport = InlineAnimationTestTransport()
+        showInlineTestConversation(fixture.state, MediaDownloadIntegrationFixture.GROUP)
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .installTestTransport(transport)
+        val bytes =
+            dev.ipf.whitenoise.android.core
+                .twoFrameGif()
+        fixture.disk.put(request(0).cacheKey(), bytes)
+        fixture.reopenDisk()
+        var shown by mutableStateOf(true)
+        val focused =
+            object : androidx.compose.ui.platform.WindowInfo {
+                override val isWindowFocused = true
+            }
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    CompositionLocalProvider(androidx.compose.ui.platform.LocalWindowInfo provides focused) {
+                        if (shown) Bubble()
+                    }
+                }
+            }
+            composeRule.waitUntil(10_000) { transport.animations.size == 1 }
+            composeRule.runOnIdle {
+                assertTrue(transport.animations.single().isRunning)
+                assertEquals(0, fixture.calls.size)
+                assertEquals(null, controller.thumbnailFor(request(0).messageIdHex, 0))
+                shown = false
+            }
+            composeRule.runOnIdle {
+                assertTrue(!transport.animations.single().isRunning)
+                shown = true
+            }
+            composeRule.waitUntil(10_000) { transport.animations.size == 2 }
+            composeRule.runOnIdle {
+                assertTrue(transport.animations.last().isRunning)
+                assertEquals(0, fixture.calls.size)
+            }
+        } finally {
+            composeRule.runOnIdle { shown = false }
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
+                dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport,
+            )
+        }
+    }
+
     /** A genuine miss must still respect a disabled automatic-download policy after index hydration. */
     @Test
     fun coldCacheMissDoesNotGrantNetworkPermission() {
