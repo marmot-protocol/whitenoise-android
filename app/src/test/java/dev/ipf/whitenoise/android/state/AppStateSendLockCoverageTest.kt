@@ -181,7 +181,7 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "token rotation must not start registration sync during a delivery-mode transaction",
             rotationBody.indexOf("if (!notificationDeliveryModeBusy)") in
-                0 until rotationBody.indexOf("syncNativePushRegistrationIfEnabled()"),
+                0 until rotationBody.indexOf("syncNativePushRegistration(token, ownerIsCurrent)"),
         )
         assertTrue(
             "token rotation must serialize its busy check with the delivery-mode transaction",

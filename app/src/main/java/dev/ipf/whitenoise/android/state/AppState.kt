@@ -1510,6 +1510,7 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
+    private val pushTokenRotationSequence = AtomicLong()
     private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     private val notificationDeliveryModeMutex = Mutex()
     private val notificationDeliveryModeIntent = StalenessGuard()
@@ -10044,8 +10045,23 @@ class WhiteNoiseAppState private constructor(
      * lifecycle.
      */
     fun onPushTokenRotated(token: String) {
+        if (token.isBlank()) return
+        val rotation = pushTokenRotationSequence.incrementAndGet()
+        val runtime = marmotRuntime
+        val generation = runtimeGeneration
+        val account = activeAccountRef
+        val accountSwitch = accountSwitchHandoff.capture()
+        val ownerIsCurrent = {
+            pushTokenRotationSequence.get() == rotation &&
+                marmotRuntime === runtime &&
+                runtimeGeneration == generation &&
+                activeAccountRef == account &&
+                accountSwitchHandoff.isCurrent(accountSwitch) &&
+                !signOutInProgress &&
+                !wipeInProgress
+        }
         try {
-            pushTokenStore.setToken(token)
+            if (!pushTokenStore.setTokenIfCurrent(token) { pushTokenRotationSequence.get() == rotation }) return
         } catch (_: PushTokenStorageException) {
             android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
             return
@@ -10060,7 +10076,9 @@ class WhiteNoiseAppState private constructor(
                 }
             if (recorded != true) return@launch
             notificationDeliveryModeMutex.withLock {
-                if (!notificationDeliveryModeBusy) syncNativePushRegistrationIfEnabled()
+                if (!notificationDeliveryModeBusy) {
+                    if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
+                }
             }
         }
     }
@@ -10074,9 +10092,17 @@ class WhiteNoiseAppState private constructor(
      * something changes. Returns true only when every account that currently
      * requires native push is registered (or does not require registration).
      */
-    suspend fun syncNativePushRegistrationIfEnabled(): Boolean =
+    suspend fun syncNativePushRegistrationIfEnabled(): Boolean = syncNativePushRegistration()
+
+    /** A callback token is ephemeral authority for this rotation only, never a persisted-cache fallback. */
+    private suspend fun syncNativePushRegistration(
+        freshCallbackToken: String? = null,
+        callbackOwnerIsCurrent: () -> Boolean = { true },
+    ): Boolean =
         try {
-            nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
+            nativePushSyncMutex.withLock {
+                syncNativePushRegistrationIfEnabledLocked(freshCallbackToken, callbackOwnerIsCurrent)
+            }
         } catch (_: PushTokenStorageException) {
             android.util.Log.w("PushTokenStorage", "registration_deferred")
             false
@@ -10097,7 +10123,13 @@ class WhiteNoiseAppState private constructor(
 
     /** Replays pending cleanup before registration and gates token acquisition on capability. */
     @Suppress("ReturnCount")
-    private suspend fun syncNativePushRegistrationIfEnabledLocked(): Boolean {
+    private suspend fun syncNativePushRegistrationIfEnabledLocked(
+        freshCallbackToken: String? = null,
+        callbackOwnerIsCurrent: () -> Boolean = { true },
+    ): Boolean {
+        val rotation = pushTokenRotationSequence.get()
+        val operationIsCurrent = { pushTokenRotationSequence.get() == rotation && callbackOwnerIsCurrent() }
+
         // Drain before resolving the push-server config so a clear that
         // failed earlier still retries even if the config is later blanked
         // or GMS is uninstalled — otherwise a stale server-side registration
@@ -10126,8 +10158,9 @@ class WhiteNoiseAppState private constructor(
                     .filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
                     .map { it.label }
             if (accountRefs.isEmpty()) {
-                pushTokenStore.clearPendingNativePushRegistrationSync()
-                return true
+                return withContext(pushWakeStorageDispatcher) {
+                    pushTokenStore.completeRegistrationSyncIfCurrent(ownerIsCurrent = operationIsCurrent)
+                }
             }
         }
         val config = pushServerConfigProvider()
@@ -10135,14 +10168,37 @@ class WhiteNoiseAppState private constructor(
         if (!capability.isAvailable) return reconcileUnavailableNativePushFallback(capability, accountRefs)
         config ?: return false
         if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
-        val token = fetchFcmTokenOrNull() ?: return false
+        if (!operationIsCurrent()) return false
+        val token = tokenForNativePushSync(freshCallbackToken, operationIsCurrent) ?: return false
+        val tokenIsCurrent: suspend () -> Boolean = {
+            operationIsCurrent() &&
+                (
+                    freshCallbackToken == null ||
+                        withContext(pushWakeStorageDispatcher) { pushTokenStore.lastToken() == token }
+                ) &&
+                operationIsCurrent()
+        }
+        if (!tokenIsCurrent()) return false
         for (account in accountRefs) {
-            val synced = syncPushForAccount(account, config, token)
+            val synced = syncPushForAccount(account, config, token, tokenIsCurrent)
             if (!synced) return false
         }
-        pushTokenStore.clearPendingNativePushRegistrationSync()
-        return true
+        if (!tokenIsCurrent()) return false
+        return withContext(pushWakeStorageDispatcher) {
+            pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
+        }
     }
+
+    /** Only this invocation's fresh callback can replace a failed SDK acquisition. */
+    private suspend fun tokenForNativePushSync(
+        freshCallbackToken: String?,
+        operationIsCurrent: () -> Boolean,
+    ): String? =
+        fetchFcmTokenOrNull(freshCallbackToken, operationIsCurrent)
+            ?: freshCallbackToken?.takeIf {
+                operationIsCurrent() &&
+                    withContext(pushWakeStorageDispatcher) { pushTokenStore.lastToken() == it }
+            }
 
     /** Migrates the active account while reporting unknown or background-owned state as incomplete. */
     private suspend fun reconcileUnavailableNativePushFallback(
@@ -10270,6 +10326,7 @@ class WhiteNoiseAppState private constructor(
         account: String,
         config: PushServerConfig,
         token: String,
+        tokenIsCurrent: suspend () -> Boolean = { true },
     ): Boolean {
         val settings = runCatchingCancellable { marmotIo { notificationSettings(account) } }.getOrNull() ?: return false
         if (account == activeAccountRef) localNotificationSettings = settings
@@ -10287,7 +10344,7 @@ class WhiteNoiseAppState private constructor(
         return runCatching {
             val syncResult =
                 marmotIo {
-                    if (!pushTokenStore.registrationAllowed()) throw PushTokenStorageException()
+                    if (!pushTokenStore.registrationAllowed() || !tokenIsCurrent()) throw PushTokenStorageException()
                     upsertPushRegistration(
                         accountRef = account,
                         platform = PushPlatformFfi.FCM,
@@ -10313,11 +10370,12 @@ class WhiteNoiseAppState private constructor(
                     false.also {
                         appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }
                     }
-                settingsAfter.nativePushEnabled -> {
+                settingsAfter.nativePushEnabled && tokenIsCurrent() -> {
                     perAccountSyncedFingerprints[account] = fingerprint
                     appStateDebug { "push registration synced account=${account.take(8)}" }
                     true
                 }
+                settingsAfter.nativePushEnabled -> false
                 else -> {
                     appStateDebug { "push registration raced disable; rolling back account=${account.take(8)}" }
                     // Shares the pending-clear bookkeeping: a failed rollback
@@ -10418,7 +10476,11 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Fetches and retains a non-blank FCM token only when every push prerequisite is available. */
-    private suspend fun fetchFcmTokenOrNull(): String? {
+    private suspend fun fetchFcmTokenOrNull(
+        expectedCallbackToken: String? = null,
+        tokenOwnerIsCurrent: () -> Boolean = { true },
+    ): String? {
+        val rotation = pushTokenRotationSequence.get()
         if (!nativePushCapability().isAvailable) return null
         val token =
             runCatchingCancellable {
@@ -10427,8 +10489,14 @@ class WhiteNoiseAppState private constructor(
             }.onFailure {
                 appStateDebug { "FCM token fetch failed: ${it.readableMessage()}" }
             }.getOrNull()
-        if (!token.isNullOrBlank()) pushTokenStore.setToken(token)
-        return token?.takeIf { it.isNotBlank() }
+        if (token.isNullOrBlank()) return null
+        val retained =
+            withContext(pushWakeStorageDispatcher) {
+                pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
+                    pushTokenRotationSequence.get() == rotation && tokenOwnerIsCurrent()
+                }
+            }
+        return token.takeIf { retained }
     }
 
     private suspend fun readFcmTokenFromSdk(): String? =

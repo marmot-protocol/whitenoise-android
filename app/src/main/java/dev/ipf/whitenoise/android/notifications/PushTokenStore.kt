@@ -81,6 +81,33 @@ class PushTokenStore(
         }
     }
 
+    /** Commits only the current callback/SDK result while sharing cleanup and rotation's store lock. */
+    internal fun setTokenIfCurrent(
+        token: String,
+        expectedToken: String? = null,
+        ownerIsCurrent: () -> Boolean,
+    ): Boolean =
+        synchronized(LOCK) {
+            if (!ownerIsCurrent()) return@synchronized false
+            if (expectedToken != null && (!registrationAllowed() || lastToken() != expectedToken)) {
+                return@synchronized false
+            }
+            preferences.edit().putString(KEY_FCM_TOKEN, token).apply()
+            true
+        }
+
+    /** A superseded callback cannot acknowledge the latest rotation's durable retry obligation. */
+    internal fun completeRegistrationSyncIfCurrent(
+        token: String? = null,
+        ownerIsCurrent: () -> Boolean,
+    ): Boolean =
+        synchronized(LOCK) {
+            if (!ownerIsCurrent()) return@synchronized false
+            if (token != null && (!registrationAllowed() || lastToken() != token)) return@synchronized false
+            preferences.edit().remove(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).apply()
+            true
+        }
+
     /** Removes only the token, retaining outstanding registration and push-wake retry obligations. */
     fun clear() {
         synchronized(LOCK) {

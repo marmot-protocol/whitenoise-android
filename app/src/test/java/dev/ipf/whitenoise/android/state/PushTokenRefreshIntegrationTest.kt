@@ -209,6 +209,376 @@ class PushTokenRefreshIntegrationTest {
             }
         }
 
+    /** A current Firebase callback remains usable when a redundant SDK read fails. */
+    @Test
+    fun freshCallbackRegistersWithoutSuccessfulSecondSdkRead() =
+        runBlocking {
+            var unavailable = false
+            val fixture = fixture { if (unavailable) error("unavailable") else "bootstrap-token" }
+            try {
+                fixture.bootstrap()
+                fixture.appState.syncNativePushRegistrationIfEnabled()
+                fixture.upsertedPushTokens.clear()
+                unavailable = true
+                val callback = queueRotation(fixture, "callback-token")
+                fixture.runWithMainLooperPumping { callback.join() }
+                assertEquals(listOf("callback-token"), fixture.upsertedPushTokens.toList())
+                assertFalse(PushTokenStore.create(context).nativePushRegistrationSyncPending())
+            } finally {
+                fixture.close()
+                NotificationStreamForegroundService.stop(context)
+            }
+        }
+
+    /** A later callback owns queued registration; older work cannot acknowledge its pending flag. */
+    @Test
+    fun onlyLatestQueuedCallbackRegisters() =
+        runBlocking {
+            var unavailable = false
+            val fixture = fixture { if (unavailable) error("unavailable") else "bootstrap-token" }
+            try {
+                fixture.bootstrap()
+                fixture.appState.syncNativePushRegistrationIfEnabled()
+                fixture.upsertedPushTokens.clear()
+                unavailable = true
+                val mutex = deliveryMutex(fixture)
+                mutex.lock()
+                try {
+                    val first = queueRotation(fixture, "first-callback")
+                    val latest = queueRotation(fixture, "latest-callback")
+                    mutex.unlock()
+                    fixture.runWithMainLooperPumping {
+                        first.join()
+                        latest.join()
+                    }
+                } finally {
+                    if (mutex.isLocked) mutex.unlock()
+                }
+                assertEquals(listOf("latest-callback"), fixture.upsertedPushTokens.toList())
+                assertFalse(PushTokenStore.create(context).nativePushRegistrationSyncPending())
+            } finally {
+                fixture.close()
+                NotificationStreamForegroundService.stop(context)
+            }
+        }
+
+    /** SDK success can supersede the callback, but callback authority cannot survive owner changes. */
+    @Test
+    fun callbackPrefersNewerSdkTokenAndRejectsRetiredOwners() =
+        runBlocking {
+            for (retirement in listOf("none", "runtime", "account", "signout", "wipe", "clear")) {
+                var token = "bootstrap-token"
+                val fixture = fixture { token }
+                try {
+                    fixture.bootstrap()
+                    fixture.appState.syncNativePushRegistrationIfEnabled()
+                    fixture.upsertedPushTokens.clear()
+                    token = "newer-sdk-token"
+                    val mutex = deliveryMutex(fixture)
+                    mutex.lock()
+                    val callback = queueRotation(fixture, "callback-token")
+                    when (retirement) {
+                        "runtime" -> {
+                            val generation =
+                                WhiteNoiseAppState::class.java
+                                    .getDeclaredField("runtimeGeneration\$delegate")
+                                    .apply { isAccessible = true }
+                                    .get(fixture.appState) as androidx.compose.runtime.MutableIntState
+                            generation.intValue += 1
+                        }
+                        "account" -> {
+                            @Suppress("UNCHECKED_CAST")
+                            val account =
+                                WhiteNoiseAppState::class.java
+                                    .getDeclaredField("activeAccountRef\$delegate")
+                                    .apply { isAccessible = true }
+                                    .get(fixture.appState) as androidx.compose.runtime.MutableState<String?>
+                            account.value = "different-account"
+                        }
+                        "signout" -> fixture.appState.signOutInProgress = true
+                        "wipe" -> fixture.appState.wipeInProgress = true
+                        "clear" -> PushTokenStore.create(context).clear()
+                    }
+                    mutex.unlock()
+                    fixture.runWithMainLooperPumping { callback.join() }
+                    if (retirement == "none") {
+                        assertEquals(listOf("newer-sdk-token"), fixture.upsertedPushTokens.toList())
+                    } else {
+                        assertTrue(retirement, fixture.upsertedPushTokens.isEmpty())
+                    }
+                } finally {
+                    fixture.appState.signOutInProgress = false
+                    fixture.appState.wipeInProgress = false
+                    fixture.close()
+                    NotificationStreamForegroundService.stop(context)
+                }
+            }
+        }
+
+    /** Unconfirmed cleanup still blocks a fresh event, even though it was durably recorded. */
+    @Test
+    fun callbackCannotBypassUnknownStorageCleanup() =
+        runBlocking {
+            var unavailable = false
+            val fixture = fixture { if (unavailable) error("unavailable") else "bootstrap-token" }
+            try {
+                fixture.bootstrap()
+                fixture.appState.syncNativePushRegistrationIfEnabled()
+                fixture.upsertedPushTokens.clear()
+                unavailable = true
+                val blocked =
+                    PushTokenStore(
+                        context.getSharedPreferences("callback-cleanup-test", android.content.Context.MODE_PRIVATE),
+                        recoveryStatus = {
+                            dev.ipf.whitenoise.android.notifications.PushStorageRecovery.StorageUnavailable
+                        },
+                    )
+                fixture.replacePushTokenStore(blocked)
+                val callback = queueRotation(fixture, "callback-token")
+                fixture.runWithMainLooperPumping { callback.join() }
+                assertTrue(fixture.upsertedPushTokens.isEmpty())
+                assertTrue(blocked.nativePushRegistrationSyncPending())
+            } finally {
+                fixture.close()
+                context.deleteSharedPreferences("callback-cleanup-test")
+                NotificationStreamForegroundService.stop(context)
+            }
+        }
+
+    /** Suspended SDK work cannot outlive its callback, runtime or account owner. */
+    @Test
+    fun suspendedSdkReadRejectsSupersededCallbackAndRetiredOwners() =
+        runBlocking {
+            for (retirement in listOf("rotation", "runtime", "account")) {
+                var rotating = false
+                val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+                val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+                val reads =
+                    java.util.concurrent.atomic
+                        .AtomicInteger()
+                val fixture =
+                    fixture {
+                        if (!rotating) {
+                            "bootstrap-token"
+                        } else if (reads.incrementAndGet() == 1) {
+                            started.complete(Unit)
+                            release.await()
+                            "superseded-sdk-token"
+                        } else {
+                            error("unavailable")
+                        }
+                    }
+                try {
+                    fixture.bootstrap()
+                    fixture.appState.syncNativePushRegistrationIfEnabled()
+                    fixture.upsertedPushTokens.clear()
+                    rotating = true
+                    val first = queueRotation(fixture, "first-callback")
+                    fixture.runWithMainLooperPumping {
+                        kotlinx.coroutines.withTimeout(5_000L) { started.await() }
+                        val latest =
+                            when (retirement) {
+                                "rotation" -> queueRotation(fixture, "latest-callback")
+                                "runtime" -> {
+                                    val generation =
+                                        WhiteNoiseAppState::class.java
+                                            .getDeclaredField("runtimeGeneration\$delegate")
+                                            .apply { isAccessible = true }
+                                            .get(fixture.appState) as androidx.compose.runtime.MutableIntState
+                                    generation.intValue += 1
+                                    null
+                                }
+                                else -> {
+                                    @Suppress("UNCHECKED_CAST")
+                                    val account =
+                                        WhiteNoiseAppState::class.java
+                                            .getDeclaredField("activeAccountRef\$delegate")
+                                            .apply { isAccessible = true }
+                                            .get(fixture.appState) as androidx.compose.runtime.MutableState<String?>
+                                    account.value = "different-account"
+                                    null
+                                }
+                            }
+                        release.complete(Unit)
+                        first.join()
+                        latest?.join()
+                    }
+                    if (retirement == "rotation") {
+                        assertEquals(listOf("latest-callback"), fixture.upsertedPushTokens.toList())
+                        assertEquals("latest-callback", PushTokenStore.create(context).lastToken())
+                        assertFalse(PushTokenStore.create(context).nativePushRegistrationSyncPending())
+                    } else {
+                        assertTrue(retirement, fixture.upsertedPushTokens.isEmpty())
+                        assertEquals("first-callback", PushTokenStore.create(context).lastToken())
+                        assertTrue(PushTokenStore.create(context).nativePushRegistrationSyncPending())
+                    }
+                } finally {
+                    release.complete(Unit)
+                    fixture.close()
+                    NotificationStreamForegroundService.stop(context)
+                }
+            }
+        }
+
+    /** A callback arriving inside an older SDK write must win the shared store lock before registration. */
+    @Test
+    fun sdkPersistenceAndConcurrentCallbackStayOrdered() =
+        runBlocking {
+            var rotating = false
+            val enteredWrite = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val releaseWrite = java.util.concurrent.CountDownLatch(1)
+            val reads =
+                java.util.concurrent.atomic
+                    .AtomicInteger()
+            val fixture =
+                fixture {
+                    if (!rotating) {
+                        "bootstrap-token"
+                    } else if (reads.incrementAndGet() == 1) {
+                        "older-sdk-token"
+                    } else {
+                        error("unavailable")
+                    }
+                }
+            val store = PushTokenStore(heldSdkPreferences(enteredWrite, releaseWrite))
+            try {
+                fixture.bootstrap()
+                fixture.appState.syncNativePushRegistrationIfEnabled()
+                fixture.upsertedPushTokens.clear()
+                store.setToken("bootstrap-token")
+                fixture.replacePushTokenStore(store)
+                rotating = true
+                val first = queueRotation(fixture, "first-callback")
+                fixture.runWithMainLooperPumping {
+                    kotlinx.coroutines.coroutineScope {
+                        kotlinx.coroutines.withTimeout(5_000L) { enteredWrite.await() }
+                        val latest =
+                            async(kotlinx.coroutines.Dispatchers.IO) { queueRotation(fixture, "latest-callback") }
+                        val sequence =
+                            WhiteNoiseAppState::class.java
+                                .getDeclaredField("pushTokenRotationSequence")
+                                .apply { isAccessible = true }
+                                .get(fixture.appState) as java.util.concurrent.atomic.AtomicLong
+                        kotlinx.coroutines.withTimeout(5_000L) {
+                            while (sequence.get() < 2L) kotlinx.coroutines.yield()
+                        }
+                        releaseWrite.countDown()
+                        first.join()
+                        latest.await().join()
+                    }
+                }
+                assertEquals(listOf("latest-callback"), fixture.upsertedPushTokens.toList())
+                assertEquals("latest-callback", store.lastToken())
+                assertFalse(store.nativePushRegistrationSyncPending())
+            } finally {
+                releaseWrite.countDown()
+                fixture.close()
+                context.deleteSharedPreferences("callback-atomic-test")
+                NotificationStreamForegroundService.stop(context)
+            }
+        }
+
+    /** An ordinary query suspended before a fresh callback cannot replace it or consume its retry marker. */
+    @Test
+    fun ordinarySdkReadCannotReplaceFreshCallback() =
+        runBlocking {
+            var rotating = false
+            val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val reads =
+                java.util.concurrent.atomic
+                    .AtomicInteger()
+            val fixture =
+                fixture {
+                    if (!rotating) {
+                        "bootstrap-token"
+                    } else if (reads.incrementAndGet() == 1) {
+                        started.complete(Unit)
+                        release.await()
+                        "older-sdk-token"
+                    } else {
+                        error("unavailable")
+                    }
+                }
+            try {
+                fixture.bootstrap()
+                fixture.appState.syncNativePushRegistrationIfEnabled()
+                fixture.upsertedPushTokens.clear()
+                rotating = true
+                fixture.runWithMainLooperPumping {
+                    kotlinx.coroutines.coroutineScope {
+                        val ordinary = async { fixture.appState.syncNativePushRegistrationIfEnabled() }
+                        kotlinx.coroutines.withTimeout(5_000L) { started.await() }
+                        val callback = queueRotation(fixture, "callback-token")
+                        release.complete(Unit)
+                        assertFalse(ordinary.await())
+                        callback.join()
+                    }
+                }
+                assertEquals(listOf("callback-token"), fixture.upsertedPushTokens.toList())
+                assertEquals("callback-token", PushTokenStore.create(context).lastToken())
+                assertFalse(PushTokenStore.create(context).nativePushRegistrationSyncPending())
+            } finally {
+                release.complete(Unit)
+                fixture.close()
+                NotificationStreamForegroundService.stop(context)
+            }
+        }
+
+    private fun heldSdkPreferences(
+        enteredWrite: kotlinx.coroutines.CompletableDeferred<Unit>,
+        releaseWrite: java.util.concurrent.CountDownLatch,
+    ): android.content.SharedPreferences {
+        val preferences = context.getSharedPreferences("callback-atomic-test", android.content.Context.MODE_PRIVATE)
+        return object : android.content.SharedPreferences by preferences {
+            override fun edit(): android.content.SharedPreferences.Editor {
+                val editor = preferences.edit()
+                return object : android.content.SharedPreferences.Editor by editor {
+                    private var heldSdkWrite = false
+
+                    override fun putString(
+                        key: String?,
+                        value: String?,
+                    ): android.content.SharedPreferences.Editor {
+                        heldSdkWrite = value == "older-sdk-token"
+                        editor.putString(key, value)
+                        return this
+                    }
+
+                    override fun apply() {
+                        if (heldSdkWrite) {
+                            enteredWrite.complete(Unit)
+                            check(releaseWrite.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                        }
+                        editor.apply()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun deliveryMutex(fixture: NotificationBootstrapTestFixture): kotlinx.coroutines.sync.Mutex =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("notificationDeliveryModeMutex")
+            .apply { isAccessible = true }
+            .get(fixture.appState) as kotlinx.coroutines.sync.Mutex
+
+    /** Captures the actual callback child so assertions wait for its complete production path. */
+    private fun queueRotation(
+        fixture: NotificationBootstrapTestFixture,
+        token: String,
+    ): kotlinx.coroutines.Job {
+        val scope =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("notificationScope")
+                .apply { isAccessible = true }
+                .get(fixture.appState) as kotlinx.coroutines.CoroutineScope
+        val parent = checkNotNull(scope.coroutineContext[kotlinx.coroutines.Job])
+        val previous = parent.children.toSet()
+        fixture.appState.onPushTokenRotated(token)
+        return parent.children.first { it !in previous }
+    }
+
     private fun fixture(
         available: Boolean = true,
         reader: suspend () -> String?,
