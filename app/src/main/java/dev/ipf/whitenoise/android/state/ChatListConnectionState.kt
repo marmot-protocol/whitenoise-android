@@ -175,7 +175,10 @@ private fun ChatListConnectionState.matches(token: ChatListConnectionEvidenceTok
 private fun ChatListConnectionState.sessionIdentityOrNull(): ChatListConnectionSessionIdentity? =
     accountRef?.let { ChatListConnectionSessionIdentity(it, runtimeGeneration, bindEpoch, sessionAttemptId) }
 
-/** Owns the controller's observable readiness state and stale-result fences. */
+/**
+ * Owns observable readiness and stale-result fences. The compatibility-named
+ * hasValidatedInternet input is foreground route availability, not OS probe validation.
+ */
 @Suppress("TooManyFunctions") // Readiness transitions and their diagnostics share one fenced owner.
 internal class ChatListConnectionOwner(
     private val runtimeGeneration: () -> Int,
@@ -189,7 +192,7 @@ internal class ChatListConnectionOwner(
         hasCurrentSubscriptions: () -> Boolean,
     ) : this(
         runtimeGeneration = { appState.runtimeGeneration },
-        hasValidatedInternet = { appState.connectivitySignals.value.hasValidatedInternet },
+        hasValidatedInternet = { appState.connectivitySignals.value.hasAppNetwork },
         launchCatchUpRequest = appState::launchCatchUpAccounts,
         hasCurrentSubscriptions = hasCurrentSubscriptions,
         diagnostics = ChatListConnectionDiagnostics(appState::chatListConnectionDiagnosticConfiguration),

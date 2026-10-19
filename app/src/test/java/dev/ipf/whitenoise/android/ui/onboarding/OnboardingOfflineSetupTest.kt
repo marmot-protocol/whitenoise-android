@@ -19,6 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/** Sign-in stays available offline; SignUpProfileDraftSubmissionTest covers the real creation route. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class OnboardingOfflineSetupTest {
@@ -28,75 +29,13 @@ class OnboardingOfflineSetupTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val nsec = "nsec1" + "q".repeat(58)
 
-    @Test
-    fun onlyNewIdentityCreationIsHeldWhileOffline() {
-        val offline = mutableListOf<OnboardingAction>()
-        var starts = 0
-
-        setupActions.forEach { action ->
-            dispatchOnboardingAction(
-                inFlightAction = OnboardingAction.Idle,
-                hasValidatedInternet = false,
-                requestedAction = action,
-                onOffline = offline::add,
-                onStart = { starts += 1 },
-            )
-        }
-
-        assertEquals(listOf(OnboardingAction.Creating), offline)
-        assertEquals(2, starts)
-    }
-
-    @Test
-    fun retryStartsTheSameActionOnceAfterNetworkReturns() {
-        var online = false
-        var pending: OnboardingAction? = null
-        var starts = 0
-
-        fun dispatch(action: OnboardingAction) {
-            dispatchOnboardingAction(
-                inFlightAction = OnboardingAction.Idle,
-                hasValidatedInternet = online,
-                requestedAction = action,
-                onOffline = { pending = it },
-                onStart = {
-                    pending = null
-                    starts += 1
-                },
-            )
-        }
-
-        dispatch(OnboardingAction.Creating)
-        assertEquals(OnboardingAction.Creating, pending)
-        assertEquals(0, starts)
-
-        online = true
-        dispatch(requireNotNull(pending))
-
-        assertEquals(null, pending)
-        assertEquals(1, starts)
-    }
-
-    @Test
-    fun anInFlightActionRejectsRepeatedSetupTaps() {
-        setupActions.forEach { requested ->
-            dispatchOnboardingAction(
-                inFlightAction = OnboardingAction.Creating,
-                hasValidatedInternet = true,
-                requestedAction = requested,
-                onOffline = { error("busy work must not be replaced by an offline prompt") },
-                onStart = { error("busy work must not start a second setup call") },
-            )
-        }
-    }
-
     /** Valid nsec reaches identity acceptance even while offline. */
     @Test
     fun validNsecReachesIdentityAcceptanceEvenWhileOffline() {
         val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("expected") })
         val appState = signInTestAppState(context, engine)
         composeRule.setContent {
-            WhiteNoiseTheme { OnboardingScreen(appState = appState, hasValidatedInternet = { false }) }
+            WhiteNoiseTheme { OnboardingScreen(appState = appState, hasActiveNetwork = { false }) }
         }
         composeRule.onNodeWithText(context.getString(R.string.onboarding_login)).performClick()
         composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(nsec)
@@ -114,7 +53,7 @@ class OnboardingOfflineSetupTest {
         val appState = signInTestAppState(context, engine)
         composeRule.setContent {
             WhiteNoiseTheme {
-                OnboardingScreen(appState = appState, hasValidatedInternet = { false })
+                OnboardingScreen(appState = appState, hasActiveNetwork = { false })
             }
         }
 
@@ -125,14 +64,5 @@ class OnboardingOfflineSetupTest {
         composeRule.onNodeWithText(context.getString(R.string.identity_entry_error_invalid_key)).assertExists()
         composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertDoesNotExist()
         assertEquals(0, engine.logins.size)
-    }
-
-    private companion object {
-        val setupActions =
-            listOf(
-                OnboardingAction.Creating,
-                OnboardingAction.Importing,
-                OnboardingAction.AmberLogin,
-            )
     }
 }

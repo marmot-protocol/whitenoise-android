@@ -117,7 +117,7 @@ internal fun RelayConnectivityPollingEffect(
             while (true) {
                 refreshRelayConnectivity()
                 val signals = connectivitySignals()
-                if (signals.hasValidatedInternet && !signals.relaysConnected) {
+                if (signals.hasAppNetwork && !signals.relaysConnected) {
                     revalidateConnectionReadiness()
                 }
                 val pollDelay = relayPollDelayMillis(currentDisplayed, signals.relaysConnected)
@@ -132,12 +132,13 @@ internal fun RelayConnectivityPollingEffect(
 }
 
 /**
- * Re-evaluates chat-list readiness whenever validated internet appears, recovers, or drops, keyed so
- * the first signal after a bind only invalidates rather than assuming a prior attempt failed.
+ * Re-evaluates chat-list readiness when active-default-network availability changes, independently
+ * of OS validation. The first signal after a bind only invalidates rather than assuming a prior
+ * attempt failed.
  */
 @Composable
 @Suppress("FunctionNaming")
-internal fun ValidatedInternetRefreshEffect(
+internal fun ActiveNetworkRefreshEffect(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
     activeAccountRef: String?,
@@ -146,15 +147,15 @@ internal fun ValidatedInternetRefreshEffect(
     LaunchedEffect(controller, activeAccountRef, runtimeGeneration) {
         var firstSignal = true
         appState.connectivitySignals
-            .map { it.hasValidatedInternet }
+            .map { it.hasAppNetwork }
             .distinctUntilChanged()
-            .collect { hasValidatedInternet ->
+            .collect { hasAppNetwork ->
                 when {
                     firstSignal -> {
                         firstSignal = false
-                        if (!hasValidatedInternet) controller.invalidateConnectionReadinessOnNetworkLoss()
+                        if (!hasAppNetwork) controller.invalidateConnectionReadinessOnNetworkLoss()
                     }
-                    hasValidatedInternet -> controller.refreshConnectionReadiness()
+                    hasAppNetwork -> controller.refreshConnectionReadiness()
                     else -> controller.invalidateConnectionReadinessOnNetworkLoss()
                 }
             }
@@ -163,8 +164,8 @@ internal fun ValidatedInternetRefreshEffect(
 
 /**
  * Revalidates chat-list readiness on the two edges the periodic poll would otherwise be alone in
- * catching: a foreground resume with usable internet, and relays reading disconnected while internet
- * is validated.
+ * catching: a foreground resume with an active default route, and relays reading disconnected while
+ * that route is available. The caller supplies active-route availability as hasValidatedInternet.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList") // Explicit lifecycle/relay dependencies keep the effect testable.

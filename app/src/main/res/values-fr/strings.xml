@@ -2236,6 +2236,7 @@
     <string name="local_reset_retry_detail">\u2068La réinitialisation est arrêtée. Choisissez à nouveau Réinitialiser et attendre une nouvelle invitation ; le résultat précédent sera vérifié d\'abord. Si le problème persiste, redémarrez l\'application.\u2069</string>
     <string name="chat_list_delete_stopped">Suppression arrêtée</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d suppressions confirmées sur %2$d. Réessayez Supprimer de cet appareil pour vérifier le résultat. Si l\'échec persiste, redémarrez l\'application.\u2069</string>
+    <string name="group_image_destination_refused_detail">La destination du téléversement a été bloquée par les règles de sécurité réseau. Vérifiez votre serveur de téléversement et vos paramètres réseau, puis réessayez.</string>
     <string name="group_svg_rejected_detail">Impossible de préparer ce SVG. Choisissez un SVG simple, un PNG ou un JPEG.</string>
     <string name="error_invalid_key_package">La clé de discussion publiée pour cette personne n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
     <string name="error_invalid_key_package_for">La clé de discussion publiée pour %1$s n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>

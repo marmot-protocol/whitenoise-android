@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.whitenoise.android.core.RecentEmojiList
-import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
+import dev.ipf.whitenoise.android.ui.MarkdownLinkLayoutRegistry
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayoutReporter
 import dev.ipf.whitenoise.android.ui.SelectableTextLayoutReporter
 import kotlinx.coroutines.Job
@@ -138,7 +138,7 @@ internal class MessageBubblePressState {
 @Stable
 internal class MessageBubbleTextLayouts {
     val selectableTextLayouts = SelectableTextLayoutRegistry()
-    val markdownLinkLayouts = mutableStateMapOf<Any, MarkdownLinkTextLayout>()
+    val markdownLinkLayouts = MarkdownLinkLayoutRegistry(mutableStateMapOf())
     val pendingLongPressLinkDestination = arrayOfNulls<String>(1)
     val plainTextLayoutKey = "plain"
     val plainTextLayoutTracker = SelectableTextLayoutTracker()
@@ -146,13 +146,7 @@ internal class MessageBubbleTextLayouts {
     var textSelectionBoundsInWindow by mutableStateOf<Rect?>(null)
 
     /** Keeps the latest layout of each rendered link leaf, and drops it when the leaf reports no layout. */
-    val markdownLinkLayoutReporter: MarkdownLinkTextLayoutReporter = { key, text, layoutResult, coordinates ->
-        if (layoutResult != null && coordinates != null) {
-            markdownLinkLayouts[key] = MarkdownLinkTextLayout(text, layoutResult, coordinates)
-        } else {
-            markdownLinkLayouts.remove(key)
-        }
-    }
+    val markdownLinkLayoutReporter: MarkdownLinkTextLayoutReporter = markdownLinkLayouts.report
 
     /** Keeps the latest layout of each selectable text leaf for selection seeding and read-aloud hit tests. */
     val selectableTextLayoutReporter: SelectableTextLayoutReporter = { key, layoutResult, coordinates ->
