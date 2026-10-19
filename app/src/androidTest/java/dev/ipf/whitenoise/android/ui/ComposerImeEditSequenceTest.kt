@@ -69,9 +69,17 @@ class ComposerImeEditSequenceTest {
         val layouts = mutableListOf<TextLayoutResult>()
         editor.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val position = layouts.single().getBoundingBox(7).center
+        var holdDurationMillis = 0L
         editor.performTouchInput {
+            holdDurationMillis = viewConfiguration.longPressTimeoutMillis + 100
             down(position)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+        }
+        // Let queued focus/selection work run while the finger is still held. Advancing only
+        // event timestamps in one batch can release before the native selection owner settles.
+        composeRule.mainClock.advanceTimeBy(holdDurationMillis)
+        composeRule.waitForIdle()
+        editor.performTouchInput {
+            advanceEventTime(holdDurationMillis)
             up()
         }
         editor.assertIsFocused()
