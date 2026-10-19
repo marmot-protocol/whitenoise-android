@@ -71,6 +71,10 @@ class ChatListAvatarReturnScreenshotTest {
     @Test
     fun hiddenRevisionRefreshKeepsPixelsUntilChangedBytesLoad() = verifyReturn(dark = false, refresh = true)
 
+    /** A STALE return may refresh through MDK, then must settle without competing pixel-owner writes. */
+    @Test
+    fun staleReturnSettlesAfterTheLocalRefreshCompletes() = verifyReturn(dark = false, stale = true)
+
     /** Holds every post-eviction local read so a late decode cannot disguise a missing returning avatar. */
     // One navigation fixture owns both read gates, the retained shell, and cleanup throughout the case.
     @Suppress("LongMethod")
@@ -78,41 +82,16 @@ class ChatListAvatarReturnScreenshotTest {
         dark: Boolean,
         late: Boolean = false,
         refresh: Boolean = false,
+        stale: Boolean = false,
     ) {
         AvatarImageLoader.clear()
-        val bytes = avatarPng()
-        val replacementBytes = avatarPng(REPLACEMENT_COLOR)
         val revision = AtomicLong(1)
-        val firstReads = CompletableDeferred<Unit>().also { if (!late) it.complete(Unit) }
+        val firstReads = CompletableDeferred<Unit>()
+        if (!late) firstReads.complete(Unit)
         val holdReads = AtomicBoolean(false)
         val releaseReads = CompletableDeferred<Unit>()
-        val fixture =
-            ReturnFixture(
-                avatarAssetForRow = { asset(it.groupIdHex).copy(contentRevision = revision.get().toULong()) },
-                readAvatars = { references ->
-                    firstReads.await()
-                    if (holdReads.get()) releaseReads.await()
-                    val payload = if (revision.get() == 1L) bytes else replacementBytes
-                    references.map { reference ->
-                        AvatarBytesFfi(
-                            reference,
-                            AvatarAvailabilityFfi.READY,
-                            revision.get().toULong(),
-                            payload.size.toULong(),
-                            false,
-                            payload,
-                            "image/png",
-                            64u,
-                            64u,
-                        )
-                    }
-                },
-            )
-        if (!late) runBlocking {
-            fixture.rows.forEach { row ->
-                assertNotNull(fixture.appState.durableAvatar(asset(row.groupIdHex), acquireMissing = false))
-            }
-        }
+        val fixture = avatarFixture(revision, firstReads, holdReads, releaseReads, stale)
+        if (!late) warmRows(fixture)
         val mounted = mutableStateOf(true)
         val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
         val controller =
@@ -141,13 +120,7 @@ class ChatListAvatarReturnScreenshotTest {
             val readsBeforeReturn = fixture.avatarReads.get()
             AvatarCacheDiagnostics.start()
             evictWorkingSet()
-            fixture.rows.forEach { row ->
-                assertNull(AvatarImageLoader.cachedImage(checkNotNull(asset(row.groupIdHex).cacheKey(ACCOUNT))))
-            }
-            assertTrue(
-                "the fixture must cause capacity eviction",
-                AvatarCacheDiagnostics.snapshot().profile.evictions > 0,
-            )
+            assertCapacityEviction(fixture)
 
             if (refresh) {
                 revision.set(2)
@@ -163,22 +136,12 @@ class ChatListAvatarReturnScreenshotTest {
             rule.onNodeWithContentDescription("Back").performClick()
             rule.mainClock.advanceTimeBy(1_000)
             rule.waitForIdle()
-            fixture.rows.forEach { assertAvatarPixels(it.groupIdHex) }
-            val theme = if (dark) "dark" else "light"
-            val state = if (late) "_late" else if (refresh) "_refresh_pending" else ""
-            rule
-                .onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}")
-                .captureRoboImage("src/test/snapshots/chat_list_avatar_return_$theme$state.png")
-            if (!refresh) {
+            captureRetainedReturn(fixture, snapshotName(dark, late, refresh, stale), stale)
+            if (!refresh && !stale) {
                 assertEquals("retained pixels need no repeat local read", readsBeforeReturn, fixture.avatarReads.get())
             }
-            assertEquals("READY local assets need no acquisition", 0, fixture.avatarRequests.get())
-            assertEquals(
-                "held reads cannot hide a repeat decode",
-                0L,
-                AvatarCacheDiagnostics.snapshot().profile.decodeCalls,
-            )
             if (refresh) assertRefreshedPixels(fixture, releaseReads)
+            if (stale) assertStaleRefreshSettles(fixture, releaseReads)
         } finally {
             firstReads.complete(Unit)
             releaseReads.complete(Unit)
@@ -189,6 +152,116 @@ class ChatListAvatarReturnScreenshotTest {
             }
             rule.waitForIdle()
         }
+    }
+
+    /** Supplies held native local bytes independently from the row's render and navigation lifecycle. */
+    private fun avatarFixture(
+        revision: AtomicLong,
+        firstReads: CompletableDeferred<Unit>,
+        holdReads: AtomicBoolean,
+        releaseReads: CompletableDeferred<Unit>,
+        stale: Boolean,
+    ): ReturnFixture {
+        val bytes = avatarPng()
+        val replacementBytes = avatarPng(REPLACEMENT_COLOR)
+        return ReturnFixture(
+            avatarAssetForRow = {
+                asset(it.groupIdHex).copy(
+                    contentRevision = revision.get().toULong(),
+                    availability = if (stale) AvatarAvailabilityFfi.STALE else AvatarAvailabilityFfi.READY,
+                )
+            },
+            readAvatars = { references ->
+                firstReads.await()
+                if (holdReads.get()) releaseReads.await()
+                val payload = if (revision.get() == 1L) bytes else replacementBytes
+                references.map { reference ->
+                    AvatarBytesFfi(
+                        reference,
+                        AvatarAvailabilityFfi.READY,
+                        revision.get().toULong(),
+                        payload.size.toULong(),
+                        false,
+                        payload,
+                        "image/png",
+                        64u,
+                        64u,
+                    )
+                }
+            },
+        )
+    }
+
+    /** Seeds ordinary warm-return scenarios through the real local-byte decoder. */
+    private fun warmRows(fixture: ReturnFixture) =
+        runBlocking {
+            fixture.rows.forEach { row ->
+                assertNotNull(fixture.appState.durableAvatar(asset(row.groupIdHex), acquireMissing = false))
+            }
+        }
+
+    /** Confirms real capacity churn removed each initial revision from the LRU. */
+    private fun assertCapacityEviction(fixture: ReturnFixture) {
+        fixture.rows.forEach { row ->
+            assertNull(AvatarImageLoader.cachedImage(checkNotNull(asset(row.groupIdHex).cacheKey(ACCOUNT))))
+        }
+        assertTrue("the fixture must cause capacity eviction", AvatarCacheDiagnostics.snapshot().profile.evictions > 0)
+    }
+
+    /** Names each required baseline by its theme and the observable pending-load state. */
+    private fun snapshotName(
+        dark: Boolean,
+        late: Boolean,
+        refresh: Boolean,
+        stale: Boolean,
+    ): String {
+        val theme = if (dark) "dark" else "light"
+        val state =
+            when {
+                late -> "_late"
+                refresh -> "_refresh_pending"
+                stale -> "_stale"
+                else -> ""
+            }
+        return "src/test/snapshots/chat_list_avatar_return_$theme$state.png"
+    }
+
+    /** Captures visible retained pixels while every new local read remains held. */
+    private fun captureRetainedReturn(
+        fixture: ReturnFixture,
+        path: String,
+        stale: Boolean,
+    ) {
+        fixture.rows.forEach { assertAvatarPixels(it.groupIdHex) }
+        rule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").captureRoboImage(path)
+        if (!stale) assertEquals("READY local assets need no acquisition", 0, fixture.avatarRequests.get())
+        assertEquals(
+            "held reads cannot hide a repeat decode",
+            0L,
+            AvatarCacheDiagnostics.snapshot().profile.decodeCalls,
+        )
+    }
+
+    /** A completed STALE decode must converge with the existing preparation seed and retain visible pixels. */
+    private fun assertStaleRefreshSettles(
+        fixture: ReturnFixture,
+        releaseReads: CompletableDeferred<Unit>,
+    ) {
+        releaseReads.complete(Unit)
+        rule.mainClock.autoAdvance = true
+        rule.waitUntil(10_000) {
+            fixture.rows.all {
+                AvatarImageLoader.cachedImage(checkNotNull(asset(it.groupIdHex).cacheKey(ACCOUNT))) != null
+            }
+        }
+        // Competing row and preparation writes would keep Compose busy indefinitely here.
+        rule.waitForIdle()
+        fixture.rows.forEach { assertAvatarPixels(it.groupIdHex) }
+        assertTrue("STALE is allowed to request MDK refresh", fixture.avatarRequests.get() > 0)
+        assertTrue(
+            "the released local read decoded a new bitmap",
+            AvatarCacheDiagnostics.snapshot().profile.decodeCalls > 0,
+        )
     }
 
     /** Lets the one-shot preparation expire before a row's detached local read successfully completes. */

@@ -6,7 +6,7 @@
       {
         "surface": "Retain completed visible decodes and valid previous revisions during navigation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DurableAvatar.kt",
-        "anchor": "pins?.recordLoaded?.invoke",
+        "anchor": "pins?.recordCompleted",
         "test_ids": [
           "CHL-017"
         ]

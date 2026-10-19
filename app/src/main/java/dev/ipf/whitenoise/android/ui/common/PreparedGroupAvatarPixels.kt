@@ -13,6 +13,14 @@ internal data class PreparedGroupAvatarPixels(
     val retained: List<PreparedAvatarImage> = emptyList(),
     val recordLoaded: ((AvatarAssetFfi, ImageBitmap) -> Unit)? = null,
 ) {
+    /** Records an exact completed load; absent loads and previous-revision fallback never enter the window. */
+    fun recordCompleted(
+        asset: AvatarAssetFfi?,
+        image: ImageBitmap?,
+    ) {
+        if (asset != null && image != null) recordLoaded?.invoke(asset, image)
+    }
+
     /** A revision refresh may reuse known pixels, but a removed or different selection never can. */
     fun retainedFor(asset: AvatarAssetFfi?): ImageBitmap? =
         asset?.takeIf { it.isRenderable() }?.let { current ->

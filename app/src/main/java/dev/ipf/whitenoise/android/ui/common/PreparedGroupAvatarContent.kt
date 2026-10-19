@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
@@ -89,15 +90,25 @@ internal fun rememberRetainedGroupAvatarPreparation(
         remember(appState, accountRef, appState.runtimeGeneration, lifetime, surfaceIdentity) {
             RetainedAvatarWindow(accountRef)
         }
-    val prepared = rememberPreparedGroupAvatarPixels(appState, window.assets, accountRef, surfaceIdentity)
-    SideEffect {
-        window.assets.forEach { asset ->
-            prepared.images[accountRef?.let(asset::cacheKey)]?.let { window.recordLoaded(asset, it) }
+    val selected = window.assets.filter { it.isRenderable() }
+    LaunchedEffect(window, selected) {
+        if (accountRef == null) return@LaunchedEffect
+        withTimeoutOrNull(LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS) {
+            for (asset in selected) {
+                if (!window.hasExactRevision(asset)) {
+                    appState.durableAvatar(asset, accountRef, acquireMissing = false)?.let {
+                        window.recordLoaded(asset, it)
+                    }
+                }
+            }
         }
     }
     return RetainedGroupAvatarPreparation(
-        prepared.copy(
-            images = prepared.images + window.exactImages(),
+        PreparedGroupAvatarPixels(
+            accountRef,
+            appState.runtimeGeneration,
+            lifetime,
+            images = window.exactImages(),
             retained = window.retained,
             recordLoaded = window::recordLoaded,
         ),
@@ -120,13 +131,17 @@ private class RetainedAvatarWindow(
         retained = retained.filter { known -> assets.any { it.isRenderable() && sameSelection(it, known.asset) } }
     }
 
+    /** Existing exact pins need neither a new preparation read nor a second retained bitmap map. */
+    fun hasExactRevision(asset: AvatarAssetFfi): Boolean =
+        retained.any { sameSelection(it.asset, asset) && it.asset.contentRevision == asset.contentRevision }
+
     /** Accepts exact loaded pixels only for a still-selected revision, with at most one image per selection. */
     fun recordLoaded(
         asset: AvatarAssetFfi,
         image: ImageBitmap,
     ) {
-        val current = assets.firstOrNull { it.isRenderable() && sameSelection(it, asset) } ?: return
-        if (accountRef == null || current.cacheKey(accountRef) != asset.cacheKey(accountRef)) return
+        val current = assets.firstOrNull { it.isRenderable() && sameSelection(it, asset) }
+        if (current == null || accountRef == null || current.cacheKey(accountRef) != asset.cacheKey(accountRef)) return
         val previous = retained.firstOrNull { sameSelection(it.asset, asset) }
         if (previous?.asset == asset && previous.image === image) return
         retained = retained.filterNot { sameSelection(it.asset, asset) } + PreparedAvatarImage(asset.copy(), image)
@@ -164,7 +179,7 @@ internal fun PreparedGroupAvatarContent(
     }
 }
 
-/** Shares the same local-only decode stage between mounted surfaces and a retained navigation owner. */
+/** Builds the local-only preparation for surfaces whose lifetime already matches their visible content. */
 @Composable
 private fun rememberPreparedGroupAvatarPixels(
     appState: WhiteNoiseAppState,

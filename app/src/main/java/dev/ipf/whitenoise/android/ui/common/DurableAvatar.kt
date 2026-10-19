@@ -69,7 +69,7 @@ internal fun rememberDurableAvatar(
         displayed.owner = owner
         displayed.image = shown
         // Only exact loaded pixels may enter the window; a prior revision used as fallback stays prior.
-        if (ownedAsset != null && loaded != null) pins?.recordLoaded?.invoke(ownedAsset, loaded)
+        pins?.recordCompleted(ownedAsset, loaded)
     }
     return shown
 }
