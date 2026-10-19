@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.ImageUploadPreparationException
 import dev.ipf.whitenoise.android.state.AppText
@@ -17,6 +18,42 @@ class GroupImageFailureDetailTest {
                     3L,
                     ImageUploadPreparationException.UnsupportedSvg,
                 ),
+            ),
+        )
+    }
+
+    @Test
+    fun uploadDestinationRefusalHasFixedRestrictionCopy() {
+        assertEquals(
+            AppText.Resource(R.string.group_image_destination_refused_detail),
+            groupImageFailureDetail(
+                GroupAvatarUploadFailure(
+                    GroupAvatarUploadStage.Upload,
+                    3L,
+                    MarmotKitException.InvalidMediaReference("https://private.invalid/?auth=secret"),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun mediaReferenceErrorsOutsideUploadKeepExistingCopy() {
+        GroupAvatarUploadStage.entries.filter { it != GroupAvatarUploadStage.Upload }.forEach { stage ->
+            assertEquals(
+                AppText.Resource(R.string.error_try_again),
+                groupImageFailureDetail(
+                    GroupAvatarUploadFailure(stage, 3L, MarmotKitException.InvalidMediaReference("private detail")),
+                ),
+            )
+        }
+        assertEquals(
+            AppText.Resource(R.string.error_try_again),
+            groupImageFailureDetail(MarmotKitException.InvalidMediaReference("private detail")),
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_try_again),
+            groupImageFailureDetail(
+                GroupAvatarUploadFailure(GroupAvatarUploadStage.Upload, 3L, IllegalStateException()),
             ),
         )
     }
