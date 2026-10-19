@@ -42,7 +42,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -99,7 +98,6 @@ internal fun NostrEventReaderDialog(
     ) {
         NostrEventReaderScreen(
             card = card,
-            authoredReference = authoredReference,
             document = prepared.document,
             parsing = prepared.parsing,
             authorDisplayName = authorDisplayName,
@@ -137,7 +135,6 @@ internal fun NostrEventReaderDialog(
 @Composable
 internal fun NostrEventReaderScreen(
     card: NostrEventCardModel,
-    authoredReference: String? = null,
     document: MarkdownDocumentFfi?,
     parsing: Boolean,
     authorDisplayName: (String) -> String,
@@ -166,7 +163,6 @@ internal fun NostrEventReaderScreen(
             HorizontalDivider()
             NostrEventReaderBody(
                 card = card,
-                authoredReference = authoredReference,
                 document = document,
                 parsing = parsing,
                 authorDisplayName = authorDisplayName,
@@ -216,11 +212,10 @@ private fun NostrEventReaderHeader(
     }
 }
 
-/** Renders event metadata, the authored reference, and the bounded full Markdown body. */
+/** Renders event metadata and the bounded full Markdown body. */
 @Composable
 private fun NostrEventReaderBody(
     card: NostrEventCardModel,
-    authoredReference: String?,
     document: MarkdownDocumentFfi?,
     parsing: Boolean,
     authorDisplayName: (String) -> String,
@@ -254,7 +249,7 @@ private fun NostrEventReaderBody(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("event-context") {
-            NostrEventReaderContext(card, authoredReference, authorDisplayName, onPlayVideo, media.videoUrls)
+            NostrEventReaderContext(card, authorDisplayName, onPlayVideo, media.videoUrls)
         }
         itemsIndexed(media.imageUrls, key = { _, url -> "image:$url" }) { _, url ->
             NostrEventImagePane(url = url)
@@ -278,11 +273,13 @@ private fun NostrEventReaderBody(
     }
 }
 
-/** Keeps the signed event context and explicit media actions above the complete body. */
+/**
+ * Keeps the signed event context and explicit media actions above the complete body. The reader stands for its
+ * event, so the encoded reference is not printed here (#3317); its Copy reference action keeps the full value.
+ */
 @Composable
 private fun NostrEventReaderContext(
     card: NostrEventCardModel,
-    authoredReference: String?,
     authorDisplayName: (String) -> String,
     onPlayVideo: ((String) -> Unit)?,
     videoUrls: List<String>,
@@ -296,15 +293,6 @@ private fun NostrEventReaderContext(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        authoredReference?.takeIf(String::isNotBlank)?.let { reference ->
-            Text(
-                reference,
-                modifier = Modifier.fillMaxWidth().testTag(NOSTR_EVENT_READER_REFERENCE_TAG),
-                style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         card.metadata.forEach { detail -> EmojiLabel(detail, style = MaterialTheme.typography.bodyMedium) }
         if (onPlayVideo != null) {
             videoUrls.forEach { url ->
@@ -329,8 +317,6 @@ private fun openNostrEvent(
         )
     }
 }
-
-internal const val NOSTR_EVENT_READER_REFERENCE_TAG = "nostr-event-reader-reference"
 
 /** Hosts the referenced video in its own window and uses normal dismissal when returning to a playback source. */
 @Composable

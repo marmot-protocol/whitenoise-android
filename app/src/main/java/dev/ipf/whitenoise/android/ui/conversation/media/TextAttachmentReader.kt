@@ -248,6 +248,8 @@ internal fun TextAttachmentReaderDialog(
                 }
             },
             onSave = { scope.launch { actions.save() } },
+            onShare = { scope.launch { actions.share() } },
+            shareBusy = actions.sharing,
             isReading = isReading,
             readAloudBusy = speechRequested,
             onOpenExternal = { scope.launch { onOpenExternal() } },
@@ -277,6 +279,8 @@ internal fun TextAttachmentReaderScreen(
     onReadAloud: (TextAttachmentPreview) -> Unit,
     onOpenExternal: () -> Unit,
     onSave: () -> Unit = {},
+    onShare: () -> Unit = {},
+    shareBusy: Boolean = false,
     isReading: Boolean = false,
     readAloudBusy: Boolean = false,
     modifier: Modifier = Modifier,
@@ -304,6 +308,8 @@ internal fun TextAttachmentReaderScreen(
                     onDismiss = onBack,
                     onOpenExternal = onOpenExternal,
                     onSave = onSave,
+                    onShare = onShare,
+                    shareBusy = shareBusy,
                     onReadFromTop = { preview?.let(onReadFromTop) },
                     canRead = !readAloudBusy && preview?.text?.isNotBlank() == true,
                 )
@@ -347,13 +353,19 @@ internal fun TextAttachmentReaderScreen(
     }
 }
 
-/** Keeps the prototype titled navigation and overflow on the existing external-open callback. */
+/**
+ * Keeps the prototype titled navigation and overflow on the existing external-open callback. Share sends the original
+ * file to another app (#3331) and is unavailable while a share is still being prepared.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList")
 private fun TextAttachmentReaderTopBar(
     onDismiss: () -> Unit,
     onOpenExternal: () -> Unit,
     onSave: () -> Unit,
+    onShare: () -> Unit,
+    shareBusy: Boolean,
     onReadFromTop: () -> Unit,
     canRead: Boolean,
 ) {
@@ -382,6 +394,12 @@ private fun TextAttachmentReaderTopBar(
                                 label = stringResource(R.string.save),
                                 icon = R.drawable.ic_download,
                                 onClick = onSave,
+                            ),
+                            WhiteNoiseMenuItem(
+                                label = stringResource(R.string.share),
+                                icon = R.drawable.ic_share,
+                                onClick = onShare,
+                                enabled = !shareBusy,
                             ),
                             WhiteNoiseMenuItem(
                                 label = stringResource(R.string.text_attachment_open_external),

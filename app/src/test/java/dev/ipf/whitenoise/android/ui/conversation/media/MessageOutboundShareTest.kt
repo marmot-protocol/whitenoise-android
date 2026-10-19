@@ -1,5 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
+import android.content.pm.ResolveInfo
+import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
@@ -20,12 +26,15 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.IOException
@@ -222,6 +231,13 @@ class MessageOutboundShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /** A Markdown or text file message keeps the menu's Share, so long-pressing it can share the file (#3331). */
+    @Test
+    fun aMarkdownFileMessageIsShareableFromItsMenu() {
+        assertTrue(messageHasShareablePayload(null, listOf(reference("notes.md", "text/markdown")), emptyList()))
+        assertTrue(messageHasShareablePayload("caption", listOf(reference("notes.txt", "text/plain")), emptyList()))
+    }
+
     /** A chooser that fails to launch deletes the completed staged set. */
     @Test
     fun launchFailureDeletesCompletedPlaintextSet() =
@@ -397,6 +413,86 @@ class MessageOutboundShareTest {
         assertTrue(runCatching { boundedShareTotal(almostFull, 9L) }.exceptionOrNull() is IOException)
     }
 
+    /** A reader's Share stages the attachment's whole file under its own name, without a caption, and opens it. */
+    @Test
+    fun aReaderShareStagesTheWholeFileUnderItsOwnName() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget(MARKDOWN)
+            val bytes = "# Notes\n\nThe whole file, never the reader's preview.".encodeToByteArray()
+
+            shareNotes { plaintext(bytes) }
+
+            val chooser = requireNotNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+            val send = requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java))
+            val uri = requireNotNull(send.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
+            assertEquals(Intent.ACTION_SEND, send.action)
+            assertEquals(MARKDOWN, send.type)
+            assertNull("no caption travels with the file", send.getStringExtra(Intent.EXTRA_TEXT))
+            assertEquals("notes.md", displayName(uri))
+            assertArrayEquals(bytes, context.contentResolver.openInputStream(uri)!!.use { it.readBytes() })
+        }
+
+    /** A reader closed while its file was staged opens no share sheet and leaves no plaintext behind. */
+    @Test
+    fun aReaderClosedDuringStagingSharesNothingAndDeletesTheFile() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget(MARKDOWN)
+
+            val failure =
+                runCatching {
+                    shareNotes(isCurrent = { false }) { plaintext("# Notes".encodeToByteArray()) }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is CancellationException)
+            assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    /** With no app to share to, the attachment is never read or decrypted, and nothing is staged. */
+    @Test
+    fun withNoShareTargetTheAttachmentIsNeverRead() =
+        runTest {
+            clearSharedFiles()
+            var reads = 0
+
+            val failure =
+                runCatching {
+                    shareNotes {
+                        reads += 1
+                        plaintext("# Notes".encodeToByteArray())
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is ActivityNotFoundException)
+            assertEquals(0, reads)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    /** Shares `notes.md` through the reader's path, reading its plaintext through [read]. */
+    private suspend fun shareNotes(
+        isCurrent: () -> Boolean = { true },
+        read: suspend () -> AttachmentPlaintext,
+    ) = shareAttachmentExternally(context, 0, reference("notes.md", MARKDOWN), "Share", isCurrent, read)
+
+    /** Registers an external app that accepts a shared file of [mediaType]. */
+    private fun registerShareTarget(mediaType: String) {
+        val application = ApplicationInfo().apply { packageName = SHARE_TARGET_PACKAGE }
+        shadowOf(context.packageManager).addResolveInfoForIntent(
+            Intent(Intent.ACTION_SEND).setType(mediaType),
+            ResolveInfo().apply {
+                activityInfo =
+                    ActivityInfo().apply {
+                        packageName = SHARE_TARGET_PACKAGE
+                        name = "$SHARE_TARGET_PACKAGE.ShareActivity"
+                        exported = true
+                        applicationInfo = application
+                    }
+            },
+        )
+    }
+
     /** A share source held in memory, as a small attachment's is. */
     private fun plaintext(bytes: ByteArray): AttachmentPlaintext = AttachmentPlaintext.Bytes(bytes)
 
@@ -439,4 +535,9 @@ class MessageOutboundShareTest {
             .listFiles()
             ?.filter(File::isFile)
             .orEmpty()
+
+    private companion object {
+        const val MARKDOWN = "text/markdown"
+        const val SHARE_TARGET_PACKAGE = "com.example.notes"
+    }
 }

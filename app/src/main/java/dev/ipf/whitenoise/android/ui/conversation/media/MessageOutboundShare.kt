@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.enqueueInteractiveAttachmentDownload
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -143,11 +144,45 @@ internal suspend fun shareMessageExternally(
 }
 
 /**
+ * Stages one attachment's whole verified file, read through [plaintext], for Android's share sheet: its original
+ * bytes and filename, never a reader's truncated preview, and none of its message's caption or other attachments.
+ * [isCurrent] is checked again once the file is staged, so a reader closed or switched meanwhile opens no share sheet
+ * and its staged plaintext is deleted.
+ */
+internal suspend fun shareAttachmentExternally(
+    context: Context,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    chooserTitle: String,
+    isCurrent: () -> Boolean,
+    plaintext: suspend () -> AttachmentPlaintext,
+) {
+    // Resolve handler availability before decrypting or retaining any new plaintext, as the message Share does.
+    val probe =
+        outboundShareIntent(
+            null,
+            listOf(
+                OutboundShareStream(
+                    uri = Uri.parse("content://${context.packageName}.fileprovider/outbound-share-probe"),
+                    mediaType = reference.mediaType,
+                ),
+            ),
+        )
+    outboundShareChooser(context, probe, chooserTitle)
+    val source = MessageShareAttachmentSource.Confirmed(attachmentIndex, reference)
+    val staged = stageMessageShareStreams(context, listOf(source)) { plaintext() }
+    launchStagedMessageShare(staged) { streams ->
+        if (!isCurrent()) throw CancellationException("shared attachment owner changed")
+        launchOutboundShare(context, outboundShareIntent(null, streams), chooserTitle)
+    }
+}
+
+/**
  * The attachment's verified plaintext as a source that may be a private file, so a large attachment is never read
  * whole into memory: an own pending item's retained bytes, otherwise MDK's download of the authoritative reference.
  * The caller closes it.
  */
-private suspend fun attachmentSource(
+internal suspend fun attachmentSource(
     controller: ConversationController,
     messageIdHex: String,
     attachmentIndex: Int,

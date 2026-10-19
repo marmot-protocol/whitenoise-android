@@ -150,7 +150,8 @@ private fun URI.isHttp(): Boolean =
     scheme?.equals("https", ignoreCase = true) == true ||
         scheme?.equals("http", ignoreCase = true) == true
 
-private fun MarkdownNostrHrpFfi.isPublicEventHrp(): Boolean =
+/** Whether [this] names a public event: a note, nevent or naddr. */
+internal fun MarkdownNostrHrpFfi.isPublicEventHrp(): Boolean =
     this == MarkdownNostrHrpFfi.NOTE || this == MarkdownNostrHrpFfi.NEVENT || this == MarkdownNostrHrpFfi.NADDR
 
 private const val MAX_MARKDOWN_DESTINATION_LENGTH = 8_192
