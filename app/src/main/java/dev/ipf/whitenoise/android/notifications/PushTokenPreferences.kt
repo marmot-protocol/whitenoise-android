@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.SharedPreferences
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import org.json.JSONArray
 import org.json.JSONObject
@@ -66,15 +67,15 @@ internal class PushTokenPreferences(
 
     override fun edit(): SharedPreferences.Editor = Editor()
 
-    override fun registerOnSharedPreferenceChangeListener(
-        listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) =
-        error("Push state does not use preference listeners")
+    override fun registerOnSharedPreferenceChangeListener(listener: OnSharedPreferenceChangeListener) =
+        error(
+            "Push state does not use preference listeners",
+        )
 
-    override fun unregisterOnSharedPreferenceChangeListener(
-        listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) =
-        error("Push state does not use preference listeners")
+    override fun unregisterOnSharedPreferenceChangeListener(listener: OnSharedPreferenceChangeListener) =
+        error(
+            "Push state does not use preference listeners",
+        )
 
     /** A durable target receipt makes an unreadable leftover source irrelevant. */
     fun hasImported(source: String): Boolean =
