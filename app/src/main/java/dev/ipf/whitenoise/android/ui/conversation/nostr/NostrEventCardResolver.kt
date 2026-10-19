@@ -92,6 +92,8 @@ internal class NostrEventCardResolver(
     private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
     private val maxEntries: Int = MAX_RESOLVED_ENTRIES,
     private val verificationDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val nativePreview: (suspend (String, Boolean) -> NostrEventCardState)? = null,
+    private val nativeAuthor: (suspend (NostrEventCardState.Loaded) -> NostrEventCardState.Loaded)? = null,
 ) : AutoCloseable {
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]))
     private val lock = Any()
@@ -101,19 +103,23 @@ internal class NostrEventCardResolver(
     private val jobs = HashMap<String, Job>()
     private var cachedRelays: List<String>? = null
 
-    fun state(reference: NostrEventReference): StateFlow<NostrEventCardState> =
+    fun state(
+        reference: NostrEventReference,
+        authoredReference: String = reference.stableId,
+    ): StateFlow<NostrEventCardState> =
         synchronized(lock) {
             states[reference.stableId]?.also { return@synchronized it }
             makeRoomForNewEntryLocked()
             MutableStateFlow<NostrEventCardState>(NostrEventCardState.Loading).also { state ->
                 states[reference.stableId] = state
-                startResolveLocked(reference, state)
+                startResolveLocked(reference, state, authoredReference = authoredReference)
             }
         }
 
     fun retry(
         reference: NostrEventReference,
         observedState: StateFlow<NostrEventCardState>? = null,
+        authoredReference: String = reference.stableId,
     ) {
         synchronized(lock) {
             val state =
@@ -126,8 +132,10 @@ internal class NostrEventCardResolver(
                     }
                 }
             jobs.remove(reference.stableId)?.cancel()
-            state.value = NostrEventCardState.Loading
-            startResolveLocked(reference, state, refreshRelays = true)
+            if (nativePreview == null || state.value !is NostrEventCardState.Loaded) {
+                state.value = NostrEventCardState.Loading
+            }
+            startResolveLocked(reference, state, refreshRelays = true, authoredReference = authoredReference)
         }
     }
 
@@ -135,10 +143,72 @@ internal class NostrEventCardResolver(
         reference: NostrEventReference,
         state: MutableStateFlow<NostrEventCardState>,
         refreshRelays: Boolean = false,
+        authoredReference: String,
     ) {
-        val job = scope.launch(start = CoroutineStart.LAZY) { resolve(reference, state, refreshRelays) }
+        val job =
+            scope.launch(start = CoroutineStart.LAZY) {
+                if (nativePreview == null) {
+                    resolve(reference, state, refreshRelays)
+                } else {
+                    resolveNative(reference, authoredReference, state)
+                }
+            }
         jobs[reference.stableId] = job
         job.start()
+    }
+
+    private suspend fun resolveNative(
+        reference: NostrEventReference,
+        authoredReference: String,
+        state: MutableStateFlow<NostrEventCardState>,
+    ) {
+        val currentJob = coroutineContext[Job]
+        val read = checkNotNull(nativePreview)
+        try {
+            val cached =
+                try {
+                    read(authoredReference, false)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A failed projection read is not proof that the event is absent.
+                    // Let MDK perform its normal resolve/recovery path.
+                    NostrEventCardState.NotFound
+                }
+            coroutineContext.ensureActive()
+            if (cached != NostrEventCardState.NotFound &&
+                !(cached is NostrEventCardState.Loaded && state.value is NostrEventCardState.Loaded) &&
+                !publishResolvedState(reference, state, currentJob, cached, complete = false)
+            ) {
+                return
+            }
+            val refreshed = read(authoredReference, true)
+            val previous = state.value as? NostrEventCardState.Loaded
+            val resolved =
+                if (refreshed is NostrEventCardState.Loaded &&
+                    refreshed.card.authorMetadata == null &&
+                    previous?.card?.authorPubkeyHex == refreshed.card.authorPubkeyHex
+                ) {
+                    refreshed.copy(card = refreshed.card.copy(authorMetadata = previous?.card?.authorMetadata))
+                } else {
+                    refreshed
+                }
+            coroutineContext.ensureActive()
+            if (resolved is NostrEventCardState.Loaded && nativeAuthor != null) {
+                if (!publishResolvedState(reference, state, currentJob, resolved, complete = false)) return
+                val enriched = nativeAuthor(resolved)
+                coroutineContext.ensureActive()
+                publishResolvedState(reference, state, currentJob, enriched, complete = true)
+            } else {
+                publishResolvedState(reference, state, currentJob, resolved, complete = true)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A refresh failure must not discard a cached, verified card.
+            val result = state.value.takeIf { it is NostrEventCardState.Loaded } ?: NostrEventCardState.Failed
+            publishResolvedState(reference, state, currentJob, result, complete = true)
+        }
     }
 
     private suspend fun resolve(

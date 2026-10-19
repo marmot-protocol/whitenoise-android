@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.state.SavedComposerExpansion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.bindBlockListMirror
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingCameraCaptureFiles
 
 /**
  * Process-owned presentation state for the one active shell.
@@ -34,6 +35,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 internal class MainShellProcessState(
     private val appState: WhiteNoiseAppState,
 ) {
+    val pendingCameraCaptureFiles = PendingCameraCaptureFiles()
     val selectedChat = mutableStateOf<ChatListItem?>(null)
     val selectedChatOpenContext = mutableStateOf(ConversationOpenContext())
     val selectedChatJustCreated = mutableStateOf(false)
@@ -139,6 +141,12 @@ internal class MainShellProcessState(
         while (iterator.hasNext()) {
             val entry = iterator.next()
             if (entry.value !in retained) {
+                val retiredGroupId = entry.value.group.groupIdHex
+                val keepsOrigin =
+                    retained.any {
+                        it.boundAccountRef == entry.key.accountRef && it.group.groupIdHex == retiredGroupId
+                    }
+                if (!keepsOrigin) pendingCameraCaptureFiles.releaseOrigin("${entry.key.accountRef}:$retiredGroupId")
                 appState.detachConversationController(entry.value)
                 entry.value.onCleared()
                 iterator.remove()
@@ -197,6 +205,7 @@ internal class MainShellProcessState(
     }
 
     private fun clearConversationControllers() {
+        pendingCameraCaptureFiles.releaseAll()
         conversationControllers.values.forEach { controller ->
             appState.detachConversationController(controller)
             controller.onCleared()
@@ -266,6 +275,35 @@ internal class MainShellStateHolder(
      */
     val inboundShareRequest = mutableStateOf<ShareRequest?>(null)
     val pendingShareRequest = mutableStateOf<ShareRequest?>(null)
+
+    // The account-switch handoff must outlive lock-driven shell disposal.
+    private var stagedShareOpen by mutableStateOf(
+        savedStateHandle.get<Bundle>("pending_staged_share_open")?.let { state ->
+            val account = state.getString("account")
+            val group = state.getString("group")
+            if (account != null && group != null) {
+                PendingStagedShareOpen(account, group, state.getInt("other_count"))
+            } else {
+                null
+            }
+        },
+    )
+    var pendingStagedShareOpen: PendingStagedShareOpen?
+        get() = stagedShareOpen
+        set(value) {
+            stagedShareOpen = value
+            if (value == null) {
+                savedStateHandle.remove<Bundle>("pending_staged_share_open")
+            } else {
+                savedStateHandle["pending_staged_share_open"] =
+                    Bundle().apply {
+                        putString("account", value.accountRef)
+                        putString("group", value.groupIdHex)
+                        putInt("other_count", value.otherChatCount)
+                    }
+            }
+        }
+    val pendingCameraCaptureFiles = processState.pendingCameraCaptureFiles
     val selectedChat = processState.selectedChat
     val selectedChatOpenContext = processState.selectedChatOpenContext
     val selectedChatJustCreated = processState.selectedChatJustCreated

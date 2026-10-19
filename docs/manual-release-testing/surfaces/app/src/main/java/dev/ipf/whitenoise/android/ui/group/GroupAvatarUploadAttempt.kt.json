@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAvatarUploadAttempt.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Group avatar upload safety failure classification without invalidating saved avatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAvatarUploadAttempt.kt",
+        "anchor": "internal class GroupAvatarUploadFailure(",
+        "test_ids": [
+          "STB-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

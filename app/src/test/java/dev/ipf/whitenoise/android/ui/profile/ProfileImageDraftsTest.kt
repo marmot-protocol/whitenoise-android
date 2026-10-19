@@ -5,6 +5,18 @@ import org.junit.Test
 
 class ProfileImageDraftsTest {
     @Test
+    fun restoredUploadedPictureRemainsAnEditAgainstTheNativeRefreshBaseline() {
+        val native = ProfileEditDraft(picture = "https://example.com/previous.jpg")
+        val restored = native.copy(picture = "https://example.com/uploaded.jpg")
+        val refreshed = native.copy(about = "Refreshed native biography")
+
+        val merged = restored.mergeUntouchedFields(loadStartedWith = native, refreshed = refreshed)
+
+        assertEquals(restored.picture, merged.picture)
+        assertEquals(refreshed.about, merged.about)
+    }
+
+    @Test
     fun bannerUploadUpdatesOnlyTheBannerDraft() {
         val drafts =
             ProfileImageDrafts(
@@ -52,7 +64,7 @@ class ProfileImageDraftsTest {
             )
 
         assertEquals(
-            ProfileImageDrafts(picture = "https://example.com/picture.jpg"),
+            drafts.copy(banner = ""),
             drafts.without(ProfileImageTarget.Banner),
         )
     }

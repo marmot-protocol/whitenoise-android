@@ -26,7 +26,9 @@ class GroupAvatarUploadAttemptTest {
                         { draft },
                         {
                             uploads++
-                            throw MarmotKitException.InvalidMediaReference("private destination")
+                            throw MarmotKitException.InvalidMediaReference(
+                                "unsafe media host address: private destination",
+                            )
                         },
                         {
                             avatar = it
@@ -169,7 +171,9 @@ class GroupAvatarUploadAttemptTest {
                         },
                         {
                             now = 17
-                            throw MarmotKitException.InvalidMediaReference("https://secret.invalid/private?auth=token")
+                            throw MarmotKitException.InvalidMediaReference(
+                                "unsafe media host address: https://secret.invalid/private?auth=token",
+                            )
                         },
                         { true },
                     )

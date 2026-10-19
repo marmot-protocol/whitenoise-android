@@ -43,6 +43,16 @@
           "MED-031"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Pending camera output survives empty draft cleanup across authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "pendingCameraFiles?.releasePersisted",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

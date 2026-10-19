@@ -27,6 +27,16 @@
           "MED-010"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "External operation ownership through authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentNativeActions.kt",
+        "anchor": "rememberDocumentSaveFallback(appState",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

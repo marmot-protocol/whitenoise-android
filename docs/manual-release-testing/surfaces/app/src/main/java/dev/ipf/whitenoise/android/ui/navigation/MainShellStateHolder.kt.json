@@ -32,6 +32,14 @@
         "test_ids": [
           "INT-012"
         ]
+      },
+      {
+        "surface": "External operation ownership through authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt",
+        "anchor": "var pendingStagedShareOpen:",
+        "test_ids": [
+          "STB-001"
+        ]
       }
     ]
   },

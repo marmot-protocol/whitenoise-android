@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +76,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSnackbarTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
@@ -85,11 +87,15 @@ import dev.ipf.whitenoise.android.ui.navigation.NotificationRouteAppLockTrace
 import dev.ipf.whitenoise.android.ui.navigation.NotificationRouteStartupSwapTrace
 import dev.ipf.whitenoise.android.ui.navigation.PrepareMainShellFirstFrame
 import dev.ipf.whitenoise.android.ui.navigation.WarmResumeFirstUsefulSurface
+import dev.ipf.whitenoise.android.ui.navigation.rememberProtectedShellSavedState
 import dev.ipf.whitenoise.android.ui.navigation.shouldComposeProtectedMainShell
 import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.settings.DictationProviderChooser
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsPromptState
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsPromptState.CHOICE
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsPromptState.CLOSED
 import dev.ipf.whitenoise.android.ui.settings.UsageDiagnosticsPrompt
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
@@ -214,13 +220,21 @@ internal fun WhiteNoiseApp(
     onAppUpdateTapHandled: (Int) -> Unit = {},
     onRequestAppUnlock: () -> Unit = {},
 ) {
+    val protectedShell = rememberProtectedShellSavedState(appState.activeAccountRef, appState.runtimeGeneration)
+    SideEffect {
+        mainShellStateHolder.pendingCameraCaptureFiles.retainOwner(
+            "${appState.runtimeGeneration}:${appState.activeAccountRef}",
+        )
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val profileEntryTicket = remember(inboundProfilePayload) { appState.diagnostics.observations.ticket() }
     val notificationEntryTicket = remember(inboundNotificationRequestId) { appState.diagnostics.observations.ticket() }
     val shareEntryTicket = remember(inboundShareRequest) { appState.diagnostics.observations.ticket() }
 
-    var diagnosticsPromptSeen by remember(appState.runtimeGeneration) { mutableStateOf(false) }
-    var diagnosticsPromptOpen by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    var diagnosticsPromptState by remember(appState.runtimeGeneration) {
+        mutableStateOf(StartupDiagnosticsPromptState.AWAITING_RECEIPT)
+    }
+    val diagnosticsPromptOpen = diagnosticsPromptState.visible
     val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
 
     // One owner decides which top slot shows the app's temporary banners; under app lock none does.
@@ -497,6 +511,7 @@ internal fun WhiteNoiseApp(
     // the IME (no learning / suggestion history / cloud sync of typed content).
     IncognitoKeyboardScope(enabled = appState.forceIncognitoKeyboard) {
         CompositionLocalProvider(
+            LocalPendingCameraCaptureFiles provides mainShellStateHolder.pendingCameraCaptureFiles,
             LocalTopNoticeHost provides topNoticeHost,
             LocalCustomEmoji provides customEmojiStore.emoji,
         ) {
@@ -654,60 +669,68 @@ internal fun WhiteNoiseApp(
                                             surface = renderedSurface,
                                         ) {
                                             WarmResumeUsefulSurface {
-                                                MainShell(
-                                                    appState = appState,
-                                                    stateHolder = mainShellStateHolder,
-                                                    diagnosticsPrompt = {
-                                                        if (
-                                                            diagnosticsEligible &&
-                                                            !appState.wipeInProgress &&
-                                                            diagnosticsRootUnobstructed
-                                                        ) {
-                                                            LaunchedEffect(
-                                                                appState.runtimeGeneration,
-                                                                appState.diagnostics.snapshot,
-                                                                appState.diagnostics.failed,
-                                                                appState.auditUploadConsentRequired,
+                                                protectedShell.holder.SaveableStateProvider(protectedShell.key) {
+                                                    MainShell(
+                                                        appState = appState,
+                                                        stateHolder = mainShellStateHolder,
+                                                        diagnosticsPrompt = {
+                                                            if (
+                                                                diagnosticsEligible &&
+                                                                !appState.wipeInProgress &&
+                                                                diagnosticsRootUnobstructed
                                                             ) {
-                                                                val decisionLoaded =
-                                                                    appState.diagnostics.snapshot != null ||
-                                                                        appState.diagnostics.failed
-                                                                if (!diagnosticsPromptSeen && decisionLoaded) {
-                                                                    diagnosticsPromptSeen = true
-                                                                    diagnosticsPromptOpen =
-                                                                        appState.diagnostics.requiresChoice ||
-                                                                        appState.auditUploadConsentRequired ||
-                                                                        appState.diagnostics.failed
+                                                                LaunchedEffect(
+                                                                    appState.runtimeGeneration,
+                                                                    appState.diagnostics.snapshot,
+                                                                    appState.diagnostics.failed,
+                                                                    appState.auditUploadConsentRequired,
+                                                                ) {
+                                                                    val decisionLoaded =
+                                                                        appState.diagnostics.snapshot != null ||
+                                                                            appState.diagnostics.failed
+                                                                    diagnosticsPromptState =
+                                                                        diagnosticsPromptState.refreshed(
+                                                                            decisionLoaded = decisionLoaded,
+                                                                            choiceRequired =
+                                                                                appState.diagnostics.requiresChoice ||
+                                                                                    appState.auditUploadConsentRequired,
+                                                                            readFailed = appState.diagnostics.failed,
+                                                                        )
+                                                                }
+                                                                if (diagnosticsPromptOpen) {
+                                                                    UsageDiagnosticsPrompt(
+                                                                        appState,
+                                                                        onChoiceStarted = {
+                                                                            diagnosticsPromptState = CHOICE
+                                                                        },
+                                                                    ) {
+                                                                        diagnosticsPromptState = CLOSED
+                                                                    }
                                                                 }
                                                             }
-                                                            if (diagnosticsPromptOpen) {
-                                                                UsageDiagnosticsPrompt(appState) {
-                                                                    diagnosticsPromptOpen = false
-                                                                }
-                                                            }
-                                                        }
-                                                    },
-                                                    inboundNotificationTarget = inboundNotificationTarget,
-                                                    inboundNotificationRequestId = inboundNotificationRequestId,
-                                                    onNotificationTargetHandled = { target, requestId ->
-                                                        appState.recordProductObservation(
-                                                            ProductObservation.NOTIFICATION_ENTRY,
-                                                            notificationEntryTicket,
-                                                        )
-                                                        onNotificationTargetHandled(target, requestId)
-                                                    },
-                                                    inboundShareRequest = inboundShareRequest,
-                                                    shareImport = shareImport,
-                                                    onShareRequestHandled = { request ->
-                                                        appState.recordProductObservation(
-                                                            ProductObservation.SHARE_ENTRY,
-                                                            shareEntryTicket,
-                                                        )
-                                                        onShareRequestHandled(request)
-                                                    },
-                                                    inboundAppUpdateTap = inboundAppUpdateTap,
-                                                    onAppUpdateTapHandled = onAppUpdateTapHandled,
-                                                )
+                                                        },
+                                                        inboundNotificationTarget = inboundNotificationTarget,
+                                                        inboundNotificationRequestId = inboundNotificationRequestId,
+                                                        onNotificationTargetHandled = { target, requestId ->
+                                                            appState.recordProductObservation(
+                                                                ProductObservation.NOTIFICATION_ENTRY,
+                                                                notificationEntryTicket,
+                                                            )
+                                                            onNotificationTargetHandled(target, requestId)
+                                                        },
+                                                        inboundShareRequest = inboundShareRequest,
+                                                        shareImport = shareImport,
+                                                        onShareRequestHandled = { request ->
+                                                            appState.recordProductObservation(
+                                                                ProductObservation.SHARE_ENTRY,
+                                                                shareEntryTicket,
+                                                            )
+                                                            onShareRequestHandled(request)
+                                                        },
+                                                        inboundAppUpdateTap = inboundAppUpdateTap,
+                                                        onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                                    )
+                                                }
                                             }
                                         }
                                     }

@@ -24,7 +24,15 @@ internal class GroupAvatarUploadFailure(
     DiagnosticErrorMetadata {
     // The public-profile uploader maps UnsafeMediaFetch to InvalidMediaReference. Do not infer
     // anything about image bytes from that error, or weaken MDK's destination policy to retry it.
-    val destinationRefused = stage == GroupAvatarUploadStage.Upload && cause is MarmotKitException.InvalidMediaReference
+    val destinationRefused =
+        stage == GroupAvatarUploadStage.Upload &&
+            cause is MarmotKitException.InvalidMediaReference &&
+            cause.details.let { detail ->
+                // Exact native safety categories only. The same variant also represents
+                // descriptor/integrity failures; never misreport those as network policy.
+                detail.startsWith("unsafe Blossom URL:") ||
+                    detail.startsWith("unsafe media host address:")
+            }
     override val diagnosticErrorCode =
         if (destinationRefused) "MEDIA_DESTINATION_REFUSED" else DiagnosticFormatter.errorCode(cause)
     override val diagnosticTechnicalDetail = "phase=${stage.name} elapsed_ms=${elapsedMillis.coerceAtLeast(0)}"

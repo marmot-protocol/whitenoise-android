@@ -58,11 +58,15 @@ class UsageDiagnosticsPromptDismissTest {
     fun choosingAnOptionLeavesTheSheetUsable() {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
         runBlocking { state.refreshSecurityPrivacySettings() }
+        var choiceStarted = 0
         composeRule.setContent {
-            WhiteNoiseTheme { UsageDiagnosticsPrompt(state, onDone = {}) }
+            WhiteNoiseTheme {
+                UsageDiagnosticsPrompt(state, onChoiceStarted = { choiceStarted++ }, onDone = {})
+            }
         }
 
         composeRule.onAllNodes(isToggleable())[0].performClick()
+        assertEquals("an explicit choice must pin the sheet before its receipt settles", 1, choiceStarted)
         composeRule.waitUntil(timeoutMillis = TIMEOUT_MS) { idleAnd { !state.diagnostics.busy } }
 
         composeRule.onNodeWithContentDescription(CLOSE).assertIsDisplayed()

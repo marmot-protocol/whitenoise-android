@@ -15,10 +15,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -57,6 +59,7 @@ private class StagedEmoji(
     val bytes: ByteArray,
     val preview: ImageBitmap,
     val suggestedCode: String,
+    val owner: String,
 )
 
 /** The user's `:shortcode:` emoji: device-local images added from Photos or Files, removable one by one. */
@@ -70,56 +73,101 @@ internal fun CustomEmojiScreen(
     val store = rememberCustomEmojiStore(context)
     val scope = rememberCoroutineScope()
     var staged by remember { mutableStateOf<StagedEmoji?>(null) }
+    var selectedUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var pickerOwner by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedOwner by rememberSaveable { mutableStateOf<String?>(null) }
     var removing by remember { mutableStateOf<CustomEmoji?>(null) }
 
-    fun stage(uri: Uri) {
-        scope.launch {
+    val selectionAccount = appState.activeAccountRef
+    val selectionRuntime = appState.runtimeGeneration
+    val selectionIdentity = "$selectionRuntime:$selectionAccount"
+
+    fun stage(uri: Uri?) {
+        val owner = pickerOwner
+        pickerOwner = null
+        if (owner != "${appState.runtimeGeneration}:${appState.activeAccountRef}" || uri == null) return
+        selectedOwner = owner
+        selectedUri = uri.toString()
+    }
+    LaunchedEffect(selectedUri, selectedOwner, selectionIdentity) {
+        if (selectedOwner != selectionIdentity) {
+            selectedUri = null
+            selectedOwner = null
+            return@LaunchedEffect
+        }
+        val uri = selectedUri?.let(Uri::parse) ?: return@LaunchedEffect
+
+        fun failSelection(message: Int) {
+            if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) return
+            if (selectedUri == uri.toString()) {
+                selectedUri = null
+                selectedOwner = null
+            }
+            appState.present(message)
+        }
+        run {
             val resolver = context.contentResolver
             val (read, name) =
                 withContext(Dispatchers.IO) {
                     readBoundedDocument(CustomEmojiStore.MAX_BYTES) { resolver.openInputStream(uri) } to
                         queryDisplayName(resolver, uri).orEmpty()
                 }
+            if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) {
+                return@LaunchedEffect
+            }
             val bytes =
                 when (read) {
                     is BoundedDocumentRead.Success -> read.bytes
-                    BoundedDocumentRead.TooLarge -> return@launch appState.present(R.string.custom_emoji_too_large)
+                    BoundedDocumentRead.TooLarge -> return@LaunchedEffect failSelection(R.string.custom_emoji_too_large)
                     BoundedDocumentRead.Empty,
                     BoundedDocumentRead.Unreadable,
-                    -> return@launch appState.present(R.string.custom_emoji_not_image)
+                    -> return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
                 }
             val preview =
                 withContext(Dispatchers.Default) { decodeEmojiImage(bytes) }
-                    ?: return@launch appState.present(R.string.custom_emoji_not_image)
-            staged = StagedEmoji(bytes, preview, emojiCodeForFileName(name))
+                    ?: return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
+            if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) {
+                return@LaunchedEffect
+            }
+            staged = StagedEmoji(bytes, preview, emojiCodeForFileName(name), selectionIdentity)
         }
     }
 
     val photos =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            uri?.let(::stage)
+            stage(uri)
         }
     val files =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            uri?.let(::stage)
+            stage(uri)
         }
     CustomEmojiContent(
         emoji = store.emoji,
         onBack = onBack,
         onChoosePhoto = {
+            pickerOwner = selectionIdentity
             photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },
-        onChooseFile = { files.launch(arrayOf("image/*")) },
+        onChooseFile = {
+            pickerOwner = selectionIdentity
+            files.launch(arrayOf("image/*"))
+        },
         onRemove = { removing = it },
     )
-    staged?.let { pending ->
+    staged?.takeIf { it.owner == selectionIdentity }?.let { pending ->
         CustomEmojiNameDialog(
             preview = pending.preview,
             suggestedCode = pending.suggestedCode,
             existing = store.emoji,
-            onDismiss = { staged = null },
+            onDismiss = {
+                staged = null
+                selectedUri = null
+                selectedOwner = null
+            },
             onSave = { code ->
                 staged = null
+                selectedUri = null
+                selectedOwner = null
                 scope.launch {
                     customEmojiSaveMessage(store.save(code, pending.bytes))?.let(appState::present)
                 }

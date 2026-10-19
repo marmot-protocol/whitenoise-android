@@ -40,7 +40,9 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAcceptanceToken
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingCameraCaptureFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
@@ -103,6 +105,7 @@ internal class ConversationMediaDraftState(
     private val context: Context,
     private val scope: CoroutineScope,
     private val messages: PhotoEditorMessages,
+    private val pendingCameraFiles: PendingCameraCaptureFiles? = null,
 ) {
     private val renderer = PhotoEditorRenderer()
     private val stager =
@@ -159,6 +162,9 @@ internal class ConversationMediaDraftState(
             previousUris = if (ownerChanged) emptyList() else currentDocumentUris.map(Uri::toString),
             currentUris = documentUris.map(Uri::toString),
         )
+        currentSlots.filter { previous -> slots.none { it.uri == previous.uri } }.forEach { removed ->
+            pendingCameraFiles?.discard(removed.uri)
+        }
         currentSlots = slots
         currentDocumentUris = documentUris
         currentAccountRef = accountRef
@@ -577,7 +583,10 @@ internal class ConversationMediaDraftState(
                 markNotEditable(slot.id, result)
                 stageVisualAttachment(slot, accountRef)
             }
-            is PhotoDraftStageResult.PreparedOnly -> markPreparedOnly(slot.id, result.photo)
+            is PhotoDraftStageResult.PreparedOnly -> {
+                markPreparedOnly(slot.id, result.photo)
+                pendingCameraFiles?.releasePersisted(slot.uri)
+            }
             PhotoDraftStageResult.DraftUnavailable,
             PhotoDraftStageResult.SourceUnavailable,
             -> {
@@ -607,6 +616,7 @@ internal class ConversationMediaDraftState(
                 attachmentId,
                 pending,
             ) ?: return
+        pendingCameraFiles?.releasePersisted(slot.uri)
         if (currentSlots.any { it.id == slot.id }) {
             preparedPhotos += slot.id to prepared
         } else {
@@ -663,6 +673,7 @@ internal class ConversationMediaDraftState(
         accountRef: String,
         photo: DraftBackedPhoto,
     ) {
+        pendingCameraFiles?.releasePersisted(slot.uri)
         if (slot !in currentSlots) {
             stager.remove(accountRef, controller.group.groupIdHex, photo)
             clearRequestedEditor(slot.id)
@@ -749,6 +760,7 @@ internal fun rememberConversationMediaDraftState(
 ): ConversationMediaDraftState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val pendingCameraFiles = LocalPendingCameraCaptureFiles.current
     val messages =
         PhotoEditorMessages(
             animationNotEditable = stringResource(R.string.photo_editor_not_editable_animation),
@@ -758,8 +770,17 @@ internal fun rememberConversationMediaDraftState(
             budgetExceeded = stringResource(R.string.photo_editor_budget_exceeded),
         )
     val state =
-        remember(appState, controller, chatId, controller.boundAccountRef, context, scope, messages) {
-            ConversationMediaDraftState(appState, controller, context, scope, messages)
+        remember(
+            appState,
+            controller,
+            chatId,
+            controller.boundAccountRef,
+            context,
+            scope,
+            messages,
+            pendingCameraFiles,
+        ) {
+            ConversationMediaDraftState(appState, controller, context, scope, messages, pendingCameraFiles)
         }
     SideEffect {
         state.updateInputs(mediaSlots, documentUris, controller.boundAccountRef)

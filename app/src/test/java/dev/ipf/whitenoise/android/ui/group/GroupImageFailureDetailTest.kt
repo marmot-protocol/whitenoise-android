@@ -30,7 +30,9 @@ class GroupImageFailureDetailTest {
                 GroupAvatarUploadFailure(
                     GroupAvatarUploadStage.Upload,
                     3L,
-                    MarmotKitException.InvalidMediaReference("https://private.invalid/?auth=secret"),
+                    MarmotKitException.InvalidMediaReference(
+                        "unsafe Blossom URL: https://private.invalid/?auth=secret",
+                    ),
                 ),
             ),
         )
@@ -42,18 +44,44 @@ class GroupImageFailureDetailTest {
             assertEquals(
                 AppText.Resource(R.string.error_try_again),
                 groupImageFailureDetail(
-                    GroupAvatarUploadFailure(stage, 3L, MarmotKitException.InvalidMediaReference("private detail")),
+                    GroupAvatarUploadFailure(
+                        stage,
+                        3L,
+                        MarmotKitException.InvalidMediaReference(
+                            "private detail",
+                        ),
+                    ),
                 ),
             )
         }
         assertEquals(
             AppText.Resource(R.string.error_try_again),
-            groupImageFailureDetail(MarmotKitException.InvalidMediaReference("private detail")),
+            groupImageFailureDetail(
+                MarmotKitException.InvalidMediaReference(
+                    "private detail",
+                ),
+            ),
         )
         assertEquals(
             AppText.Resource(R.string.error_try_again),
             groupImageFailureDetail(
                 GroupAvatarUploadFailure(GroupAvatarUploadStage.Upload, 3L, IllegalStateException()),
+            ),
+        )
+    }
+
+    @Test
+    fun uploadIntegrityFailureIsNotReportedAsUnsafeDestination() {
+        assertEquals(
+            AppText.Resource(R.string.error_try_again),
+            groupImageFailureDetail(
+                GroupAvatarUploadFailure(
+                    GroupAvatarUploadStage.Upload,
+                    3L,
+                    MarmotKitException.InvalidMediaReference(
+                        "upload descriptor hash mismatch",
+                    ),
+                ),
             ),
         )
     }

@@ -69,7 +69,10 @@ internal fun diagnosticsStatusLabel(status: DiagnosticsExporterStatusFfi?): Int 
 
 /** Presents the pending choice immediately while the native receipt remains the collection authority. */
 @Composable
-private fun UsageDiagnosticsChoice(appState: WhiteNoiseAppState) {
+private fun UsageDiagnosticsChoice(
+    appState: WhiteNoiseAppState,
+    onChoiceStarted: () -> Unit,
+) {
     val state = appState.diagnostics
     ConsentSwitchRow(
         title = stringResource(R.string.onboarding_share_usage_title),
@@ -77,7 +80,10 @@ private fun UsageDiagnosticsChoice(appState: WhiteNoiseAppState) {
         checked = state.selected,
         enabled = state.snapshot != null && !state.failed,
         saving = state.busy,
-        onCheckedChange = { enabled -> appState.launchMutation { appState.setTelemetryEnabled(enabled) } },
+        onCheckedChange = { enabled ->
+            onChoiceStarted()
+            appState.launchMutation { appState.setTelemetryEnabled(enabled) }
+        },
     )
 }
 
@@ -107,6 +113,7 @@ private fun UsageDiagnosticsFeedback(appState: WhiteNoiseAppState) {
 @Composable
 internal fun UsageDiagnosticsPrompt(
     appState: WhiteNoiseAppState,
+    onChoiceStarted: () -> Unit = {},
     onDone: () -> Unit,
 ) {
     val state = appState.diagnostics
@@ -157,7 +164,7 @@ internal fun UsageDiagnosticsPrompt(
                 onClose = finish,
                 closeEnabled = settled,
             )
-            UsageDiagnosticsPromptBody(appState, loggingBusy) { loggingBusy = it }
+            UsageDiagnosticsPromptBody(appState, loggingBusy, onChoiceStarted) { loggingBusy = it }
         }
     }
 }
@@ -167,6 +174,7 @@ internal fun UsageDiagnosticsPrompt(
 private fun ColumnScope.UsageDiagnosticsPromptBody(
     appState: WhiteNoiseAppState,
     loggingBusy: Boolean,
+    onChoiceStarted: () -> Unit,
     onLoggingBusyChange: (Boolean) -> Unit,
 ) {
     Column(
@@ -191,7 +199,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
                             R.string.diagnostics_retention,
                             R.string.diagnostics_disable_disclosure,
                         ),
-                ) { UsageDiagnosticsChoice(appState) }
+                ) { UsageDiagnosticsChoice(appState, onChoiceStarted) }
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -207,7 +215,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
                             R.string.diagnostics_retention,
                             R.string.diagnostics_disable_disclosure,
                         ),
-                ) { IndependentAuditLogChoice(appState, loggingBusy, onLoggingBusyChange) }
+                ) { IndependentAuditLogChoice(appState, loggingBusy, onChoiceStarted, onLoggingBusyChange) }
             }
         }
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -224,6 +232,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
 private fun IndependentAuditLogChoice(
     appState: WhiteNoiseAppState,
     busy: Boolean,
+    onChoiceStarted: () -> Unit,
     onBusyChange: (Boolean) -> Unit,
 ) {
     var failed by remember { mutableStateOf(false) }
@@ -249,6 +258,7 @@ private fun IndependentAuditLogChoice(
         enabled = appState.auditLogSettings != null,
         saving = busy,
         onCheckedChange = { enabled ->
+            onChoiceStarted()
             if (enabled) confirmUpload = true else saveChoice(false)
         },
     )

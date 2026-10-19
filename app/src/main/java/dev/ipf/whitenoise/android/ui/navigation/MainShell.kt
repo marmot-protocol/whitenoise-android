@@ -654,7 +654,7 @@ internal fun MainShell(
     val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
     val currentShareRequestId by rememberUpdatedState(visibleShareRequest?.requestId ?: inboundShareRequest?.requestId)
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
-    var pendingStagedShareOpen by remember { mutableStateOf<PendingStagedShareOpen?>(null) }
+    var pendingStagedShareOpen by shellStateHolder::pendingStagedShareOpen
     val clearSharePickerRequest: () -> Unit = {
         val request = visibleShareRequest ?: inboundShareRequest
         val requestId = request?.requestId ?: shellStateHolder.pendingShareRequestId
