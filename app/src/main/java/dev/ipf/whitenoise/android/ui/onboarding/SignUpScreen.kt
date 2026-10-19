@@ -64,7 +64,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun SignUpScreen(
     controller: SignUpController,
-    hasValidatedInternet: () -> Boolean,
+    hasActiveNetwork: () -> Boolean,
     randomName: (String?) -> String,
     onBack: () -> Unit,
 ) {
@@ -95,10 +95,10 @@ internal fun SignUpScreen(
             }
     }
 
-    /** Submits sign-up after the connectivity check. */
+    /** OS validation can fail on usable VPNs. Only a missing app-default network vetoes an explicit attempt. */
     fun submit() {
         if (preparingPhoto || stage.busy) return
-        if (!hasValidatedInternet()) {
+        if (!hasActiveNetwork()) {
             offline = true
             return
         }
