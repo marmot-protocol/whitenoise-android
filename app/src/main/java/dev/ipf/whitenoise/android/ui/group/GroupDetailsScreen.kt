@@ -392,7 +392,8 @@ internal fun GroupDetailsScreen(
             !isDm &&
                 canEdit &&
                 memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
-        val mutationsBlocked = activeMutation != null || controller.mutationInFlight
+        val mutationOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, reviewRuntime)
+        val mutationsBlocked = activeMutation != null || controller.mutationInFlight || !mutationOwnerCurrent
         val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
         var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         LaunchedEffect(canAdministerMembers) {
@@ -576,6 +577,7 @@ internal fun GroupDetailsScreen(
             mutation: suspend () -> Boolean,
             target: String? = null,
             onSuccess: () -> Unit = {},
+            onAccepted: () -> Unit = {},
         ) {
             // Launched on a process-lifetime scope so the MLS commit + Nostr
             // publish complete even if the user dismisses this sheet mid-flight.
@@ -583,17 +585,13 @@ internal fun GroupDetailsScreen(
             // ConversationController.* method then always run, regardless of
             // whether this composable is still on screen.
             val canRun =
-                when {
-                    activeMutation != null || controller.mutationInFlight -> false
-                    controller.boundAccountRef == null ||
-                        controller.boundAccountRef != appState.activeAccountRef -> false
-                    reviewRuntime != appState.runtimeGeneration -> false
-                    appState.signOutInProgress || appState.wipeInProgress -> false
-                    else -> true
-                }
+                activeMutation == null &&
+                    !controller.mutationInFlight &&
+                    controller.isCurrentGroupMutationOwner(appState, reviewRuntime)
             if (!canRun) return
             activeMutation = ActiveGroupMutation(action, target)
             controller.clearLastMutationError()
+            onAccepted()
             appState.launchMutation {
                 try {
                     val succeeded = mutation()
@@ -1059,12 +1057,13 @@ internal fun GroupDetailsScreen(
                     confirm is DetailsConfirm.StepDownAdmin ||
                     confirm == DetailsConfirm.StepDownSoleAdmin ||
                     confirm is DetailsConfirm.LeaveSoleAdminTransfer
+            val departureHandover = confirm is DetailsConfirm.LeaveSoleAdminTransfer
             val currentReview =
                 controller.boundAccountRef == appState.activeAccountRef &&
                     reviewRuntime == appState.runtimeGeneration &&
                     reviewedRoster == (memberIds to adminIds) &&
                     controller.isSelfMember &&
-                    (!administration || canAdministerMembers)
+                    (!administration || controller.canClaimAdministrationReview(allowDmDeparture = departureHandover))
             LaunchedEffect(currentReview, reviewTicket) {
                 if (!currentReview && pendingReview.ticket === reviewTicket) pendingConfirm = null
             }
@@ -1080,7 +1079,8 @@ internal fun GroupDetailsScreen(
                     controller.boundAccountRef != appState.activeAccountRef -> false
                     reviewRuntime != appState.runtimeGeneration -> false
                     reviewedRoster != (liveMembers to liveAdmins) || !controller.isSelfMember -> false
-                    administration && !controller.canClaimAdministrationReview() -> false
+                    administration &&
+                        !controller.canClaimAdministrationReview(allowDmDeparture = departureHandover) -> false
                     activeMutation != null || controller.mutationInFlight -> false
                     appState.signOutInProgress || appState.wipeInProgress -> false
                     else -> {
@@ -1261,9 +1261,9 @@ internal fun GroupDetailsScreen(
         }
 
         abandonment.target?.let { target ->
-            GroupAbandonmentDialog(
+            GroupAbandonmentReviewDialog(
                 // The acting account's name resolves while the review shows, as the group-action identity does.
-                target = target.copy(accountName = abandonmentAccountName(appState, target.accountRef)),
+                targets = listOf(target.copy(accountName = abandonmentAccountName(appState, target.accountRef))),
                 status =
                     when {
                         activeMutation?.action == GroupMutationAction.Reset -> GroupAbandonmentStatus.Running
@@ -1275,10 +1275,10 @@ internal fun GroupDetailsScreen(
                     if (!abandonment.targets(actingAccount, controller.group.groupIdHex)) {
                         abandonment.dismiss()
                     } else if (activeMutation == null && !controller.mutationInFlight) {
-                        abandonment.attempted = true
                         runGroupMutation(
                             action = GroupMutationAction.Reset,
                             mutation = { controller.forgetGroupLocal() },
+                            onAccepted = { abandonment.attempted = true },
                             onSuccess = {
                                 abandonment.dismiss()
                                 onLeft()
@@ -1290,6 +1290,7 @@ internal fun GroupDetailsScreen(
                 // The screen's error banner sits behind this modal, so the failed review carries its Copy action.
                 error = controller.lastMutationError.takeIf { abandonment.attempted },
                 identity = ownIdentity,
+                confirmEnabled = mutationOwnerCurrent,
             )
         }
         // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.
@@ -2799,9 +2800,21 @@ private class GroupInviteWarningTicket {
 }
 
 /** Re-read each authority fence when claiming an administration confirmation. */
-private fun ConversationController.canClaimAdministrationReview(): Boolean =
+private fun ConversationController.canClaimAdministrationReview(allowDmDeparture: Boolean = false): Boolean =
     when {
-        !isSelfAdmin || isDm -> false
+        !isSelfAdmin || (isDm && !allowDmDeparture) -> false
         group.pendingConfirmation || group.disbanding || group.disbanded -> false
         else -> memberAdministrationPresentable(memberRosterState, seededSelfMember)
+    }
+
+/** Shared presentation/admission ownership, with the same ordered account and runtime fences. */
+private fun ConversationController.isCurrentGroupMutationOwner(
+    appState: WhiteNoiseAppState,
+    reviewedRuntime: Int,
+): Boolean =
+    when {
+        boundAccountRef == null || boundAccountRef != appState.activeAccountRef -> false
+        reviewedRuntime != appState.runtimeGeneration -> false
+        appState.signOutInProgress || appState.wipeInProgress -> false
+        else -> true
     }

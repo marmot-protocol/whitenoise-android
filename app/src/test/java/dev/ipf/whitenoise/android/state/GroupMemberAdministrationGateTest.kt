@@ -260,16 +260,14 @@ class GroupMemberAdministrationGateTest {
     fun profileInvitesPreserveRecipientGuidanceAndFailureCounts() =
         runBlocking {
             for ((failure, resource) in inviteFailures()) {
-                var calls = 0
-                val state =
-                    appState(marmotAccessObserver = {
-                        calls += 1
-                        throw failure
-                    })
+                val calls = java.util.concurrent.CopyOnWriteArrayList<String>()
+                val state = appState(initialMarmotRuntime = invitationFailureRuntime(failure, calls))
                 // Generic failures must not request profiles or encode an uncached recipient name.
                 if (resource != R.string.error_try_again) state.setContactNickname(invitee, "Carol")
                 assertFalse(state.inviteProfileToGroups(invitee, listOf("one", "two")))
-                assertEquals(2, calls)
+                assertEquals(List(2) { "inviteMembersDetailed" }, calls.filter { it.startsWith("inviteMembers") })
+                assertFalse(calls.any { it.contains("profile", ignoreCase = true) })
+                if (resource == R.string.error_try_again) assertFalse("npub" in calls)
                 assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), state.toast?.title)
                 assertEquals(expectedInviteDetail(state, resource), state.toast?.detail)
                 assertTrue(state.toast?.copyable == true)
@@ -280,19 +278,21 @@ class GroupMemberAdministrationGateTest {
     fun conversationInvitesUseTypedRecipientAndNeutralGenericFailure() =
         runBlocking {
             for ((failure, resource) in inviteFailures()) {
-                var calls = 0
-                val state =
-                    appState(marmotAccessObserver = {
-                        calls += 1
-                        throw failure
-                    })
+                val calls = java.util.concurrent.CopyOnWriteArrayList<String>()
+                val state = appState(initialMarmotRuntime = invitationFailureRuntime(failure, calls))
                 // Generic failures must not request profiles or encode an uncached recipient name.
                 if (resource != R.string.error_try_again) state.setContactNickname(invitee, "Carol")
                 val controller = readyController(state)
                 assertFalse(controller.inviteMembers(listOf(invitee)))
-                val expectedCalls = if (resource == R.string.error_try_again) 2 else 1
+                assertEquals(
+                    listOf("inviteMembersDetailedWithInitialAdmins"),
+                    calls.filter { it.startsWith("inviteMembers") },
+                )
                 // Unknown native replies get one read-only reconciliation, never another invitation.
-                assertEquals(expectedCalls, calls)
+                val expectedReads = if (resource == R.string.error_try_again) 1 else 0
+                assertEquals(expectedReads, calls.count { it == "groupConversationSnapshot" })
+                assertFalse(calls.any { it.contains("profile", ignoreCase = true) })
+                if (resource == R.string.error_try_again) assertFalse("npub" in calls)
                 assertEquals(expectedInviteDetail(state, resource), controller.lastMutationError?.message)
                 assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), state.toast?.title)
                 assertEquals(expectedInviteDetail(state, resource), state.toast?.detail)
@@ -468,6 +468,7 @@ class GroupMemberAdministrationGateTest {
     private fun appState(
         runtimeAccess: RuntimeAccessRecorder? = null,
         marmotAccessObserver: (() -> Unit)? = runtimeAccess?.let { it::record },
+        initialMarmotRuntime: AppMarmotRuntime? = null,
     ) = WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext(),
         draftStore = DraftStore(GroupMemberAdministrationDraftPersistence()),
@@ -485,6 +486,7 @@ class GroupMemberAdministrationGateTest {
             ),
         activeAccountRef = "alice",
         marmotAccessObserver = marmotAccessObserver,
+        initialMarmotRuntime = initialMarmotRuntime,
     )
 
     private fun group(admins: List<String> = listOf("alice")) =
@@ -563,4 +565,61 @@ private class GroupMemberAdministrationDraftPersistence : DraftPersistence {
     ) {
         if (value == null) values.remove(key) else values[key] = value
     }
+}
+
+/** Pure identity decoding stays separate from the mutation/read boundaries asserted above. */
+private fun invitationFailureRuntime(
+    failure: Throwable,
+    calls: MutableList<String>,
+): AppMarmotRuntime {
+    val metadata =
+        java.lang.reflect.Proxy.newProxyInstance(
+            dev.ipf.marmotkit.MarmotInterface::class.java.classLoader,
+            arrayOf(dev.ipf.marmotkit.MarmotInterface::class.java),
+        ) { proxy, method, arguments ->
+            val name = method.name.substringBefore('-')
+            when (name) {
+                "equals" -> proxy === arguments?.firstOrNull()
+                "hashCode" -> System.identityHashCode(proxy)
+                "toString" -> "InvitationFailureMetadata"
+                "accountIdHex" -> arguments?.first().toString()
+                "recordHostTiming" -> dev.ipf.marmotkit.ProductRecordResultFfi.IGNORED_DISABLED
+                else -> {
+                    calls += name
+                    error("Unexpected test runtime call: $name")
+                }
+            }
+        } as dev.ipf.marmotkit.MarmotInterface
+    // The generated interface does not declare checked exceptions. Throwing these
+    // from InvocationHandler would wrap MarmotKitException and erase typed failures.
+    val native =
+        object : dev.ipf.marmotkit.MarmotInterface by metadata {
+            override suspend fun inviteMembersDetailed(
+                accountRef: String,
+                groupIdHex: String,
+                memberRefs: List<String>,
+            ): dev.ipf.marmotkit.GroupMutationResultFfi {
+                calls += "inviteMembersDetailed"
+                throw failure
+            }
+
+            override suspend fun inviteMembersDetailedWithInitialAdmins(
+                accountRef: String,
+                groupIdHex: String,
+                memberRefs: List<String>,
+                initialAdminRefs: List<String>,
+            ): dev.ipf.marmotkit.GroupMutationResultFfi {
+                calls += "inviteMembersDetailedWithInitialAdmins"
+                throw failure
+            }
+
+            override suspend fun groupConversationSnapshot(
+                accountRef: String,
+                groupIdHex: String,
+            ): dev.ipf.marmotkit.GroupConversationSnapshotFfi {
+                calls += "groupConversationSnapshot"
+                throw failure
+            }
+        }
+    return AppMarmotRuntime("test", native)
 }

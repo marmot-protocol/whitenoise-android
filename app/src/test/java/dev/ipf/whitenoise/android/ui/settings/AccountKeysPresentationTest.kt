@@ -46,12 +46,16 @@ class AccountKeysPresentationTest {
 
     private val app = ApplicationProvider.getApplicationContext<Context>()
 
-    /** The public key row shows the full npub (middle-ellipsized visually) and never the account hex. */
+    /**
+     * The public key row shows the whole npub, grouped only where it is drawn (#3321): it is read as the contiguous
+     * canonical value, never as its display groups, and never as the account hex.
+     */
     @Test
     fun publicIdentityUsesNpubAndDoesNotRenderAccountIdHex() {
         render()
         composeRule.onNodeWithTag("profile_keys.public_key_value", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText(CANONICAL_NPUB).assertExists()
+        composeRule.onNodeWithText(publicKeyDisplayGroups(CANONICAL_NPUB).joinToString(" ")).assertDoesNotExist()
         composeRule.onNodeWithText(ACCOUNT_HEX).assertDoesNotExist()
     }
 

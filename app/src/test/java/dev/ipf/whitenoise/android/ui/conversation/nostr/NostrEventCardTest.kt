@@ -1,15 +1,18 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -327,34 +330,74 @@ class NostrEventCardTest {
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).assertIsDisplayed()
     }
 
+    /**
+     * A loaded note, article or generic card represents its event, so it shows the kind 0 author and its Copy
+     * reference action but not the encoded reference beneath it (#3317).
+     */
     @Test
-    fun kindZeroAuthorAndCompactReferenceAreShownInsideTheCard() {
+    fun loadedCardsShowTheirAuthorAndCopyButNotTheirEncodedReference() {
         val reference = "nevent1" + "q".repeat(48) + "ending1"
+        val author = NostrEventAuthorMetadata(displayName = "Alice Rivers", pictureUrl = null)
         composeRule.setContent {
             WhiteNoiseTheme {
-                NostrEventCard(
-                    state =
-                        NostrEventCardState.Loaded(
-                            noteCard().copy(
-                                authorMetadata =
-                                    NostrEventAuthorMetadata(
-                                        displayName = "Alice Rivers",
-                                        pictureUrl = null,
-                                    ),
-                            ),
-                        ),
-                    authorDisplayName = { "Local fallback" },
-                    referenceLabel = compactEventReference(reference),
-                    contentColor = Color.Black,
-                    onRetry = {},
-                    onCopy = {},
-                    onOpen = {},
-                )
+                Column {
+                    listOf(
+                        noteCard(),
+                        noteCard().copy(kind = NostrEventCardKind.Article, eventKind = 30_023, title = "An article"),
+                        noteCard().copy(kind = NostrEventCardKind.Generic, eventKind = 7_777),
+                    ).forEach { card ->
+                        NostrEventCard(
+                            state = NostrEventCardState.Loaded(card.copy(authorMetadata = author)),
+                            authorDisplayName = { "Local fallback" },
+                            referenceLabel = compactEventReference(reference),
+                            contentColor = Color.Black,
+                            onRetry = {},
+                            onCopy = {},
+                            onOpen = {},
+                        )
+                    }
+                }
             }
         }
 
-        composeRule.onNodeWithText("Alice Rivers").assertIsDisplayed()
-        composeRule.onNodeWithText("nevent1qqqqqqq…ending1").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Alice Rivers").assertCountEquals(3)
+        composeRule.onAllNodesWithContentDescription(string(R.string.nostr_event_copy)).assertCountEquals(3)
+        composeRule.onNodeWithText("nevent1", substring = true).assertDoesNotExist()
+    }
+
+    /** A pending, missing or failed card cannot show its event yet, so it keeps the compact reference and Copy. */
+    @Test
+    fun unresolvedCardsKeepTheirReferenceAndCopy() {
+        val label = compactEventReference("nevent1" + "q".repeat(48) + "ending1")
+        var copies = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Column {
+                    listOf(
+                        NostrEventCardState.Loading,
+                        NostrEventCardState.NotFound,
+                        NostrEventCardState.Failed,
+                    ).forEach { state ->
+                        NostrEventCard(
+                            state = state,
+                            authorDisplayName = { "" },
+                            referenceLabel = label,
+                            contentColor = Color.Black,
+                            onRetry = {},
+                            onCopy = { copies++ },
+                            onOpen = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithText("nevent1qqqqqqq…ending1").assertCountEquals(3)
+        composeRule.onAllNodesWithContentDescription(string(R.string.nostr_event_copy)).run {
+            assertCountEquals(3)
+            fetchSemanticsNodes().indices.forEach { index -> get(index).performClick() }
+        }
+        assertEquals(3, copies)
     }
 
     /** Verifies every point in the ellipsized note preview invokes only the in-app reader action. */

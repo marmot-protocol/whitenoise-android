@@ -244,6 +244,7 @@ class NostrEventCardScreenshotTest {
         capture("nostr_image_reader_light")
     }
 
+    /** Renders the full-screen reader for one event kind, which shows the event without its encoded reference. */
     private fun renderExpandedEventReader(
         kind: NostrEventCardKind,
         eventKind: Int,
@@ -256,7 +257,6 @@ class NostrEventCardScreenshotTest {
                 Surface(Modifier.width(360.dp).height(900.dp).testTag(TAG)) {
                     NostrEventReaderScreen(
                         card = card(kind, eventKind, title, body, readerBody = body).copy(imageUrls = imageUrls),
-                        authoredReference = AUTHORED_REFERENCE,
                         document = null,
                         parsing = false,
                         authorDisplayName = { "Alex Morgan" },
@@ -298,7 +298,6 @@ class NostrEventCardScreenshotTest {
                                     summary = "A compact note preview.",
                                     readerBody = NOTE_READER_BODY,
                                 ),
-                            authoredReference = AUTHORED_REFERENCE,
                             document = noteReaderDocument(),
                             parsing = false,
                             authorDisplayName = { "Alex Morgan" },
@@ -536,7 +535,6 @@ class NostrEventCardScreenshotTest {
 
     private companion object {
         const val TAG = "nostr-event-cards"
-        const val AUTHORED_REFERENCE = "nevent1qqs8f4r0originalreference6da8fv0"
         const val NESTED_NOTE = "note1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsn9e8p"
         const val NOTE_READER_BODY = "This is the complete referenced note with a link and a nested Nostr reference."
     }

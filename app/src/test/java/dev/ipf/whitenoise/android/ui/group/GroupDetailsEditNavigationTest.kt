@@ -753,14 +753,14 @@ class GroupDetailsConfirmationNavigationTest {
                 .fetchSemanticsNode()
                 .config[SemanticsActions.OnClick]
                 .action!!
-        val callsBefore = nativeCalls.toList()
+        val callsBefore = nativeCalls.filterNot { it == "npub" }
         composeRule.runOnIdle {
             fixture.appState.advanceLocalDeleteTestRuntime()
             retained()
         }
         composeRule.waitForIdle()
         assertEquals(emptyList<String>(), mutations)
-        assertEquals(callsBefore, nativeCalls.toList())
+        assertEquals(callsBefore, nativeCalls.filterNot { it == "npub" })
     }
 
     /** Equal async Leave results replace the ticket without stranding the visible review. */

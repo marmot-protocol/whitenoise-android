@@ -203,7 +203,7 @@ internal fun GroupAbandonmentDialog(
 /** The review for one or several chats, where a single chat keeps its own title and confirm wording. */
 @Suppress("FunctionNaming")
 @Composable
-private fun GroupAbandonmentReviewDialog(
+internal fun GroupAbandonmentReviewDialog(
     targets: List<GroupAbandonmentTarget>,
     status: GroupAbandonmentStatus,
     onConfirm: () -> Unit,

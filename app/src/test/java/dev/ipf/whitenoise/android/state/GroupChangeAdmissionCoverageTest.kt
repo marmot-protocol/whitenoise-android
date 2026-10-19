@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -73,12 +74,35 @@ class GroupChangeAdmissionCoverageTest {
     /** Start the existing distance bound at the callback body, excluding a multiline metadata argument list. */
     private fun groupChangeBodies(lines: List<String>): List<Pair<Int, Int>> =
         lines.indices.filter { "runGroupChange(" in lines[it] && "fun " !in lines[it] }.map { start ->
+            var argumentDepth = 0
             val body =
-                (start until minOf(lines.size, start + HEADER_WINDOW)).firstOrNull {
-                    lines[it].trimEnd().endsWith(") {")
+                (start until minOf(lines.size, start + HEADER_WINDOW)).firstOrNull { index ->
+                    val line =
+                        lines[index]
+                            .replace(Regex("\"(?:\\\\.|[^\"\\\\])*\""), "")
+                            .substringBefore("//")
+                    argumentDepth += line.count { it == '(' } - line.count { it == ')' }
+                    argumentDepth == 0 && line.trimEnd().endsWith(") {")
                 } ?: error("Unbounded runGroupChange header at ${start + 1}")
             body to start
         }
+
+    /** Metadata may contain an if block; admission starts after the entire argument list closes. */
+    @Test
+    fun metadataConditionDoesNotStartTheGuardedCallback() {
+        val lines =
+            listOf(
+                "appState.runGroupChange(",
+                "    account, group,",
+                "    actionLabel = if (draft == null) {",
+                "        R.string.remove_photo",
+                "    } else { R.string.change_photo },",
+                ") {",
+                "    updateGroupImage(account, group, bytes, mediaType)",
+                "}",
+            )
+        assertEquals(listOf(5 to 0), groupChangeBodies(lines))
+    }
 
     /** The admission helper acknowledges exactly the two advisory refusals MDK lets a user override. */
     @Test
