@@ -237,6 +237,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
     if (remoteGiphyMedia != null) {
         RemoteGiphyMediaBubble(
             media = remoteGiphyMedia,
+            controller = controller,
+            messageIdHex = record.messageIdHex,
             footer =
                 GiphyMessageFooter(
                     timeText = rememberedMessageBubbleTime(record.recordedAt),
@@ -245,7 +247,6 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     editedLabel = giphyEditedLabel,
                     onEditedClick = onGiphyEditedClick,
                 ),
-            appState = appState,
             onLongPress = onMediaLongPress,
         )
     }
