@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,9 +46,9 @@ import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
@@ -58,7 +57,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -75,7 +73,6 @@ private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
 
 /** Process-wide cap shared by GIPHY fetch/decode work to bound animated-media pressure. */
 private val giphyFetchSlots = Semaphore(6)
-private val giphyPlaybackSlots = Semaphore(6)
 private val giphyByteCache = RemoteGiphyByteCache(GIPHY_MEMORY_CACHE_MAX_BYTES)
 
 /** The message's existing metadata, placed once inside the GIPHY card footer. */
@@ -128,19 +125,23 @@ internal fun shouldLoadRemoteGiphyMedia(
 
 /** Loads and renders one iOS-originated GIPHY envelope through Android's media policy. */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // One row owns decoding and playback policy.
 internal fun RemoteGiphyMediaBubble(
     media: RemoteGiphyMedia,
     footer: GiphyMessageFooter,
-    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+    messageIdHex: String,
     onLongPress: () -> Unit,
 ) {
-    var presentation by remember(media.url) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
-    var failed by remember(media.url) { mutableStateOf(false) }
-    var manualRequest by remember(media.url) { mutableStateOf(false) }
-    var retryToken by remember(media.url) { mutableIntStateOf(0) }
-    var playbackGranted by remember(media.url) { mutableStateOf(false) }
-    val imageRequest = remember(media.url) { media.imageRequest() }
+    val appState = controller.appState
+    val identity = remember(controller, messageIdHex, media.url) { Any() }
+    val presentationState = remember(identity) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
+    var presentation by presentationState
+    OwnLatestAttachmentPresentation(identity, presentationState)
+    var failed by remember(identity) { mutableStateOf(false) }
+    var manualRequest by remember(identity) { mutableStateOf(false) }
+    var retryToken by remember(identity) { mutableIntStateOf(0) }
+    val imageRequest = remember(identity) { media.imageRequest() }
     val cachedBytes = remember(imageRequest?.url, retryToken) { imageRequest?.url?.let(giphyByteCache::get) }
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     val automaticAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
@@ -151,15 +152,23 @@ internal fun RemoteGiphyMediaBubble(
             manualRequest = manualRequest,
             cachedAvailable = cachedBytes != null,
         )
-    val playbackAllowed = cachedBytes != null || manualRequest || !automaticDownloadsPaused
+    val animationSource =
+        rememberInlineAnimationSource(identity, appState, controller.boundAccountRef, controller.group.groupIdHex) {
+            imageRequest?.url?.let(giphyByteCache::get)
+        }
 
-    LaunchedEffect(media.url, shouldLoad, retryToken) {
+    LaunchedEffect(identity, shouldLoad, retryToken) {
         if (!shouldLoad || presentation != null) return@LaunchedEffect
         failed = false
         try {
             val decoded = fetchAndDecodeRemoteGiphyMedia(media, cachedBytes)
-            currentCoroutineContext().ensureActive()
-            if (decoded == null) failed = true else presentation = decoded
+            try {
+                currentCoroutineContext().ensureActive()
+                if (decoded == null) failed = true else presentation = decoded
+            } catch (cancelled: CancellationException) {
+                decoded?.releaseOwnedPresentation()
+                throw cancelled
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
@@ -167,26 +176,12 @@ internal fun RemoteGiphyMediaBubble(
         }
     }
 
-    LaunchedEffect(media.url, presentation, playbackAllowed) {
-        if (presentation == null || !playbackAllowed) {
-            playbackGranted = false
-            return@LaunchedEffect
-        }
-        giphyPlaybackSlots.withPermit {
-            playbackGranted = true
-            try {
-                awaitCancellation()
-            } finally {
-                playbackGranted = false
-            }
-        }
-    }
-
     RemoteGiphyMediaCard(
         media = media,
         footer = footer,
-        presentation = presentation.takeIf { playbackGranted },
-        loading = shouldLoad && (presentation == null || !playbackGranted) && !failed,
+        presentation = presentation,
+        animationSource = animationSource,
+        loading = shouldLoad && presentation == null && !failed,
         failed = failed,
         onLoad = {
             manualRequest = true
@@ -199,7 +194,7 @@ internal fun RemoteGiphyMediaBubble(
 
 /** Stateless GIPHY card used by production state ownership and deterministic screenshot tests. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Stateless inputs include a local playback source.
 internal fun RemoteGiphyMediaCard(
     media: RemoteGiphyMedia,
     footer: GiphyMessageFooter,
@@ -208,6 +203,7 @@ internal fun RemoteGiphyMediaCard(
     failed: Boolean,
     onLoad: () -> Unit,
     onLongPress: () -> Unit = {},
+    animationSource: InlineAnimationSource? = null,
 ) {
     val attribution = media.attribution?.let { "via GIPHY · $it" } ?: stringResource(R.string.giphy_attribution)
     Surface(
@@ -225,8 +221,9 @@ internal fun RemoteGiphyMediaCard(
             ) {
                 when (presentation) {
                     is DecodedAttachmentPresentation.Static ->
-                        Image(
-                            bitmap = presentation.toImageBitmap(),
+                        InlineAttachmentImage(
+                            still = presentation,
+                            source = animationSource,
                             contentDescription = stringResource(R.string.giphy_media_preview),
                             contentScale = ContentScale.Crop,
                             modifier =

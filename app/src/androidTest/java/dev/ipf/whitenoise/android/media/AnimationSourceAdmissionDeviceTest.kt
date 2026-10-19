@@ -140,6 +140,39 @@ class AnimationSourceAdmissionDeviceTest {
         }
     }
 
+    /** The exact inline decoder entry point must deliver changing isolated pixels within the smaller row budget. */
+    @Test
+    fun inlineGrantStreamsChangingIsolatedPixels() {
+        val instrumentation =
+            androidx.test.platform.app.InstrumentationRegistry
+                .getInstrumentation()
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .install(instrumentation.targetContext)
+        val animated =
+            requireNotNull(
+                runBlocking {
+                    dev.ipf.whitenoise.android.ui.conversation.media
+                        .decodeInlineAttachmentAnimation(ordinaryGif())
+                },
+            )
+        val pixels = Bitmap.createBitmap(animated.intrinsicWidth, animated.intrinsicHeight, Bitmap.Config.ARGB_8888)
+        try {
+            assertTrue(animated is IsolatedAnimationDrawable)
+            val isolation = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation)
+            assertTrue(isolation.isolated && !isolation.internetGranted && !isolation.runtimeInitialized)
+            assertTrue(isolation.uid != android.os.Process.myUid())
+            assertTrue(
+                maxOf(animated.intrinsicWidth, animated.intrinsicHeight) <=
+                    dev.ipf.whitenoise.android.ui.conversation.media.INLINE_ANIMATION_MAX_EDGE_PX,
+            )
+            instrumentation.runOnMainSync { (animated as Animatable).start() }
+            assertChangingPixels(animated, pixels)
+        } finally {
+            instrumentation.runOnMainSync { (animated as java.io.Closeable).close() }
+            pixels.recycle()
+        }
+    }
+
     private fun assertChangingPixels(
         animated: Drawable,
         pixels: Bitmap,
