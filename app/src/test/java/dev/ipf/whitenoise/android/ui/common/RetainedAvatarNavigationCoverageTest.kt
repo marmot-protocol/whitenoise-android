@@ -92,7 +92,11 @@ class RetainedAvatarNavigationCoverageTest {
 
         assertTrue("the returning content must have committed", commits.isNotEmpty())
         commits.forEach { assertSame("first and subsequent commits retain the actual image", image, it) }
-        assertEquals("empty layout must not replace the scrolled window with top rows", expected, owner.pixels.images.keys)
+        assertEquals(
+            "empty layout must not replace the scrolled window with top rows",
+            expected,
+            owner.pixels.images.keys,
+        )
     }
 
     /** Window replacement releases older pins rather than accumulating every previously visited row. */
@@ -106,6 +110,7 @@ class RetainedAvatarNavigationCoverageTest {
         select(assets.drop(20))
 
         assertEquals(assets.subList(20, 36).map { it.cacheKey(ACCOUNT) }.toSet(), owner.pixels.images.keys)
+        assertEquals("revision fallback shares the same window bound", 16, owner.pixels.retained.size)
     }
 
     /** A → B → A, sign-out, and a new list owner cannot revive a selection through an outgoing callback. */
@@ -115,11 +120,15 @@ class RetainedAvatarNavigationCoverageTest {
         seed(assets.take(1))
         select(assets.take(1))
         val retired = owner.updateVisible
+        val retiredPixels = checkNotNull(owner.pixels.recordLoaded)
 
         listOf("other", null, ACCOUNT).forEach { next ->
             rule.runOnIdle { account = next }
             rule.waitForIdle()
-            rule.runOnIdle { retired(assets.take(1)) }
+            rule.runOnIdle {
+                retired(assets.take(1))
+                retiredPixels(assets.first(), image)
+            }
             rule.waitForIdle()
             assertTrue("a retired account callback cannot select pixels for $next", owner.pixels.images.isEmpty())
         }
@@ -210,7 +219,14 @@ class RetainedAvatarNavigationCoverageTest {
 
     /** Gives each row a stable, independently selected MDK reference. */
     private fun asset(index: Int) =
-        AvatarAssetFfi("row-$index", "ref-$index", AvatarAvailabilityFfi.READY, AvatarAcquisitionStateFfi.IDLE, 1uL, 64uL)
+        AvatarAssetFfi(
+            "row-$index",
+            "ref-$index",
+            AvatarAvailabilityFfi.READY,
+            AvatarAcquisitionStateFfi.IDLE,
+            1uL,
+            64uL,
+        )
 
     private companion object {
         const val ACCOUNT = ConversationTimelineTestIds.ACCOUNT_REF

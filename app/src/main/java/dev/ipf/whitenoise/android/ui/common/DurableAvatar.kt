@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.first
  * never does; a cached image is returned on the first frame so re-entering a screen never blanks it.
  * While a new content revision of the same drawable reference is read, the pixels this call site last
  * showed stay up and are swapped in place once the replacement is ready, or kept if the read fails (#3284).
- * Null while a first image loads, or when MDK has no drawable bytes; authoritative misses stay placeholders.
+ * A returning list may supply the same valid fallback through its owner-bound prepared window. Exact
+ * completed loads join that window even when they finish after its preparation budget; fallback pixels
+ * keep their original revision. Null when no valid picture is known; authoritative misses stay placeholders.
  */
 @Composable
 internal fun rememberDurableAvatar(
@@ -62,10 +64,12 @@ internal fun rememberDurableAvatar(
                 }
             }.value
         }
-    val shown = loaded ?: displayed.retainedFor(owner)
+    val shown = loaded ?: displayed.retainedFor(owner) ?: pins?.retainedFor(ownedAsset)
     SideEffect {
         displayed.owner = owner
         displayed.image = shown
+        // Only exact loaded pixels may enter the window; a prior revision used as fallback stays prior.
+        if (ownedAsset != null && loaded != null) pins?.recordLoaded?.invoke(ownedAsset, loaded)
     }
     return shown
 }

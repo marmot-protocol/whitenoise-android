@@ -221,12 +221,22 @@ internal class ReturnFixture(
                     COROUTINE_SUSPENDED
                 }
                 "requestAvatarAssets" -> avatarRequests.incrementAndGet().let { emptyList<AvatarAssetFfi>() }
-                "toString" -> "ChatListReturnRuntime"
-                "hashCode" -> System.identityHashCode(proxy)
-                "equals" -> proxy === args?.firstOrNull()
-                else -> error("Unexpected return-fixture call: ${method.name}")
+                else -> objectMethod(proxy, method.name, args)
             }
         } as MarmotInterface
+
+    /** Implements object identity without disguising unexpected native enrichment calls. */
+    private fun objectMethod(
+        proxy: Any,
+        name: String,
+        args: Array<out Any?>?,
+    ): Any =
+        when (name) {
+            "toString" -> "ChatListReturnRuntime"
+            "hashCode" -> System.identityHashCode(proxy)
+            "equals" -> proxy === args?.firstOrNull()
+            else -> error("Unexpected return-fixture call: $name")
+        }
 
     /** Keeps the mounted destination on its consented, authoritative empty timeline. */
     private fun groupDetails() =
@@ -275,7 +285,10 @@ internal class ReturnWindow(
                         presentation =
                             presented.presentation.copy(
                                 avatar =
-                                    SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", presented.row.title),
+                                    SelectedAvatarFfi.RemoteImage(
+                                        "https://example.invalid/avatar",
+                                        presented.row.title,
+                                    ),
                             ),
                     )
                 },

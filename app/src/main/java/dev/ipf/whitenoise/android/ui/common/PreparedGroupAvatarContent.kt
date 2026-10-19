@@ -11,6 +11,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -52,7 +53,10 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
         // A returning LazyColumn has no layout yet. Keep its last real viewport until layout restores it.
         if (window.hasVisibleRows) SideEffect { retainedPreparation.updateVisible(window.assets) }
         key(accountRef) {
-            CompositionLocalProvider(LocalPreparedGroupAvatarPixels provides retainedPreparation.pixels, content = content)
+            CompositionLocalProvider(
+                LocalPreparedGroupAvatarPixels provides retainedPreparation.pixels,
+                content = content,
+            )
         }
     }
 }
@@ -81,18 +85,62 @@ internal fun rememberRetainedGroupAvatarPreparation(
     surfaceIdentity: Any,
 ): RetainedGroupAvatarPreparation {
     val lifetime = AvatarImageLoader.currentCacheLifetime()
-    val selected =
+    val window =
         remember(appState, accountRef, appState.runtimeGeneration, lifetime, surfaceIdentity) {
-            mutableStateOf<List<AvatarAssetFfi>>(emptyList())
+            RetainedAvatarWindow(accountRef)
         }
-    val updateVisible =
-        remember(selected) {
-            { assets: List<AvatarAssetFfi> -> selected.value = assets.take(VISIBLE_GROUP_AVATAR_LIMIT).map { it.copy() } }
+    val prepared = rememberPreparedGroupAvatarPixels(appState, window.assets, accountRef, surfaceIdentity)
+    SideEffect {
+        window.assets.forEach { asset ->
+            prepared.images[accountRef?.let(asset::cacheKey)]?.let { window.recordLoaded(asset, it) }
         }
+    }
     return RetainedGroupAvatarPreparation(
-        rememberPreparedGroupAvatarPixels(appState, selected.value, accountRef, surfaceIdentity),
-        updateVisible,
+        prepared.copy(
+            images = prepared.images + window.exactImages(),
+            retained = window.retained,
+            recordLoaded = window::recordLoaded,
+        ),
+        window::select,
     )
+}
+
+/** One owner retains only its latest measured window, including row loads that outlive preparation. */
+private class RetainedAvatarWindow(
+    private val accountRef: String?,
+) {
+    var assets by mutableStateOf<List<AvatarAssetFfi>>(emptyList())
+        private set
+    var retained by mutableStateOf<List<PreparedAvatarImage>>(emptyList())
+        private set
+
+    /** Drops departed or invalidated selections, keeping valid prior revisions until their replacement loads. */
+    fun select(visible: List<AvatarAssetFfi>) {
+        assets = visible.take(VISIBLE_GROUP_AVATAR_LIMIT).map { it.copy() }
+        retained = retained.filter { known -> assets.any { it.isRenderable() && sameSelection(it, known.asset) } }
+    }
+
+    /** Accepts exact loaded pixels only for a still-selected revision, with at most one image per selection. */
+    fun recordLoaded(
+        asset: AvatarAssetFfi,
+        image: ImageBitmap,
+    ) {
+        val current = assets.firstOrNull { it.isRenderable() && sameSelection(it, asset) } ?: return
+        if (accountRef == null || current.cacheKey(accountRef) != asset.cacheKey(accountRef)) return
+        val previous = retained.firstOrNull { sameSelection(it.asset, asset) }
+        if (previous?.asset == asset && previous.image === image) return
+        retained = retained.filterNot { sameSelection(it.asset, asset) } + PreparedAvatarImage(asset.copy(), image)
+    }
+
+    /** Seeds only the revision these pixels actually depict; revision fallback remains a separate lookup. */
+    fun exactImages(): Map<String, ImageBitmap> =
+        retained.mapNotNull { known -> accountRef?.let(known.asset::cacheKey)?.let { it to known.image } }.toMap()
+
+    /** Target and selected reference jointly identify a drawable picture independently of content refresh. */
+    private fun sameSelection(
+        first: AvatarAssetFfi,
+        second: AvatarAssetFfi,
+    ): Boolean = first.target == second.target && first.reference == second.reference
 }
 
 /**
