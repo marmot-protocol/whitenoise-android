@@ -1,6 +1,5 @@
 name: Feature request
 description: Propose a user-visible White Noise Android capability or improvement
-title: ""
 labels: []
 body:
   - type: textarea

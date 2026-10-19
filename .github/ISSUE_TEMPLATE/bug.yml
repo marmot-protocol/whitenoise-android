@@ -1,6 +1,5 @@
 name: Bug report
 description: Report reproducible incorrect behavior in White Noise Android
-title: ""
 labels: []
 body:
   - type: textarea
