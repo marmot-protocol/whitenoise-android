@@ -277,28 +277,7 @@ class PushTokenRefreshIntegrationTest {
                     val mutex = deliveryMutex(fixture)
                     mutex.lock()
                     val callback = queueRotation(fixture, "callback-token")
-                    when (retirement) {
-                        "runtime" -> {
-                            val generation =
-                                WhiteNoiseAppState::class.java
-                                    .getDeclaredField("runtimeGeneration\$delegate")
-                                    .apply { isAccessible = true }
-                                    .get(fixture.appState) as androidx.compose.runtime.MutableIntState
-                            generation.intValue += 1
-                        }
-                        "account" -> {
-                            @Suppress("UNCHECKED_CAST")
-                            val account =
-                                WhiteNoiseAppState::class.java
-                                    .getDeclaredField("activeAccountRef\$delegate")
-                                    .apply { isAccessible = true }
-                                    .get(fixture.appState) as androidx.compose.runtime.MutableState<String?>
-                            account.value = "different-account"
-                        }
-                        "signout" -> fixture.appState.signOutInProgress = true
-                        "wipe" -> fixture.appState.wipeInProgress = true
-                        "clear" -> PushTokenStore.create(context).clear()
-                    }
+                    retirePushOwner(fixture, retirement)
                     mutex.unlock()
                     fixture.runWithMainLooperPumping { callback.join() }
                     if (retirement == "none") {
@@ -377,27 +356,11 @@ class PushTokenRefreshIntegrationTest {
                     fixture.runWithMainLooperPumping {
                         kotlinx.coroutines.withTimeout(5_000L) { started.await() }
                         val latest =
-                            when (retirement) {
-                                "rotation" -> queueRotation(fixture, "latest-callback")
-                                "runtime" -> {
-                                    val generation =
-                                        WhiteNoiseAppState::class.java
-                                            .getDeclaredField("runtimeGeneration\$delegate")
-                                            .apply { isAccessible = true }
-                                            .get(fixture.appState) as androidx.compose.runtime.MutableIntState
-                                    generation.intValue += 1
-                                    null
-                                }
-                                else -> {
-                                    @Suppress("UNCHECKED_CAST")
-                                    val account =
-                                        WhiteNoiseAppState::class.java
-                                            .getDeclaredField("activeAccountRef\$delegate")
-                                            .apply { isAccessible = true }
-                                            .get(fixture.appState) as androidx.compose.runtime.MutableState<String?>
-                                    account.value = "different-account"
-                                    null
-                                }
+                            if (retirement == "rotation") {
+                                queueRotation(fixture, "latest-callback")
+                            } else {
+                                retirePushOwner(fixture, retirement)
+                                null
                             }
                         release.complete(Unit)
                         first.join()
@@ -524,6 +487,35 @@ class PushTokenRefreshIntegrationTest {
                 NotificationStreamForegroundService.stop(context)
             }
         }
+
+    /** Uses the same owner invalidations in queued and suspended-query fixture cases. */
+    private fun retirePushOwner(
+        fixture: NotificationBootstrapTestFixture,
+        retirement: String,
+    ) {
+        when (retirement) {
+            "runtime" -> {
+                val generation =
+                    WhiteNoiseAppState::class.java
+                        .getDeclaredField("runtimeGeneration\$delegate")
+                        .apply { isAccessible = true }
+                        .get(fixture.appState) as androidx.compose.runtime.MutableIntState
+                generation.intValue += 1
+            }
+            "account" -> {
+                @Suppress("UNCHECKED_CAST")
+                val account =
+                    WhiteNoiseAppState::class.java
+                        .getDeclaredField("activeAccountRef\$delegate")
+                        .apply { isAccessible = true }
+                        .get(fixture.appState) as androidx.compose.runtime.MutableState<String?>
+                account.value = "different-account"
+            }
+            "signout" -> fixture.appState.signOutInProgress = true
+            "wipe" -> fixture.appState.wipeInProgress = true
+            "clear" -> PushTokenStore.create(context).clear()
+        }
+    }
 
     private fun heldSdkPreferences(
         enteredWrite: kotlinx.coroutines.CompletableDeferred<Unit>,

@@ -10060,12 +10060,14 @@ class WhiteNoiseAppState private constructor(
                 !signOutInProgress &&
                 !wipeInProgress
         }
-        try {
-            if (!pushTokenStore.setTokenIfCurrent(token) { pushTokenRotationSequence.get() == rotation }) return
-        } catch (_: PushTokenStorageException) {
-            android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
-            return
-        }
+        val retained =
+            try {
+                pushTokenStore.setTokenIfCurrent(token) { pushTokenRotationSequence.get() == rotation }
+            } catch (_: PushTokenStorageException) {
+                android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
+                false
+            }
+        if (!retained) return
         notificationScope.launch {
             val recorded =
                 withContext(pushWakeStorageDispatcher) {
@@ -10169,6 +10171,16 @@ class WhiteNoiseAppState private constructor(
         config ?: return false
         if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
         if (!operationIsCurrent()) return false
+        return syncNativePushRegistrationForAccountsLocked(accountRefs, config, freshCallbackToken, operationIsCurrent)
+    }
+
+    /** The caller holds the sync mutex through every account and the atomic pending-marker acknowledgement. */
+    private suspend fun syncNativePushRegistrationForAccountsLocked(
+        accountRefs: List<String>,
+        config: PushServerConfig,
+        freshCallbackToken: String?,
+        operationIsCurrent: () -> Boolean,
+    ): Boolean {
         val token = tokenForNativePushSync(freshCallbackToken, operationIsCurrent) ?: return false
         val tokenIsCurrent: suspend () -> Boolean = {
             operationIsCurrent() &&
@@ -10178,15 +10190,12 @@ class WhiteNoiseAppState private constructor(
                 ) &&
                 operationIsCurrent()
         }
-        if (!tokenIsCurrent()) return false
-        for (account in accountRefs) {
-            val synced = syncPushForAccount(account, config, token, tokenIsCurrent)
-            if (!synced) return false
-        }
-        if (!tokenIsCurrent()) return false
-        return withContext(pushWakeStorageDispatcher) {
-            pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
-        }
+        return tokenIsCurrent() &&
+            accountRefs.all { account -> syncPushForAccount(account, config, token, tokenIsCurrent) } &&
+            tokenIsCurrent() &&
+            withContext(pushWakeStorageDispatcher) {
+                pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
+            }
     }
 
     /** Only this invocation's fresh callback can replace a failed SDK acquisition. */
@@ -10489,14 +10498,17 @@ class WhiteNoiseAppState private constructor(
             }.onFailure {
                 appStateDebug { "FCM token fetch failed: ${it.readableMessage()}" }
             }.getOrNull()
-        if (token.isNullOrBlank()) return null
-        val retained =
-            withContext(pushWakeStorageDispatcher) {
-                pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
-                    pushTokenRotationSequence.get() == rotation && tokenOwnerIsCurrent()
+        return if (token.isNullOrBlank()) {
+            null
+        } else {
+            val retained =
+                withContext(pushWakeStorageDispatcher) {
+                    pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
+                        pushTokenRotationSequence.get() == rotation && tokenOwnerIsCurrent()
+                    }
                 }
-            }
-        return token.takeIf { retained }
+            token.takeIf { retained }
+        }
     }
 
     private suspend fun readFcmTokenFromSdk(): String? =
