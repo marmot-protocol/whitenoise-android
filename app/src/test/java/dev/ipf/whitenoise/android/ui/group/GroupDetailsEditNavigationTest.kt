@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.group
 import android.content.Context
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
@@ -50,7 +49,6 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
-import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -432,13 +430,14 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("chat_info.members_screen").assertIsDisplayed()
     }
 
-    /** Seeds the existing observable controller error, matching native administration fixture conventions. */
-    @Suppress("UNCHECKED_CAST")
+    /** Seeds native-style feedback through the actual mutation-presentation boundary. */
     private fun presentMutationFailure(controller: ConversationController) {
-        val field = ConversationController::class.java.getDeclaredField("lastMutationError\$delegate")
-        field.isAccessible = true
-        (field.get(controller) as MutableState<ErrorPresentation?>).value =
-            ErrorPresentation(AppText.Plain("Member update failed"), "operation=TEST")
+        controller.recordMutationFailure(
+            R.string.toast_couldnt_add_members,
+            "TEST",
+            IllegalStateException("fixture failure"),
+            detail = AppText.Plain("Member update failed"),
+        )
     }
 
     /** Full-member route state cannot carry into another group's controller. */
@@ -581,11 +580,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
         val successor = testController.controller.transferAdminCandidates().first()
         val successorName = testController.controller.memberDisplayName(successor)
-        // Leave routing awaits a native roster read outside Compose's idle tracking.
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodes(hasText(successorName) and hasClickAction()).fetchSemanticsNodes().size == 1
-        }
-        composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
+        pickLeaveSuccessor(successorName)
         composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
         composeRule
             .onNode(
@@ -603,11 +598,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("confirmation.confirm").assertDoesNotExist()
         assertEquals(emptyList<String>(), mutations)
         composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
-        // Leave routing awaits a native roster read outside Compose's idle tracking.
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodes(hasText(successorName) and hasClickAction()).fetchSemanticsNodes().size == 1
-        }
-        composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
+        pickLeaveSuccessor(successorName)
         composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
         try {
             composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
@@ -625,6 +616,15 @@ class GroupDetailsEditNavigationTest {
         // demotes or leaves after rejection. Successful transfer/leave needs device evidence.
         assertEquals(listOf("promoteAdminDetailed"), mutations)
         assertEquals(listOf("member-b"), promotionTargets)
+    }
+
+    private fun pickLeaveSuccessor(name: String) {
+        val matcher = hasText(name) and hasClickAction()
+        // Leave resolves the live roster on IO before opening the picker.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(matcher).fetchSemanticsNodes().size == 1
+        }
+        composeRule.onNode(matcher).performClick()
     }
 
     private fun render(

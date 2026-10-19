@@ -8299,8 +8299,10 @@ class WhiteNoiseAppState private constructor(
         get() = notificationNetworkRecovery
 
     /**
-     * Reactive Android-validated internet and aggregate relay fallback inputs
-     * for the chat-list connectivity banner. Active-account attempt and
+     * Reactive active-default-route availability, Android internet validation,
+     * and aggregate relay fallback inputs for the chat-list connectivity banner.
+     * Foreground readiness and relay sampling use the active route even when
+     * OS validation probes fail. Active-account attempt and
      * application-readiness phases live in [ChatsController]; neither a local
      * subscription nor this device-wide relay count can mark that account
      * ready. The pool count is retained only to trigger an active-account
@@ -8316,19 +8318,21 @@ class WhiteNoiseAppState private constructor(
     private fun updateConnectivitySignals(
         hasValidatedInternet: Boolean? = null,
         relaysConnected: Boolean? = null,
-    ) = connectivitySignalOwner.update(hasValidatedInternet, relaysConnected)
+        hasActiveNetwork: Boolean? = null,
+    ) = connectivitySignalOwner.update(hasValidatedInternet, relaysConnected, hasActiveNetwork)
 
     /**
      * Refresh [connectivitySignals] from the engine's relay-health snapshot.
-     * No-op while backgrounded or offline; a failed read keeps the previous
-     * value rather than flashing a guess, and a snapshot that straddled a
+     * No-op while backgrounded or without an active default route; OS internet
+     * validation is not required. A failed read keeps the previous value rather
+     * than flashing a guess, and a snapshot that straddled a
      * network transition is discarded via [connectivityNetworkGeneration].
      * The banner only changes state on evidence from the current network.
      */
     suspend fun refreshRelayConnectivity() {
-        // Offline needs no sample: the write clamp already pinned the signal
-        // false, and pool counts read while offline are stale by definition.
-        if (!appInForeground || !connectivitySignals.value.hasValidatedInternet) return
+        // No active default route needs no sample: the write clamp already pinned
+        // the signal false, and pool counts read without a route are stale.
+        if (!appInForeground || !connectivitySignals.value.hasAppNetwork) return
         val generation = connectivitySignalOwner.captureNetworkGeneration()
         val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull()
         // A snapshot that straddled a network transition describes the wrong
@@ -8360,7 +8364,10 @@ class WhiteNoiseAppState private constructor(
         runCatchingCancellable {
             val network = cm.activeNetwork
             hasActiveNetworkSnapshot = activeDefaultNetwork.seed(network?.networkHandle)
-            updateConnectivitySignals(hasValidatedInternet = hasValidatedInternet())
+            updateConnectivitySignals(
+                hasValidatedInternet = hasValidatedInternet(),
+                hasActiveNetwork = hasActiveNetworkSnapshot,
+            )
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
             if (network != null) schedulePendingPushWakeCatchUpDrain()
@@ -8496,7 +8503,10 @@ class WhiteNoiseAppState private constructor(
                 hasActiveDefaultNetwork = hasActiveNetworkSnapshot,
                 hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
             )
-        updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
+        updateConnectivitySignals(
+            hasValidatedInternet = recovery.hasUsableInternet,
+            hasActiveNetwork = hasActiveNetworkSnapshot,
+        )
         refreshNativeAttachmentPermissions()
         if (!recovery.restored) return
         resumePushWakeEpisodeFromLifecycle()

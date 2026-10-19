@@ -6262,13 +6262,6 @@ class ConversationController(
     )
         private set
 
-    /** The accepted in-flight archive/restore, presentation-only; identity-compared on settle. */
-    private class ConversationArchiveIntent(
-        val archived: Boolean,
-    )
-
-    private var pendingArchiveIntent by mutableStateOf<ConversationArchiveIntent?>(null)
-
     private val mutationPresentation =
         ConversationMutationPresentation(
             ownsPresentation = {
@@ -6304,7 +6297,7 @@ class ConversationController(
      * authoritative state shows through instead of a captured snapshot.
      */
     val presentedArchived: Boolean
-        get() = pendingArchiveIntent?.archived ?: group.archived
+        get() = mutationPresentation.presentedArchived(group.archived)
 
     private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
 
@@ -6552,40 +6545,25 @@ class ConversationController(
         private set
     internal var hasMoreAfter by mutableStateOf(false)
 
-    // Single guard for archive/leave/member-management mutations so the UI can
-    // disable buttons while one is in flight and prevent double-submits.
-    var mutationInFlight by mutableStateOf(false)
-        private set
-    var lastMutationError by mutableStateOf<ErrorPresentation?>(null)
-        private set
+    /** Shared action slot, independent of the subscription attempt's lifetime. */
+    val mutationInFlight: Boolean get() = mutationPresentation.inFlight
+    var lastMutationError: ErrorPresentation?
+        get() = mutationPresentation.error
+        private set(value) {
+            if (value == null) mutationPresentation.clearError() else mutationPresentation.recordFailure(value)
+        }
     private var subscriptionError by mutableStateOf<ErrorPresentation?>(null)
     internal var pageError by mutableStateOf<ErrorPresentation?>(null)
     val error: ErrorPresentation?
         get() = pageError ?: subscriptionError
     internal val errorEdge: ConversationLoadFailureEdge
         get() = conversationLoadFailureEdge(pageError != null, failedPageDirection)
-    private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
 
     // staleness-exempt: observable retry trigger; nullable snapshots below retain its value.
     var retryGeneration by mutableLongStateOf(0L)
         private set
     private var terminalLoadFailure = false
     internal var failedPageDirection: ConversationSearchPageDirection? = null
-
-    // Drops re-entrant calls so a rapid double-tap can't enqueue duplicate
-    // FFI work even before Compose re-evaluates `enabled = !mutationInFlight`.
-    // mutationsScope runs on Main.immediate, so the check + set is sequential
-    // within a single coroutine and atomic across coroutines on the same
-    // dispatcher.
-    private suspend inline fun withMutationLock(block: () -> Unit) {
-        if (mutationInFlight) return
-        mutationInFlight = true
-        try {
-            block()
-        } finally {
-            mutationInFlight = false
-        }
-    }
 
     fun clearLastMutationError() {
         lastMutationError = null
@@ -6610,18 +6588,11 @@ class ConversationController(
         if (this is CancellationException) throw this
     }
 
-    private suspend inline fun <T> withMutationLockResult(
+    /** Admits one UI mutation while keeping its execution in the caller/app-owned scope. */
+    private suspend fun <T> withMutationLockResult(
         defaultValue: T,
-        block: () -> T,
-    ): T {
-        if (mutationInFlight) return defaultValue
-        mutationInFlight = true
-        return try {
-            block()
-        } finally {
-            mutationInFlight = false
-        }
-    }
+        block: suspend () -> T,
+    ): T = mutationPresentation.runIfIdle(defaultValue, block)
 
     private val conversationAccountRef = accountRefOverride ?: appState.activeAccountRef
     private val conversationRuntimeGeneration = appState.runtimeGeneration
@@ -6754,12 +6725,10 @@ class ConversationController(
     private val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
     private val reactionIntentConflator = ReactionIntentConflator()
 
-    private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val initialTimelineSubscriptionRead =
-        SingleFlightBoundedInitialResourceRead<ConversationTimelineSubscriptionHandle>(
-            closeUnclaimed = { lateStream -> runCatching { lateStream.close() } },
-        )
-    private val initialTimelineSnapshotRead = SingleFlightBoundedInitialSnapshotRead<TimelinePageFfi?>()
+    internal val window = ConversationWindowState()
+    private val timelineSession =
+        ConversationTimelineSession(onTimelineRetired = { window.readySubscription = null })
+    private val controllerScope = timelineSession.scope
     private val initialPresentationWarmCoordinator =
         ConversationInitialPresentationWarmCoordinator(
             scope = controllerScope,
@@ -6768,36 +6737,24 @@ class ConversationController(
             onReady = { hasPreparedInitialPresentation = true },
         )
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val attachmentTransferScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    internal val attachmentTransfers = AttachmentTransferCoordinator(attachmentTransferScope)
+    private val attachmentPresentation =
+        ConversationAttachmentPresentation(
+            appState = appState,
+            accountRef = conversationAccountRef,
+            groupIdHex = initialGroup.groupIdHex,
+            sourceMessageId = { nativeAttachmentSourceId(it) },
+        )
+    internal val attachmentTransfers: AttachmentTransferCoordinator get() = attachmentPresentation.transfers
 
-    // Cached at start() so `loadOlderPage` / `loadNewerPage` can drive
-    // `paginate_backwards` / `paginate_forwards` on the subscription. Per
-    // the PR-#400 contract, the subscription owns the materialized window
-    // (ordering, dedup, head-anchoring, cap, has_more_*); clients render
-    // the returned page directly instead of merging against a hand-rolled
-    // cursor.
-    @Volatile
-    internal var timelineSubscription: ConversationTimelineSubscriptionHandle? = null
-        private set
+    /** The installed native handle; paging and commits share the session's retirement authorities. */
+    internal val timelineSubscription: ConversationTimelineSubscriptionHandle?
+        get() = timelineSession.timelineSubscription
+    internal val liveSubscriptionLock: Any get() = timelineSession.lock
+    internal val timelineSubscriptionActiveCallMutex: Mutex get() = timelineSession.activeCallMutex
+    private val conversationScope: CoroutineScope? get() = timelineSession.currentScope
+    internal val accountTeardownRequested: Boolean get() = timelineSession.accountTeardownRequested
+    private val controllerCleared: Boolean get() = timelineSession.cleared
 
-    /** Newest installed conversation-window sidecar: header, capabilities, draft and reaction references. */
-    internal val window = ConversationWindowState()
-    internal val liveSubscriptionLock = Any()
-    internal val timelineSubscriptionActiveCallMutex = Mutex()
-    private var groupStateSubscription: ConversationGroupStateSubscriptionHandle? = null
-    private var startJob: Job? = null
-    private var timelineHandoff: ConversationTimelineHandoff? = null
-
-    // staleness-exempt: captured subscription-start token, not a counter owner.
-    private var lastStartedGeneration: Long? = null
-    private var conversationScope: CoroutineScope? = null
-
-    @Volatile
-    internal var accountTeardownRequested = false
-
-    @Volatile
-    private var controllerCleared = false
     internal val inboundVisibleHostAttempt = HostPerformanceAttemptSlot()
     internal var inboundVisibleHostGeneration by mutableLongStateOf(0L)
         private set
@@ -7058,64 +7015,38 @@ class ConversationController(
      */
     fun start() {
         val account = conversationAccountRef ?: return
-        val candidate =
-            controllerScope.launch(start = CoroutineStart.LAZY) {
-                runStart(account)
-            }
-        val shouldStart =
-            synchronized(liveSubscriptionLock) {
-                val generation = retryGeneration
-                val alreadyStartedForGeneration =
-                    startJob?.isActive == true || lastStartedGeneration == generation
-                if (accountTeardownRequested || controllerCleared || alreadyStartedForGeneration) {
-                    false
-                } else {
-                    lastStartedGeneration = generation
-                    startJob = candidate
-                    true
-                }
-            }
-        if (shouldStart) {
-            candidate.start()
-        } else {
-            candidate.cancel()
-        }
+        timelineSession.start(retryGeneration) { runStart(account) }
     }
 
+    /** Presents startup outcomes while the timeline session owns admission and finalization. */
     private suspend fun runStart(account: String) {
-        val currentStartJob = coroutineContext[Job]
         isLoading = true
         terminalConversationUnavailable = false
         subscriptionError = null
         pageError = null
         terminalLoadFailure = false
         try {
-            coroutineScope {
-                conversationScope = this
+            timelineSession.runReadScope {
+                // Global relay catch-up is owned by the chat-list/foreground
+                // lifecycle. The timeline and group handles below subscribe to
+                // local projections, so opening them does not need another
+                // account-worker sync; reactions render their optimistic overlay
+                // before any authoritative commit waits for that worker.
+                // Local NIP-40 enforcement (#333) + secure delete (#334): on open
+                // and then at the next loaded row's expiry boundary, securely wipe
+                // plaintext past the retention window via the engine and re-publish
+                // so rows leave the open timeline while the user is still watching.
+                // The timer is lifecycle-bound to this conversation and is
+                // rescheduled by timeline/group-state publishes; when there is no
+                // loaded row near expiry it falls back to the old slow cadence.
+                val foregroundSweepJob = launch { runForegroundDisappearingMessageSweep(account) }
                 try {
-                    // Global relay catch-up is owned by the chat-list/foreground
-                    // lifecycle. The timeline and group handles below subscribe to
-                    // local projections, so opening them does not need another
-                    // account-worker sync; reactions render their optimistic overlay
-                    // before any authoritative commit waits for that worker.
-                    // Local NIP-40 enforcement (#333) + secure delete (#334): on open
-                    // and then at the next loaded row's expiry boundary, securely wipe
-                    // plaintext past the retention window via the engine and re-publish
-                    // so rows leave the open timeline while the user is still watching.
-                    // The timer is lifecycle-bound to this conversation and is
-                    // rescheduled by timeline/group-state publishes; when there is no
-                    // loaded row near expiry it falls back to the old slow cadence.
-                    val foregroundSweepJob = launch { runForegroundDisappearingMessageSweep(account) }
-                    try {
-                        runConversationSubscriptionLoop(account)
-                    } finally {
-                        // A terminal initial-open failure returns normally from
-                        // the subscription loop. Stop its infinite sibling so
-                        // runStart can finish and release its lifecycle state.
-                        foregroundSweepJob.cancel()
-                    }
+                    runConversationSubscriptionLoop(account)
                 } finally {
-                    conversationScope = null
+                    // A terminal initial-open failure returns normally from
+                    // the subscription loop. Stop its infinite sibling so
+                    // runStart can finish and release its lifecycle state.
+                    foregroundSweepJob.cancel()
                 }
             }
         } catch (cancel: CancellationException) {
@@ -7138,14 +7069,6 @@ class ConversationController(
             isLoading = false
             subscriptionError = privacySafeErrorPresentation("CONVERSATION_LOAD", throwable)
             terminalLoadFailure = true
-        } finally {
-            conversationScope = null
-            cleanupConversationSubscriptions()
-            synchronized(liveSubscriptionLock) {
-                if (startJob === currentStartJob) {
-                    startJob = null
-                }
-            }
         }
     }
 
@@ -7351,28 +7274,13 @@ class ConversationController(
         foregroundSweepScheduleSignals.trySend(Unit)
     }
 
+    /** Retires this account's reads before native teardown; accepted mutations keep their app owner. */
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
         if (!shouldTeardownLiveSubscriptionsForAccount(accountRef, conversationAccountRef, conversationAccountRef)) return
-        val teardown =
-            synchronized(liveSubscriptionLock) {
-                accountTeardownRequested = true
-                memberRosterRefreshGeneration.advance()
-                val current = Triple(groupStateSubscription, timelineSubscription, startJob)
-                groupStateSubscription = null
-                startJob = null
-                current
-            }
-        val (groupSubscription, timelineStream, job) = teardown
-        withContext(NonCancellable + Dispatchers.IO) {
-            runCatching { groupSubscription?.close() }
-        }
-        closeTimelineSubscriptionSafely(timelineStream)
-        if (shouldCancelLiveSubscriptionJob(job, coroutineContext[Job])) {
-            job?.cancelAndJoin()
-        }
+        timelineSession.closeForAccountTeardown { memberRosterRefreshGeneration.advance() }
     }
 
-    private fun isAccountTeardownRequested(): Boolean = synchronized(liveSubscriptionLock) { accountTeardownRequested }
+    private fun isAccountTeardownRequested(): Boolean = timelineSession.accountTeardownRequested
 
     // The initial page is a local read, but it crosses the FFI boundary — a
     // hung call would leave the chat-list tap permanently inert because
@@ -7385,7 +7293,7 @@ class ConversationController(
         account: String,
         timelineStream: ConversationTimelineSubscriptionHandle,
     ): List<String> {
-        val snapshot = initialTimelineSnapshotRead.await { timelineStream.snapshot() }
+        val snapshot = timelineSession.snapshot(timelineStream)
         windowPresentationTiming.begin(
             receivedAtElapsedMs = SystemClock.elapsedRealtime(),
             ticket = appState.productObservationTicket(),
@@ -7432,20 +7340,7 @@ class ConversationController(
      * monolithic method hit an invalid stack-map-table bug in release builds).
      */
     private suspend fun runConversationSubscriptionLoop(account: String) {
-        var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-        while (coroutineContext.isActive && !isAccountTeardownRequested()) {
-            val (shouldExit, connected) = runConversationSubscriptionIteration(account)
-            if (shouldExit) return
-            if (connected) retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-            if (!coroutineContext.isActive || isAccountTeardownRequested()) break
-            val userRequestedRetry = withTimeoutOrNull(retryDelayMs) { retryLoadSignal.receive() } != null
-            retryDelayMs =
-                if (userRequestedRetry) {
-                    LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-                } else {
-                    nextLiveSubscriptionRetryDelayMillis(retryDelayMs)
-                }
-        }
+        timelineSession.runReconnectLoop { runConversationSubscriptionIteration(account) }
     }
 
     /**
@@ -7462,19 +7357,9 @@ class ConversationController(
         val rosterPrefetch = conversationScope?.prefetchGroupRoster(group.groupIdHex, account, groupRosterReader)
         try {
             timelineStream =
-                initialTimelineSubscriptionRead.await {
+                timelineSession.openTimeline {
                     liveSubscriptions.openTimeline(account, group.groupIdHex, ConversationTimelinePageLimit)
-                }
-            val stopAfterTimelineOpen =
-                synchronized(liveSubscriptionLock) {
-                    if (accountTeardownRequested) {
-                        true
-                    } else {
-                        timelineSubscription = timelineStream
-                        false
-                    }
-                }
-            if (stopAfterTimelineOpen) return true to false
+                } ?: return true to false
             val snapshotStreamIds = publishInitialTimelineSnapshot(account, timelineStream)
             timelineOpen.success()
             // Don't blanket-mark the absolute newest as read here — the UI
@@ -7509,18 +7394,10 @@ class ConversationController(
                         // transcript consent and membership presentation retain their own gates.
                         // Otherwise a slow roster can leave background messages queued until
                         // well after the retained conversation's first foreground frame (#3178).
-                        val groupStream = liveSubscriptions.openGroupState(account, group.groupIdHex)
+                        val groupStream =
+                            timelineSession.openGroup { liveSubscriptions.openGroupState(account, group.groupIdHex) }
+                                ?: return@runUntilFirstLiveSubscriptionEndsWithAttemptJobs
                         groupSubscription = groupStream
-                        val stopAfterGroupOpen =
-                            synchronized(liveSubscriptionLock) {
-                                if (accountTeardownRequested) {
-                                    true
-                                } else {
-                                    groupStateSubscription = groupStream
-                                    false
-                                }
-                            }
-                        if (stopAfterGroupOpen) return@runUntilFirstLiveSubscriptionEndsWithAttemptJobs
                         val groupSnapshot =
                             withContext(Dispatchers.IO) {
                                 groupStream.snapshot()
@@ -7568,14 +7445,14 @@ class ConversationController(
                 // worker. Automatic retries would accumulate more stuck calls;
                 // stop here. The user must restart rather than launch another
                 // native open while the single-flight owner is unresolved.
-                initialTimelineSubscriptionRead.cancel()
+                timelineSession.cancelInitialOpen()
                 terminalLoadFailure = true
                 return true to false
             }
         } finally {
             timelineOpen.unavailable()
             rosterPrefetch?.cancel() // A no-op once awaited; an early return must not leave it running.
-            closeConversationSubscriptionHandles(groupSubscription, timelineStream)
+            timelineSession.closeHandles(groupSubscription, timelineStream)
         }
         return false to false
     }
@@ -7819,53 +7696,6 @@ class ConversationController(
         }
     }
 
-    private suspend fun closeConversationSubscriptionHandles(
-        groupSubscription: ConversationGroupStateSubscriptionHandle?,
-        timelineStream: ConversationTimelineSubscriptionHandle?,
-    ) {
-        synchronized(liveSubscriptionLock) {
-            if (groupStateSubscription === groupSubscription) {
-                groupStateSubscription = null
-            }
-        }
-        withContext(NonCancellable + Dispatchers.IO) {
-            runCatching { groupSubscription?.close() }
-        }
-        closeTimelineSubscriptionSafely(timelineStream)
-    }
-
-    private suspend fun cleanupConversationSubscriptions() {
-        // Do NOT cancel inviteStreamScope here: it is not owned by a single
-        // start() invocation (see onCleared / #279). start()'s subscription
-        // loops can end while the screen is still composed, and acceptInvite()
-        // — which launches into inviteStreamScope from an independent mutation
-        // scope — may fire afterward.
-        val closingSubscription =
-            synchronized(liveSubscriptionLock) {
-                val current = timelineSubscription
-                current
-            }
-        closeTimelineSubscriptionSafely(closingSubscription)
-    }
-
-    private suspend fun closeTimelineSubscriptionSafely(timelineStream: ConversationTimelineSubscriptionHandle?) {
-        if (timelineStream == null) return
-        withContext(NonCancellable) {
-            timelineSubscriptionActiveCallMutex.withLock {
-                synchronized(liveSubscriptionLock) {
-                    if (timelineSubscription === timelineStream) {
-                        timelineSubscription = null
-                        window.readySubscription = null
-                    }
-                }
-                withContext(Dispatchers.IO) {
-                    runCatching { timelineStream.cancel() }
-                    runCatching { timelineStream.close() }
-                }
-            }
-        }
-    }
-
     /**
      * Cancel controller-owned scopes that outlive a single [start] call. The
      * conversation screen calls this once when it disposes the controller.
@@ -7880,20 +7710,15 @@ class ConversationController(
      */
     fun onCleared() {
         cancelMessageEdit()
-        synchronized(liveSubscriptionLock) {
-            controllerCleared = true
+        timelineSession.dispose {
             memberRosterRefreshGeneration.advance()
             timelineWindowGeneration.advance()
-            timelineHandoff?.close()
         }
         windowPresentationTiming.cancel()
         inboundVisibleHostAttempt.cancel()
         outboundVisibleHostAttempts.cancelAll()
-        initialTimelineSubscriptionRead.cancel()
-        initialTimelineSnapshotRead.cancel()
-        controllerScope.cancel()
         inviteStreamScope.cancel()
-        attachmentTransferScope.cancel()
+        attachmentPresentation.dispose()
     }
 
     /** Transfers every just-published optimistic row to the next conversation reveal frame. */
@@ -7911,10 +7736,7 @@ class ConversationController(
     ): Boolean = !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
 
     /** Captures only pages already received by the current local subscription attempt. */
-    internal fun pendingTimelineAtForeground(): CompletableDeferred<Boolean>? =
-        synchronized(liveSubscriptionLock) {
-            timelineHandoff?.pendingAtForeground()
-        }
+    internal fun pendingTimelineAtForeground(): CompletableDeferred<Boolean>? = timelineSession.pendingAtForeground()
 
     /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
@@ -7981,7 +7803,7 @@ class ConversationController(
     ) {
         val timelineWindows = Channel<RecoveryStampedTimelineWindow>(capacity = Channel.BUFFERED)
         val handoff = ConversationTimelineHandoff()
-        synchronized(liveSubscriptionLock) { timelineHandoff = handoff }
+        timelineSession.installHandoff(handoff)
         var observedProducerEnd = false
         val pump =
             async {
@@ -8096,10 +7918,7 @@ class ConversationController(
                 }
             }
         } finally {
-            handoff.close()
-            synchronized(liveSubscriptionLock) {
-                if (timelineHandoff === handoff) timelineHandoff = null
-            }
+            timelineSession.retireHandoff(handoff)
             // Channel close precedes coroutine completion. Let an ended producer finish normally;
             // cancelling in that gap makes await() throw and bypasses initial metadata settlement.
             if (!observedProducerEnd && pump.isActive) {
@@ -10473,21 +10292,7 @@ class ConversationController(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
-    ): String = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
-
-    /** Builds a durable identity without guessing when display and source message ids differ. */
-    private fun attachmentRequest(
-        account: String,
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): AttachmentTransferRequest =
-        AttachmentTransferRequest(
-            accountRef = account,
-            groupIdHex = group.groupIdHex,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
-        )
+    ): String = attachmentPresentation.mediaCacheKey(account, messageIdHex, attachmentIndex)
 
     private fun mediaUploadSessionStillCurrent(account: String): Boolean =
         shouldAcceptMediaUploadForAccount(
@@ -10554,213 +10359,135 @@ class ConversationController(
         }
     }
 
-    /**
-     * Yes/no probe: are the decrypted bytes for [messageIdHex] /
-     * [attachmentIndex] already resident in either cache tier? Lets a file
-     * bubble decide whether to surface the download chevron without firing
-     * an FFI hop. Strictly peek — never schedules a download or seeds the
-     * cache. Returns false when there's no active account.
-     */
+    /** Peeks at the existing cache without starting a native transfer. */
     fun hasCachedAttachment(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean {
-        val account = conversationAccountRef ?: return false
-        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        if (appState.cachedMediaPlaintext(cacheKey) != null) return true
-        return appState.diskMediaCache.contains(cacheKey)
-    }
+    ): Boolean = attachmentPresentation.hasCachedAttachment(messageIdHex, attachmentIndex)
 
-    /** Resolve a cold disk-index state without performing main-thread I/O. */
+    /** Hydrates the disk index off main before reporting availability. */
     suspend fun hasCachedAttachmentAfterHydration(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return appState.hasCachedAttachmentAfterHydration(
-            attachmentRequest(account, messageIdHex, attachmentIndex),
-        )
-    }
+    ): Boolean = attachmentPresentation.hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
 
-    /** Observable presentation state owned outside the attachment composable. */
+    /** Acquires one attachment observer under this conversation presentation owner. */
     internal fun attachmentTransferState(
         messageIdHex: String,
         attachmentIndex: Int,
         initiallyAvailable: Boolean,
     ): StateFlow<AttachmentTransferState> =
-        attachmentTransfers.acquireState(
-            key = attachmentTransferKey(messageIdHex, attachmentIndex),
-            initiallyAvailable = initiallyAvailable,
+        attachmentPresentation.attachmentTransferState(
+            messageIdHex,
+            attachmentIndex,
+            initiallyAvailable,
         )
 
-    /** Release presentation state when its attachment composable leaves composition. */
+    /** Releases the row observer independently of app/native transfer work. */
     internal fun releaseAttachmentTransferState(
         messageIdHex: String,
         attachmentIndex: Int,
-    ) {
-        attachmentTransfers.releaseState(attachmentTransferKey(messageIdHex, attachmentIndex))
-    }
+    ): Unit = attachmentPresentation.releaseAttachmentTransferState(messageIdHex, attachmentIndex)
 
-    /** Suspends until this attachment, rather than any process-wide cache key, becomes available. */
+    /** Waits for a fresh availability event for this exact attachment. */
     internal suspend fun awaitNextAttachmentAvailability(
         messageIdHex: String,
         attachmentIndex: Int,
-    ) {
-        attachmentTransfers.awaitNextAvailability(attachmentTransferKey(messageIdHex, attachmentIndex))
-    }
+    ): Unit = attachmentPresentation.awaitNextAttachmentAvailability(messageIdHex, attachmentIndex)
 
-    /**
-     * Request one controller-owned transfer. Auto-download and tap-to-open
-     * callers receive the same [Deferred], while truthful post-load probing
-     * decides whether the result survived in either local cache tier.
-     */
+    /** Joins one presentation transfer while native admission retains its app owner. */
     internal fun requestAttachmentTransfer(
         messageIdHex: String,
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
         retainedPlaintext: ByteArray? = null,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
-    ): Deferred<ByteArray> {
-        val account = conversationAccountRef
-        if (retainedPlaintext == null && reference.sourceEpoch != 0uL && account != null) {
-            appState.enqueueAttachmentDownload(
-                attachmentRequest(account, messageIdHex, attachmentIndex),
-                priority,
-            )
-        }
-        return attachmentTransfers.request(
-            key = attachmentTransferKey(messageIdHex, attachmentIndex),
-            load = {
-                retainedPlaintext
-                    ?: downloadAttachment(messageIdHex, attachmentIndex, reference, priority)
-            },
-            availableAfterLoad = {
-                retainedPlaintext != null ||
-                    hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
-            },
+    ): Deferred<ByteArray> =
+        attachmentPresentation.requestAttachmentTransfer(
+            messageIdHex,
+            attachmentIndex,
+            reference,
+            retainedPlaintext,
+            priority,
         )
-    }
 
+    /** Captures an open intent for the visible attachment destination. */
     internal fun requestAttachmentOpen(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return appState.attachmentOpens.requestOpen(
-            attachmentRequest(account, messageIdHex, attachmentIndex),
-        )
-    }
+    ): Boolean = attachmentPresentation.requestAttachmentOpen(messageIdHex, attachmentIndex)
 
+    /** Finds the current visible destination for this attachment. */
     internal fun attachmentOpenRequest(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): AttachmentOpenRequest? {
-        val account = conversationAccountRef ?: return null
-        return appState.attachmentOpens.openRequest(
-            attachmentRequest(account, messageIdHex, attachmentIndex),
-        )
-    }
+    ): AttachmentOpenRequest? = attachmentPresentation.attachmentOpenRequest(messageIdHex, attachmentIndex)
 
+    /** Whether this attachment still has an unconsumed open intent. */
     internal fun hasAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean {
-        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
-        return appState.attachmentOpens.hasIntent(request)
-    }
+    ): Boolean = attachmentPresentation.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)
 
+    /** Consumes the matching platform-open intent after bytes arrive. */
     internal suspend fun consumeAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean {
-        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
-        return appState.attachmentOpens.consume(request)
-    }
+    ): Boolean = attachmentPresentation.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex)
 
+    /** Restores an interrupted platform-open intent under its existing owner. */
     internal fun restoreAttachmentOpenIntent(
         messageIdHex: String,
         attachmentIndex: Int,
-    ) {
-        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return
-        appState.attachmentOpens.restore(request)
-    }
+    ): Unit = attachmentPresentation.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex)
 
-    /** Upgrade an optimistic imeta fallback before download/save uses its epoch. */
+    /** Resolves an optimistic reference before native download/save admission. */
     internal suspend fun authoritativeAttachmentReference(
         messageIdHex: String,
         attachmentIndex: Int,
         fallback: MediaAttachmentReferenceFfi,
-    ): MediaAttachmentReferenceFfi {
-        if (fallback.sourceEpoch != 0uL) return fallback
-        val account = conversationAccountRef ?: error("no active account")
-        val request = attachmentRequest(account, messageIdHex, attachmentIndex)
-        repeat(ATTACHMENT_REFERENCE_RESOLVE_ATTEMPTS) { attempt ->
-            appState
-                .resolveAttachmentReference(request)
-                ?.takeIf { it.sourceEpoch != 0uL }
-                ?.let { return it }
-            if (attempt < ATTACHMENT_REFERENCE_RESOLVE_ATTEMPTS - 1) {
-                delay(ATTACHMENT_REFERENCE_RESOLVE_BACKOFF_MILLIS)
-            }
-        }
-        throw AttachmentReferenceNotReadyException()
-    }
+    ): MediaAttachmentReferenceFfi =
+        attachmentPresentation.authoritativeAttachmentReference(
+            messageIdHex,
+            attachmentIndex,
+            fallback,
+        )
 
-    /**
-     * Resolves one attachment's plaintext as an array of at most [maxBytes], which defaults to the presentation
-     * budget so a preview cannot allocate an unbounded array, explicit Save and Share name their own budget.
-     */
+    /** Materializes plaintext within the requested presentation budget. */
     internal suspend fun downloadAttachment(
         messageIdHex: String,
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
         priority: AttachmentDownloadPriority,
         maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
-    ): ByteArray {
-        val account = conversationAccountRef ?: error("no active account")
-        val request = attachmentRequest(account, messageIdHex, attachmentIndex)
-        if (priority == AttachmentDownloadPriority.Interactive) {
-            appState.enqueueAttachmentDownload(request, priority)
-        }
-        return appState.downloadAttachmentPlaintext(
-            request = request,
-            reference = reference,
-            priority = priority,
-            maxBytes = maxBytes,
-        )
-    }
-
-    suspend fun downloadAttachment(
-        messageIdHex: String,
-        attachmentIndex: Int,
-        reference: MediaAttachmentReferenceFfi,
     ): ByteArray =
-        downloadAttachment(
+        attachmentPresentation.downloadAttachment(
             messageIdHex,
             attachmentIndex,
             reference,
-            AttachmentDownloadPriority.Interactive,
+            priority,
+            maxBytes,
         )
 
-    /** Decoded thumbnail for [messageIdHex] if one is cached (renders with no
-     *  spinner). Null when unanchored or not yet decoded. */
+    /** Returns a decoded thumbnail from the existing app cache. */
     fun thumbnailFor(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): android.graphics.Bitmap? {
-        val account = conversationAccountRef ?: return null
-        return appState.cachedMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex))
-    }
+    ): android.graphics.Bitmap? = attachmentPresentation.thumbnailFor(messageIdHex, attachmentIndex)
 
-    /** Cache a decoded thumbnail so re-renders / re-entry skip the decode. */
+    /** Stores a decoded thumbnail under the pinned cache identity. */
     fun cacheThumbnail(
         messageIdHex: String,
         attachmentIndex: Int,
         bitmap: android.graphics.Bitmap,
-    ) {
-        val account = conversationAccountRef ?: return
-        appState.cacheMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex), bitmap)
-    }
+    ): Unit = attachmentPresentation.cacheThumbnail(messageIdHex, attachmentIndex, bitmap)
+
+    /** Resolves interactive attachment bytes through the bounded presentation owner. */
+    suspend fun downloadAttachment(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        reference: MediaAttachmentReferenceFfi,
+    ): ByteArray = downloadAttachment(messageIdHex, attachmentIndex, reference, AttachmentDownloadPriority.Interactive)
 
     /**
      * Race-fix for own-sent media bubbles: when an outgoing media projection
@@ -11243,7 +10970,7 @@ class ConversationController(
     suspend fun leaveGroup(displayName: String? = null): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = conversationAccountRef ?: return false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             val activeAccountIdHex = conversationAccountIdHex
             // Decide the leave from a live roster read rather than the in-memory
             // `members` count, which can be stale (#811). If the roster is just
@@ -11260,7 +10987,7 @@ class ConversationController(
                 )
             if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, liveMemberCount)) {
                 appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-                return false
+                return@withMutationLockResult false
             }
             var demotedBeforeLeave = false
             runCatching {
@@ -11512,8 +11239,7 @@ class ConversationController(
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val groupIdHex = group.groupIdHex
-            val intent = ConversationArchiveIntent(archived)
-            pendingArchiveIntent = intent
+            val intent = mutationPresentation.beginArchive(archived)
             val chatListIntent = appState.beginChatListArchiveIntent(account, groupIdHex, archived)
             val authorityEpochBefore = mutationPresentation.groupAuthorityEpoch
             try {
@@ -11525,8 +11251,8 @@ class ConversationController(
                         // was in flight wins over the late success; the engine's
                         // own archive-change event reconverges the projection.
                         if (mutationPresentation.groupAuthorityEpoch == authorityEpochBefore) {
-                            group = updated
-                            appState.applyLocalGroupUpdate(updated)
+                            if (mutationPresentation.ownsCurrentPresentation()) group = updated
+                            appState.applyLocalGroupUpdate(updated, account)
                         }
                     }
                     presentConversationTransient(
@@ -11540,7 +11266,7 @@ class ConversationController(
                 // Identity-compared so a newer action's intent is never cleared
                 // by an older completion, and account/group switches (which
                 // rebind the chat list) cannot receive this stale settle.
-                if (pendingArchiveIntent === intent) pendingArchiveIntent = null
+                mutationPresentation.finishArchive(intent)
                 appState.finishChatListArchiveIntent(account, groupIdHex, chatListIntent)
             }
         }
@@ -12762,7 +12488,7 @@ class ConversationController(
                     terminalLoadFailure = false
                     retryGeneration += 1L
                 } else {
-                    retryLoadSignal.trySend(Unit)
+                    timelineSession.retry()
                 }
         }
     }
@@ -14928,9 +14654,6 @@ class ConversationController(
 
         // Cap retained transient debug rows while the toggle stays on, oldest-first.
         private const val MAX_STREAM_DEBUG_ROWS = 200
-
-        private const val ATTACHMENT_REFERENCE_RESOLVE_ATTEMPTS = 3
-        private const val ATTACHMENT_REFERENCE_RESOLVE_BACKOFF_MILLIS = 150L
 
         /**
          * 32 MiB cap on retained compressed bytes for in-flight/failed

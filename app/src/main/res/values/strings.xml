@@ -2402,6 +2402,7 @@
     <string name="local_reset_retry_detail">\u2068Reset stopped. Try Reset and wait for a new invite again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
     <string name="chat_list_delete_stopped">Deletion stopped</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
+    <string name="group_image_destination_refused_detail">The upload destination was blocked by network safety rules. Check your upload server and network settings, then try again.</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
     <string name="error_invalid_key_package">The published chat key for this person couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>

@@ -6,7 +6,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ValidatedInternetNetworkTrackerTest {
-    /** Advances the probe fence only when validated-internet identity changes. */
+    /** Foreground route changes fence samples independently of OS validation. */
+    @Test
+    fun foregroundRouteChangesFenceProbesWithoutGrantingOsValidation() {
+        val owner = ConnectivitySignalOwner()
+        owner.update(hasValidatedInternet = false, hasActiveNetwork = true, relaysConnected = true)
+        val generation = owner.captureNetworkGeneration()
+        assertTrue(owner.signals.value.hasAppNetwork)
+        assertFalse(owner.signals.value.hasValidatedInternet)
+        assertTrue(owner.signals.value.relaysConnected)
+        owner.update(hasActiveNetwork = false)
+        assertFalse(owner.isNetworkGenerationCurrent(generation))
+        assertFalse(owner.signals.value.hasAppNetwork)
+        assertFalse(owner.signals.value.relaysConnected)
+    }
+
+    @Test
+    fun validationAloneDoesNotSupplyAForegroundRoute() {
+        val owner = ConnectivitySignalOwner()
+        owner.update(hasValidatedInternet = true)
+        assertTrue(owner.signals.value.hasValidatedInternet)
+        assertFalse(owner.signals.value.hasAppNetwork)
+        assertFalse(owner.signals.value.relaysConnected)
+    }
+
     @Test
     fun usableRecoveryWakesOnlyAfterBothRouteAndValidatedUpstreamRecover() {
         val tracker = UsableValidatedInternetRecoveryTracker()
