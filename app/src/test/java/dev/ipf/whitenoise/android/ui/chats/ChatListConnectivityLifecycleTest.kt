@@ -90,7 +90,13 @@ class ChatListConnectivityLifecycleTest {
                     effectOwner = Unit,
                     displayed = ConnectivityBannerState.Hidden,
                     foregroundEpoch = foregroundEpoch,
-                    connectivitySignals = { ConnectivitySignals(hasValidatedInternet = true, relaysConnected = true) },
+                    connectivitySignals = {
+                        ConnectivitySignals(
+                            hasValidatedInternet = true,
+                            relaysConnected = true,
+                            hasActiveNetwork = true,
+                        )
+                    },
                     relaysConnectedFlow = relaysConnectedFlow,
                     refreshRelayConnectivity = { refreshCount += 1 },
                     revalidateConnectionReadiness = {},
@@ -148,7 +154,11 @@ class ChatListConnectivityLifecycleTest {
                     displayed = ConnectivityBannerState.Offline,
                     foregroundEpoch = foregroundEpoch,
                     connectivitySignals = {
-                        ConnectivitySignals(hasValidatedInternet = true, relaysConnected = false)
+                        ConnectivitySignals(
+                            hasValidatedInternet = false,
+                            relaysConnected = false,
+                            hasActiveNetwork = true,
+                        )
                     },
                     relaysConnectedFlow = relaysConnectedFlow,
                     refreshRelayConnectivity = { refreshCount += 1 },
@@ -208,7 +218,13 @@ class ChatListConnectivityLifecycleTest {
                     effectOwner = owner,
                     displayed = ConnectivityBannerState.Hidden,
                     foregroundEpoch = foregroundEpoch,
-                    connectivitySignals = { ConnectivitySignals(hasValidatedInternet = true, relaysConnected = true) },
+                    connectivitySignals = {
+                        ConnectivitySignals(
+                            hasValidatedInternet = true,
+                            relaysConnected = true,
+                            hasActiveNetwork = true,
+                        )
+                    },
                     relaysConnectedFlow = relaysConnectedFlow,
                     refreshRelayConnectivity = { refreshCount += 1 },
                     revalidateConnectionReadiness = {},
