@@ -40,7 +40,10 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
 ) {
     val window by remember(rows, listState, rowKey, assetForRow) {
         derivedStateOf {
-            val visibleKeys = listState.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
+            val visibleKeys =
+                listState.layoutInfo.visibleItemsInfo
+                    .map { it.key }
+                    .toSet()
             val visibleRows = visibleGroupAvatarWindow(rows, visibleKeys, rowKey)
             VisibleGroupAvatarAssets(
                 assets = visibleRows.mapNotNull(assetForRow),
@@ -132,8 +135,9 @@ private class RetainedAvatarWindow(
     }
 
     /** Existing exact pins need neither a new preparation read nor a second retained bitmap map. */
-    fun hasExactRevision(asset: AvatarAssetFfi): Boolean =
-        retained.any { sameSelection(it.asset, asset) && it.asset.contentRevision == asset.contentRevision }
+    fun hasExactRevision(asset: AvatarAssetFfi): Boolean {
+        return retained.any { sameSelection(it.asset, asset) && it.asset.contentRevision == asset.contentRevision }
+    }
 
     /** Accepts exact loaded pixels only for a still-selected revision, with at most one image per selection. */
     fun recordLoaded(
@@ -148,8 +152,11 @@ private class RetainedAvatarWindow(
     }
 
     /** Seeds only the revision these pixels actually depict; revision fallback remains a separate lookup. */
-    fun exactImages(): Map<String, ImageBitmap> =
-        retained.mapNotNull { known -> accountRef?.let(known.asset::cacheKey)?.let { it to known.image } }.toMap()
+    fun exactImages(): Map<String, ImageBitmap> {
+        return retained
+            .mapNotNull { known -> accountRef?.let(known.asset::cacheKey)?.let { it to known.image } }
+            .toMap()
+    }
 
     /** Target and selected reference jointly identify a drawable picture independently of content refresh. */
     private fun sameSelection(
