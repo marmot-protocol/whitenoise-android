@@ -17,6 +17,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.EmptyCoroutineContext
 
 /**
@@ -44,18 +46,28 @@ class ForwardUploadStallTest {
 
     /**
      * The production shape, a queued binding call that suspends between polls on the I/O dispatcher as UniFFI's async
-     * calls do, is abandoned at the bound: the watchdog reports the stall without waiting for MDK to answer.
+     * calls do, is abandoned at the bound: the watchdog reports the stall without waiting for MDK to answer. The
+     * first counter reading waits for the call to be suspended on the I/O dispatcher, so the test clock cannot reach
+     * the bound before the call it is meant to abandon has started.
      */
     @Test
     fun aQueuedBindingCallOnTheIoDispatcherIsAbandonedAtTheBound() =
         runTest {
+            val ioCallStarted = CountDownLatch(1)
+            val readOnceTheCallStarted = {
+                ioCallStarted.await(IO_CALL_START_WAIT_SECONDS, TimeUnit.SECONDS)
+                0L
+            }
             val failure =
                 runCatching {
-                    watch(progress = { 0L }) {
-                        withContext(Dispatchers.IO) { suspendCancellableCoroutine<Unit> { } }
+                    watch(progress = readOnceTheCallStarted) {
+                        withContext(Dispatchers.IO) {
+                            suspendCancellableCoroutine<Unit> { ioCallStarted.countDown() }
+                        }
                     }
                 }.exceptionOrNull()
 
+            assertEquals("the I/O call never started", 0L, ioCallStarted.count)
             assertTrue("$failure", failure is ForwardUploadStalledException)
             assertEquals(1, cancels)
             assertEquals(FORWARD_UPLOAD_START_MILLIS, testScheduler.currentTime)
@@ -203,5 +215,6 @@ class ForwardUploadStallTest {
 
     private companion object {
         const val LARGE_ITEM_BYTES = 6_000_000L
+        const val IO_CALL_START_WAIT_SECONDS = 5L
     }
 }
