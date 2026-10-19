@@ -1,0 +1,85 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+  "legacy_sha256": "8e1bbcedd6370658d5da87707747ead59686a14a125d1fbf6be0f3412dc6dcdd",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: ProfileQrSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ProfileQrSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "fun ProfileQrSheet(",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "profile-qr:string:profile_share_card_headline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.profile_share_card_headline",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "profile-qr:string:share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "profile-qr:string:share_profile_card",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.share_profile_picture",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "profile-qr:string:share_profile_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.share_profile_url",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
+      },
+      {
+        "surface": "Full public key caption: R.string.public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.public_key",
+        "test_ids": [
+          "ACC-019"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ProfileQrSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

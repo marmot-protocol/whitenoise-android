@@ -81,6 +81,8 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
+import dev.ipf.whitenoise.android.core.withoutRepeatsOf
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSearchHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighlight
@@ -159,6 +161,9 @@ internal fun MarkdownMessageBody(
     ttsSentenceActions: TtsSentenceActions? = null,
     searchHighlight: MessageSearchHighlight? = null,
     onWebLinkActivated: ((String) -> Boolean)? = null,
+    // Stable ids of the events the bubble's cards represent. A reference to one of them only repeats its card, so it
+    // is left out of the prose and a top-level paragraph of nothing else is not drawn (#3317).
+    hiddenEventIds: Set<String> = emptySet(),
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -196,8 +201,14 @@ internal fun MarkdownMessageBody(
             }
         }
     val bodyContext =
-        remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds) {
-            MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds)
+        remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds, hiddenEventIds) {
+            MarkdownBodyContext(
+                linkListener,
+                mentionDisplayName,
+                isGroupMember,
+                useDecorativeBackgrounds,
+                hiddenEventIds,
+            )
         }
     CompositionLocalProvider(
         LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged,
@@ -281,6 +292,7 @@ private data class MarkdownBodyContext(
     val mentionDisplayName: ((String) -> String?)?,
     val isGroupMember: ((String) -> Boolean)?,
     val useDecorativeBackgrounds: Boolean,
+    val hiddenEventIds: Set<String> = emptySet(),
 )
 
 internal typealias SelectableTextLayoutReporter =
@@ -562,6 +574,10 @@ internal fun markdownLinkDestination(annotation: LinkAnnotation): String? =
         else -> null
     }
 
+/**
+ * Lays out sibling [blocks] with paragraph spacing and authored blank lines, eliding past the sibling cap. At the top
+ * level, a paragraph that only repeats events the cards represent is not drawn (#3317).
+ */
 @Composable
 private fun MarkdownBlockList(
     blocks: List<MarkdownBlockFfi>,
@@ -579,18 +595,27 @@ private fun MarkdownBlockList(
     // line up with the document's per-block blankLinesBefore entries.
     val grouped = remember(visibleBlocks) { groupMarkdownDetailsBlocksWithSource(visibleBlocks) }
     val groups = grouped.groups
+    // A top-level paragraph that only repeats events the cards show is not
+    // drawn at all, so it leaves no empty line or gap (#3317).
+    val skipped =
+        remember(groups, ctx.hiddenEventIds, depth) {
+            groups.map { group -> depth == 0 && group.onlyRepeatsRepresentedEvents(ctx.hiddenEventIds) }
+        }
+    val lastDrawnIndex = skipped.lastIndexOf(false)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(MARKDOWN_BLOCK_SPACING)) {
+        var drawnGroups = 0
         groups.forEachIndexed { index, group ->
+            if (skipped[index]) return@forEachIndexed
             // A collapsible has no stable trailing text line, so the inline
-            // footer callback only rides the last group when it is a plain block.
+            // footer callback only rides the last drawn group when it is a plain block.
             val lastPlainCallback =
-                if (!blocksElided && index == groups.lastIndex) onLastTextLayout else null
+                if (!blocksElided && index == lastDrawnIndex) onLastTextLayout else null
             // One authored blank line is the ordinary paragraph break the Column
             // spacing already provides; each additional one adds a further gap so
             // two blank lines read differently from one (#1719). Leading blank
-            // lines stay normalized by the send path, so index 0 is skipped.
+            // lines stay normalized by the send path, so the first drawn group is skipped.
             val extraBlankLines =
-                if (index == 0) {
+                if (drawnGroups++ == 0) {
                     0
                 } else {
                     markdownExtraBlankLines(blankLinesBefore, grouped.sourceIndices.getOrNull(index))
@@ -922,6 +947,12 @@ internal fun markdownDetailsSection(inlines: List<MarkdownInlineFfi>): MarkdownD
     }
     return MarkdownDetailsSection(summary, content)
 }
+
+/** Whether [this] is a paragraph holding nothing but repeats of the [represented] events. */
+private fun MarkdownRenderGroup.onlyRepeatsRepresentedEvents(represented: Set<String>): Boolean =
+    this is MarkdownRenderGroup.Plain &&
+        block is MarkdownBlockFfi.Paragraph &&
+        block.inlines.onlyRepeatsRepresentedEvents(represented)
 
 /**
  * A message's blocks grouped so a `<details>` disclosure that spans several
@@ -1351,6 +1382,12 @@ private fun rememberMarkdownInlineText(
     val mentionBech32s = remember(inlines) { markdownInlineMentionBech32s(inlines) }
     val mentionNames = resolveMentionNames(mentionBech32s, ctx.mentionDisplayName)
     val timestampRevision = rememberTimestampRevision(remember(inlines) { markdownInlineTimestamps(inlines) })
+    // A leaf that would be left empty keeps its references: only a top-level
+    // paragraph may disappear, a heading, list item or cell stays readable.
+    val hiddenEventIds =
+        remember(inlines, ctx.hiddenEventIds) {
+            ctx.hiddenEventIds.takeUnless { inlines.onlyRepeatsRepresentedEvents(it) }.orEmpty()
+        }
     // Links must derive from the content color like every other accent:
     // colorScheme.primary disappears on the outgoing bubble, whose container
     // IS primary. Underline alone carries the affordance on both surfaces.
@@ -1376,6 +1413,7 @@ private fun rememberMarkdownInlineText(
             mentionDisplayName = mentionNames::get,
             isGroupMember = ctx.isGroupMember,
             useDecorativeBackgrounds = ctx.useDecorativeBackgrounds,
+            hiddenEventIds = hiddenEventIds,
         )
     }
 }
@@ -1450,6 +1488,7 @@ internal fun markdownInlinesToAnnotatedString(
     mentionDisplayName: ((String) -> String?)? = null,
     isGroupMember: ((String) -> Boolean)? = null,
     useDecorativeBackgrounds: Boolean = true,
+    hiddenEventIds: Set<String> = emptySet(),
 ): AnnotatedString =
     buildAnnotatedString {
         appendMarkdownInlines(
@@ -1461,6 +1500,7 @@ internal fun markdownInlinesToAnnotatedString(
                 mentionDisplayName,
                 isGroupMember,
                 useDecorativeBackgrounds,
+                hiddenEventIds,
             ),
             depth = 0,
         )
@@ -1474,9 +1514,32 @@ private class MarkdownInlineRenderContext(
     val mentionDisplayName: ((String) -> String?)?,
     val isGroupMember: ((String) -> Boolean)?,
     val useDecorativeBackgrounds: Boolean,
-)
+    val hiddenEventIds: Set<String>,
+) {
+    /**
+     * This context with no reference hidden, for a link or image label. A link that only repeats a card is removed
+     * whole before its label is drawn, so any label that is drawn belongs to a link that stays and keeps its text.
+     */
+    fun withoutHiding(): MarkdownInlineRenderContext =
+        if (hiddenEventIds.isEmpty()) {
+            this
+        } else {
+            MarkdownInlineRenderContext(
+                codeStyle,
+                linkStyle,
+                linkListener,
+                mentionDisplayName,
+                isGroupMember,
+                useDecorativeBackgrounds,
+                hiddenEventIds = emptySet(),
+            )
+        }
+}
 
-/** Appends [inlines] with their styles and gated link annotations, bounded by [depth]. */
+/**
+ * Appends [inlines] with their styles and gated link annotations, bounded by [depth]. A reference that only repeats
+ * an event in [MarkdownInlineRenderContext.hiddenEventIds] is left out and the space around it closed up (#3317).
+ */
 private fun AnnotatedString.Builder.appendMarkdownInlines(
     inlines: List<MarkdownInlineFfi>,
     ctx: MarkdownInlineRenderContext,
@@ -1485,7 +1548,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
     // Bound inline recursion (nested emphasis/strong/link/image) against a
     // peer-crafted deep tree, mirroring the block-depth cap. See #156.
     if (markdownInlineDepthExceeded(depth)) return
-    markdownVisibleSiblings(inlines).forEach { inline ->
+    markdownVisibleSiblings(inlines).withoutRepeatsOf(ctx.hiddenEventIds).forEach { inline ->
         when (inline) {
             is MarkdownInlineFfi.Text -> {
                 val content = markdownSafeDisplayText(inline.content, Int.MAX_VALUE)
@@ -1697,9 +1760,11 @@ internal fun resolveMentionsInPlaintext(
 private fun AnnotatedString.Builder.appendMarkdownLink(
     dest: String,
     children: List<MarkdownInlineFfi>,
-    ctx: MarkdownInlineRenderContext,
+    linkCtx: MarkdownInlineRenderContext,
     depth: Int,
 ) {
+    // A web link labelled with a carded reference keeps its label, or it would vanish from the prose (#3317).
+    val ctx = linkCtx.withoutHiding()
     // Normalize once at the boundary so the openability gate, the stored
     // annotation, and the eventual ACTION_VIEW all agree on the same string.
     // A whitespace-padded URL would otherwise pass the (trimming) gate but
