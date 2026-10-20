@@ -22,6 +22,26 @@ and verifies body word coordinates after sender narration. It leaves the default
 engine unchanged. Run it once with each engine, recording actual test output.
 Missing arguments skip the case and cannot count as physical proof.
 
+## Synthetic speaker controls
+
+For the two-member narration check, run
+`TtsRealEnginePositionAndroidTest#twoMemberPlaybackSubmitsOnlyChangedSpeakerPrefixes`
+with the same explicit engine/range arguments. It verifies four actual platform
+submissions: A, A, B and A. It waits for all four completions; its aggregate word
+mapping assertions do not independently qualify every message's highlight.
+
+For an unknown emoji-name pronunciation report, run the opt-in
+`TtsSpeakerSynthesisDeviceTest#exportSyntheticSpeakerNameAudioControls` with
+`ttsEngine` on the isolated `dev.ipf.whitenoise.android.maestrolab` pair. It keeps
+six synthetic name/punctuation audio controls and `controls.json` in a unique
+`tts-speaker-*` directory under that app's external files. Record the engine
+version separately. Export only those generated files and listen to the plain,
+leading/trailing emoji and joined-emoji cases, comparing colon and whitespace
+separators. Preserve the exact text, effective voice/locale and source/APK digest.
+Successful synthesis or a valid text payload does not establish correct
+pronunciation or reproduce an unknown original report. Do not record live
+profiles, messages or the microphone for this test.
+
 ## Exercise the complete reader journey with both engines
 
 Use disposable messages containing several sentences, Markdown, links,
