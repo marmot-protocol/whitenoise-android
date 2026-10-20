@@ -11593,9 +11593,7 @@ class ConversationController(
             groupId,
             stillWanted = { change.stillOwned() },
             actionLabel =
-                if (draft ==
-                    null
-                ) {
+                if (draft == null) {
                     R.string.remove_photo
                 } else {
                     R.string.change_photo

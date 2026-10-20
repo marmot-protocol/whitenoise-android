@@ -85,14 +85,14 @@ internal fun GroupMembersReviewDialog(
     val liveGroups = rememberUpdatedState(groups)
     val liveAdmins = rememberUpdatedState(initialAdminIds)
     val reviewedAdmins = initialAdminIds.toSet()
-    val reviewedMembers = members.map { it.accountIdHex }.toList()
-    val reviewedGroups = groups.map { it.id }.toList()
-    DisposableEffect(ticket) { onDispose { ticket.active = false } }
+    val reviewedMembers = members.map { it.accountIdHex }
+    val reviewedGroups = groups.map { it.id }
+    DisposableEffect(ticket) { onDispose { ticket.invalidate() } }
     val current = groupMembersReviewOwnerCurrent(appState, actingAccount, runtime)
 
     LaunchedEffect(current) {
         if (!current) {
-            ticket.active = false
+            ticket.invalidate()
             onDismiss()
         }
     }
@@ -100,7 +100,7 @@ internal fun GroupMembersReviewDialog(
         modifier = Modifier.testTag("group.members.review.dialog"),
         onDismissRequest = {
             if (dismissEnabled && ticket.active) {
-                ticket.active = false
+                ticket.invalidate()
                 onDismiss()
             }
         },
@@ -139,7 +139,7 @@ internal fun GroupMembersReviewDialog(
         dismissButton = {
             TextButton(onClick = {
                 if (ticket.active) {
-                    ticket.active = false
+                    ticket.invalidate()
                     onDismiss()
                 }
             }, enabled = dismissEnabled) { Text(stringResource(R.string.cancel)) }
@@ -266,8 +266,15 @@ internal fun reviewMemberPublicName(value: String?): String? {
     return publicName.takeUnless(IdentityFormatter::isNostrIdentityFallback)
 }
 
-private class GroupMembersReviewTicket {
+/** Single-use presentation ownership shared by disposal, dismissal and confirmation. */
+internal class GroupMembersReviewTicket {
     var active: Boolean = true
+        private set
+
+    /** Revokes callbacks retained from a presentation that has ended. */
+    fun invalidate() {
+        active = false
+    }
 
     fun claim(
         ownerCurrent: () -> Boolean,
@@ -290,10 +297,7 @@ private fun groupMembersReviewConfirmEnabled(
     busy: Boolean,
     hasMembers: Boolean,
     hasGroups: Boolean,
-): Boolean {
-    if (!current || busy || !hasMembers) return false
-    return hasGroups
-}
+): Boolean = current && !busy && hasMembers && hasGroups
 
 /** The frozen review belongs to one active account and runtime. */
 private fun groupMembersReviewOwnerCurrent(
