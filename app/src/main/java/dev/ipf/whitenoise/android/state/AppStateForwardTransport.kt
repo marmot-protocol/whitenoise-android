@@ -8,6 +8,13 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedDiskClaims
+import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadCopyBytes
+import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadFits
+import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadSnapshotBytes
+import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
+import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -42,6 +49,9 @@ internal fun WhiteNoiseAppState.forwardTransport(
         if (!isForwardOwnerSignedIn(account)) throw ForwardSessionInvalidatedException()
     }
 
+    // Disk this forward's concurrent destination uploads hold for staged copies, so they never count on the same space.
+    val diskClaims = StagedDiskClaims()
+
     return object : ForwardTransport {
         /** Resolves and decrypts one attachment strictly through the source account. */
         override suspend fun materialize(
@@ -75,39 +85,115 @@ internal fun WhiteNoiseAppState.forwardTransport(
             }
         }
 
-        /** Uploads already-materialized bytes strictly through the destination account. */
+        /**
+         * Uploads already-materialized bytes strictly through the destination account. The upload goes through
+         * MDK's file-backed path, which bounds every transfer attempt and stops when the user cancels, and a
+         * transfer that never starts fails at the upload stage instead of looking stalled for minutes (#2556).
+         * The in-memory upload stays for runtimes without the native library, as in JVM tests, and for messages
+         * the file path cannot take: more items or bytes than one native file batch, or too little free disk for
+         * the staged copies once the other destinations of this forward have claimed theirs.
+         */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
         ): List<MediaAttachmentReferenceFfi> {
             requireDestinationAccount()
-            val uploaded =
-                diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
-                    marmotIo {
-                        uploadMedia(
-                            account,
-                            targetGroupIdHex,
-                            MediaUploadRequestFfi(
-                                attachments =
-                                    message.attachments.map { attachment ->
-                                        MediaUploadAttachmentRequestFfi(
-                                            fileName = attachment.fileName,
-                                            mediaType = attachment.mediaType,
-                                            plaintext = attachment.plaintextBytes,
-                                            dim = attachment.dim,
-                                            thumbhash = attachment.thumbhash,
-                                        )
-                                    },
-                                caption = message.caption,
-                                send = false,
-                                blossomServer = null,
-                            ),
-                        ).attachments.map { it.reference }
+            val copyBytes = fileUploadCopyBytes(message.attachments)
+            val snapshotBytes = fileUploadSnapshotBytes(message.attachments)
+            val batchAndUsableBytes =
+                withContext(Dispatchers.IO) {
+                    nativeFileBackedSendLimits()?.let { limits ->
+                        limits.batchCiphertextBytes to usableSpaceFor(uploadSourcesDirectory(appContext.cacheDir))
                     }
+                }
+            // Claimed here, not inside withContext, which drops its result when the caller is cancelled on the way
+            // back: no suspension point may sit between the claim and the try that releases it.
+            val claim =
+                batchAndUsableBytes?.let { (batch, usableBytes) ->
+                    diskClaims.claimIf(copyBytes, usableBytes) { available ->
+                        fileUploadFits(message.attachments, batch, available)
+                    }
+                }
+            val batchCiphertextBytes = batchAndUsableBytes?.first?.takeIf { claim != null }
+            val uploaded =
+                try {
+                    diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
+                        if (batchCiphertextBytes == null) {
+                            uploadInMemory(targetGroupIdHex, message)
+                        } else {
+                            // The staged snapshots now sit on disk, where free space counts them.
+                            uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes) {
+                                claim?.shrinkBy(snapshotBytes)
+                            }
+                        }
+                    }
+                } finally {
+                    claim?.release()
                 }
             requireDestinationAccount()
             return uploaded
         }
+
+        /**
+         * Stages the bytes as private snapshots for one native file upload that must start within a bound, calling
+         * [onStaged] once the snapshots are written and before MDK starts. Abandoning
+         * a call that never started is safe even while MDK still has it queued. The queued command holds its own
+         * reference to the transfer control, so closing this handle does not free it. It checks the cancel before it
+         * opens any source and on every chunk, so it never reads the deleted snapshots. With `send = false`, it
+         * publishes nothing.
+         */
+        private suspend fun uploadFileBacked(
+            targetGroupIdHex: String,
+            message: PreparedForwardMessage.Media,
+            batchCiphertextBytes: Long,
+            onStaged: () -> Unit,
+        ): List<MediaAttachmentReferenceFfi> =
+            withFileUploadRequest(
+                message.attachments,
+                message.caption,
+                uploadSourcesDirectory(appContext.cacheDir),
+                batchCiphertextBytes,
+            ) { request ->
+                onStaged()
+                withNativeTransferControl(register = {}) { control ->
+                    withUploadStartWatchdog(
+                        startMillis = FORWARD_UPLOAD_START_MILLIS,
+                        progress = { control.processedBytes().toLong() },
+                        cancel = control::cancel,
+                    ) {
+                        marmotIo { uploadMediaFiles(account, targetGroupIdHex, request, control) }
+                            .attachments
+                            .map { it.reference }
+                    }
+                }
+            }
+
+        /** Passes the bytes across the binding in memory, for runtimes without the native file path. */
+        private suspend fun uploadInMemory(
+            targetGroupIdHex: String,
+            message: PreparedForwardMessage.Media,
+        ): List<MediaAttachmentReferenceFfi> =
+            marmotIo {
+                uploadMedia(
+                    account,
+                    targetGroupIdHex,
+                    MediaUploadRequestFfi(
+                        attachments =
+                            message.attachments.map { attachment ->
+                                MediaUploadAttachmentRequestFfi(
+                                    fileName = attachment.fileName,
+                                    mediaType = attachment.mediaType,
+                                    plaintext = attachment.plaintextBytes,
+                                    dim = attachment.dim,
+                                    thumbhash = attachment.thumbhash,
+                                )
+                            },
+                        caption = message.caption,
+                        send = false,
+                        blossomServer = null,
+                    ),
+                ).attachments.map { it.reference }
+            }
 
         /** Reads enough recent destination history to classify an uncertain batch publication. */
         private suspend fun recentForwardTimeline(
