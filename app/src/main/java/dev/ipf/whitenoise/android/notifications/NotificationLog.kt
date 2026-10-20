@@ -27,3 +27,8 @@ internal inline fun notificationWarningMessage(
     } else {
         message
     }
+
+/** Evaluates private notification diagnostics only in debug builds, without changing their existing log tag. */
+internal inline fun notificationDebug(message: () -> String) {
+    if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())
+}

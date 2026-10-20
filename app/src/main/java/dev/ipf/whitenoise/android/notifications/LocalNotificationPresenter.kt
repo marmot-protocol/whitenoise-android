@@ -13,7 +13,6 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
@@ -24,7 +23,6 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -48,7 +46,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -159,6 +156,8 @@ class LocalNotificationPresenter(
     /** The catch-up cohort boundary first posts are judged against; the catch-up coordinator drives it. */
     internal val catchUpWindow: NotificationCatchUpWindow
         get() = alertBudget.catchUpWindow
+
+    private val enrichmentRunner = NotificationEnrichmentRunner(enrichmentLauncher)
 
     private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
@@ -1386,6 +1385,7 @@ class LocalNotificationPresenter(
         }.takeIf { it }?.let { shortcutId }
     }
 
+    /** Hands optional picture work to its execution owner while keeping content and write checks here. */
     private suspend fun dispatchMessagingEnrichment(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
@@ -1394,7 +1394,10 @@ class LocalNotificationPresenter(
         directShareEligible: Boolean,
         isPostStillAllowed: () -> Boolean,
     ) {
-        val enrich: suspend () -> Unit = {
+        enrichmentRunner.runOrLaunch(
+            requiresRemoteAvatarResolution = messaging.requiresRemoteAvatarResolution,
+            showToken = showToken,
+        ) {
             enrichMessagingNotification(
                 update = update,
                 content = content,
@@ -1403,51 +1406,6 @@ class LocalNotificationPresenter(
                 directShareEligible = directShareEligible,
                 isPostStillAllowed = isPostStillAllowed,
             )
-        }
-        if (messaging.requiresRemoteAvatarResolution) {
-            launchMessagingEnrichment(content.notificationTag, showToken, enrich)
-        } else {
-            enrich()
-        }
-    }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun launchMessagingEnrichment(
-        notificationTag: String,
-        showToken: ConversationCardShowToken,
-        enrich: suspend () -> Unit,
-    ) {
-        if (!ConversationCardPostSynchronizer.retainShow(showToken)) return
-        val released = AtomicBoolean(false)
-        val releaseShow = {
-            if (released.compareAndSet(false, true)) {
-                ConversationCardPostSynchronizer.releaseShow(showToken)
-            }
-        }
-        try {
-            enrichmentLauncher {
-                try {
-                    enrich()
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (failure: Exception) {
-                    notificationDebug {
-                        "enrichment failed tag=${notificationTag.take(16)} " +
-                            "type=${failure.javaClass.simpleName}"
-                    }
-                } finally {
-                    releaseShow()
-                }
-            }
-        } catch (cancellation: CancellationException) {
-            releaseShow()
-            throw cancellation
-        } catch (failure: RuntimeException) {
-            releaseShow()
-            notificationDebug {
-                "enrichment launch failed tag=${notificationTag.take(16)} " +
-                    "type=${failure.javaClass.simpleName}"
-            }
         }
     }
 
@@ -3041,10 +2999,6 @@ private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {
                 AvatarImageLoader.loadBitmap(avatarUrl)
             }
     }
-}
-
-private inline fun notificationDebug(message: () -> String) {
-    if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())
 }
 
 private const val CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA =
