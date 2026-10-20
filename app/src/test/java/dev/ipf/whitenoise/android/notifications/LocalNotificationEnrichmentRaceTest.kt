@@ -190,7 +190,7 @@ class LocalNotificationEnrichmentRaceTest {
         assertTrue(enrichmentReadyToWrite.await(5, TimeUnit.SECONDS))
         Thread {
             try {
-                presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != "msg-a" }
+                presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "msg-a" }
             } finally {
                 deletionFinished.countDown()
             }

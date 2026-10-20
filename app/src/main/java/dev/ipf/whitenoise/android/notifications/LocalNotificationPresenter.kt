@@ -398,8 +398,8 @@ class LocalNotificationPresenter(
 
     /**
      * Silently reconciles every deterministic card of one conversation with the messages that may still be shown
-     * (#3323, #2065). Each retained entry carries its own message id; an entry for which [isEntryValid] fails, or
-     * that carries no id, is dropped. A card left with nothing is cancelled, and a card that lost only some entries
+     * (#3323, #2065). Each retained entry carries its own message id and the time it was shown; an entry for which
+     * [isEntryValid] fails is dropped. A card left with nothing is cancelled, and a card that lost only some entries
      * is rewritten from the live card with just the valid ones, silently and under its card lock, so a newer valid
      * sibling survives without a second alert. A reaction card quotes a target the card does not identify, so it is
      * cancelled when [cancelReactionCards] is set. Membership cards carry no message content and are left alone.
@@ -409,7 +409,7 @@ class LocalNotificationPresenter(
         accountRef: String,
         groupIdHex: String,
         cancelReactionCards: Boolean,
-        isEntryValid: (String?) -> Boolean,
+        isEntryValid: (entryMessageIdHex: String?, shownAtMs: Long) -> Boolean,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
         val compat = NotificationManagerCompat.from(context)
@@ -418,7 +418,11 @@ class LocalNotificationPresenter(
                 when (key.id) {
                     LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID -> CardContentOutcome.UNCHANGED
                     LocalNotificationFormatter.REACTION_NOTIFICATION_ID ->
-                        if (cancelReactionCards) reconcileCard(compat, key) { false } else CardContentOutcome.UNCHANGED
+                        if (cancelReactionCards) {
+                            reconcileCard(compat, key) { _, _ -> false }
+                        } else {
+                            CardContentOutcome.UNCHANGED
+                        }
                     else -> reconcileCard(compat, key, isEntryValid)
                 }
             }
@@ -435,7 +439,7 @@ class LocalNotificationPresenter(
     private fun reconcileCard(
         compat: NotificationManagerCompat,
         key: NotificationDismissalKey,
-        isEntryValid: (String?) -> Boolean,
+        isEntryValid: (entryMessageIdHex: String?, shownAtMs: Long) -> Boolean,
     ): CardContentOutcome =
         ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
             val manager =
@@ -445,7 +449,7 @@ class LocalNotificationPresenter(
                 activeNotification(manager, key.tag, key.id)?.notification
                     ?: return@withLock CardContentOutcome.ABSENT
             val entries = retainedEntryGroups(live)
-            val kept = entries.filter { isEntryValid(entryMessageId(it)) }
+            val kept = entries.filter { isEntryValid(entryMessageId(it), it.first().timestamp) }
             try {
                 when {
                     kept.size == entries.size && entries.isNotEmpty() -> CardContentOutcome.UNCHANGED

@@ -240,6 +240,7 @@ import java.net.InetAddress
 import java.net.URI
 import java.util.Collections
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -1681,6 +1682,7 @@ class WhiteNoiseAppState private constructor(
         )
     private val notificationContentInvalidations =
         NotificationContentInvalidations(NOTIFICATION_CONTENT_INVALIDATION_CAPACITY)
+    private val notificationReconcileLocks = ConcurrentHashMap<String, Mutex>()
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
@@ -8697,7 +8699,10 @@ class WhiteNoiseAppState private constructor(
             }
         // A successful local hide retracts the message's notification content too (#3323).
         if (hidden && accountRef != null) {
-            retractNotificationContent(RemovedNotificationMessage(accountRef, groupIdHex, messageIdHex))
+            // The hide is already persisted, so its retraction completes even if the caller is cancelled.
+            withContext(NonCancellable) {
+                retractNotificationContent(RemovedNotificationMessage(accountRef, groupIdHex, messageIdHex))
+            }
         }
         return hidden
     }
@@ -12424,9 +12429,10 @@ class WhiteNoiseAppState private constructor(
     /**
      * Reads MDK's durable state for one message candidate right before it may alert or be enriched (#2065, #3323).
      * Only incoming timeline messages are governed: reactions, invites and membership events always pass. A read,
-     * deleted or hidden candidate is withheld, and so is one whose state cannot be read, because a stale alert is
-     * worse than a missed one that catch-up re-delivers while MDK still reports it unread. The outcome is logged
-     * without identifiers or content.
+     * deleted or hidden candidate is withheld. A read that fails or exceeds its bounded time is retried once, and a
+     * state that still cannot be read is [NotificationCandidateState.Unknown]: the first write is withheld, because a
+     * stale alert is worse than a missed one, while enrichment of an already-posted card proceeds. The outcome is
+     * logged without identifiers or content.
      */
     private suspend fun notificationCandidateGate(
         update: NotificationUpdateFfi,
@@ -12442,14 +12448,35 @@ class WhiteNoiseAppState private constructor(
             if (notificationContentInvalidations.isRemoved(update.accountRef, update.groupIdHex, messageIdHex)) {
                 NotificationCandidateState.Removed
             } else {
-                runCatchingCancellable { readNotificationCandidateState(update, messageIdHex) }
-                    .getOrDefault(NotificationCandidateState.Unknown)
+                readNotificationCandidateStateWithinBudget(update, messageIdHex)
             }
         appStateDebug { "notification candidate phase=$phase outcome=${state.logValue}" }
         return state
     }
 
-    /** Resolves one governed candidate from its hidden mark, chat-list row and latest timeline page, off main. */
+    /**
+     * Reads one candidate's state within [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS] per attempt, at most
+     * [NOTIFICATION_CANDIDATE_ATTEMPTS] times, so a stalled MDK read can never hold the first alert indefinitely.
+     */
+    private suspend fun readNotificationCandidateStateWithinBudget(
+        update: NotificationUpdateFfi,
+        messageIdHex: String,
+    ): NotificationCandidateState {
+        repeat(NOTIFICATION_CANDIDATE_ATTEMPTS) {
+            runCatchingCancellable {
+                withTimeoutOrNull(NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS) {
+                    readNotificationCandidateState(update, messageIdHex)
+                }
+            }.getOrNull()?.let { return it }
+        }
+        return NotificationCandidateState.Unknown
+    }
+
+    /**
+     * Resolves one governed candidate from its hidden mark, chat-list row and timeline record, off main. The record
+     * is always looked up, first in the latest page and then in the wider reconciliation page, so a deletion MDK
+     * already accepted is honoured even when nothing has been read yet or the removal mark did not survive a restart.
+     */
     private suspend fun readNotificationCandidateState(
         update: NotificationUpdateFfi,
         messageIdHex: String,
@@ -12458,8 +12485,13 @@ class WhiteNoiseAppState private constructor(
             withContext(Dispatchers.IO) { hiddenMessageIdsInGroup(update.accountRef, update.groupIdHex) }
         if (hidden.any { it.equals(messageIdHex, ignoreCase = true) }) return NotificationCandidateState.Removed
         val row = marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(update.accountRef, update.groupIdHex) }
-        // Without a read marker nothing can cover the candidate, so the common first-message case skips the page.
-        val page = row?.lastReadMessageIdHex?.let { notificationTimelinePage(update.accountRef, update.groupIdHex) }
+        val latest = notificationTimelinePage(update.accountRef, update.groupIdHex)
+        val page =
+            if (latest.any { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }) {
+                latest
+            } else {
+                notificationTimelinePage(update.accountRef, update.groupIdHex, NOTIFICATION_RECONCILIATION_PAGE_LIMIT)
+            }
         return notificationCandidateState(messageIdHex, row, page)
     }
 
@@ -12492,53 +12524,93 @@ class WhiteNoiseAppState private constructor(
      */
     internal suspend fun retractNotificationContent(message: RemovedNotificationMessage) {
         notificationContentInvalidations.markRemoved(message)
-        withContext(Dispatchers.Default) {
-            localNotificationPresenter.reconcileConversationContent(
-                message.accountRef,
-                message.groupIdHex,
-                cancelReactionCards = true,
-            ) { entryId -> entryId != null && !entryId.equals(message.messageIdHex, ignoreCase = true) }
+        withNotificationReconcileLock(message.accountRef, message.groupIdHex) {
+            withContext(Dispatchers.Default) {
+                localNotificationPresenter.reconcileConversationContent(
+                    message.accountRef,
+                    message.groupIdHex,
+                    cancelReactionCards = true,
+                ) { entryId, _ ->
+                    entryId != null &&
+                        !notificationContentInvalidations.isRemoved(message.accountRef, message.groupIdHex, entryId)
+                }
+            }
         }
     }
+
+    /**
+     * Serializes card reconciliation per account and conversation, so a deletion, a read change and a stream-open
+     * pass for the same conversation apply in order while other conversations proceed independently.
+     */
+    private suspend fun <T> withNotificationReconcileLock(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T =
+        notificationReconcileLocks
+            .computeIfAbsent("$accountRef\u0000${groupIdHex.lowercase()}") { Mutex() }
+            .withLock { block() }
 
     /**
      * Reconciles each conversation with an active card against MDK's bounded state (#3323, #2065), on every runtime
      * event-stream open and whenever a conversation's read marker moves.
      */
-    internal suspend fun reconcileActiveNotificationCards() {
+    internal suspend fun reconcileActiveNotificationCards(marmot: MarmotInterface? = null) {
         val cards = withContext(Dispatchers.Default) { localNotificationPresenter.activeConversationCards() }
         cards.groupBy { it.accountRef to it.groupIdHex }.forEach { (scope, scopeCards) ->
-            reconcileConversationCards(scope.first, scope.second, scopeCards)
+            reconcileConversationCards(scope.first, scope.second, scopeCards, marmot)
         }
     }
 
     /**
-     * Keeps on one conversation's cards only the entries MDK still reports showable: present in its bounded latest
-     * page, not deleted, not hidden on this device and not read. Cards whose entries carry no identity (posted by an
-     * older build) fall back to [reconcileActiveConversationCard]. State that cannot be read is retried with a short
-     * bounded backoff, then the cards are cancelled, because content that cannot be verified is withheld.
+     * Keeps on one conversation's cards only the entries MDK still reports showable: not deleted, not hidden on this
+     * device and not read (#3323, #2065). Only what the state snapshot covers is judged. An entry missing from the
+     * snapshot that was shown after the snapshot was taken is newer than it and stays; an older missing entry
+     * cannot be verified and leaves. Cards whose entries carry no identity (posted by an older build) fall back to
+     * [reconcileActiveConversationCard]. When MDK state stays unavailable, cards are kept and only content this
+     * process knows was removed leaves them: the reconciliation is retried at the next stream open or read change.
      */
     private suspend fun reconcileConversationCards(
         accountRef: String,
         groupIdHex: String,
         cards: List<ActiveConversationCard>,
+        marmot: MarmotInterface? = null,
     ) {
-        val state = readNotificationReconciliationState(accountRef, groupIdHex)
-        val reconcile = { cancelReactions: Boolean, valid: (String?) -> Boolean ->
+        val snapshotStartedMs = System.currentTimeMillis()
+        val state = readNotificationReconciliationState(accountRef, groupIdHex, marmot)
+        val reconcile = { cancelReactions: Boolean, valid: (String?, Long) -> Boolean ->
             localNotificationPresenter.reconcileConversationContent(accountRef, groupIdHex, cancelReactions, valid)
         }
         val outcome =
-            when {
-                state == null -> "unavailable".also { withContext(Dispatchers.Default) { reconcile(true) { false } } }
-                cards.all { card -> card.entryMessageIds.all { it == null } } ->
-                    reconcileLegacyConversationCards(accountRef, groupIdHex, cards, state).logValue
-                else -> {
-                    val (row, page, hidden) = state
-                    val cancelReactions = hasRemovalWhileShown(page, hidden, cards.minOf { it.contentSinceMs })
-                    withContext(Dispatchers.Default) {
-                        reconcile(cancelReactions) { id -> isNotificationEntryShowable(id, row, page, hidden) }
+            withNotificationReconcileLock(accountRef, groupIdHex) {
+                when {
+                    state == null -> {
+                        withContext(Dispatchers.Default) {
+                            reconcile(false) { id, _ ->
+                                id == null || !notificationContentInvalidations.isRemoved(accountRef, groupIdHex, id)
+                            }
+                        }
+                        "unavailable"
                     }
-                    "entries"
+                    cards.all { card -> card.entryMessageIds.all { it == null } } ->
+                        reconcileLegacyConversationCards(accountRef, groupIdHex, cards, state).logValue
+                    else -> {
+                        val (row, page, hidden) = state
+                        val cancelReactions = hasRemovalWhileShown(page, hidden, cards.minOf { it.contentSinceMs })
+                        withContext(Dispatchers.Default) {
+                            reconcile(cancelReactions) { id, shownAtMs ->
+                                isNotificationEntryStillShowable(
+                                    accountRef = accountRef,
+                                    groupIdHex = groupIdHex,
+                                    messageIdHex = id,
+                                    shownAtMs = shownAtMs,
+                                    snapshotStartedMs = snapshotStartedMs,
+                                    state = state,
+                                )
+                            }
+                        }
+                        "entries"
+                    }
                 }
             }
         appStateDebug { "notification reconcile outcome=$outcome" }
@@ -12563,7 +12635,9 @@ class WhiteNoiseAppState private constructor(
         withContext(Dispatchers.Default) {
             when (outcome) {
                 ActiveCardReconciliation.Retract ->
-                    localNotificationPresenter.reconcileConversationContent(accountRef, groupIdHex, true) { false }
+                    localNotificationPresenter.reconcileConversationContent(accountRef, groupIdHex, true) { _, _ ->
+                        false
+                    }
                 ActiveCardReconciliation.CancelRead ->
                     localNotificationPresenter.cancelConversationCardIfSameGeneration(
                         LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex).tag,
@@ -12578,25 +12652,71 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Reads the hidden marks, chat-list row and bounded latest page one conversation's cards are checked against,
-     * retrying a failed read [NOTIFICATION_RECONCILIATION_ATTEMPTS] times with a doubling delay. Null means the state
-     * stayed unavailable.
+     * through [marmot] when the caller owns a runtime, retrying a failed read [NOTIFICATION_RECONCILIATION_ATTEMPTS]
+     * times with a doubling delay. Null means the state stayed unavailable.
      */
     private suspend fun readNotificationReconciliationState(
         accountRef: String,
         groupIdHex: String,
+        marmot: MarmotInterface? = null,
     ): NotificationReconciliationState? {
         var delayMillis = NOTIFICATION_RECONCILIATION_RETRY_MILLIS
         repeat(NOTIFICATION_RECONCILIATION_ATTEMPTS) { attempt ->
             runCatchingCancellable {
                 val hidden = withContext(Dispatchers.IO) { hiddenMessageIdsInGroup(accountRef, groupIdHex) }
-                val row = marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(accountRef, groupIdHex) }
-                val page = notificationTimelinePage(accountRef, groupIdHex, NOTIFICATION_RECONCILIATION_PAGE_LIMIT)
+                val (row, page) =
+                    if (marmot != null) {
+                        withContext(Dispatchers.IO) {
+                            marmot.chatListRow(accountRef, groupIdHex) to
+                                marmot.timelineMessages(accountRef, notificationPageQuery(groupIdHex)).messages
+                        }
+                    } else {
+                        marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(accountRef, groupIdHex) } to
+                            notificationTimelinePage(accountRef, groupIdHex, NOTIFICATION_RECONCILIATION_PAGE_LIMIT)
+                    }
                 NotificationReconciliationState(row, page, hidden.mapTo(HashSet()) { it.lowercase() })
             }.onSuccess { return it }
             if (attempt < NOTIFICATION_RECONCILIATION_ATTEMPTS - 1) delay(delayMillis)
             delayMillis *= 2
         }
         return null
+    }
+
+    /** The reconciliation page query for one conversation. */
+    private fun notificationPageQuery(groupIdHex: String) =
+        TimelineMessageQueryFfi(
+            groupIdHex = groupIdHex,
+            search = null,
+            before = null,
+            beforeMessageId = null,
+            after = null,
+            afterMessageId = null,
+            limit = NOTIFICATION_RECONCILIATION_PAGE_LIMIT,
+        )
+
+    /**
+     * Whether a shown card entry may stay after reconciling against [state] read at [snapshotStartedMs] (#3323). An
+     * entry the snapshot covers is judged by [isNotificationEntryShowable]. One it does not cover stays only if it was
+     * shown after the snapshot started, so a message posted while the state was being read is never dropped, and an
+     * older uncovered entry, which cannot be verified, leaves. An entry this process saw removed never stays.
+     */
+    private fun isNotificationEntryStillShowable(
+        accountRef: String,
+        groupIdHex: String,
+        messageIdHex: String?,
+        shownAtMs: Long,
+        snapshotStartedMs: Long,
+        state: NotificationReconciliationState,
+    ): Boolean {
+        val id = messageIdHex ?: return false
+        val covered = state.page.any { it.messageIdHex.equals(id, ignoreCase = true) }
+        val removedHere = notificationContentInvalidations.isRemoved(accountRef, groupIdHex, id)
+        return !removedHere &&
+            if (covered) {
+                isNotificationEntryShowable(id, state.row, state.page, state.hidden)
+            } else {
+                id.lowercase() !in state.hidden && shownAtMs >= snapshotStartedMs - CARD_SNAPSHOT_SLACK_MILLIS
+            }
     }
 
     /**
@@ -12977,7 +13097,7 @@ class WhiteNoiseAppState private constructor(
     /**
      * Re-checks a posted candidate before detached work rewrites its card (#2065, #3323). A candidate that became
      * read since its post has that card cancelled while it still shows this message, so a newer sibling survives;
-     * a deleted or hidden one was already retracted, and an unreadable state only skips the rewrite.
+     * a deleted or hidden one was already retracted, and an unreadable state lets the rewrite proceed.
      */
     private suspend fun isNotificationCandidateStillUnread(
         update: NotificationUpdateFfi,
@@ -12989,7 +13109,8 @@ class WhiteNoiseAppState private constructor(
                 localNotificationPresenter.cancelNotificationUpdateCardIfCurrent(update)
             }
         }
-        return state == NotificationCandidateState.Unread
+        // An unreadable state never cancels or freezes a card that already posted: its enrichment proceeds.
+        return state == NotificationCandidateState.Unread || state == NotificationCandidateState.Unknown
     }
 
     /** Runs receipt scheduling beside the first post, so queueing media never delays the notification. */
@@ -13032,6 +13153,7 @@ class WhiteNoiseAppState private constructor(
     ) = supervisorScope {
         var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
         var preopened = initial
+        var openReconciliation: Job? = null
         while (isActive) {
             val subscription =
                 preopened?.also { preopened = null } ?: runCatchingCancellable { marmot.subscribeEvents() }
@@ -13044,16 +13166,19 @@ class WhiteNoiseAppState private constructor(
             if (subscription != null) {
                 // Each open first reconciles the cards already in the tray, so a deletion or read that happened
                 // while this process was dead or the stream was down is honoured too (#3323, #2065).
-                launch {
-                    runCatchingCancellable { reconcileActiveNotificationCards() }
-                        .onFailure { appStateDebug(it) { "notification reconcile failed" } }
-                }
+                // A newer open supersedes an unfinished pass, so a flapping stream never stacks reconciliations.
+                openReconciliation?.cancel()
+                openReconciliation =
+                    launch {
+                        runCatchingCancellable { reconcileActiveNotificationCards(marmot) }
+                            .onFailure { appStateDebug(it) { "notification reconcile failed" } }
+                    }
                 try {
                     runCatchingCancellable {
                         var event = subscription.next()
                         while (event != null) {
                             backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                            retractRemovedNotificationContent(event)
+                            handleNotificationContentEvent(event, marmot)
                             val received = (event as? MarmotEventFfi.MessageReceived)?.received
                             // Only the cheap kind and sender check runs here; the suppression reads run with the
                             // lookup, as a child of this loop, so they never delay the next event.
@@ -13078,17 +13203,31 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Retracts the notification content of every message [event] reports deleted, invalidated or pruned (#3323).
-     * A failure is logged and never ends the event loop that also schedules receipts.
+     * Applies [event]'s notification consequences without delaying the receipt loop that delivered it (#3323,
+     * #2065). A removal is fenced at once, so no queued post or correction can restore it, and its cards are
+     * rewritten in a supervised child. A read-state change reconciles that conversation's cards in a child too, and
+     * once more shortly after, so a card the platform had not listed yet when the read landed is also corrected.
+     * Children serialize per conversation and their failures are logged, never cancelling the loop.
      */
-    private suspend fun retractRemovedNotificationContent(event: MarmotEventFfi) {
+    private fun CoroutineScope.handleNotificationContentEvent(
+        event: MarmotEventFfi,
+        marmot: MarmotInterface,
+    ) {
         removedNotificationMessages(event).forEach { message ->
-            runCatchingCancellable { retractNotificationContent(message) }
-                .onFailure { appStateDebug(it) { "notification retraction failed" } }
+            notificationContentInvalidations.markRemoved(message)
+            launch {
+                runCatchingCancellable { retractNotificationContent(message) }
+                    .onFailure { appStateDebug(it) { "notification retraction failed" } }
+            }
         }
         readStateChangedConversation(event)?.let { (accountRef, groupIdHex) ->
-            runCatchingCancellable { reconcileConversationNotificationCards(accountRef, groupIdHex) }
-                .onFailure { appStateDebug(it) { "notification read reconcile failed" } }
+            launch {
+                runCatchingCancellable {
+                    reconcileConversationNotificationCards(accountRef, groupIdHex, marmot)
+                    delay(NOTIFICATION_READ_RECONCILE_FOLLOW_UP_MILLIS)
+                    reconcileConversationNotificationCards(accountRef, groupIdHex, marmot)
+                }.onFailure { appStateDebug(it) { "notification read reconcile failed" } }
+            }
         }
     }
 
@@ -13099,11 +13238,12 @@ class WhiteNoiseAppState private constructor(
     private suspend fun reconcileConversationNotificationCards(
         accountRef: String,
         groupIdHex: String,
+        marmot: MarmotInterface? = null,
     ) {
         val cards =
             withContext(Dispatchers.Default) { localNotificationPresenter.activeConversationCards() }
                 .filter { it.accountRef == accountRef && it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-        if (cards.isNotEmpty()) reconcileConversationCards(accountRef, groupIdHex, cards)
+        if (cards.isNotEmpty()) reconcileConversationCards(accountRef, groupIdHex, cards, marmot)
     }
 
     /** Whether [this] is a chat message from someone else, the only received messages that carry attachments. */
@@ -13194,7 +13334,8 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Posts and enriches one update under a foreground/app-lock eligibility epoch. */
-    private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
+    private suspend fun processNotificationUpdate(incoming: NotificationUpdateFfi) {
+        val update = withoutUnverifiableReactionQuote(incoming)
         PushWakeDiagnostics.event(PushWakeEvent.Candidate)
         val receivedAtElapsedMs = SystemClock.elapsedRealtime()
         recordNotificationFirstPostTiming(
@@ -13229,6 +13370,17 @@ class WhiteNoiseAppState private constructor(
             },
         )
         schedulePostNotificationMaintenance(update)
+    }
+
+    /**
+     * Drops a reaction's quoted excerpt when its conversation holds a message hidden on this device (#3323). MDK
+     * already omits the quote of a deleted or invalidated target, but it cannot know a local hide, and the update
+     * names no target to compare, so any hidden message in the conversation withholds the quote.
+     */
+    private suspend fun withoutUnverifiableReactionQuote(update: NotificationUpdateFfi): NotificationUpdateFfi {
+        if (!LocalNotificationFormatter.isReaction(update) || update.reactedToPreview.isNullOrBlank()) return update
+        val hidden = withContext(Dispatchers.IO) { hiddenMessageIdsInGroup(update.accountRef, update.groupIdHex) }
+        return if (hidden.isEmpty()) update else update.copy(reactedToPreview = null)
     }
 
     /** Exercises the exact typed-update production path from JVM or instrumentation acceptance tests. */
@@ -13794,6 +13946,10 @@ class WhiteNoiseAppState private constructor(
         private const val NOTIFICATION_CANDIDATE_PAGE_LIMIT = 30u
         private const val NOTIFICATION_RECONCILIATION_PAGE_LIMIT = 200u
         private const val NOTIFICATION_RECONCILIATION_ATTEMPTS = 3
+        private const val NOTIFICATION_CANDIDATE_ATTEMPTS = 2
+        private const val NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS = 1_500L
+        private const val NOTIFICATION_READ_RECONCILE_FOLLOW_UP_MILLIS = 1_000L
+        private const val CARD_SNAPSHOT_SLACK_MILLIS = 1_000L
         private const val NOTIFICATION_RECONCILIATION_RETRY_MILLIS = 1_000L
 
         /** How many receipt history lookups run at once; more wait their turn rather than fan out. */

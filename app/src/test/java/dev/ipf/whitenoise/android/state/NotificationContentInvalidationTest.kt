@@ -17,25 +17,27 @@ import org.junit.Test
 
 /** Pure decisions behind deleted-content retraction (#3323) and the read-before-post gate (#2065). */
 class NotificationContentInvalidationTest {
-    /** A row MDK marks deleted, or reports under the deletion trigger, yields its account-scoped identity. */
+    /** A row reported under MDK's message-deleted trigger yields its account-scoped identity. */
     @Test
     fun deletedUpsertsAreRemovedMessages() {
+        val change = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, record("b", 2uL))
+        val event = projection(change)
+
+        assertEquals(listOf(RemovedNotificationMessage(ACCOUNT, GROUP, "b")), removedNotificationMessages(event))
+    }
+
+    /** A long-deleted row that is merely reprojected is not a fresh removal, so it cannot churn cards or the guard. */
+    @Test
+    fun reprojectedLongDeletedRowIsNotARemoval() {
         val event =
             projection(
                 TimelineMessageChangeFfi.Upsert(
                     TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
                     record("a", 1uL, deleted = true),
                 ),
-                TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, record("b", 2uL)),
             )
 
-        assertEquals(
-            listOf(
-                RemovedNotificationMessage(ACCOUNT, GROUP, "a"),
-                RemovedNotificationMessage(ACCOUNT, GROUP, "b"),
-            ),
-            removedNotificationMessages(event),
-        )
+        assertTrue(removedNotificationMessages(event).isEmpty())
     }
 
     /** Invalidated, cleared and pruned rows are removed; a row that only left a query window is not. */
@@ -80,6 +82,19 @@ class NotificationContentInvalidationTest {
         assertFalse(invalidations.isRemoved(ACCOUNT, "ab12", "beef"))
         assertFalse(invalidations.isRemoved(ACCOUNT, "ab12", null))
         assertFalse(invalidations.isRemoved(ACCOUNT, "ab12", ""))
+    }
+
+    /** Each account keeps its own bounded removals, so one account's burst never evicts another's. */
+    @Test
+    fun invalidationsAreBoundedPerAccount() {
+        val invalidations = NotificationContentInvalidations(capacity = 1)
+        invalidations.markRemoved(RemovedNotificationMessage(ACCOUNT, GROUP, "kept"))
+        invalidations.markRemoved(RemovedNotificationMessage("account-b", GROUP, "b1"))
+        invalidations.markRemoved(RemovedNotificationMessage("account-b", GROUP, "b2"))
+
+        assertTrue(invalidations.isRemoved(ACCOUNT, GROUP, "kept"))
+        assertFalse(invalidations.isRemoved("account-b", GROUP, "b1"))
+        assertTrue(invalidations.isRemoved("account-b", GROUP, "b2"))
     }
 
     /** The guard stays bounded, evicting the oldest removal while a re-marked one stays recent. */
@@ -141,10 +156,11 @@ class NotificationContentInvalidationTest {
         assertEquals(NotificationCandidateState.Unread, notificationCandidateState("a", chatRow(GROUP), null))
         val row = readRow(markerId = "m", markerAt = 10uL)
 
-        assertEquals(NotificationCandidateState.Read, notificationCandidateState("old", row, emptyList()))
+        // A candidate MDK has not projected yet cannot be ordered against the marker, so it alerts.
+        assertEquals(NotificationCandidateState.Unread, notificationCandidateState("new", row, emptyList()))
         assertEquals(
             NotificationCandidateState.Unread,
-            notificationCandidateState("old", row.copy(unreadCount = 2uL, hasUnread = true), emptyList()),
+            notificationCandidateState("new", row.copy(unreadCount = 2uL, hasUnread = true), emptyList()),
         )
     }
 

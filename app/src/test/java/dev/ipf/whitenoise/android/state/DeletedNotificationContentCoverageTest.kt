@@ -51,10 +51,10 @@ class DeletedNotificationContentCoverageTest {
     @Test
     fun everyRemovalSourceReachesTheRetraction() {
         val source = source("state/AppState.kt")
-        assertTrue("retractRemovedNotificationContent(event)" in functionBody(source, "runMutedChatReceiptLoop"))
-        assertTrue("reconcileActiveNotificationCards()" in functionBody(source, "runMutedChatReceiptLoop"))
+        assertTrue("handleNotificationContentEvent(event, marmot)" in functionBody(source, "runMutedChatReceiptLoop"))
+        assertTrue("reconcileActiveNotificationCards(marmot)" in functionBody(source, "runMutedChatReceiptLoop"))
         assertTrue("retractNotificationContent(" in functionBody(source, "hideMessageForMe"))
-        val eventBody = functionBody(source, "retractRemovedNotificationContent")
+        val eventBody = functionBody(source, "handleNotificationContentEvent")
         assertTrue("removedNotificationMessages(event)" in eventBody)
         assertTrue("readStateChangedConversation(event)" in eventBody)
     }
@@ -85,7 +85,8 @@ class DeletedNotificationContentCoverageTest {
         source: String,
         name: String,
     ): String {
-        val start = Regex("""\bfun\s+${Regex.escape(name)}\s*\(""").find(source)?.range?.first ?: error("Missing $name")
+        val declaration = Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(name)}\s*\(""")
+        val start = declaration.find(source)?.range?.first ?: error("Missing $name")
         val signatureEnd = matchingClose(source, source.indexOf('(', start), '(', ')')
         val brace = source.indexOf('{', signatureEnd)
         return source.substring(brace, matchingClose(source, brace, '{', '}') + 1)

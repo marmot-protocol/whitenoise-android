@@ -16,10 +16,11 @@ internal data class RemovedNotificationMessage(
 )
 
 /**
- * The messages a runtime event reports as no longer showable (#3323): a timeline row MDK marked deleted, and a row
- * removed from the projection because it was invalidated, cleared or pruned. MDK owns accepted deletion, so this
- * only reads its typed projection changes and never parses deletion tags. A row that merely stopped matching a
- * query, and every other event, yields nothing.
+ * The messages a runtime event reports as newly removed (#3323): a row MDK reprojected under its message-deleted
+ * trigger, and a row removed from the projection because it was invalidated, cleared or pruned. MDK owns accepted
+ * deletion, so this only reads its typed projection changes and never parses deletion tags. A long-deleted row that
+ * is merely reprojected, a row that stopped matching a query, and every other event yield nothing; a deletion this
+ * process never saw live is found by reconciliation from the row's deleted flag instead.
  */
 internal fun removedNotificationMessages(event: MarmotEventFfi): List<RemovedNotificationMessage> {
     val runtime = (event as? MarmotEventFfi.ProjectionUpdated)?.update ?: return emptyList()
@@ -28,9 +29,7 @@ internal fun removedNotificationMessages(event: MarmotEventFfi): List<RemovedNot
         val messageIdHex =
             when (change) {
                 is TimelineMessageChangeFfi.Upsert ->
-                    change.message.messageIdHex.takeIf {
-                        change.message.deleted || change.trigger == TimelineUpdateTriggerFfi.MESSAGE_DELETED
-                    }
+                    change.message.messageIdHex.takeIf { change.trigger == TimelineUpdateTriggerFfi.MESSAGE_DELETED }
                 is TimelineMessageChangeFfi.Remove ->
                     change.messageIdHex.takeIf { change.reason != TimelineRemoveReasonFfi.NO_LONGER_MATCHES_QUERY }
             }
@@ -41,19 +40,22 @@ internal fun removedNotificationMessages(event: MarmotEventFfi): List<RemovedNot
 /**
  * Messages whose notification content was removed in this process, so a queued post or a delayed enrichment for one
  * of them can never put its content back on a card (#3323). It is a small bounded guard of identities only, never
- * content or protocol state: the most recent [capacity] removals are kept, and an older one is still caught by the
- * authoritative read of the candidate's timeline row before posting.
+ * content or protocol state: each account keeps its own most recent [capacity] removals, so one account's burst
+ * cannot evict another's. A removal older than that, or one from before a restart, is caught by the candidate's
+ * timeline record, which is always read before posting.
  */
 internal class NotificationContentInvalidations(
     private val capacity: Int,
 ) {
-    private val removed = LinkedHashSet<String>()
+    private val removedByAccount = HashMap<String, LinkedHashSet<String>>()
 
     /** Records [message] as removed. */
     fun markRemoved(message: RemovedNotificationMessage) {
         synchronized(this) {
-            removed.remove(key(message.accountRef, message.groupIdHex, message.messageIdHex))
-            removed.add(key(message.accountRef, message.groupIdHex, message.messageIdHex))
+            val removed = removedByAccount.getOrPut(message.accountRef) { LinkedHashSet() }
+            val key = key(message.groupIdHex, message.messageIdHex)
+            removed.remove(key)
+            removed.add(key)
             if (removed.size > capacity) removed.remove(removed.first())
         }
     }
@@ -65,15 +67,14 @@ internal class NotificationContentInvalidations(
         messageIdHex: String?,
     ): Boolean {
         val id = messageIdHex?.takeIf(String::isNotBlank) ?: return false
-        return synchronized(this) { key(accountRef, groupIdHex, id) in removed }
+        return synchronized(this) { removedByAccount[accountRef]?.contains(key(groupIdHex, id)) == true }
     }
 
-    /** One identity per account, conversation and case-insensitive message id. */
+    /** One identity per case-insensitive conversation and message within an account. */
     private fun key(
-        accountRef: String,
         groupIdHex: String,
         messageIdHex: String,
-    ): String = "$accountRef\u0000${groupIdHex.lowercase()}\u0000${messageIdHex.lowercase()}"
+    ): String = "${groupIdHex.lowercase()}\u0000${messageIdHex.lowercase()}"
 }
 
 /** Whether a message notification candidate may still alert, decided at the final post boundary (#2065). */
@@ -100,9 +101,9 @@ internal enum class NotificationCandidateState(
  * MDK orders its read marker by a canonical key the binding does not expose, so the candidate counts as read only
  * when the exposed state agrees without ambiguity: it is the marker itself, or it sits at or before the marker in
  * MDK's fallback `(timeline_at, message_id)` order while either nothing is unread or it also precedes MDK's first
- * unread message. Outside the page, a conversation with nothing unread has read it too. A row MDK reports deleted
- * is removed. Without a chat-list row or a read marker nothing has been read, and every ambiguous case stays
- * unread, so a genuinely new message is never silenced.
+ * unread message. A row MDK reports deleted is removed. A candidate missing from the page, without a chat-list row
+ * or without a read marker cannot be shown read, and every ambiguous case stays unread, so a genuinely new message
+ * is never silenced.
  */
 internal fun notificationCandidateState(
     messageIdHex: String,
@@ -116,7 +117,8 @@ internal fun notificationCandidateState(
             record?.deleted == true -> return NotificationCandidateState.Removed
             row == null || markerId == null -> false
             markerId.equals(messageIdHex, ignoreCase = true) -> true
-            record == null -> row.unreadCount == 0uL && !row.hasUnread
+            // A candidate MDK has not projected yet, or one beyond the page, cannot be ordered, so it alerts.
+            record == null -> false
             else -> isCoveredByReadMarker(row, record) && precedesFirstUnread(row, record, page)
         }
     return if (read) NotificationCandidateState.Read else NotificationCandidateState.Unread

@@ -60,7 +60,8 @@ class NotificationDeletedContentTest {
         post(message("old-id", "older secret text"))
         post(message("new-id", "newer valid text"))
 
-        assertTrue(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != null && it != "old-id" })
+        val reconciled = presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "old-id" }
+        assertTrue(reconciled)
 
         val card = requireNotNull(card(ACCOUNT))
         assertEquals(listOf("newer valid text"), messageTexts(card))
@@ -74,7 +75,7 @@ class NotificationDeletedContentTest {
         post(message("old-id", "older valid text"))
         post(message("new-id", "newest secret text"))
 
-        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != null && it != "new-id" }
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != null && id != "new-id" }
 
         val card = requireNotNull(card(ACCOUNT))
         assertEquals(listOf("older valid text"), messageTexts(card))
@@ -89,7 +90,7 @@ class NotificationDeletedContentTest {
         post(message("new-id", "newer valid text"))
         val before = reconciliations.get()
 
-        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != "old-id" }
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "old-id" }
 
         val card = requireNotNull(card(ACCOUNT))
         assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
@@ -102,7 +103,7 @@ class NotificationDeletedContentTest {
         post(message("long-id", "x".repeat(LONG_BODY_CODE_POINTS)))
         requireNotNull(card(ACCOUNT))
 
-        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != "long-id" }
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "long-id" }
 
         assertNull(card(ACCOUNT))
     }
@@ -113,7 +114,7 @@ class NotificationDeletedContentTest {
         post(message("long-id", "y".repeat(LONG_BODY_CODE_POINTS)))
         val posted = requireNotNull(card(ACCOUNT)).`when`
 
-        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != "other-id" }
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "other-id" }
 
         assertEquals(posted, requireNotNull(card(ACCOUNT)).`when`)
     }
@@ -124,7 +125,7 @@ class NotificationDeletedContentTest {
         post(message("a-id", "account a secret"))
         post(message("b-id", "account b text", account = OTHER_ACCOUNT))
 
-        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != "a-id" }
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "a-id" }
 
         assertNull(card(ACCOUNT))
         assertEquals(listOf("account b text"), messageTexts(requireNotNull(card(OTHER_ACCOUNT))))
@@ -151,7 +152,7 @@ class NotificationDeletedContentTest {
             manager.notify(key.tag, key.id, card)
         }
 
-        assertTrue(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != "deleted" })
+        assertTrue(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "deleted" })
 
         val remaining = manager.activeNotifications.map { it.tag to it.id }
         assertFalse(target.tag to target.id in remaining)
@@ -166,7 +167,7 @@ class NotificationDeletedContentTest {
         val key = LocalNotificationFormatter.reactionDismissalKey(ACCOUNT, GROUP)
         assertTrue(manager.activeNotifications.any { it.tag == key.tag && it.id == key.id })
 
-        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != "deleted-id" }
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "deleted-id" }
 
         assertFalse(manager.activeNotifications.any { it.tag == key.tag && it.id == key.id })
     }
@@ -177,7 +178,7 @@ class NotificationDeletedContentTest {
         post(message(null, "unidentified text"))
         post(message("new-id", "identified text"))
 
-        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { it != null }
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != null }
 
         assertEquals(listOf("identified text"), messageTexts(requireNotNull(card(ACCOUNT))))
     }

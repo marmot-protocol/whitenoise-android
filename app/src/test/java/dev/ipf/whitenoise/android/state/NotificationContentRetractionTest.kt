@@ -13,7 +13,10 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.notifications.ConversationCardBarrier
+import dev.ipf.whitenoise.android.notifications.ConversationCardOp
 import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
+import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
@@ -21,6 +24,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -42,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
+@Suppress("LargeClass") // Every scenario drives the same process-wide listener, presenter and card fixture.
 class NotificationContentRetractionTest {
     private val context: Application = RuntimeEnvironment.getApplication()
     private val cardKey = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT_REF, GROUP_ID)
@@ -381,6 +386,8 @@ class NotificationContentRetractionTest {
             val release = CountDownLatch(1)
             val calls = AtomicInteger(0)
             val read = AtomicBoolean(false)
+            val writes = AtomicInteger(0)
+            ConversationCardPostSynchronizer.testHook = countWrites(writes)
             val fixture =
                 NotificationBootstrapTestFixture(
                     context = context,
@@ -408,11 +415,12 @@ class NotificationContentRetractionTest {
                 release.countDown()
                 // The first write lands, and its read re-check sees the read that committed while it was in flight.
                 withTimeout(AWAIT_TIMEOUT_MS) {
-                    while (calls.get() < 2) {
+                    while (calls.get() < 2 || writes.get() < 1) {
                         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                         delay(1L)
                     }
                 }
+                assertEquals("the first write landed before it was withdrawn", 1, writes.get())
                 awaitCardGone()
                 assertFalse("the stale card must not come back", pumpFor(NO_POST_WINDOW_MS))
             } finally {
@@ -449,9 +457,12 @@ class NotificationContentRetractionTest {
             }
         }
 
-    /** When MDK state stays unreadable, reconciliation retries, then withholds the unverifiable card. */
+    /**
+     * When MDK state stays unreadable, reconciliation retries and then keeps the shown card for a later pass instead
+     * of wiping valid content it cannot verify yet (#3323).
+     */
     @Test
-    fun unavailableReconciliationStateCancelsTheCardAfterRetries() =
+    fun unavailableReconciliationStateKeepsTheCardAfterRetries() =
         runBlocking {
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -465,9 +476,15 @@ class NotificationContentRetractionTest {
                 assertTrue(LocalNotificationPresenter(context).show(fixture.update, shortNpub = { "sender" }))
                 fixture.bootstrap()
                 fixture.awaitRuntimeEventSubscription()
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (fixture.chatListRowCalls.get() < 3) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                pumpFor(NO_POST_WINDOW_MS)
 
-                awaitCardGone()
-                assertTrue("the read is retried before withholding", fixture.chatListRowCalls.get() >= 3)
+                assertTrue("an unverifiable but valid card stays shown", cardActive())
             } finally {
                 fixture.close()
             }
@@ -507,6 +524,266 @@ class NotificationContentRetractionTest {
                 assertTrue(cardActive())
                 assertTrue(activeCardText().orEmpty().contains("newer valid text"))
             } finally {
+                fixture.close()
+            }
+        }
+
+    /** A message posted while reconciliation reads its snapshot is newer than it and stays on the card (#3323). */
+    @Test
+    fun aPostLandingDuringTheReconciliationSnapshotStays() =
+        runBlocking {
+            val snapshotReading = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val pageReads = AtomicInteger(0)
+            val olderShown = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = OLDER_ID,
+                    emitStartupNotification = false,
+                    onTimelineMessages = { _, _ ->
+                        if (olderShown.get() && pageReads.incrementAndGet() == 1) {
+                            snapshotReading.countDown()
+                            check(release.await(5, TimeUnit.SECONDS))
+                        }
+                        TimelinePageFfi(listOf(record(OLDER_ID, 10uL)), false, false)
+                    },
+                )
+            try {
+                val older = fixture.update.copy(previewText = "older valid text")
+                assertTrue(LocalNotificationPresenter(context).show(older, shortNpub = { "sender" }))
+                olderShown.set(true)
+                fixture.bootstrap()
+                awaitLatch(snapshotReading)
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = MESSAGE_ID,
+                        notificationKey = "startup:account-a:$MESSAGE_ID",
+                        previewText = "newer posted during snapshot",
+                    ),
+                )
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("newer posted during snapshot") != true) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                release.countDown()
+                pumpFor(NO_POST_WINDOW_MS)
+
+                assertTrue(activeCardText().orEmpty().contains("newer posted during snapshot"))
+                assertTrue(activeCardText().orEmpty().contains("older valid text"))
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** A candidate MDK already reports deleted never posts, even before anything in its conversation was read. */
+    @Test
+    fun aDeletedCandidateWithoutAReadMarkerNeverPosts() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onTimelineMessages = { _, _ ->
+                        TimelinePageFfi(listOf(record(MESSAGE_ID, 12uL, deleted = true)), false, false)
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitUpdateConsumed()
+
+                assertFalse(pumpFor(NO_POST_WINDOW_MS))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A candidate MDK has not projected yet still alerts, even when the conversation shows nothing unread (#2065). */
+    @Test
+    fun anUnprojectedCandidateStillPosts() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ -> readRow(marker = OLDER_ID) },
+                    onTimelineMessages = { _, _ -> TimelinePageFfi(listOf(record(OLDER_ID, 12uL)), false, false) },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A slow reconciliation in one conversation never delays a deletion in another (#3323). */
+    @Test
+    fun aSlowReconciliationNeverStallsAnotherDeletion() =
+        runBlocking {
+            val slowGroup = "ef56ab78"
+            val release = CountDownLatch(1)
+            val slowReading = CountDownLatch(1)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                    onTimelineMessages = { _, group ->
+                        if (group == slowGroup) {
+                            slowReading.countDown()
+                            check(release.await(10, TimeUnit.SECONDS))
+                        }
+                        TimelinePageFfi(listOf(record(MESSAGE_ID, 12uL)), false, false)
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitRuntimeEventSubscription()
+                val presenter = LocalNotificationPresenter(context)
+                assertTrue(presenter.show(fixture.update.copy(groupIdHex = slowGroup), shortNpub = { "sender" }))
+                assertTrue(presenter.show(fixture.update, shortNpub = { "sender" }))
+                fixture.emitRuntimeEvent(readStateChanged(slowGroup))
+                awaitLatch(slowReading)
+
+                fixture.emitRuntimeEvent(deletion(MESSAGE_ID))
+                awaitCardGone()
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** A reaction never quotes into the shade from a conversation holding a message hidden on this device (#3323). */
+    @Test
+    fun aReactionQuoteIsWithheldWhenItsConversationHasAHiddenMessage() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                )
+            val reactionKey = LocalNotificationFormatter.reactionDismissalKey(ACCOUNT_REF, GROUP_ID)
+            try {
+                fixture.bootstrap()
+                val hidden =
+                    fixture.runOnMainLooperPumping {
+                        fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, OLDER_ID)
+                    }
+                assertTrue(hidden)
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = "ef".repeat(32),
+                        notificationKey = "reaction:account-a",
+                        reactionEmoji = "👍",
+                        reactedToPreview = "hidden quoted secret",
+                    ),
+                )
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (manager().activeNotifications.none { it.tag == reactionKey.tag }) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                val reaction =
+                    manager().activeNotifications.first { it.tag == reactionKey.tag && it.id == reactionKey.id }
+                assertFalse(
+                    reaction.notification.extras
+                        .toString()
+                        .contains("hidden quoted secret"),
+                )
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A stalled read-state read is bounded: the first write is withheld instead of waiting on it (#2065). */
+    @Test
+    fun aStalledReadStateCheckIsBounded() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ ->
+                        Thread.sleep(STALLED_READ_MS)
+                        null
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitUpdateConsumed()
+
+                assertFalse("a stalled check must not post late", pumpFor(STALLED_READ_MS + NO_POST_WINDOW_MS))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** One failed read-state read is retried within the budget, so a transient failure still alerts (#2065). */
+    @Test
+    fun aTransientReadStateFailureIsRetried() =
+        runBlocking {
+            val calls = AtomicInteger(0)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ ->
+                        check(calls.incrementAndGet() > 1) { "transient failure" }
+                        null
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** An unreadable state after the first post never stops that card's enrichment (#2065). */
+    @Test
+    fun anUnreadableStateAfterThePostStillEnriches() =
+        runBlocking {
+            val calls = AtomicInteger(0)
+            val releaseFirstRead = CountDownLatch(1)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    previewText = "already final",
+                    onChatListRow = { _, _ ->
+                        check(calls.incrementAndGet() == 1) { "runtime unavailable" }
+                        null
+                    },
+                    // The first sender read times out, so the posted card needs a late correction.
+                    onDisplayName = { _, _ ->
+                        releaseFirstRead.await(5, TimeUnit.SECONDS)
+                        "Alice"
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+                releaseFirstRead.countDown()
+
+                fixture.awaitSenderDisplayNameCalls(expected = 2)
+                assertTrue(cardActive())
+            } finally {
+                releaseFirstRead.countDown()
                 fixture.close()
             }
         }
@@ -560,15 +837,30 @@ class NotificationContentRetractionTest {
             ),
         )
 
-    /** MDK's report that the fixture conversation's read state changed. */
-    private fun readStateChanged(): MarmotEventFfi =
+    /** Counts serialized first writes so a test can prove one landed. */
+    private fun countWrites(writes: AtomicInteger) =
+        object : ConversationCardTestHook {
+            override fun onBarrier(
+                op: ConversationCardOp,
+                barrier: ConversationCardBarrier,
+                notificationTag: String,
+                notificationId: Int,
+            ) {
+                if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_WRITE) {
+                    writes.incrementAndGet()
+                }
+            }
+        }
+
+    /** MDK's report that [groupIdHex]'s read state changed. */
+    private fun readStateChanged(groupIdHex: String = GROUP_ID): MarmotEventFfi =
         MarmotEventFfi.ProjectionUpdated(
             RuntimeProjectionUpdateFfi(
                 accountIdHex = ACCOUNT_REF,
                 accountLabel = ACCOUNT_REF,
                 update =
                     TimelineProjectionUpdateFfi(
-                        groupIdHex = GROUP_ID,
+                        groupIdHex = groupIdHex,
                         messages = emptyList(),
                         changes = emptyList(),
                         chatListRow = readRow(marker = MESSAGE_ID),
@@ -654,6 +946,7 @@ class NotificationContentRetractionTest {
         val OLDER_ID = "aa".repeat(32)
         val NEWER_ID = "cd".repeat(32)
         const val NO_POST_WINDOW_MS = 500L
+        const val STALLED_READ_MS = 4_000L
         const val PUMP_STEP_MS = 10L
         const val AWAIT_TIMEOUT_MS = 60_000L
     }
