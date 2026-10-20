@@ -596,8 +596,9 @@ class ConversationMediaSendReconciliationIntegrationTest {
 
     /** MDK can refuse staging before upload; the same retained attachment must remain available for a later retry. */
     @Test
-    fun storageFullSendKeepsItsAttachmentUntilRetrySucceeds() =
+    fun storageFullSendKeepsItsAttachmentUntilRetrySucceeds() {
         assertVideoSurvivesUploadRefusal(MarmotKitException.StorageFull("synthetic native reserve"))
+    }
 
     /** Drives refusal and retry through the real controller, retaining the pending bytes until publication succeeds. */
     @Suppress("LongMethod") // One send, one failure and one retry belong in a single ordered flow.
