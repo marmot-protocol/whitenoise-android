@@ -90,6 +90,30 @@ class PendingCameraCaptureFilesTest {
         assertFalse("retirement must release the publication hold", file.exists())
     }
 
+    /**
+     * Lock disposal, unlock and Activity recreation re-assert the same owner and keep every capture. A
+     * real account/runtime replacement removes only captures still awaiting native staging, never one
+     * whose bytes native staging already copied.
+     */
+    @Test
+    fun ownerReassertionKeepsCapturesAndReplacementSparesNativeStagedOnes() {
+        val directory = temporary.newFolder("camera")
+        val staged = directory.resolve("staged.jpg").apply { writeText("staged") }
+        val pending = directory.resolve("pending.jpg").apply { writeText("pending") }
+        val stagedUri = Uri.parse("content://capture/staged")
+        val leases = PendingCameraCaptureFiles()
+        leases.retainOwner("4:account")
+        leases.hold(staged, stagedUri, "account:group")
+        leases.hold(pending, Uri.parse("content://capture/pending"), "account:group")
+        repeat(3) { leases.retainOwner("4:account") }
+        assertTrue(staged.isFile)
+        assertTrue(pending.isFile)
+        leases.releasePersisted(stagedUri)
+        leases.retainOwner("4:other-account")
+        assertTrue("a capture native staging already owns must survive the switch", staged.isFile)
+        assertFalse("an unstaged capture of the retired account is removed", pending.exists())
+    }
+
     private object EmptyDrafts : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
 
