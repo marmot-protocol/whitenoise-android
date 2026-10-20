@@ -12,13 +12,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import java.io.File
 
-/** One account/conversation-owned capture, retained by the protected shell's saved-state registry. */
+/**
+ * One account/conversation-owned capture, retained by the protected shell's saved-state registry.
+ * [onCaptured] returns false when the shelf refuses the photo — its private output is then removed
+ * and [onRejected] explains why, so a readable capture is never dropped silently.
+ */
 @Composable
 internal fun rememberConversationCameraCapture(
     origin: String,
     onCaptured: (Uri) -> Boolean,
     onFailure: () -> Unit,
     isCurrent: () -> Boolean,
+    onRejected: () -> Unit,
 ): () -> Unit {
     val context = LocalContext.current
     val captureFiles = LocalPendingCameraCaptureFiles.current
@@ -48,6 +53,7 @@ internal fun rememberConversationCameraCapture(
                 if (!onCaptured(requireNotNull(uri))) {
                     captureFiles?.release(requireNotNull(file))
                     file?.delete()
+                    onRejected()
                 }
             } else {
                 file?.let { captureFiles?.release(it) }
@@ -82,6 +88,7 @@ internal fun rememberConversationCameraCapture(
     }
 }
 
+/** True only for an accepted result whose exact private output now holds readable bytes. */
 private fun readableCameraCapture(
     success: Boolean,
     file: File?,

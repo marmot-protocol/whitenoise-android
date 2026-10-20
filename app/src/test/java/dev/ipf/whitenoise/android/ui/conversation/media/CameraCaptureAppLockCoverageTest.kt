@@ -51,6 +51,7 @@ class CameraCaptureAppLockCoverageTest {
     @get:Rule val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** The production root keeps the protected shell's saved registry above the lock gate. */
     @Test
     fun productionRootOwnsTheSavedRegistryAboveItsPrivacyGate() {
         val source =
@@ -65,39 +66,51 @@ class CameraCaptureAppLockCoverageTest {
         assertTrue(source.contains("protectedShell.holder.SaveableStateProvider(protectedShell.key)"))
     }
 
+    /** An empty draft disposed before the camera writes keeps the pending output for the later result. */
     @Test fun emptyDraftDisposalBeforeCameraWritesPreservesItsPendingOutput() {
         exercise(emptyComposer = true, writeAfterLock = true)
     }
 
+    /** A cold restore re-holds the pending capture even when the draft is empty. */
     @Test fun coldRestoreReestablishesCaptureHoldWithAnEmptyDraft() {
         exercise(emptyComposer = true, restore = true, writeAfterLock = true)
     }
 
+    /** A result landing in the same frame as lock disposal keeps its accepted output. */
     @Test fun emptyDraftDisposalImmediatelyAfterResultPreservesItsAcceptedOutput() {
         exercise(emptyComposer = true, resultAndLockTogether = true)
     }
 
+    /** A full shelf refuses the capture with one actionable notice and leaks neither its output nor its hold. */
     @Test fun fullShelfRejectsTheCaptureWithoutLeakingItsOutputOrHold() = exercise(fullComposer = true)
 
+    /** A cancelled camera discards its unused private output. */
     @Test fun cancelledCameraDiscardsTheUnusedOutput() = exercise(cancelCapture = true)
 
+    /** A result accepted before lock disposal survives on the shelf after unlock. */
     @Test fun resultBeforeLockRetainsShelf() = exercise(resultBeforeLock = true)
 
+    /** A result delivered while locked waits for unlock and stages exactly once. */
     @Test fun resultWhileLockedWaitsForUnlockAndStagesOnce() = exercise()
 
+    /** A cancelled authentication keeps the capture for a successful retry. */
     @Test fun cancelledAuthenticationCanRetryWithoutLosingCapture() = exercise(cancelAuthentication = true)
 
+    /** A restored process recovers the pending capture and the existing shelf. */
     @Test fun restoredProcessRecoversPendingCaptureAndExistingShelf() = exercise(restore = true)
 
+    /** A callback after an account change but before disposal rejects and deletes its capture. */
     @Test fun callbackBeforeAccountDisposalRejectsAndCleansItsCapture() {
         exercise(resultBeforeLock = true, replaceAccount = true, replaceBeforeCallback = true)
     }
 
+    /** An account change while locked rejects the old account's result. */
     @Test fun changingAccountWhileLockedRejectsTheOldResult() = exercise(replaceAccount = true)
 
+    /** A runtime replacement while locked rejects the old runtime's result. */
     @Test fun changingRuntimeWhileLockedRejectsTheOldResult() = exercise(replaceRuntime = true)
 
-    // Each parameter selects one lifecycle ordering in this focused matrix.
+    /** Runs one lifecycle ordering from the matrix — each parameter selects one ordering — through the fixture. */
     @Suppress("LongParameterList")
     private fun exercise(
         resultBeforeLock: Boolean = false,
@@ -190,6 +203,7 @@ private class CameraCaptureFixture(
     private var visibleUris = emptyList<Uri>()
     private var composed = false
     private var failures = 0
+    private var rejections = 0
     private val restoration = StateRestorationTester(composeRule)
     private lateinit var captured: Uri
     private lateinit var abandoned: File
@@ -236,6 +250,7 @@ private class CameraCaptureFixture(
                                 },
                                 onFailure = { failures++ },
                                 isCurrent = { account.value == captureAccount && runtime.value == captureRuntime },
+                                onRejected = { rejections++ },
                             )
                         trackDraft(slots)
                         visibleUris = slots.map { it.uri }
@@ -329,6 +344,7 @@ private class CameraCaptureFixture(
         composeRule.runOnIdle {
             assertTrue(composed)
             assertEquals(0, failures)
+            assertEquals("a full shelf must explain the refused photo once", if (fullComposer) 1 else 0, rejections)
             assertEquals(
                 if (ownerReplaced || captureRejected) {
                     initialUris

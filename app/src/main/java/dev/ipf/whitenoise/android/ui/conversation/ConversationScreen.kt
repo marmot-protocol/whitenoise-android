@@ -205,6 +205,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationCame
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationMediaViewerSessionState
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberOriginGuardedResultLauncher
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -1967,10 +1968,9 @@ internal fun ConversationScreen(
     importedShareEffects()
     val attachmentRuntime = appState.runtimeGeneration
     val attachmentOrigin = "$attachmentRuntime:$conversationAccountRef:${chat.group.groupIdHex}"
-    var cameraRequestOrigin by rememberSaveable { mutableStateOf<String?>(null) }
-    var photoRequestOrigin by rememberSaveable { mutableStateOf<String?>(null) }
-    var documentRequestOrigin by rememberSaveable { mutableStateOf<String?>(null) }
-    var contactRequestOrigin by rememberSaveable { mutableStateOf<String?>(null) }
+    val attachmentOwnerCurrent = {
+        appState.activeAccountRef == conversationAccountRef && appState.runtimeGeneration == attachmentRuntime
+    }
 
     // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
@@ -1978,17 +1978,12 @@ internal fun ConversationScreen(
     // cap comes from MEDIA_PICKER_MAX_ITEMS; picking a single image still works
     // (returns a one-element list).
     val imagePickerLauncher =
-        rememberLauncherForActivityResult(
+        rememberOriginGuardedResultLauncher(
             ActivityResultContracts.PickMultipleVisualMedia(maxItems = MEDIA_PICKER_MAX_ITEMS),
+            attachmentOrigin,
+            attachmentOwnerCurrent,
         ) { uris ->
-            val origin = photoRequestOrigin
-            photoRequestOrigin = null
-            val currentAccount =
-                appState.activeAccountRef == conversationAccountRef &&
-                    appState.runtimeGeneration == attachmentRuntime
-            if (origin != attachmentOrigin || !currentAccount || uris.isEmpty()) {
-                return@rememberLauncherForActivityResult
-            }
+            if (uris.isEmpty()) return@rememberOriginGuardedResultLauncher
             // Append rather than replace so a follow-up "Add more" tile-pick
             // grows the staging shelf instead of clobbering whatever the user
             // already queued. Each occurrence gets its own stable slot identity
@@ -2011,23 +2006,25 @@ internal fun ConversationScreen(
                     !appState.signOutInProgress &&
                     !appState.wipeInProgress
             },
+            onRejected = {
+                appState.presentText(
+                    AppText.Plain(
+                        context.resources.getQuantityString(R.plurals.toast_share_attachments_dropped, 1, 1),
+                    ),
+                )
+            },
         )
 
     // TakePicture needs no permission of its own, but because CAMERA is declared
     // in the manifest (for the QR scanner) some OEMs require the runtime grant
     // before launching the capture intent — request it first if missing.
     val cameraPermissionLauncher =
-        rememberLauncherForActivityResult(
+        rememberOriginGuardedResultLauncher(
             ActivityResultContracts.RequestPermission(),
+            attachmentOrigin,
+            attachmentOwnerCurrent,
         ) { granted ->
-            val owner = cameraRequestOrigin
-            cameraRequestOrigin = null
-            val currentAccount =
-                appState.activeAccountRef == conversationAccountRef &&
-                    appState.runtimeGeneration == attachmentRuntime
-            if (granted && owner == attachmentOrigin && currentAccount) {
-                launchCameraCapture()
-            }
+            if (granted) launchCameraCapture()
         }
 
     // Contact share (attachment sheet): the phone-row picker returns a data
@@ -2050,16 +2047,12 @@ internal fun ConversationScreen(
     var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
-        rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
-            val origin = contactRequestOrigin
-            contactRequestOrigin = null
-            val currentAccount =
-                appState.activeAccountRef == conversationAccountRef &&
-                    appState.runtimeGeneration == attachmentRuntime
-            if (origin != attachmentOrigin || !currentAccount || contactUri == null) {
-                return@rememberLauncherForActivityResult
-            }
-            pendingContactUri = contactUri.toString()
+        rememberOriginGuardedResultLauncher(
+            PickContactPhoneRow(),
+            attachmentOrigin,
+            attachmentOwnerCurrent,
+        ) { contactUri ->
+            if (contactUri != null) pendingContactUri = contactUri.toString()
         }
     LaunchedEffect(pendingContactUri, attachmentOrigin) {
         val uri = pendingContactUri ?: return@LaunchedEffect
@@ -2296,17 +2289,12 @@ internal fun ConversationScreen(
     // to recorded voice notes until this client grows a general audio
     // transcode path.
     val documentPickerLauncher =
-        rememberLauncherForActivityResult(
+        rememberOriginGuardedResultLauncher(
             ActivityResultContracts.OpenMultipleDocuments(),
+            attachmentOrigin,
+            attachmentOwnerCurrent,
         ) { uris ->
-            val origin = documentRequestOrigin
-            documentRequestOrigin = null
-            val currentAccount =
-                appState.activeAccountRef == conversationAccountRef &&
-                    appState.runtimeGeneration == attachmentRuntime
-            if (origin != attachmentOrigin || !currentAccount || uris.isEmpty()) {
-                return@rememberLauncherForActivityResult
-            }
+            if (uris.isEmpty()) return@rememberOriginGuardedResultLauncher
             // Append into the document side of the staging shelf rather than
             // sending immediately. The preview sheet renders both lists and
             // a single Send dispatches both decoders into one kind-9 album.
@@ -4112,7 +4100,6 @@ internal fun ConversationScreen(
                     revealSentMessage()
                 },
                 onPickFromGallery = {
-                    photoRequestOrigin = attachmentOrigin
                     imagePickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                     )
@@ -4124,12 +4111,10 @@ internal fun ConversationScreen(
                     if (granted) {
                         launchCameraCapture()
                     } else {
-                        cameraRequestOrigin = attachmentOrigin
                         cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     }
                 },
                 onPickDocument = {
-                    documentRequestOrigin = attachmentOrigin
                     documentPickerLauncher.launch(arrayOf("*/*"))
                 },
                 onShareLocation = {
@@ -4148,7 +4133,6 @@ internal fun ConversationScreen(
                 },
                 onShareUser = { shareUserPickerOpen = true },
                 onShareContact = {
-                    contactRequestOrigin = attachmentOrigin
                     contactPickerLauncher.launch(Unit)
                 },
                 onCreatePoll =
@@ -4969,13 +4953,11 @@ internal fun ConversationScreen(
             composerText = composerTextState::acceptanceToken,
             onCaptionAccepted = composerTextState::clearAccepted,
             onAddPhotos = {
-                photoRequestOrigin = attachmentOrigin
                 imagePickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                 )
             },
             onAddDocuments = {
-                documentRequestOrigin = attachmentOrigin
                 documentPickerLauncher.launch(arrayOf("*/*"))
             },
             onAfterSend = { revealSentMessage() },
