@@ -128,7 +128,7 @@ class DiagnosticsCopyScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
-                    UsageDiagnosticsPrompt(state, onDone = {})
+                    UsageDiagnosticsPrompt(state, onCloseStarted = {}, onDone = {})
                 }
             }
         }

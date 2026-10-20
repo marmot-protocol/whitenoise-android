@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StartupUsageDiagnosticsPrompt.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StartupUsageDiagnosticsPrompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StartupUsageDiagnosticsPrompt.kt",
+        "anchor": "fun StartupUsageDiagnosticsPrompt(",
+        "test_ids": [
+          "STB-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "runtime-scoped failed dismissal and partial retry ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StartupUsageDiagnosticsPrompt.kt",
+        "anchor": "class StartupDiagnosticsCloseState",
+        "test_ids": [
+          "STB-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

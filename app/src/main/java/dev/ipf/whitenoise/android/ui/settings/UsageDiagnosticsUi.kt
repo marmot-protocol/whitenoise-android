@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +72,7 @@ internal fun diagnosticsStatusLabel(status: DiagnosticsExporterStatusFfi?): Int 
 @Composable
 private fun UsageDiagnosticsChoice(
     appState: WhiteNoiseAppState,
+    enabled: Boolean,
     onChoiceStarted: () -> Unit,
 ) {
     val state = appState.diagnostics
@@ -78,7 +80,7 @@ private fun UsageDiagnosticsChoice(
         title = stringResource(R.string.onboarding_share_usage_title),
         subtitle = stringResource(R.string.onboarding_share_usage_summary),
         checked = state.selected,
-        enabled = state.snapshot != null && !state.failed,
+        enabled = enabled && state.snapshot != null && !state.failed,
         saving = state.busy,
         onCheckedChange = { enabled ->
             onChoiceStarted()
@@ -114,17 +116,21 @@ private fun UsageDiagnosticsFeedback(appState: WhiteNoiseAppState) {
 internal fun UsageDiagnosticsPrompt(
     appState: WhiteNoiseAppState,
     onChoiceStarted: () -> Unit = {},
+    onCloseStarted: () -> Unit,
+    closeFailed: Boolean = false,
+    closeBusy: Boolean = false,
+    onRetryClose: () -> Unit = {},
     onDone: () -> Unit,
 ) {
     val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
-    val settled = !state.busy && !state.failed && state.snapshot != null && !loggingBusy
+    val settled = !state.busy && !state.failed && state.snapshot != null && !loggingBusy && !closeBusy && !closeFailed
     // `rememberModalBottomSheetState` keys its saved state on `confirmValueChange`, so a lambda that
     // captures `settled` gets a new identity the moment a choice starts writing — and the sheet state
     // is rebuilt underneath it, which the reader sees as the sheet closing and reopening on every tap.
     // The lambda is remembered once and reads the current value through a snapshot instead.
-    val settledNow by rememberUpdatedState(settled)
+    val settledNow by rememberUpdatedState(settled || closing)
     val confirmValueChange = remember { { value: SheetValue -> value != SheetValue.Hidden || settledNow } }
     val sheetState =
         rememberModalBottomSheetState(
@@ -132,23 +138,25 @@ internal fun UsageDiagnosticsPrompt(
             confirmValueChange = confirmValueChange,
         )
     val scope = rememberCoroutineScope()
+    val onDoneNow by rememberUpdatedState(onDone)
+    DisposableEffect(Unit) {
+        onDispose {
+            // A lock/overlay can remove the sheet before its hide animation finishes.
+            // The runtime owner and its native save outlive this presentation scope.
+            if (closing) onDoneNow()
+        }
+    }
     // The sheet closes on the gesture and records the declined choices afterwards. Waiting for one or
     // two native writes first made a slow write read as "the X did nothing", and invited a second tap
     // that re-entered the whole thing; `closing` makes the second tap a no-op instead.
     //
-    // Declining is safe to lose: both writes turn things off and are idempotent, and nothing has
-    // recorded consent, so the policy simply asks again next launch.
     val finish = {
         if (settled && !closing) {
             closing = true
+            onCloseStarted()
             scope.launch {
                 sheetState.hide()
                 onDone()
-            }
-            appState.launchMutation {
-                val auditSettled =
-                    !appState.auditUploadConsentRequired || appState.setAuditLogsEnabled(false)
-                if (auditSettled && state.requiresChoice) appState.setTelemetryEnabled(false)
             }
         }
         Unit
@@ -164,7 +172,19 @@ internal fun UsageDiagnosticsPrompt(
                 onClose = finish,
                 closeEnabled = settled,
             )
-            UsageDiagnosticsPromptBody(appState, loggingBusy, onChoiceStarted) { loggingBusy = it }
+            if (closeFailed) {
+                Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+                    Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
+                    TextButton(enabled = !closeBusy, onClick = onRetryClose) { Text(stringResource(R.string.retry)) }
+                }
+            }
+            UsageDiagnosticsPromptBody(
+                appState,
+                loggingBusy,
+                onChoiceStarted,
+                showFeedback = !closeFailed,
+                choicesEnabled = !closeBusy && !closing && !closeFailed,
+            ) { loggingBusy = it }
         }
     }
 }
@@ -175,6 +195,8 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
     appState: WhiteNoiseAppState,
     loggingBusy: Boolean,
     onChoiceStarted: () -> Unit,
+    showFeedback: Boolean = true,
+    choicesEnabled: Boolean = true,
     onLoggingBusyChange: (Boolean) -> Unit,
 ) {
     Column(
@@ -199,7 +221,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
                             R.string.diagnostics_retention,
                             R.string.diagnostics_disable_disclosure,
                         ),
-                ) { UsageDiagnosticsChoice(appState, onChoiceStarted) }
+                ) { UsageDiagnosticsChoice(appState, choicesEnabled, onChoiceStarted) }
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -215,14 +237,22 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
                             R.string.diagnostics_retention,
                             R.string.diagnostics_disable_disclosure,
                         ),
-                ) { IndependentAuditLogChoice(appState, loggingBusy, onChoiceStarted, onLoggingBusyChange) }
+                ) {
+                    IndependentAuditLogChoice(
+                        appState,
+                        loggingBusy,
+                        onChoiceStarted,
+                        onLoggingBusyChange,
+                        choicesEnabled,
+                    )
+                }
             }
         }
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (appState.auditUploadConsentRequired) {
                 Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
             }
-            UsageDiagnosticsFeedback(appState)
+            if (showFeedback) UsageDiagnosticsFeedback(appState)
         }
     }
 }
@@ -234,6 +264,7 @@ private fun IndependentAuditLogChoice(
     busy: Boolean,
     onChoiceStarted: () -> Unit,
     onBusyChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     var failed by remember { mutableStateOf(false) }
     var pendingChoice by remember { mutableStateOf<Boolean?>(null) }
@@ -255,7 +286,7 @@ private fun IndependentAuditLogChoice(
         title = stringResource(R.string.onboarding_share_logs_title),
         subtitle = stringResource(R.string.onboarding_share_logs_summary),
         checked = pendingChoice ?: (appState.auditLogSettings?.enabled == true),
-        enabled = appState.auditLogSettings != null,
+        enabled = enabled && appState.auditLogSettings != null,
         saving = busy,
         onCheckedChange = { enabled ->
             onChoiceStarted()

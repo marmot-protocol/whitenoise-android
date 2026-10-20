@@ -59,4 +59,111 @@ class StartupDiagnosticsPromptStateTest {
         assertEquals(awaiting, awaiting.refreshed(false, false, false))
         assertFalse(awaiting.visible)
     }
+
+    /** A close failure wins regardless of whether the sheet animation finished first. */
+    @Test
+    fun failedCloseStaysRetryableInEitherCompletionOrder() =
+        kotlinx.coroutines.runBlocking {
+            for (hiddenFirst in listOf(false, true)) {
+                val owner = StartupDiagnosticsCloseState()
+                owner.prompt = StartupDiagnosticsPromptState.CHOICE
+                val attempt = owner.begin(false, true)!!
+                if (hiddenFirst) owner.hidden()
+                owner.save(attempt, { true }, { error("Audit was already settled") }, { false })
+                if (!hiddenFirst) owner.hidden()
+                assertEquals(StartupDiagnosticsPromptState.CLOSE_ERROR, owner.prompt)
+                assertTrue(owner.failed)
+                assertEquals(owner.prompt, owner.prompt.refreshed(true, false, false))
+            }
+        }
+
+    /** Saving one independent receipt never repeats it when the remaining decline is retried. */
+    @Test
+    fun explicitRetryWritesOnlyTheUnsettledChoice() =
+        kotlinx.coroutines.runBlocking {
+            val owner = StartupDiagnosticsCloseState()
+            var audits = 0
+            var usages = 0
+            val attempt = owner.begin(true, true)!!
+            owner.hidden()
+            owner.save(attempt, { true }, {
+                audits++
+                true
+            }, {
+                usages++
+                false
+            })
+            assertEquals(StartupDiagnosticsPromptState.CLOSE_ERROR, owner.prompt)
+            val retry = owner.retry()!!
+            assertEquals(null, owner.retry())
+            owner.save(retry, { true }, {
+                audits++
+                true
+            }, {
+                usages++
+                true
+            })
+            assertEquals(1, audits)
+            assertEquals(2, usages)
+            assertEquals(StartupDiagnosticsPromptState.CLOSED, owner.prompt)
+        }
+
+    /** An audit failure leaves telemetry unsettled until the explicit retry succeeds. */
+    @Test
+    fun auditFailureRetainsBothPendingOperations() =
+        kotlinx.coroutines.runBlocking {
+            val owner = StartupDiagnosticsCloseState()
+            var usages = 0
+            val attempt = owner.begin(true, true)!!
+            owner.save(attempt, { true }, { false }, {
+                usages++
+                true
+            })
+            owner.hidden()
+            assertEquals(0, usages)
+            owner.save(owner.retry()!!, { true }, { true }, {
+                usages++
+                true
+            })
+            assertEquals(1, usages)
+            assertEquals(StartupDiagnosticsPromptState.CLOSED, owner.prompt)
+        }
+
+    /** A newer explicit choice or runtime cannot inherit an old dismissal's UI result or second write. */
+    @Test
+    fun replacementAndExplicitChoiceInvalidateOldClose() =
+        kotlinx.coroutines.runBlocking {
+            for (replaceRuntime in listOf(false, true)) {
+                val owner = StartupDiagnosticsCloseState()
+                var current = true
+                var usages = 0
+                val attempt = owner.begin(true, true)!!
+                owner.save(attempt, { current }, {
+                    if (replaceRuntime) current = false else owner.choiceStarted()
+                    true
+                }, {
+                    usages++
+                    true
+                })
+                if (!replaceRuntime) {
+                    owner.hidden()
+                    assertEquals(StartupDiagnosticsPromptState.CHOICE, owner.prompt)
+                }
+                assertEquals(0, usages)
+            }
+        }
+
+    /** A slow successful save stays closed and a rapid second close starts no second transaction. */
+    @Test
+    fun successfulCloseDoesNotReopenOrDuplicateWrites() =
+        kotlinx.coroutines.runBlocking {
+            val owner = StartupDiagnosticsCloseState()
+            val attempt = owner.begin(false, true)!!
+            assertEquals(null, owner.begin(false, true))
+            owner.hidden()
+            assertEquals(StartupDiagnosticsPromptState.CLOSED, owner.prompt)
+            owner.save(attempt, { true }, { error("No audit choice") }, { true })
+            assertEquals(StartupDiagnosticsPromptState.CLOSED, owner.prompt)
+            assertFalse(owner.failed)
+        }
 }

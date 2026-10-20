@@ -138,7 +138,7 @@
       {
         "surface": "startup diagnostics read-error lifetime",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "diagnosticsPromptState.refreshed(",
+        "anchor": "StartupUsageDiagnosticsPrompt(",
         "test_ids": [
           "STB-004"
         ]

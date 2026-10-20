@@ -93,10 +93,7 @@ import dev.ipf.whitenoise.android.ui.navigation.warmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.settings.DictationProviderChooser
-import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsPromptState
-import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsPromptState.CHOICE
-import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsPromptState.CLOSED
-import dev.ipf.whitenoise.android.ui.settings.UsageDiagnosticsPrompt
+import dev.ipf.whitenoise.android.ui.settings.StartupUsageDiagnosticsPrompt
 import dev.ipf.whitenoise.android.ui.settings.WipeOutcomeSheet
 import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -230,10 +227,8 @@ internal fun WhiteNoiseApp(
     val notificationEntryTicket = remember(inboundNotificationRequestId) { appState.diagnostics.observations.ticket() }
     val shareEntryTicket = remember(inboundShareRequest) { appState.diagnostics.observations.ticket() }
 
-    var diagnosticsPromptState by remember(appState.runtimeGeneration) {
-        mutableStateOf(StartupDiagnosticsPromptState.AWAITING_RECEIPT)
-    }
-    val diagnosticsPromptOpen = diagnosticsPromptState.visible
+    val diagnosticsPromptOwner = mainShellStateHolder.startupDiagnosticsPrompt(appState.runtimeGeneration)
+    val diagnosticsPromptOpen = diagnosticsPromptOwner.prompt.visible || diagnosticsPromptOwner.busy
     val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
 
     // One owner decides which top slot shows the app's temporary banners; under app lock none does.
@@ -692,34 +687,10 @@ internal fun WhiteNoiseApp(
                                                                 !appState.wipeInProgress &&
                                                                 diagnosticsRootUnobstructed
                                                             ) {
-                                                                LaunchedEffect(
-                                                                    appState.runtimeGeneration,
-                                                                    appState.diagnostics.snapshot,
-                                                                    appState.diagnostics.failed,
-                                                                    appState.auditUploadConsentRequired,
-                                                                ) {
-                                                                    val decisionLoaded =
-                                                                        appState.diagnostics.snapshot != null ||
-                                                                            appState.diagnostics.failed
-                                                                    diagnosticsPromptState =
-                                                                        diagnosticsPromptState.refreshed(
-                                                                            decisionLoaded = decisionLoaded,
-                                                                            choiceRequired =
-                                                                                appState.diagnostics.requiresChoice ||
-                                                                                    appState.auditUploadConsentRequired,
-                                                                            readFailed = appState.diagnostics.failed,
-                                                                        )
-                                                                }
-                                                                if (diagnosticsPromptOpen) {
-                                                                    UsageDiagnosticsPrompt(
-                                                                        appState,
-                                                                        onChoiceStarted = {
-                                                                            diagnosticsPromptState = CHOICE
-                                                                        },
-                                                                    ) {
-                                                                        diagnosticsPromptState = CLOSED
-                                                                    }
-                                                                }
+                                                                StartupUsageDiagnosticsPrompt(
+                                                                    appState,
+                                                                    diagnosticsPromptOwner,
+                                                                )
                                                             }
                                                         },
                                                         inboundNotificationTarget = inboundNotificationTarget,

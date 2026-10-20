@@ -6,10 +6,11 @@ internal enum class StartupDiagnosticsPromptState {
     CLOSED,
     CHOICE,
     READ_ERROR,
+    CLOSE_ERROR,
     ;
 
     /** Whether startup currently owns a sheet. */
-    val visible: Boolean get() = this == CHOICE || this == READ_ERROR
+    val visible: Boolean get() = this == CHOICE || this == READ_ERROR || this == CLOSE_ERROR
 
     /** A real renewal stays open for both choices even after the first choice is persisted. */
     fun refreshed(
@@ -33,6 +34,6 @@ internal enum class StartupDiagnosticsPromptState {
                     else -> this
                 }
 
-            CHOICE, CLOSED -> this
+            CHOICE, CLOSED, CLOSE_ERROR -> this
         }
 }
