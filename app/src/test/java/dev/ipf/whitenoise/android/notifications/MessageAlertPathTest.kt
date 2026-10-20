@@ -88,6 +88,13 @@ class MessageAlertPathTest {
     @Test
     fun mutedChannelGetsNoFallbackSound() = assertParentAudioChoiceRespected(vibrate = false)
 
+    /**
+     * A vibration-only parent stays soundless in its conversation child, with no app fallback sound, and a
+     * parent vibrating with the system default waveform (no explicit pattern) keeps vibrating in its child.
+     */
+    @Test
+    fun vibrationOnlyChannelGetsNoFallbackSound() = assertParentAudioChoiceRespected(vibrate = true)
+
     /** Posts a DM under a soundless parent and checks the child and card follow the parent's choice. */
     private fun assertParentAudioChoiceRespected(vibrate: Boolean) =
         runBlocking {
