@@ -82,7 +82,8 @@ class NotificationDeliveryModeRecoveryTest {
             val bootstrap = async { fixture.bootstrap() }
             try {
                 withTimeout(5_000) { while (reading.count > 0) yield() }
-                fixture.runWithMainLooperPumping { fixture.appState.createIdentity() }
+                // Identity publication clears main-confined caches, so it runs on the main looper like the UI caller.
+                fixture.runOnMainLooperPumping { fixture.appState.createIdentity() }
                 release.countDown()
                 bootstrap.await()
                 assertEquals("new-owner", fixture.appState.activeAccountRef)

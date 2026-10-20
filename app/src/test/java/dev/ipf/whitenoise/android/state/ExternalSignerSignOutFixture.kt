@@ -67,8 +67,10 @@ internal abstract class ExternalSignerSignOutFixture {
     protected var additionalAccounts: List<AccountSummaryFfi> = emptyList()
     protected var beforeListAccounts: () -> Unit = {}
     protected var beforeSignOutReply: () -> Unit = {}
-    protected var setupRecoveryReply: ((Continuation<Any?>) -> Any?)? = null
-    protected var setupSnapshotReply: ((Continuation<Any?>) -> Any?)? = null
+
+    // Both setup reads are synchronous bindings, so a scenario holds them on their IO thread instead of suspending.
+    protected var setupRecoveryReply: (() -> Boolean)? = null
+    protected var setupSnapshotReply: (() -> dev.ipf.marmotkit.OnboardingSnapshotFfi?)? = null
     protected val setupRecoverCalls = AtomicInteger(0)
     protected val nativePrivacyConfigCalls = AtomicInteger(0)
     protected var createdIdentity: AccountSummaryFfi? = null
@@ -134,7 +136,8 @@ internal abstract class ExternalSignerSignOutFixture {
                 "listAccounts" -> {
                     beforeListAccounts()
                     listAccountsCalls.incrementAndGet()
-                    listAccountsFailure?.let(::suspendFailure)
+                    // The account list is a synchronous binding: a failure is thrown, not resumed.
+                    listAccountsFailure?.let { throw it }
                     if (engineWiped) {
                         emptyList()
                     } else {
@@ -149,9 +152,8 @@ internal abstract class ExternalSignerSignOutFixture {
                         dev.ipf.marmotkit.AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
                     }
                 }
-                "onboardingRecoveryRequired" ->
-                    setupRecoveryReply?.invoke(arguments!!.last() as Continuation<Any?>) ?: false
-                "onboardingSnapshot" -> setupSnapshotReply?.invoke(arguments!!.last() as Continuation<Any?>)
+                "onboardingRecoveryRequired" -> setupRecoveryReply?.invoke() ?: false
+                "onboardingSnapshot" -> setupSnapshotReply?.invoke()
                 "recoverOnboarding" -> {
                     setupRecoverCalls.incrementAndGet()
                     error("Stale recovery must never reach native mutation")

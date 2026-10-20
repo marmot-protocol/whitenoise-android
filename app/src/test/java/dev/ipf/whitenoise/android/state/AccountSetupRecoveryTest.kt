@@ -65,13 +65,19 @@ class AccountSetupRecoveryTest {
         ).forEach { assertTrue("activation must keep $it", activation.contains(it)) }
     }
 
+    /** Amber's legacy fallback logs in through the external-signer API and never reaches setup recovery. */
     @Test
     fun externalSignerLoginIsUntouchedByRecovery() {
-        val body = appStateSource().functionBody("loginWithAmber")
+        val source = appStateSource()
+        val login = source.functionBody("loginWithAmber")
+        val fallback = source.functionBody("loginAmberFallback")
 
-        assertTrue(body.contains("loginExternalSigner("))
-        assertFalse(body.contains("loginRecoveringIncompleteSetup"))
-        assertFalse(body.contains("acknowledgePossibleKeyPackageOrphan"))
+        assertTrue(login.contains("loginAmberFallback("))
+        assertTrue(fallback.contains("loginExternalSigner("))
+        listOf(login, fallback).forEach { body ->
+            assertFalse(body.contains("loginRecoveringIncompleteSetup"))
+            assertFalse(body.contains("acknowledgePossibleKeyPackageOrphan"))
+        }
     }
 
     @Test

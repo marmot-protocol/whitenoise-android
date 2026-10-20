@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.LocalCleanupReportFfi
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -59,6 +58,7 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             }
         }
 
+    /** A setup route held in its checkpoint read stands down, unmounted, after a newer public activation. */
     @Test
     fun staleSameRuntimeSetupRouteCannotMountAfterNewerPublicActivation() =
         runBlocking {
@@ -68,27 +68,23 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
                 )
             val state = appState(profileReader = { null })
             val epoch = state.runtimeGeneration
-            val read = CompletableDeferred<kotlin.coroutines.Continuation<Any?>>()
-            setupSnapshotReply = { continuation ->
-                read.complete(continuation)
-                kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-            }
+            val read = HeldNativeCall<dev.ipf.marmotkit.OnboardingSnapshotFfi?>()
+            setupSnapshotReply = read::hold
             val earlier = async { runCatching { state.setActiveAccount(accountRef) } }
-            val continuation = withTimeout(5_000) { read.await() }
+            read.awaitEntered()
             setupSnapshotReply = null
             try {
                 assertTrue(state.setActiveAccount(otherAccountRef))
             } finally {
-                continuation.resumeWith(
-                    Result.success(
-                        dev.ipf.whitenoise.android.ui.onboarding.setup
-                            .setupSnapshot()
-                            .copy(accountIdHex = accountRef),
-                    ),
+                read.release(
+                    dev.ipf.whitenoise.android.ui.onboarding.setup
+                        .setupSnapshot()
+                        .copy(accountIdHex = accountRef),
                 )
             }
             val result = withTimeout(5_000) { earlier.await() }
-            assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            // Like any retired switch, the older selection stands down instead of failing its caller.
+            assertEquals(false, result.getOrThrow())
             assertEquals(epoch, state.runtimeGeneration)
             assertEquals(otherAccountRef, state.activeAccountRef)
             assertEquals(AppPhase.Ready, state.phase)
@@ -189,26 +185,22 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             assertFalse(nativePushEnabled)
         }
 
+    /** A setup checkpoint read held across a public wipe cannot mount a controller afterwards. */
     @Test
     fun staleSetupSnapshotCannotMountAfterPublicWipe() =
         runBlocking {
             val state = appState()
-            val read = CompletableDeferred<kotlin.coroutines.Continuation<Any?>>()
-            setupSnapshotReply = { continuation ->
-                read.complete(continuation)
-                kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-            }
+            val read = HeldNativeCall<dev.ipf.marmotkit.OnboardingSnapshotFfi?>()
+            setupSnapshotReply = read::hold
             val routing = async { runCatching { state.accountSetup.routeIfPending(accountRef) } }
-            val continuation = withTimeout(5_000) { read.await() }
+            read.awaitEntered()
             setupSnapshotReply = null
             try {
                 assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
             } finally {
-                continuation.resumeWith(
-                    Result.success(
-                        dev.ipf.whitenoise.android.ui.onboarding.setup
-                            .setupSnapshot(),
-                    ),
+                read.release(
+                    dev.ipf.whitenoise.android.ui.onboarding.setup
+                        .setupSnapshot(),
                 )
             }
             val result = withTimeout(5_000) { routing.await() }
@@ -221,18 +213,15 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
     fun staleSetupRecoveryReadCannotMutateAfterPublicWipe() =
         runBlocking {
             val state = appState()
-            val read = CompletableDeferred<kotlin.coroutines.Continuation<Any?>>()
-            setupRecoveryReply = { continuation ->
-                read.complete(continuation)
-                kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-            }
+            val read = HeldNativeCall<Boolean>()
+            setupRecoveryReply = read::hold
             val recovery = async { runCatching { state.accountSetup.recover(accountRef) } }
-            val continuation = withTimeout(5_000) { read.await() }
+            read.awaitEntered()
             setupRecoveryReply = null
             try {
                 assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
             } finally {
-                continuation.resumeWith(Result.success(true))
+                read.release(true)
             }
             val result = withTimeout(5_000) { recovery.await() }
             assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
@@ -317,7 +306,8 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
 
             assertEquals(SignOutCompletion.AccountCleanupIncomplete, completion)
             assertEquals(1, signOutCalls.get())
-            assertEquals(0, listAccountsCalls.get())
+            // Partial native cleanup is not proof either way, so one readback confirms the account stayed signed in.
+            assertEquals(1, listAccountsCalls.get())
             assertEquals(accountRef, appState.activeAccountRef)
             assertEquals(listOf(accountRef), appState.accounts.map { it.label })
             assertEquals(
@@ -325,8 +315,9 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
                 appState.composerExpansionStateRetention.preferenceFor(accountRef, groupId),
             )
             assertEquals(phaseBefore, appState.phase)
-            assertTrue(
-                "unfinished cleanup must retain the selection",
+            // Admission retires older selections before native work, so a selection queued during it can win.
+            assertFalse(
+                "admitted cleanup retires older selections even when native teardown stays unfinished",
                 appState.accountSession.handoff.isCurrent(selectionBefore),
             )
         }

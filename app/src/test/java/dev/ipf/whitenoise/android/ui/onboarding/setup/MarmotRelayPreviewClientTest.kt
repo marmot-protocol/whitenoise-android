@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.state.AppAccountSessionActivation
 import dev.ipf.whitenoise.android.state.AppAccountSessionCoordinator
+import dev.ipf.whitenoise.android.state.HeldNativeCall
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -110,9 +111,9 @@ class MarmotRelayPreviewClientTest {
                     cleanup.set(true)
                     val close = async { controller.close() }
                     previewReply.getAndSet(null)!!.resumeWith(Result.success(preview))
-                    withTimeout(5_000) { cleanupEntered.await() }
+                    cleanupRead.awaitEntered()
                     assertFalse(close.isCompleted)
-                    cleanupReply.getAndSet(null)!!.resumeWith(Result.success(preview))
+                    cleanupRead.release(preview)
                     withTimeout(5_000) { close.await() }
                     assertEquals(1, cancels.get())
                     assertNull(nativeCurrent.get().proposal)
@@ -120,7 +121,7 @@ class MarmotRelayPreviewClientTest {
                 } finally {
                     finishing.set(true)
                     previewReply.getAndSet(null)?.resumeWith(Result.success(preview))
-                    cleanupReply.getAndSet(null)?.resumeWith(Result.success(preview))
+                    cleanupRead.release(preview)
                     withTimeout(5_000) { controller.close() }
                     parent.cancel()
                 }
@@ -154,6 +155,7 @@ class MarmotRelayPreviewClientTest {
     }
 }
 
+/** Real coordinator, setup client and controller whose relay proposal and owned-cleanup read are both held. */
 private class ClosedMountPreviewFixture {
     val parent = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val unusedActivation =
@@ -168,9 +170,10 @@ private class ClosedMountPreviewFixture {
     val nativeCurrent = AtomicReference(relayDecision())
     val preview = relayPreviewSnapshot()
     val previewReply = AtomicReference<Continuation<Any?>?>(null)
-    val cleanupReply = AtomicReference<Continuation<Any?>?>(null)
     val previewEntered = CompletableDeferred<Unit>()
-    val cleanupEntered = CompletableDeferred<Unit>()
+
+    // The checkpoint read is a synchronous binding, so the scenario holds it on its calling thread.
+    val cleanupRead = HeldNativeCall<OnboardingSnapshotFfi?>()
     val cancels = AtomicInteger(0)
     val native = createNative()
     val nativeClient =
@@ -197,6 +200,7 @@ private class ClosedMountPreviewFixture {
         }
     val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, parent, mounted::get, {}, {})
 
+    /** Answers each expected native call, holding the proposal delivery and the owned-cleanup read. */
     private fun createNative(): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -216,17 +220,8 @@ private class ClosedMountPreviewFixture {
                         COROUTINE_SUSPENDED
                     }
                 }
-                "onboardingSnapshot" -> {
-                    if (cleanup.get() && !finishing.get()) {
-                        @Suppress("UNCHECKED_CAST")
-                        val continuation = args!!.last() as Continuation<Any?>
-                        cleanupReply.set(continuation)
-                        cleanupEntered.complete(Unit)
-                        COROUTINE_SUSPENDED
-                    } else {
-                        nativeCurrent.get()
-                    }
-                }
+                "onboardingSnapshot" ->
+                    if (cleanup.get() && !finishing.get()) cleanupRead.hold() else nativeCurrent.get()
                 "cancelOnboardingRepair" -> {
                     cancels.incrementAndGet()
                     relayDecision().copy(revision = 5uL).also(nativeCurrent::set)

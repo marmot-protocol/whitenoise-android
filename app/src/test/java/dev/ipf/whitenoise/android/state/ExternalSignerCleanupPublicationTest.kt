@@ -258,7 +258,10 @@ internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixtu
             assertEquals(listOf("disable", "signOut"), nativeCallOrder)
         }
 
-    /** Push bookkeeping failure preserves the completed native sign-out and local cleanup. */
+    /**
+     * Push bookkeeping that fails once native push is confirmed off — the pending-disable clear that now precedes
+     * the native logout — preserves the completed native sign-out and local cleanup.
+     */
     @Test
     fun postNativePushCleanupFailurePreservesSignOutCompletion() =
         runBlocking {
@@ -270,7 +273,7 @@ internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixtu
                         key: String?,
                         defValues: MutableSet<String>?,
                     ): MutableSet<String>? {
-                        if (engineSignedOut) {
+                        if (nativeDisableCalls.get() > 0) {
                             failedPushReads += 1
                             error("scripted encrypted push value corruption")
                         }

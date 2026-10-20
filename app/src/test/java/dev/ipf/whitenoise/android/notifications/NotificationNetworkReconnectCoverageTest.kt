@@ -276,9 +276,14 @@ class NotificationNetworkReconnectCoverageTest {
                 teardownOwner.indexOf("cancelListener()"),
         )
         assertTrue(
-            "teardown must suppress connectivity callbacks before its first suspension",
+            "teardown must suppress connectivity callbacks before it suspends to drain controllers",
             prepare.indexOf("networkNotificationRecoverySuppressed = true") in 0 until
-                prepare.indexOf("accountSetup.close()"),
+                prepare.indexOf("AccountSessionTeardown("),
+        )
+        val publicWipe = appState.functionBody("signOutAndWipeActiveAccount")
+        assertTrue(
+            "setup cleanup may need the lifetime for its preview, so it drains before the wipe takes it",
+            publicWipe.indexOf("accountSetup.close()") in 0 until publicWipe.indexOf("withAccountLifetime"),
         )
         assertTrue(
             "destructive teardown must invalidate captured service retries before suppression or suspension",

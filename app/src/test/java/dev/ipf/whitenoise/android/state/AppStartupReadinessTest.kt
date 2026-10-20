@@ -52,13 +52,22 @@ class AppStartupReadinessTest {
         assertTrue("Unread roster folds must not return to the bootstrap critical path", blockingFold < 0)
     }
 
+    /** Bootstrap owns the account lifetime and times each required startup stage separately. */
     @Test
     fun bootstrapTimesRequiredStagesSeparately() {
         val source = appStateSource()
-        val wrapper = source.functionBody("startBootstrapRuntime")
+        // The wrapper is an expression body, so read its declaration up to the locked implementation.
+        val wrapper =
+            source
+                .substringAfter("fun startBootstrapRuntime(")
+                .substringBefore("fun startBootstrapRuntimeLocked(")
         assertTrue(wrapper.contains("withAccountLifetime"))
         assertTrue(wrapper.contains("startBootstrapRuntimeLocked()"))
-        val runtime = source.functionBody("startBootstrapRuntimeLocked")
+        // Runtime construction lives in the locked opener's expression body, so read through to the next helper.
+        val runtime =
+            source
+                .substringAfter("fun startBootstrapRuntimeLocked(")
+                .substringBefore("fun startMarmotWithNotificationListener(")
         val runtimeStart = source.functionBody("startMarmotWithNotificationListener")
         val expectedStages =
             listOf(

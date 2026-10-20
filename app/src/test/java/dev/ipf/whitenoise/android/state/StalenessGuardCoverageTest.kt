@@ -74,8 +74,13 @@ class StalenessGuardCoverageTest {
         val mutationPresentation = productionSource("ConversationMutationPresentation.kt")
         val guardedPaths =
             mapOf(
-                "AppState.kt:prepareSignOutPushCleanup" to
-                    listOf("marmotRuntime !== runtime", "activeAccountRef != account"),
+                // Sign-out push cleanup is admitted only after both push locks and a still-owned sign-out check.
+                "AppState.kt:finishRevokedAccountSignOut" to
+                    listOf(
+                        "nativePushSyncMutex.lock()",
+                        "accountSwitchHandoff.isCurrent(selectionEpoch)",
+                        "accountSession.retireSelectionsForSignOut()",
+                    ),
                 "AppState.kt:drainPendingPushDisables" to
                     listOf("runtime.marmot.setNativePushEnabled", "marmotRuntime !== runtime"),
                 "AppState.kt:refreshAccountUnreadCounts" to
@@ -254,6 +259,11 @@ class StalenessGuardCoverageTest {
                 // Both completion bodies run inside withRevokedPinnedTarget, retaining native command ownership.
                 "AppState.kt:finishRevokedAccountSignOut" to "durably fenced authoritative sign-out completion",
                 "AppState.kt:finishRevokedAccountWipe" to "durably fenced serialized native wipe completion",
+                // Lifetime and both push locks are owned, so the native disable receipt is the authoritative state.
+                "AppState.kt:admittedNativeSignOutLocked" to "lock-owned authoritative sign-out command result",
+                "AppState.kt:signOutAfterNativeDisableLocked" to "lock-owned authoritative sign-out command result",
+                // Runs inside the owned lifetime after admission; it publishes the authoritative native outcome.
+                "AppState.kt:finishOwnedSignOutLocked" to "lifetime-owned authoritative sign-out completion",
                 // Busy is claimed before suspension; one retry owns this instance's flag until finally releases it.
                 "AppState.kt:retryPushStorageRecovery" to "single-flight push storage recovery command",
                 // Existing settings snapshot refresh is outside the audited stale-counter migration inventory.
@@ -268,6 +278,8 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:syncPushForAccount" to "serialized sync with authoritative re-read",
                 // Enable/disable is an authoritative command and rollback is transactionally explicit.
                 "AppState.kt:setNativePushEnabled" to "authoritative settings command with rollback",
+                // The caller rechecks ownership under the lifetime and delivery-mode locks before this body runs.
+                "AppState.kt:setNativePushEnabledLocked" to "lock-owned authoritative settings command with rollback",
                 // Foreground catch-up is lifecycle-admitted and clears only the durable generation it observed.
                 "AppState.kt:catchUpAfterForegroundActivation" to "lifecycle admission with generation-checked clear",
                 // The durable attempted flag makes this a one-shot orchestration, not a refresh race.

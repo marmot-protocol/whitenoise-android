@@ -132,7 +132,13 @@ class AppStateSendLockCoverageTest {
     /** The fenced wipe completion must clear native push state under the same mutex as push synchronization. */
     @Test
     fun destructiveWipeDropsSyncedPushFingerprintUnderNativePushMutex() {
-        val entry = appStateFunctionBody("signOutAndWipeActiveAccount")
+        val publicEntry = appStateFunctionBody("signOutAndWipeActiveAccount")
+        assertTrue(
+            "the public wipe must own the account lifetime before entering its revocation bracket",
+            publicEntry.indexOf("withAccountLifetime") in
+                0 until publicEntry.indexOf("signOutAndWipeActiveAccountLocked(requested)"),
+        )
+        val entry = appStateFunctionBody("signOutAndWipeActiveAccountLocked")
         assertTrue(
             "the public wipe must delegate completion inside the durable launcher-revocation bracket",
             entry.indexOf("withRevokedPinnedTarget(wipedRef)") in

@@ -34,6 +34,9 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.resumeWithException
 
+/** A bounded receiver barrier, so setup-ready activation proceeds well inside each step's three-second timeout. */
+private const val RECEIVER_TIMEOUT_MILLIS = 100L
+
 /** Legacy import completion must preserve MDK's pending setup/recovery admission for both signer types. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -46,10 +49,11 @@ class ImportedIdentitySetupRoutingTest {
     @Test
     fun currentSetupReadyActivatesWithoutSelfRejection() = assertSetupReadySelection(replaceSelection = false)
 
+    /** Holds setup-ready's account refresh, optionally selects another account, then checks who became active. */
     private fun assertSetupReadySelection(replaceSelection: Boolean) =
         runBlocking {
             val fixture = Fixture(amber = false, recoveryRequired = false)
-            var held: Continuation<Any?>? = null
+            val read = HeldNativeCall<List<AccountSummaryFfi>>()
             try {
                 runWithMainLooperPumping { fixture.state.importIdentity("nsec1" + "q".repeat(58)) }
                 val controller = checkNotNull(fixture.state.accountSetup.controller)
@@ -57,11 +61,7 @@ class ImportedIdentitySetupRoutingTest {
                     while (controller.state.value.busy || controller.state.value.snapshot == null) delay(1)
                 }
                 fixture.pending = fixture.pending.copy(ready = true)
-                val read = kotlinx.coroutines.CompletableDeferred<Continuation<Any?>>()
-                fixture.accountsReply = { continuation ->
-                    read.complete(continuation)
-                    COROUTINE_SUSPENDED
-                }
+                fixture.accountsReply = read::hold
                 val epoch = fixture.state.runtimeGeneration
                 val lifetime =
                     controller.javaClass
@@ -70,13 +70,12 @@ class ImportedIdentitySetupRoutingTest {
                         .get(controller) as kotlinx.coroutines.Job
                 val existingJobs = lifetime.children.toSet()
                 controller.openChats()
-                held = runWithMainLooperPumping { read.await() }
+                runWithMainLooperPumping { read.awaitEntered() }
                 val readyCommand = lifetime.children.filterNot { it in existingJobs }.single()
                 if (replaceSelection) {
                     assertTrue(runWithMainLooperPumping { fixture.state.setActiveAccount("existing") })
                 }
-                held.resumeWith(Result.success(fixture.accountList))
-                held = null
+                read.release(fixture.accountList)
                 runWithMainLooperPumping { readyCommand.join() }
                 assertEquals(epoch, fixture.state.runtimeGeneration)
                 val expectedAccount = if (replaceSelection) "existing" else fixture.imported.label
@@ -84,7 +83,7 @@ class ImportedIdentitySetupRoutingTest {
                 assertEquals(AppPhase.Ready, fixture.state.phase)
             } finally {
                 fixture.accountsReply = null
-                held?.resumeWith(Result.success(fixture.accountList))
+                read.release(fixture.accountList)
                 runWithMainLooperPumping { fixture.state.accountSetup.close() }
             }
         }
@@ -102,7 +101,7 @@ class ImportedIdentitySetupRoutingTest {
                         .getDeclaredField("client")
                         .apply { isAccessible = true }
                         .get(controller) as dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupClient
-                fixture.state.accountSetup.close()
+                runWithMainLooperPumping { fixture.state.accountSetup.close() }
                 val before = fixture.calls.toList()
                 for (action in listOf(
                     dev.ipf.marmotkit.OnboardingActionFfi.RETRY,
@@ -123,7 +122,7 @@ class ImportedIdentitySetupRoutingTest {
                     assertEquals(before, fixture.calls.toList())
                 }
             } finally {
-                fixture.state.accountSetup.close()
+                runWithMainLooperPumping { fixture.state.accountSetup.close() }
             }
         }
 
@@ -167,7 +166,7 @@ class ImportedIdentitySetupRoutingTest {
             } finally {
                 wipe?.cancel()
                 wipe?.join()
-                fixture.state.accountSetup.close()
+                runWithMainLooperPumping { fixture.state.accountSetup.close() }
             }
         }
 
@@ -268,7 +267,9 @@ class ImportedIdentitySetupRoutingTest {
         val imported = AccountSummaryFfi("bb".repeat(32), "bb".repeat(32), !amber, amber, false, true)
         var pending = setupSnapshot(actions = emptyList()).copy(accountIdHex = imported.label)
         val accountList get() = listOf(existing, imported)
-        var accountsReply: ((Continuation<Any?>) -> Any)? = null
+
+        // The account list is a synchronous binding, so a scenario holds it on its IO thread.
+        var accountsReply: (() -> List<AccountSummaryFfi>)? = null
         private val marmot =
             Proxy.newProxyInstance(
                 MarmotInterface::class.java.classLoader,
@@ -292,13 +293,7 @@ class ImportedIdentitySetupRoutingTest {
                     "listAccounts" -> {
                         val reply = accountsReply
                         accountsReply = null
-                        if (reply == null) {
-                            accountList
-                        } else {
-                            @Suppress("UNCHECKED_CAST")
-                            val continuation = arguments?.last() as Continuation<Any?>
-                            reply(continuation)
-                        }
+                        reply?.invoke() ?: accountList
                     }
                     "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
                     "beginAttachmentPermissionUpdate" -> 1uL
@@ -330,6 +325,8 @@ class ImportedIdentitySetupRoutingTest {
                     profileReader = { null },
                     profileRefreshRequest = { profileRequests += it },
                     identityLoginCalls = loginCalls(),
+                    // Setup-ready activation waits for the receiver barrier, which this fake never satisfies.
+                    notificationReceiverTimeoutMillis = { RECEIVER_TIMEOUT_MILLIS },
                 )
             state.amberPublicKeyRequest = { imported.accountIdHex }
             WhiteNoiseAppState::class.java

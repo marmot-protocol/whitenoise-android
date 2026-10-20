@@ -13,9 +13,17 @@ class AttachmentPolicyStartupOrderingTest {
     @Test
     fun existingAccountsAreContainedBeforeStartAndListenerStillFollowsImmediately() {
         val appState = source("AppState.kt").readText()
-        val wrapper = appState.functionBody("startBootstrapRuntime")
+        // The wrapper is an expression body, so read its declaration up to the locked implementation.
+        val wrapper =
+            appState
+                .substringAfter("fun startBootstrapRuntime(")
+                .substringBefore("fun startBootstrapRuntimeLocked(")
         assertOrdered(wrapper, "withAccountLifetime", "startBootstrapRuntimeLocked()")
-        val bootstrap = appState.functionBody("startBootstrapRuntimeLocked")
+        // Runtime construction lives in the locked opener's expression body, so read through to the next helper.
+        val bootstrap =
+            appState
+                .substringAfter("fun startBootstrapRuntimeLocked(")
+                .substringBefore("fun startMarmotWithNotificationListener(")
         val configure = bootstrap.indexOf("enforceAppOwnedAttachmentAcquisitionForKnownAccounts()")
         val startCall = bootstrap.indexOf("startMarmotWithNotificationListener(runtime)")
         val body = source("AppState.kt").readText().functionBody("startMarmotWithNotificationListener")
@@ -71,8 +79,10 @@ class AttachmentPolicyStartupOrderingTest {
         assertOrdered(imported, "enforceAppOwnedAttachmentAcquisitionPolicy", "refreshAccounts()")
         assertOrdered(imported, "refreshAccounts()", "activateAccountSession(")
 
+        val amberFallback = appState.functionBody("loginAmberFallback")
+        assertOrdered(amberFallback, "loginExternalSigner(", "registerExternalSigner(")
         val amber = appState.functionBody("loginWithAmber")
-        assertOrdered(amber, "registerExternalSigner(", "activateImportedIdentity(summary, runtime, epoch, selection)")
+        assertOrdered(amber, "loginAmberFallback(", "activateImportedIdentity(summary, runtime, epoch, selection)")
 
         val refresh = appState.functionBody("refreshAccountSnapshot")
         assertTrue(refresh.contains("listAccountsWithAppAttachmentPolicy()"))
