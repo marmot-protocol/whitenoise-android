@@ -12686,15 +12686,11 @@ class WhiteNoiseAppState private constructor(
         includeMissingIdentity: Boolean = false,
     ): ProfileMaterializationReservation? =
         synchronized(profilePresentationLock) {
+            val needsIdentity =
+                includeMissingIdentity && npubs.get(id) == null && profilePresentations[id]?.displayName.isNullOrBlank()
             profileMaterializations[id]?.let { running ->
                 ProfileMaterializationReservation(running, ownsRead = false)
-            } ?: if (profilePresentations.containsKey(id) &&
-                (
-                    !includeMissingIdentity ||
-                        npubs.get(id) != null ||
-                        !profilePresentations[id]?.displayName.isNullOrBlank()
-                )
-            ) {
+            } ?: if (profilePresentations.containsKey(id) && !needsIdentity) {
                 null
             } else {
                 CompletableDeferred<Unit>().let { completion ->

@@ -196,6 +196,7 @@ class SearchNameIdentityPresentationTest {
         assertSeededIdentityDuringCooldown(staleLifetime = true)
     }
 
+    /** Holds the shared identity read across cooldown and optional account-lifetime invalidation. */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun assertSeededIdentityDuringCooldown(staleLifetime: Boolean) =
         runTest {
@@ -221,19 +222,9 @@ class SearchNameIdentityPresentationTest {
                         releaseRead.await()
                         CANONICAL_NPUB
                     }
-                val profileScope =
-                    WhiteNoiseAppState::class.java
-                        .getDeclaredField("profileScope")
-                        .apply { isAccessible = true }
-                        .get(appState) as CoroutineScope
-                profileJob = profileScope.coroutineContext[Job]
+                profileJob = profileScope(appState).coroutineContext[Job]
                 appState.applyAccountSwitchProfileSeed(accountSwitchProfileSeed(PEER, null, null))
-                val gate =
-                    WhiteNoiseAppState::class.java
-                        .getDeclaredField("profileRefreshGate")
-                        .apply { isAccessible = true }
-                        .get(appState) as ProfileRefreshGate
-                gate.finish(PEER, System.currentTimeMillis() + 60_000L)
+                coolDownProfileRefresh(appState)
                 val before = appState.profileRevisionForCompose
                 repeat(20) { appState.requestProfile(PEER) }
                 runCurrent()
@@ -253,19 +244,7 @@ class SearchNameIdentityPresentationTest {
                 }
                 releaseRead.complete(Unit)
                 warm.await()
-                if (staleLifetime) {
-                    val unknown =
-                        ApplicationProvider
-                            .getApplicationContext<Context>()
-                            .getString(dev.ipf.whitenoise.android.R.string.unknown)
-                    assertEquals(unknown, appState.chatMemberTitleCached(PEER))
-                    assertEquals(before, appState.profileRevisionForCompose)
-                } else {
-                    assertEquals(IdentityFormatter.short(CANONICAL_NPUB, 10, 8), appState.chatMemberTitleCached(PEER))
-                    assertNotEquals(before, appState.profileRevisionForCompose)
-                    appState.requestProfile(PEER)
-                    runCurrent()
-                }
+                assertSeededPresentation(appState, staleLifetime, before)
                 assertEquals(1, identityReads.get())
                 assertEquals(0, nameReads.get())
                 assertEquals(0, relayReads.get())
@@ -279,8 +258,48 @@ class SearchNameIdentityPresentationTest {
             }
         }
 
+    /** A retired read must leave both fallback text and revision untouched; a current read publishes once. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun TestScope.assertSeededPresentation(
+        appState: WhiteNoiseAppState,
+        staleLifetime: Boolean,
+        before: ProfilePresentationRevision,
+    ) {
+        if (staleLifetime) {
+            val unknown =
+                ApplicationProvider
+                    .getApplicationContext<Context>()
+                    .getString(dev.ipf.whitenoise.android.R.string.unknown)
+            assertEquals(unknown, appState.chatMemberTitleCached(PEER))
+            assertEquals(before, appState.profileRevisionForCompose)
+        } else {
+            assertEquals(IdentityFormatter.short(CANONICAL_NPUB, 10, 8), appState.chatMemberTitleCached(PEER))
+            assertNotEquals(before, appState.profileRevisionForCompose)
+            appState.requestProfile(PEER)
+            runCurrent()
+        }
+    }
+
+    /** Returns the actual materialization owner so the fixture joins its children before resetting Main. */
+    private fun profileScope(appState: WhiteNoiseAppState): CoroutineScope =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("profileScope")
+            .apply { isAccessible = true }
+            .get(appState) as CoroutineScope
+
+    /** Keeps relay refresh in cooldown to exercise local hydration independently of network admission. */
+    private fun coolDownProfileRefresh(appState: WhiteNoiseAppState) {
+        val gate =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("profileRefreshGate")
+                .apply { isAccessible = true }
+                .get(appState) as ProfileRefreshGate
+        gate.finish(PEER, System.currentTimeMillis() + 60_000L)
+    }
+
     private val createdAppStates = mutableListOf<WhiteNoiseAppState>()
 
+    /** Drives Main publication on the test scheduler and joins every created state before restoring Main. */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun runIdentityPresentationTest(block: suspend TestScope.() -> Unit) =
         runTest {
@@ -305,6 +324,7 @@ class SearchNameIdentityPresentationTest {
             }
         }
 
+    /** Permits only authoritative identity encoding; unexpected native work fails the fixture. */
     private fun nativeRuntime(encode: () -> String): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -316,6 +336,7 @@ class SearchNameIdentityPresentationTest {
             }
         } as MarmotInterface
 
+    /** Pins one synthetic account and injected readers while retaining the production profile scope. */
     private fun appState(
         native: MarmotInterface? = null,
         readDisplayName: suspend (String) -> String? = { null },

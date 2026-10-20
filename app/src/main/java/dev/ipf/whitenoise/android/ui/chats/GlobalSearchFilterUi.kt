@@ -130,10 +130,8 @@ internal fun GlobalSearchFilterMenu(
                 modifier = Modifier.testTag(globalSearchFilterMenuItemTag(category)),
             )
         }
-    val hasNonScopeFilters =
-        state.messageFiltersActive || state.folderFilters.isNotEmpty() || state.chatTypeFilters.isNotEmpty()
     val clearAll =
-        if (state.hasActiveFilters && (!conversationScope || hasNonScopeFilters)) {
+        if (state.hasActiveFilters && (!conversationScope || state.hasNonScopeFilters)) {
             listOf(
                 WhiteNoiseMenuItem(
                     label = stringResource(R.string.chat_list_search_clear_all_filters),
@@ -152,7 +150,11 @@ internal fun GlobalSearchFilterMenu(
     )
 }
 
-/** The prototype's active-filter bar: Clear All first, then one removable chip per filter. */
+/** Conversation Clear all preserves chat scope, so only filters it can remove offer that action. */
+private val GlobalSearchState.hasNonScopeFilters: Boolean
+    get() = messageFiltersActive || folderFilters.isNotEmpty() || chatTypeFilters.isNotEmpty()
+
+/** The active-filter bar shares the menu's Clear all eligibility and keeps individual chips removable. */
 @Composable
 internal fun GlobalSearchFilterControlsRow(
     state: GlobalSearchState,
@@ -173,7 +175,7 @@ internal fun GlobalSearchFilterControlsRow(
             horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (chips.items.any { it.chipId != conversationScope?.chipId }) {
+            if (state.hasActiveFilters && (conversationScope == null || state.hasNonScopeFilters)) {
                 item(key = "clear-all") {
                     TextButton(
                         onClick = onClearAll,

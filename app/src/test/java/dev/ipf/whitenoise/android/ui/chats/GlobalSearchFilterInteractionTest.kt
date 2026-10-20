@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
+import dev.ipf.whitenoise.android.ui.conversation.clearConversationSearchFilters
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -398,6 +399,37 @@ class GlobalSearchFilterInteractionTest {
         assertEquals("", removed)
         composeRule.onNodeWithTag("search-other-chats").performClick()
         assertTrue(broadened)
+    }
+
+    /** Retained chat chips cannot expose a no-op action; a removable date filter can still be cleared. */
+    @Test
+    fun conversationChatChipsOfferClearAllOnlyWhenNonScopeFiltersCanChange() {
+        val origin = GlobalSearchChatFilter("origin", "Community")
+        val other = GlobalSearchChatFilter("other", "Another chat")
+        val selectedChats = setOf(origin, other)
+        val state = mutableStateOf(GlobalSearchState(isOpen = true, chatFilters = selectedChats))
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterControlsRow(
+                    state = state.value,
+                    conversationScope = origin,
+                    onRemoveFilter = {},
+                    onClearAll = { state.value = clearConversationSearchFilters(state.value) },
+                )
+            }
+        }
+        composeRule.onNodeWithTag(globalSearchFilterChipTag(other.chipId)).assertExists()
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).assertDoesNotExist()
+        composeRule.runOnIdle {
+            state.value = state.value.copy(dateFilterSelection = GlobalSearchDateFilterSelection.Today)
+        }
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).performClick()
+        composeRule.runOnIdle {
+            assertEquals(selectedChats, state.value.chatFilters)
+            assertEquals(GlobalSearchDateFilterSelection.AnyTime, state.value.dateFilterSelection)
+        }
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(globalSearchFilterChipTag(other.chipId)).assertExists()
     }
 
     /** Narrow large-font scope/action controls use full-width rows without losing the explicit action. */
