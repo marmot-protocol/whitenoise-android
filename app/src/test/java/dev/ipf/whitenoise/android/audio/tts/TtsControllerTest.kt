@@ -16,6 +16,35 @@ import kotlin.concurrent.thread
 
 @Suppress("LargeClass") // Controller lifecycle, focus, and seek cases share one fake engine/focus harness.
 class TtsControllerTest {
+    /** Actual engine starts, rather than queued utterances, own two-member navigation context. */
+    @Test
+    fun twoMemberNavigationReceivesTheStartedSpeakerFromTheEngineAdapter() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        val entries =
+            listOf(
+                TtsSpeakableEntry("alice", "Alice", "First.", messageIdHex = "a1", conversationMemberCount = 2),
+                TtsSpeakableEntry("alice", "Alice", "Second.", messageIdHex = "a2", conversationMemberCount = 2),
+                TtsSpeakableEntry("bob", "Bob", "Reply.", messageIdHex = "b1", conversationMemberCount = 2),
+            )
+        assertTrue(controller.speak(entries, Locale.US))
+        assertEquals(listOf("First.", "Second.", "Bob: Reply."), engine.spoken.map { it.text })
+        engine.start(0)
+        var first = engine.spoken.size
+        controller.skipNextMessage()
+        assertEquals("Second.", engine.spoken[first].text)
+        engine.start(first)
+        first = engine.spoken.size
+        controller.skipNextMessage()
+        assertEquals("Bob: Reply.", engine.spoken[first].text)
+        engine.start(first)
+        controller.pause()
+        first = engine.spoken.size
+        controller.resume()
+        assertEquals("Reply.", engine.spoken[first].text)
+    }
+
     /** A document replaces message playback; blank or unavailable starts preserve the current queue. */
     @Test
     fun attachmentStartReplacesTheQueueAndRejectsBlankOrUnavailableSpeech() {

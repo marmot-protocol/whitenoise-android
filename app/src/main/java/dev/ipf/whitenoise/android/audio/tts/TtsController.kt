@@ -834,6 +834,7 @@ class TtsController internal constructor(
         // arms a schedule nor opens a calibration window.
         val activeUtteranceId = utteranceId ?: return
         val chunk = queue.submittedChunk(activeUtteranceId) ?: return
+        queue.onStarted(activeUtteranceId)
         rangeProbe.onUtteranceStart()
         val appliedRate = utteranceRates[activeUtteranceId] ?: speechRate()
         val startedAt = clock()

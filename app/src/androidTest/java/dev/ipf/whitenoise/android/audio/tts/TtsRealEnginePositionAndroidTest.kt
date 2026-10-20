@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,6 +31,21 @@ class TtsRealEnginePositionAndroidTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Synthetic Unicode controls distinguish generated prefix text from platform pronunciation. */
+    @Test
+    fun syntheticSpeakerNamesRetainBodyCoordinatesOnTheSelectedEngine() {
+        val args = InstrumentationRegistry.getArguments()
+        val packageName = args.getString("ttsEngine").orEmpty()
+        assumeTrue("This case requires an explicitly selected installed speech engine", packageName.isNotEmpty())
+        val expectedRanges = requireNotNull(args.getString("ttsExpectedRanges")).toBooleanStrict()
+        for (name in listOf("Alice", "🚀 Alice", "Al👩🏽‍💻ice", "Alice 🚀", "🇳🇬 Alice", "Jose\u0301", "ليلى", "👩🏽‍💻")) {
+            EngineProbe(packageName, name).use { probe ->
+                probe.speak()
+                probe.verify(expectedRanges)
+            }
+        }
+    }
+
     @Test
     fun selectedInstalledEngineProducesMappedWordsOrTheEstimatedFallback() {
         val args = InstrumentationRegistry.getArguments()
@@ -45,6 +61,7 @@ class TtsRealEnginePositionAndroidTest {
 
 private class EngineProbe(
     private val packageName: String,
+    private val senderName: String = "Grace",
 ) : AutoCloseable {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val ready = CountDownLatch(1)
@@ -97,6 +114,16 @@ private class EngineProbe(
     private fun recordingEngine(): TtsSpeechEngine {
         val adapter = AndroidTtsSpeechEngine(tts, packageName)
         return object : TtsSpeechEngine by adapter {
+            /** Logs only this fixed synthetic fixture, never a live message or profile. */
+            override fun speak(
+                text: String,
+                utteranceId: String,
+            ): Int {
+                assertEquals("$senderName: ${this@EngineProbe.text}", text)
+                Log.i("TtsSyntheticSpeaker", "engine=$packageName voice=${tts.voice?.name} locale=${tts.voice?.locale} text=$text")
+                return adapter.speak(text, utteranceId)
+            }
+
             override fun setCallbacks(
                 onStart: (String?) -> Unit,
                 onDone: (String?) -> Unit,
@@ -128,7 +155,7 @@ private class EngineProbe(
     private fun entry() =
         TtsSpeakableEntry(
             senderKey = "author",
-            senderDisplayName = "Grace",
+            senderDisplayName = senderName,
             text = text,
             messageIdHex = "engine-position-fixture",
             spokenTextSpans =

@@ -117,6 +117,8 @@ internal fun createTtsAutoReadContinuation(appState: WhiteNoiseAppState): TtsAut
                     message = TimelineProjector.toAppMessageRecord(record),
                     editedText = null,
                     senderDisplayName = appState.displayName(record.sender),
+                    conversationMemberCount =
+                        appState.cachedGroupMemberSnapshot(appState.activeAccountRef, record.groupIdHex)?.memberCount,
                     parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
                     mentionDisplayName = appState::mentionSpeechName,
                 )

@@ -179,6 +179,8 @@ internal class TtsPlaybackQueue(
     private var senderAnnouncedAtMessageIndex: Int? = null
     private var pendingResumeAnnouncement: SenderAnnouncement? = null
     private var messageIndexAtPause: Int? = null
+    private var conversationMemberCount: Int? = null
+    private var lastSpokenSenderKey: String? = null
 
     // Generation of a deferred edge navigation the caller has not resolved
     // yet, and the generation whose final chunk finished while that request
@@ -259,6 +261,8 @@ internal class TtsPlaybackQueue(
         rangeTracker.clear()
         refreshAtNextBoundary = false
         replaceMessages(messages)
+        conversationMemberCount = messages.firstOrNull()?.conversationMemberCount
+        lastSpokenSenderKey = null
         currentIndex =
             if (chunks.isEmpty()) {
                 0
@@ -306,6 +310,7 @@ internal class TtsPlaybackQueue(
                 emptyList()
             }
         if (newMessages.isEmpty()) return false
+        updateConversationMemberCount(newMessages)
         val appended = appendMessages(newMessages)
         if (speaking != null) {
             // A parked terminal chunk has already been spoken, so progress has
@@ -417,6 +422,8 @@ internal class TtsPlaybackQueue(
         playbackCallbacks.advance()
         rangeTracker.clear()
         messages = emptyList()
+        conversationMemberCount = null
+        lastSpokenSenderKey = null
         projection = TtsQueueProjection.EMPTY
         currentIndex = 0
         resetMessageProgress()
@@ -558,6 +565,7 @@ internal class TtsPlaybackQueue(
         val currentMessageId = messageIdAt(projection.messageIndexForChunk(currentIndex))
         val announcedId = senderAnnouncedAtMessageIndex?.let(::messageIdAt)
         val pausedId = messageIndexAtPause?.let(::messageIdAt)
+        updateConversationMemberCount(window)
         messages = window
         rebuildFlatChunks()
         senderAnnouncedAtMessageIndex = announcedId?.let(::messageIndexOf)
@@ -657,9 +665,24 @@ internal class TtsPlaybackQueue(
         return if (active) rangeTracker.submitted(index) else null
     }
 
+    /** Records audible identity only after a current engine callback, never while prebuffering future speech. */
+    fun onStarted(utteranceId: String?) {
+        val index = parseCurrentGenerationIndex(utteranceId) ?: return
+        if (_state.value !is TtsState.Speaking || index != currentIndex) return
+        recordSpokenSender(index)
+    }
+
+    /** Retains the last message speaker while document narration remains body-first. */
+    private fun recordSpokenSender(index: Int) {
+        val message = messages[projection.messageIndexForChunk(index)]
+        if (message.attachmentDisplayName == null) lastSpokenSenderKey = message.senderKey
+    }
+
+    /** Advances only the current audible chunk and retains its speaker through deferred history loads. */
     fun onDone(utteranceId: String?) {
         val completedIndex = parseCurrentGenerationIndex(utteranceId) ?: return
         if (_state.value !is TtsState.Speaking || completedIndex != currentIndex) return
+        recordSpokenSender(completedIndex)
         val completedMessage = projection.messageIndexForChunk(completedIndex)
         rangeTracker.remove(completedIndex)
         val next = completedIndex + 1
@@ -978,10 +1001,15 @@ internal class TtsPlaybackQueue(
         // A cross-message sentence skip can target a mid-message sentence, so
         // a forced announcement attaches to the target chunk itself.
         val forcedAtTarget = announceSenderForCurrentMessage && chunk.index == currentIndex
+        val introduceSpeaker =
+            if (conversationMemberCount == 2) {
+                (isFirstChunkOfMessage || chunk.index == currentIndex) &&
+                    changedTwoMemberSpeaker(messageIndex, chunk.index)
+            } else {
+                forcedAtTarget || (isFirstChunkOfMessage && shouldAnnounceSender(messageIndex))
+            }
         val announced =
-            message.attachmentDisplayName == null &&
-                (forcedAtTarget || (isFirstChunkOfMessage && shouldAnnounceSender(messageIndex))) &&
-                message.senderDisplayName.isNotBlank()
+            message.attachmentDisplayName == null && introduceSpeaker && message.senderDisplayName.isNotBlank()
         if (!announced) return chunk.copy(senderPrefix = null)
         senderAnnouncedAtMessageIndex = messageIndex
         val prefix = "${message.senderDisplayName}: "
@@ -999,6 +1027,26 @@ internal class TtsPlaybackQueue(
                 },
             senderPrefix = TtsTextRange(0, prefix.length),
         )
+    }
+
+    /** Uses the audible session at a requeue target and queued predecessors only for future messages. */
+    private fun changedTwoMemberSpeaker(
+        messageIndex: Int,
+        chunkIndex: Int,
+    ): Boolean {
+        val previousSender =
+            if (chunkIndex == currentIndex) {
+                lastSpokenSenderKey
+            } else {
+                messages.take(messageIndex).lastOrNull { it.attachmentDisplayName == null }?.senderKey
+                    ?: lastSpokenSenderKey
+            }
+        return previousSender != null && !messages[messageIndex].senderKey.equals(previousSender, ignoreCase = true)
+    }
+
+    /** Unknown background projections retain the last resolved roster context of this speech session. */
+    private fun updateConversationMemberCount(messages: List<TtsQueuedMessage>) {
+        messages.asReversed().firstNotNullOfOrNull { it.conversationMemberCount }?.let { conversationMemberCount = it }
     }
 
     private fun shouldAnnounceSender(messageIndex: Int): Boolean =
