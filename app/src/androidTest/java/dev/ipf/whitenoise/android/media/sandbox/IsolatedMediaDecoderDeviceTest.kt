@@ -275,6 +275,11 @@ class IsolatedMediaDecoderDeviceTest {
         }
     }
 
+    @Test
+    fun characterizeDirectStillTransportWithFixedSyntheticCorpus() {
+        MediaWorkerBaseline.run()
+    }
+
     private fun png(): ByteArray = imageBytes(Bitmap.CompressFormat.PNG, Color.RED)
 
     private fun imageBytes(

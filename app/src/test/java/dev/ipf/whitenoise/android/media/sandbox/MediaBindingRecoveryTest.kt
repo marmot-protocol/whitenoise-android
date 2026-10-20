@@ -67,6 +67,23 @@ class MediaBindingRecoveryTest {
         }
     }
 
+    @Test
+    fun completedReplyBaselineReusesTheCurrentBindingAcrossDistinctInputs() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext())
+        val transport = IsolatedMediaTransport(context)
+        try {
+            // This fixture's same-UID replies are rejected, but complete the real exchange.
+            assertNull(transport.decode(byteArrayOf(1), 1, false, MediaDecodePolicy.DECODE))
+            assertNull(transport.decode(byteArrayOf(2), 1, false, MediaDecodePolicy.DECODE))
+            assertNull(transport.decode(byteArrayOf(3), 1, false, MediaDecodePolicy.DECODE))
+            assertEquals(2, context.bindings.size)
+            assertEquals(2, context.current.requests)
+            assertEquals(0, context.current.retireRequests)
+        } finally {
+            transport.close()
+        }
+    }
+
     private class BindingFixture(
         base: Context,
     ) : ContextWrapper(base) {
@@ -92,6 +109,7 @@ class MediaBindingRecoveryTest {
     /** Dispatch/reply capability fixture. Same-UID replies deliberately cannot attest an isolated worker. */
     private class ReplyingBinder : Binder() {
         var requests = 0
+        var retireRequests = 0
 
         override fun onTransact(
             code: Int,
@@ -103,6 +121,7 @@ class MediaBindingRecoveryTest {
             data.enforceInterface("android.os.IMessenger")
             if (data.readInt() != 0) {
                 val message = Message.CREATOR.createFromParcel(data)
+                if (message.what == MediaDecodePolicy.RETIRE) retireRequests += 1
                 if (message.what == MediaDecodePolicy.DECODE) {
                     requests += 1
                     sendMediaDecodeReply(message.replyTo.binder, message.arg1, Bundle())
