@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
+import dev.ipf.whitenoise.android.state.conversationSourceGroup
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
@@ -74,6 +75,7 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
+import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
@@ -366,6 +368,12 @@ internal fun MainShell(
         shellStateHolder.chatsController(
             accountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
+        )
+    val retainedAvatarPreparation =
+        rememberRetainedGroupAvatarPreparation(
+            appState,
+            appState.activeAccountRef,
+            chatsController,
         )
     var quickAccountSwitchTransition by remember {
         mutableStateOf<QuickAccountSwitchTransition?>(null)
@@ -1447,7 +1455,7 @@ internal fun MainShell(
                 ) {
                     ConversationController(
                         appState = appState,
-                        initialGroup = openChat.group,
+                        initialGroup = appState.conversationSourceGroup(openChat, accountRef),
                         initialMemberSnapshot =
                             openChat.memberSnapshot
                                 ?: appState.cachedGroupMemberSnapshot(
@@ -2005,6 +2013,7 @@ internal fun MainShell(
                                 ChatsScreen(
                                     appState = appState,
                                     controller = chatsController,
+                                    retainedAvatarPreparation = retainedAvatarPreparation,
                                     diagnosticsPrompt = {
                                         val chatsSettled =
                                             selectedChat == null &&
