@@ -22,7 +22,7 @@ def cli_outputs(event, mode='', labels=None, raw=None, base='a' * 40, head='b' *
     stdout = io.StringIO()
     environment = {'ANDROID_CI_MODE': mode, 'CI_CURRENT_LABELS': json.dumps(labels)}
     with patch.dict(os.environ, environment, clear=True), contextlib.redirect_stdout(stdout), \
-         patch('sys.argv', ['classifier', '--event', event, '--base', base, '--head', head]):
+         patch('sys.argv', ['classifier', '--event', event, f'--base={base}', f'--head={head}']):
         if observe:
             main()
         else:
