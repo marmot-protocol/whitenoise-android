@@ -730,6 +730,7 @@ class MarkdownInlineTextTest {
         )
     }
 
+    /** An external identity has the member username styling while navigation retains its canonical public key. */
     @Test
     fun resolvedExternalReferenceSharesMentionAppearanceAndStaysTappable() {
         val npub = "npub1" + "q".repeat(58)
@@ -755,6 +756,7 @@ class MarkdownInlineTextTest {
         assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
     }
 
+    /** An uncached external identity keeps a bounded clickable fallback without consulting roster authority. */
     @Test
     fun unresolvedExternalReferenceSharesMentionAppearanceAndStaysTappable() {
         val npub = "npub1" + "q".repeat(58)
@@ -779,6 +781,7 @@ class MarkdownInlineTextTest {
         assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
     }
 
+    /** Relay-hinted profile encodings use the same resolved username presentation as npub references. */
     @Test
     fun externalNprofileReferenceUsesTheSameUsernameAppearance() {
         val nprofile = "nprofile1" + "q".repeat(60)
@@ -821,6 +824,7 @@ class MarkdownInlineTextTest {
         assertEquals("@Alice", annotated.text)
     }
 
+    /** A parsed NIP-21 profile URI displays its name while retaining the original in-app profile target. */
     @Test
     fun profileUriResolvesTheSameUsernameAndKeepsTheCanonicalTarget() {
         val nprofile = "nprofile1" + "q".repeat(60)

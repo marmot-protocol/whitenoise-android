@@ -11285,9 +11285,8 @@ class WhiteNoiseAppState private constructor(
     /**
      * Whether a mention/profile [bech32] (npub/nprofile) resolves to an account
      * that is in [members] — the active group's roster snapshot for this
-     * message render. The message renderer uses this to reserve the "@" mention
-     * treatment for real group members: a pasted npub/nprofile of a non-member
-     * still resolves to a display name but renders without the "@" (#1017).
+     * message render. Roster membership is separate from profile-name
+     * presentation: external profile references use the same username styling.
      * Pure FFI/local encoding + roster comparison (case-insensitive, as hex
      * casing round-trips through the FFI); an unresolvable reference is never a
      * member.

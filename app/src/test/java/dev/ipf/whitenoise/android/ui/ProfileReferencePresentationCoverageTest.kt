@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.state.resolveNotificationPreviewText
+import dev.ipf.whitenoise.android.ui.conversation.messages.focusedMessagePreviewText
 import dev.ipf.whitenoise.android.ui.group.MEMBER_HEX
 import dev.ipf.whitenoise.android.ui.group.MEMBER_NPROFILE
 import dev.ipf.whitenoise.android.ui.group.MEMBER_NPUB
@@ -40,7 +41,8 @@ class ProfileReferencePresentationCoverageTest {
                 )
             assertEquals("@Alice", rendered.text)
             assertEquals(TextDirection.Content, rendered.paragraphStyles.single().item.textDirection)
-            val preview = markdownDocumentToPreviewAnnotatedString(document(inline), codeStyle, mentionDisplayName = { "Alice" })
+            val preview =
+                markdownDocumentToPreviewAnnotatedString(document(inline), codeStyle, mentionDisplayName = { "Alice" })
             assertEquals(TextDirection.Content, preview.paragraphStyles.single().item.textDirection)
             assertEquals(FontWeight.Bold, rendered.spanStyles.single().item.fontWeight)
             assertEquals(
@@ -52,17 +54,56 @@ class ProfileReferencePresentationCoverageTest {
         }
     }
 
+    /** Focused excerpts apply direction once across their authored separators and remain inert. */
+    @Test
+    fun focusedProfilePreviewHasOneDirectionRangeForTheCompleteExcerpt() {
+        val first = document(profiles().last())
+        val second = document(MarkdownInlineFfi.Text("second"))
+        for (blocks in listOf(first.blocks, first.blocks + second.blocks)) {
+            val preview = focusedMessagePreviewText("", first.copy(blocks = blocks), mentionDisplayName = { "Alice" })
+            val direction = preview.paragraphStyles.single()
+            assertEquals(TextDirection.Content, direction.item.textDirection)
+            assertEquals(0, direction.start)
+            assertEquals(preview.length, direction.end)
+            assertEquals(if (blocks.size == 1) "@Alice" else "@Alice\n\nsecond", preview.text)
+            assertTrue(preview.getLinkAnnotations(0, preview.length).isEmpty())
+        }
+    }
+
     /** A missing name remains a bounded clickable identity and can resolve without changing its target. */
     @Test
     fun unresolvedUriAndMentionKeepTheSameSafeFallback() {
         for (inline in profiles()) {
             val entity = entity(inline)
-            val display = markdownNostrEntityDisplay(entity, inline is MarkdownInlineFfi.NostrMention, { null }, { false })
+            val display =
+                markdownNostrEntityDisplay(entity, inline is MarkdownInlineFfi.NostrMention, { null }, { false })
             assertEquals("@" + shortenedBech32(entity.bech32), display.visibleText)
             assertTrue(display.opensProfile)
             assertEquals(display.visibleText, markdownDocumentToPreviewText(document(inline)))
             assertEquals("@Alice", markdownNostrEntityDisplay(entity, false, { "Alice" }, { false }).visibleText)
         }
+    }
+
+    /** UTF-16 highlight coordinates still address the visible URI label beside supplementary characters. */
+    @Test
+    fun profileUriSpeechSpansMatchVisibleTextWithoutDirectionCharacters() {
+        val uri = profiles().last()
+        val parsed = document(MarkdownInlineFfi.Text("😀 "), uri, MarkdownInlineFfi.Text("!"))
+        val projection = markdownDocumentToSpeakableProjection(parsed, mentionDisplayName = { "Alice" })
+        val rendered =
+            markdownInlinesToAnnotatedString(
+                inlines = (parsed.blocks.single() as MarkdownBlockFfi.Paragraph).inlines,
+                codeStyle = codeStyle,
+                linkStyle = SpanStyle(),
+                mentionDisplayName = { "Alice" },
+            )
+        assertEquals("😀 @Alice!", rendered.text)
+        val span = projection.spans.single { it.leafId == "b0/n1" }
+        assertEquals(SpeakableTextProjectionSpan(3, 9, "b0/n1", 0, 6), span)
+        assertEquals("@Alice", projection.text.substring(span.spokenStart, span.spokenEnd))
+        val link = rendered.getLinkAnnotations(0, rendered.length).single()
+        assertEquals("@Alice", rendered.text.substring(link.start + span.visibleStart, link.start + span.visibleEnd))
+        assertEquals(span.visibleEnd, link.end - link.start)
     }
 
     /** Display hydration accepts profile URIs without broadening the existing self-mention collector. */
@@ -137,7 +178,9 @@ class ProfileReferencePresentationCoverageTest {
         val uri = profiles().last()
         val parsed =
             MarkdownDocumentFfi(
-                listOf(MarkdownBlockFfi.Details(listOf(uri), false, listOf(document(uri).blocks.single()), byteArrayOf())),
+                listOf(
+                    MarkdownBlockFfi.Details(listOf(uri), false, listOf(document(uri).blocks.single()), byteArrayOf()),
+                ),
                 false,
                 byteArrayOf(),
             )

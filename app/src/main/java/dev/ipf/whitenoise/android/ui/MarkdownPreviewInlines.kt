@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 
 /** Walks a bounded inline window, stopping as soon as the preview is full. */
 internal fun MarkdownPreviewBuilder.appendPreviewInlines(
@@ -85,12 +86,20 @@ private fun MarkdownPreviewBuilder.appendPreviewInline(
         // Same visible text as the bubble (name or shortened bech32) but
         // inert: the row's only tap target is the chat itself.
         is MarkdownInlineFfi.NostrMention -> appendPreviewMention(inline.entity.bech32, codeStyle, mentionDisplayName)
-        is MarkdownInlineFfi.NostrUri ->
-            if (inline.entity.isProfileReference()) {
-                appendPreviewMention(inline.entity.bech32, codeStyle, mentionDisplayName)
-            } else {
-                withStyle(codeStyle) { append(shortenedBech32(inline.entity.bech32)) }
-            }
+        is MarkdownInlineFfi.NostrUri -> appendPreviewNostrUri(inline.entity, codeStyle, mentionDisplayName)
+    }
+}
+
+/** Profile URIs share username labels; other Nostr entities retain their inert shortened form. */
+private fun MarkdownPreviewBuilder.appendPreviewNostrUri(
+    entity: MarkdownNostrEntityFfi,
+    codeStyle: MarkdownPreviewStyle,
+    mentionDisplayName: ((String) -> String?)?,
+) {
+    if (entity.isProfileReference()) {
+        appendPreviewMention(entity.bech32, codeStyle, mentionDisplayName)
+    } else {
+        withStyle(codeStyle) { append(shortenedBech32(entity.bech32)) }
     }
 }
 

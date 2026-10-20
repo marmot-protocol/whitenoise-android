@@ -1628,6 +1628,7 @@ internal fun markdownNostrEntityDisplay(
     )
 }
 
+/** Applies the shared identity label and canonical profile target with the bubble's visible link colors. */
 private fun AnnotatedString.Builder.appendNostrEntity(
     entity: MarkdownNostrEntityFfi,
     mention: Boolean,
@@ -1928,18 +1929,22 @@ internal fun rememberMarkdownPreviewText(
  *   display name or shortened bech32) but, like links, stay annotation-free.
  * - The result is capped at [maxLength]; the walk stops early once the budget
  *   is spent so a huge message never builds a giant string for a one-line row.
+ *
+ * [applyProfileDirection] is disabled for fragments assembled into a focused
+ * preview; that caller styles the complete text to avoid extra paragraph boundaries.
  */
 internal fun markdownDocumentToPreviewAnnotatedString(
     document: MarkdownDocumentFfi,
     codeStyle: SpanStyle,
     maxLength: Int = MARKDOWN_PREVIEW_MAX_LENGTH,
     mentionDisplayName: ((String) -> String?)? = null,
+    applyProfileDirection: Boolean = true,
 ): AnnotatedString {
     val projection = markdownDocumentToPreviewProjection(document, maxLength, mentionDisplayName, captureStyles = true)
     return EmojiShortcodes.annotate(
         buildAnnotatedString {
             append(projection.text)
-            if (length > 0 && markdownDocumentProfileReferenceBech32s(document).isNotEmpty()) {
+            if (applyProfileDirection && length > 0 && markdownDocumentProfileReferenceBech32s(document).isNotEmpty()) {
                 addStyle(ParagraphStyle(textDirection = TextDirection.Content), 0, length)
             }
             projection.ranges.forEach { range ->

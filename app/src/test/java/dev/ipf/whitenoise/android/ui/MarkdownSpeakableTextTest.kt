@@ -339,6 +339,7 @@ class MarkdownSpeakableTextTest {
         assertTrue(projection.projectionId != renamed.projectionId)
     }
 
+    /** Speech uses the visible member/external username and omits unresolved identities rather than spelling keys. */
     @Test
     fun namedMentionsAreSpokenAndUnresolvedKeysAreOmitted() {
         val alice = "npub1" + "q".repeat(58)
@@ -347,6 +348,7 @@ class MarkdownSpeakableTextTest {
         val unknownNonMember = "npub1" + "x".repeat(58)
         val note = "note1" + "n".repeat(58)
 
+        /** Supplies typed native entities without exercising or replacing native validation. */
         fun entity(
             hrp: MarkdownNostrHrpFfi,
             bech32: String,

@@ -23,10 +23,12 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -36,6 +38,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
+import dev.ipf.whitenoise.android.ui.markdownDocumentProfileReferenceBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentTimestamps
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.ui.markdownInlinesToAnnotatedString
@@ -52,59 +55,77 @@ internal fun focusedMessagePreviewText(
 ): AnnotatedString {
     if (document == null || document.blocks.isEmpty()) return EmojiShortcodes.annotate(AnnotatedString(source))
     val paragraph = document.blocks.singleOrNull() as? MarkdownBlockFfi.Paragraph
-    return if (paragraph != null) {
-        val styled =
-            markdownInlinesToAnnotatedString(
-                inlines = paragraph.inlines,
-                codeStyle = SpanStyle(fontFamily = FontFamily.Monospace),
-                linkStyle = SpanStyle(textDecoration = TextDecoration.Underline),
-                mentionDisplayName = mentionDisplayName,
-                isGroupMember = isGroupMember,
-                useDecorativeBackgrounds = false,
-            )
-        val inertLinkStyles =
-            styled.getLinkAnnotations(0, styled.length).mapNotNull { range ->
-                range.item.styles
-                    ?.style
-                    ?.let { style -> AnnotatedString.Range(style, range.start, range.end) }
-            }
-        EmojiShortcodes.annotate(
-            buildAnnotatedString {
-                append(styled.text)
-                (styled.spanStyles + inertLinkStyles).forEach { addStyle(it.item, it.start, it.end) }
-                styled
-                    .getStringAnnotations(
-                        0,
-                        styled.length,
-                    ).forEach { addStringAnnotation(it.tag, it.item, it.start, it.end) }
-            },
-        )
-    } else {
-        // Multi-block excerpts follow the prototype's plain-text projection, preserving block separation.
-        val text =
-            buildAnnotatedString {
-                for (block in document.blocks) {
-                    if (length >= FOCUSED_PREVIEW_TEXT_BUDGET) break
-                    if (length > 0) append("\n\n")
-                    val remaining = (FOCUSED_PREVIEW_TEXT_BUDGET - length).coerceAtLeast(0)
-                    append(
-                        when (block) {
-                            is MarkdownBlockFfi.CodeBlock -> AnnotatedString(block.content.previewTake(remaining))
-                            is MarkdownBlockFfi.MathBlock -> AnnotatedString(block.content.previewTake(remaining))
-                            else ->
-                                markdownDocumentToPreviewAnnotatedString(
-                                    document = document.copy(blocks = listOf(block)),
-                                    codeStyle = SpanStyle(fontFamily = FontFamily.Monospace),
-                                    maxLength = remaining,
-                                    mentionDisplayName = mentionDisplayName,
-                                )
-                        },
-                    )
+    val preview =
+        if (paragraph != null) {
+            val styled =
+                markdownInlinesToAnnotatedString(
+                    inlines = paragraph.inlines,
+                    codeStyle = SpanStyle(fontFamily = FontFamily.Monospace),
+                    linkStyle = SpanStyle(textDecoration = TextDecoration.Underline),
+                    mentionDisplayName = mentionDisplayName,
+                    isGroupMember = isGroupMember,
+                    useDecorativeBackgrounds = false,
+                )
+            val inertLinkStyles =
+                styled.getLinkAnnotations(0, styled.length).mapNotNull { range ->
+                    range.item.styles
+                        ?.style
+                        ?.let { style -> AnnotatedString.Range(style, range.start, range.end) }
                 }
-            }
-        text
-    }
+            EmojiShortcodes.annotate(
+                buildAnnotatedString {
+                    append(styled.text)
+                    (styled.spanStyles + inertLinkStyles).forEach { addStyle(it.item, it.start, it.end) }
+                    styled
+                        .getStringAnnotations(
+                            0,
+                            styled.length,
+                        ).forEach { addStringAnnotation(it.tag, it.item, it.start, it.end) }
+                },
+            )
+        } else {
+            focusedMultiBlockPreview(document, mentionDisplayName)
+        }
+    return preview.withFocusedProfileDirection(document)
 }
+
+/** Keeps authored block separators outside any fragment paragraph style. */
+private fun focusedMultiBlockPreview(
+    document: MarkdownDocumentFfi,
+    mentionDisplayName: ((String) -> String?)?,
+): AnnotatedString =
+    buildAnnotatedString {
+        for (block in document.blocks) {
+            if (length >= FOCUSED_PREVIEW_TEXT_BUDGET) break
+            if (length > 0) append("\n\n")
+            val remaining = (FOCUSED_PREVIEW_TEXT_BUDGET - length).coerceAtLeast(0)
+            append(
+                when (block) {
+                    is MarkdownBlockFfi.CodeBlock -> AnnotatedString(block.content.previewTake(remaining))
+                    is MarkdownBlockFfi.MathBlock -> AnnotatedString(block.content.previewTake(remaining))
+                    else ->
+                        markdownDocumentToPreviewAnnotatedString(
+                            document = document.copy(blocks = listOf(block)),
+                            codeStyle = SpanStyle(fontFamily = FontFamily.Monospace),
+                            maxLength = remaining,
+                            mentionDisplayName = mentionDisplayName,
+                            applyProfileDirection = false,
+                        )
+                },
+            )
+        }
+    }
+
+/** Applies profile direction once after both single- and multi-block excerpts are assembled. */
+private fun AnnotatedString.withFocusedProfileDirection(document: MarkdownDocumentFfi): AnnotatedString =
+    if (isNotEmpty() && markdownDocumentProfileReferenceBech32s(document).isNotEmpty()) {
+        buildAnnotatedString {
+            append(this@withFocusedProfileDirection)
+            addStyle(ParagraphStyle(textDirection = TextDirection.Content), 0, length)
+        }
+    } else {
+        this
+    }
 
 /** Five-line text presentation uses the native frame, typography and delivery footer without a controller. */
 @Composable

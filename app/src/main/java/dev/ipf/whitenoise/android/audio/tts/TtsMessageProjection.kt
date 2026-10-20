@@ -53,9 +53,21 @@ internal suspend fun projectTtsSpeakableEntry(
                 visibleLeaves = projection.visibleLeaves,
                 sourceText = source.text,
                 mentionPresentation =
-                    TtsMentionPresentation(names.toMap(), members.toMap().takeIf { isGroupMember != null }),
+                    snapshotTtsMentionPresentation(names, members, isGroupMember),
             )
         }
+}
+
+/** Freezes roster facts for projected identities independently of the visual label's membership-free policy. */
+private fun snapshotTtsMentionPresentation(
+    names: Map<String, String?>,
+    members: MutableMap<String, Boolean>,
+    isGroupMember: ((String) -> Boolean)?,
+): TtsMentionPresentation {
+    if (isGroupMember != null) {
+        names.keys.forEach { key -> members.getOrPut(key) { isGroupMember(key) } }
+    }
+    return TtsMentionPresentation(names.toMap(), members.toMap().takeIf { isGroupMember != null })
 }
 
 internal suspend fun resolveTtsSpeakableDocument(

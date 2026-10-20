@@ -1,0 +1,45 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+  "legacy_sha256": "bc12083baf86ecd2201930303eb45645528211eb74302f6ddda7ef3c0c20a954",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: FocusedMessagePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "FocusedRenderedMessagePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "fun FocusedRenderedMessagePreview(",
+        "test_ids": [
+          "MSG-004",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "FocusedTextMessagePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "fun FocusedTextMessagePreview(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-009"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Focused profile-reference excerpt direction and block spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "fun focusedMessagePreviewText(",
+        "test_ids": [
+          "CON-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

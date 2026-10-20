@@ -22,17 +22,27 @@ private fun collectReferenceBech32s(
     markdownVisibleSiblings(inlines).forEach { inline ->
         when (inline) {
             is MarkdownInlineFfi.NostrMention ->
-                if (!includeProfileUris || inline.entity.isProfileReference()) out += inline.entity.bech32
+                addReferenceBech32(inline.entity, out, profileOnly = includeProfileUris)
             is MarkdownInlineFfi.NostrUri ->
-                if (includeProfileUris && inline.entity.isProfileReference()) out += inline.entity.bech32
+                if (includeProfileUris) addReferenceBech32(inline.entity, out, profileOnly = true)
             is MarkdownInlineFfi.Emph -> collectReferenceBech32s(inline.children, out, depth + 1, includeProfileUris)
             is MarkdownInlineFfi.Strong -> collectReferenceBech32s(inline.children, out, depth + 1, includeProfileUris)
-            is MarkdownInlineFfi.Strikethrough -> collectReferenceBech32s(inline.children, out, depth + 1, includeProfileUris)
+            is MarkdownInlineFfi.Strikethrough ->
+                collectReferenceBech32s(inline.children, out, depth + 1, includeProfileUris)
             is MarkdownInlineFfi.Link -> collectReferenceBech32s(inline.children, out, depth + 1, includeProfileUris)
             is MarkdownInlineFfi.Image -> collectReferenceBech32s(inline.alt, out, depth + 1, includeProfileUris)
             else -> Unit
         }
     }
+}
+
+/** Filters hydration to profiles while retaining the legacy semantic collector's native mention set. */
+private fun addReferenceBech32(
+    entity: MarkdownNostrEntityFfi,
+    out: MutableSet<String>,
+    profileOnly: Boolean,
+) {
+    if (!profileOnly || entity.isProfileReference()) out += entity.bech32
 }
 
 /** Shares block, list, and table-area limits with the visible text projection. */
@@ -45,24 +55,40 @@ private fun collectBlockReferenceBech32s(
     if (markdownDepthExceeded(depth)) return
     markdownVisibleSiblings(blocks).forEach { block ->
         when (block) {
-            is MarkdownBlockFfi.Paragraph -> collectReferenceBech32s(block.inlines, out, depth = 0, includeProfileUris = includeProfileUris)
-            is MarkdownBlockFfi.Heading -> collectReferenceBech32s(block.inlines, out, depth = 0, includeProfileUris = includeProfileUris)
-            is MarkdownBlockFfi.BlockQuote -> collectBlockReferenceBech32s(block.blocks, out, depth + 1, includeProfileUris)
+            is MarkdownBlockFfi.Paragraph ->
+                collectReferenceBech32s(block.inlines, out, depth = 0, includeProfileUris = includeProfileUris)
+            is MarkdownBlockFfi.Heading ->
+                collectReferenceBech32s(block.inlines, out, depth = 0, includeProfileUris = includeProfileUris)
+            is MarkdownBlockFfi.BlockQuote ->
+                collectBlockReferenceBech32s(block.blocks, out, depth + 1, includeProfileUris)
             is MarkdownBlockFfi.ListBlock ->
-                markdownVisibleSiblings(block.items).forEach { collectBlockReferenceBech32s(it.blocks, out, depth + 1, includeProfileUris) }
+                markdownVisibleSiblings(block.items).forEach {
+                    collectBlockReferenceBech32s(it.blocks, out, depth + 1, includeProfileUris)
+                }
             is MarkdownBlockFfi.Details ->
                 if (includeProfileUris) {
                     collectReferenceBech32s(block.summary, out, depth = 0, includeProfileUris = true)
                     collectBlockReferenceBech32s(block.body, out, depth + 1, includeProfileUris = true)
                 }
-            is MarkdownBlockFfi.Table -> {
-                val visibleTable = markdownVisibleTable(block.header, block.rows)
-                visibleTable.header.cells.forEach { cell -> collectReferenceBech32s(cell.inlines, out, depth = 0, includeProfileUris = includeProfileUris) }
-                visibleTable.rows.forEach { row ->
-                    row.cells.forEach { cell -> collectReferenceBech32s(cell.inlines, out, depth = 0, includeProfileUris = includeProfileUris) }
-                }
-            }
+            is MarkdownBlockFfi.Table -> collectTableReferenceBech32s(block, out, includeProfileUris)
             else -> Unit
+        }
+    }
+}
+
+/** Applies the shared table-area budget before collecting names from its visible cells. */
+private fun collectTableReferenceBech32s(
+    table: MarkdownBlockFfi.Table,
+    out: MutableSet<String>,
+    includeProfileUris: Boolean,
+) {
+    val visibleTable = markdownVisibleTable(table.header, table.rows)
+    visibleTable.header.cells.forEach { cell ->
+        collectReferenceBech32s(cell.inlines, out, depth = 0, includeProfileUris = includeProfileUris)
+    }
+    visibleTable.rows.forEach { row ->
+        row.cells.forEach { cell ->
+            collectReferenceBech32s(cell.inlines, out, depth = 0, includeProfileUris = includeProfileUris)
         }
     }
 }

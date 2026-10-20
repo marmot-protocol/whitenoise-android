@@ -18,6 +18,7 @@ import org.junit.Test
 import java.util.Locale
 
 class TtsMessageProjectionTest {
+    /** Playback freezes names and roster facts, while roster changes alone never alter the visible projection. */
     @Test
     fun activePresentationSurvivesProfileChangesButRejectsDifferentSourcesAndSessions() =
         runBlocking {
@@ -31,6 +32,7 @@ class TtsMessageProjectionTest {
             var name = "Alice"
             var member = true
 
+            /** Projects the live callbacks so repeated calls can exercise account-scoped presentation changes. */
             suspend fun entry() = namedEntry(record, name, member)
 
             val original = entry()
@@ -38,8 +40,12 @@ class TtsMessageProjectionTest {
             controller.attachEngine(FakeSessionEngine())
             assertTrue(controller.speak(listOf(original), Locale.US))
             val session = controller.state.value.sessionId
-            name = "A different display name"
             member = false
+            val changedRoster = entry()
+            assertEquals(original.text, changedRoster.text)
+            assertEquals(original.projectionId, changedRoster.projectionId)
+            assertEquals(false, changedRoster.mentionPresentation?.membershipResolver()?.invoke(key))
+            name = "A different display name"
             val changed = entry()
             assertFalse(original.projectionId == changed.projectionId)
             assertEquals("Alice", original.mentionPresentation?.displayName(key))

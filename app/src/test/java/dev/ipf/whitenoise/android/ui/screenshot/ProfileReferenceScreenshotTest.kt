@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -22,6 +22,8 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
+import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.group.MEMBER_NPROFILE
 import dev.ipf.whitenoise.android.ui.group.MEMBER_NPUB
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
@@ -64,33 +66,44 @@ class ProfileReferenceScreenshotTest {
         val resolved = document()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
-                CompositionLocalProvider(LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                val layoutDirection = if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+                CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
                     Surface(modifier = Modifier.width(400.dp).testTag("profile-references")) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-                                MarkdownMessageBody(
-                                    resolved,
-                                    modifier = Modifier.padding(12.dp),
-                                    mentionDisplayName = { "Alice" },
-                                    isGroupMember = { false },
-                                )
-                            }
-                            Surface(color = MaterialTheme.colorScheme.primaryContainer) {
-                                MarkdownMessageBody(
-                                    resolved,
-                                    modifier = Modifier.padding(12.dp),
-                                    mentionDisplayName = { "Alice" },
-                                    isGroupMember = { true },
-                                )
-                            }
+                            ProfileBubble(resolved, mine = false)
+                            ProfileBubble(resolved, mine = true)
                             Text(rememberMarkdownPreviewText(resolved) { "Alice" })
-                            MarkdownMessageBody(document = resolved, mentionDisplayName = { null }, isGroupMember = { false })
+                            MarkdownMessageBody(
+                                document = resolved,
+                                mentionDisplayName = { null },
+                                isGroupMember = { false },
+                            )
                         }
                     }
                 }
             }
         }
         composeRule.onNodeWithTag("profile-references").captureRoboImage("src/test/snapshots/$file")
+    }
+
+    /** Uses production direction/AMOLED colors together so the capture exercises real label contrast. */
+    @Composable
+    private fun ProfileBubble(
+        document: MarkdownDocumentFfi,
+        mine: Boolean,
+    ) {
+        val presentation = messageBubblePresentation(deleted = false, mine = mine)
+        Surface(
+            color = colorFromArgb(presentation.backgroundArgb),
+            contentColor = colorFromArgb(presentation.contentArgb),
+        ) {
+            MarkdownMessageBody(
+                document,
+                modifier = Modifier.padding(12.dp),
+                mentionDisplayName = { "Alice" },
+                isGroupMember = { false },
+            )
+        }
     }
 
     /** Uses existing MDK vector identities in both typed native representations. */
@@ -101,7 +114,9 @@ class ProfileReferenceScreenshotTest {
                     listOf(
                         MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, MEMBER_NPUB)),
                         MarkdownInlineFfi.Text(" · "),
-                        MarkdownInlineFfi.NostrUri(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPROFILE, MEMBER_NPROFILE)),
+                        MarkdownInlineFfi.NostrUri(
+                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPROFILE, MEMBER_NPROFILE),
+                        ),
                     ),
                 ),
             ),
