@@ -310,7 +310,7 @@ internal class TtsPlaybackQueue(
                 emptyList()
             }
         if (newMessages.isEmpty()) return false
-        updateConversationMemberCount(newMessages)
+        applyResolvedMemberCount(newMessages.asReversed().firstNotNullOfOrNull { it.conversationMemberCount })
         val appended = appendMessages(newMessages)
         if (speaking != null) {
             // A parked terminal chunk has already been spoken, so progress has
@@ -544,13 +544,15 @@ internal class TtsPlaybackQueue(
      * [targetMessageIdHex]. Bookkeeping is re-derived from message identity
      * because positions are not stable across prepends or eviction. While
      * speaking the engine restarts at the target — while paused only the
-     * cursor moves, exactly like a paused navigation tap.
+     * cursor moves, exactly like a paused navigation tap. [resolvedMemberCount]
+     * comes from the fresh request, independently of retained message order.
      */
     fun replaceWindow(
         window: List<TtsQueuedMessage>,
         targetMessageIdHex: String,
         targetSentence: TtsWindowSentenceTarget,
         sentenceOrdinal: Int? = null,
+        resolvedMemberCount: Int? = null,
     ): Boolean {
         // An empty target would alias every ad-hoc message in the window.
         require(targetMessageIdHex.isNotEmpty()) { "window replacement needs a concrete target id" }
@@ -565,7 +567,7 @@ internal class TtsPlaybackQueue(
         val currentMessageId = messageIdAt(projection.messageIndexForChunk(currentIndex))
         val announcedId = senderAnnouncedAtMessageIndex?.let(::messageIdAt)
         val pausedId = messageIndexAtPause?.let(::messageIdAt)
-        updateConversationMemberCount(window)
+        applyResolvedMemberCount(resolvedMemberCount)
         messages = window
         rebuildFlatChunks()
         senderAnnouncedAtMessageIndex = announcedId?.let(::messageIndexOf)
@@ -1045,8 +1047,8 @@ internal class TtsPlaybackQueue(
     }
 
     /** Unknown background projections retain the last resolved roster context of this speech session. */
-    private fun updateConversationMemberCount(messages: List<TtsQueuedMessage>) {
-        messages.asReversed().firstNotNullOfOrNull { it.conversationMemberCount }?.let { conversationMemberCount = it }
+    private fun applyResolvedMemberCount(count: Int?) {
+        if (count != null) conversationMemberCount = count
     }
 
     private fun shouldAnnounceSender(messageIndex: Int): Boolean =

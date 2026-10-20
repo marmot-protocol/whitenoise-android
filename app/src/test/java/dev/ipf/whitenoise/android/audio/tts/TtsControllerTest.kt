@@ -16,6 +16,51 @@ import kotlin.concurrent.thread
 
 @Suppress("LargeClass") // Controller lifecycle, focus, and seek cases share one fake engine/focus harness.
 class TtsControllerTest {
+    /** Chronologically newer retained rows must never override the fresh request's authoritative roster. */
+    @Test
+    fun olderHistoryAndRenderedSeekUseTheFreshRosterInBothDirections() {
+        for ((previous, resolved) in listOf(2 to 3, 3 to 2)) {
+            for (renderedSeek in listOf(false, true)) {
+                val engine = FakeTtsSpeechEngine()
+                val controller = controller(FakeTtsAudioFocus())
+                controller.attachEngine(engine)
+                val retained =
+                    TtsSpeakableEntry(
+                        "alice",
+                        "Alice",
+                        "Retained.",
+                        messageIdHex = "new",
+                        timelineAt = 2uL,
+                        conversationMemberCount = previous,
+                    )
+                val incoming =
+                    retained.copy(
+                        text = "Older.",
+                        messageIdHex = "old",
+                        timelineAt = 1uL,
+                        conversationMemberCount = resolved,
+                    )
+                assertTrue(controller.speak(listOf(retained), Locale.US))
+                engine.start(0)
+                val first = engine.spoken.size
+                val installed =
+                    if (renderedSeek) {
+                        controller.installSeekTarget(incoming, 0, controller.state.value.sessionId, incoming.projectionId)
+                    } else {
+                        controller.extendReadAloudWindow(
+                            TtsHistoryDirection.Older,
+                            listOf(incoming),
+                            "old",
+                            TtsWindowSentenceTarget.First,
+                        )
+                    }
+                assertTrue(installed)
+                assertEquals(listOf("old", "new"), controller.queuedMessageIds())
+                assertEquals(if (resolved == 2) "Older." else "Alice: Older.", engine.spoken[first].text)
+            }
+        }
+    }
+
     /** Actual engine starts, rather than queued utterances, own two-member navigation context. */
     @Test
     fun twoMemberNavigationReceivesTheStartedSpeakerFromTheEngineAdapter() {
