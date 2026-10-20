@@ -59,6 +59,12 @@ class NotificationDeletedContentTest {
     fun deletingAnOlderEntryKeepsTheNewerSiblingWithoutItsText() {
         post(message("old-id", "older secret text"))
         post(message("new-id", "newer valid text"))
+        val originalActions = actionTargets(requireNotNull(card(ACCOUNT)))
+        assertEquals(
+            setOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ),
+            originalActions.map { it.kind }.toSet(),
+        )
+        assertTrue(originalActions.all { it.target.messageIdHex == "new-id" })
 
         val reconciled = presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "old-id" }
         assertTrue(reconciled)
@@ -67,13 +73,20 @@ class NotificationDeletedContentTest {
         assertEquals(listOf("newer valid text"), messageTexts(card))
         assertFalse(allText(card.extras).any { it.contains("older secret text") })
         assertEquals("new-id", card.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
+        assertEquals(originalActions, actionTargets(card))
     }
 
-    /** Deleting the newest entry keeps the older valid one and makes it the card's stamped message. */
+    /** Deleting the newest entry keeps its older sibling while removing every action bound to the removed message. */
     @Test
     fun deletingTheNewestEntryKeepsTheOlderValidEntry() {
         post(message("old-id", "older valid text"))
         post(message("new-id", "newest secret text"))
+        val originalActions = actionTargets(requireNotNull(card(ACCOUNT)))
+        assertEquals(
+            setOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ),
+            originalActions.map { it.kind }.toSet(),
+        )
+        assertTrue(originalActions.all { it.target.messageIdHex == "new-id" })
 
         presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != null && id != "new-id" }
 
@@ -81,6 +94,24 @@ class NotificationDeletedContentTest {
         assertEquals(listOf("older valid text"), messageTexts(card))
         assertFalse(allText(card.extras).any { it.contains("newest secret text") })
         assertEquals("old-id", card.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX))
+        assertTrue(card.actions.isNullOrEmpty())
+    }
+
+    /** A fresh incoming message supplies current actions after a reconciliation removed stale ones. */
+    @Test
+    fun aNewMessageRestoresActionsAfterTheNewestEntryWasRemoved() {
+        post(message("old-id", "older valid text"))
+        post(message("removed-id", "newest secret text"))
+        presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "removed-id" }
+        assertTrue(requireNotNull(card(ACCOUNT)).actions.isNullOrEmpty())
+
+        post(message("fresh-id", "fresh valid text"))
+
+        val card = requireNotNull(card(ACCOUNT))
+        assertEquals(listOf("older valid text", "fresh valid text"), messageTexts(card))
+        val actions = actionTargets(card)
+        assertEquals(setOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ), actions.map { it.kind }.toSet())
+        assertTrue(actions.all { it.target.messageIdHex == "fresh-id" })
     }
 
     /** The rewrite never alerts again and asks the group reconciler to release artwork no card references. */
@@ -213,6 +244,12 @@ class NotificationDeletedContentTest {
             ?.messages
             .orEmpty()
             .map { it.text.toString() }
+
+    /** Parses the actual PendingIntent payloads so action assertions cover their message targets. */
+    private fun actionTargets(card: Notification): List<NotificationAction> =
+        card.actions.orEmpty().map { action ->
+            requireNotNull(NotificationActions.parse(Shadows.shadowOf(action.actionIntent).savedIntent))
+        }
 
     /** Every string anywhere in [bundle], including nested message bundles. */
     private fun allText(bundle: Bundle?): List<String> =

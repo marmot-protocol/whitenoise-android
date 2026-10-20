@@ -501,7 +501,8 @@ class LocalNotificationPresenter(
     /**
      * Silently rewrites a live conversation card with only [kept] entries, so no removed entry's text, quote or
      * artwork survives anywhere in the payload. The newest kept entry becomes the card's stamped message; the
-     * generation is unchanged, so the write lands only while that same card is still live.
+     * generation is unchanged, so the write lands only while that same card is still live. Copied actions are
+     * removed when their newest-message target no longer matches the retained card.
      */
     private fun rewriteWithEntries(
         compat: NotificationManagerCompat,
@@ -520,6 +521,10 @@ class LocalNotificationPresenter(
         messages.forEach { style.addMessage(copiedMessage(it, replacement = null)) }
         val builder = NotificationCompat.Builder(context, live)
         REMOVED_CONTENT_EXTRAS.forEach(builder.extras::remove)
+        val newestKeptId = entryMessageId(kept.last())
+        if (newestKeptId != conversationCardMessageIdHex(live)) {
+            builder.clearActions()
+        }
         val rewritten =
             builder
                 .setStyle(style)
@@ -531,7 +536,7 @@ class LocalNotificationPresenter(
                     Bundle().apply {
                         putString(
                             LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
-                            entryMessageId(kept.last()),
+                            newestKeptId,
                         )
                     },
                 ).build()
