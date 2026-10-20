@@ -244,6 +244,14 @@
         "test_ids": [
           "CHL-029"
         ]
+      },
+      {
+        "surface": "Returning chat-list avatar preparation handoff",
+        "anchor": "retainedPreparation = retainedAvatarPreparation",
+        "test_ids": [
+          "CHL-017"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"
       }
     ]
   },
