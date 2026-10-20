@@ -215,8 +215,8 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
-  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.mdk_qualification && 'mdk-qualification' || inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.mdk_qualification)) }}
 
 permissions:
   contents: read
@@ -833,7 +833,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: python3 scripts/run_mdk_qualification.py
-      - name: Retain qualification evidence without account secrets
+      - name: Retain sanitized qualification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

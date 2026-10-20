@@ -182,6 +182,35 @@ media fault injection and database compaction also require separate evidence;
 post-completion cold restart does not establish those outcomes. A raised policy
 reserve proves admission pause/resume, not an operating-system ENOSPC write.
 
+## Upstream fault-case evidence
+
+The exact-source [MDK CI run 39387012544](https://github.com/marmot-protocol/mdk/actions/runs/39387012544)
+passed. Its retained individual test logs include:
+
+- [Rust shard 3](https://github.com/marmot-protocol/mdk/actions/runs/39387012544/job/118513209710):
+  `staged_media_upgrade_keeps_rows_and_triggers` (pending, ready, lost and staged
+  schema rows), `an_interrupted_move_reads_the_file_and_then_only_drops_the_rows`,
+  `outgoing_staging_survives_restart_and_pending_send_outlives_orphan_ttl`, and
+  `the_maintenance_batch_moves_a_legacy_body_and_wakes_observers`.
+- [Rust shard 4](https://github.com/marmot-protocol/mdk/actions/runs/39387012544/job/118513209785):
+  `a_corrupt_legacy_body_is_refused_and_dropped_leaving_the_slot_unavailable`.
+- [Rust shard 5](https://github.com/marmot-protocol/mdk/actions/runs/39387012544/job/118513209590):
+  `a_tight_disk_pauses_the_move_until_the_user_prunes`.
+- [Rust shard 1](https://github.com/marmot-protocol/mdk/actions/runs/39387012544/job/118513209717):
+  `legacy_bodies_move_into_the_media_store_and_usage_reports_completion`.
+- [Rust shard 2](https://github.com/marmot-protocol/mdk/actions/runs/39387012544/job/118513209662):
+  `rows_are_not_dropped_without_a_ready_file`.
+
+These are native source fault-injection results, not Android process-crash or
+signed-preview evidence. They keep the migration implementation and repair
+semantics owned and tested by MDK.
+
+The separate exact-source [Simulator Nightly 39394193448](https://github.com/marmot-protocol/mdk/actions/runs/39394193448/job/118532735864)
+failed `replay_budget_exhaustion_fails_closed_then_repairs_with_same_durable_inputs`:
+it expected a typed fail-closed error but observed buffered outcomes. Subsequent
+campaign steps also failed. This is unresolved upstream qualification evidence;
+Android smoke success does not clear it or the existing #2375/#2381 blockers.
+
 ## Retention and exit
 
 Upstream deletes nightly releases and tags after 30 days. This 20 October 2026

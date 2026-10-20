@@ -26,7 +26,12 @@ import dev.ipf.marmotkit.Marmot
 
 /** The old published API has no storage-usage endpoint; only the candidate measures background migration. */
 @Suppress("UNUSED_PARAMETER")
-internal suspend fun verifyUpgradeStorage(runtime: Marmot, phase: String, beforeStart: Boolean) = Unit
+internal suspend fun verifyUpgradeStorage(
+    runtime: Marmot,
+    phase: String,
+    beforeStart: Boolean,
+    readWhilePaused: suspend () -> Unit = {},
+) = Unit
 ''')
 
 

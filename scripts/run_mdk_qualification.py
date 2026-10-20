@@ -16,7 +16,7 @@ from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
 
 APP = 'dev.ipf.whitenoise.android.mdkqualification'
-RUNNER = APP + '.test/androidx.test.runner.AndroidJUnitRunner'
+RUNNER = APP + '.test/dev.ipf.whitenoise.android.qualification.QualificationRunner'
 UPGRADE = 'dev.ipf.whitenoise.android.qualification.MarmotUpgradeFixtureTest'
 RECOVERY = 'dev.ipf.whitenoise.android.state.MarmotKitRecoveryQualificationTest'
 RECOVERY_CASES = {
@@ -39,8 +39,15 @@ def adb(*arguments, timeout=120, binary=False):
 
 def instrument(name, test_class, expected, extra=()):
     """Require each named case's terminal PASS; a zero adb exit or ignored test cannot qualify it."""
-    output = adb('shell', 'am', 'instrument', '-w', '-r', '-e', 'class', test_class,
-                 *extra, RUNNER, timeout=1200)
+    try:
+        output = adb('shell', 'am', 'instrument', '-w', '-r', '-e', 'class', test_class,
+                     *extra, RUNNER, timeout=1200)
+    except subprocess.TimeoutExpired as error:
+        partial = error.stdout or b''
+        if isinstance(partial, bytes):
+            partial = partial.decode('utf-8', errors='replace')
+        (REPORTS / f'{name}.txt').write_text(partial + '\nHOST_TIMEOUT: qualification incomplete\n')
+        raise
     (REPORTS / f'{name}.txt').write_text(output)
     statuses = {}
     current = {}
@@ -69,12 +76,21 @@ def stop():
     adb('shell', 'am', 'force-stop', APP)
     if adb('shell', f'pidof {APP} || true').strip():
         raise RuntimeError('Fixture process survived force-stop')
+    disable_background_entries()
 
 
 def install(role):
     """Both app generations use the same package and signer, and every update is an ordinary -r install."""
     for name in ('app', 'test'):
         adb('install', '-r', '-t', str(Path('build/mdk-pair') / role / f'{name}.apk'), timeout=180)
+    disable_background_entries()
+
+
+def disable_background_entries():
+    """Reassert fixture ownership after production WorkManager initialization and before native instrumentation."""
+    for component in ('androidx.work.impl.background.systemjob.SystemJobService',
+                      'dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'):
+        adb('shell', 'pm', 'disable-user', '--user', '0', APP + '/' + component)
 
 
 def usable_chat(name):

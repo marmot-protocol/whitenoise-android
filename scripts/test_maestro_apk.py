@@ -296,6 +296,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         """The opt-in upgrade runner must not race another test job over its fixture or run unrelated suites."""
         for name in ('instrumented', 'attachment-fixture'):
             self.assertFalse(self.enabled(name, 'workflow_dispatch', False, mdk_qualification=True))
+        self.assertIn("inputs.mdk_qualification && 'mdk-qualification'", self.workflow)
         self.assertTrue(self.enabled('mdk-qualification', 'workflow_dispatch', False, mdk_qualification=True))
         self.assertFalse(self.enabled('mdk-qualification', 'pull_request', False, mdk_qualification=True))
 
@@ -351,7 +352,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         self.assertNotIn('secrets.', job)
         self.assertIn('actions: read', job)
         self.assertIn("&& 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}'", self.workflow)
-        self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}", self.workflow)
+        self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.mdk_qualification)) }}", self.workflow)
         self.assertIn('if: always()', job)
         self.assertIn('retention-days: 7', job)
         self.assertIn('timeout-minutes: 15', job)

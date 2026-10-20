@@ -24,7 +24,9 @@ for role in baseline candidate; do
       -Pandroid.injected.build.abi=x86_64 -Pandroid.injected.testOnly=true \
       :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon --stacktrace
     mapfile -t app_apks < <(find app/build/outputs/apk/devZapstore/debug -name '*x86_64*.apk')
-    mapfile -t test_apks < <(find app/build/outputs/apk/androidTest/devZapstore/debug -name '*.apk')
+    test_dir=app/build/outputs/apk/androidTest/devZapstore/debug
+    [[ -d "$test_dir" ]] || test_dir=app/build/intermediates/apk/androidTest/devZapstore/debug
+    mapfile -t test_apks < <(find "$test_dir" -name '*.apk')
     [[ ${#app_apks[@]} == 1 && ${#test_apks[@]} == 1 ]]
     cp "${app_apks[0]}" "$root/build/mdk-pair/$role/app.apk"
     cp "${test_apks[0]}" "$root/build/mdk-pair/$role/test.apk"

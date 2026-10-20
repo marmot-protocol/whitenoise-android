@@ -18,6 +18,7 @@ internal suspend fun verifyUpgradeStorage(
     runtime: Marmot,
     phase: String,
     beforeStart: Boolean,
+    readWhilePaused: suspend () -> Unit = {},
 ) {
     if (phase == "seed") return
     val accounts = runtime.listAccounts().map { it.label }
@@ -43,6 +44,7 @@ internal suspend fun verifyUpgradeStorage(
         check(accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes } == initialLegacyBytes)
         check(accounts.any { runtime.attachmentStorageUsage(it).migrationBytes > 0uL })
         reportUpgradeStorage(runtime, accounts, phase, "reserve-paused")
+        readWhilePaused()
         for ((account, policy) in savedUpgradePolicies) runtime.setAttachmentDownloadPolicy(account, policy)
     }
     withTimeout(120_000L) {

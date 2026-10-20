@@ -66,6 +66,9 @@ gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-andro
   --ref <candidate-branch> -f mdk_qualification=true
 ```
 
+The isolated package disables its boot receiver and WorkManager job service so a
+background preflight cannot migrate the root ahead of measurement. Instrumentation
+omits Application scheduling; UI checks launch the normal manifest Application.
 The original encrypted synthetic root stays on the runner until job teardown;
 artifacts retain its digest, APK/native/signer provenance, storage states, UI
 observations and individual test outcomes without account secrets. A failed

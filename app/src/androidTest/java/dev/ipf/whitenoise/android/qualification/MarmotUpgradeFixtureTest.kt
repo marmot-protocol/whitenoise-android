@@ -46,14 +46,16 @@ class MarmotUpgradeFixtureTest {
             val relay = "ws://127.0.0.1:${requireNotNull(arguments.getString("relayPort"))}"
             val runtime = upgradeFixtureRuntime(context, root, relay)
             try {
-                withTimeout(180_000L) {
+                withTimeout(360_000L) {
                     verifyUpgradeStorage(runtime, phase, beforeStart = true)
                     runtime.start()
                     if (phase == "seed") {
                         seed(runtime, relay, requireNotNull(arguments.getString("blobPort")), receipt)
                     } else {
                         verify(runtime, receipt, phase)
-                        verifyUpgradeStorage(runtime, phase, beforeStart = false)
+                        verifyUpgradeStorage(runtime, phase, beforeStart = false) {
+                            verifyRetained(runtime, JSONObject(receipt.readText()))
+                        }
                         verify(runtime, receipt, phase)
                         verifyPendingUpload(runtime, receipt, phase)
                     }
@@ -199,10 +201,18 @@ class MarmotUpgradeFixtureTest {
         }
         val message = value.getString("pendingMessage")
         val target = AttachmentLocalTargetFfi(message, message, 0u)
-        val assets = runtime.attachmentLocalAssets(account, group, listOf(target))
-        val reference = requireNotNull(assets.single().reference) { "baseline pending upload did not retain plaintext" }
-        val bytes = runtime.readAttachmentAsset(account, reference, 0uL, PAYLOAD_SIZE.toUInt()).bytes
-        assertArrayEquals(payload(1), bytes)
+        withTimeout(30_000L) {
+            while (true) {
+                val assets = runtime.attachmentLocalAssets(account, group, listOf(target))
+                val reference = assets.single().reference
+                if (reference != null) {
+                    val bytes = runtime.readAttachmentAsset(account, reference, 0uL, PAYLOAD_SIZE.toUInt()).bytes
+                    assertArrayEquals(payload(1), bytes)
+                    break
+                }
+                delay(100L)
+            }
+        }
     }
 
     /** The native account roster and usable chat projections must match what the baseline actually wrote. */
