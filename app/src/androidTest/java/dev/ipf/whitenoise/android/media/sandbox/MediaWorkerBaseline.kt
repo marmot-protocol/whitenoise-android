@@ -101,7 +101,7 @@ internal object MediaWorkerBaseline {
             2 -> transport.inspect(corpus[0])?.let { it.width == CORPUS_EDGE && it.height == CORPUS_EDGE } == true
             3 -> transport.exif(corpus[1]) == 1
             4 -> validBitmap(transport.region(corpus[0], MediaImageRegion(0, 0, 128, 128), 64))
-            else -> validBitmap(transport.decode(corpus[2], 64, false, MediaDecodePolicy.SVG))
+            else -> validBitmap(transport.decode(corpus[2], MediaDecodePolicy.SVG_EDGE, false, MediaDecodePolicy.SVG))
         }
 
     private fun validBitmap(bitmap: Bitmap?): Boolean =

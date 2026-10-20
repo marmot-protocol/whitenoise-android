@@ -34,6 +34,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             checker.write_text(
                 "import sys\n"
                 "print('required-cases ' + ' '.join(sys.argv[1:]))\n"
+                "if '--required' in sys.argv: print(open(sys.argv[sys.argv.index('--required') + 1]).read())\n"
                 f"sys.exit({29 if fail_required else 0})\n"
             )
             result = subprocess.run(
@@ -75,6 +76,32 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("PullRequestDeviceSmoke", output)
         with self.assertRaises(subprocess.CalledProcessError):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_baseline_is_required_in_focused_containment_and_excluded_from_pr_smoke(self):
+        """Check real class annotations plus the dispatcher's actual required-case selection."""
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        baseline = (directory / "MediaWorkerBaselineDeviceTest.kt").read_text()
+        original = (directory / "IsolatedMediaDecoderDeviceTest.kt").read_text()
+        self.assertIn("@MediaContainmentAcceptance", baseline)
+        self.assertNotIn("@PullRequestDeviceSmoke", baseline)
+        self.assertIn("@PullRequestDeviceSmoke", original)
+        self.assertIn("@MediaContainmentAcceptance", original)
+        method = "characterizeDirectStillTransportWithFixedSyntheticCorpus"
+        self.assertIn("fun " + method + "()", baseline)
+        self.assertNotIn("fun " + method + "()", original)
+        case = "dev.ipf.whitenoise.android.media.sandbox.MediaWorkerBaselineDeviceTest#" + method
+        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        self.assertIn(case, focused)
+        required = (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
+        for line in required:
+            if any("." + name + "#" in line for name in (
+                "IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest", "MediaCodecCorpusDeviceTest"
+            )):
+                self.assertIn(line, focused)
+        smoke = self.run_dispatch("pull_request")
+        self.assertIn("RunnerArguments.annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke", smoke)
+        self.assertNotIn("MediaContainmentAcceptance", smoke)
+        self.assertNotIn(case, smoke)
 
     def test_outbound_share_dispatch_is_focused_and_rejects_overlapping_suites(self):
         """Real package visibility uses its own emulator users without also running the full suite."""

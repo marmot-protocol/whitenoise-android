@@ -14,7 +14,7 @@ raw instrumentation output and `android-instrumented-reports` artifact. Run thes
 The existing workflow collects connected-test additional output without a new
 workflow, permissions or qualification threshold.
 
-`IsolatedMediaDecoderDeviceTest.characterizeDirectStillTransportWithFixedSyntheticCorpus`
+`MediaWorkerBaselineDeviceTest.characterizeDirectStillTransportWithFixedSyntheticCorpus`
 runs 100 requests against the real unchanged transport. The fixed ordering cycles
 through PNG thumbnail, JPEG viewer, PNG inspection, JPEG EXIF, PNG region and SVG
 operations. Inputs are a synthetic 256×256 gradient encoded as PNG/JPEG and a
