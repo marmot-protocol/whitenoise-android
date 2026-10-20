@@ -11,6 +11,12 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
+import dev.ipf.marmotkit.AttachmentEntryFfi
+import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
+import dev.ipf.marmotkit.AttachmentHistoryCursor
+import dev.ipf.marmotkit.AttachmentHistoryVersion
+import dev.ipf.marmotkit.AttachmentPageFfi
+import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
@@ -25,10 +31,12 @@ import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
+import dev.ipf.marmotkit.EventsSubscription
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
@@ -142,7 +150,7 @@ internal class NotificationBootstrapTestFixture(
     private val onSetNativePushEnabled: ((accountRef: String, enabled: Boolean) -> NotificationSettingsFfi)? = null,
     private val onClearPushRegistration: ((accountRef: String) -> PushRegistrationShareOutcomeFfi)? = null,
     private val onUpsertPushRegistration: ((accountRef: String) -> Unit)? = null,
-    private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi)? = null,
+    private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi?)? = null,
     private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
@@ -155,6 +163,10 @@ internal class NotificationBootstrapTestFixture(
     private val profileRefreshRequest: (suspend (String) -> Unit)? = null,
     private val timelinePage: TimelinePageFfi? = null,
     private val messageRecords: List<AppMessageRecordFfi> = emptyList(),
+    // Newest-first attachment history the receipt scheduler pages through (#3308).
+    private val attachmentHistory: List<AttachmentEntryFfi> = emptyList(),
+    // Continuation reads answered as RestartRequired first, as when history changes under the cursor.
+    attachmentHistoryRestarts: Int = 0,
     private val profileImageDownload: ((url: String, maxBytes: ULong) -> ByteArray)? = null,
     notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)? = null,
     notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -213,6 +225,32 @@ internal class NotificationBootstrapTestFixture(
     val notificationTimelineCalls = AtomicInteger(0)
     val notificationMessageHistoryCalls = AtomicInteger(0)
     val notificationGroupDetailsCalls = AtomicInteger(0)
+    val attachmentHistoryPageCalls = AtomicInteger(0)
+    private val attachmentHistoryRestartsLeft = AtomicInteger(attachmentHistoryRestarts)
+    val listMediaCalls = AtomicInteger(0)
+
+    /** Runtime events the fixture's firehose delivers, in order, to every subscriber. */
+    private val runtimeEvents = Channel<MarmotEventFfi>(Channel.UNLIMITED)
+
+    /** How many runtime event subscriptions the app opened. */
+    val eventsSubscriptions =
+        java.util.concurrent.atomic
+            .AtomicInteger()
+
+    /** Whether the first runtime event subscription was opened before the runtime started. */
+    @Volatile
+    var firstEventsSubscriptionBeforeStart: Boolean? = null
+        private set
+
+    /** How many of the next runtime event-stream opens fail, as an unavailable binding would. */
+    val eventOpenFailures =
+        java.util.concurrent.atomic
+            .AtomicInteger()
+
+    /** Emits one runtime event on the firehose, as MDK does for every delivered message. */
+    fun emitRuntimeEvent(event: MarmotEventFfi) {
+        check(runtimeEvents.trySend(event).isSuccess)
+    }
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -319,6 +357,15 @@ internal class NotificationBootstrapTestFixture(
                     AuditLogSettingsFfi(enabled = false)
                 }
                 "setAuditLogSettings" -> arguments?.first()
+                "subscribeEvents" -> {
+                    if (eventsSubscriptions.getAndIncrement() == 0) {
+                        firstEventsSubscriptionBeforeStart = !runtimeStarted.get()
+                    }
+                    if (eventOpenFailures.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0) {
+                        error("fixture event stream unavailable")
+                    }
+                    allocateWithoutConstructor(FixtureEventsSubscription::class.java).apply { events = runtimeEvents }
+                }
                 "chatNotificationSettings" -> {
                     val accountRef = arguments?.get(0) as String
                     val groupIdHex = arguments[1] as String
@@ -449,6 +496,31 @@ internal class NotificationBootstrapTestFixture(
                 "setAttachmentDownloadPolicy" -> Unit
                 "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"
                 "setAttachmentAutomaticPermission" -> true
+                "attachmentHistoryVersion" -> allocateWithoutConstructor(FixtureHistoryVersion::class.java)
+                "attachmentHistoryPage" -> {
+                    attachmentHistoryPageCalls.incrementAndGet()
+                    val limit = (arguments!![2] as Number).toInt()
+                    val start = (arguments[3] as? FixtureHistoryCursor)?.offset ?: 0
+                    val end = minOf(attachmentHistory.size, start + limit)
+                    val more = end < attachmentHistory.size
+                    val restart = start > 0 && attachmentHistoryRestartsLeft.getAndUpdate { maxOf(0, it - 1) } > 0
+                    if (restart) {
+                        AttachmentPageReadFfi.RestartRequired
+                    } else {
+                        AttachmentPageReadFfi.Page(
+                            AttachmentPageFfi(
+                                entries = attachmentHistory.subList(start, end),
+                                version = allocateWithoutConstructor(FixtureHistoryVersion::class.java),
+                                nextCursor = if (more) historyCursor(end) else null,
+                                hasMore = more,
+                            ),
+                        )
+                    }
+                }
+                "listMedia" -> {
+                    listMediaCalls.incrementAndGet()
+                    emptyList<Any>()
+                }
                 "openChatListWindow" -> {
                     val view = arguments?.get(1) as ChatListViewFfi
                     if (view == ChatListViewFfi.CHATS) localSnapshotSubscriptionCalls.incrementAndGet()
@@ -638,6 +710,30 @@ internal class NotificationBootstrapTestFixture(
         return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, type) as T
     }
 
+    /** One immutable attachment history generation that owns no native handle. */
+    private class FixtureHistoryVersion : AttachmentHistoryVersion(NoPointer) {
+        /** Every page of this fixture reads the same generation. */
+        override fun changeSince(previous: AttachmentHistoryVersion) = AttachmentHistoryChangeFfi.UNCHANGED
+
+        /** The fixture version owns no native handle. */
+        override fun close() = Unit
+    }
+
+    /** Allocates a page boundary at [offset] without a native handle. */
+    private fun historyCursor(offset: Int): AttachmentHistoryCursor {
+        val cursor = allocateWithoutConstructor(FixtureHistoryCursor::class.java)
+        cursor.offset = offset
+        return cursor
+    }
+
+    /** A page boundary into [attachmentHistory], allocated without a native handle. */
+    private class FixtureHistoryCursor : AttachmentHistoryCursor(NoPointer) {
+        var offset = 0
+
+        /** The fixture cursor owns no native handle. */
+        override fun close() = Unit
+    }
+
     private class EmptyChatListWindow : ChatListWindowSubscription(NoPointer) {
         lateinit var onSnapshot: () -> Unit
         lateinit var view: ChatListViewFfi
@@ -686,6 +782,24 @@ internal class NotificationBootstrapTestFixture(
         /** Ends immediately so the mirror does not hold the fixture open. */
         override suspend fun next(): AccountAttentionSnapshotFfi? = null
 
+        override fun close() = Unit
+    }
+
+    /**
+     * The runtime's event firehose, fed from [runtimeEvents]. MDK delivers every received message here, including
+     * those its notification stream suppresses, such as ordinary traffic in a muted chat. It is allocated without
+     * its constructor, like the other fakes here, because the UniFFI base registers a cleaner the JVM cannot open.
+     */
+    private class FixtureEventsSubscription : EventsSubscription(NoPointer) {
+        lateinit var events: Channel<MarmotEventFfi>
+
+        /** Waits for the next emitted runtime event. */
+        override suspend fun next(): MarmotEventFfi? = events.receive()
+
+        /** Holds no native handle. */
+        override fun destroy() = Unit
+
+        /** Holds no native handle. */
         override fun close() = Unit
     }
 
@@ -793,6 +907,9 @@ internal class NotificationBootstrapTestFixture(
             }
         }
     }
+
+    /** How many engine notification updates the notification subscription has consumed so far. */
+    fun consumedUpdateCount(): Int = consumedUpdates.get()
 
     /** Waits for the fake engine update to cross the subscription boundary, before Android posting is required. */
     suspend fun awaitUpdateConsumed() {

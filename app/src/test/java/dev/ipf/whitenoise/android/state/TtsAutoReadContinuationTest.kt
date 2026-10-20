@@ -25,6 +25,31 @@ import java.util.Locale
 import kotlin.coroutines.CoroutineContext
 
 class TtsAutoReadContinuationTest {
+    /** App-owned background projection has no fresh roster and must retain the session's resolved two-member policy. */
+    @Test
+    fun backgroundAppendRetainsTwoMemberNarrationWithoutACachedRosterOverride() =
+        runTest {
+            val first = timelineRecord("m1", 0uL, "Text m1.").copy(sender = "alice")
+            val host = Host(timelinePage(first), initialMemberCount = 2)
+            host.start(this)
+            runCurrent()
+            host.windows.send(
+                timelinePage(
+                    first,
+                    timelineRecord("m2", 1uL, "Text m2.").copy(sender = "alice"),
+                    timelineRecord("m3", 2uL, "Text m3.").copy(sender = "bob"),
+                ),
+            )
+            runCurrent()
+
+            assertEquals(listOf("Text m1.", "Text m2.", "Alice: Text m3."), host.engine.spoken.map { it.text })
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            assertEquals(1, host.opens)
+            host.controller.stop()
+            runCurrent()
+            assertEquals(1, host.closes)
+        }
+
     @Test
     fun completeBatchesAreAppendedOnceInNativeOrderWithNoConversationScreen() =
         runTest {
@@ -419,6 +444,7 @@ class TtsAutoReadContinuationTest {
 
     private class Host(
         var initial: TimelinePageFfi,
+        initialMemberCount: Int? = null,
     ) : TtsAutoReadContinuationHost {
         val engine = FakeSessionEngine()
         override val controller = TtsController(FakeSessionFocus(), maxChunkLength = 4_000)
@@ -439,7 +465,7 @@ class TtsAutoReadContinuationTest {
 
         init {
             controller.attachEngine(engine)
-            check(controller.speak(listOf(entry("m1")), Locale.US))
+            check(controller.speak(listOf(entry("m1").copy(conversationMemberCount = initialMemberCount)), Locale.US))
         }
 
         fun start(

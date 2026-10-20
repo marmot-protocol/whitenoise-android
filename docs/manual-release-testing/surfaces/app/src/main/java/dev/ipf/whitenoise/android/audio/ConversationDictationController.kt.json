@@ -246,6 +246,14 @@
         "test_ids": [
           "DIC-009"
         ]
+      },
+      {
+        "surface": "Slow caller-audio Send uses one logical drain deadline across provider generations",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun armCallerAudioDrainTimeout(",
+        "test_ids": [
+          "DIC-010"
+        ]
       }
     ]
   },

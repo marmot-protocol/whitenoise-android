@@ -55,6 +55,12 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
                 self.assertEqual(select('pull_request', [path], TRIGGERS),
                                  {'attachment_fixture': True, 'connected': True})
 
+    def test_network_wait_registry_alone_runs_the_fixture(self):
+        """A change limited to the network-wait registry starts the workflow and selects the receipt fixture."""
+        path = 'app/src/main/java/dev/ipf/whitenoise/android/state/AutomaticAttachmentNetworkWaits.kt'
+        self.assertTrue(matches(path, TRIGGERS))
+        self.assertTrue(select('pull_request', [path], TRIGGERS)['attachment_fixture'])
+
     def test_unrelated_files_beside_fixture_inputs_do_not_start_connected(self):
         lanes = select('pull_request', ['README.md', 'app/src/main/java/Other.kt',
                                         'scripts/run-controlled-attachment-fixture.sh'], TRIGGERS)
