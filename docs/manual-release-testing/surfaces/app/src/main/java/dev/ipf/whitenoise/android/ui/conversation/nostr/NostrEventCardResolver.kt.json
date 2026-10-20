@@ -4,17 +4,17 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "First-use event-card client initialization stays off the conversation UI thread",
+        "surface": "Cached event cards start complete from the conversation snapshot and never return to Loading on refresh",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
-        "anchor": "internal fun defaultNostrEventQuery(",
+        "anchor": "val seeded = snapshots[reference.stableId]",
         "test_ids": [
-          "CHL-005"
+          "STB-002"
         ]
       },
       {
         "surface": "Account-scoped native cached public event card resolution and refresh",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
-        "anchor": "private class NativeEventCardResolver(",
+        "anchor": "internal class NostrEventCardResolver(",
         "test_ids": [
           "STB-002"
         ]

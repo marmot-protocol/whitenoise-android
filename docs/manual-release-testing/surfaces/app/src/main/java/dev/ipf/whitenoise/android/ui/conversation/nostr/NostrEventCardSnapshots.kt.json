@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardSnapshots.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Previously resolved event cards are read from MDK's cache before the conversation's first frame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardSnapshots.kt",
+        "anchor": "suspend fun warm(",
+        "test_ids": [
+          "STB-002",
+          "CHL-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
