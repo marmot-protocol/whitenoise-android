@@ -74,7 +74,11 @@ internal fun rememberDocumentSaveFallback(
         val currentOwner = owner == origin && owner == currentOrigin
         if (continuation?.isActive == true && currentOwner) {
             completeDocumentDestination(continuation, destination)
-        } else if (destination != null) {
+            return@LaunchedEffect
+        }
+        // A caller still waiting under a stale owner must not suspend forever.
+        continuation?.cancel(DocumentDestinationCancelledException())
+        if (destination != null) {
             // Lock disposal intentionally cancelled the source's lifetime/security
             // guards. Do not revive stale plaintext or bypass message-expiry checks.
             // Remove the empty CREATE_DOCUMENT output and invite a fresh guarded save.
