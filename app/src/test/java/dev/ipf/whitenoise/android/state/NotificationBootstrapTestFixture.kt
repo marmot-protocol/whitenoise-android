@@ -60,6 +60,7 @@ import dev.ipf.marmotkit.PushRegistrationSyncResultFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
@@ -165,6 +166,9 @@ internal class NotificationBootstrapTestFixture(
     private val markdownDocumentFactory: ((String?) -> MarkdownDocumentFfi)? = null,
     private val profileRefreshRequest: (suspend (String) -> Unit)? = null,
     private val timelinePage: TimelinePageFfi? = null,
+    // Per-call timeline and read-state hooks for deletion and read-gate scenarios (#3323, #2065).
+    private val onTimelineMessages: ((accountRef: String, groupIdHex: String) -> TimelinePageFfi?)? = null,
+    private val onChatListRow: ((accountRef: String, groupIdHex: String) -> ChatListRowFfi?)? = null,
     private val messageRecords: List<AppMessageRecordFfi> = emptyList(),
     // Newest-first attachment history the receipt scheduler pages through (#3308).
     private val attachmentHistory: List<AttachmentEntryFfi> = emptyList(),
@@ -254,6 +258,9 @@ internal class NotificationBootstrapTestFixture(
     fun emitRuntimeEvent(event: MarmotEventFfi) {
         check(runtimeEvents.trySend(event).isSuccess)
     }
+
+    /** How many chat-list row reads the app made, such as the notification read-state check. */
+    val chatListRowCalls = AtomicInteger(0)
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -557,7 +564,9 @@ internal class NotificationBootstrapTestFixture(
                 "requestAvatarAssets" -> emptyList<AvatarAssetFfi>()
                 "timelineMessages" -> {
                     notificationTimelineCalls.incrementAndGet()
-                    timelinePage
+                    val query = arguments?.get(1) as TimelineMessageQueryFfi
+                    onTimelineMessages?.invoke(arguments[0] as String, query.groupIdHex.orEmpty())
+                        ?: timelinePage
                         // An exhausted, empty page: recovery probes conclude
                         // NotCommitted deterministically instead of erroring.
                         ?: TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
@@ -622,6 +631,10 @@ internal class NotificationBootstrapTestFixture(
                     signInFailure?.let { throw it }
                     onSignInAccount?.invoke(accountRef)
                     accounts.first { it.label == accountRef }
+                }
+                "chatListRow" -> {
+                    chatListRowCalls.incrementAndGet()
+                    onChatListRow?.invoke(arguments?.get(0) as String, arguments[1] as String)
                 }
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -989,6 +1002,16 @@ internal class NotificationBootstrapTestFixture(
     suspend fun awaitSenderDisplayNameCalls(expected: Int) {
         withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (senderDisplayNameCalls.get() < expected) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Waits until the notification listener has opened the runtime event stream. */
+    suspend fun awaitRuntimeEventSubscription() {
+        withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
+            while (eventsSubscriptions.get() == 0) {
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                 delay(1L)
             }

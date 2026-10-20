@@ -82,6 +82,51 @@ internal data class ConversationDismissalResult(
                 }
 }
 
+/**
+ * One app-owned conversation card in the tray: its stamped newest message, card kind, the time of its oldest
+ * retained entry, and the message id of each retained entry, null where an entry carries none.
+ */
+internal data class ActiveConversationCard(
+    val accountRef: String,
+    val groupIdHex: String,
+    val messageIdHex: String?,
+    val isMessageCard: Boolean,
+    val contentSinceMs: Long,
+    val entryMessageIds: List<String?>,
+)
+
+/** What reconciling one conversation card did, logged by count only. */
+internal enum class CardContentOutcome(
+    val logValue: String,
+) {
+    /** Every retained entry is still valid. */
+    UNCHANGED("unchanged"),
+
+    /** Rewritten silently with only its valid entries. */
+    REBUILT("rebuilt"),
+
+    /** Nothing valid remained, so the card was cancelled. */
+    CANCELLED("cancelled"),
+
+    /** No such card was shown. */
+    ABSENT("absent"),
+
+    /** The platform refused the read, write or cancel; reconciliation must run again. */
+    FAILED("failed"),
+}
+
+/** Payload keys a rewritten card drops so no removed entry's text can survive outside its MessagingStyle. */
+private val REMOVED_CONTENT_EXTRAS =
+    listOf(
+        Notification.EXTRA_TEXT,
+        Notification.EXTRA_BIG_TEXT,
+        Notification.EXTRA_TEXT_LINES,
+        Notification.EXTRA_SUMMARY_TEXT,
+        Notification.EXTRA_MESSAGES,
+        Notification.EXTRA_HISTORIC_MESSAGES,
+        EXTRA_EXPANDED_SINGLE_MESSAGE_BODY,
+    )
+
 /** Opening-time boundary used to keep queued cleanup from consuming later notifications. */
 internal data class ConversationDismissalRequest(
     val accountRef: String,
@@ -349,6 +394,176 @@ class LocalNotificationPresenter(
         val result = dismissConversationMessagesOnce(accountRef, groupIdHex, request.cutoffMs)
         logConversationDismissal(groupIdHex, attempts = 1, result)
         return result.complete
+    }
+
+    /**
+     * Silently reconciles every deterministic card of one conversation with the messages that may still be shown
+     * (#3323, #2065). Each retained entry carries its own message id; an entry for which [isEntryValid] fails, or
+     * that carries no id, is dropped. A card left with nothing is cancelled, and a card that lost only some entries
+     * is rewritten from the live card with just the valid ones, silently and under its card lock, so a newer valid
+     * sibling survives without a second alert. A reaction card quotes a target the card does not identify, so it is
+     * cancelled when [cancelReactionCards] is set. Membership cards carry no message content and are left alone.
+     * Returns whether every card was confirmed reconciled.
+     */
+    fun reconcileConversationContent(
+        accountRef: String,
+        groupIdHex: String,
+        cancelReactionCards: Boolean,
+        isEntryValid: (String?) -> Boolean,
+    ): Boolean {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return false
+        val compat = NotificationManagerCompat.from(context)
+        val outcomes =
+            conversationDismissalKeys(accountRef, groupIdHex).associateWith { key ->
+                when (key.id) {
+                    LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID -> CardContentOutcome.UNCHANGED
+                    LocalNotificationFormatter.REACTION_NOTIFICATION_ID ->
+                        if (cancelReactionCards) reconcileCard(compat, key) { false } else CardContentOutcome.UNCHANGED
+                    else -> reconcileCard(compat, key, isEntryValid)
+                }
+            }
+        notificationDebug {
+            "reconciled group=${groupIdHex.take(8)} " +
+                CardContentOutcome.entries.joinToString(" ") { outcome ->
+                    "${outcome.logValue}=${outcomes.values.count { it == outcome }}"
+                }
+        }
+        return outcomes.values.none { it == CardContentOutcome.FAILED }
+    }
+
+    /** Reconciles one card under its lock: unchanged, rewritten with its valid entries, or cancelled. */
+    private fun reconcileCard(
+        compat: NotificationManagerCompat,
+        key: NotificationDismissalKey,
+        isEntryValid: (String?) -> Boolean,
+    ): CardContentOutcome =
+        ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
+            val manager =
+                context.getSystemService(NotificationManager::class.java)
+                    ?: return@withLock CardContentOutcome.FAILED
+            val live =
+                activeNotification(manager, key.tag, key.id)?.notification
+                    ?: return@withLock CardContentOutcome.ABSENT
+            val entries = retainedEntryGroups(live)
+            val kept = entries.filter { isEntryValid(entryMessageId(it)) }
+            try {
+                when {
+                    kept.size == entries.size && entries.isNotEmpty() -> CardContentOutcome.UNCHANGED
+                    kept.isEmpty() || live.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true -> {
+                        ConversationCardPostedRegistry.clearPosted(key.tag, key.id)
+                        cancelNotification(compat, key.tag, key.id)
+                        CardContentOutcome.CANCELLED
+                    }
+                    else -> rewriteWithEntries(compat, key, live, kept)
+                }
+            } catch (exception: RuntimeException) {
+                notificationDebug { "reconcile card failed type=${exception.javaClass.simpleName}" }
+                CardContentOutcome.FAILED
+            }
+        }
+
+    /**
+     * The card's retained entries as logical messages, newest last. A conversation card keeps its history in
+     * MessagingStyle; a long first message, a plain card or a redacted card is one entry identified by the card's
+     * stamped newest message id.
+     */
+    private fun retainedEntryGroups(notification: Notification): List<List<NotificationCompat.MessagingStyle.Message>> {
+        val redacted = notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true
+        val messages =
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(notification)
+                ?.messages
+                ?.takeUnless { redacted || it.isEmpty() }
+        if (messages != null) return notificationLogicalMessageGroups(messages)
+        val single =
+            expandedSingleMessage(notification.extras)?.firstOrNull()
+                ?: NotificationCompat.MessagingStyle.Message(
+                    notification.extras?.getCharSequence(Notification.EXTRA_TEXT) ?: "",
+                    notification.`when`,
+                    null as Person?,
+                )
+        conversationCardMessageIdHex(notification)?.let {
+            single.extras.putString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX, it)
+        }
+        return listOf(listOf(single))
+    }
+
+    /** The message id stamped on one logical entry, or null for an entry posted before entries carried ids. */
+    private fun entryMessageId(entry: List<NotificationCompat.MessagingStyle.Message>): String? =
+        entry.firstNotNullOfOrNull { message ->
+            message.extras.getString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX)?.takeIf(String::isNotBlank)
+        }
+
+    /**
+     * Silently rewrites a live conversation card with only [kept] entries, so no removed entry's text, quote or
+     * artwork survives anywhere in the payload. The newest kept entry becomes the card's stamped message; the
+     * generation is unchanged, so the write lands only while that same card is still live.
+     */
+    private fun rewriteWithEntries(
+        compat: NotificationManagerCompat,
+        key: NotificationDismissalKey,
+        live: Notification,
+        kept: List<List<NotificationCompat.MessagingStyle.Message>>,
+    ): CardContentOutcome {
+        val previous = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live)
+        val messages = kept.flatten()
+        val user: Person = previous?.user ?: Person.Builder().setName("").build()
+        val style =
+            NotificationCompat
+                .MessagingStyle(user)
+                .setConversationTitle(previous?.conversationTitle)
+                .setGroupConversation(previous?.isGroupConversation == true)
+        messages.forEach { style.addMessage(copiedMessage(it, replacement = null)) }
+        val builder = NotificationCompat.Builder(context, live)
+        REMOVED_CONTENT_EXTRAS.forEach(builder.extras::remove)
+        val rewritten =
+            builder
+                .setStyle(style)
+                .setContentText(messages.last().text)
+                .setTicker(null)
+                .setSilent(true)
+                .setOnlyAlertOnce(true)
+                .addExtras(
+                    Bundle().apply {
+                        putString(
+                            LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
+                            entryMessageId(kept.last()),
+                        )
+                    },
+                ).build()
+        val result = postNotificationSafely(compat, key.tag, key.id, rewritten, mustBeLive = true)
+        val written = result == NotificationCardWriteResult.WRITTEN
+        return if (written) CardContentOutcome.REBUILT else CardContentOutcome.FAILED
+    }
+
+    /** Lists the conversation cards this app currently shows, for bounded restart reconciliation. */
+    internal fun activeConversationCards(): List<ActiveConversationCard> {
+        val platform = context.getSystemService(NotificationManager::class.java) ?: return emptyList()
+        return readActiveNotifications(platform)
+            .orEmpty()
+            .mapNotNull { sbn ->
+                val extras = sbn.notification.extras
+                val isInvite = !extras?.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF).isNullOrBlank()
+                val scope = LocalNotificationFormatter.conversationScopeOfCard(sbn.tag, sbn.id)
+                scope?.takeUnless { isInvite }?.let { (accountRef, groupIdHex) ->
+                    val entries = retainedEntryGroups(sbn.notification)
+                    ActiveConversationCard(
+                        accountRef = accountRef,
+                        groupIdHex = groupIdHex,
+                        messageIdHex = conversationCardMessageIdHex(sbn.notification),
+                        isMessageCard = sbn.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID,
+                        contentSinceMs = entries.flatten().minOfOrNull { it.timestamp } ?: sbn.notification.`when`,
+                        entryMessageIds = entries.map(::entryMessageId),
+                    )
+                }
+            }
+    }
+
+    /** Cancels [update]'s card only while it still shows that same newest message, keeping newer siblings. */
+    internal fun cancelNotificationUpdateCardIfCurrent(update: NotificationUpdateFfi) {
+        val messageIdHex = update.messageIdHex?.takeIf(String::isNotBlank) ?: return
+        val key = LocalNotificationFormatter.notificationDismissalKey(update)
+        cancelConversationCardIfSameGeneration(key.tag, key.id, messageIdHex)
     }
 
     /** Runs one cancellation and verification pass without invalidating genuinely later registrations. */
@@ -1110,6 +1325,7 @@ class LocalNotificationPresenter(
                                                     messaging.sender,
                                                     presentationTimestampMs,
                                                     emojiArtifact?.uri,
+                                                    update.messageIdHex,
                                                 ),
                                             )
                                         }
@@ -1175,6 +1391,7 @@ class LocalNotificationPresenter(
                                                         sender = messaging.sender,
                                                         newMessageTimestampMs = presentationTimestampMs,
                                                         emojiArtwork = null,
+                                                        messageIdHex = update.messageIdHex,
                                                     ),
                                                 )
                                                 val cleanNotification = buildSettled(true)
@@ -2428,6 +2645,7 @@ class LocalNotificationPresenter(
         sender: Person,
         newMessageTimestampMs: Long,
         emojiArtwork: android.net.Uri? = null,
+        messageIdHex: String? = null,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -2445,6 +2663,9 @@ class LocalNotificationPresenter(
                 emojiArtwork,
                 context.getString(R.string.custom_emoji),
             )
+        messageIdHex?.takeIf(String::isNotBlank)?.let { id ->
+            newMessages.forEach { it.extras.putString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX, id) }
+        }
         carriedHistory
             ?.let { capNotificationLogicalHistory(it, historyCap, MAX_NOTIFICATION_MESSAGE_HISTORY - newMessages.size) }
             ?.forEach { message ->
@@ -2510,11 +2731,17 @@ class LocalNotificationPresenter(
                 null
             } else {
                 listOf(
-                    NotificationCompat.MessagingStyle.Message(
-                        boundedNotificationMessageText(body),
-                        timestamp,
-                        Person.fromBundle(senderBundle),
-                    ),
+                    NotificationCompat.MessagingStyle
+                        .Message(
+                            boundedNotificationMessageText(body),
+                            timestamp,
+                            Person.fromBundle(senderBundle),
+                        ).apply {
+                            // The long first message is one entry identified by the card's stamped message.
+                            bundle.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX)?.let {
+                                extras.putString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX, it)
+                            }
+                        },
                 )
             }
         }

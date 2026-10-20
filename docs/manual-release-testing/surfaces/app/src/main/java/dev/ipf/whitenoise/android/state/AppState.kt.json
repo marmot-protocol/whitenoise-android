@@ -385,6 +385,39 @@
         "test_ids": [
           "PRO-005"
         ]
+      },
+      {
+        "surface": "Deleted or hidden message notification retraction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun retractNotificationContent(",
+        "test_ids": [
+          "NTF-043"
+        ]
+      },
+      {
+        "surface": "Restart reconciliation of deleted or read message cards",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun reconcileActiveNotificationCards(",
+        "test_ids": [
+          "NTF-043",
+          "NTF-044"
+        ]
+      },
+      {
+        "surface": "Read message delayed notification gate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun notificationCandidateGate(",
+        "test_ids": [
+          "NTF-044"
+        ]
+      },
+      {
+        "surface": "Read-state change notification reconciliation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun reconcileConversationNotificationCards(",
+        "test_ids": [
+          "NTF-044"
+        ]
       }
     ]
   },

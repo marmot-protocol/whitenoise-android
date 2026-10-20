@@ -1,0 +1,660 @@
+package dev.ipf.whitenoise.android.state
+
+import android.Manifest
+import android.app.Application
+import android.app.NotificationManager
+import android.os.Looper
+import androidx.core.app.NotificationCompat
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
+import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
+import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.After
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * Production-path coverage for retracting deleted or hidden content (#3323) and withholding a read message's
+ * delayed notification (#2065), driven through the real listener, presenter and card synchronizer.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class NotificationContentRetractionTest {
+    private val context: Application = RuntimeEnvironment.getApplication()
+    private val cardKey = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT_REF, GROUP_ID)
+
+    /** Grants posting and starts from an empty tray. */
+    @Before
+    fun setUp() {
+        shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        manager().cancelAll()
+    }
+
+    /** Releases synchronizer hooks and clears the tray. */
+    @After
+    fun tearDown() {
+        ConversationCardPostSynchronizer.testHook = null
+        manager().cancelAll()
+    }
+
+    /** A message that is already the conversation's read marker never posts its delayed first card. */
+    @Test
+    fun readCandidateNeverPostsItsFirstCard() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ -> readRow(marker = MESSAGE_ID) },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitUpdateConsumed()
+                val sawCard = pumpFor(NO_POST_WINDOW_MS)
+
+                assertTrue("the gate must read MDK's read state", fixture.chatListRowCalls.get() > 0)
+                assertFalse("a read message must never be written, even briefly", sawCard)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A newer message after the marker still posts, as does one whose own account has read nothing. */
+    @Test
+    fun newerUnreadCandidateStillPosts() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    // Another account read this message; that never suppresses this account's card.
+                    onChatListRow = { account, _ ->
+                        if (account == ACCOUNT_REF) {
+                            readRow(marker = OLDER_ID, unread = 1uL, firstUnread = MESSAGE_ID)
+                        } else {
+                            readRow(marker = MESSAGE_ID)
+                        }
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Unreadable read state withholds the stale candidate instead of alerting. */
+    @Test
+    fun unreadableReadStateFailsClosed() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ -> throw IllegalStateException("runtime unavailable") },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitUpdateConsumed()
+                val sawCard = pumpFor(NO_POST_WINDOW_MS)
+
+                assertTrue(fixture.chatListRowCalls.get() > 0)
+                assertFalse(sawCard)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A read that commits after the first post cancels the card before detached enrichment can rewrite it. */
+    @Test
+    fun readAfterFirstPostCancelsTheCardBeforeEnrichment() =
+        runBlocking {
+            val readCommitted = CountDownLatch(1)
+            val calls = AtomicInteger(0)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ ->
+                        if (calls.incrementAndGet() == 1) {
+                            null
+                        } else {
+                            check(readCommitted.await(5, TimeUnit.SECONDS))
+                            readRow(marker = MESSAGE_ID)
+                        }
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+                readCommitted.countDown()
+
+                awaitCardGone()
+            } finally {
+                readCommitted.countDown()
+                fixture.close()
+            }
+        }
+
+    /** An accepted deletion retracts the card silently, a replay stays fenced, and a newer message still posts. */
+    @Test
+    fun acceptedDeletionRetractsTheCardAndFencesReplays() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+                fixture.awaitRuntimeEventSubscription()
+
+                fixture.emitRuntimeEvent(deletion(MESSAGE_ID))
+                awaitCardGone()
+
+                fixture.emitUpdate(fixture.update)
+                assertFalse("a replayed candidate must stay fenced", pumpFor(NO_POST_WINDOW_MS))
+
+                fixture.emitUpdate(
+                    fixture.update.copy(messageIdHex = NEWER_ID, notificationKey = "startup:account-a:$NEWER_ID"),
+                )
+                fixture.awaitNotificationPosted()
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Deleting an older message through MDK's event stream keeps the newer sibling on the card (#3323). */
+    @Test
+    fun acceptedDeletionOfAnOlderEntryKeepsTheNewerSibling() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = OLDER_ID,
+                    previewText = "older deleted text",
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+                fixture.awaitRuntimeEventSubscription()
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = MESSAGE_ID,
+                        notificationKey = "startup:account-a:$MESSAGE_ID",
+                        previewText = "newer valid text",
+                    ),
+                )
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("newer valid text") != true) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+
+                fixture.emitRuntimeEvent(deletion(OLDER_ID))
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("older deleted text") != false) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                assertTrue(activeCardText().orEmpty().contains("newer valid text"))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A deletion that lands after the read-state check but before the first write leaves no card. */
+    @Test
+    fun deletionWhileTheFirstPostIsQueuedLeavesNoCard() =
+        runBlocking {
+            val checking = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    // Holds the final read-state check open, so the deletion lands after it judged the message unread.
+                    onChatListRow = { _, _ ->
+                        checking.countDown()
+                        check(release.await(5, TimeUnit.SECONDS))
+                        null
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                awaitLatch(checking)
+                fixture.appState.retractNotificationContent(
+                    RemovedNotificationMessage(ACCOUNT_REF, GROUP_ID, MESSAGE_ID),
+                )
+                release.countDown()
+
+                assertFalse(pumpFor(NO_POST_WINDOW_MS))
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** The same queued first post with no deletion still writes, proving the scenario above reaches the write. */
+    @Test
+    fun queuedFirstPostWithoutDeletionStillWrites() =
+        runBlocking {
+            val checking = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ ->
+                        checking.countDown()
+                        check(release.await(5, TimeUnit.SECONDS))
+                        null
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                awaitLatch(checking)
+                release.countDown()
+                fixture.awaitNotificationPosted()
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** A successful local hide retracts the card and keeps the hidden message from posting again. */
+    @Test
+    fun localHideRetractsTheCard() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(context = context, groupIdHex = GROUP_ID, messageIdHex = MESSAGE_ID)
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+
+                val hidden =
+                    fixture.runOnMainLooperPumping {
+                        fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, MESSAGE_ID)
+                    }
+                assertTrue(hidden)
+                awaitCardGone()
+
+                fixture.emitUpdate(fixture.update)
+                assertFalse(pumpFor(NO_POST_WINDOW_MS))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A card left by an earlier process is retracted once the event stream opens and MDK reports it deleted. */
+    @Test
+    fun restartReconciliationRetractsADeletedCard() =
+        runBlocking {
+            assertRestartReconciliationCancels(
+                timeline = { TimelinePageFfi(listOf(record(MESSAGE_ID, 12uL, deleted = true)), false, false) },
+                row = { null },
+            )
+        }
+
+    /** A card left by an earlier process whose message was read meanwhile is cancelled at reconciliation. */
+    @Test
+    fun restartReconciliationCancelsAReadCard() =
+        runBlocking {
+            assertRestartReconciliationCancels(
+                timeline = { TimelinePageFfi(listOf(record(MESSAGE_ID, 12uL)), false, false) },
+                row = { readRow(marker = MESSAGE_ID) },
+            )
+        }
+
+    /**
+     * A read MDK reports while a card is shown removes it silently (#2065). The card was left by an earlier process,
+     * so only the read-state change can reconcile it.
+     */
+    @Test
+    fun readStateChangeRemovesAShownCard() =
+        runBlocking {
+            val read = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                    onChatListRow = { _, _ -> readRow(marker = MESSAGE_ID).takeIf { read.get() } },
+                    onTimelineMessages = { _, _ -> TimelinePageFfi(listOf(record(MESSAGE_ID, 12uL)), false, false) },
+                )
+            try {
+                assertTrue(LocalNotificationPresenter(context).show(fixture.update, shortNpub = { "sender" }))
+                fixture.bootstrap()
+                fixture.awaitRuntimeEventSubscription()
+                pumpFor(NO_POST_WINDOW_MS)
+                assertTrue("an unread card survives the stream-open reconciliation", cardActive())
+
+                read.set(true)
+                fixture.emitRuntimeEvent(readStateChanged())
+                awaitCardGone()
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A read that commits while the first write is in flight cancels the card once that write lands. */
+    @Test
+    fun readCommittingDuringTheCheckIsCancelledAfterTheWrite() =
+        runBlocking {
+            val checking = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val calls = AtomicInteger(0)
+            val read = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    onChatListRow = { _, _ ->
+                        if (calls.incrementAndGet() == 1) {
+                            // The first check reads the pre-read state, then waits while the read commits.
+                            checking.countDown()
+                            check(release.await(5, TimeUnit.SECONDS))
+                            null
+                        } else {
+                            readRow(marker = MESSAGE_ID).takeIf { read.get() }
+                        }
+                    },
+                    onTimelineMessages = { _, _ -> TimelinePageFfi(listOf(record(MESSAGE_ID, 12uL)), false, false) },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitRuntimeEventSubscription()
+                awaitLatch(checking)
+                read.set(true)
+                fixture.emitRuntimeEvent(readStateChanged())
+                pumpFor(NO_POST_WINDOW_MS)
+                release.countDown()
+                // The first write lands, and its read re-check sees the read that committed while it was in flight.
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (calls.get() < 2) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                awaitCardGone()
+                assertFalse("the stale card must not come back", pumpFor(NO_POST_WINDOW_MS))
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** Repeated delivery of a read message, and its delivery through push-wake catch-up, never alert. */
+    @Test
+    fun repeatedAndPushWakeDeliveryOfAReadMessageNeverPosts() =
+        runBlocking {
+            lateinit var fixture: NotificationBootstrapTestFixture
+            fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                    onChatListRow = { _, _ -> readRow(marker = MESSAGE_ID) },
+                    onCatchUpAccounts = { fixture.emitNotification() },
+                )
+            try {
+                fixture.bootstrap()
+                PushTokenStore.create(context).recordPendingPushWakeCatchUp()
+                fixture.runWithMainLooperPumping { fixture.appState.runPushWakeRecoveryAttempt() }
+                fixture.awaitUpdateConsumed()
+                repeat(2) { fixture.emitUpdate(fixture.update) }
+
+                assertFalse(pumpFor(NO_POST_WINDOW_MS * 2))
+                assertTrue(fixture.chatListRowCalls.get() >= 3)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** When MDK state stays unreadable, reconciliation retries, then withholds the unverifiable card. */
+    @Test
+    fun unavailableReconciliationStateCancelsTheCardAfterRetries() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                    onChatListRow = { _, _ -> throw IllegalStateException("runtime unavailable") },
+                )
+            try {
+                assertTrue(LocalNotificationPresenter(context).show(fixture.update, shortNpub = { "sender" }))
+                fixture.bootstrap()
+                fixture.awaitRuntimeEventSubscription()
+
+                awaitCardGone()
+                assertTrue("the read is retried before withholding", fixture.chatListRowCalls.get() >= 3)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A deleted older entry beyond the candidate page is dropped at restart while the newer sibling stays. */
+    @Test
+    fun restartDropsADeletedOlderEntryAndKeepsTheNewerSibling() =
+        runBlocking {
+            val olderId = OLDER_ID
+            val filler = (1..60).map { record("%064x".format(it), 100uL + it.toULong()) }
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                    onTimelineMessages = { _, _ ->
+                        val rows = listOf(record(olderId, 10uL, deleted = true)) + filler + record(MESSAGE_ID, 200uL)
+                        TimelinePageFfi(rows, false, false)
+                    },
+                )
+            try {
+                val presenter = LocalNotificationPresenter(context)
+                val older = fixture.update.copy(messageIdHex = olderId, previewText = "older deleted text")
+                assertTrue(presenter.show(older, shortNpub = { "sender" }))
+                assertTrue(presenter.show(fixture.update.copy(previewText = "newer valid text"), shortNpub = { "s" }))
+                fixture.bootstrap()
+                fixture.awaitRuntimeEventSubscription()
+
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("older deleted text") != false) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                assertTrue(cardActive())
+                assertTrue(activeCardText().orEmpty().contains("newer valid text"))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Pre-posts the fixture's card as an earlier process would, then starts a process that must cancel it. */
+    private suspend fun assertRestartReconciliationCancels(
+        timeline: () -> TimelinePageFfi,
+        row: () -> ChatListRowFfi?,
+    ) {
+        val fixture =
+            NotificationBootstrapTestFixture(
+                context = context,
+                groupIdHex = GROUP_ID,
+                messageIdHex = MESSAGE_ID,
+                emitStartupNotification = false,
+                onTimelineMessages = { _, _ -> timeline() },
+                onChatListRow = { _, _ -> row() },
+            )
+        try {
+            assertTrue(LocalNotificationPresenter(context).show(fixture.update, shortNpub = { "sender" }))
+            assertTrue(cardActive())
+
+            fixture.bootstrap()
+            fixture.awaitRuntimeEventSubscription()
+            awaitCardGone()
+        } finally {
+            fixture.close()
+        }
+    }
+
+    /** An accepted-deletion projection update for [messageIdHex]. */
+    private fun deletion(messageIdHex: String): MarmotEventFfi =
+        MarmotEventFfi.ProjectionUpdated(
+            RuntimeProjectionUpdateFfi(
+                accountIdHex = ACCOUNT_REF,
+                accountLabel = ACCOUNT_REF,
+                update =
+                    TimelineProjectionUpdateFfi(
+                        groupIdHex = GROUP_ID,
+                        messages = emptyList(),
+                        changes =
+                            listOf(
+                                TimelineMessageChangeFfi.Upsert(
+                                    TimelineUpdateTriggerFfi.MESSAGE_DELETED,
+                                    record(messageIdHex, 12uL, deleted = true),
+                                ),
+                            ),
+                        chatListRow = null,
+                        chatListTrigger = ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+                    ),
+            ),
+        )
+
+    /** MDK's report that the fixture conversation's read state changed. */
+    private fun readStateChanged(): MarmotEventFfi =
+        MarmotEventFfi.ProjectionUpdated(
+            RuntimeProjectionUpdateFfi(
+                accountIdHex = ACCOUNT_REF,
+                accountLabel = ACCOUNT_REF,
+                update =
+                    TimelineProjectionUpdateFfi(
+                        groupIdHex = GROUP_ID,
+                        messages = emptyList(),
+                        changes = emptyList(),
+                        chatListRow = readRow(marker = MESSAGE_ID),
+                        chatListTrigger = ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+                    ),
+            ),
+        )
+
+    /** Every text the fixture card carries, including its retained MessagingStyle history. */
+    private fun activeCardText(): String? =
+        manager()
+            .activeNotifications
+            .firstOrNull { it.tag == cardKey.tag && it.id == cardKey.id }
+            ?.notification
+            ?.let { notification ->
+                val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+                val texts = style?.messages.orEmpty().map { it.text.toString() }
+                (texts + notification.extras.toString()).joinToString("|")
+            }
+
+    /** One timeline row at [timelineAt]. */
+    private fun record(
+        id: String,
+        timelineAt: ULong,
+        deleted: Boolean = false,
+    ) = requireNotNull(projectedTimelineMessage(timelineAppMessage(id, timelineAt)).projected).copy(deleted = deleted)
+
+    /** The fixture conversation's chat-list row with its read marker at [marker]. */
+    private fun readRow(
+        marker: String,
+        unread: ULong = 0uL,
+        firstUnread: String? = null,
+    ): ChatListRowFfi =
+        chatRow(GROUP_ID).copy(
+            lastReadMessageIdHex = marker,
+            lastReadTimelineAt = 12uL,
+            unreadCount = unread,
+            hasUnread = unread > 0uL,
+            firstUnreadMessageIdHex = firstUnread,
+        )
+
+    /** The platform notification manager. */
+    private fun manager(): NotificationManager = context.getSystemService(NotificationManager::class.java)
+
+    /** Whether the fixture conversation's message card is in the tray. */
+    private fun cardActive() = manager().activeNotifications.any { it.tag == cardKey.tag && it.id == cardKey.id }
+
+    /** Pumps the main looper until the fixture card leaves the tray. */
+    private suspend fun awaitCardGone() {
+        withTimeout(AWAIT_TIMEOUT_MS) {
+            while (cardActive()) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Pumps the main looper while waiting for a deterministic race checkpoint. */
+    private suspend fun awaitLatch(latch: CountDownLatch) {
+        withTimeout(AWAIT_TIMEOUT_MS) {
+            while (latch.count > 0L) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Lets queued work run for [millis] so an unwanted post would have landed, and reports whether one ever did. */
+    private suspend fun pumpFor(millis: Long): Boolean {
+        var sawCard = cardActive()
+        repeat((millis / PUMP_STEP_MS).toInt()) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(PUMP_STEP_MS))
+            delay(PUMP_STEP_MS)
+            sawCard = sawCard || cardActive()
+        }
+        return sawCard
+    }
+
+    private companion object {
+        const val ACCOUNT_REF = "account-a"
+        const val GROUP_ID = "ab12cd34"
+        val MESSAGE_ID = "ab".repeat(32)
+        val OLDER_ID = "aa".repeat(32)
+        val NEWER_ID = "cd".repeat(32)
+        const val NO_POST_WINDOW_MS = 500L
+        const val PUMP_STEP_MS = 10L
+        const val AWAIT_TIMEOUT_MS = 60_000L
+    }
+}
