@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.MediaStore
@@ -69,6 +70,7 @@ private const val LOCKED_DWELL_MILLIS = 1_500L
  * stub result through the ordinary `sendActivityResult` path. The lock is shown through the same
  * reflection seam the unit suite uses, because the isolated emulator has no device credential, and
  * cleared through [WhiteNoiseAppState.markAppUnlockSucceeded], the production unlock completion.
+ * Grant CAMERA to the fixture package with `adb shell pm grant` before running it.
  */
 @ManualDeviceFixture
 class CameraCaptureAppLockDeviceTest {
@@ -91,7 +93,10 @@ class CameraCaptureAppLockDeviceTest {
     private suspend fun journey(context: Context) {
         val root = File(context.filesDir, "camera-lock-${UUID.randomUUID()}").apply { mkdirs() }
         MarmotAndroid.initialize(context)
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.CAMERA)
+        // The Maestro host never claims the UI-automation connection, so the operator grants CAMERA up front.
+        check(context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            "Grant CAMERA first: adb shell pm grant ${context.packageName} ${Manifest.permission.CAMERA}"
+        }
         LoopbackNostrRelay().use { relay ->
             val native = openNative(File(root, "owner"), relay.url)
             var app: WhiteNoiseAppState? = null
