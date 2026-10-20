@@ -524,7 +524,9 @@ private fun ForwardTargetProgressRow(
             ForwardTargetPhase.Failed -> {
                 val failure =
                     when (progress.failureStage) {
-                        ForwardFailureStage.Upload -> stringResource(R.string.forward_failed_upload)
+                        ForwardFailureStage.Upload,
+                        ForwardFailureStage.UploadTimeout,
+                        -> stringResource(R.string.forward_failed_upload)
                         ForwardFailureStage.Publish -> stringResource(R.string.forward_failed_publish)
                         ForwardFailureStage.PayloadTooLarge -> stringResource(R.string.forward_payload_too_large)
                         ForwardFailureStage.Expired -> stringResource(R.string.forward_failed_expired)

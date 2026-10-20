@@ -126,6 +126,15 @@
           "NTF-042",
           "NTF-036"
         ]
+      },
+      {
+        "surface": "picture enrichment delegates execution ownership without moving live-card eligibility checks",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "enrichmentRunner.runOrLaunch(",
+        "test_ids": [
+          "NTF-006",
+          "NTF-010"
+        ]
       }
     ],
     "source_coverage": [
