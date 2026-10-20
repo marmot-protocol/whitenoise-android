@@ -8,7 +8,7 @@ import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.parseMarkdownOrEmptyDocument
 
 /** Builds the single active message projection consumed by every TTS entry point. */
-@Suppress("ReturnCount")
+@Suppress("ReturnCount", "LongParameterList") // Explicit rendering and roster inputs share this one speech projection.
 internal suspend fun projectTtsSpeakableEntry(
     message: AppMessageRecordFfi,
     editedText: String?,
@@ -16,6 +16,7 @@ internal suspend fun projectTtsSpeakableEntry(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)? = null,
     isGroupMember: ((String) -> Boolean)? = null,
+    conversationMemberCount: Int? = null,
 ): TtsSpeakableEntry? {
     val source = resolveTtsSpeakableSource(message, editedText) ?: return null
     val document =
@@ -42,6 +43,7 @@ internal suspend fun projectTtsSpeakableEntry(
             TtsSpeakableEntry(
                 senderKey = message.sender,
                 senderDisplayName = senderDisplayName,
+                conversationMemberCount = conversationMemberCount,
                 text = it,
                 messageIdHex = message.messageIdHex,
                 timelineAt = message.recordedAt,

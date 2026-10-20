@@ -405,6 +405,7 @@ internal fun ConversationTtsFollowEffects(
     }
 }
 
+/** Uses the actual loaded roster for foreground/backlog narration, with conservative unresolved fallback. */
 private suspend fun projectConversationTtsEntry(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
@@ -414,6 +415,7 @@ private suspend fun projectConversationTtsEntry(
         message = record,
         editedText = controller.editsByTarget[record.messageIdHex]?.latestText,
         senderDisplayName = appState.displayName(record.sender),
+        conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
         parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
         mentionDisplayName = appState::mentionSpeechName,
         isGroupMember =

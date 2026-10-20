@@ -21,4 +21,6 @@ internal data class TtsQueuedMessage(
     val attachmentDisplayName: String? = null,
     /** The immutable projection submitted to speech, retained only by this bounded queue. */
     val presentationEntry: TtsSpeakableEntry? = null,
+    /** Authoritative roster context carried with this request, independent of loaded message authors. */
+    val conversationMemberCount: Int? = null,
 )
