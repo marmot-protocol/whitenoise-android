@@ -79,23 +79,27 @@ class NotificationReactionRemovalRaceTest {
 
     /** Evicting the accepted target removal cannot revive a reaction that already captured its quote. */
     @Test
-    fun acceptedDeletionFencesAnEvictedQueuedReactionFirstWrite() =
+    fun acceptedDeletionFencesAnEvictedQueuedReactionFirstWrite() {
         assertRace(localHide = false, lateCorrection = false, evictRemoval = true)
+    }
 
     /** The captured removal version also survives eviction before a queued silent correction. */
     @Test
-    fun acceptedDeletionFencesAnEvictedQueuedReactionCorrection() =
+    fun acceptedDeletionFencesAnEvictedQueuedReactionCorrection() {
         assertRace(localHide = false, lateCorrection = true, evictRemoval = true)
+    }
 
     /** A local hide also invalidates the already-captured quote after its bounded identity is evicted. */
     @Test
-    fun localHideFencesAnEvictedQueuedReactionFirstWrite() =
+    fun localHideFencesAnEvictedQueuedReactionFirstWrite() {
         assertRace(localHide = true, lateCorrection = false, evictRemoval = true)
+    }
 
     /** A queued correction cannot outlive a local hide by waiting for removal-identity eviction. */
     @Test
-    fun localHideFencesAnEvictedQueuedReactionCorrection() =
+    fun localHideFencesAnEvictedQueuedReactionCorrection() {
         assertRace(localHide = true, lateCorrection = true, evictRemoval = true)
+    }
 
     /** A matching queued reaction without a removal reaches the platform and retains its valid quote. */
     @Test
@@ -215,19 +219,18 @@ class NotificationReactionRemovalRaceTest {
     private fun fixture(
         identityReady: CountDownLatch,
         lateCorrection: Boolean = false,
-    ) =
-        NotificationBootstrapTestFixture(
-            context = context,
-            groupIdHex = GROUP,
-            messageIdHex = TARGET,
-            emitStartupNotification = false,
-            notificationUsersHaveDisplayNames = false,
-            localDisplayName = if (lateCorrection) null else "Alice",
-            onDisplayName = { _, _ ->
-                check(identityReady.await(5, TimeUnit.SECONDS))
-                "Alice"
-            },
-        )
+    ) = NotificationBootstrapTestFixture(
+        context = context,
+        groupIdHex = GROUP,
+        messageIdHex = TARGET,
+        emitStartupNotification = false,
+        notificationUsersHaveDisplayNames = false,
+        localDisplayName = if (lateCorrection) null else "Alice",
+        onDisplayName = { _, _ ->
+            check(identityReady.await(5, TimeUnit.SECONDS))
+            "Alice"
+        },
+    )
 
     /** A reaction has its own event identity, distinct from the removed quoted target. */
     private fun reaction(update: NotificationUpdateFfi) =
@@ -270,7 +273,13 @@ class NotificationReactionRemovalRaceTest {
                 val messageId =
                     card?.extras?.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX)
                 val sameMessage = expectedMessageId == null || messageId == expectedMessageId
-                if (sameMessage && card?.extras?.let(::allText).orEmpty().any { text in it }) return@withTimeout
+                val containsText =
+                    card
+                        ?.extras
+                        ?.let(::allText)
+                        .orEmpty()
+                        .any { text in it }
+                if (sameMessage && containsText) return@withTimeout
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                 delay(1L)
             }
