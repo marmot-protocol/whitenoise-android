@@ -20,11 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -38,7 +36,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import kotlinx.coroutines.launch
 
 /** Full settings disclosure; onboarding offers the same information in each choice's Details section. */
 @Composable
@@ -129,58 +126,35 @@ internal fun UsageDiagnosticsPrompt(
 ) {
     val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
-    var closing by remember { mutableStateOf(false) }
-    val idle = !state.busy && !loggingBusy && !closeBusy
-    val settled = idle && !state.failed && state.snapshot != null && !closeFailed
-    // A failed close may be left unsaved: nothing is written, so collection stays off and the
-    // next launch asks again. A retry in flight still pins the sheet until it settles.
-    val abandonable = idle && closeFailed
+    val close = remember { PromptCloseState() }
+    val closeMode =
+        promptCloseMode(
+            idle = !state.busy && !loggingBusy && !closeBusy,
+            receiptSettled = !state.failed && state.snapshot != null,
+            closeFailed = closeFailed,
+        )
     // `rememberModalBottomSheetState` keys its saved state on `confirmValueChange`, so a lambda that
     // captures `settled` gets a new identity the moment a choice starts writing — and the sheet state
     // is rebuilt underneath it, which the reader sees as the sheet closing and reopening on every tap.
     // The lambda is remembered once and reads the current value through a snapshot instead.
-    val settledNow by rememberUpdatedState(settled || abandonable || closing)
+    val settledNow by rememberUpdatedState(closeMode != null || close.closing)
     val confirmValueChange = remember { { value: SheetValue -> value != SheetValue.Hidden || settledNow } }
     val sheetState =
         rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
             confirmValueChange = confirmValueChange,
         )
-    val scope = rememberCoroutineScope()
-    val onDoneNow by rememberUpdatedState(onDone)
-    val onDismissFailedCloseNow by rememberUpdatedState(onDismissFailedClose)
-    var abandoning by remember { mutableStateOf(false) }
-    DisposableEffect(Unit) {
-        onDispose {
-            // A lock/overlay can remove the sheet before its hide animation finishes.
-            // The runtime owner and its native save outlive this presentation scope.
-            if (abandoning) onDismissFailedCloseNow() else if (closing) onDoneNow()
-        }
-    }
-    // The sheet closes on the gesture and records the declined choices afterwards. Waiting for one or
-    // two native writes first made a slow write read as "the X did nothing", and invited a second tap
-    // that re-entered the whole thing; `closing` makes the second tap a no-op instead.
-    //
-    val finish = {
-        if (settled && !closing) {
-            closing = true
-            onCloseStarted()
-            scope.launch {
-                sheetState.hide()
-                onDone()
-            }
-        } else if (abandonable && !closing) {
-            closing = true
-            abandoning = true
-            scope.launch {
-                sheetState.hide()
-                onDismissFailedClose()
-            }
-        }
-        Unit
-    }
+    val finish =
+        rememberPromptFinish(
+            close,
+            hide = sheetState::hide,
+            mode = closeMode,
+            onCloseStarted = onCloseStarted,
+            onDone = onDone,
+            onDismissFailedClose = onDismissFailedClose,
+        )
     ModalBottomSheet(
-        onDismissRequest = { if (settled || abandonable) finish() },
+        onDismissRequest = finish,
         containerColor = amoledSheetContainerColor(),
         sheetState = sheetState,
     ) {
@@ -188,7 +162,7 @@ internal fun UsageDiagnosticsPrompt(
             WhiteNoiseSheetHeader(
                 title = stringResource(R.string.usage_diagnostics_prompt_title),
                 onClose = finish,
-                closeEnabled = settled || abandonable,
+                closeEnabled = closeMode != null,
             )
             DiagnosticsCloseFailure(closeFailed, closeBusy, onRetryClose)
             UsageDiagnosticsPromptBody(
@@ -196,7 +170,7 @@ internal fun UsageDiagnosticsPrompt(
                 loggingBusy,
                 onChoiceStarted,
                 showFeedback = !closeFailed,
-                choicesEnabled = !closeBusy && !closing && !closeFailed,
+                choicesEnabled = !closeBusy && !close.closing && !closeFailed,
             ) { loggingBusy = it }
         }
     }

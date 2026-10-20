@@ -60,7 +60,8 @@ class ProductRegistryFingerprintTest {
                 ProductEventSchemaFfi(
                     name = "app_example_added",
                     mode = ProductEventModeFfi.AGGREGATE,
-                    properties = listOf(ProductPropertySchemaFfi("outcome", ProductPropertyKindFfi.BOOLEAN, emptyList())),
+                    properties =
+                        listOf(ProductPropertySchemaFfi("outcome", ProductPropertyKindFfi.BOOLEAN, emptyList())),
                 )
         assertNotEquals(registryFingerprint(androidProductRegistry), registryFingerprint(expanded))
     }
