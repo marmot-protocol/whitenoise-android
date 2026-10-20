@@ -2354,4 +2354,10 @@
     <string name="group_change_invite_anyway">Yine de davet et</string>
     <string name="starting_as">Şu hesapla başlat</string>
     <string name="starting_as_account">Şu hesapla başlat: %1$s</string>
+    <string name="search_scope_this_chat">Bu sohbet · %1$s</string>
+    <string name="search_scope_all_chats">Tüm sohbetler</string>
+    <string name="search_scope_other_chats">Diğer sohbetlerde ara</string>
+    <string name="search_scope_selected_chats">Seçilen sohbetler</string>
+    <string name="search_message_content_loading">Mesaj içeriği aranıyor…</string>
+    <string name="search_message_content_failed">Mesaj içeriğinde arama yapılamadı.</string>
 </resources>

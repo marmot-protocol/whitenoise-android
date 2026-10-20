@@ -913,6 +913,16 @@ internal fun ChatsScreen(
             runtimeGeneration = appState.runtimeGeneration,
             searchFilters = globalSearchState.viewportFilters(),
         )
+    // Capture restoration before the reset effect records a fresh dataset. Only an existing deep
+    // viewport needs the complete body list to avoid clamping its retained message anchor.
+    val preservePendingSearchAnchor =
+        remember(chatListDatasetKey, bodySearchRequest) {
+            preserveSearchBodyAnchor(
+                sameDataset = searchViewport?.resetState(showArchived)?.appliedDatasetKey == chatListDatasetKey,
+                firstVisibleIndex = chatListState.firstVisibleItemIndex,
+                firstVisibleOffset = chatListState.firstVisibleItemScrollOffset,
+            )
+        }
     ChatListSearchTopResetEffect(
         listState = chatListState,
         datasetKey = chatListDatasetKey,
@@ -1900,11 +1910,14 @@ internal fun ChatsScreen(
                             requireNotNull(controller.error),
                             onRetry = controller::retryLoad,
                         )
-                    bodySearchLoading ->
-                        // Even nonempty title-only rows would clamp a deep message-results position
-                        // before the current body lookup publishes. Wait without measuring a replacement list.
+                    blockLocalSearchRows(
+                        loading = bodySearchLoading,
+                        hasLocalRows = visibleItems.isNotEmpty(),
+                        preservePendingAnchor = preservePendingSearchAnchor,
+                    ) ->
+                        // A restored deep anchor still waits; fresh local name matches remain usable.
                         LoadingScreen(message = stringResource(R.string.conversation_search_loading))
-                    bodySearchFailure != null ->
+                    bodySearchFailure != null && visibleItems.isEmpty() ->
                         ErrorContent(
                             stringResource(R.string.couldnt_load_chats),
                             bodySearchFailure,
@@ -1993,6 +2006,15 @@ internal fun ChatsScreen(
                                             contentType = CHAT_LIST_ROW_CONTENT_TYPE,
                                         ) {
                                             chatRowContent(item, targetIndex, null)
+                                        }
+                                    }
+                                    if (bodySearchLoading || bodySearchFailure != null) {
+                                        item(key = "global-search-body-stage") {
+                                            GlobalSearchBodyStage(
+                                                loading = bodySearchLoading,
+                                                failure = bodySearchFailure,
+                                                onRetry = { bodySearchRetry++ },
+                                            )
                                         }
                                     }
                                     if (searchSections.messages.isNotEmpty()) {

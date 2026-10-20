@@ -2521,4 +2521,10 @@
     <string name="group_change_wait">Wait</string>
     <string name="group_change_continue_anyway">Continue anyway</string>
     <string name="group_change_invite_anyway">Invite anyway</string>
+    <string name="search_scope_this_chat">This chat · %1$s</string>
+    <string name="search_scope_all_chats">All chats</string>
+    <string name="search_scope_other_chats">Search other chats</string>
+    <string name="search_scope_selected_chats">Selected chats</string>
+    <string name="search_message_content_loading">Searching message content…</string>
+    <string name="search_message_content_failed">Couldn’t search message content.</string>
 </resources>

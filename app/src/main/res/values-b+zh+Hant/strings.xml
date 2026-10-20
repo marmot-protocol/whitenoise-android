@@ -2323,4 +2323,10 @@
     <string name="group_change_invite_anyway">仍要邀請</string>
     <string name="starting_as">以此身分發起</string>
     <string name="starting_as_account">以 %1$s 的身分發起</string>
+    <string name="search_scope_this_chat">此聊天 · %1$s</string>
+    <string name="search_scope_all_chats">所有聊天</string>
+    <string name="search_scope_other_chats">搜尋其他聊天</string>
+    <string name="search_scope_selected_chats">已選聊天</string>
+    <string name="search_message_content_loading">正在搜尋訊息內容…</string>
+    <string name="search_message_content_failed">無法搜尋訊息內容。</string>
 </resources>

@@ -346,4 +346,52 @@ class GlobalSearchFilterInteractionTest {
             .onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
             .assertContentDescriptionEquals(context.getString(R.string.chat_list_search_clear_all_filters))
     }
+
+    /** The local menu offers message filters while conflicting restored chips remain recoverable. */
+    @Test
+    fun conversationMenuOffersOnlyMessageFilters() {
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterMenu(
+                    expanded = true,
+                    state = GlobalSearchState(isOpen = true),
+                    onDismiss = {},
+                    onCategory = {},
+                    onClearAll = {},
+                    conversationScope = true,
+                )
+            }
+        }
+        listOf(GlobalSearchFilterCategory.Sender, GlobalSearchFilterCategory.Date, GlobalSearchFilterCategory.Content)
+            .forEach { composeRule.onNodeWithTag(globalSearchFilterMenuItemTag(it)).assertExists() }
+        listOf(GlobalSearchFilterCategory.Chat, GlobalSearchFilterCategory.ChatType, GlobalSearchFilterCategory.Folder)
+            .forEach { composeRule.onNodeWithTag(globalSearchFilterMenuItemTag(it)).assertDoesNotExist() }
+    }
+
+    /** The origin is labelled and cannot be accidentally removed; broadening has its own action. */
+    @Test
+    fun conversationScopeIsVisibleAndBroadeningIsExplicit() {
+        val chat = GlobalSearchChatFilter("origin", "Community")
+        var broadened = false
+        var removed = ""
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterControlsRow(
+                    state = GlobalSearchState(isOpen = true, chatFilters = setOf(chat)),
+                    onRemoveFilter = { removed = it },
+                    onClearAll = {},
+                    conversationScope = chat,
+                    onSearchOtherChats = { broadened = true },
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag("search-scope-label")
+            .assertTextEquals(context.getString(R.string.search_scope_this_chat, "Community"))
+        composeRule.onNodeWithTag(globalSearchFilterChipTag(chat.chipId)).assertDoesNotExist()
+        assertFalse(broadened)
+        assertEquals("", removed)
+        composeRule.onNodeWithTag("search-other-chats").performClick()
+        assertTrue(broadened)
+    }
 }

@@ -3,8 +3,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilledIconButton
@@ -113,9 +116,10 @@ internal fun GlobalSearchFilterMenu(
     onDismiss: () -> Unit,
     onCategory: (GlobalSearchFilterCategory) -> Unit,
     onClearAll: () -> Unit,
+    conversationScope: Boolean = false,
 ) {
     val categories =
-        GlobalSearchFilterCategory.entries.map { category ->
+        globalSearchVisibleFilterCategories(conversationScope).map { category ->
             WhiteNoiseMenuItem(
                 label = stringResource(category.labelRes()),
                 selected = state.isCategoryActive(category),
@@ -124,7 +128,14 @@ internal fun GlobalSearchFilterMenu(
             )
         }
     val clearAll =
-        if (state.hasActiveFilters) {
+        if (state.hasActiveFilters &&
+            (
+                !conversationScope ||
+                    state.messageFiltersActive ||
+                    state.folderFilters.isNotEmpty() ||
+                    state.chatTypeFilters.isNotEmpty()
+            )
+        ) {
             listOf(
                 WhiteNoiseMenuItem(
                     label = stringResource(R.string.chat_list_search_clear_all_filters),
@@ -151,41 +162,70 @@ internal fun GlobalSearchFilterControlsRow(
     onClearAll: () -> Unit,
     modifier: Modifier = Modifier,
     folderNames: Map<String, String> = emptyMap(),
+    conversationScope: GlobalSearchChatFilter? = null,
+    onSearchOtherChats: (() -> Unit)? = null,
 ) {
     val chips = GlobalSearchActiveChips.from(state)
     val clearAllDescription = stringResource(R.string.chat_list_search_clear_all_filters)
-    LazyRow(
-        modifier = modifier.fillMaxWidth().testTag(CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG),
-        contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (chips.count > 0) {
-            item(key = "clear-all") {
+    Column(modifier = modifier.fillMaxWidth().testTag("search-scope-controls")) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text =
+                    when {
+                        conversationScope != null ->
+                            stringResource(R.string.search_scope_this_chat, conversationScope.displayLabel)
+                        state.chatFilters.size == 1 ->
+                            stringResource(R.string.search_scope_this_chat, state.chatFilters.single().displayLabel)
+                        state.chatFilters.isNotEmpty() -> stringResource(R.string.search_scope_selected_chats)
+                        else -> stringResource(R.string.search_scope_all_chats)
+                    },
+                modifier = Modifier.weight(1f).testTag("search-scope-label"),
+            )
+            if (onSearchOtherChats != null) {
                 TextButton(
-                    onClick = onClearAll,
-                    modifier =
-                        Modifier
-                            .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
-                            .semantics { contentDescription = clearAllDescription },
+                    onClick = onSearchOtherChats,
+                    modifier = Modifier.weight(1f).testTag("search-other-chats"),
                 ) {
-                    Text(stringResource(R.string.chat_list_search_clear_all_filters))
+                    Text(stringResource(R.string.search_scope_other_chats))
                 }
             }
         }
-        items(chips.items, key = { it.chipId }) { chip ->
-            val chipLabel = globalSearchActiveChipLabel(chip, state, folderNames)
-            val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
-            InputChip(
-                selected = true,
-                onClick = { onRemoveFilter(chip.chipId) },
-                label = { Text(chipLabel) },
-                trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = null) },
-                modifier =
-                    Modifier
-                        .testTag(globalSearchFilterChipTag(chip.chipId))
-                        .semantics { contentDescription = removeDescription },
-            )
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().testTag(CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG),
+            contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (chips.items.any { it.chipId != conversationScope?.chipId }) {
+                item(key = "clear-all") {
+                    TextButton(
+                        onClick = onClearAll,
+                        modifier =
+                            Modifier
+                                .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
+                                .semantics { contentDescription = clearAllDescription },
+                    ) {
+                        Text(stringResource(R.string.chat_list_search_clear_all_filters))
+                    }
+                }
+            }
+            items(chips.items.filterNot { it.chipId == conversationScope?.chipId }, key = { it.chipId }) { chip ->
+                val chipLabel = globalSearchActiveChipLabel(chip, state, folderNames)
+                val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
+                InputChip(
+                    selected = true,
+                    onClick = { onRemoveFilter(chip.chipId) },
+                    label = { Text(chipLabel) },
+                    trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = null) },
+                    modifier =
+                        Modifier
+                            .testTag(globalSearchFilterChipTag(chip.chipId))
+                            .semantics { contentDescription = removeDescription },
+                )
+            }
         }
     }
 }

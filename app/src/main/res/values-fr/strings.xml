@@ -2356,4 +2356,10 @@
     <string name="group_change_invite_anyway">Inviter quand même</string>
     <string name="starting_as">Démarrer en tant que</string>
     <string name="starting_as_account">Démarrer en tant que %1$s</string>
+    <string name="search_scope_this_chat">Cette discussion · %1$s</string>
+    <string name="search_scope_all_chats">Toutes les discussions</string>
+    <string name="search_scope_other_chats">Rechercher dans d’autres discussions</string>
+    <string name="search_scope_selected_chats">Discussions sélectionnées</string>
+    <string name="search_message_content_loading">Recherche dans le contenu des messages…</string>
+    <string name="search_message_content_failed">Impossible de rechercher dans le contenu des messages.</string>
 </resources>

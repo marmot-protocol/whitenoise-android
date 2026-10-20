@@ -2373,4 +2373,10 @@
     <string name="group_change_invite_anyway">Trotzdem einladen</string>
     <string name="starting_as">Starten als</string>
     <string name="starting_as_account">Starten als %1$s</string>
+    <string name="search_scope_this_chat">Dieser Chat · %1$s</string>
+    <string name="search_scope_all_chats">Alle Chats</string>
+    <string name="search_scope_other_chats">Andere Chats durchsuchen</string>
+    <string name="search_scope_selected_chats">Ausgewählte Chats</string>
+    <string name="search_message_content_loading">Nachrichteninhalte werden durchsucht…</string>
+    <string name="search_message_content_failed">Nachrichteninhalte konnten nicht durchsucht werden.</string>
 </resources>

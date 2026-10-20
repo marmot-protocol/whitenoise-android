@@ -2428,4 +2428,10 @@
     <string name="group_change_invite_anyway">Всё равно пригласить</string>
     <string name="starting_as">Начать от имени</string>
     <string name="starting_as_account">Начать от имени %1$s</string>
+    <string name="search_scope_this_chat">Этот чат · %1$s</string>
+    <string name="search_scope_all_chats">Все чаты</string>
+    <string name="search_scope_other_chats">Искать в других чатах</string>
+    <string name="search_scope_selected_chats">Выбранные чаты</string>
+    <string name="search_message_content_loading">Поиск по содержимому сообщений…</string>
+    <string name="search_message_content_failed">Не удалось выполнить поиск по содержимому сообщений.</string>
 </resources>
