@@ -120,7 +120,8 @@ def usable_chat(name):
                 print(f'{name}: retained conversation ready', flush=True)
                 return
             close_consent = (consent and node.get('content-desc') == 'Close' and node.get('enabled') == 'true')
-            open_chat = not consent and text == 'Nightly upgrade qualification' and not opened
+            open_chat = (chat_list and not conversation and not consent
+                         and text == 'Nightly upgrade qualification' and not opened)
             if close_consent or open_chat:
                 bounds = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
                 if len(bounds) != 4:
@@ -185,6 +186,19 @@ def main():
             facts['phases']['cold_restart'] = 'passed'
         except (RuntimeError, subprocess.SubprocessError) as error:
             facts['phases']['upgrade_campaign'] = type(error).__name__ + ': ' + str(error)
+        # Keep core upgrade/cold evidence even if the separate pending upload qualification fails.
+        if facts['phases'].get('cold_restart') == 'passed':
+            try:
+                stop()
+                instrument('pending-promotion', UPGRADE, {'retainedAccountHistoryAndMedia'},
+                           (*ports, '-e', 'qualificationPhase', 'promote'))
+                facts['phases']['pending_promotion'] = 'passed'
+                stop()
+                instrument('promoted-cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
+                           (*ports, '-e', 'qualificationPhase', 'promoted-cold'))
+                facts['phases']['promoted_cold_restart'] = 'passed'
+            except (RuntimeError, subprocess.SubprocessError) as error:
+                facts['phases']['pending_promotion_campaign'] = type(error).__name__ + ': ' + str(error)
         # Separate generated roots in the maintained recovery fixture do not depend on upgrade success.
         install('candidate')
         for comparison in ('refuse', 'ignore'):
@@ -200,7 +214,8 @@ def main():
         for server in (relay, blob):
             server.shutdown()
             server.server_close()
-    required = {'baseline', 'upgrade', 'cold_restart', 'recovery_refuse', 'recovery_ignore'}
+    required = {'baseline', 'upgrade', 'cold_restart', 'pending_promotion', 'promoted_cold_restart',
+                'recovery_refuse', 'recovery_ignore'}
     if set(facts['phases']) != required or any(value != 'passed' for value in facts['phases'].values()):
         raise SystemExit('Qualification failed; retained reports distinguish failed and unexecuted phases')
 

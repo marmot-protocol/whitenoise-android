@@ -92,7 +92,8 @@ class QualificationUiTest(unittest.TestCase):
             '<hierarchy><node resource-id="chats.scope.chats"/>'
             '<node text="Retained qualification history 0"/>'
             '<node text="Nightly upgrade qualification" bounds="[30,30][90,90]"/></hierarchy>',
-            '<hierarchy><node resource-id="composer-pill-surface"/>'
+            '<hierarchy><node text="Nightly upgrade qualification" bounds="[0,0][120,40]"/>'
+            '<node resource-id="composer-pill-surface"/>'
             '<node text="Retained qualification history 0"/></hierarchy>',
         ]
         taps = []
@@ -111,6 +112,26 @@ class QualificationUiTest(unittest.TestCase):
                 campaign.usable_chat('fixture')
                 self.assertEqual(taps, [('20', '20'), ('60', '60')])
                 self.assertEqual((Path(directory) / 'fixture.png').read_bytes(), b'image')
+
+    def test_restored_conversation_header_is_not_a_chat_list_row(self):
+        """An already-open retained conversation must pass without tapping its identically named group header."""
+        window = ('<hierarchy><node text="Nightly upgrade qualification" bounds="[0,0][120,40]"/>'
+                  '<node resource-id="composer-pill-surface"/>'
+                  '<node text="Retained qualification history 0"/></hierarchy>')
+
+        def fixture_adb(*args, **kwargs):
+            """Expose the restored conversation and reject any navigation away from its retained messages."""
+            if args[:2] == ('shell', 'cat'):
+                return window
+            if args[:3] == ('shell', 'input', 'tap'):
+                self.fail('The conversation header must not be opened')
+            return b'image' if kwargs.get('binary') else ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=fixture_adb):
+                campaign.usable_chat('restored')
+                self.assertTrue((Path(directory) / 'restored.png').exists())
 
 
 if __name__ == '__main__':

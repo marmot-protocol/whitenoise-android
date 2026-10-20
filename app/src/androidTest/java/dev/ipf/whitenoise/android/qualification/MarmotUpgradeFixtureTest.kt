@@ -27,7 +27,7 @@ import java.io.File
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class MarmotUpgradeFixtureTest {
-    /** Each invocation is a separate instrumentation process; neither read phase may create replacement data. */
+    /** Each invocation is a new process; read phases cannot replace the baseline fixture or its pending upload. */
     @Test
     fun retainedAccountHistoryAndMedia() =
         runBlocking<Unit> {
@@ -35,7 +35,7 @@ class MarmotUpgradeFixtureTest {
             check(context.packageName == "dev.ipf.whitenoise.android.mdkqualification")
             val arguments = InstrumentationRegistry.getArguments()
             val phase = requireNotNull(arguments.getString("qualificationPhase"))
-            require(phase in setOf("seed", "upgrade", "cold"))
+            require(phase in setOf("seed", "upgrade", "cold", "promote", "promoted-cold"))
             val receipt = File(context.filesDir, "upgrade-fixture.json")
             val root = File(context.filesDir, "Marmot")
             if (phase == "seed") {
@@ -57,16 +57,18 @@ class MarmotUpgradeFixtureTest {
                             runtime,
                             phase,
                             beforeStart = false,
-                            pendingLegacyBytes = if (phase == "upgrade") PAYLOAD_SIZE.toULong() else 0uL,
+                            pendingLegacyBytes = if (phase == "promoted-cold") 0uL else PAYLOAD_SIZE.toULong(),
                         ) {
                             verifyRetained(runtime, JSONObject(receipt.readText()))
                         }
                         verify(runtime, receipt, phase)
-                        verifyPendingUpload(runtime, receipt, phase)
-                        if (phase == "upgrade") {
+                        if (phase == "promote") {
+                            verifyPendingUpload(runtime, receipt, phase)
                             verifyUpgradeStorage(runtime, "promoted", beforeStart = false)
                             verifyRetained(runtime, JSONObject(receipt.readText()))
                             verifyPendingUpload(runtime, receipt, "promoted")
+                        } else if (phase == "promoted-cold") {
+                            verifyPendingUpload(runtime, receipt, phase)
                         }
                     }
                 }
@@ -141,23 +143,27 @@ class MarmotUpgradeFixtureTest {
         val value = JSONObject(receipt.readText())
         assertNotEquals(value.getInt("seedPid"), Process.myPid())
         if (phase == "cold") assertNotEquals(value.getInt("upgradePid"), Process.myPid())
+        if (phase == "promote") assertNotEquals(value.getInt("coldPid"), Process.myPid())
+        if (phase == "promoted-cold") assertNotEquals(value.getInt("promotePid"), Process.myPid())
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
         value.put("${phase}Pid", Process.myPid())
         receipt.writeText(value.toString())
     }
 
-    /** Waits for the receiver's native history instead of constructing a target from sender metadata. */
+    /** Resolves native attachment history so retained reads use MDK's source ID, not the application event ID. */
     private suspend fun awaitTarget(
         runtime: Marmot,
         account: String,
         group: String,
+        message: String? = null,
     ): AttachmentLocalTargetFfi {
         while (true) {
             val result = runtime.attachmentHistoryPage(account, group, 100u, null)
             val page = (result as AttachmentPageReadFfi.Page).page
             try {
-                page.entries.singleOrNull()?.let {
+                page.entries.singleOrNull { message == null || it.messageIdHex == message }?.let {
+                    // Each fixture message has one attachment; the native source ID is distinct from its event ID.
                     return AttachmentLocalTargetFfi(it.messageIdHex, it.sourceMessageIdHex, 0u)
                 }
             } finally {
@@ -203,25 +209,29 @@ class MarmotUpgradeFixtureTest {
         val value = JSONObject(receipt.readText())
         val account = value.getString("sender")
         val group = value.getString("group")
-        if (phase == "upgrade") {
+        if (phase == "promote") {
             val reference = value.getJSONObject("pendingReference").upgradeMediaReference()
             val sent = runtime.sendMediaReference(account, group, reference, "Promoted baseline pending upload")
             value.put("pendingMessage", sent.messageIds.single())
             receipt.writeText(value.toString())
         }
         val message = value.getString("pendingMessage")
-        val target = AttachmentLocalTargetFfi(message, message, 0u)
-        withTimeout(30_000L) {
-            while (true) {
-                val assets = runtime.attachmentLocalAssets(account, group, listOf(target))
-                val reference = assets.single().reference
-                if (reference != null) {
-                    val bytes = runtime.readAttachmentAsset(account, reference, 0uL, PAYLOAD_SIZE.toUInt()).bytes
-                    assertArrayEquals(payload(1), bytes)
-                    break
+        try {
+            withTimeout(30_000L) {
+                val target = awaitTarget(runtime, account, group, message)
+                while (true) {
+                    val assets = runtime.attachmentLocalAssets(account, group, listOf(target))
+                    val reference = assets.single().reference
+                    if (reference != null) {
+                        val bytes = runtime.readAttachmentAsset(account, reference, 0uL, PAYLOAD_SIZE.toUInt()).bytes
+                        assertArrayEquals(payload(1), bytes)
+                        break
+                    }
+                    delay(100L)
                 }
-                delay(100L)
             }
+        } finally {
+            verifyUpgradeStorage(runtime, "pending-read-observation", beforeStart = true)
         }
     }
 
