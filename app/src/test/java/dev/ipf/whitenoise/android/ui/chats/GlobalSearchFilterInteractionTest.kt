@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -11,6 +14,8 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
@@ -391,6 +396,39 @@ class GlobalSearchFilterInteractionTest {
         composeRule.onNodeWithTag(globalSearchFilterChipTag(chat.chipId)).assertDoesNotExist()
         assertFalse(broadened)
         assertEquals("", removed)
+        composeRule.onNodeWithTag("search-other-chats").performClick()
+        assertTrue(broadened)
+    }
+
+    /** Narrow large-font scope/action controls use full-width rows without losing the explicit action. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
+    fun narrowLargeRtlScopeStacksTheExplicitBroadeningActionBelowTheLabel() {
+        val chat = GlobalSearchChatFilter("origin", "Community")
+        var broadened = false
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, 2f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+            ) {
+                WhiteNoiseTheme {
+                    Surface {
+                        GlobalSearchFilterControlsRow(
+                            state = GlobalSearchState(isOpen = true, chatFilters = setOf(chat)),
+                            onRemoveFilter = {},
+                            onClearAll = {},
+                            conversationScope = chat,
+                            onSearchOtherChats = { broadened = true },
+                        )
+                    }
+                }
+            }
+        }
+        val label = composeRule.onNodeWithTag("search-scope-label").fetchSemanticsNode().boundsInRoot
+        val action = composeRule.onNodeWithTag("search-other-chats").fetchSemanticsNode().boundsInRoot
+        assertTrue("explicit action must be below the full-width scope label", action.top >= label.bottom)
+        assertTrue("action retains the label's available width", action.width >= label.width)
         composeRule.onNodeWithTag("search-other-chats").performClick()
         assertTrue(broadened)
     }

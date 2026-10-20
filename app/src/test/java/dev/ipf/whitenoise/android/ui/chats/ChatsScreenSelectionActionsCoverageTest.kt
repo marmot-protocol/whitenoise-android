@@ -6,19 +6,44 @@ import org.junit.Test
 import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
+    /** Behavioral coverage also lives in GlobalSearchBodyStageTest and GlobalSearchStagedViewportTest. */
     @Test
-    fun pendingBodySearchNeverMeasuresAShortTitleOnlyReplacementList() {
+    fun pendingBodySearchProtectsDeepAnchorsWithoutHidingFreshLocalNames() {
         val source = chatsScreenSource().readText()
-        assertTrue("pending search always keeps the loading fence", "bodySearchLoading ->" in source)
-        assertFalse("title hits cannot remove that fence", "bodySearchLoading && visibleItems.isEmpty()" in source)
+        assertTrue("the viewport uses the staged loading fence", "blockLocalSearchRows(" in source)
+        assertTrue(
+            "the fence receives the restoration owner",
+            "preservePendingAnchor = preservePendingSearchAnchor" in source,
+        )
+        assertTrue("the fence receives available local rows", "hasLocalRows = visibleItems.isNotEmpty()" in source)
+        assertTrue("restoration is captured per request", "remember(chatListDatasetKey, bodySearchRequest)" in source)
+        val deepAnchor = preserveSearchBodyAnchor(sameDataset = true, firstVisibleIndex = 40, firstVisibleOffset = 9)
+        assertTrue(
+            "pending deep restoration cannot measure a shortened list",
+            blockLocalSearchRows(true, true, deepAnchor),
+        )
+        assertFalse("fresh local names do not wait for body work", blockLocalSearchRows(true, true, false))
+        assertTrue(
+            "message-only empty results still wait for matching bodies",
+            blockLocalSearchRows(true, false, false),
+        )
         assertTrue("the viewport expires off-window return focus", "globalSearchReturnFocusExpiryEffect(" in source)
     }
 
-    /** Error presentation retries only its lookup and cannot settle or expire the results viewport. */
+    /** Inline body failure keeps names available; request-only retry cannot settle the results viewport. */
     @Test
-    fun lookupFailureKeepsTheViewportUnmountedAndOffersRequestOnlyRetry() {
+    fun lookupFailureRetainsLocalRowsAndOffersRequestOnlyRetry() {
         val source = chatsScreenSource().readText()
-        assertTrue("body failures have recoverable presentation", "bodySearchFailure != null ->" in source)
+        assertTrue(
+            "full-screen body failure is reserved for unavailable local rows",
+            "bodySearchFailure != null && visibleItems.isEmpty() ->" in source,
+        )
+        assertTrue("available local rows retain inline body recovery", "GlobalSearchBodyStage(" in source)
+        val stage = File(chatsScreenSource().parentFile, "GlobalSearchBodyStage.kt").readText()
+        assertTrue(
+            "inline failure preserves retry controls",
+            "InlineErrorBanner(" in stage && "onRetry = onRetry" in stage,
+        )
         assertTrue(
             "attachment failures have recoverable presentation",
             "browsingAttachments && libraryFailure != null ->" in source,

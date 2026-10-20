@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -26,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
@@ -168,28 +171,40 @@ internal fun GlobalSearchFilterControlsRow(
     val chips = GlobalSearchActiveChips.from(state)
     val clearAllDescription = stringResource(R.string.chat_list_search_clear_all_filters)
     Column(modifier = modifier.fillMaxWidth().testTag("search-scope-controls")) {
-        Row(
+        val scopeLabel =
+            when {
+                conversationScope != null ->
+                    stringResource(R.string.search_scope_this_chat, conversationScope.displayLabel)
+                state.chatFilters.size == 1 ->
+                    stringResource(R.string.search_scope_this_chat, state.chatFilters.single().displayLabel)
+                state.chatFilters.isNotEmpty() -> stringResource(R.string.search_scope_selected_chats)
+                else -> stringResource(R.string.search_scope_all_chats)
+            }
+        BoxWithConstraints(
             modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text =
-                    when {
-                        conversationScope != null ->
-                            stringResource(R.string.search_scope_this_chat, conversationScope.displayLabel)
-                        state.chatFilters.size == 1 ->
-                            stringResource(R.string.search_scope_this_chat, state.chatFilters.single().displayLabel)
-                        state.chatFilters.isNotEmpty() -> stringResource(R.string.search_scope_selected_chats)
-                        else -> stringResource(R.string.search_scope_all_chats)
-                    },
-                modifier = Modifier.weight(1f).testTag("search-scope-label"),
-            )
-            if (onSearchOtherChats != null) {
-                TextButton(
-                    onClick = onSearchOtherChats,
-                    modifier = Modifier.weight(1f).testTag("search-other-chats"),
-                ) {
-                    Text(stringResource(R.string.search_scope_other_chats))
+            val stacked = maxWidth < 360.dp && LocalDensity.current.fontScale >= 1.5f && onSearchOtherChats != null
+            if (stacked) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(text = scopeLabel, modifier = Modifier.testTag("search-scope-label"))
+                    TextButton(
+                        onClick = requireNotNull(onSearchOtherChats),
+                        modifier = Modifier.fillMaxWidth().testTag("search-other-chats"),
+                    ) {
+                        Text(stringResource(R.string.search_scope_other_chats))
+                    }
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = scopeLabel, modifier = Modifier.weight(1f).testTag("search-scope-label"))
+                    if (onSearchOtherChats != null) {
+                        TextButton(
+                            onClick = onSearchOtherChats,
+                            modifier = Modifier.weight(1f).testTag("search-other-chats"),
+                        ) {
+                            Text(stringResource(R.string.search_scope_other_chats))
+                        }
+                    }
                 }
             }
         }
