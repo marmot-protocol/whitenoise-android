@@ -110,4 +110,7 @@ internal fun markdownDocumentProfileReferenceBech32s(document: MarkdownDocumentF
 
 /** Only native-parsed public-key entities can resolve to an in-app profile. */
 internal fun MarkdownNostrEntityFfi.isProfileReference(): Boolean =
-    hrp == MarkdownNostrHrpFfi.NPUB || hrp == MarkdownNostrHrpFfi.NPROFILE
+    when (hrp) {
+        MarkdownNostrHrpFfi.NPUB, MarkdownNostrHrpFfi.NPROFILE -> true
+        else -> false
+    }
