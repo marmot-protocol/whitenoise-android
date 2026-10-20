@@ -114,7 +114,7 @@ class AmberActivityCoordinatorTest {
     }
 
     private class SlowLauncher(
-        private val delayMs: Long,
+        private val awaitTimeout: () -> Unit,
     ) : androidx.activity.result.ActivityResultLauncher<Intent>() {
         val launched = ConcurrentLinkedQueue<Intent>()
 
@@ -123,7 +123,7 @@ class AmberActivityCoordinatorTest {
             options: androidx.core.app.ActivityOptionsCompat?,
         ) {
             launched.add(input)
-            Thread.sleep(delayMs)
+            awaitTimeout()
         }
 
         override fun unregister() = Unit
@@ -816,32 +816,40 @@ class AmberActivityCoordinatorTest {
     @Test
     fun timeoutDuringLaunchIsAmbiguousAndCannotBecomeRetryable() {
         AmberActivityCoordinator.detach(coordinatorLauncher)
-        val slowLauncher = SlowLauncher(delayMs = 250)
+        lateinit var worker: Thread
+        val slowLauncher =
+            SlowLauncher {
+                // Timeout normalization must wait for the launch monitor held by this callback.
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+                while (worker.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+                    Thread.sleep(5)
+                }
+                assertEquals(Thread.State.BLOCKED, worker.state)
+            }
         coordinatorLauncher = slowLauncher
         AmberActivityCoordinator.attach(coordinatorLauncher)
         val outcome = AtomicReference<AmberActivityCoordinator.Outcome>()
         val done = CountDownLatch(1)
 
-        Thread {
-            outcome.set(
-                AmberActivityCoordinator.awaitApproval(
-                    groupedCryptoIntent("slow-launch", currentUser = "slow-launch-account"),
-                    timeoutMs = 100,
-                    requestId = "slow-launch",
-                    allowGrouping = true,
-                ),
-            )
-            done.countDown()
-        }.start()
+        worker =
+            Thread {
+                outcome.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        groupedCryptoIntent("slow-launch", currentUser = "slow-launch-account"),
+                        timeoutMs = 5_000,
+                        requestId = "slow-launch",
+                        allowGrouping = true,
+                    ),
+                )
+                done.countDown()
+            }
+        worker.start()
 
-        val admissionDeadline = System.currentTimeMillis() + 2_000
-        while (
-            AmberActivityCoordinator.groupedPendingCountForTest() == 0 &&
-            System.currentTimeMillis() < admissionDeadline
-        ) {
+        val launchDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        while (slowLauncher.launched.isEmpty() && System.nanoTime() < launchDeadline) {
+            shadowOf(Looper.getMainLooper()).idle()
             Thread.sleep(5)
         }
-        shadowOf(Looper.getMainLooper()).idle()
 
         assertTrue(done.await(2, TimeUnit.SECONDS))
         assertEquals(1, slowLauncher.launched.size)
