@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import java.io.File
@@ -82,7 +83,10 @@ internal fun createMaestroExternalContact(
         Marmot.newWithConfiguration(
             File(root, "external-contact").absolutePath,
             relays,
-            MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+            MarmotOptions(
+                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                deployment = marmotDeploymentWhiteNoise(),
+            ),
         )
     return MaestroExternalContact(remote, relays, owner)
 }

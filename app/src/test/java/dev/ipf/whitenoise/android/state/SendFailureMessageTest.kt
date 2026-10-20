@@ -7,6 +7,14 @@ import org.junit.Test
 import java.io.IOException
 
 class SendFailureMessageTest {
+    /** A native staging refusal needs free-space guidance without exposing the engine's disk details. */
+    @Test
+    fun aStorageFullSendExplainsThatSpaceMustBeFreedBeforeRetry() {
+        val refused = MarmotKitException.StorageFull("synthetic native reserve")
+
+        assertEquals(R.string.toast_send_storage_full, sendFailureMessageRes(refused))
+    }
+
     @Test
     fun aRefusedSendReadsAsABackedUpChatRatherThanAGenericFailure() {
         val refused = MarmotKitException.GroupSendQueueFull("7c3bdc38")

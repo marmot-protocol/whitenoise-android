@@ -1158,6 +1158,7 @@
     <string name="toast_profile_published_detail">Your profile is now on %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
+    <string name="toast_send_storage_full">Not enough storage to send. Free up space and try again.</string>
     <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
     <string name="toast_send_queue_full">This chat has too many messages waiting to send, so yours wasn\'t sent. Try again once it catches up.</string>
     <string name="toast_send_chat_changed">The chat changed while your message was sending, so it wasn\'t sent. Try again.</string>

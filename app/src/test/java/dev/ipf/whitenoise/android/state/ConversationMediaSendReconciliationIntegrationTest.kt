@@ -24,6 +24,7 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
@@ -590,8 +591,17 @@ class ConversationMediaSendReconciliationIntegrationTest {
      * so the poster never blinks out at the handover (#2732).
      */
     @Test
-    @Suppress("LongMethod") // One send, one failure and one retry belong in a single ordered flow.
     fun pendingVideoKeepsItsPosterSourceAcrossRetryUntilTheConfirmedBubbleTakesOver() =
+        assertVideoSurvivesUploadRefusal(IllegalStateException("upload interrupted"))
+
+    /** MDK can refuse staging before upload; the same retained attachment must remain available for a later retry. */
+    @Test
+    fun storageFullSendKeepsItsAttachmentUntilRetrySucceeds() =
+        assertVideoSurvivesUploadRefusal(MarmotKitException.StorageFull("synthetic native reserve"))
+
+    /** Drives refusal and retry through the real controller, retaining the pending bytes until publication succeeds. */
+    @Suppress("LongMethod") // One send, one failure and one retry belong in a single ordered flow.
+    private fun assertVideoSurvivesUploadRefusal(refusal: Throwable) =
         runTest {
             val appState = mediaSendReconciliationAppState()
             attachedChatsController(appState)
@@ -607,7 +617,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
                     groupRosterReader = { _, _ -> authoritativeRoster() },
                     mediaUploader = { _, _, _ ->
                         uploadAttempts += 1
-                        if (uploadAttempts == 1) error("upload interrupted") else uploadResult(reference)
+                        if (uploadAttempts == 1) throw refusal else uploadResult(reference)
                     },
                     mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
                     mediaPublisher = { _, _, _, _ ->
@@ -629,6 +639,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
 
             val failedMessage = controller.timeline.single()
             assertEquals(MessageStatus.Failed, failedMessage.status)
+            assertTrue("a refused upload must not publish", retainedDuringPublish.isEmpty())
             assertEquals(
                 "a failed upload must keep the bytes the poster is drawn from",
                 listOf(VIDEO_MEDIA_TYPE),
