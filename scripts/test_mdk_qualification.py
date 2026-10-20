@@ -69,5 +69,37 @@ class QualificationPackageTest(unittest.TestCase):
                 package_identity(manifest, 'app')
 
 
+class QualificationUiTest(unittest.TestCase):
+    """Reach the retained conversation through the real consent icon and chat-list transition."""
+
+    def test_consent_icon_is_dismissed_before_opening_retained_chat(self):
+        """A content-description close icon is actionable; a chat preview alone cannot qualify the UI."""
+        windows = [
+            '<hierarchy><node text="Help Improve White Noise"/>'
+            '<node content-desc="Close" enabled="true" bounds="[10,10][30,30]"/></hierarchy>',
+            '<hierarchy><node resource-id="chats.scope.chats"/>'
+            '<node text="Retained qualification history 0"/>'
+            '<node text="Nightly upgrade qualification" bounds="[30,30][90,90]"/></hierarchy>',
+            '<hierarchy><node resource-id="composer-pill-surface"/>'
+            '<node text="Retained qualification history 0"/></hierarchy>',
+        ]
+        taps = []
+
+        def fixture_adb(*args, **kwargs):
+            """Only user-like taps advance the synthetic UI; screenshots contain no account data."""
+            if args[:2] == ('shell', 'cat'):
+                return windows[len(taps)]
+            if args[:3] == ('shell', 'input', 'tap'):
+                taps.append(args[3:])
+            return b'image' if kwargs.get('binary') else ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=fixture_adb), patch.object(campaign.time, 'sleep'):
+                campaign.usable_chat('fixture')
+                self.assertEqual(taps, [('20', '20'), ('60', '60')])
+                self.assertEqual((Path(directory) / 'fixture.png').read_bytes(), b'image')
+
+
 if __name__ == '__main__':
     unittest.main()

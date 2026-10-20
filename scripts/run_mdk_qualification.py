@@ -39,6 +39,7 @@ def adb(*arguments, timeout=120, binary=False):
 
 def instrument(name, test_class, expected, extra=()):
     """Require each named case's terminal PASS; a zero adb exit or ignored test cannot qualify it."""
+    print(f'{name}: starting native qualification', flush=True)
     try:
         output = adb('shell', 'am', 'instrument', '-w', '-r', '-e', 'class', test_class,
                      *extra, RUNNER, timeout=1200)
@@ -69,6 +70,7 @@ def instrument(name, test_class, expected, extra=()):
         raise RuntimeError(f'{name}: required cases did not all pass; see retained transcript')
     if 'INSTRUMENTATION_CODE: -1' not in output:
         raise RuntimeError(f'{name}: runner did not finish successfully')
+    print(f'{name}: passed {len(passed)} cases; explicitly ignored {len(skipped)} cases', flush=True)
 
 
 def stop():
@@ -95,6 +97,7 @@ def disable_background_entries():
 
 def usable_chat(name):
     """Observe production MainActivity after real bootstrap, then open retained synthetic conversation history."""
+    print(f'{name}: opening retained conversation through MainActivity', flush=True)
     adb('shell', 'pm', 'grant', APP, 'android.permission.POST_NOTIFICATIONS')
     adb('shell', 'am', 'start', '-W', '-n', APP + '/dev.ipf.whitenoise.android.MainActivity')
     deadline = time.monotonic() + 120
@@ -111,8 +114,11 @@ def usable_chat(name):
             if 'Retained qualification history' in text and conversation and not chat_list:
                 (REPORTS / f'{name}-window.xml').write_text(xml)
                 (REPORTS / f'{name}.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
+                print(f'{name}: retained conversation ready', flush=True)
                 return
-            if (text == 'Nightly upgrade qualification' and not opened) or (consent and text == 'Close'):
+            close_consent = (consent and node.get('content-desc') == 'Close' and node.get('enabled') == 'true')
+            open_chat = not consent and text == 'Nightly upgrade qualification' and not opened
+            if close_consent or open_chat:
                 bounds = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
                 if len(bounds) != 4:
                     raise RuntimeError('Conversation bounds unavailable')
@@ -122,6 +128,7 @@ def usable_chat(name):
                 break
         time.sleep(2)
     (REPORTS / f'{name}-window.xml').write_text(xml)
+    (REPORTS / f'{name}.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
     raise RuntimeError(f'{name}: retained conversation did not become usable')
 
 

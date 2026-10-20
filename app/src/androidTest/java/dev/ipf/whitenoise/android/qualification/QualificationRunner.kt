@@ -33,7 +33,11 @@ class QualificationApplication : WhiteNoiseApplication() {
             )
         for (name in components) {
             val state = packageManager.getComponentEnabledSetting(ComponentName(this, name))
-            check(state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER)
+            // PackageManager may normalize disable-user to DISABLED for individual components.
+            check(
+                state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED ||
+                    state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
+            ) { "Fixture background component $name must be disabled; observed state=$state" }
         }
         // No production onCreate: the native fixture owns files/Marmot for this instrumentation process.
     }
