@@ -112,6 +112,8 @@ internal fun createTtsAutoReadContinuation(appState: WhiteNoiseAppState): TtsAut
                     CONVERSATION_WINDOW_MAX_ROWS,
                 )
 
+            // This stream carries no fresh roster. Preserve the session's resolved count
+            // instead of applying a cached roster.
             override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry? =
                 projectTtsSpeakableEntry(
                     message = TimelineProjector.toAppMessageRecord(record),
