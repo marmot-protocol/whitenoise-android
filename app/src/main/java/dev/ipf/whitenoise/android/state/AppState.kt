@@ -12381,6 +12381,10 @@ class WhiteNoiseAppState private constructor(
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }
 
+    /**
+     * Rechecks synchronous app and content fences at every platform write. A reaction's own event id cannot verify
+     * its quoted target, so a known removal in that conversation also rejects a captured, still-quoted update.
+     */
     private fun isNotificationGenerationPostAllowed(
         update: NotificationUpdateFfi,
         postEpoch: Long,
@@ -12396,7 +12400,12 @@ class WhiteNoiseAppState private constructor(
         // A deleted or hidden message can never be written back by a queued post or late enrichment (#3323).
         val contentAvailable =
             !notificationContentInvalidations.isRemoved(update.accountRef, update.groupIdHex, update.messageIdHex)
-        return lockAllowsPost && runtimeAllowsPost && contentAvailable && shouldPostNotification(update, engineMuted)
+        // Reactions name their own event, not the quoted target. Recheck removals at every platform write too.
+        val quoteAvailable =
+            !LocalNotificationFormatter.isReaction(update) ||
+                update.reactedToPreview.isNullOrBlank() ||
+                !notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)
+        return lockAllowsPost && runtimeAllowsPost && contentAvailable && quoteAvailable && shouldPostNotification(update, engineMuted)
     }
 
     private fun isNotificationEnrichmentAllowed(
@@ -13373,14 +13382,15 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Drops a reaction's quoted excerpt when its conversation holds a message hidden on this device (#3323). MDK
-     * already omits the quote of a deleted or invalidated target, but it cannot know a local hide, and the update
-     * names no target to compare, so any hidden message in the conversation withholds the quote.
+     * Drops a reaction's quoted excerpt when its conversation holds a local hide or a retained removal (#3323).
+     * The update names no quoted target, so the excerpt cannot be verified. Newly received reactions still post
+     * without it; the final write fence rejects an older queued excerpt when a removal lands after this check.
      */
     private suspend fun withoutUnverifiableReactionQuote(update: NotificationUpdateFfi): NotificationUpdateFfi {
         if (!LocalNotificationFormatter.isReaction(update) || update.reactedToPreview.isNullOrBlank()) return update
         val hidden = withContext(Dispatchers.IO) { hiddenMessageIdsInGroup(update.accountRef, update.groupIdHex) }
-        return if (hidden.isEmpty()) update else update.copy(reactedToPreview = null)
+        val removed = notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)
+        return if (hidden.isEmpty() && !removed) update else update.copy(reactedToPreview = null)
     }
 
     /** Exercises the exact typed-update production path from JVM or instrumentation acceptance tests. */

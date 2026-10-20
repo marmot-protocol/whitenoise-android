@@ -70,6 +70,15 @@ internal class NotificationContentInvalidations(
         return synchronized(this) { removedByAccount[accountRef]?.contains(key(groupIdHex, id)) == true }
     }
 
+    /** Whether a retained removal makes an unidentified reaction quote unsafe in this account and conversation. */
+    fun hasRemovalInConversation(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean {
+        val prefix = "${groupIdHex.lowercase()}\u0000"
+        return synchronized(this) { removedByAccount[accountRef]?.any { it.startsWith(prefix) } == true }
+    }
+
     /** One identity per case-insensitive conversation and message within an account. */
     private fun key(
         groupIdHex: String,

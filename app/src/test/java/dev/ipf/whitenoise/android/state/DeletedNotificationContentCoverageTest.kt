@@ -7,8 +7,8 @@ import java.io.File
 /**
  * Invariant gate for #3323: every platform write of message content honors the current content invalidation, every
  * retained history entry carries the identity that lets it be removed, and every removal source reaches the
- * retraction. Behavioral coverage lives in NotificationContentRetractionTest and NotificationDeletedContentTest; this
- * gate fails when a new write path or removal source bypasses them.
+ * retraction. Behavioral coverage lives in NotificationContentRetractionTest, NotificationDeletedContentTest and
+ * NotificationReactionRemovalRaceTest; this gate fails when a new write path or removal source bypasses them.
  */
 class DeletedNotificationContentCoverageTest {
     /** Every content write from AppState rechecks the generation fence that carries the removal mark. */
@@ -27,6 +27,11 @@ class DeletedNotificationContentCoverageTest {
         assertTrue(
             "the generation fence must check the removal mark",
             "notificationContentInvalidations.isRemoved(" in
+                functionBody(source, "isNotificationGenerationPostAllowed"),
+        )
+        assertTrue(
+            "a reaction's own event id cannot verify its quoted target at the final write",
+            "notificationContentInvalidations.hasRemovalInConversation(" in
                 functionBody(source, "isNotificationGenerationPostAllowed"),
         )
     }

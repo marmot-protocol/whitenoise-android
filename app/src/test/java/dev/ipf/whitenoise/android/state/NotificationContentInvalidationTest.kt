@@ -84,6 +84,19 @@ class NotificationContentInvalidationTest {
         assertFalse(invalidations.isRemoved(ACCOUNT, "ab12", ""))
     }
 
+    /** Opaque reaction quotes use only their own account/conversation's retained removals. */
+    @Test
+    fun reactionQuoteRemovalsMatchTheExactConversation() {
+        val invalidations = NotificationContentInvalidations(capacity = 4)
+        assertFalse(invalidations.hasRemovalInConversation(ACCOUNT, "ab12"))
+        invalidations.markRemoved(RemovedNotificationMessage(ACCOUNT, "AB12", "CAFE"))
+
+        assertTrue(invalidations.hasRemovalInConversation(ACCOUNT, "ab12"))
+        assertFalse(invalidations.hasRemovalInConversation("account-b", "ab12"))
+        assertFalse(invalidations.hasRemovalInConversation(ACCOUNT, "ab123"))
+        assertFalse(invalidations.hasRemovalInConversation(ACCOUNT, "ab1"))
+    }
+
     /** Each account keeps its own bounded removals, so one account's burst never evicts another's. */
     @Test
     fun invalidationsAreBoundedPerAccount() {
