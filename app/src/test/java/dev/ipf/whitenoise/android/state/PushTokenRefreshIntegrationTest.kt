@@ -428,6 +428,10 @@ class PushTokenRefreshIntegrationTest {
                         releaseWrite.countDown()
                         first.join()
                         latest.await().join()
+                        // The child snapshot can include another notification job; await the durable result.
+                        kotlinx.coroutines.withTimeout(5_000L) {
+                            while (store.nativePushRegistrationSyncPending()) kotlinx.coroutines.yield()
+                        }
                     }
                 }
                 assertEquals(listOf("latest-callback"), fixture.upsertedPushTokens.toList())

@@ -29,10 +29,18 @@ class PushLegacyImportAdmissionTest {
     @Before
     fun prepare() {
         val base = ApplicationProvider.getApplicationContext<Context>()
-        (SOURCES + TARGET + "whitenoise.push.safety").forEach { base.deleteSharedPreferences(it) }
+        (SOURCES + TARGET + "whitenoise.push.safety").forEach { name ->
+            // Clear cached preferences as well as disk, matching the other import fixtures.
+            val preferences = base.getSharedPreferences(name, Context.MODE_PRIVATE)
+            assertTrue(preferences.edit().clear().commit())
+            assertTrue(preferences.all.isEmpty())
+            base.deleteSharedPreferences(name)
+        }
         context = CountingContext(base)
         key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
         PushTokenStore.installKeyProvider(provider())
+        SOURCES.forEach { assertFalse(target().hasImported(it)) }
+        assertTrue(base.getSharedPreferences("whitenoise.push.safety", Context.MODE_PRIVATE).all.isEmpty())
     }
 
     @After
@@ -115,6 +123,7 @@ class PushLegacyImportAdmissionTest {
             .commit()
         context.failTargetCommit = true
         assertEquals(PushStorageRecovery.LegacyImportPending, PushTokenStore.create(context).recoveryState())
+        assertTrue(context.failedTargetCommits > 0)
         assertTrue(legacy.contains(KEY_FCM_TOKEN))
         context.resetCounts()
         val fresh = PushTokenStore.create(context)
@@ -145,6 +154,7 @@ class PushLegacyImportAdmissionTest {
         val deletions = mutableMapOf<String, Int>()
         var targetEdits = 0
         var failTargetCommit = false
+        var failedTargetCommits = 0
 
         override fun getApplicationContext(): Context = this
 
@@ -167,6 +177,7 @@ class PushLegacyImportAdmissionTest {
 
                         override fun commit(): Boolean {
                             if (failTargetCommit) {
+                                failedTargetCommits += 1
                                 editor.apply() // Android can publish the new receipt in memory despite commit=false.
                                 return false
                             }
