@@ -12405,7 +12405,10 @@ class WhiteNoiseAppState private constructor(
             !LocalNotificationFormatter.isReaction(update) ||
                 update.reactedToPreview.isNullOrBlank() ||
                 !notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)
-        return lockAllowsPost && runtimeAllowsPost && contentAvailable && quoteAvailable &&
+        return lockAllowsPost &&
+            runtimeAllowsPost &&
+            contentAvailable &&
+            quoteAvailable &&
             shouldPostNotification(update, engineMuted)
     }
 
@@ -12445,7 +12448,8 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
     ): Boolean =
-        !LocalNotificationFormatter.isReaction(update) || update.reactedToPreview.isNullOrBlank() ||
+        !LocalNotificationFormatter.isReaction(update) ||
+            update.reactedToPreview.isNullOrBlank() ||
             notificationContentInvalidations.removalVersion(update.accountRef) == firstPost.contentRemovalVersion
 
     /**
