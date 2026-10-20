@@ -229,6 +229,7 @@ class MessageForwardingTest {
             assertEquals(listOf("target" to 0, "target" to 1), transport.published)
         }
 
+    /** A failed materialization on retry keeps the evidence of an uncertain earlier publish for recovery. */
     @Test
     fun materializationRetryFailurePreservesAmbiguousPublishEvidence() =
         runTest {
@@ -269,6 +270,42 @@ class MessageForwardingTest {
             assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
             assertEquals(listOf("target" to 0, "target" to 1), transport.published)
             assertEquals(listOf("target"), transport.convergenceTargets)
+        }
+
+    /**
+     * A destination upload that never starts fails that target as an upload timeout instead of looking stuck
+     * (#2556), offers Retry without retrying by itself, and Retry uploads again and publishes the message once.
+     */
+    @Test
+    fun aStalledUploadFailsAtTheUploadStageAndRetryPublishesOnce() =
+        runTest {
+            val transport = RecordingForwardTransport(stallUploadOnceFor = mutableSetOf("target"))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "notes.txt")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            val failed =
+                session.state.value.targets
+                    .single()
+            assertEquals(ForwardFailureStage.UploadTimeout, failed.failureStage)
+            assertTrue(session.state.value.canRetry)
+            assertFalse(session.state.value.canAutomaticallyRetry)
+            assertEquals(emptyList<Pair<String, Int>>(), transport.published)
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(listOf("target", "target"), transport.uploadTargets)
+            assertEquals(listOf("target" to 0), transport.published)
         }
 
     /** Cancellation after upload begins must not cancel unrelated source-cache work. */
@@ -567,6 +604,38 @@ class MessageForwardingTest {
             owner.release()
         }
 
+    /** The app owner surfaces an upload that never started once, instead of going back to in progress (#2556). */
+    @Test
+    fun ownerDoesNotAutomaticallyRetryAnUploadThatNeverStarted() =
+        runTest {
+            val terminalSnapshots = mutableListOf<ForwardOperationSnapshot>()
+            val transport = RecordingForwardTransport(stallUploadOnceFor = mutableSetOf("target"))
+            val owner =
+                ForwardOperationOwner(
+                    scope = this,
+                    automaticRetryAttempts = 3,
+                    retryDelayMillis = { 1L },
+                    onTerminal = terminalSnapshots::add,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "notes.txt")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            assertTrue(owner.start(session))
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, owner.state.value?.phase)
+            assertTrue(owner.state.value?.canRetry == true)
+            assertEquals(listOf("target"), transport.uploadTargets)
+            assertEquals(listOf(ForwardOperationPhase.Failed), terminalSnapshots.map { it.phase })
+            assertTrue(transport.published.isEmpty())
+            owner.release()
+        }
+
     @Test
     fun oversizedMaterializedBatchFailsBeforeAnyUpload() =
         runTest {
@@ -843,6 +912,7 @@ class MessageForwardingTest {
             owner.release()
         }
 
+    /** Once a destination is sending, the forward can no longer be cancelled. */
     @Test
     fun operationCannotBeCancelledAfterPublishingBegins() =
         runTest {
@@ -867,6 +937,7 @@ class MessageForwardingTest {
 
     private class RecordingForwardTransport(
         private val failUploadOnceFor: MutableSet<String> = mutableSetOf(),
+        private val stallUploadOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishUncertainOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishBeforeCommitOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
@@ -922,6 +993,7 @@ class MessageForwardingTest {
             if (failMaterializationCleanup) error("cleanup failed")
         }
 
+        /** Records the upload and waits on its gate, then fails or never starts once per chosen target, or uploads. */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
@@ -930,6 +1002,7 @@ class MessageForwardingTest {
             onUpload()
             uploadGate?.await()
             if (failUploadOnceFor.remove(targetGroupIdHex)) error("upload failed")
+            if (stallUploadOnceFor.remove(targetGroupIdHex)) throw ForwardUploadStalledException(null)
             return message.attachments.mapIndexed { index, attachment ->
                 reference(
                     fileName = attachment.fileName,
