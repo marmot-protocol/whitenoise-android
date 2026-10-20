@@ -11,8 +11,8 @@ is verified.
 `fuzz-pr.yml` handle `merge_group: checks_requested`. Queue runs keep both
 distributions and every lane that a ready PR ran before PR-side narrowing; path
 filters and draft skips apply only to `pull_request`. Checkouts use the event's
-immutable SHA. Queue concurrency keys include that SHA and do not cancel earlier
-integration runs. Queue caches are read-only; all workflows reserve the authorization check name
+immutable SHA. Queue concurrency keys use the workflow run ID, allowing each
+integration run to finish independently. Queue caches are read-only; all workflows reserve the authorization check name
 and restrict token writes to the existing explicit publishers. Repository
 default token permissions must be read-only with PR approval disabled; preview and release publishing
 remain separate.

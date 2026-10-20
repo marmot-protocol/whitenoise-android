@@ -1133,3 +1133,10 @@ jobs:
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)
           ' > /dev/null
+      # QUEUE_CANARY_EVENT: temporary production fence; retain through held invalidation.
+      - name: Exercise held queue failure recovery
+        if: ${{ success() && github.event_name == 'merge_group' }}
+        shell: bash
+        run: |
+          printf '%s\n' 'Intentional integration failure; remove the temporary exercise step'
+          exit 1
