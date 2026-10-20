@@ -303,19 +303,20 @@ internal fun GroupEditScreen(
                                 val change = ScopedGroupImageMutation(safeUrl, attemptIsCurrent)
                                 controller.updateGroupAvatarUrl(change, commitIfCurrent = attemptIsCurrent)
                             },
+                            // Any outcome — including a stale owner or an unreported `false` —
+                            // clears the saved crop evidence, so only a real interruption
+                            // shows the "interrupted" notice after recreation.
+                            finished = { if (acceptedCrop) cropRecovery.settled() },
                         )
                     if (updated) {
-                        if (acceptedCrop) cropRecovery.settled()
                         showImageSearch = false
                     } else if (attemptIsCurrent() && controller.lastMutationError != null) {
-                        if (acceptedCrop) cropRecovery.settled()
                         imageFailureScope.captureFailure(failureAttempt)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
                     if (!attemptIsCurrent()) return@launchMutation
-                    if (acceptedCrop) cropRecovery.settled()
                     val uploadFailure = error as? GroupAvatarUploadFailure
                     appState.presentFailure(
                         titleRes = groupAvatarFailureTitle(uploadFailure?.stage),
