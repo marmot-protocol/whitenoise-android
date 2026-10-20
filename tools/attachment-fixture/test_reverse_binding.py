@@ -1,11 +1,13 @@
 """Device listeners are allocated independently of host sockets and cleaned up by ownership."""
 
+import http.client
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.parse import urlsplit
 
 import device_runner
 
@@ -14,13 +16,13 @@ class ReverseBindingTest(unittest.TestCase):
     """Exercise the real runner with ADB responses and device-port contention controlled."""
 
     def test_allocated_ports_reach_both_processes_and_only_owned_mappings_are_removed(self):
-        """Occupied host-numbered device ports cannot block or redirect either instrumentation process."""
+        """Occupied device ports cannot block or redirect upload descriptors in either instrumentation process."""
         for restart in (False, True):
             with self.subTest(restart=restart), tempfile.TemporaryDirectory() as directory:
                 calls, allocated, host_ports, listeners = [], [], [], {}
 
                 def adb(binary, serial, *args):
-                    """Model independent device listeners, including unrelated owners at both host port numbers."""
+                    """Model independent device listeners, including contention at host-numbered device ports."""
                     self.assertEqual(("chosen-adb", "emulator-5554"), (binary, serial))
                     calls.append(args)
                     if args[:2] == ("shell", "getprop"):
@@ -43,6 +45,20 @@ class ReverseBindingTest(unittest.TestCase):
                     elif args[:3] == ("shell", "am", "instrument"):
                         self.assertEqual(str(allocated[0]), args[args.index("fixtureBlobPort") + 1])
                         self.assertEqual(str(allocated[1]), args[args.index("fixtureRelayPort") + 1])
+                        # Simulate the device namespace: resolve the advertised listener through its mapping.
+                        client = http.client.HTTPConnection("127.0.0.1", host_ports[0], timeout=5)
+                        try:
+                            body = b"fixture-ciphertext"
+                            client.request("PUT", "/upload", body)
+                            upload = json.loads(client.getresponse().read())
+                            locator = urlsplit(upload["url"])
+                            self.assertEqual("127.0.0.1", locator.hostname)
+                            self.assertEqual(allocated[0], locator.port)
+                            self.assertEqual("fixture", listeners[locator.port])
+                            client.request("GET", locator.path)
+                            self.assertEqual(body, client.getresponse().read())
+                        finally:
+                            client.close()
                         return "OK (1 test)"
                     return ""
 
@@ -58,6 +74,8 @@ class ReverseBindingTest(unittest.TestCase):
                 self.assertTrue(report["instrumentation_passed"])
                 self.assertFalse(report["qualified"])
                 self.assertFalse(report["reverse_cleanup_failed"])
+                self.assertEqual(2 if restart else 1, report["http_upload_requests"])
+                self.assertEqual(2 if restart else 1, report["http_get_requests"])
                 self.assertEqual(2, len(allocated))
                 self.assertEqual({"unrelated"}, set(listeners.values()))
                 self.assertEqual(set(host_ports) - set(allocated), set(listeners))
@@ -114,6 +132,23 @@ class ReverseBindingTest(unittest.TestCase):
             with self.subTest(response=response), patch.object(device_runner, "adb_command", return_value=response) as adb:
                 self.assertEqual(port, device_runner.bind_reverse_port("chosen-adb", "emulator-5554", 32100))
                 adb.assert_called_once_with("chosen-adb", "emulator-5554", "reverse", "--no-rebind", "tcp:0", "tcp:32100")
+
+    def test_client_upload_port_preserves_the_host_url_and_rejects_invalid_configuration(self):
+        """Only upload descriptors change authority; failed configuration preserves the current valid port."""
+        with tempfile.TemporaryDirectory() as directory:
+            server = device_runner.FixtureServer(Path(directory))
+            try:
+                host_url = server.url
+                self.assertEqual(host_url, server.upload_url)
+                server.set_upload_port(1)
+                self.assertEqual("http://127.0.0.1:1", server.upload_url)
+                self.assertEqual(host_url, server.url)
+                for port in (None, True, "123", 0, -1, 65536):
+                    with self.subTest(port=port), self.assertRaises(ValueError):
+                        server.set_upload_port(port)
+                    self.assertEqual("http://127.0.0.1:1", server.upload_url)
+            finally:
+                server.server_close()
 
 
 if __name__ == "__main__":

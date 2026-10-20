@@ -198,6 +198,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             # Host allocation says nothing about device availability; keep the two namespaces separate.
             device_ports.append(bind_reverse_port(adb, serial, port))
         blob_port, relay_port = device_ports
+        server.set_upload_port(blob_port)
         stage = "instrumentation"
         result = adb_command(
             adb, serial, "shell", "am", "instrument", "-w", "-r",
