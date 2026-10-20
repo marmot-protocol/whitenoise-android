@@ -48,6 +48,7 @@ internal class TtsQueuePreparation(
                             announcementsPrepared = false,
                             attachmentDisplayName = attachmentDisplayName,
                             presentationEntry = this,
+                            conversationMemberCount = conversationMemberCount,
                         )
                     }
                 }
@@ -90,6 +91,7 @@ internal class TtsQueuePreparation(
                 projectionId = projectionId,
                 timelineAt = timelineAt,
                 presentationEntry = this,
+                conversationMemberCount = conversationMemberCount,
             )
         }
     }

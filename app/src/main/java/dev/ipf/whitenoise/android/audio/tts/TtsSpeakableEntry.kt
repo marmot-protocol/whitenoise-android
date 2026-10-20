@@ -82,6 +82,8 @@ data class TtsSpeakableEntry(
     /** Canonical authored source; null for ad-hoc speech without a message renderer. */
     val sourceText: String? = null,
     val mentionPresentation: TtsMentionPresentation? = null,
+    /** Known roster size including self; null preserves introductions for an unresolved roster. */
+    val conversationMemberCount: Int? = null,
 )
 
 // A hazard bound, not a feature knob: an inflated unread count would anchor
