@@ -116,6 +116,8 @@ class RunnerContractTest(unittest.TestCase):
                 return "1\n"
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP + "\n"
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:2] == ("reverse", "--remove"):
                 raise subprocess.CalledProcessError(1, "adb")
             if args[:3] == ("shell", "am", "instrument"):
@@ -144,6 +146,8 @@ class RunnerContractTest(unittest.TestCase):
                 return "1"
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:3] == ("shell", "am", "instrument"):
                 raise subprocess.CalledProcessError(1, [binary, "-s", serial, *args],
                     output="INSTRUMENTATION_RESULT: shortMsg=Process crashed.\n" + secret, stderr=secret)

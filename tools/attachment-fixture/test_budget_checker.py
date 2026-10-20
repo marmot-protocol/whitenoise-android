@@ -118,6 +118,8 @@ class BudgetContractTest(unittest.TestCase):
                 return properties[args[2]]
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:3] != ("shell", "am", "instrument"):
                 return ""
             client = http.client.HTTPConnection("127.0.0.1", owned["server"].server_port, timeout=5)

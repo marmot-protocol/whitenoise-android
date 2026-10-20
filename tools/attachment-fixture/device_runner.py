@@ -29,6 +29,17 @@ def adb_command(adb, serial, *args):
     return subprocess.run([adb, "-s", serial, *args], check=True, capture_output=True, text=True, timeout=180).stdout
 
 
+def bind_reverse_port(adb, serial, host_port):
+    """Let adbd reserve a free device port without replacing another task's listener."""
+    allocated = adb_command(adb, serial, "reverse", "--no-rebind", "tcp:0", f"tcp:{host_port}").strip()
+    if not allocated.isascii() or not allocated.isdecimal() or not 1 <= len(allocated) <= 5:
+        raise ValueError("adb reverse did not return an allocated TCP port")
+    port = int(allocated)
+    if not 1 <= port <= 65535:
+        raise ValueError("adb reverse returned an out-of-range TCP port")
+    return port
+
+
 def failure_diagnostics(error, stage, adb, serial, physical):
     """Keep fixed failure categories; raw subprocess output and crash messages remain in memory."""
     details = {"stage": stage, "timed_out": isinstance(error, subprocess.TimeoutExpired)}
@@ -167,7 +178,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
     # held-body qualification so native fallback cannot silently replace its locator.
     server = FixtureServer(root, upload_extension=".bin") if transport_resume or unknown_length or platform_background or automatic_resume else FixtureServer(root)
     relay = FixtureRelay()
-    forwards = []
+    device_ports = []
     threads = []
     report = {"schema": 1, "scope": "android-host-resolver-packaged-native", "metrics": [], "qualified": False,
               "android_send_controller_requested": android_send_controller,
@@ -184,16 +195,16 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             started_services.append(service)
         stage = "reverse-binding"
         for port in (server.server_port, relay.port):
-            # --no-rebind fails instead of overwriting an existing reverse owned by another task.
-            adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{port}")
-            forwards.append(port)
+            # Host allocation says nothing about device availability; keep the two namespaces separate.
+            device_ports.append(bind_reverse_port(adb, serial, port))
+        blob_port, relay_port = device_ports
         stage = "instrumentation"
         result = adb_command(
             adb, serial, "shell", "am", "instrument", "-w", "-r",
             "-e", "class", ("dev.ipf.whitenoise.android.media.UnknownLengthAttachmentDeviceTest#nativeUnknownLengthProgressHasAccessibleByteOnlyControl" if unknown_length else PROBE),
             "-e", "allowControlledAttachmentProbe", "true",
-            "-e", "fixtureBlobPort", str(server.server_port),
-            "-e", "fixtureRelayPort", str(relay.port),
+            "-e", "fixtureBlobPort", str(blob_port),
+            "-e", "fixtureRelayPort", str(relay_port),
             *(["-e", "fixtureUseAndroidSendController", "true"] if android_send_controller else []),
             *(["-e", "fixtureCancellation", "true"] if held_cancellation else []),
             *(["-e", "fixtureTransportResume", transport_resume] if transport_resume else []),
@@ -212,8 +223,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             results.append(adb_command(
                 adb, serial, "shell", "am", "instrument", "-w", "-r",
                 "-e", "class", PROBE, "-e", "allowControlledAttachmentProbe", "true",
-                "-e", "fixtureBlobPort", str(server.server_port),
-                "-e", "fixtureRelayPort", str(relay.port),
+                "-e", "fixtureBlobPort", str(blob_port),
+                "-e", "fixtureRelayPort", str(relay_port),
                 "-e", "fixtureRestartRole", "read", "-e", "fixtureRestartSession", session,
                 APP + ".test/androidx.test.runner.AndroidJUnitRunner",
             ))
@@ -360,7 +371,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             report["deferred"].remove("physical-device")
         report["deferred"].extend(["manual-ui-flows", "representative-large-file-performance"])
         report["reverse_cleanup_failed"] = False
-        for port in forwards:
+        for port in device_ports:
             try:
                 adb_command(adb, serial, "reverse", "--remove", f"tcp:{port}")
             except (subprocess.SubprocessError, OSError):
