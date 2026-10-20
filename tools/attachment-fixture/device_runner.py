@@ -105,7 +105,7 @@ def failure_diagnostics(error, stage, adb, serial, physical):
                 (f"error: device '{serial}' not found", "device-missing"),
                 ("error: no devices/emulators found", "device-missing"),
                 ("error: closed", "transport-closed"), ("error: protocol fault", "transport-protocol-fault"),
-                ("cannot bind", "listener-bind-failed"), ("listener", "listener-error"),
+                ("cannot bind listener", "listener-bind-failed"), ("error: listener", "listener-error"),
                 ("Can't find service: activity", "activity-service-missing"),
                 ("Failure calling service activity", "activity-service-failed"),
                 ("java.lang.SecurityException", "security-exception"), ("Permission Denial", "permission-denied"),

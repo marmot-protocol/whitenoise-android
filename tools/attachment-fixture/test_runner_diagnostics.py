@@ -59,7 +59,13 @@ class RunnerDiagnosticsTest(unittest.TestCase):
             ("Can't find service: activity", "activity-service-missing", "unknown"),
             ("Failure calling service activity", "activity-service-failed", "unknown"),
             ("java.lang.SecurityException: PRIVATE", "security-exception", "java.lang.SecurityException"),
+            ("cannot bind listener: Address already in use", "listener-bind-failed", "unknown"),
             ("error: listener 'PRIVATE' not found", "listener-error", "unknown"),
+            ("androidx.test.internal.runner.listener.RunListener PRIVATE\nINSTRUMENTATION_FAILED",
+             "instrumentation-failed", "unknown"),
+            ("androidx.test.internal.runner.listener.RunListener PRIVATE\nINSTRUMENTATION_ABORTED",
+             "instrumentation-aborted", "unknown"),
+            ("cannot bind PRIVATE\nINSTRUMENTATION_FAILED", "instrumentation-failed", "unknown"),
             ("PRIVATE", "unknown", "unknown"),
         ):
             with self.subTest(status=status), patch.object(device_runner.subprocess, "run") as capture:
