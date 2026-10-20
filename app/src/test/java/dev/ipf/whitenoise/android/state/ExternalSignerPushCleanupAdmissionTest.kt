@@ -49,36 +49,7 @@ internal class ExternalSignerPushCleanupAdmissionTest : ExternalSignerSignOutFix
             val intercepted =
                 java.util.concurrent.atomic
                     .AtomicBoolean(false)
-            val store =
-                PushTokenStore(
-                    object : android.content.SharedPreferences by backing {
-                        override fun edit(): android.content.SharedPreferences.Editor {
-                            val editor = backing.edit()
-                            var admitsA = false
-                            return object : android.content.SharedPreferences.Editor by editor {
-                                override fun putStringSet(
-                                    key: String?,
-                                    values: MutableSet<String>?,
-                                ): android.content.SharedPreferences.Editor =
-                                    apply {
-                                        admitsA =
-                                            key == dev.ipf.whitenoise.android.notifications.KEY_PENDING_DISABLES &&
-                                            values?.contains(accountRef) == true
-                                        editor.putStringSet(key, values)
-                                    }
-
-                                override fun commit(): Boolean {
-                                    val result = editor.commit()
-                                    if (admitsA && intercepted.compareAndSet(false, true)) {
-                                        committed.countDown()
-                                        check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
-                                    }
-                                    return result
-                                }
-                            }
-                        }
-                    },
-                )
+            val store = blockingDisableStore(backing, committed, release, intercepted)
             additionalAccounts =
                 listOf(
                     externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)),
@@ -105,20 +76,13 @@ internal class ExternalSignerPushCleanupAdmissionTest : ExternalSignerSignOutFix
                 }
                 assertFalse(successorEntered.get())
                 release.countDown()
-                kotlinx.coroutines.withTimeout(5_000) {
-                    while (!logout.isCompleted || successor?.isCompleted == false) {
-                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1))
-                        kotlinx.coroutines.delay(1)
-                    }
-                }
+                awaitSignOutJobs(logout, successor)
                 logout.join()
                 successor?.await()
                 assertTrue(logout.isCancelled)
                 assertEquals(queueExplicit, successorEntered.get())
                 if (!queueExplicit) {
-                    assertEquals(otherAccountRef, state.activeAccountRef)
-                    assertEquals(AppPhase.Ready, state.phase)
-                    assertEquals(0, nativePrivacyConfigCalls.get())
+                    assertAutomaticSuccessorReady(state)
                 }
                 assertEquals(listOf("disable", "signOut"), nativeCallOrder)
                 assertFalse(nativePushEnabled)
@@ -128,16 +92,65 @@ internal class ExternalSignerPushCleanupAdmissionTest : ExternalSignerSignOutFix
                 release.countDown()
                 logout.cancel()
                 successor?.cancel()
-                kotlinx.coroutines.withTimeout(5_000) {
-                    while (!logout.isCompleted || successor?.isCompleted == false) {
-                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1))
-                        kotlinx.coroutines.delay(1)
-                    }
-                }
+                awaitSignOutJobs(logout, successor)
                 logout.join()
                 successor?.join()
             }
         }
+
+    private fun assertAutomaticSuccessorReady(state: WhiteNoiseAppState) {
+        assertEquals(otherAccountRef, state.activeAccountRef)
+        assertEquals(AppPhase.Ready, state.phase)
+        assertEquals(0, nativePrivacyConfigCalls.get())
+    }
+
+    private suspend fun awaitSignOutJobs(
+        logout: kotlinx.coroutines.Job,
+        successor: kotlinx.coroutines.Job?,
+    ) {
+        kotlinx.coroutines.withTimeout(5_000) {
+            while (!logout.isCompleted || successor?.isCompleted == false) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1))
+                kotlinx.coroutines.delay(1)
+            }
+        }
+    }
+
+    private fun blockingDisableStore(
+        backing: android.content.SharedPreferences,
+        committed: java.util.concurrent.CountDownLatch,
+        release: java.util.concurrent.CountDownLatch,
+        intercepted: java.util.concurrent.atomic.AtomicBoolean,
+    ): PushTokenStore =
+        PushTokenStore(
+            object : android.content.SharedPreferences by backing {
+                override fun edit(): android.content.SharedPreferences.Editor {
+                    val editor = backing.edit()
+                    var admitsA = false
+                    return object : android.content.SharedPreferences.Editor by editor {
+                        override fun putStringSet(
+                            key: String?,
+                            values: MutableSet<String>?,
+                        ): android.content.SharedPreferences.Editor =
+                            apply {
+                                admitsA =
+                                    key == dev.ipf.whitenoise.android.notifications.KEY_PENDING_DISABLES &&
+                                    values?.contains(accountRef) == true
+                                editor.putStringSet(key, values)
+                            }
+
+                        override fun commit(): Boolean {
+                            val result = editor.commit()
+                            if (admitsA && intercepted.compareAndSet(false, true)) {
+                                committed.countDown()
+                                check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                            }
+                            return result
+                        }
+                    }
+                }
+            },
+        )
 
     /** A confirmed still-signed-in native partial outcome retains Android ownership without enabling push. */
     @Test

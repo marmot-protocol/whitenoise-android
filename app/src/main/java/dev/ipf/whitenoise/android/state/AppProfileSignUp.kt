@@ -40,9 +40,9 @@ internal class AppProfileSignUp(
     private suspend fun createOwnedIdentity(expectedOwner: SignUpOwner): AccountSummaryFfi {
         val owner = CreatingRuntime(appState.marmot(), appState.runtimeGeneration)
         return appState.withCurrentAccountLifetime {
-            if (appState.runtimeGeneration != owner.epoch ||
-                appState.marmot() !== owner.native ||
-                expectedOwner.runtime != owner.epoch ||
+            val runtimeCurrent = appState.runtimeGeneration == owner.epoch && appState.marmot() === owner.native
+            if (!runtimeCurrent) throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
+            if (expectedOwner.runtime != owner.epoch ||
                 expectedOwner.accountRef != appState.activeAccountRef ||
                 !appState.accountSession.handoff.isCurrent(expectedOwner.selection)
             ) {

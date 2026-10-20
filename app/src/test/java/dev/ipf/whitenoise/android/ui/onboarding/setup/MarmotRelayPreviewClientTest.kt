@@ -99,105 +99,31 @@ class MarmotRelayPreviewClientTest {
     @Test
     fun closedMountStillDrainsOnlyItsOwnedNativePreview() =
         runBlocking {
-            val parent = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-            val unusedActivation =
-                Proxy.newProxyInstance(
-                    AppAccountSessionActivation::class.java.classLoader,
-                    arrayOf(AppAccountSessionActivation::class.java),
-                ) { _, method, _ -> error("Unexpected activation: ${method.name}") } as AppAccountSessionActivation
-            val owner = AppAccountSessionCoordinator(parent, Dispatchers.Default, { error("unused") }, unusedActivation)
-            val mounted = AtomicBoolean(true)
-            val finishing = AtomicBoolean(false)
-            val cleanup = AtomicBoolean(false)
-            val nativeCurrent = AtomicReference(relayDecision())
-            val preview = relayPreviewSnapshot()
-            val previewReply = AtomicReference<Continuation<Any?>?>(null)
-            val cleanupReply = AtomicReference<Continuation<Any?>?>(null)
-            val previewEntered = CompletableDeferred<Unit>()
-            val cleanupEntered = CompletableDeferred<Unit>()
-            val cancels = AtomicInteger(0)
-            val native =
-                Proxy.newProxyInstance(
-                    MarmotInterface::class.java.classLoader,
-                    arrayOf(MarmotInterface::class.java),
-                ) { _, method, args ->
-                    when (method.name.substringBefore('-')) {
-                        "runOnboarding" -> relayDecision()
-                        "proposeOnboardingRelayRepair" -> {
-                            nativeCurrent.set(preview)
-                            if (finishing.get()) {
-                                preview
-                            } else {
-                                @Suppress("UNCHECKED_CAST")
-                                val continuation = args!!.last() as Continuation<Any?>
-                                previewReply.set(continuation)
-                                previewEntered.complete(Unit)
-                                COROUTINE_SUSPENDED
-                            }
-                        }
-                        "onboardingSnapshot" -> {
-                            if (cleanup.get() && !finishing.get()) {
-                                @Suppress("UNCHECKED_CAST")
-                                val continuation = args!!.last() as Continuation<Any?>
-                                cleanupReply.set(continuation)
-                                cleanupEntered.complete(Unit)
-                                COROUTINE_SUSPENDED
-                            } else {
-                                nativeCurrent.get()
-                            }
-                        }
-                        "cancelOnboardingRepair" -> {
-                            cancels.incrementAndGet()
-                            relayDecision().copy(revision = 5uL).also(nativeCurrent::set)
-                        }
-                        else -> error("Unexpected native call: ${method.name}")
-                    }
-                } as MarmotInterface
-            val nativeClient =
-                MarmotAccountSetupClient(
-                    native,
-                    SETUP_TEST_ACCOUNT,
-                    withLifetime = { command ->
-                        owner.withLifetime {
-                            if (!mounted.get()) throw CancellationException("stale mount")
-                            command()
-                        }
-                    },
-                    withOwnedPreviewCleanup = { command -> owner.withLifetime { command() } },
-                ) {}
-            val stream = FakeSetupClient(relayDecision())
-            val client =
-                object : AccountSetupClient by nativeClient {
-                    override suspend fun subscribe() = stream.subscribe()
-
-                    override suspend fun discardOwnedRelayPreview(preview: OnboardingSnapshotFfi) =
-                        nativeClient.discardOwnedRelayPreview(
-                            preview,
-                        )
+            val fixture = ClosedMountPreviewFixture()
+            with(fixture) {
+                try {
+                    controller.reconnect()
+                    withTimeout(5_000) { controller.state.first { it.snapshot != null && !it.busy } }
+                    controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
+                    withTimeout(5_000) { previewEntered.await() }
+                    mounted.set(false)
+                    cleanup.set(true)
+                    val close = async { controller.close() }
+                    previewReply.getAndSet(null)!!.resumeWith(Result.success(preview))
+                    withTimeout(5_000) { cleanupEntered.await() }
+                    assertFalse(close.isCompleted)
+                    cleanupReply.getAndSet(null)!!.resumeWith(Result.success(preview))
+                    withTimeout(5_000) { close.await() }
+                    assertEquals(1, cancels.get())
+                    assertNull(nativeCurrent.get().proposal)
+                    assertEquals(5uL, nativeCurrent.get().revision)
+                } finally {
+                    finishing.set(true)
+                    previewReply.getAndSet(null)?.resumeWith(Result.success(preview))
+                    cleanupReply.getAndSet(null)?.resumeWith(Result.success(preview))
+                    withTimeout(5_000) { controller.close() }
+                    parent.cancel()
                 }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, parent, mounted::get, {}, {})
-            try {
-                controller.reconnect()
-                withTimeout(5_000) { controller.state.first { it.snapshot != null && !it.busy } }
-                controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
-                withTimeout(5_000) { previewEntered.await() }
-                mounted.set(false)
-                cleanup.set(true)
-                val close = async { controller.close() }
-                previewReply.getAndSet(null)!!.resumeWith(Result.success(preview))
-                withTimeout(5_000) { cleanupEntered.await() }
-                assertFalse(close.isCompleted)
-                cleanupReply.getAndSet(null)!!.resumeWith(Result.success(preview))
-                withTimeout(5_000) { close.await() }
-                assertEquals(1, cancels.get())
-                assertNull(nativeCurrent.get().proposal)
-                assertEquals(5uL, nativeCurrent.get().revision)
-            } finally {
-                finishing.set(true)
-                previewReply.getAndSet(null)?.resumeWith(Result.success(preview))
-                cleanupReply.getAndSet(null)?.resumeWith(Result.success(preview))
-                withTimeout(5_000) { controller.close() }
-                parent.cancel()
             }
         }
 
@@ -226,4 +152,86 @@ class MarmotRelayPreviewClientTest {
             onCall(method.name.substringBefore('-'))
         } as MarmotInterface
     }
+}
+
+private class ClosedMountPreviewFixture {
+    val parent = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val unusedActivation =
+        Proxy.newProxyInstance(
+            AppAccountSessionActivation::class.java.classLoader,
+            arrayOf(AppAccountSessionActivation::class.java),
+        ) { _, method, _ -> error("Unexpected activation: ${method.name}") } as AppAccountSessionActivation
+    val owner = AppAccountSessionCoordinator(parent, Dispatchers.Default, { error("unused") }, unusedActivation)
+    val mounted = AtomicBoolean(true)
+    val finishing = AtomicBoolean(false)
+    val cleanup = AtomicBoolean(false)
+    val nativeCurrent = AtomicReference(relayDecision())
+    val preview = relayPreviewSnapshot()
+    val previewReply = AtomicReference<Continuation<Any?>?>(null)
+    val cleanupReply = AtomicReference<Continuation<Any?>?>(null)
+    val previewEntered = CompletableDeferred<Unit>()
+    val cleanupEntered = CompletableDeferred<Unit>()
+    val cancels = AtomicInteger(0)
+    val native = createNative()
+    val nativeClient =
+        MarmotAccountSetupClient(
+            native,
+            SETUP_TEST_ACCOUNT,
+            withLifetime = { command ->
+                owner.withLifetime {
+                    if (!mounted.get()) throw CancellationException("stale mount")
+                    command()
+                }
+            },
+            withOwnedPreviewCleanup = { command -> owner.withLifetime { command() } },
+        ) {}
+    val stream = FakeSetupClient(relayDecision())
+    val client =
+        object : AccountSetupClient by nativeClient {
+            override suspend fun subscribe() = stream.subscribe()
+
+            override suspend fun discardOwnedRelayPreview(preview: OnboardingSnapshotFfi) =
+                nativeClient.discardOwnedRelayPreview(
+                    preview,
+                )
+        }
+    val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, parent, mounted::get, {}, {})
+
+    private fun createNative(): MarmotInterface =
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { _, method, args ->
+            when (method.name.substringBefore('-')) {
+                "runOnboarding" -> relayDecision()
+                "proposeOnboardingRelayRepair" -> {
+                    nativeCurrent.set(preview)
+                    if (finishing.get()) {
+                        preview
+                    } else {
+                        @Suppress("UNCHECKED_CAST")
+                        val continuation = args!!.last() as Continuation<Any?>
+                        previewReply.set(continuation)
+                        previewEntered.complete(Unit)
+                        COROUTINE_SUSPENDED
+                    }
+                }
+                "onboardingSnapshot" -> {
+                    if (cleanup.get() && !finishing.get()) {
+                        @Suppress("UNCHECKED_CAST")
+                        val continuation = args!!.last() as Continuation<Any?>
+                        cleanupReply.set(continuation)
+                        cleanupEntered.complete(Unit)
+                        COROUTINE_SUSPENDED
+                    } else {
+                        nativeCurrent.get()
+                    }
+                }
+                "cancelOnboardingRepair" -> {
+                    cancels.incrementAndGet()
+                    relayDecision().copy(revision = 5uL).also(nativeCurrent::set)
+                }
+                else -> error("Unexpected native call: ${method.name}")
+            }
+        } as MarmotInterface
 }

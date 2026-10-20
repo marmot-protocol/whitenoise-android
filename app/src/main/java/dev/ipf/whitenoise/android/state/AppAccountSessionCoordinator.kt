@@ -94,6 +94,7 @@ internal class AppAccountSessionCoordinator(
     private val activation: AppAccountSessionActivation,
 ) {
     private val lifetime = Mutex()
+    private val activationWork = ActivationWork()
 
     /** Serializes native lifetime mutations; callers use owned helpers instead of recursive acquisition. */
     suspend fun <T> withLifetime(block: suspend () -> T): T = lifetime.withLock { block() }
@@ -187,7 +188,7 @@ internal class AppAccountSessionCoordinator(
             if (!beforePrepare(generation)) {
                 null
             } else {
-                activateCurrentRequest(request, generation, awaitPostActivationWork, onActivated)
+                activationWork.activateCurrentRequest(request, generation, awaitPostActivationWork, onActivated)
             }
         } finally {
             handoff.finishRequest(generation)
@@ -208,101 +209,38 @@ internal class AppAccountSessionCoordinator(
                 handoff.beginRequestIfCurrent(signOutGeneration, request.label)
             } ?: return null
         return try {
-            if (!beforePrepare(generation)) return null
-            val committed =
-                commitCurrentRequest(
-                    request.copy(shouldActivate = {
-                        ownerIsCurrent() && request.shouldActivate()
-                    }),
-                    generation,
-                    {
-                        if (
-                            handoff.isCurrent(generation) &&
-                            activation.activeAccount == request.label &&
-                            ownerIsCurrent()
-                        ) {
-                            onActivated()
-                        }
-                    },
-                ) ?: return null
-            AccountSessionActivationReceipt(request.label, generation, committed.first.runtimeGeneration)
+            if (!beforePrepare(generation)) {
+                null
+            } else {
+                activationWork
+                    .commitCurrentRequest(
+                        request.copy(shouldActivate = { ownerIsCurrent() && request.shouldActivate() }),
+                        generation,
+                        {
+                            if (handoff.isCurrent(generation) &&
+                                activation.activeAccount == request.label &&
+                                ownerIsCurrent()
+                            ) {
+                                onActivated()
+                            }
+                        },
+                    )?.let { committed ->
+                        AccountSessionActivationReceipt(request.label, generation, committed.first.runtimeGeneration)
+                    }
+            }
         } finally {
             handoff.finishRequest(generation)
         }
     }
 
-    /** Rechecks after shortcut I/O and keeps publication atomic before the caller's frame barrier. */
-    @Suppress("ReturnCount") // Preparation failure and each post-suspension fence reject without publication.
-    private suspend fun activateCurrentRequest(
-        request: AccountSessionActivationRequest,
-        generation: Long,
-        awaitPostActivationWork: suspend () -> Unit,
-        onActivated: () -> Unit,
-    ): AccountSessionActivationReceipt? {
-        val committed = commitCurrentRequest(request, generation, onActivated) ?: return null
-        val (prepared, switching) = committed
-        awaitPostActivationWork()
-        refreshActivatedAccount(request, generation, prepared.runtimeGeneration, switching)
-        return AccountSessionActivationReceipt(request.label, generation, prepared.runtimeGeneration)
-    }
-
-    /** Owns only native local preparation and synchronous publication, without optional enrichment. */
-    private suspend fun commitCurrentRequest(
-        request: AccountSessionActivationRequest,
-        generation: Long,
-        onActivated: () -> Unit,
-    ): Pair<PreparedAccountSessionActivation, Boolean>? =
-        withLifetime {
-            if (!request.shouldActivate() || !handoff.isCurrent(generation)) return@withLifetime null
-            val switching = request.label != activation.activeAccount
-            val prepared = activation.prepare(request, generation, switching) ?: return@withLifetime null
-            val allowed = {
-                request.shouldActivate() &&
-                    handoff.isCurrent(generation) &&
-                    activation.canPublish(request.label, prepared.runtimeGeneration)
-            }
-            if (!allowed()) return@withLifetime null
-            if (switching) activation.hidePreviousAccountShortcuts()
-            if (!allowed()) return@withLifetime null
-            activation.publish(request.label, generation, switching, prepared)
-            // The synchronous local-ready projection belongs to this same accepted publication.
-            onActivated()
-            prepared to switching
-        }
-
     /** Optional successor enrichment stays in the original cancellable caller after owned bookkeeping finishes. */
     suspend fun refreshAfterSignOut(receipt: AccountSessionActivationReceipt) {
-        refreshActivatedAccount(
+        activationWork.refreshActivatedAccount(
             AccountSessionActivationRequest(receipt.label),
             receipt.generation,
             receipt.runtimeGeneration,
             switching = true,
         )
-    }
-
-    /** Each suspension can replace the account/runtime, so later effects must revalidate ownership. */
-    @Suppress("ReturnCount") // Every suspending adapter is a separate stale-owner admission boundary.
-    private suspend fun refreshActivatedAccount(
-        request: AccountSessionActivationRequest,
-        generation: Long,
-        runtimeGeneration: Int,
-        switching: Boolean,
-    ) {
-        val isCurrent = {
-            activation.canPublish(request.label, runtimeGeneration) &&
-                activation.activeAccount == request.label &&
-                handoff.isCurrent(generation)
-        }
-        if (!isCurrent()) return
-        activation.warmAccountProfile(request.label)
-        if (!isCurrent()) return
-        activation.configurePrivacy()
-        if (!isCurrent()) return
-        activation.refreshNotificationSettings()
-        if (!isCurrent()) return
-        val startup = request.preloadPolicy == AccountSwitchPreloadPolicy.STARTUP_RESTORATION
-        if (startup && !activation.isInForeground()) return
-        activation.reconcileNotificationDelivery(includeBackgroundAccountModes = switching && !startup)
     }
 
     /** Fences the runtime, drains captured controllers, then joins the existing listener owner. */
@@ -318,4 +256,70 @@ internal class AppAccountSessionCoordinator(
 
     /** Delegates to the shipped owner, including native subscription close and recovery-job joins. */
     suspend fun stopListenersForAccountTeardown() = listenerTeardown().stopForAccountTeardown()
+
+    private inner class ActivationWork {
+        /** Rechecks after shortcut I/O and keeps publication atomic before the caller's frame barrier. */
+        @Suppress("ReturnCount") // Preparation failure and each post-suspension fence reject without publication.
+        suspend fun activateCurrentRequest(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+            awaitPostActivationWork: suspend () -> Unit,
+            onActivated: () -> Unit,
+        ): AccountSessionActivationReceipt? {
+            val committed = commitCurrentRequest(request, generation, onActivated) ?: return null
+            val (prepared, switching) = committed
+            awaitPostActivationWork()
+            refreshActivatedAccount(request, generation, prepared.runtimeGeneration, switching)
+            return AccountSessionActivationReceipt(request.label, generation, prepared.runtimeGeneration)
+        }
+
+        /** Owns only native local preparation and synchronous publication, without optional enrichment. */
+        suspend fun commitCurrentRequest(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+            onActivated: () -> Unit,
+        ): Pair<PreparedAccountSessionActivation, Boolean>? =
+            withLifetime {
+                if (!request.shouldActivate() || !handoff.isCurrent(generation)) return@withLifetime null
+                val switching = request.label != activation.activeAccount
+                val prepared = activation.prepare(request, generation, switching) ?: return@withLifetime null
+                val allowed = {
+                    request.shouldActivate() &&
+                        handoff.isCurrent(generation) &&
+                        activation.canPublish(request.label, prepared.runtimeGeneration)
+                }
+                if (!allowed()) return@withLifetime null
+                if (switching) activation.hidePreviousAccountShortcuts()
+                if (!allowed()) return@withLifetime null
+                activation.publish(request.label, generation, switching, prepared)
+                // The synchronous local-ready projection belongs to this same accepted publication.
+                onActivated()
+                prepared to switching
+            }
+
+        /** Each suspension can replace the account/runtime, so later effects must revalidate ownership. */
+        @Suppress("ReturnCount") // Every suspending adapter is a separate stale-owner admission boundary.
+        suspend fun refreshActivatedAccount(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+            runtimeGeneration: Int,
+            switching: Boolean,
+        ) {
+            val isCurrent = {
+                activation.canPublish(request.label, runtimeGeneration) &&
+                    activation.activeAccount == request.label &&
+                    handoff.isCurrent(generation)
+            }
+            if (!isCurrent()) return
+            activation.warmAccountProfile(request.label)
+            if (!isCurrent()) return
+            activation.configurePrivacy()
+            if (!isCurrent()) return
+            activation.refreshNotificationSettings()
+            if (!isCurrent()) return
+            val startup = request.preloadPolicy == AccountSwitchPreloadPolicy.STARTUP_RESTORATION
+            if (startup && !activation.isInForeground()) return
+            activation.reconcileNotificationDelivery(includeBackgroundAccountModes = switching && !startup)
+        }
+    }
 }
