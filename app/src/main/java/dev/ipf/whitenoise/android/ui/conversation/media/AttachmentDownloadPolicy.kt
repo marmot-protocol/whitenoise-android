@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -10,6 +11,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.AttachmentTransferCancelledByUserException
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -93,6 +96,35 @@ internal enum class AttachmentMaterializationIntent {
         if (!stoppedExplicitly) throw cancellation
         return Idle
     }
+}
+
+/**
+ * Whether this device already holds an attachment's bytes, for the video and voice bubbles' "local bytes" input. It
+ * starts from the Android-side caches, read synchronously, and then asks off the main thread whether MDK retains the
+ * bytes, as a background automatic download leaves them (#3308). A bubble that finds them that way materializes from
+ * local data even when its automatic network policy is off, so it plays offline instead of showing Download, as the
+ * image and file bubbles already do. [key] restarts the check when the bubble's identity or source epoch changes.
+ */
+@Composable
+internal fun rememberLocalAttachmentAvailability(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    key: Any?,
+): State<Boolean> {
+    val local =
+        remember(controller, messageIdHex, attachmentIndex, key) {
+            mutableStateOf(controller.hasCachedAttachment(messageIdHex, attachmentIndex))
+        }
+    LaunchedEffect(controller, messageIdHex, attachmentIndex, key) {
+        if (!local.value) {
+            local.value =
+                runCatchingCancellable {
+                    controller.hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
+                }.getOrDefault(false)
+        }
+    }
+    return local
 }
 
 /**

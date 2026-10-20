@@ -190,7 +190,15 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ApkInstallerAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureSession.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MatrixAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/IncomingAttachmentBackgroundDownloadAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptFixtureSupport.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
+      # Receipt scheduling and durable admission (#3308) are proven by the background receipt fixture.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/IncomingAttachmentScheduling.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/AutomaticAttachmentPolicy.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/AutomaticAttachmentNetworkWaits.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/MessageForwarding.kt'
       # Stored direct-peer title and membership separation (#2149) against the real native runtime.
@@ -274,6 +282,7 @@ jobs:
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-media
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-tile-transfer
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background-receipt
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk-recreation

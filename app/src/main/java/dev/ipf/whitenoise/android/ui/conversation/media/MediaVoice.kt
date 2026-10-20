@@ -300,10 +300,14 @@ internal fun MediaVoiceBubble(
             attachmentIndex = attachmentIndex,
             reference = reference,
         )
-    val cachedPlaintextOnEntry =
-        remember(pillKey, epoch, reference.mediaType) {
-            controller.hasCachedAttachment(messageIdHex, attachmentIndex)
-        }
+    // MDK-retained bytes from a background download count as local, so the clip plays offline (#3308).
+    val cachedPlaintextOnEntry by
+        rememberLocalAttachmentAvailability(
+            controller,
+            messageIdHex,
+            attachmentIndex,
+            Triple(pillKey, epoch, reference.mediaType),
+        )
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
     var totalDurationMs by remember(pillKey, epoch) { mutableIntStateOf(0) }

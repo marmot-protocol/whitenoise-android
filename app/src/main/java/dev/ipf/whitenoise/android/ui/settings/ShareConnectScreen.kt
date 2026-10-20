@@ -459,6 +459,15 @@ private fun ShareProfileContent(
                 visualTestTag = "share_connect.copy_public_key.visual",
                 modifier = Modifier.padding(top = 4.dp),
             )
+            // The capsule abbreviates; the whole key stays readable for comparison (#3321).
+            if (profile.npub.isNotBlank()) {
+                FullPublicKey(
+                    npub = profile.npub,
+                    modifier = Modifier.padding(top = 8.dp),
+                    testTag = "share_connect.full_public_key",
+                    label = stringResource(R.string.public_key),
+                )
+            }
             IdentityQrCodeSurface(
                 value = qrContent,
                 availableWidth = availableWidth,

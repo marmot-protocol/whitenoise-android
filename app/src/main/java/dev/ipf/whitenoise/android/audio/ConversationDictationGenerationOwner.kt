@@ -1,13 +1,14 @@
 package dev.ipf.whitenoise.android.audio
 
 /** Owns one recognizer generation and retires callbacks before Android session teardown. */
-internal class ConversationDictationGenerationOwner {
+internal class ConversationDictationGenerationOwner(
+    private val cancelDeadline: () -> Unit,
+) {
     private var nextId = 0L
     var activeId: Long? = null
         private set
     var session: ConversationDictationRecognitionSession? = null
         private set
-    private var timeout: ConversationDictationTimeoutHandle? = null
     var hasSpeech = false
         private set
     var callerAudioEndpointingActive = false
@@ -28,8 +29,9 @@ internal class ConversationDictationGenerationOwner {
         session = created
     }
 
+    /** Cancels the provider generation deadline and records when readiness was observed. */
     fun ready(now: Long): Long {
-        cancelTimeout()
+        cancelDeadline()
         readyAtElapsedMillis = now
         return now
     }
@@ -42,18 +44,9 @@ internal class ConversationDictationGenerationOwner {
         callerAudioEndpointingActive = true
     }
 
-    fun armTimeout(handle: ConversationDictationTimeoutHandle) {
-        cancelTimeout()
-        timeout = handle
-    }
-
-    fun cancelTimeout() {
-        timeout?.cancel()
-        timeout = null
-    }
-
+    /** Cancels the generation deadline and detaches callbacks before returning the retired session. */
     fun retire(): ConversationDictationRecognitionSession? {
-        cancelTimeout()
+        cancelDeadline()
         val retired = session
         session = null
         activeId = null

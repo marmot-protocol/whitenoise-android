@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentNativeActions.kt",
+  "legacy_sha256": "06d6bf8611104fa46c0f9ce20b8aa87a76866a4d6285cbb9b4d57aa5822338fe",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:shared_media_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentNativeActions.kt",
+        "anchor": "R.string.shared_media_save_failed",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:shared_media_saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentNativeActions.kt",
+        "anchor": "R.string.shared_media_saved",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "Text reader share sheet title: R.string.shared_media_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentNativeActions.kt",
+        "anchor": "R.string.shared_media_share",
+        "test_ids": [
+          "MED-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

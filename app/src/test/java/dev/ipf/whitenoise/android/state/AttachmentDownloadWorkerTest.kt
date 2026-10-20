@@ -130,4 +130,14 @@ class AttachmentDownloadWorkerTest {
             ),
         )
     }
+
+    /**
+     * The generic classifier treats a pending approval as a transient failure. The worker catches it before that path
+     * and retries without spending the budget, which AttachmentDownloadWorkerTransferTest locks (#3308).
+     */
+    @Test
+    fun pendingPermissionIsClassifiedAsTransient() {
+        assertTrue(shouldRetryAttachmentDownloadWork(false, AttachmentPermissionPendingException()))
+        assertFalse(shouldRetryAttachmentDownloadWork(true, AttachmentPermissionPendingException()))
+    }
 }

@@ -38,7 +38,7 @@ internal class EncryptedAttachmentInstallerHandoffRecordStore(
             operation()
         } catch (error: GeneralSecurityException) {
             secureStore.clear()
-            Log.w(TAG, "installer handoff secure store was reset after a cryptographic failure", error)
+            Log.w(TAG, "attachment secure store was reset after a cryptographic failure", error)
             fallback
         }
 
@@ -47,13 +47,20 @@ internal class EncryptedAttachmentInstallerHandoffRecordStore(
         private const val KEY_ALIAS = "whitenoise.attachment_installer_handoff.aes_gcm.v1"
         private const val TAG = "InstallerHandoffStore"
 
-        /** Builds the dedicated encrypted store for the application process. */
-        fun create(context: Context): EncryptedAttachmentInstallerHandoffRecordStore =
+        /**
+         * Builds a dedicated encrypted store for the application process: the installer handoff record by
+         * default, or another small attachment record sealed in its own [fileName] under its own [keyAlias].
+         */
+        fun create(
+            context: Context,
+            fileName: String = SECURE_FILE,
+            keyAlias: String = KEY_ALIAS,
+        ): EncryptedAttachmentInstallerHandoffRecordStore =
             EncryptedAttachmentInstallerHandoffRecordStore(
                 KeystoreSecureStore(
                     context = context.applicationContext,
-                    fileName = SECURE_FILE,
-                    keyProvider = AndroidKeystoreSecretKeyProvider(KEY_ALIAS),
+                    fileName = fileName,
+                    keyProvider = AndroidKeystoreSecretKeyProvider(keyAlias),
                 ),
             )
     }
