@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -20,7 +19,10 @@ internal class ProtectedShellSavedState(
     val key: String,
 )
 
-/** Preserves the live shell on owner changes; retires suspended snapshots when their owner changes. */
+/**
+ * Preserves the live shell on owner changes; retires suspended snapshots when their owner changes.
+ * Lock suspension and Activity recreation keep the snapshot, so external results land in it later.
+ */
 @Composable
 internal fun rememberProtectedShellSavedState(
     accountRef: String?,
@@ -48,10 +50,15 @@ internal fun rememberProtectedShellSavedState(
     previousProcess = processIdentity
     previousAccount = accountRef
     previouslySuspended = suspended
-    SideEffect { composedInThisInstance = true }
     val key = epoch.toString()
-    DisposableEffect(key) {
-        onDispose { holder.removeState(key) }
+    var retainedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    SideEffect {
+        composedInThisInstance = true
+        // Retire a snapshot only when its owner is replaced. Composition teardown (Activity
+        // recreation) must not remove it — the saved-instance bundle may still reference the
+        // holder's live state map, so a removal there would erase the state being restored.
+        retainedKey?.takeIf { it != key }?.let(holder::removeState)
+        retainedKey = key
     }
     return ProtectedShellSavedState(holder, key)
 }
