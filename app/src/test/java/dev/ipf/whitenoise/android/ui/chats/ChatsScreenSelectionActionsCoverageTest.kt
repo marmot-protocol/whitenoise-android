@@ -16,7 +16,13 @@ class ChatsScreenSelectionActionsCoverageTest {
             "preservePendingAnchor = preservePendingSearchAnchor" in source,
         )
         assertTrue("the fence receives available local rows", "hasLocalRows = visibleItems.isNotEmpty()" in source)
-        assertTrue("restoration is captured per request", "remember(chatListDatasetKey, bodySearchRequest)" in source)
+        assertTrue("the dataset owns restoration", "rememberSearchBodyAnchorRestoration(" in source)
+        val stage = File(chatsScreenSource().parentFile, "GlobalSearchBodyStage.kt").readText()
+        assertTrue("restoration survives request-only retry", "remember(datasetKey)" in stage)
+        assertTrue(
+            "committed loading retires restoration",
+            "SideEffect { restoration.observeLoading(loading) }" in stage,
+        )
         val deepAnchor = preserveSearchBodyAnchor(sameDataset = true, firstVisibleIndex = 40, firstVisibleOffset = 9)
         assertTrue(
             "pending deep restoration cannot measure a shortened list",

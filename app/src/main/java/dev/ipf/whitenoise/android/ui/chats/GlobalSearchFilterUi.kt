@@ -240,7 +240,7 @@ private fun GlobalSearchScopeControlsHeader(
                 if (onSearchOtherChats != null) {
                     TextButton(
                         onClick = onSearchOtherChats,
-                        modifier = Modifier.weight(1f).testTag("search-other-chats"),
+                        modifier = Modifier.testTag("search-other-chats"),
                     ) {
                         Text(stringResource(R.string.search_scope_other_chats))
                     }
