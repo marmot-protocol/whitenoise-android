@@ -412,12 +412,22 @@ class PushTokenStore(
     }
 
     /** Clears only the matching account's disable obligation after completion or an explicit re-enable. */
-    fun clearPendingDisable(account: String) {
-        if (account.isBlank()) return
-        synchronized(LOCK) {
+    @SuppressLint("ApplySharedPref")
+    fun clearPendingDisable(account: String): Boolean {
+        if (account.isBlank()) return false
+        return synchronized(LOCK) {
+            // Recommit even an in-memory absence after an earlier failed disk write.
             val current = pendingDisables()
-            if (account !in current) return
-            preferences.edit().putStringSet(KEY_PENDING_DISABLES, current - account).apply()
+            val cleared =
+                runCatching {
+                    preferences.edit().putStringSet(KEY_PENDING_DISABLES, current - account).commit()
+                }.getOrDefault(false)
+            if (!cleared) {
+                // A failed commit may already remove A from memory. Restore the accepted obligation
+                // conservatively so background positive writers cannot mistake that absence for authority.
+                runCatching { preferences.edit().putStringSet(KEY_PENDING_DISABLES, current).commit() }
+            }
+            cleared
         }
     }
 

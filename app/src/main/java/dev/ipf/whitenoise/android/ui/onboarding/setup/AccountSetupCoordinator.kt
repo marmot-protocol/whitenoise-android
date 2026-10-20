@@ -12,8 +12,11 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.appStateDebug
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val ACCOUNT_LOG_PREFIX_LENGTH = 8
 
@@ -23,13 +26,26 @@ internal class AccountSetupCoordinator(
     private val scope: CoroutineScope,
     private val onPhaseChange: (AppPhase) -> Unit,
     private val awaitActivationReadiness: suspend () -> Unit,
-    private val reconnectSigner: suspend (MarmotInterface, String) -> Unit,
+    private val reconnectSigner: suspend (MarmotInterface, String, () -> Boolean) -> Unit,
 ) {
     var controller by mutableStateOf<AccountSetupController?>(null)
         private set
     private var generation = 0L
     private var pending by mutableStateOf(emptySet<String>())
     private var recoveryRequired by mutableStateOf(emptySet<String>())
+
+    private data class RuntimeOwner(
+        val runtime: MarmotInterface,
+        val epoch: Int,
+    )
+
+    private fun runtimeOwner() = RuntimeOwner(app.marmot(), app.runtimeGeneration)
+
+    private fun requireOwner(owner: RuntimeOwner) {
+        if (app.runtimeGeneration != owner.epoch || app.marmot() !== owner.runtime) {
+            throw CancellationException("Setup runtime was replaced")
+        }
+    }
 
     /** Account-scoped setup eligibility returned from one runtime generation. */
     internal data class AccountsState(
@@ -82,16 +98,39 @@ internal class AccountSetupCoordinator(
     fun eligible(account: AccountSummaryFfi): Boolean = account.label !in pending && account.label !in recoveryRequired
 
     /** Imports only local identity material and then mounts the saved preflight route. */
-    suspend fun begin(nsec: String): OnboardingSnapshotFfi {
-        val snapshot = app.marmotIo { beginOnboarding(nsec, setupOptions()) }
-        open(snapshot)
+    suspend fun begin(
+        nsec: String,
+        mayBegin: () -> Boolean = { true },
+    ): OnboardingSnapshotFfi {
+        val owner = runtimeOwner()
+        val snapshot =
+            app.withAccountLifetime {
+                requireOwner(owner)
+                if (!mayBegin()) throw CancellationException("Setup action was replaced")
+                withContext(Dispatchers.IO) { owner.runtime.beginOnboarding(nsec, setupOptions()) }
+            }
+        open(snapshot, owner, mayBegin)
         return snapshot
     }
 
     /** Gates all account-selection paths before legacy reactivation or chat preload. */
-    suspend fun routeIfPending(account: String): Boolean {
+    suspend fun routeIfPending(
+        account: String,
+        mayRoute: () -> Boolean = { true },
+    ): Boolean {
+        if (!mayRoute()) throw CancellationException("Setup route was superseded")
         if (needsRecovery(account)) return true
-        val recoveryRead = app.marmotIo { runCatchingCancellable { onboardingRecoveryRequired(account) } }
+        val owner = runtimeOwner()
+
+        fun requireRoute() {
+            requireOwner(owner)
+            if (!mayRoute()) throw CancellationException("Setup route was superseded")
+        }
+        val recoveryRead =
+            withContext(Dispatchers.IO) {
+                runCatchingCancellable { owner.runtime.onboardingRecoveryRequired(account) }
+            }
+        requireRoute()
         return when {
             recoveryRead.isFailure -> {
                 pending = pending + account
@@ -109,7 +148,11 @@ internal class AccountSetupCoordinator(
 
             else -> {
                 recoveryRequired = recoveryRequired - account
-                val snapshotRead = app.marmotIo { runCatchingCancellable { onboardingSnapshot(account) } }
+                val snapshotRead =
+                    withContext(Dispatchers.IO) {
+                        runCatchingCancellable { owner.runtime.onboardingSnapshot(account) }
+                    }
+                requireRoute()
                 val snapshot = snapshotRead.getOrNull()
                 when {
                     snapshotRead.isFailure -> {
@@ -121,7 +164,7 @@ internal class AccountSetupCoordinator(
                     }
 
                     snapshot?.requiresSetup() == true -> {
-                        open(snapshot)
+                        open(snapshot, owner, mayRoute)
                         true
                     }
 
@@ -136,31 +179,83 @@ internal class AccountSetupCoordinator(
 
     /** Replaces an unreadable checkpoint only after the onboarding UI's explicit acknowledgement. */
     suspend fun recover(account: String): Boolean {
-        if (!app.marmotIo { onboardingRecoveryRequired(account) }) return false
-        close()
-        app.marmotIo { recoverOnboarding(account, acknowledgeLatestOnlyEvidence = true) }
+        val owner = runtimeOwner()
+        val required = withContext(Dispatchers.IO) { owner.runtime.onboardingRecoveryRequired(account) }
+        requireOwner(owner)
+        if (!required) return false
+        val token = drain()
+        app.withAccountLifetime {
+            requireOwner(owner)
+            if (generation != token) throw CancellationException("Setup route was replaced")
+            withContext(Dispatchers.IO) {
+                owner.runtime.recoverOnboarding(account, acknowledgeLatestOnlyEvidence = true)
+            }
+        }
         return true
     }
 
     /** Mounts a controller tied to the current runtime and never changes the active account. */
-    suspend fun open(snapshot: OnboardingSnapshotFfi) {
-        close()
-        val token = generation
-        val runtimeGeneration = app.runtimeGeneration
-        val runtime = app.marmot()
-        val account = snapshot.accountIdHex
-        pending = pending + account
-        val client = MarmotAccountSetupClient(runtime, account) { reconnectSigner(runtime, account) }
-        controller =
-            AccountSetupController(
-                account,
-                client,
-                scope,
-                isCurrent = { generation == token && app.runtimeGeneration == runtimeGeneration },
-                onReady = { finish(token, runtimeGeneration, client, account) },
-                onCancelled = { app.launchMutation { if (generation == token) later() } },
-            )
-        if (app.phase == AppPhase.Bootstrapping) onPhaseChange(AppPhase.Onboarding)
+    suspend fun open(snapshot: OnboardingSnapshotFfi) = open(snapshot, runtimeOwner())
+
+    /** External signer setup keeps its producer receipt and original selection across controller draining. */
+    internal suspend fun open(
+        snapshot: OnboardingSnapshotFfi,
+        runtime: MarmotInterface,
+        epoch: Int,
+        mayMount: () -> Boolean,
+    ) = open(snapshot, RuntimeOwner(runtime, epoch), mayMount)
+
+    private suspend fun open(
+        snapshot: OnboardingSnapshotFfi,
+        owner: RuntimeOwner,
+        mayMount: () -> Boolean = { true },
+    ) {
+        requireOwner(owner)
+        if (!mayMount()) throw CancellationException("Setup action was replaced")
+        val token = drain()
+        app.withAccountLifetime {
+            requireOwner(owner)
+            if (!mayMount()) throw CancellationException("Setup action was replaced")
+            if (generation != token) throw CancellationException("Setup route was replaced")
+            val runtimeGeneration = owner.epoch
+            val runtime = owner.runtime
+            val account = snapshot.accountIdHex
+            pending = pending + account
+            val isMountCurrent = {
+                generation == token &&
+                    app.runtimeGeneration == runtimeGeneration &&
+                    app.marmot() === runtime &&
+                    mayMount()
+            }
+            val client =
+                MarmotAccountSetupClient(
+                    runtime,
+                    account,
+                    withLifetime = { command ->
+                        app.withAccountLifetime {
+                            if (!isMountCurrent()) throw CancellationException("Setup mount was replaced")
+                            command()
+                        }
+                    },
+                    withOwnedPreviewCleanup = { command ->
+                        app.withAccountLifetime {
+                            // Controller close drains this owned preview before native lifetime can end.
+                            requireOwner(owner)
+                            command()
+                        }
+                    },
+                ) { reconnectSigner(runtime, account, isMountCurrent) }
+            controller =
+                AccountSetupController(
+                    account,
+                    client,
+                    scope,
+                    isCurrent = isMountCurrent,
+                    onReady = { finish(token, owner, client, account, isMountCurrent) },
+                    onCancelled = { app.launchMutation { if (generation == token) later() } },
+                )
+            if (app.phase == AppPhase.Bootstrapping) onPhaseChange(AppPhase.Onboarding)
+        }
         controller?.reconnect()
     }
 
@@ -173,35 +268,44 @@ internal class AccountSetupCoordinator(
 
     /** Invalidates callbacks before draining the old native reader and command. */
     suspend fun close() {
-        generation++
+        drain()
+    }
+
+    private suspend fun drain(): Long {
+        val token = ++generation
         val previous = controller
         controller = null
         previous?.close()
+        return token
     }
 
     /** Activates only a freshly certified account and leaves the route available if activation fails. */
     private suspend fun finish(
         token: Long,
-        runtimeGeneration: Int,
+        owner: RuntimeOwner,
         client: AccountSetupClient,
         account: String,
+        isMountCurrent: () -> Boolean,
     ) {
-        if (generation != token || app.runtimeGeneration != runtimeGeneration) return
+        val selection = app.accountSession.handoff.capture()
+        if (!isMountCurrent()) return
         val snapshot = client.snapshot() ?: return
-        if (snapshot.ready && !snapshot.cancellationPending && generation == token) {
-            app.refreshAccounts()
-            // Resumed setup may have diverted bootstrap before its receiver/privacy barrier.
-            awaitActivationReadiness()
-            if (generation == token && app.runtimeGeneration == runtimeGeneration) {
-                val activated =
-                    app.setActiveAccount(
-                        account,
-                        shouldActivate = { generation == token && app.runtimeGeneration == runtimeGeneration },
-                        onActivated = { onPhaseChange(AppPhase.Ready) },
-                    )
-                if (activated) scope.launch { if (generation == token) close() }
-            }
-        }
+        if (!isMountCurrent() || !snapshot.ready || snapshot.cancellationPending) return
+        app.refreshAccounts()
+        if (!isMountCurrent()) return
+        // Resumed setup may have diverted bootstrap before its receiver/privacy barrier.
+        awaitActivationReadiness()
+        if (!isMountCurrent()) return
+        val activated =
+            app.setActiveAccount(
+                account,
+                shouldActivate = {
+                    generation == token && app.runtimeGeneration == owner.epoch && app.marmot() === owner.runtime
+                },
+                expectedSelection = selection,
+                onActivated = { onPhaseChange(AppPhase.Ready) },
+            )
+        if (activated) scope.launch { if (generation == token) close() }
     }
 }
 

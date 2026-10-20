@@ -20,6 +20,20 @@ class PushTokenStoreTest {
         assertEquals(2, preferences.commitCalls)
     }
 
+    /** Failed removal acknowledgement must be retried even when the old obligation disappeared from memory. */
+    @Test
+    fun pendingDisableClearRecommitsAfterFailedDiskAcknowledgement() {
+        val preferences = FakeSharedPreferences(ArrayDeque(listOf(true, true, false, true, true)))
+        val store = PushTokenStore(preferences)
+        assertTrue(store.recordPendingDisable("account-a"))
+        assertTrue(store.recordPendingDisable("account-b"))
+        assertFalse(store.clearPendingDisable("account-a"))
+        assertEquals(setOf("account-a", "account-b"), store.pendingDisables())
+        assertTrue(store.clearPendingDisable("account-a"))
+        assertEquals(5, preferences.commitCalls)
+        assertEquals(setOf("account-b"), store.pendingDisables())
+    }
+
     /** A new generation and its eligible exhausted-budget reset must share one commit. */
     @Test
     fun wakeRecordAndEpisodeAdmissionCommitAtomically() {

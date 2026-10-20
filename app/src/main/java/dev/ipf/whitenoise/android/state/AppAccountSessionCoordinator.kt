@@ -4,6 +4,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Caller intent for one account selection; the coordinator supplies its lifetime token. */
@@ -91,6 +93,11 @@ internal class AppAccountSessionCoordinator(
     private val listenerTeardown: () -> AppRuntimeListenerTeardownOwner,
     private val activation: AppAccountSessionActivation,
 ) {
+    private val lifetime = Mutex()
+
+    /** Serializes native lifetime mutations; callers use owned helpers instead of recursive acquisition. */
+    suspend fun <T> withLifetime(block: suspend () -> T): T = lifetime.withLock { block() }
+
     val bootstrapAttempts = BootstrapAttemptCoordinator()
 
     /** One selection receipt authority, also consumed by the facade's native projection adapters. */
@@ -102,29 +109,39 @@ internal class AppAccountSessionCoordinator(
             bootstrapAttempts.currentOrStart { mutationScope.async { start() } }
         }
 
-    /** A synchronous created-identity publication supersedes any suspended selection of an older account. */
-    fun publishCreatedIdentity(
+    /** Declare intent before waiting so later explicit selections can supersede native creation publication. */
+    suspend fun publishCreatedIdentity(
         label: String,
         publish: () -> Unit,
     ) {
         val generation = handoff.beginRequest(label)
         try {
-            publish()
+            withLifetime {
+                if (!handoff.isCurrent(generation)) {
+                    throw kotlinx.coroutines.CancellationException("Identity publication superseded")
+                }
+                publish()
+            }
         } finally {
             handoff.finishRequest(generation)
         }
     }
 
-    /** Admitted local sign-out retires older selections before its suspended platform/account cleanup. */
-    fun retireSelectionsForSignOut() {
-        handoff.beginRequest()
-    }
+    /** Retiring selections is part of admitted cleanup, not proof that native sign-out completed. */
+    fun retireSelectionsForSignOut(): Long = handoff.beginRequest()
 
-    /** Final local sign-out retires pending selections even when native sign-out used its fail-open path. */
-    fun publishSignedOutIdentity(publish: () -> Unit) {
+    /** Startup deactivation cannot publish after a later explicit selection wins its lifetime. */
+    suspend fun publishSignedOutIdentity(publish: () -> Unit): Boolean {
         val generation = handoff.beginRequest()
-        try {
-            publish()
+        return try {
+            withLifetime {
+                if (!handoff.isCurrent(generation)) {
+                    false
+                } else {
+                    publish()
+                    true
+                }
+            }
         } finally {
             handoff.finishRequest(generation)
         }
@@ -156,10 +173,59 @@ internal class AppAccountSessionCoordinator(
         request: AccountSessionActivationRequest,
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
+        beforePrepare: suspend (Long) -> Boolean = { true },
+        expectedGeneration: Long? = null,
     ): AccountSessionActivationReceipt? {
-        val generation = handoff.beginRequest(request.label)
+        val generation =
+            if (expectedGeneration == null) {
+                handoff.beginRequest(request.label)
+            } else {
+                handoff.beginRequestIfCurrent(expectedGeneration, request.label) ?: return null
+            }
         return try {
-            activateCurrentRequest(request, generation, awaitPostActivationWork, onActivated)
+            // Routing may close/join setup commands; keep its original request identity outside the gate.
+            if (!beforePrepare(generation)) {
+                null
+            } else {
+                activateCurrentRequest(request, generation, awaitPostActivationWork, onActivated)
+            }
+        } finally {
+            handoff.finishRequest(generation)
+        }
+    }
+
+    /** A newer explicit request wins without being invalidated by automatic logout succession. */
+    suspend fun activateAfterSignOutIfCurrent(
+        signOutGeneration: Long,
+        request: AccountSessionActivationRequest,
+        beforePrepare: suspend (Long) -> Boolean = { true },
+        onActivated: () -> Unit = {},
+        ownerIsCurrent: () -> Boolean,
+    ): AccountSessionActivationReceipt? {
+        val generation =
+            withLifetime {
+                if (activation.activeAccount != null || !ownerIsCurrent()) return@withLifetime null
+                handoff.beginRequestIfCurrent(signOutGeneration, request.label)
+            } ?: return null
+        return try {
+            if (!beforePrepare(generation)) return null
+            val committed =
+                commitCurrentRequest(
+                    request.copy(shouldActivate = {
+                        ownerIsCurrent() && request.shouldActivate()
+                    }),
+                    generation,
+                    {
+                        if (
+                            handoff.isCurrent(generation) &&
+                            activation.activeAccount == request.label &&
+                            ownerIsCurrent()
+                        ) {
+                            onActivated()
+                        }
+                    },
+                ) ?: return null
+            AccountSessionActivationReceipt(request.label, generation, committed.first.runtimeGeneration)
         } finally {
             handoff.finishRequest(generation)
         }
@@ -173,21 +239,45 @@ internal class AppAccountSessionCoordinator(
         awaitPostActivationWork: suspend () -> Unit,
         onActivated: () -> Unit,
     ): AccountSessionActivationReceipt? {
-        val switching = request.label != activation.activeAccount
-        val prepared = activation.prepare(request, generation, switching) ?: return null
-        val allowed = {
-            request.shouldActivate() &&
-                handoff.isCurrent(generation) &&
-                activation.canPublish(request.label, prepared.runtimeGeneration)
-        }
-        if (!allowed()) return null
-        if (switching) activation.hidePreviousAccountShortcuts()
-        if (!allowed()) return null
-        activation.publish(request.label, generation, switching, prepared)
-        onActivated()
+        val committed = commitCurrentRequest(request, generation, onActivated) ?: return null
+        val (prepared, switching) = committed
         awaitPostActivationWork()
         refreshActivatedAccount(request, generation, prepared.runtimeGeneration, switching)
         return AccountSessionActivationReceipt(request.label, generation, prepared.runtimeGeneration)
+    }
+
+    /** Owns only native local preparation and synchronous publication, without optional enrichment. */
+    private suspend fun commitCurrentRequest(
+        request: AccountSessionActivationRequest,
+        generation: Long,
+        onActivated: () -> Unit,
+    ): Pair<PreparedAccountSessionActivation, Boolean>? =
+        withLifetime {
+            if (!request.shouldActivate() || !handoff.isCurrent(generation)) return@withLifetime null
+            val switching = request.label != activation.activeAccount
+            val prepared = activation.prepare(request, generation, switching) ?: return@withLifetime null
+            val allowed = {
+                request.shouldActivate() &&
+                    handoff.isCurrent(generation) &&
+                    activation.canPublish(request.label, prepared.runtimeGeneration)
+            }
+            if (!allowed()) return@withLifetime null
+            if (switching) activation.hidePreviousAccountShortcuts()
+            if (!allowed()) return@withLifetime null
+            activation.publish(request.label, generation, switching, prepared)
+            // The synchronous local-ready projection belongs to this same accepted publication.
+            onActivated()
+            prepared to switching
+        }
+
+    /** Optional successor enrichment stays in the original cancellable caller after owned bookkeeping finishes. */
+    suspend fun refreshAfterSignOut(receipt: AccountSessionActivationReceipt) {
+        refreshActivatedAccount(
+            AccountSessionActivationRequest(receipt.label),
+            receipt.generation,
+            receipt.runtimeGeneration,
+            switching = true,
+        )
     }
 
     /** Each suspension can replace the account/runtime, so later effects must revalidate ownership. */

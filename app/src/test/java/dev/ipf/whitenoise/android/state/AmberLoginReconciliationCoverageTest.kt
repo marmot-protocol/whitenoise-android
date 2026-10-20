@@ -38,7 +38,8 @@ class AmberLoginReconciliationCoverageTest {
 
         val loginIndex = body.indexOf("loginExternalSigner(")
         val reconcileIndex = body.indexOf("registerExternalSigner(", loginIndex + 1)
-        val importedActivation = body.indexOf("activateImportedIdentity(summary)", reconcileIndex + 1)
+        val importedActivation =
+            body.indexOf("activateImportedIdentity(summary, runtime, epoch, selection)", reconcileIndex + 1)
         val imported = source.functionBody("activateImportedIdentity")
         val refreshIndex = imported.indexOf("refreshAccounts()")
         val activateIndex = imported.indexOf("activateAccountSession(", refreshIndex + 1)
@@ -69,7 +70,7 @@ class AmberLoginReconciliationCoverageTest {
         require(start >= 0 && end > start) { "Missing nsec setup boundary" }
         val body = source.substring(start, end)
         val production = body.substring(body.indexOf("return try {"))
-        assertTrue(production.contains("accountSetup.begin(nsec)"))
+        assertTrue(production.contains("accountSetup.begin(nsec, ownsOrigin)"))
         val caughtTypes =
             Regex("catch\\s*\\([^:]+:\\s*([^)]*)\\)")
                 .findAll(production)

@@ -33,6 +33,219 @@ import org.robolectric.annotation.GraphicsMode
 internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture() {
     /** Completed non-destructive sign-out clears geometry only after engine-owned teardown completes. */
     @Test
+    fun callerCancellationKeepsNewerExplicitAccountAheadOfAutomaticSuccessor() =
+        runBlocking {
+            val explicitRef = "explicit-account"
+            additionalAccounts =
+                listOf(
+                    externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)),
+                    externalSignerAccount().copy(label = explicitRef, accountIdHex = "ee".repeat(32)),
+                )
+            val state = appState(profileReader = { null })
+            var explicit: kotlinx.coroutines.Deferred<Boolean>? = null
+            val logout = async(start = CoroutineStart.LAZY) { state.signOutActiveAccount() }
+            beforeSignOutReply = {
+                explicit = async(start = CoroutineStart.UNDISPATCHED) { state.setActiveAccount(explicitRef) }
+                logout.cancel()
+            }
+            try {
+                logout.start()
+                logout.join()
+                assertTrue(logout.isCancelled)
+                assertTrue(checkNotNull(explicit).await())
+                assertEquals(explicitRef, state.activeAccountRef)
+                assertEquals(AppPhase.Ready, state.phase)
+                assertTrue(state.accounts.first { it.label == accountRef }.signedOut)
+            } finally {
+                logout.cancel()
+                logout.join()
+                explicit?.cancel()
+                explicit?.join()
+            }
+        }
+
+    @Test
+    fun staleSameRuntimeSetupRouteCannotMountAfterNewerPublicActivation() =
+        runBlocking {
+            additionalAccounts =
+                listOf(
+                    externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)),
+                )
+            val state = appState(profileReader = { null })
+            val epoch = state.runtimeGeneration
+            val read = CompletableDeferred<kotlin.coroutines.Continuation<Any?>>()
+            setupSnapshotReply = { continuation ->
+                read.complete(continuation)
+                kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+            }
+            val earlier = async { runCatching { state.setActiveAccount(accountRef) } }
+            val continuation = withTimeout(5_000) { read.await() }
+            setupSnapshotReply = null
+            try {
+                assertTrue(state.setActiveAccount(otherAccountRef))
+            } finally {
+                continuation.resumeWith(
+                    Result.success(
+                        dev.ipf.whitenoise.android.ui.onboarding.setup
+                            .setupSnapshot()
+                            .copy(accountIdHex = accountRef),
+                    ),
+                )
+            }
+            val result = withTimeout(5_000) { earlier.await() }
+            assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertEquals(epoch, state.runtimeGeneration)
+            assertEquals(otherAccountRef, state.activeAccountRef)
+            assertEquals(AppPhase.Ready, state.phase)
+            assertNull(state.accountSetup.controller)
+        }
+
+    @Test
+    fun nativeCancellationAfterSignedOutCommitsAutomaticSuccessorBeforePropagation() =
+        runBlocking {
+            additionalAccounts =
+                listOf(
+                    externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)),
+                )
+            signOutFailure = kotlinx.coroutines.CancellationException("native reply cancelled")
+            persistSignedOutBeforePartialFailure = true
+            val state = appState(profileReader = { null })
+            val result = runCatching { state.signOutActiveAccount() }
+            assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertEquals(otherAccountRef, state.activeAccountRef)
+            assertEquals(AppPhase.Ready, state.phase)
+            assertTrue(state.accounts.first { it.label == accountRef }.signedOut)
+            assertEquals(listOf("disable", "signOut"), nativeCallOrder)
+            assertEquals(0, nativePrivacyConfigCalls.get())
+        }
+
+    @Test
+    fun explicitAccountQueuedDuringNativeSignOutWinsSuccessorAndBecomesReady() =
+        runBlocking {
+            val explicitRef = "explicit-account"
+            additionalAccounts =
+                listOf(
+                    externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)),
+                    externalSignerAccount().copy(label = explicitRef, accountIdHex = "ee".repeat(32)),
+                )
+            val state = appState(profileReader = { null })
+            var explicit: kotlinx.coroutines.Deferred<Boolean>? = null
+            beforeSignOutReply = {
+                explicit = async(start = CoroutineStart.UNDISPATCHED) { state.setActiveAccount(explicitRef) }
+            }
+            try {
+                assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+                assertTrue(checkNotNull(explicit).await())
+                assertEquals(explicitRef, state.activeAccountRef)
+                assertEquals(AppPhase.Ready, state.phase)
+                assertTrue(state.accounts.first { it.label == accountRef }.signedOut)
+                assertEquals(listOf("disable", "signOut"), nativeCallOrder.take(2))
+            } finally {
+                explicit?.cancel()
+                explicit?.join()
+            }
+        }
+
+    @Test
+    fun successfulSignOutActivatesRetainedSuccessorInReadyPhase() =
+        runBlocking {
+            additionalAccounts =
+                listOf(
+                    externalSignerAccount().copy(label = otherAccountRef, accountIdHex = "dd".repeat(32)),
+                )
+            val state = appState(profileReader = { null })
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertEquals(otherAccountRef, state.activeAccountRef)
+            assertEquals(AppPhase.Ready, state.phase)
+            assertEquals(listOf("disable", "signOut"), nativeCallOrder.take(2))
+            assertTrue(state.accounts.first { it.label == accountRef }.signedOut)
+        }
+
+    @Test
+    fun retainedCreationReceiptCannotQualifyOrActivateAfterPublicWipe() =
+        runBlocking {
+            val state = appState()
+            createdIdentity = externalSignerAccount().copy(label = "created", accountIdHex = "cc".repeat(32))
+            createdPolicyFailure = java.io.IOException("policy qualification unavailable")
+            state.createIdentity()
+            assertEquals(1, createdIdentityCalls.get())
+            assertEquals(accountRef, state.activeAccountRef)
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+            createdPolicyFailure = null
+            val retry = runCatching { state.createIdentity() }
+            assertTrue(retry.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertEquals(1, createdIdentityCalls.get())
+            assertNull(state.activeAccountRef)
+        }
+
+    @Test
+    fun cancelledNativeSignOutRetainsAuthoritativeSignedOutCacheWhenRefreshFails() =
+        runBlocking {
+            val state = appState()
+            signOutFailure = kotlinx.coroutines.CancellationException("native completion reply cancelled")
+            persistSignedOutBeforePartialFailure = true
+            beforeListAccounts = {
+                if (listAccountsCalls.get() > 0) error("later refresh unavailable")
+            }
+            val result = runCatching { state.signOutActiveAccount() }
+            assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertTrue(state.accounts.single().signedOut)
+            assertNull(state.activeAccountRef)
+            assertFalse(nativePushEnabled)
+        }
+
+    @Test
+    fun staleSetupSnapshotCannotMountAfterPublicWipe() =
+        runBlocking {
+            val state = appState()
+            val read = CompletableDeferred<kotlin.coroutines.Continuation<Any?>>()
+            setupSnapshotReply = { continuation ->
+                read.complete(continuation)
+                kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+            }
+            val routing = async { runCatching { state.accountSetup.routeIfPending(accountRef) } }
+            val continuation = withTimeout(5_000) { read.await() }
+            setupSnapshotReply = null
+            try {
+                assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+            } finally {
+                continuation.resumeWith(
+                    Result.success(
+                        dev.ipf.whitenoise.android.ui.onboarding.setup
+                            .setupSnapshot(),
+                    ),
+                )
+            }
+            val result = withTimeout(5_000) { routing.await() }
+            assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertNull(state.accountSetup.controller)
+        }
+
+    /** Recovery binds its first read to the owner that initiated it, even across controller draining. */
+    @Test
+    fun staleSetupRecoveryReadCannotMutateAfterPublicWipe() =
+        runBlocking {
+            val state = appState()
+            val read = CompletableDeferred<kotlin.coroutines.Continuation<Any?>>()
+            setupRecoveryReply = { continuation ->
+                read.complete(continuation)
+                kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+            }
+            val recovery = async { runCatching { state.accountSetup.recover(accountRef) } }
+            val continuation = withTimeout(5_000) { read.await() }
+            setupRecoveryReply = null
+            try {
+                assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+            } finally {
+                continuation.resumeWith(Result.success(true))
+            }
+            val result = withTimeout(5_000) { recovery.await() }
+            assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertEquals(0, setupRecoverCalls.get())
+            assertNull(state.accountSetup.controller)
+        }
+
+    @Test
     fun successfulExternalSignerSignOutUsesTheNormalCompletionPath() =
         runBlocking {
             val appState = appState()
@@ -300,70 +513,76 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             assertNull(state.activeAccountRef)
         }
 
-    /** A late native success clears the old account's keyed state while preserving the replacement session. */
+    /** Production identity publication queued before logout makes the captured A request stale before effects. */
     @Test
-    fun lateSignOutSuccessClearsOnlyTheCapturedAccount() =
+    fun queuedAccountPublicationCannotTurnSignOutAIntoSignOutB() =
         runBlocking {
-            // This native reply hook simulates a Main-thread account switch before delivering its result.
-            val state = appState(marmotIoDispatcher = kotlinx.coroutines.Dispatchers.Unconfined)
+            val state = appState()
             retainComposerExpansion(state)
-            retainContactPictures(state)
-            val originalPhase = state.phase
+            val release = CompletableDeferred<Unit>()
+            val hold = async(start = CoroutineStart.UNDISPATCHED) { state.withAccountLifetime { release.await() } }
+            val replacement =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    state.accountSession.publishCreatedIdentity(otherAccountRef) {
+                        state.switchMediaSessionForTest(otherAccountRef)
+                    }
+                }
+            val logout = async(start = CoroutineStart.UNDISPATCHED) { state.signOutActiveAccount() }
+            release.complete(Unit)
+            hold.await()
+            replacement.await()
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, logout.await())
+            assertEquals(otherAccountRef, state.activeAccountRef)
+            assertEquals(0, nativeDisableCalls.get())
+            assertEquals(0, signOutCalls.get())
+            assertTrue(PushTokenStore.create(context).pendingDisables().isEmpty())
+        }
+
+    /** Same-ref publication is a new selection lifetime even without replacing the native object. */
+    @Test
+    fun queuedSameAccountReactivationRejectsOlderLogoutWithoutPushEffects() =
+        runBlocking {
+            val state = appState()
+            val release = CompletableDeferred<Unit>()
+            val hold = async(start = CoroutineStart.UNDISPATCHED) { state.withAccountLifetime { release.await() } }
+            val logout = async(start = CoroutineStart.UNDISPATCHED) { state.signOutActiveAccount() }
+            val replacement =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    state.accountSession.publishCreatedIdentity(accountRef) {
+                        state.switchMediaSessionForTest(accountRef)
+                    }
+                }
+            release.complete(Unit)
+            hold.await()
+            replacement.await()
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, logout.await())
+            assertEquals(accountRef, state.activeAccountRef)
+            assertEquals(0, nativeDisableCalls.get())
+            assertEquals(0, signOutCalls.get())
+        }
+
+    /** A real queued publication cannot overtake native completion and old shared-data cleanup. */
+    @Test
+    fun publicationRequestedDuringNativeReplyWaitsForOwnedCleanup() =
+        runBlocking {
+            val state = appState()
+            retainComposerExpansion(state)
+            var replacement: kotlinx.coroutines.Deferred<Unit>? = null
             beforeSignOutReply = {
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("marmotRuntime")
-                    .apply { isAccessible = true }
-                    .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
-                state.switchMediaSessionForTest(otherAccountRef)
+                replacement =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        state.accountSession.publishCreatedIdentity(otherAccountRef) {
+                            assertNull(state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
+                            state.switchMediaSessionForTest(otherAccountRef)
+                        }
+                    }
+                assertFalse(checkNotNull(replacement).isCompleted)
+                assertEquals(accountRef, state.activeAccountRef)
             }
             assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            checkNotNull(replacement).await()
             assertEquals(otherAccountRef, state.activeAccountRef)
-            assertEquals(originalPhase, state.phase)
-            assertTrue(state.accounts.single().signedOut)
-            assertNull(state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
-            assertEquals(
-                composerExpansion,
-                state.composerExpansionStateRetention.preferenceFor(otherAccountRef, groupId),
-            )
-            assertContactPicturesRemovedOnlyForThisAccount(state)
-        }
-
-    /** A replacement runtime with the same ref owns its keyed state until it completes its own sign-out. */
-    @Test
-    fun lateSuccessCannotEraseReplacementUsingTheSameAccountRef() =
-        runBlocking {
-            val state = appState()
-            retainComposerExpansion(state)
-            beforeSignOutReply = {
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("marmotRuntime")
-                    .apply { isAccessible = true }
-                    .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
-            }
-            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(accountRef, state.activeAccountRef)
-            assertEquals(composerExpansion, state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
-            assertTrue(PushTokenStore.create(context).pendingDisables().contains(accountRef))
-        }
-
-    /** A replaced runtime's failed reply cannot report sign-out or tear down the still-active session. */
-    @Test
-    fun lateSignOutFailureKeepsAccountAndReportsIncompleteCleanup() =
-        runBlocking {
-            val state = appState()
-            retainComposerExpansion(state)
-            signOutFailure = java.io.IOException("scripted late failure")
-            beforeSignOutReply = {
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("marmotRuntime")
-                    .apply { isAccessible = true }
-                    .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
-            }
-            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
-            assertEquals(accountRef, state.activeAccountRef)
-            assertFalse(state.accounts.single().signedOut)
-            assertEquals(composerExpansion, state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
-            assertTrue(PushTokenStore.create(context).pendingDisables().contains(accountRef))
+            assertEquals(listOf("disable", "signOut"), nativeCallOrder)
         }
 
     /** Push bookkeeping failure preserves the completed native sign-out and local cleanup. */

@@ -22,6 +22,7 @@ internal data class SignUpProfileDraft(
 internal data class SignUpOwner(
     val runtime: Int,
     val accountRef: String?,
+    val selection: Long = 0,
 )
 
 /** Failed profile stages retain the accepted identity and can never return to identity creation. */
@@ -77,7 +78,12 @@ internal class SignUpController(
         }
         val captured = owner ?: openingOwner
         val expected = acceptedIdentity?.let { captured.copy(accountRef = it.label) } ?: captured
-        return currentOwner() == expected
+        val current = currentOwner()
+        return if (acceptedIdentity == null) {
+            current == expected
+        } else {
+            current.runtime == expected.runtime && current.accountRef == expected.accountRef
+        }
     }
 
     /** Keeps non-secret form state through view recreation without creating or publishing anything. */
@@ -131,7 +137,11 @@ internal class SignUpController(
      */
     private fun ownsAcceptedIdentity(): Boolean {
         val expected = owner?.let { captured -> acceptedIdentity?.let { captured.copy(accountRef = it.label) } }
-        return expected != null && ownerAvailable() && currentOwner() == expected
+        val current = currentOwner()
+        return expected != null &&
+            ownerAvailable() &&
+            current.runtime == expected.runtime &&
+            current.accountRef == expected.accountRef
     }
 
     /** Runs only uncommitted stages; failures keep the accepted identity and uploaded image URL. */

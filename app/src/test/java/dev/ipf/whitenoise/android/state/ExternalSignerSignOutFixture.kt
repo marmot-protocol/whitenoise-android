@@ -54,6 +54,7 @@ internal abstract class ExternalSignerSignOutFixture {
     protected val nativeCallOrder = mutableListOf<String>()
     protected var listAccountsFailure: Throwable? = null
     protected var engineSignedOut = false
+    protected var persistSignedOutBeforePartialFailure = false
     protected var wipeOutcome =
         WipeOutcomeFfi(
             groupsLeft = 1u,
@@ -63,8 +64,16 @@ internal abstract class ExternalSignerSignOutFixture {
             localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
         )
     protected var engineWiped = false
+    protected var additionalAccounts: List<AccountSummaryFfi> = emptyList()
     protected var beforeListAccounts: () -> Unit = {}
     protected var beforeSignOutReply: () -> Unit = {}
+    protected var setupRecoveryReply: ((Continuation<Any?>) -> Any?)? = null
+    protected var setupSnapshotReply: ((Continuation<Any?>) -> Any?)? = null
+    protected val setupRecoverCalls = AtomicInteger(0)
+    protected val nativePrivacyConfigCalls = AtomicInteger(0)
+    protected var createdIdentity: AccountSummaryFfi? = null
+    protected val createdIdentityCalls = AtomicInteger(0)
+    protected var createdPolicyFailure: Throwable? = null
 
     /** Builds a signed-in external-signer identity without private key material for the real teardown path. */
     protected fun externalSignerAccount(
@@ -92,6 +101,14 @@ internal abstract class ExternalSignerSignOutFixture {
             }
 
             when (method.name) {
+                "setRelayTelemetryRuntimeConfig" -> {
+                    nativePrivacyConfigCalls.incrementAndGet()
+                    Unit
+                }
+                "createIdentity" -> {
+                    createdIdentityCalls.incrementAndGet()
+                    checkNotNull(createdIdentity)
+                }
                 "setNativePushEnabled" -> {
                     nativeDisableCalls.incrementAndGet()
                     nativeCallOrder += "disable"
@@ -104,8 +121,11 @@ internal abstract class ExternalSignerSignOutFixture {
                     signOutCalls.incrementAndGet()
                     nativeCallOrder += "signOut"
                     beforeSignOutReply()
+                    if (signOutFailure != null && persistSignedOutBeforePartialFailure) engineSignedOut = true
                     signOutFailure?.let(::suspendFailure)
-                        ?: signOutOutcome.also { engineSignedOut = it.localCleanup.completed }
+                        ?: signOutOutcome.also {
+                            engineSignedOut = it.localCleanup.completed || persistSignedOutBeforePartialFailure
+                        }
                 }
                 "signOutAndWipe" -> {
                     wipeCalls.incrementAndGet()
@@ -115,12 +135,27 @@ internal abstract class ExternalSignerSignOutFixture {
                     beforeListAccounts()
                     listAccountsCalls.incrementAndGet()
                     listAccountsFailure?.let(::suspendFailure)
-                    if (engineWiped) emptyList() else listOf(externalSignerAccount(signedOut = engineSignedOut))
+                    if (engineWiped) {
+                        emptyList()
+                    } else {
+                        listOf(externalSignerAccount(signedOut = engineSignedOut)) + additionalAccounts
+                    }
                 }
                 // Permit the authoritative refresh instead of silently taking cached-account fallback.
-                "attachmentDownloadPolicy" -> dev.ipf.marmotkit.AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
-                "onboardingRecoveryRequired" -> false
-                "onboardingSnapshot" -> null
+                "attachmentDownloadPolicy" -> {
+                    if (arguments?.firstOrNull() == createdIdentity?.label && createdPolicyFailure != null) {
+                        suspendFailure(checkNotNull(createdPolicyFailure))
+                    } else {
+                        dev.ipf.marmotkit.AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+                    }
+                }
+                "onboardingRecoveryRequired" ->
+                    setupRecoveryReply?.invoke(arguments!!.last() as Continuation<Any?>) ?: false
+                "onboardingSnapshot" -> setupSnapshotReply?.invoke(arguments!!.last() as Continuation<Any?>)
+                "recoverOnboarding" -> {
+                    setupRecoverCalls.incrementAndGet()
+                    error("Stale recovery must never reach native mutation")
+                }
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "ExternalSignerSignOutMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -179,7 +214,7 @@ internal abstract class ExternalSignerSignOutFixture {
             context = ownerContext,
             draftStore = DraftStore.forContext(ownerContext),
             accountIdHexResolver = { null },
-            accounts = listOf(externalSignerAccount()),
+            accounts = listOf(externalSignerAccount()) + additionalAccounts,
             activeAccountRef = accountRef,
             pushTokenStore = pushTokenStore,
             marmotIoDispatcher = marmotIoDispatcher,

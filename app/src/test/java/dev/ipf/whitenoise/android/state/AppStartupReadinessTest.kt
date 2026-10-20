@@ -55,7 +55,10 @@ class AppStartupReadinessTest {
     @Test
     fun bootstrapTimesRequiredStagesSeparately() {
         val source = appStateSource()
-        val runtime = source.functionBody("startBootstrapRuntime")
+        val wrapper = source.functionBody("startBootstrapRuntime")
+        assertTrue(wrapper.contains("withAccountLifetime"))
+        assertTrue(wrapper.contains("startBootstrapRuntimeLocked()"))
+        val runtime = source.functionBody("startBootstrapRuntimeLocked")
         val runtimeStart = source.functionBody("startMarmotWithNotificationListener")
         val expectedStages =
             listOf(

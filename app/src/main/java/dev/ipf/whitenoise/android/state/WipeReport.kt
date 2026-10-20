@@ -119,7 +119,7 @@ enum class SignOutCompletion {
      */
     RelayCleanupIncomplete,
 
-    /** MDK did not deactivate the account, so Android kept the session intact. */
+    /** Account cleanup failed or its native completion is unknown; this does not certify native liveness. */
     AccountCleanupIncomplete,
 }
 

@@ -57,6 +57,119 @@ class NotificationDeliveryModeRecoveryTest {
         NotificationStreamForegroundService.stop(context)
     }
 
+    /** A no-account bootstrap suspended in its real readiness read cannot clear a newer accepted owner. */
+    @Test
+    fun delayedNoAccountBootstrapPreservesNewerOwner() =
+        runBlocking {
+            val reading = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val once = AtomicBoolean(false)
+            val created = account("new-owner")
+            val nativeAccounts = mutableListOf<AccountSummaryFfi>()
+            lateinit var fixture: NotificationBootstrapTestFixture
+            fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = nativeAccounts,
+                    onCreateIdentity = { created.also { nativeAccounts += it } },
+                    onUsageDiagnosticsRead = {
+                        if (fixture.runtimeStartCalls.get() > 0 && once.compareAndSet(false, true)) {
+                            reading.countDown()
+                            check(release.await(5, TimeUnit.SECONDS))
+                        }
+                    },
+                )
+            val bootstrap = async { fixture.bootstrap() }
+            try {
+                withTimeout(5_000) { while (reading.count > 0) yield() }
+                fixture.runWithMainLooperPumping { fixture.appState.createIdentity() }
+                release.countDown()
+                bootstrap.await()
+                assertEquals("new-owner", fixture.appState.activeAccountRef)
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+            } finally {
+                release.countDown()
+                bootstrap.cancelAndJoin()
+                fixture.close()
+            }
+        }
+
+    /** Explicit enabling cannot use an in-memory clear whose durable commit failed. */
+    @Test
+    fun explicitEnableRequiresDurableDisableMarkerClear() = assertFailedDisableClearBlocksPositiveWriter(fcm = false)
+
+    /** FCM cutover observes the same failed-clear fence before positive native settings or registration. */
+    @Test
+    fun fcmEnableRequiresDurableDisableMarkerClear() = assertFailedDisableClearBlocksPositiveWriter(fcm = true)
+
+    private fun assertFailedDisableClearBlocksPositiveWriter(fcm: Boolean) =
+        runBlocking {
+            val positive = AtomicInteger(0)
+            val fixture =
+                fixture(
+                    platform = RecordingNativePushFallbackPlatform(context),
+                    nativeEnabled = false,
+                    fcmAvailable = true,
+                    onSetNative = { account, enabled ->
+                        if (enabled) positive.incrementAndGet()
+                        settings(account, nativeEnabled = enabled)
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                val backing = context.getSharedPreferences("failed-disable-clear-$fcm", Context.MODE_PRIVATE)
+                backing.edit().clear().commit()
+                val seed = PushTokenStore(backing)
+                assertTrue(seed.recordPendingDisable(ACCOUNT_A))
+                assertTrue(seed.recordPendingDisable(ACCOUNT_B))
+                val failClear = AtomicBoolean(true)
+                val store =
+                    PushTokenStore(
+                        object : android.content.SharedPreferences by backing {
+                            override fun edit(): android.content.SharedPreferences.Editor {
+                                val editor = backing.edit()
+                                var clearsA = false
+                                return object : android.content.SharedPreferences.Editor by editor {
+                                    override fun putStringSet(
+                                        key: String?,
+                                        values: MutableSet<String>?,
+                                    ): android.content.SharedPreferences.Editor =
+                                        apply {
+                                            if (key == dev.ipf.whitenoise.android.notifications.KEY_PENDING_DISABLES) {
+                                                clearsA = values?.contains(ACCOUNT_A) == false
+                                            }
+                                            editor.putStringSet(key, values)
+                                        }
+
+                                    override fun commit(): Boolean {
+                                        val committed = editor.commit()
+                                        return if (clearsA && failClear.compareAndSet(true, false)) false else committed
+                                    }
+                                }
+                            }
+                        },
+                    )
+                fixture.replacePushTokenStore(store)
+                positive.set(0)
+                fixture.upsertedPushRegistrations.clear()
+                val enabled =
+                    fixture.runWithMainLooperPumping {
+                        if (fcm) {
+                            fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                        } else {
+                            fixture.appState.setNativePushEnabled(true)
+                        }
+                    }
+                assertFalse(enabled)
+                assertEquals(0, positive.get())
+                assertTrue(fixture.upsertedPushRegistrations.isEmpty())
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertEquals(setOf(ACCOUNT_A, ACCOUNT_B), store.pendingDisables())
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** A rejected service request restores both durable and projected persistent state. */
     @Test
     fun rejectedLocalSelectionRestoresPreviousPreference() =

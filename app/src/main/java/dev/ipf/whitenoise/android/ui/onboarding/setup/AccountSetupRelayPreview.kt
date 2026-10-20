@@ -32,7 +32,7 @@ internal suspend fun AccountSetupClient.discardRelayPreview(
 ): OnboardingSnapshotFfi? =
     withContext(NonCancellable) {
         try {
-            discardCurrentPreview(preview)
+            discardOwnedRelayPreview(preview)
         } catch (expectedCleanupFailure: Exception) {
             if (originalFailure == null) throw expectedCleanupFailure
             originalFailure.addSuppressed(expectedCleanupFailure)
@@ -41,7 +41,7 @@ internal suspend fun AccountSetupClient.discardRelayPreview(
     }
 
 /** Cancels through the non-advancing decision path only after re-reading the saved native decision. */
-private suspend fun AccountSetupClient.discardCurrentPreview(preview: OnboardingSnapshotFfi): OnboardingSnapshotFfi? {
+internal suspend fun AccountSetupClient.discardCurrentPreview(preview: OnboardingSnapshotFfi): OnboardingSnapshotFfi? {
     val latest = snapshot()
     return if (latest != null && preview.isCurrentRelayPreview(latest)) {
         execute(
@@ -58,7 +58,7 @@ private suspend fun AccountSetupClient.discardCurrentPreview(preview: Onboarding
 }
 
 /** A changed checkpoint or non-cancellable decision cannot be discarded by a superseded editor load. */
-private fun OnboardingSnapshotFfi.isCurrentRelayPreview(latest: OnboardingSnapshotFfi): Boolean {
+internal fun OnboardingSnapshotFfi.isCurrentRelayPreview(latest: OnboardingSnapshotFfi): Boolean {
     val sameCheckpoint =
         latest.accountIdHex == accountIdHex && latest.recoveryEpoch == recoveryEpoch && latest.revision == revision
     val sameProposal = proposal != null && latest.proposal == proposal
