@@ -132,7 +132,8 @@ class NotificationReactionRemovalRaceTest {
             awaitLatch(probe.removalCompleted)
             assertScopeControls(fixture)
             assertEquals("no queued reaction quote may land after the removal", 0, probe.quotedWritesAfterRemoval.get())
-            assertFalse(manager.activeNotifications.any { allText(it.notification.extras).any { text -> SECRET in text } })
+            val payloadText = manager.activeNotifications.flatMap { allText(it.notification.extras) }
+            assertFalse(payloadText.any { SECRET in it })
         } finally {
             identityReady.countDown()
             probe.release.countDown()
@@ -146,7 +147,12 @@ class NotificationReactionRemovalRaceTest {
 
     /** A later reaction remains usable without the unverifiable quote, and other scopes keep their valid quotes. */
     private suspend fun assertScopeControls(fixture: NotificationBootstrapTestFixture) {
-        fixture.emitUpdate(reaction(fixture.update).copy(messageIdHex = FRESH_REACTION, notificationKey = "reaction:$FRESH_REACTION"))
+        fixture.emitUpdate(
+            reaction(fixture.update).copy(
+                messageIdHex = FRESH_REACTION,
+                notificationKey = "reaction:$FRESH_REACTION",
+            ),
+        )
         awaitReactionText("👍", expectedMessageId = FRESH_REACTION)
         assertFalse(activeReactionText().any { SECRET in it })
         val otherGroup =
@@ -198,7 +204,8 @@ class NotificationReactionRemovalRaceTest {
 
     /** Accepted deletion of the quoted target, delivered through the production runtime-event listener. */
     private fun deletion(): MarmotEventFfi {
-        val record = requireNotNull(projectedTimelineMessage(timelineAppMessage(TARGET, 12uL)).projected).copy(deleted = true)
+        val record =
+            requireNotNull(projectedTimelineMessage(timelineAppMessage(TARGET, 12uL)).projected).copy(deleted = true)
         return MarmotEventFfi.ProjectionUpdated(
             RuntimeProjectionUpdateFfi(
                 accountIdHex = ACCOUNT,
@@ -207,7 +214,8 @@ class NotificationReactionRemovalRaceTest {
                     TimelineProjectionUpdateFfi(
                         groupIdHex = GROUP,
                         messages = emptyList(),
-                        changes = listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, record)),
+                        changes =
+                            listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, record)),
                         chatListRow = null,
                         chatListTrigger = ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
                     ),
@@ -223,9 +231,9 @@ class NotificationReactionRemovalRaceTest {
         withTimeout(AWAIT_TIMEOUT_MS) {
             while (true) {
                 val card = activeReactionCard()
-                val sameMessage =
-                    expectedMessageId == null ||
-                        card?.extras?.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX) == expectedMessageId
+                val messageId =
+                    card?.extras?.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX)
+                val sameMessage = expectedMessageId == null || messageId == expectedMessageId
                 if (sameMessage && card?.extras?.let(::allText).orEmpty().any { text in it }) return@withTimeout
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                 delay(1L)
@@ -306,10 +314,8 @@ class NotificationReactionRemovalRaceTest {
             notificationTag: String,
             notificationId: Int,
         ) {
-            if (
-                removalRequested.get() && op == ConversationCardOp.DISMISS_CANCEL &&
-                notificationTag == reactionKey.tag && notificationId == reactionKey.id
-            ) {
+            val sameCard = notificationTag == reactionKey.tag && notificationId == reactionKey.id
+            if (removalRequested.get() && op == ConversationCardOp.DISMISS_CANCEL && sameCard) {
                 removalCompleted.countDown()
             }
         }
@@ -321,7 +327,8 @@ class NotificationReactionRemovalRaceTest {
             notificationTag: String,
             notificationId: Int,
         ) {
-            if (op != ConversationCardOp.SHOW_NOTIFY || notificationTag != reactionKey.tag || notificationId != reactionKey.id) return
+            val sameCard = notificationTag == reactionKey.tag && notificationId == reactionKey.id
+            if (op != ConversationCardOp.SHOW_NOTIFY || !sameCard) return
             val heldAttempt = if (lateCorrection) 2 else 1
             if (barrier == ConversationCardBarrier.BEFORE_PLATFORM_WRITE && attempts.incrementAndGet() == heldAttempt) {
                 queued.countDown()
@@ -329,7 +336,9 @@ class NotificationReactionRemovalRaceTest {
             }
             if (barrier == ConversationCardBarrier.AFTER_WRITE) {
                 writes.incrementAndGet()
-                if (removalObserved.get() && activeReactionText().any { SECRET in it }) quotedWritesAfterRemoval.incrementAndGet()
+                if (removalObserved.get() && activeReactionText().any { SECRET in it }) {
+                    quotedWritesAfterRemoval.incrementAndGet()
+                }
                 written.countDown()
             }
         }

@@ -12405,7 +12405,8 @@ class WhiteNoiseAppState private constructor(
             !LocalNotificationFormatter.isReaction(update) ||
                 update.reactedToPreview.isNullOrBlank() ||
                 !notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)
-        return lockAllowsPost && runtimeAllowsPost && contentAvailable && quoteAvailable && shouldPostNotification(update, engineMuted)
+        return lockAllowsPost && runtimeAllowsPost && contentAvailable && quoteAvailable &&
+            shouldPostNotification(update, engineMuted)
     }
 
     private fun isNotificationEnrichmentAllowed(

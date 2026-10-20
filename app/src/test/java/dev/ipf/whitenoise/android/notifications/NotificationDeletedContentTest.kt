@@ -110,7 +110,10 @@ class NotificationDeletedContentTest {
         val card = requireNotNull(card(ACCOUNT))
         assertEquals(listOf("older valid text", "fresh valid text"), messageTexts(card))
         val actions = actionTargets(card)
-        assertEquals(setOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ), actions.map { it.kind }.toSet())
+        assertEquals(
+            setOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ),
+            actions.map { it.kind }.toSet(),
+        )
         assertTrue(actions.all { it.target.messageIdHex == "fresh-id" })
     }
 
