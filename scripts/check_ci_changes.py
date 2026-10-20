@@ -1,8 +1,10 @@
 """Select required validation and supplemental campaigns from the complete Git diff."""
 
 import argparse
+import json
+import hashlib
 import os
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 import re
 import subprocess
 
@@ -75,7 +77,7 @@ def complete_diff(event, base, head):
 
 
 def classify(event, base, head):
-    if event not in {'pull_request', 'merge_group'}:
+    if event != 'pull_request':
         return False
     diff = complete_diff(event, base, head)
     return diff is not None and docs_only_diff(diff)
@@ -127,6 +129,23 @@ def supplemental_campaigns(event, base, head):
     return diff is None or supplemental_campaigns_diff(diff)
 
 
+
+def precheck_mode(event, configured_mode, labels, raw):
+    """Only an explicitly activated queue may replace full PR CI.
+
+    Reuse the whole-diff conservative campaign classifier: unknown, executable,
+    build, dependency, native or workflow inputs all retain full PR validation.
+    Labels come from a current GitHub API read, not the possibly stale event.
+    """
+    if event != 'pull_request' or configured_mode != 'merge-queue':
+        return False
+    if not isinstance(labels, list) or not all(isinstance(label, str) for label in labels):
+        return False
+    if 'ci:full' in labels:
+        return False
+    return raw is not None and not supplemental_campaigns_diff(raw)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--event', required=True)
@@ -135,7 +154,33 @@ def main():
     args = parser.parse_args()
     value = 'true' if classify(args.event, args.base, args.head) else 'false'
     campaigns = 'true' if supplemental_campaigns(args.event, args.base, args.head) else 'false'
-    line = f'docs_only={value}\nsupplemental_campaigns={campaigns}\n'
+    try:
+        labels = json.loads(os.environ.get('CI_CURRENT_LABELS', 'null'))
+    except (ValueError, TypeError):
+        labels = None
+    raw = complete_diff(args.event, args.base, args.head)
+    activated = os.environ.get('ANDROID_CI_MODE', '') == 'merge-queue'
+    full_matrix = (args.event != 'pull_request' or
+                   (isinstance(labels, list) and 'ci:full' in labels) or
+                   (activated and (not isinstance(labels, list) or
+                                  not all(isinstance(label, str) for label in labels) or
+                                  raw is None or supplemental_campaigns_diff(raw))))
+    if full_matrix:
+        value, campaigns = 'false', 'true'
+    precheck = precheck_mode(args.event, os.environ.get('ANDROID_CI_MODE', ''),
+                             labels, raw)
+    line = f'docs_only={value}\nsupplemental_campaigns={campaigns}\nprecheck={str(precheck).lower()}\nfull_matrix={str(full_matrix).lower()}\nci_mode={"precheck" if precheck else "full"}\n'
+    # Retained diagnostics bind the selected mode to the observed run. External
+    # authorization must still verify authenticated workflow/job evidence itself.
+    if receipt := os.environ.get('CI_MODE_RECEIPT'):
+        payload = dict(item.split('=', 1) for item in line.splitlines())
+        payload.update(schema=1, event=args.event, base=args.base, head=args.head,
+                       diff_sha256=hashlib.sha256(raw).hexdigest() if raw is not None else None,
+                       labels=labels, configured_mode=os.environ.get('ANDROID_CI_MODE', ''))
+        payload['run'] = {key: os.environ.get(key, '') for key in
+                          ('GITHUB_REPOSITORY', 'GITHUB_SHA', 'GITHUB_WORKFLOW_REF',
+                           'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT')}
+        Path(receipt).write_text(json.dumps(payload, sort_keys=True, indent=2) + '\n')
     print(line, end='')
     if output := os.environ.get('GITHUB_OUTPUT'):
         with open(output, 'a', encoding='utf-8') as stream:

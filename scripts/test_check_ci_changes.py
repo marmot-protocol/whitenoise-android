@@ -1,12 +1,16 @@
 """Regressions for code hiding in apparently documentation-only diffs."""
 
 import subprocess
+import contextlib
+import io
+import json
+import os
 import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from scripts.check_ci_changes import classify, complete_diff, docs_only_diff, supplemental_campaigns, supplemental_campaigns_diff
+from scripts.check_ci_changes import classify, complete_diff, docs_only_diff, supplemental_campaigns, supplemental_campaigns_diff, precheck_mode, main
 
 
 def entry(path, old='100644', new='100644', status='M'):
@@ -14,6 +18,63 @@ def entry(path, old='100644', new='100644', status='M'):
 
 
 class CiChangesTest(unittest.TestCase):
+    def test_precheck_requires_activation_current_labels_and_known_complete_diff(self):
+        ordinary = entry('app/src/main/java/example/Screen.kt')
+        self.assertTrue(precheck_mode('pull_request', 'merge-queue', [], ordinary))
+        self.assertTrue(precheck_mode('pull_request', 'merge-queue', ['bug'], ordinary))
+        for labels in (None, {}, ['ci:full'], ['bug', 'ci:full'], [1]):
+            self.assertFalse(precheck_mode('pull_request', 'merge-queue', labels, ordinary))
+        for event in ('push', 'merge_group', 'schedule', 'workflow_dispatch', ''):
+            self.assertFalse(precheck_mode(event, 'merge-queue', [], ordinary))
+        for mode in ('', 'unknown', 'legacy', 'MERGE-QUEUE'):
+            self.assertFalse(precheck_mode('pull_request', mode, [], ordinary))
+        for raw in (None, b'', b'bad', entry('gradle/libs.versions.toml'),
+                    entry('.github/workflows/android-ci.yml'),
+                    entry('app/src/main/marmotkit/MARMOT_VERSION'),
+                    ordinary + entry('build.gradle.kts'),
+                    entry('app/src/main/java/example/Screen.kt', new='120000')):
+            self.assertFalse(precheck_mode('pull_request', 'merge-queue', [], raw))
+
+    def test_cli_modes_and_receipt_are_bound_to_exact_run(self):
+        ordinary = entry('app/src/main/java/example/Screen.kt')
+        cases = [
+            ('pull_request', 'merge-queue', [], ordinary, 'true', 'false'),
+            ('pull_request', 'merge-queue', ['ci:full'], ordinary, 'false', 'true'),
+            ('pull_request', '', ['ci:full'], ordinary, 'false', 'true'),
+            ('pull_request', '', [], ordinary, 'false', 'false'),
+            ('pull_request', 'merge-queue', None, ordinary, 'false', 'true'),
+            ('pull_request', 'merge-queue', [], entry('gradle.properties'), 'false', 'true'),
+            ('pull_request', 'merge-queue', [], None, 'false', 'true'),
+            ('merge_group', 'merge-queue', [], entry('README.md'), 'false', 'true'),
+            ('workflow_dispatch', 'merge-queue', [], ordinary, 'false', 'true'),
+        ]
+        for event, mode, labels, raw, precheck, full_matrix in cases:
+            with self.subTest(event=event, mode=mode, labels=labels, raw=raw), tempfile.TemporaryDirectory() as directory:
+                receipt = Path(directory) / 'mode.json'
+                environment = {'ANDROID_CI_MODE': mode, 'CI_CURRENT_LABELS': json.dumps(labels),
+                               'CI_MODE_RECEIPT': str(receipt), 'GITHUB_RUN_ID': '123',
+                               'GITHUB_RUN_ATTEMPT': '2', 'GITHUB_SHA': 'c' * 40}
+                stdout = io.StringIO()
+                with patch.dict(os.environ, environment, clear=True), contextlib.redirect_stdout(stdout), \
+                     patch('sys.argv', ['classifier', '--event', event, '--base', 'a' * 40, '--head', 'b' * 40]), \
+                     patch('scripts.check_ci_changes.complete_diff', return_value=raw):
+                    main()
+                values = dict(line.split('=', 1) for line in stdout.getvalue().splitlines())
+                self.assertEqual(values['precheck'], precheck)
+                self.assertEqual(values['full_matrix'], full_matrix)
+                if full_matrix == 'true':
+                    self.assertEqual(values['docs_only'], 'false')
+                    self.assertEqual(values['supplemental_campaigns'], 'true')
+                saved = json.loads(receipt.read_text())
+                self.assertEqual(saved['run']['GITHUB_RUN_ID'], '123')
+                self.assertEqual(saved['run']['GITHUB_RUN_ATTEMPT'], '2')
+                self.assertEqual(saved['run']['GITHUB_SHA'], 'c' * 40)
+                self.assertEqual(saved['event'], event)
+                self.assertEqual(saved['labels'], labels)
+                self.assertEqual(saved['base'], 'a' * 40)
+                self.assertEqual(saved['head'], 'b' * 40)
+                self.assertEqual(saved['precheck'], precheck)
+
     def test_only_known_plain_prose_files_skip_android(self):
         self.assertTrue(docs_only_diff(entry('README.md') + entry('docs/ci.md')))
         for path in ['app/src/main/assets/help.md', 'scripts/README.md',
@@ -90,7 +151,7 @@ class MergeGroupDiffTest(unittest.TestCase):
     def test_queue_diff_requires_ancestor_and_uses_complete_integration(self):
         with patch('scripts.check_ci_changes.subprocess.run',
                    return_value=subprocess.CompletedProcess([], 0, entry('README.md'))) as run:
-            self.assertTrue(classify('merge_group', 'a' * 40, 'b' * 40))
+            self.assertEqual(complete_diff('merge_group', 'a' * 40, 'b' * 40), entry('README.md'))
             self.assertEqual(run.call_args_list[0].args[0],
                              ['git', 'merge-base', '--is-ancestor', 'a' * 40, 'b' * 40])
             self.assertEqual(run.call_args_list[1].args[0][-1], 'a' * 40 + '..' + 'b' * 40)
@@ -139,7 +200,7 @@ class MergeGroupDiffTest(unittest.TestCase):
                                       ('.github/workflows/android-ci.yml', False, True)]:
             with self.subTest(path=path), patch('scripts.check_ci_changes.subprocess.run',
                     return_value=subprocess.CompletedProcess([], 0, entry(path))):
-                self.assertEqual(classify('merge_group', 'a' * 40, 'b' * 40), docs)
+                self.assertFalse(classify('merge_group', 'a' * 40, 'b' * 40))
                 self.assertEqual(supplemental_campaigns('merge_group', 'a' * 40, 'b' * 40), campaigns)
 
 

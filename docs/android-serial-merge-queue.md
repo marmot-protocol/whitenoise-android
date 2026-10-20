@@ -133,13 +133,34 @@ If a canary fails or a read is incomplete, keep authorization closed. Rollback
 first enters draining mode to revoke known live integrations and withdraw pinned
 entries; frozen mode still permits read-only uncertain-effect reconciliation. It
 then freezes the sole producer, reconciles uncertain effects, withdraws only known
-entries, restores the matching strict rules and legacy controller, and verifies
-queue absence and current-base CI before allowing legacy merges again. A
+entries, restores strict current-base rules and full-PR mode under the current
+sole coordinator/effect executor, and verifies queue absence and current-base
+CI before allowing direct merges again. Quarantined legacy discovery, repair
+and merge services remain stopped. A
 read-only snapshot helper verifies the saved strict rules and token defaults.
 The explicit legacy-restored config binds that snapshot hash to live readback,
 retains the journal and freezes on drift; deleting the audit directory is
 unnecessary. Do not
 remove required authorization while an entry remains capable of merging.
+
+## PR precheck activation
+
+`ANDROID_CI_MODE=merge-queue` enables the smaller PR lane only after the current
+coordinator verifies native queue enforcement and external integration
+authorization. The variable controls operations; live enforcement evidence authorizes admission.
+Unset or unrecognized values retain full PR validation. Rollback also requires queue draining and uncertain-effect reconciliation.
+
+Source admission checks the applicable exact-source precheck or required full
+preflight. Integration admission independently verifies the exact repository,
+workflow revision, event, run ID/attempt, entry, source H, base B and integration G,
+and every required full job. Workflow outputs and artifacts declaring `full`
+provide diagnostics; authenticated workflow evidence provides authority. Every merge group runs both full core variants,
+including documentation-only integrations. A direct merge requires full current-base qualification and authorization.
+
+Before activation, prove a deliberately failed integration reaches its existing
+source owner with retained diagnostics, one acknowledged notification, a bounded
+repair, fresh review and successful reentry. Unknown effects, active owners,
+feedback failures and the author exception retain their existing holds.
 
 ## References
 

@@ -17,7 +17,7 @@ from scripts.select_instrumented_lanes import matches
 
 WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
 PR_PRIMARY_MATRIX = (
-    "        flavor: ${{ fromJSON(github.event_name == 'pull_request' && '[\"Zapstore\"]' "
+    "        flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '[\"Zapstore\"]' "
     "|| '[\"Zapstore\", \"Play\"]') }}\n"
 )
 APP_BUILD = Path(__file__).resolve().parents[1] / 'app/build.gradle.kts'
@@ -71,11 +71,11 @@ class AndroidCiGateTest(unittest.TestCase):
         blocks = re.split(r'(?=^      - name: )', job, flags=re.MULTILINE)
         return [block for block in blocks if './gradlew' in block]
 
-    def run_gate(self, outcomes, event='pull_request', draft='false'):
+    def run_gate(self, outcomes, event='pull_request', draft='false', mode=''):
         """Run the production shell with synthetic, untrusted JSON input."""
         return subprocess.run(
             ['bash', '-c', self.script],
-            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event, 'PR_DRAFT': draft},
+            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event, 'PR_DRAFT': draft, 'ANDROID_CI_MODE': mode},
             capture_output=True, text=True, check=False,
         )
 
@@ -86,7 +86,8 @@ class AndroidCiGateTest(unittest.TestCase):
         Play matrix instead, and drafts also defer Compose reports.
         """
         outcomes = {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
-        outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true'}
+        outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true', 'precheck': 'false', 'ci_mode': 'full',
+                                         'full_matrix': 'false' if event == 'pull_request' else 'true'}
         if event != 'pull_request' or draft == 'true':
             outcomes['secondary-variant']['result'] = 'skipped'
         if event == 'pull_request' and draft == 'true':
@@ -242,7 +243,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('        id: unit_tests\n', unit_tests)
         coverage_report = test_invocations['Coverage report (Kover)']
         self.assertIn(
-            "if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' && !github.event.pull_request.draft }}",
+            "if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}",
             coverage_report,
         )
         self.assertIn('testDevZapstoreDebugUnitTest', self.app_build)
@@ -297,8 +298,8 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_queue_trigger_and_revision_are_distinct_from_pr_runs(self):
         self.assertIn('  merge_group:\n    types: [checks_requested]\n', self.workflow)
-        self.assertIn("cancel-in-progress: ${{ github.event_name != 'merge_group' }}", self.workflow)
-        self.assertIn("github.event_name == 'merge_group' && github.sha || github.ref", self.workflow)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", self.workflow)
+        self.assertIn("github.event_name == 'pull_request' && github.ref || github.run_id", self.workflow)
         self.assertIn('github.event.merge_group.base_sha ||', self.changes)
         self.assertIn('github.event.merge_group.head_sha ||', self.changes)
         self.assertIn('ref: ${{ github.sha }}', self.changes)
@@ -315,13 +316,13 @@ class AndroidCiGateTest(unittest.TestCase):
                 with self.subTest(dependency=dependency, result=result):
                     self.assertNotEqual(self.run_gate(bad, 'merge_group').returncode, 0)
 
-    def test_queue_documentation_shortcut_still_requires_the_classifiers(self):
+    def test_queue_rejects_documentation_shortcut(self):
         outcomes = self.successful_outcomes()
-        outcomes['changes']['outputs'] = {'docs_only': 'true', 'supplemental_campaigns': 'false'}
+        outcomes['changes']['outputs'].update(docs_only='true', supplemental_campaigns='false')
         for name in self.dependencies:
             if name not in {'changes', 'tooling-contracts'}:
                 outcomes[name]['result'] = 'skipped'
-        self.assertEqual(self.run_gate(outcomes, 'merge_group').returncode, 0)
+        self.assertNotEqual(self.run_gate(outcomes, 'merge_group').returncode, 0)
         for name in ['changes', 'tooling-contracts']:
             bad = json.loads(json.dumps(outcomes))
             bad[name]['result'] = 'failure'
@@ -358,7 +359,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_build_phases(self):
         """Packaging runs independently, with phase-specific diagnostics."""
         self.assertIn(
-            """phase: ${{ fromJSON(github.event.pull_request.draft && '["tooling"]' || '["tooling", "baseline"]') }}""",
+            """phase: ${{ fromJSON(((github.event.pull_request.draft && needs.changes.outputs.full_matrix != 'true') || needs.changes.outputs.precheck == 'true') && '["tooling"]' || '["tooling", "baseline"]') }}""",
             self.build_contracts)
         self.assertIn('fail-fast: false', self.build_contracts)
         for name, phase in (
@@ -624,7 +625,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_docs_mode_cannot_be_used_for_master_pushes(self):
         result = subprocess.run(['bash', '-c', self.script],
                                 env={**os.environ, 'JOB_RESULTS': json.dumps(self.docs_outcomes()),
-                                     'CI_EVENT': 'push'}, capture_output=True, check=False)
+                                     'CI_EVENT': 'push', 'ANDROID_CI_MODE': ''}, capture_output=True, check=False)
         self.assertNotEqual(result.returncode, 0)
 
     def test_campaign_deferral_is_explicit_and_cannot_mask_failed_reports(self):
@@ -647,14 +648,14 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn('  schedule:\n', events)
             self.assertIn('  workflow_dispatch:', events)
             self.assertIn('${{ github.event_name }}-${{ github.event_name ==', workflow)
-            self.assertIn("'merge_group' && github.sha || github.ref", workflow)
+            self.assertIn("'pull_request' && github.ref || github.run_id", workflow)
             self.assertIn('  pull_request:\n    branches: [master]', events)
-            self.assertIn('    types: [opened, synchronize, reopened, ready_for_review]\n', events)
+            self.assertIn('    types: [opened, synchronize, reopened, ready_for_review', events)
 
     def test_drafts_defer_only_heavy_lanes(self):
         """Marking a draft ready re-runs CI; drafts keep primary lint/tests/style."""
         for job in (self.static_analysis, self.tests_job, self.changes, self.tooling_contracts):
-            self.assertNotIn('draft', job.split('    steps:', 1)[0])
+            self.assertNotIn('github.event.pull_request.draft', job.split('    steps:', 1)[0])
         self.assertIn('!github.event.pull_request.draft', self.compose_compiler.split('    steps:', 1)[0])
         self.assertIn('!github.event.pull_request.draft', self.secondary.split('    steps:', 1)[0])
         for name in ('Coverage gate (Kover)', 'Coverage report (Kover)',
@@ -720,6 +721,82 @@ class AndroidCiGateTest(unittest.TestCase):
             bad = self.successful_outcomes(draft='true')
             bad[job]['result'] = 'skipped'
             self.assertNotEqual(self.run_gate(bad, draft='true').returncode, 0, job)
+
+    def precheck_outcomes(self, draft='false'):
+        outcomes = self.successful_outcomes(draft=draft)
+        outcomes['changes']['outputs'].update(precheck='true', ci_mode='precheck', supplemental_campaigns='false')
+        for job in ('tests', 'static-analysis', 'secondary-variant', 'compose-compiler'):
+            outcomes[job]['result'] = 'skipped'
+        return outcomes
+
+    def test_queue_precheck_accepts_only_its_exact_skip_set(self):
+        for draft in ('true', 'false'):
+            outcomes = self.precheck_outcomes(draft)
+            self.assertEqual(self.run_gate(outcomes, draft=draft, mode='merge-queue').returncode, 0)
+            for job in self.dependencies:
+                for invalid in ('failure', 'cancelled', 'skipped', 'success'):
+                    if invalid == outcomes[job]['result']:
+                        continue
+                    changed = json.loads(json.dumps(outcomes))
+                    changed[job]['result'] = invalid
+                    self.assertNotEqual(self.run_gate(changed, draft=draft, mode='merge-queue').returncode, 0,
+                                        (draft, job, invalid))
+
+    def test_precheck_cannot_satisfy_integration_or_inactive_queue(self):
+        for event in ('merge_group', 'push', 'schedule', 'workflow_dispatch', 'unknown'):
+            self.assertNotEqual(self.run_gate(self.precheck_outcomes(), event, mode='merge-queue').returncode, 0)
+        for mode in ('', 'unknown', 'legacy'):
+            self.assertNotEqual(self.run_gate(self.precheck_outcomes(), mode=mode).returncode, 0)
+        for value in ('', 'unknown', None):
+            outcomes = self.successful_outcomes()
+            outcomes['changes']['outputs']['precheck'] = value
+            self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+        outcomes = self.precheck_outcomes()
+        outcomes['changes']['outputs']['supplemental_campaigns'] = 'true'
+        self.assertNotEqual(self.run_gate(outcomes, mode='merge-queue').returncode, 0)
+
+    def test_full_pr_matches_integration_and_does_not_accept_any_core_skip(self):
+        for draft in ('true', 'false'):
+            outcomes = self.successful_outcomes('merge_group')
+            self.assertEqual(self.run_gate(outcomes, 'pull_request', draft=draft).returncode, 0)
+            for job in self.dependencies:
+                if job == 'secondary-variant':
+                    continue
+                bad = json.loads(json.dumps(outcomes))
+                bad[job]['result'] = 'skipped'
+                self.assertNotEqual(self.run_gate(bad, draft=draft).returncode, 0, job)
+        self.assertIn('timeout-minutes: 30', self.named_step(self.tests_job, 'Unit tests'))
+        self.assertIn('timeout-minutes: 40', self.tests_job)
+
+    def test_live_label_observation_fails_closed_and_is_read_only(self):
+        step = self.named_step(self.changes, 'Read current full-CI override')
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        self.assertIn('issues: read', self.changes)
+        self.assertNotIn('issues: write', self.changes)
+        self.assertNotIn('labeled,', self.workflow)
+        for body, status, expected in [('[[]]', '0', []),
+                                       ('[[{"name":"ci:full"}]]', '0', ['ci:full']),
+                                       ('not-json', '0', None), ('', '1', None)]:
+            with tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'output'
+                result = subprocess.run(['bash', '-euo', 'pipefail', '-c',
+                    'gh() { printf "%s" "$OBSERVED"; return "$API_STATUS"; }\n' + script],
+                    env={**os.environ, 'GITHUB_OUTPUT': str(output), 'GH_REPO': 'example/repository',
+                         'PR_NUMBER': '1', 'OBSERVED': body, 'API_STATUS': status}, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(output.read_text().split('=', 1)[1]), expected)
+
+    def test_precheck_compiles_all_test_sources_without_benchmark_packaging(self):
+        step = self.named_step(self.build_contracts, 'Compile (Kotlin)')
+        precheck = step.split('if [[ "$CI_PRECHECK" == true ]]; then', 1)[1].split('else', 1)[0]
+        for flavor in ('Play', 'Zapstore'):
+            for source in ('Kotlin', 'UnitTestKotlin', 'AndroidTestKotlin'):
+                self.assertIn(f':app:compileDev{flavor}Debug{source}', precheck)
+        self.assertNotIn('assemble', precheck)
+        self.assertIn("needs.changes.outputs.precheck == 'true'", self.build_contracts)
+        for job in (self.static_analysis, self.tests_job, self.secondary, self.compose_compiler):
+            self.assertIn("needs.changes.outputs.precheck != 'true'", job.split('    steps:', 1)[0])
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", self.workflow)
 
     def test_missing_or_extra_dependency_evidence_blocks(self):
         for job in self.dependencies:

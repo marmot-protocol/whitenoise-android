@@ -68,58 +68,40 @@ batch related edits into one candidate push, reuse matching results, retry diagn
 transient failures selectively, and request preview APKs only when testing needs them.
 Core code validation and final readiness/merge requirements remain mandatory.
 
-Every pull request to `master` (and every push to `master`) runs the
-`.github/workflows/android-ci.yml` validation workflow. It fails the build on
-Kotlin compile errors, unit-test failures, Compose screenshot regressions
-(Roborazzi — see [Screenshot tests](#screenshot-tests)), ktlint violations,
-new detekt findings, or Android lint regressions. Existing detekt findings are
-frozen in `config/detekt/detekt-baseline.xml`. `master` pushes, the nightly run,
-manual dispatches and merge-queue runs cover both the `zapstore` and `play` dev
-debug variants in full. Pull requests run unit tests and lint for `zapstore` only,
-because its source set carries the self-updater and installer; a separate
-`Compile and flavor-check Play` job compiles Play's main, unit-test and androidTest
-sources and runs the unit tests that read `BuildConfig.SELF_UPDATE_ENABLED`. The
-workflow requires no signing secrets or `google-services.json`.
+Every pull request to `master` and every push to `master` starts
+`.github/workflows/android-ci.yml`. The workflow uses read-only credentials and public build inputs. Existing detekt findings remain frozen in
+`config/detekt/detekt-baseline.xml`.
 
-Validation runs concurrently on separate runners: tooling and packaging contracts,
-one static-analysis job per distribution, and one full unit, screenshot and coverage
-job per distribution (Zapstore only on PRs). Each static-analysis job runs its Android lint variant;
-the tooling job owns the flavor-independent ktlint and detekt checks. Unit jobs
-run the complete suite once with Roborazzi verification enabled, then require that
-every committed golden was compared. The Zapstore job also enforces all Kover
-ratchets. Coverage invocations retain identical verification inputs to reuse the
-completed suite. There are no separate screenshot runners or reduced unit filters.
-API preparation and system-label checks reuse one runner-local Gradle daemon across
-sequential invocations, as do both test jobs. System-label checks read each
-invocation's stable or isolated preview environment, then stop the lightweight
-daemon before isolated builds. Tooling compilation, static analysis and baseline
-packaging retain process isolation.
-Compose compiler reports and independent unsigned release reproduction run nightly,
-on manual dispatch, and for changed build/packaging/CI inputs; known ordinary source
-PRs defer only those supplemental campaigns. See the
-conservative classifier and release-candidate requirements in
-[CI request policy](docs/ci-request-policy.md). Draft PRs run the fast lane
-(classification, tooling contracts, the offline signer contract, Zapstore lint and
-unit/screenshot tests, ktlint, detekt and compilation) and defer coverage, baseline
-packaging, Compose reports, the Play check, emulators and release verification.
-Marking a draft ready re-runs CI with every applicable lane.
-Unit suites use three isolated 1 GiB workers;
-tests outside CI stay serial unless `-PciTestForks=3` is set. Coding agents
-use hosted tests rather than duplicating CI compilation locally. Coverage reports run only
-after a successful unit step, so a
-failed suite cannot trigger a second full test execution. The existing
-`Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
-the offline ZSP contract, and fails if any dependency fails or is cancelled.
-It accepts the Play-check skip outside PRs and the draft skips above only when
-the event itself is a non-PR event or a draft PR. On drafts it reports as
-`… (draft fast lane)`, so the required context comes only from a ready run.
-A successful docs-only classifier permits only the explicitly named Android
-job skips on a PR. All tooling/manual-guide/metadata validators still run, and
-missing classification or unexpected skips fail the aggregate. Lightweight
-tooling contracts run separately in parallel and remain required. Classification
-uses the whole PR diff: a docs fixup on a code PR still runs the full matrix.
-Master pushes always run the required core validation; supplemental campaigns use
-the same conservative diff policy and run in full on the daily schedule.
+The [CI request policy](docs/ci-request-policy.md#queue-gated-pr-feedback-and-full-integration)
+defines the staged merge-queue mode. With `ANDROID_CI_MODE=merge-queue`, ordinary
+PRs compile Zapstore and Play main, unit-test and Android-test Kotlin plus
+benchmark sources, and run ktlint/detekt, tooling/security and offline signer
+contracts. Full unit/screenshot execution, Kover, Android lint and baseline APK
+packaging move to the queue integration. The queue retains every regression test and screenshot baseline. The switch is enabled only after native queue enforcement,
+external integration authorization and source-owner failure recovery are verified.
+Merge authorization requires independently verified queue enforcement.
+
+Every merge group (including documentation-only integrations), master push,
+nightly and manual run executes the full core matrix for both distributions.
+`ci:full` requests that same matrix on a PR; labels are read live on reruns.
+Activated PRs with risky or unknown diff inputs also run full. Missing or unknown
+activation values preserve the prior Zapstore full PR suite/lint with Play
+compilation and flavor-sensitive tests; legacy drafts retain their earlier
+heavy-lane deferrals. Full suite jobs verify every committed Roborazzi golden,
+and Kover reuses the completed suite through identical verification inputs. Unit execution reserves ten minutes of the job budget for diagnostics.
+
+The existing `Compile, test, ktlint, detekt, Android lint` aggregate remains the
+required context. It checks explicit mode and exact expected job outcomes;
+unexpected skips, failures, cancellations and missing classification fail closed.
+Drafts use `… (draft fast lane)`; readiness requires the ready-head context. In activated mode,
+marking a draft ready starts another precheck unless full preflight is selected.
+A direct merge requires full current-base qualification. The queue requires fresh full
+integration validation plus independent authorization.
+
+Only ordinary Markdown changes in the complete PR diff can use the docs shortcut;
+tooling/manual-guide/metadata validators still run. The complete diff retains earlier code changes during docs fixups. Master stays fully checked in this first rollout. Supplemental
+release/reproduction/Compose campaigns retain their separate conservative policy;
+release qualification remains tied to the exact release candidate.
 
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use

@@ -138,7 +138,9 @@ def plan(snapshot, candidate, verify_source, verify_integration):
     """Evidence verifiers return immutable digests, never bare approval flags.
 
     The source verifier retains latest Opus, disjoint-family source review,
-    signatures, full H CI, discussion, feature and required human proof. The
+    signatures, applicable H precheck/full preflight CI, discussion, feature
+    and required human proof. A source precheck is admission evidence only;
+    native queue rules and external integration authorization remain mandatory. The
     integration verifier additionally binds exact entry/H/B/G, fresh discussion,
     compatibility, actual G tree mapping and successful current G Actions CI.
     These are trusted local adapters, not data supplied by a PR or workflow.
