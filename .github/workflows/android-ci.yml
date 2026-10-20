@@ -346,9 +346,9 @@ jobs:
         if: matrix.phase == 'tooling'
         run: |
           if [[ "$CI_PRECHECK" == true ]]; then
-            ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevZapstoreDebugJavaWithJavac :app:compileDevZapstoreDebugUnitTestKotlin :app:compileDevZapstoreDebugUnitTestJavaWithJavac :app:compileDevZapstoreDebugAndroidTestKotlin :app:compileDevZapstoreDebugAndroidTestJavaWithJavac :app:compileDevPlayDebugKotlin :app:compileDevPlayDebugJavaWithJavac :app:compileDevPlayDebugUnitTestKotlin :app:compileDevPlayDebugUnitTestJavaWithJavac :app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :benchmark:compileDevZapstoreBenchmarkReleaseKotlin --build-cache --profile --no-daemon --stacktrace
+            ./gradlew :benchmark:compileDevZapstoreBenchmarkReleaseKotlin --build-cache --profile --no-daemon --stacktrace
           else
-            ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevZapstoreDebugJavaWithJavac :app:compileDevZapstoreDebugUnitTestKotlin :app:compileDevZapstoreDebugUnitTestJavaWithJavac :app:compileDevZapstoreDebugAndroidTestKotlin :app:compileDevZapstoreDebugAndroidTestJavaWithJavac :app:compileDevPlayDebugKotlin :app:compileDevPlayDebugJavaWithJavac :app:compileDevPlayDebugUnitTestKotlin :app:compileDevPlayDebugUnitTestJavaWithJavac :app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+            ./gradlew :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
           fi
 
       - name: ktlint and detekt
@@ -573,6 +573,112 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: android-ci-gradle-profiles-compose-compiler
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Read existing resolutions only; retain proof without a second build.
+      - name: Verify selected dependency security floors
+        if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
+
+      - name: Retain selected dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dependency-security-${{ github.job }}-${{ strategy.job-index || 0 }}
+          path: build/reports/dependency-security
+          if-no-files-found: ignore
+          retention-days: 14
+  compile-tests:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    name: Compile test sources (${{ matrix.flavor }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      # Isolate each distribution's compiler lifetime and keep both diagnostics.
+      fail-fast: false
+      matrix:
+        flavor: [Zapstore, Play]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Retain this flavor's compilation outputs in its own job cache.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      # Four heavy Kotlin test compilations previously shared one compiler JVM.
+      # Each runner now owns one flavor and one active compiler task, using the
+      # existing configured heaps. Test execution remains in the full suites.
+      - name: Compile main and test source sets
+        timeout-minutes: 25
+        run: >-
+          ./gradlew
+          :app:compileDev${{ matrix.flavor }}DebugKotlin
+          :app:compileDev${{ matrix.flavor }}DebugJavaWithJavac
+          :app:compileDev${{ matrix.flavor }}DebugUnitTestKotlin
+          :app:compileDev${{ matrix.flavor }}DebugUnitTestJavaWithJavac
+          :app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin
+          :app:compileDev${{ matrix.flavor }}DebugAndroidTestJavaWithJavac
+          --max-workers=1 --build-cache --profile --no-daemon --stacktrace
+
+      # Preserve failure diagnostics with a unique artifact name per job.
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-ci-reports-compile-tests-${{ matrix.flavor }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Keep task timings on successful runs too; wall-clock timeouts alone do
+      # not show whether compilation, tests, or analysis is doing extra work.
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-ci-gradle-profiles-compile-tests-${{ matrix.flavor }}
           path: build/reports/profile/
           if-no-files-found: ignore
           retention-days: 7
@@ -929,7 +1035,7 @@ jobs:
             class="${class%.*}"
             filters+=(--tests "${class//\//.}")
           done
-          ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :app:testDevPlayDebugUnitTest "${filters[@]}" \
+          ./gradlew :app:testDevPlayDebugUnitTest "${filters[@]}" \
             -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       - name: Upload reports
@@ -981,7 +1087,7 @@ jobs:
   # ready run creates this job only after its heavy lanes finish.
   validate:
     name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft && ' (draft fast lane)' || '' }}
-    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, static-analysis, tests, secondary-variant]
+    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, compile-tests, static-analysis, tests, secondary-variant]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -1003,7 +1109,7 @@ jobs:
             ($event == "pull_request" and $draft == "false" and ($precheck | not) and ($full | not)) as $is_ready |
             (["pull_request", "merge_group", "push", "schedule", "workflow_dispatch"] | index($event) != null) and
             ($draft == "true" or $draft == "false") and ($event == "pull_request" or $draft == "false") and
-            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
+            (keys == ["build-contracts", "changes", "compile-tests", "compose-compiler", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
             (.changes.outputs.full_matrix == "true" or .changes.outputs.full_matrix == "false") and
             (.changes.outputs.ci_mode == (if $precheck then "precheck" elif $full then "full" else "legacy-pr" end)) and
             (($event == "pull_request") or $full) and

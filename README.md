@@ -74,8 +74,10 @@ Every pull request to `master` and every push to `master` starts
 
 The [CI request policy](docs/ci-request-policy.md#queue-gated-pr-feedback-and-full-integration)
 defines the staged merge-queue mode. With `ANDROID_CI_MODE=merge-queue`, ordinary
-PRs compile Zapstore and Play main, unit-test and Android-test Kotlin/Java plus
-benchmark sources, and run ktlint/detekt, tooling/security and offline signer
+PRs compile Zapstore and Play main, unit-test and Android-test Kotlin/Java in
+separate per-flavor jobs. Each compile runner uses one active Gradle worker and
+the configured heaps; benchmark compilation runs with tooling. PRs also run
+ktlint/detekt, tooling/security and offline signer
 contracts. Full unit/screenshot execution, Kover, Android lint and baseline APK
 packaging move to the queue integration. The queue retains every regression test and screenshot baseline. The switch is enabled only after native queue enforcement,
 external integration authorization and source-owner failure recovery are verified.
@@ -109,7 +111,7 @@ Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
 `build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
-`static-analysis-Play`, `Zapstore`, or
+`static-analysis-Play`, `compile-tests-Zapstore`, `compile-tests-Play`, `Zapstore`, or
 `Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
 wall time and summed job durations when measuring CI performance. Each Gradle job

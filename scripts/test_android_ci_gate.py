@@ -35,6 +35,7 @@ class AndroidCiGateTest(unittest.TestCase):
         cls.build_contracts = cls.job_block(cls.workflow, 'build-contracts')
         cls.compose_compiler = cls.job_block(cls.workflow, 'compose-compiler')
         cls.static_analysis = cls.job_block(cls.workflow, 'static-analysis')
+        cls.compile_tests = cls.job_block(cls.workflow, 'compile-tests')
         cls.tests_job = cls.job_block(cls.workflow, 'tests')
         cls.secondary = cls.job_block(cls.workflow, 'secondary-variant')
         cls.gate = cls.job_block(cls.workflow, 'validate')
@@ -109,7 +110,7 @@ class AndroidCiGateTest(unittest.TestCase):
         comparison = self.named_step(self.build_contracts, 'Compare already-observed dependencies with exact PR base')
         self.assertIn('\n        continue-on-error: true\n', comparison)
         submission = (WORKFLOW.parent / 'dependency-submission.yml').read_text()
-        jobs = [self.build_contracts, self.compose_compiler, self.static_analysis,
+        jobs = [self.build_contracts, self.compose_compiler, self.static_analysis, self.compile_tests,
                 self.tests_job, self.secondary, submission]
         for job in jobs:
             verification = self.named_step(job, 'Verify selected dependency security floors')
@@ -195,6 +196,7 @@ class AndroidCiGateTest(unittest.TestCase):
             ('build-contracts', self.build_contracts),
             ('compose-compiler', self.compose_compiler),
             ('static-analysis', self.static_analysis),
+            ('compile-tests', self.compile_tests),
             ('tests', self.tests_job),
         ):
             for step_name in required_steps:
@@ -335,7 +337,7 @@ class AndroidCiGateTest(unittest.TestCase):
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
-        self.assertEqual(len(gradle_setup_steps), 5)
+        self.assertEqual(len(gradle_setup_steps), 6)
         for step in gradle_setup_steps:
             self.assertIn(
                 "cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && "
@@ -343,7 +345,7 @@ class AndroidCiGateTest(unittest.TestCase):
                 step,
             )
         self.assertNotIn('uses: actions/cache@', self.workflow)
-        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 5)
+        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 6)
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
         save_step = self.named_step(self.tests_job, 'Save MarmotKit artifact')
         # Zapstore is the only flavor every event runs.
@@ -597,7 +599,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_slow_tooling_does_not_block_android_job_start(self):
         self.assertNotIn('    needs:', self.tooling_contracts.split('    steps:', 1)[0])
         for name in ('offline-zsp', 'build-contracts', 'compose-compiler',
-                     'static-analysis', 'tests', 'secondary-variant'):
+                     'compile-tests', 'static-analysis', 'tests', 'secondary-variant'):
             job = self.job_block(self.workflow, name)
             self.assertIn('    needs: changes\n', job)
             self.assertIn("needs.changes.outputs.docs_only != 'true'", job)
@@ -678,7 +680,8 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_pull_requests_run_one_full_variant_and_compile_the_other(self):
         self.assertIn("github.event_name == 'pull_request'", self.secondary.split('    steps:', 1)[0])
         step = self.named_step(self.secondary, 'Compile Play and run its flavor-sensitive unit tests')
-        self.assertIn(':app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :app:testDevPlayDebugUnitTest', step)
+        self.assertIn(':app:testDevPlayDebugUnitTest', step)
+        self.assertNotIn(':app:compile', step)
         self.assertIn("grep -rlF 'BuildConfig.SELF_UPDATE_ENABLED' app/src/test/java", step)
         self.assertNotIn('grep -q', step)
         flavor_tests = [path for path in (APP_BUILD.parent / 'src/test/java').rglob('*.kt')
@@ -788,24 +791,44 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_full_draft_has_no_remaining_step_level_draft_deferral(self):
         for job in (self.build_contracts, self.compose_compiler, self.static_analysis,
-                    self.tests_job, self.secondary, self.job_block(self.workflow, 'offline-zsp')):
+                    self.tests_job, self.compile_tests, self.secondary, self.job_block(self.workflow, 'offline-zsp')):
             for line in job.split('    steps:', 1)[1].splitlines():
                 if 'if:' in line and 'github.event.pull_request.draft' in line:
                     self.assertIn("needs.changes.outputs.full_matrix == 'true'", line)
 
-    def test_precheck_compiles_all_test_sources_without_benchmark_packaging(self):
-        step = self.named_step(self.build_contracts, 'Compile (Kotlin)')
-        precheck = step.split('if [[ "$CI_PRECHECK" == true ]]; then', 1)[1].split('else', 1)[0]
-        for flavor in ('Play', 'Zapstore'):
-            for source in ('Kotlin', 'UnitTestKotlin', 'AndroidTestKotlin'):
-                self.assertIn(f':app:compileDev{flavor}Debug{source}', precheck)
-            for source in ('', 'UnitTest', 'AndroidTest'):
-                self.assertIn(f':app:compileDev{flavor}Debug{source}JavaWithJavac', precheck)
+    def test_test_compilation_is_isolated_by_flavor_in_every_code_mode(self):
+        header = self.compile_tests.split('    steps:', 1)[0]
+        self.assertIn('    needs: changes\n', header)
+        self.assertIn("    if: needs.changes.outputs.docs_only != 'true'\n", header)
+        self.assertNotIn('precheck', header)
+        self.assertNotIn('draft', header)
+        self.assertIn('        flavor: [Zapstore, Play]\n', header)
+        self.assertIn('      fail-fast: false\n', header)
+        self.assertIn('name: Compile test sources (${{ matrix.flavor }})', header)
+        step = self.named_step(self.compile_tests, 'Compile main and test source sets')
+        for source in ('', 'UnitTest', 'AndroidTest'):
+            for language in ('Kotlin', 'JavaWithJavac'):
+                self.assertIn(':app:compileDev${{ matrix.flavor }}Debug' + source + language, step)
+        self.assertIn('--max-workers=1', step)
+        self.assertIn('--no-daemon', step)
+        self.assertNotIn('assemble', step)
+        self.assertNotIn('Xmx', step)
+        self.assertIn('timeout-minutes: 25', step)
+        self.assertIn('timeout-minutes: 35', self.compile_tests)
+        tooling = self.named_step(self.build_contracts, 'Compile (Kotlin)')
+        self.assertNotIn(':app:compile', tooling)
+        self.assertIn(':benchmark:compileDevZapstoreBenchmarkReleaseKotlin', tooling)
+        self.assertIn(':benchmark:assembleDevZapstoreBenchmarkRelease', tooling)
+        precheck = tooling.split('if [[ "$CI_PRECHECK" == true ]]; then', 1)[1].split('else', 1)[0]
         self.assertNotIn('assemble', precheck)
         self.assertIn("needs.changes.outputs.precheck == 'true'", self.build_contracts)
         for job in (self.static_analysis, self.tests_job, self.secondary, self.compose_compiler):
             self.assertIn("needs.changes.outputs.precheck != 'true'", job.split('    steps:', 1)[0])
         self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", self.workflow)
+        for name in ('Upload reports', 'Upload Gradle timing reports',
+                     'Verify selected dependency security floors'):
+            self.named_step(self.compile_tests, name)
+        self.assertIn('android-ci-reports-compile-tests-${{ matrix.flavor }}', self.compile_tests)
 
     def test_missing_or_extra_dependency_evidence_blocks(self):
         for job in self.dependencies:

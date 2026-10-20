@@ -77,8 +77,11 @@ Merge admission requires separate live proof of queue enforcement and authorizat
 
 In activated mode, ordinary code PRs run tooling, dependency/security contracts,
 the offline signer, ktlint/detekt and Kotlin/Java compilation of Zapstore and
-Play main, unit-test and Android-test sources, plus benchmark source compilation.
-They defer full unit/golden execution, Kover, Android lint, baseline packaging and
+Play main, unit-test and Android-test sources. Separate per-flavor runners use
+one active Gradle worker and the existing configured heaps. Tooling owns benchmark
+source compilation in prechecks and benchmark assembly in full runs.
+The isolated compile matrix remains required in every code mode, including drafts
+and full integration. PR prechecks defer full unit/golden execution, Kover, Android lint, baseline packaging and
 the separate Play parity job to full integration CI. Existing complete suites remain the unit of integration testing. Required source regressions and
 baseline review remain unchanged. Drafts have the same precheck cost but retain
 the distinct draft aggregate context and require readiness before queue admission.
