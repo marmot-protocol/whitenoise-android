@@ -45,7 +45,10 @@ internal class PublicEventFixtureSigner(
         createdAt: Long,
         tags: List<List<String>>,
     ): String {
-        val serializedTags = tags.joinToString(",", "[", "]") { tag -> tag.joinToString(",", "[", "]", transform = ::quote) }
+        val serializedTags =
+            tags.joinToString(",", "[", "]") { tag ->
+                tag.joinToString(",", "[", "]", transform = ::quote)
+            }
         return "[0,${quote(pubkeyHex)},$createdAt,$kind,$serializedTags,${quote(content)}]"
     }
 
@@ -53,8 +56,10 @@ internal class PublicEventFixtureSigner(
     private fun schnorr(message: ByteArray): ByteArray {
         val d = if (publicPoint.y.testBit(0)) Secp256k1.N - secret else secret
         val pubkey = publicPoint.x.toFixed32()
-        val masked = d.toFixed32().zip(taggedHash("BIP0340/aux", ByteArray(SIZE))) { a, b -> (a.toInt() xor b.toInt()).toByte() }
-        val nonceSeed = BigInteger(1, taggedHash("BIP0340/nonce", masked.toByteArray() + pubkey + message)).mod(Secp256k1.N)
+        val aux = taggedHash("BIP0340/aux", ByteArray(SIZE))
+        val masked = d.toFixed32().zip(aux) { a, b -> (a.toInt() xor b.toInt()).toByte() }.toByteArray()
+        val nonceHash = taggedHash("BIP0340/nonce", masked + pubkey + message)
+        val nonceSeed = BigInteger(1, nonceHash).mod(Secp256k1.N)
         val noncePoint = Secp256k1.multiply(nonceSeed)
         val nonce = if (noncePoint.y.testBit(0)) Secp256k1.N - nonceSeed else nonceSeed
         val rx = noncePoint.x.toFixed32()
@@ -144,10 +149,19 @@ private object Secp256k1 {
     private fun add(
         a: Point?,
         b: Point?,
-    ): Point? {
-        if (a == null) return b
-        if (b == null) return a
-        if (a.x == b.x && a.y != b.y) return null
+    ): Point? =
+        when {
+            a == null -> b
+            b == null -> a
+            a.x == b.x && a.y != b.y -> null
+            else -> addDistinctOrDouble(a, b)
+        }
+
+    /** The sum of two finite points that are not each other's inverse. */
+    private fun addDistinctOrDouble(
+        a: Point,
+        b: Point,
+    ): Point {
         val slope =
             if (a == b) {
                 BigInteger.valueOf(3).multiply(a.x.pow(2)).multiply(BigInteger.valueOf(2).multiply(a.y).modInverse(P))
@@ -181,7 +195,7 @@ internal object PublicEventFixtureBech32 {
         tlv.writeTlv(0, identifier.toByteArray(Charsets.UTF_8))
         relayHint?.let { tlv.writeTlv(1, it.toByteArray(Charsets.UTF_8)) }
         tlv.writeTlv(2, authorHex.hexBytes())
-        tlv.writeTlv(3, byteArrayOf((kind ushr 24).toByte(), (kind ushr 16).toByte(), (kind ushr 8).toByte(), kind.toByte()))
+        tlv.writeTlv(3, ByteArray(KIND_BYTES) { index -> (kind ushr (8 * (KIND_BYTES - 1 - index))).toByte() })
         return encode("naddr", tlv.toByteArray())
     }
 
@@ -231,7 +245,9 @@ internal object PublicEventFixtureBech32 {
         values.forEach { value ->
             val top = checksum shr 25
             checksum = ((checksum and 0x1ffffff) shl 5) xor value
-            generators.forEachIndexed { index, generator -> if ((top shr index) and 1 == 1) checksum = checksum xor generator }
+            generators.forEachIndexed { index, generator ->
+                if ((top shr index) and 1 == 1) checksum = checksum xor generator
+            }
         }
         return checksum
     }
@@ -240,4 +256,5 @@ internal object PublicEventFixtureBech32 {
     private fun String.hexBytes(): ByteArray = chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     private const val CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    private const val KIND_BYTES = 4
 }

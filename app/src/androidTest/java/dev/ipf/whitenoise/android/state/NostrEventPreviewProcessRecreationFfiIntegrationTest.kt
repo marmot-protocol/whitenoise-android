@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
+import dev.ipf.marmotkit.PublicEventPreviewFfi
 import dev.ipf.marmotkit.PublicEventPreviewStateFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -91,7 +92,7 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
                             context = context,
                             draftStore = DraftStore(EmptyDraftPersistence),
                             accountIdHexResolver = { label ->
-                                if (label == accounts.second.label) accounts.second.accountIdHex else accounts.first.accountIdHex
+                                listOf(accounts.first, accounts.second).firstOrNull { it.label == label }?.accountIdHex
                             },
                             accounts = listOf(accounts.first, accounts.second),
                             activeAccountRef = accounts.first.label,
@@ -129,16 +130,17 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
             relay.seedEvents(fixture.initialEvents)
             val note = native.resolvePublicEventPreview(owner.label, fixture.noteReference)
             assertEquals(PublicEventPreviewStateFfi.PRESENT, note.state)
-            assertEquals(fixture.note.getString("id"), JSONObject(checkNotNull(note.eventJson)).getString("id"))
+            assertEquals(fixture.note.getString("id"), note.eventId())
             val article = native.resolvePublicEventPreview(owner.label, fixture.articleReference)
             assertEquals(PublicEventPreviewStateFfi.PRESENT, article.state)
-            assertEquals(fixture.newerArticle.getString("id"), JSONObject(checkNotNull(article.eventJson)).getString("id"))
+            assertEquals(fixture.newerArticle.getString("id"), article.eventId())
             // The older version reaches the relay after the newer one: the projection must not move back to it.
             relay.seedEvents(listOf(fixture.olderArticle))
             val again = native.resolvePublicEventPreview(owner.label, fixture.hintedArticleReference(relay.url))
-            assertEquals(fixture.newerArticle.getString("id"), JSONObject(checkNotNull(again.eventJson)).getString("id"))
+            assertEquals(fixture.newerArticle.getString("id"), again.eventId())
             val deleted = native.resolvePublicEventPreview(owner.label, fixture.deletedReference)
-            assertEquals("an authorized NIP-09 deletion settles the preview", PublicEventPreviewStateFfi.DELETED, deleted.state)
+            // An authorized NIP-09 deletion settles the preview.
+            assertEquals(PublicEventPreviewStateFfi.DELETED, deleted.state)
             val invalid = native.resolvePublicEventPreview(owner.label, fixture.badSignatureReference)
             assertTrue("a bad signature is never presented", invalid.state != PublicEventPreviewStateFfi.PRESENT)
             native.refreshProfile(fixture.signer.pubkeyHex, relays)
@@ -167,12 +169,13 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
         snapshots.warm(fixture.records(), parseMarkdown = { app.parseMarkdownOrEmpty(it) }) { references ->
             app.readCachedPublicEventCards(owner, references)
         }
+        val authorThrottle = PublicEventAuthorRefreshThrottle()
         val resolver =
             NostrEventCardResolver(
                 parentScope = scope,
                 readCached = { references -> app.readCachedPublicEventCards(owner, references) },
                 refresh = { reference -> app.refreshPublicEventCard(owner, reference) },
-                refreshAuthor = { loaded -> app.refreshPublicEventCardAuthor(loaded, PublicEventAuthorRefreshThrottle()) },
+                refreshAuthor = { loaded -> app.refreshPublicEventCardAuthor(loaded, authorThrottle) },
                 snapshots = snapshots,
             )
         try {
@@ -182,7 +185,8 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
             assertEquals(fixture.note.getString("id"), noteCard?.eventIdHex)
             assertEquals(NOTE_TEXT, noteCard?.summary)
             assertEquals(AUTHOR_NAME, noteCard?.authorMetadata?.displayName)
-            assertNotNull("preview text is prepared before the first frame", (note.value as NostrEventCardState.Loaded).preview)
+            // Preview text is prepared before the first frame.
+            assertNotNull((note.value as NostrEventCardState.Loaded).preview)
 
             val article = resolver.state(fixture.reference(fixture.articleReference), fixture.articleReference)
             val articleCard = (article.value as? NostrEventCardState.Loaded)?.card
@@ -192,7 +196,8 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
             val deleted = resolver.state(fixture.reference(fixture.deletedReference), fixture.deletedReference)
             assertEquals(NostrEventCardState.NotFound, deleted.value)
 
-            val invalid = resolver.state(fixture.reference(fixture.badSignatureReference), fixture.badSignatureReference)
+            val invalidReference = fixture.badSignatureReference
+            val invalid = resolver.state(fixture.reference(invalidReference), invalidReference)
             val settledInvalid = invalid.first { it != NostrEventCardState.Loading }
             assertFalse("an invalid event never renders as a card", settledInvalid is NostrEventCardState.Loaded)
 
@@ -236,7 +241,13 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
         val cardReferences = listOf(noteReference, articleReference, deletedReference, badSignatureReference)
 
         /** The same article coordinate with a relay hint, a distinct authored reference for a second resolve. */
-        fun hintedArticleReference(relayUrl: String): String = PublicEventFixtureBech32.naddr(LONG_FORM_KIND, signer.pubkeyHex, ARTICLE_ID, relayUrl)
+        fun hintedArticleReference(relayUrl: String): String =
+            PublicEventFixtureBech32.naddr(
+                kind = LONG_FORM_KIND,
+                authorHex = signer.pubkeyHex,
+                identifier = ARTICLE_ID,
+                relayHint = relayUrl,
+            )
 
         /** The decoded reference a card keys its state on. */
         fun reference(authored: String) = checkNotNull(NostrEventReferenceDecoder.eventReference(authored))
@@ -294,6 +305,9 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
         const val AUTHOR_SECRET = "3f1c6d0a9b8e7f6a5d4c3b2a19087f6e5d4c3b2a19087f6e5d4c3b2a19087f6e"
     }
 }
+
+/** The id of the event MDK attached to a present preview. */
+private fun PublicEventPreviewFfi.eventId(): String = JSONObject(checkNotNull(eventJson)).getString("id")
 
 /** A received chat message with [plaintext] whose Markdown has not been hydrated yet. */
 private fun message(

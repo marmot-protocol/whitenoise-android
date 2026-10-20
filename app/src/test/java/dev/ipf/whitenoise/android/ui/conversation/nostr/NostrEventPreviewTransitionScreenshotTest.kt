@@ -118,13 +118,15 @@ class NostrEventPreviewTransitionScreenshotTest {
                 .size,
         )
         assertEquals(0, composeRule.onAllNodesWithText(loading, useUnmergedTree = true).fetchSemanticsNodes().size)
-        assertEquals(CARD_KINDS.size, composeRule.onAllNodesWithText(CACHED_AUTHOR, useUnmergedTree = true).fetchSemanticsNodes().size)
+        val authorLabels = composeRule.onAllNodesWithText(CACHED_AUTHOR, useUnmergedTree = true).fetchSemanticsNodes()
+        assertEquals(CARD_KINDS.size, authorLabels.size)
     }
 
     /** Bounds of each card, each message and the row after them, in composition order. */
     private fun bounds(): List<Rect> {
         composeRule.waitForIdle()
-        val cards = composeRule.onAllNodesWithTag(NOSTR_EVENT_CARD_BOUNDS_TAG).fetchSemanticsNodes().map { it.boundsInRoot }
+        val cardNodes = composeRule.onAllNodesWithTag(NOSTR_EVENT_CARD_BOUNDS_TAG).fetchSemanticsNodes()
+        val cards = cardNodes.map { it.boundsInRoot }
         val rows =
             listOf(MESSAGE_TAG + 0, MESSAGE_TAG + 1, NEXT_ROW_TAG).map {
                 composeRule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot
@@ -311,12 +313,15 @@ private fun card(kind: NostrEventCardKind): NostrEventCardModel =
                 NostrEventCardKind.File -> 1_063
                 NostrEventCardKind.Generic -> 9_001
             },
-        title = "A ${kind.name.lowercase()} title that wraps across the reading width".takeIf { kind != NostrEventCardKind.Note },
+        title = "A ${kind.name.lowercase()} title that wraps across the reading width".takeUnless { kind.isNote() },
         summary = "A readable ${kind.name.lowercase()} summary with enough words to fill several preview lines.",
         metadata = if (kind == NostrEventCardKind.Note) emptyList() else listOf("2.4 MB", "1920x1080"),
         readerBody = "The complete ${kind.name.lowercase()} body.",
         mediaUrl = "https://cdn.example/video.mp4".takeIf { kind == NostrEventCardKind.Video },
     )
+
+/** True for the kind-1 note card, which carries no title. */
+private fun NostrEventCardKind.isNote(): Boolean = this == NostrEventCardKind.Note
 
 /** A one-paragraph Markdown document holding [text], standing in for MDK's parser. */
 private fun document(text: String): MarkdownDocumentFfi =

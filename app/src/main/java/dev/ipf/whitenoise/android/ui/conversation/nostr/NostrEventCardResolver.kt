@@ -364,6 +364,7 @@ private fun Loaded.carryingPresentationOf(previous: Loaded?): Loaded {
     }
 }
 
+/** The account relays an event card author refresh may query, validated and capped off the main thread. */
 internal suspend fun WhiteNoiseAppState.publicEventCardRelays(): List<String> {
     val lists = accountRelayLists()
     val candidates =

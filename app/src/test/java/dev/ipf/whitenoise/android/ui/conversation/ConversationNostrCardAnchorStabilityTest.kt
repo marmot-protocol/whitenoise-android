@@ -60,7 +60,10 @@ class ConversationNostrCardAnchorStabilityTest {
         NostrEventCardResolver(
             parentScope = scope,
             readCached = { references -> references.map { null } },
-            refresh = { authored -> if (authored == cached.authoredReference) cachedRefresh.await() else freshRefresh.await() },
+            refresh = { authored ->
+                val refresh = if (authored == cached.authoredReference) cachedRefresh else freshRefresh
+                refresh.await()
+            },
             snapshots =
                 NostrEventCardSnapshots().apply {
                     put(cached.reference.stableId, loaded(CACHED_ROW, "Cached author"))
@@ -148,7 +151,11 @@ class ConversationNostrCardAnchorStabilityTest {
         }
 
     /** The card occurrence shown in [row]. */
-    private fun occurrence(row: Int): NostrEventReferenceOccurrence = NostrEventReferenceOccurrence(NostrEventReference.Event(eventId(row)), "nostr:row-$row")
+    private fun occurrence(row: Int): NostrEventReferenceOccurrence =
+        NostrEventReferenceOccurrence(
+            reference = NostrEventReference.Event(eventId(row)),
+            authoredReference = "nostr:row-$row",
+        )
 
     /** A loaded note for [row] by [author], with preview text prepared like the native read. */
     private fun loaded(
