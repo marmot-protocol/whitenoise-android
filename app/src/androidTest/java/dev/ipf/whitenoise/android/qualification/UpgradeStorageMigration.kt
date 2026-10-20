@@ -13,11 +13,12 @@ import org.json.JSONObject
 private val savedUpgradePolicies = mutableMapOf<String, AttachmentDownloadPolicyFfi>()
 private var initialLegacyBytes = 0uL
 
-/** Exercises native reserve admission and resumption using public policy, without filling disk or editing SQL. */
+/** Checks completed-body migration; pending legacy uploads stay in SQL until their separate promotion. */
 internal suspend fun verifyUpgradeStorage(
     runtime: Marmot,
     phase: String,
     beforeStart: Boolean,
+    pendingLegacyBytes: ULong = 0uL,
     readWhilePaused: suspend () -> Unit = {},
 ) {
     if (phase == "seed") return
@@ -45,10 +46,17 @@ internal suspend fun verifyUpgradeStorage(
         check(accounts.any { runtime.attachmentStorageUsage(it).migrationBytes > 0uL })
         reportUpgradeStorage(runtime, accounts, phase, "reserve-paused")
         readWhilePaused()
+        reportUpgradeStorage(runtime, accounts, phase, "paused-read-passed")
         for ((account, policy) in savedUpgradePolicies) runtime.setAttachmentDownloadPolicy(account, policy)
     }
-    withTimeout(120_000L) {
-        while (accounts.any { runtime.attachmentStorageUsage(it).legacyBytes != 0uL }) delay(250L)
+    try {
+        withTimeout(120_000L) {
+            while (accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes } != pendingLegacyBytes) {
+                delay(250L)
+            }
+        }
+    } finally {
+        reportUpgradeStorage(runtime, accounts, phase, "completion-observation")
     }
     for (account in accounts) {
         val state = runtime.attachmentStorageUsage(account).migration

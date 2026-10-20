@@ -167,9 +167,14 @@ uploaded-but-unsent body through MDK, then performs ordinary in-place updates.
 Baseline native reads are required before the update. The candidate must observe
 positive legacy bytes, pause migration through the public disk-reserve policy,
 retain readable bytes while paused, restore the policy, finish conversion and
-read the same bytes. It then promotes the pending baseline upload without a new
-upload. Production MainActivity must open the retained chat after update and
-again after full process stop; native readback checks the same account roster,
+read the same bytes. [MDK's migration contract](https://github.com/marmot-protocol/mdk/blob/67cd40d8add455f5ba2c0f080f6f2ef6c5504029/crates/storage-sqlite/src/app/attachment_acquisition/legacy_migration.rs#L12-L13)
+intentionally leaves pending outgoing uploads in SQL
+until promotion: migration completion first leaves exactly the pending payload's
+legacy byte count. The fixture then promotes that baseline upload without a new
+upload, requires its resulting retained body to migrate and the legacy byte count
+to reach zero, and reads both distinct payloads again. Production MainActivity
+must open the retained chat after update and again after full process stop;
+native readback checks the same account roster,
 history and attachment bytes in new processes. Both comparison-refusal and
 comparison-silence recovery runs require all four active cases; the two known
 upstream failures remain ignored and explicitly counted.

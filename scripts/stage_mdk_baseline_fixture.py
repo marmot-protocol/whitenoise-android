@@ -30,6 +30,7 @@ internal suspend fun verifyUpgradeStorage(
     runtime: Marmot,
     phase: String,
     beforeStart: Boolean,
+    pendingLegacyBytes: ULong = 0uL,
     readWhilePaused: suspend () -> Unit = {},
 ) = Unit
 ''')

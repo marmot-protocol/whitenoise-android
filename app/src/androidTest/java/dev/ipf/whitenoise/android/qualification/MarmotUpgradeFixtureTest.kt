@@ -53,11 +53,21 @@ class MarmotUpgradeFixtureTest {
                         seed(runtime, relay, requireNotNull(arguments.getString("blobPort")), receipt)
                     } else {
                         verify(runtime, receipt, phase)
-                        verifyUpgradeStorage(runtime, phase, beforeStart = false) {
+                        verifyUpgradeStorage(
+                            runtime,
+                            phase,
+                            beforeStart = false,
+                            pendingLegacyBytes = if (phase == "upgrade") PAYLOAD_SIZE.toULong() else 0uL,
+                        ) {
                             verifyRetained(runtime, JSONObject(receipt.readText()))
                         }
                         verify(runtime, receipt, phase)
                         verifyPendingUpload(runtime, receipt, phase)
+                        if (phase == "upgrade") {
+                            verifyUpgradeStorage(runtime, "promoted", beforeStart = false)
+                            verifyRetained(runtime, JSONObject(receipt.readText()))
+                            verifyPendingUpload(runtime, receipt, "promoted")
+                        }
                     }
                 }
             } finally {
