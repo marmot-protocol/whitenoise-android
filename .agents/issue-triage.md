@@ -4,6 +4,38 @@
 authority. Read its live README and field options before metadata changes;
 execution ledgers link GitHub work rather than becoming another backlog.
 
+## Agent filing process
+
+Agents creating issues through the forms, CLI or API follow this process. Ordinary
+reporters can submit their observations without performing source investigation.
+GitHub's collapsed form guidance is not included in the submitted issue body;
+record the investigation in the form's Evidence / Context field or the CLI body.
+The checklist is guidance, not an enforcement mechanism.
+
+1. Inspect current default-branch source. Separate reported observations,
+   reproduced behavior, source findings and hypotheses. Identify the app version,
+   device or inspected revision, and state unavailable evidence. Never invent
+   reproduction steps, device tests, logs, results or a root cause.
+2. Search open and closed issues and PRs, including merged fixes, by symptom,
+   subsystem and likely cause. Read plausible matches, link canonical scope or
+   regression history, and contribute to an existing issue when it covers the cause.
+3. Trace affected entry points, the state owner and visible result. Check sibling
+   callers and relevant account/chat switches, cancellation, failure/recovery and
+   lifecycle behavior. Cite immutable source links and state what was inspected.
+4. Establish the Android/MDK boundary and verified upstream prerequisites. Preserve
+   shared ownership; do not propose another Android store/cache for shared state.
+5. Describe one bounded problem or user outcome, alternatives and observable
+   acceptance criteria. Name existing tests, proposed regression scenarios and,
+   for bugs, the applicable invariant gate or justified exemption. Keep proposed
+   checks separate from checks actually performed.
+6. Follow the current Project contract below for metadata and real relationships.
+   Preserve active owners and evidence-based priority. Respect `agent-ok` review
+   and authorization requirements; state any metadata action blocked by permissions.
+7. Obtain required review and sanitize private data before publication. Exclude
+   keys, tokens and private conversation data; report vulnerabilities privately.
+   Read back the published issue and metadata. If submission has an uncertain
+   outcome, locate the existing issue before retrying to avoid duplicates.
+
 ## Ownership and publication
 
 - Apply the [MDK/Android boundary](../AGENTS.md#architecture-minimal-android-display-layer).
