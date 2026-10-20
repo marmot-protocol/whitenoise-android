@@ -11,16 +11,6 @@
           "STB-004"
         ]
       }
-    ],
-    "source_coverage": [
-      {
-        "surface": "runtime-scoped failed dismissal and partial retry ownership",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StartupUsageDiagnosticsPrompt.kt",
-        "anchor": "class StartupDiagnosticsCloseState",
-        "test_ids": [
-          "STB-004"
-        ]
-      }
     ]
   },
   "discovery_exceptions": []

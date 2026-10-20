@@ -94,6 +94,14 @@
         "test_ids": [
           "PRO-004"
         ]
+      },
+      {
+        "surface": "DiagnosticsCloseFailure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun DiagnosticsCloseFailure(",
+        "test_ids": [
+          "STB-004"
+        ]
       }
     ],
     "settings_controls": [

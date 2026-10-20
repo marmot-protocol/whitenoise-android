@@ -28,8 +28,8 @@ internal class GroupAvatarUploadFailure(
         stage == GroupAvatarUploadStage.Upload &&
             cause is MarmotKitException.InvalidMediaReference &&
             cause.details.let { detail ->
-                // Exact native safety categories only. The same variant also represents
-                // descriptor/integrity failures; never misreport those as network policy.
+                // Match only the pinned uploader's URL/address refusal categories.
+                // Descriptor and integrity failures follow its separate BlobStore path.
                 detail.startsWith("unsafe Blossom URL:") ||
                     detail.startsWith("unsafe media host address:")
             }

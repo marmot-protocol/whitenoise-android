@@ -24,7 +24,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.bindBlockListMirror
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingCameraCaptureFiles
-import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsCloseState
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsCloseOwner
 
 /**
  * Process-owned presentation state for the one active shell.
@@ -36,17 +36,7 @@ import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsCloseState
 internal class MainShellProcessState(
     private val appState: WhiteNoiseAppState,
 ) {
-    private var diagnosticsGeneration: Int? = null
-    private var diagnosticsCloseOwner = StartupDiagnosticsCloseState()
-
-    /** Retains only the in-flight sheet close across Activity replacement, never a consent receipt. */
-    fun startupDiagnosticsPrompt(runtimeGeneration: Int): StartupDiagnosticsCloseState {
-        if (diagnosticsGeneration != runtimeGeneration) {
-            diagnosticsGeneration = runtimeGeneration
-            diagnosticsCloseOwner = StartupDiagnosticsCloseState()
-        }
-        return diagnosticsCloseOwner
-    }
+    val startupDiagnosticsPrompt = StartupDiagnosticsCloseOwner()
 
     val pendingCameraCaptureFiles = PendingCameraCaptureFiles()
     val selectedChat = mutableStateOf<ChatListItem?>(null)

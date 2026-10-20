@@ -172,12 +172,7 @@ internal fun UsageDiagnosticsPrompt(
                 onClose = finish,
                 closeEnabled = settled,
             )
-            if (closeFailed) {
-                Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
-                    Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
-                    TextButton(enabled = !closeBusy, onClick = onRetryClose) { Text(stringResource(R.string.retry)) }
-                }
-            }
+            DiagnosticsCloseFailure(closeFailed, closeBusy, onRetryClose)
             UsageDiagnosticsPromptBody(
                 appState,
                 loggingBusy,
@@ -185,6 +180,20 @@ internal fun UsageDiagnosticsPrompt(
                 showFeedback = !closeFailed,
                 choicesEnabled = !closeBusy && !closing && !closeFailed,
             ) { loggingBusy = it }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsCloseFailure(
+    failed: Boolean,
+    busy: Boolean,
+    retry: () -> Unit,
+) {
+    if (failed) {
+        Column(Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
+            Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
+            TextButton(enabled = !busy, onClick = retry) { Text(stringResource(R.string.retry)) }
         }
     }
 }
