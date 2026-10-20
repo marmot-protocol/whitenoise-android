@@ -841,3 +841,11 @@ jobs:
           path: build/mdk-qualification/
           if-no-files-found: error
           retention-days: 30
+      - name: Retain exact disposable qualification APKs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mdk-qualification-apks-${{ github.sha }}
+          path: build/mdk-pair/
+          if-no-files-found: warn
+          retention-days: 30
