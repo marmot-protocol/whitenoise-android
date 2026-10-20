@@ -221,4 +221,14 @@ class AttachmentDownloadGateTest {
             }
         }
     }
+
+    /** A pending native approval is worth a retry; a live-policy deferral is final for that run (#3308). */
+    @Test
+    fun pendingPermissionIsTransientButPolicyDeferralIsNot() {
+        assertTrue(isTransientAttachmentDownloadFailure(AttachmentPermissionPendingException()))
+        AutomaticAttachmentHold.entries.forEach { hold ->
+            val deferred = AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video, hold)
+            assertFalse(isTransientAttachmentDownloadFailure(deferred))
+        }
+    }
 }
