@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ProfileImageDraftsTest {
+    /** A native cache miss keeps the original baselines until an authoritative refresh arrives. */
     @Test
     fun unavailableNativeCachePreservesOriginalBaselinesUntilAuthoritativeRefresh() {
         val untouched = ProfileImageDrafts("old-picture", "old-banner")
@@ -15,6 +16,7 @@ class ProfileImageDraftsTest {
         )
     }
 
+    /** A cache miss cannot turn an explicit image removal back into an untouched field. */
     @Test
     fun unavailableCacheDoesNotConvertAnExplicitRemovalIntoAnUntouchedField() {
         val removed = ProfileImageDrafts("old-picture", "old-banner").without(ProfileImageTarget.Picture)
@@ -24,6 +26,7 @@ class ProfileImageDraftsTest {
         assertEquals("", refreshed.banner)
     }
 
+    /** A restored uploaded picture stays an edit when untouched fields merge a native refresh. */
     @Test
     fun restoredUploadedPictureRemainsAnEditAgainstTheNativeRefreshBaseline() {
         val native = ProfileEditDraft(picture = "https://example.com/previous.jpg")

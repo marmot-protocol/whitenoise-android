@@ -57,28 +57,35 @@ class RecoveryInterruptionNoticeScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the interrupted document save notice in the light theme. */
     @Test
     fun documentLight() = capture(R.string.document_save_interrupted, "document_light", dark = false)
 
+    /** Captures the interrupted document save notice in the dark theme. */
     @Test
     fun documentDark() = capture(R.string.document_save_interrupted, "document_dark", dark = true)
 
+    /** Captures the interrupted document save notice at a large font scale in RTL. */
     @Test
     fun documentLargeRtl() {
         capture(R.string.document_save_interrupted, "document_large_rtl", dark = true, largeRtl = true)
     }
 
+    /** Captures the interrupted avatar preparation notice in the light theme. */
     @Test
     fun avatarLight() = capture(R.string.avatar_preparation_interrupted, "avatar_light", dark = false)
 
+    /** Captures the interrupted avatar preparation notice in the dark theme. */
     @Test
     fun avatarDark() = capture(R.string.avatar_preparation_interrupted, "avatar_dark", dark = true)
 
+    /** Captures the interrupted avatar preparation notice at a large font scale in RTL. */
     @Test
     fun avatarLargeRtl() {
         capture(R.string.avatar_preparation_interrupted, "avatar_large_rtl", dark = true, largeRtl = true)
     }
 
+    /** Records a baseline of the notice for [messageRes] with the requested theme, font scale and direction. */
     private fun capture(
         @StringRes messageRes: Int,
         suffix: String,

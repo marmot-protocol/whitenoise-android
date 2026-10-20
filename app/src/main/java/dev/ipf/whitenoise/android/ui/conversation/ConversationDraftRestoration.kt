@@ -43,6 +43,7 @@ internal fun nativeDocumentsNeedingRestoration(
         .mapKeys { (uri, _) -> Uri.parse(uri) }
         .filterKeys { prepared[it]?.restoredFromNative != false }
 
+/** Wraps a native draft attachment as a prepared photo marked as restored from the native draft. */
 private fun MessageDraftAttachmentFfi.asRestoredPhoto(): DraftPreparedPhoto =
     DraftPreparedPhoto(
         this,
@@ -50,6 +51,7 @@ private fun MessageDraftAttachmentFfi.asRestoredPhoto(): DraftPreparedPhoto =
         restoredFromNative = true,
     )
 
+/** Returns the slot ids whose restored photo is no longer among the live native attachment [nativeIds]. */
 internal fun restoredPhotosMissingFrom(
     slots: List<PendingMediaSlot>,
     prepared: Map<String, DraftPreparedPhoto>,
@@ -62,6 +64,7 @@ internal fun restoredPhotosMissingFrom(
                 backed[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
         }.mapTo(mutableSetOf()) { it.id }
 
+/** Returns the document URIs whose restored attachment is no longer among the live native attachment [nativeIds]. */
 internal fun restoredDocumentsMissingFrom(
     documents: List<Uri>,
     prepared: Map<Uri, DraftPreparedPhoto>,
@@ -95,6 +98,10 @@ internal data class DraftRestorationProjection(
     val documents: List<Uri>,
 )
 
+/**
+ * Plans which restored photos and documents to drop and which slots to keep, reconciling the composer against the
+ * native draft minus [removedAttachmentIds].
+ */
 internal fun planDraftRestoration(
     inputs: DraftRestorationInputs,
     accountRef: String,
@@ -119,6 +126,10 @@ internal fun planDraftRestoration(
     return DraftRestorationPlan(removedPhotos, removedDocuments, retainedSlots, retainedDocuments, reconciliation)
 }
 
+/**
+ * Applies [plan] to [inputs], adding materialized native attachments and labelling restored photos with
+ * [sourceUnavailable], to produce the visible shelf.
+ */
 internal fun projectDraftRestoration(
     inputs: DraftRestorationInputs,
     plan: DraftRestorationPlan,

@@ -176,6 +176,7 @@ internal fun UsageDiagnosticsPrompt(
     }
 }
 
+/** Shows the save error with a retry action, disabled while a save is [busy]. */
 @Composable
 private fun DiagnosticsCloseFailure(
     failed: Boolean,

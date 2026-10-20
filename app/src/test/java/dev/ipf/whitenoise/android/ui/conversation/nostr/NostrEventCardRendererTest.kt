@@ -7,6 +7,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NostrEventCardRendererTest {
+    /** Hostile event metadata is bounded and each kind falls back to its typed card. */
     @Test
     fun rendererRegistryBoundsHostileMetadataAndUsesTypedFallbacks() {
         val article =
@@ -73,6 +74,7 @@ class NostrEventCardRendererTest {
         assertEquals(listOf("Video", "Release", "File", "Generic"), nonReaders.map { it.readerBody })
     }
 
+    /** Field and excerpt bounds never split a Unicode surrogate pair. */
     @Test
     fun textBoundsPreserveCompleteUnicodeCodePoints() {
         val emoji = "\uD83D\uDE00"
@@ -87,6 +89,7 @@ class NostrEventCardRendererTest {
         assertEquals("b".repeat(419) + emoji, boundedExcerpt)
     }
 
+    /** Video playback accepts only public HTTPS URLs on the default port without credentials. */
     @Test
     fun videoPlaybackUrlAcceptsOnlyPublicDefaultPortHttps() {
         assertEquals("https://cdn.example/video.mp4", safeNostrMediaUrl(" https://cdn.example/video.mp4 "))
@@ -97,6 +100,7 @@ class NostrEventCardRendererTest {
         assertEquals(null, safeNostrMediaUrl("https://[::1]/video.mp4"))
     }
 
+    /** HLS video metadata stays playable when its URL has no file extension. */
     @Test
     fun hlsVideoMetadataRemainsPlayableWithoutAFileExtension() {
         val video =
@@ -117,6 +121,7 @@ class NostrEventCardRendererTest {
         assertEquals("application/vnd.apple.mpegurl", video.mediaMimeType)
     }
 
+    /** Every initially supported media kind maps to its typed card renderer. */
     @Test
     fun everyInitialMediaKindUsesTheTypedRenderer() {
         listOf(21, 22, 34_235, 34_236).forEach { kind ->
@@ -128,6 +133,7 @@ class NostrEventCardRendererTest {
         assertEquals(NostrEventCardKind.File, event("e".repeat(64), kind = 1_063).toCardModel().kind)
     }
 
+    /** Kind 1 notes expose declared video media while remaining notes. */
     @Test
     fun kindOneNotesExposeDeclaredVideoWithoutChangingTheirKind() {
         val note =
@@ -147,6 +153,7 @@ class NostrEventCardRendererTest {
         assertEquals(null, untyped.mediaUrl)
     }
 
+    /** Builds a Nostr event fixture with defaults for every field but [id]. */
     private fun event(
         id: String,
         pubkey: String = "c".repeat(64),

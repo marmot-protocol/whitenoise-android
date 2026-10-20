@@ -208,6 +208,7 @@ private class CameraCaptureFixture(
     private lateinit var captured: Uri
     private lateinit var abandoned: File
 
+    /** Runs the capture, lock and delivery sequence, then checks the shelf and output ownership. */
     fun exercise() {
         try {
             mount()
@@ -220,6 +221,7 @@ private class CameraCaptureFixture(
         }
     }
 
+    /** Composes the composer shelf under the protected shell saved state with the fake camera registry. */
     private fun mount() {
         restoration.setContent {
             CompositionLocalProvider(
@@ -260,6 +262,7 @@ private class CameraCaptureFixture(
         }
     }
 
+    /** Keeps a media draft per account and runtime in sync with [slots], counting its disposals. */
     @Composable
     private fun trackDraft(slots: List<PendingMediaSlot>) {
         val scope = rememberCoroutineScope()
@@ -283,10 +286,12 @@ private class CameraCaptureFixture(
         }
     }
 
+    /** Writes fixture bytes into the camera output URI. */
     private fun writeCapture() {
         context.contentResolver.openOutputStream(captured)!!.use { it.write(byteArrayOf(3, 5, 7)) }
     }
 
+    /** Launches the camera, records its output and locks the shell, optionally delivering the result first. */
     private fun captureAndSuspend() {
         composeRule.runOnIdle { checkNotNull(launch).invoke() }
         composeRule.waitForIdle()
@@ -313,6 +318,7 @@ private class CameraCaptureFixture(
         }
     }
 
+    /** Delivers the camera result while locked, covering failed authentication and process restoration. */
     private fun deliverWhileSuspended() {
         if (writeAfterLock) writeCapture()
         if (cancelAuthentication) {
@@ -338,6 +344,7 @@ private class CameraCaptureFixture(
         }
     }
 
+    /** Unlocks and asserts which photos the shelf shows and how many rejections were reported. */
     private fun assertVisibleShelf() {
         composeRule.runOnIdle { locked.value = false }
         composeRule.waitForIdle()
@@ -356,6 +363,7 @@ private class CameraCaptureFixture(
         }
     }
 
+    /** Asserts that rejected or orphaned captures are deleted and accepted ones stay readable. */
     private fun assertOutputOwnership() {
         if (captureRejected || ownerReplaced || replaceBeforeCallback) {
             org.junit.Assert.assertThrows(java.io.FileNotFoundException::class.java) {
@@ -378,6 +386,7 @@ private class CameraCaptureFixture(
         }
     }
 
+    /** Locks, releases capture holds and tears down the controller and capture file. */
     private fun cleanUp() {
         composeRule.runOnIdle {
             locked.value = true
@@ -391,8 +400,10 @@ private class CameraCaptureFixture(
 }
 
 private object EmptyDrafts : DraftPersistence {
+    /** Starts every run with no persisted drafts. */
     override fun read(): Map<String, String> = emptyMap()
 
+    /** Discards draft writes, the test never reads them back. */
     override fun write(
         key: String,
         value: String?,
@@ -406,6 +417,7 @@ private class Camera :
     private var requestCode = 0
     var uri: Uri? = null
 
+    /** Records the launch instead of starting a camera, keeping the output URI for later delivery. */
     override fun <I, O> onLaunch(
         requestCode: Int,
         contract: ActivityResultContract<I, O>,
@@ -416,6 +428,7 @@ private class Camera :
         uri = input as Uri
     }
 
+    /** Dispatches the camera result for the recorded launch, successful unless [success] is false. */
     fun deliver(success: Boolean = true) {
         dispatchResult(requestCode, if (success) Activity.RESULT_OK else Activity.RESULT_CANCELED, null)
     }

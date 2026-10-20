@@ -115,6 +115,7 @@ private fun ShareFailurePresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+/** Presents the custom emoji naming or removal dialog over a fixture store for Maestro capture. */
 @Composable
 @Suppress("FunctionNaming")
 private fun EmojiWrapperPresentation(fixture: MaestroPresentationFixture) {

@@ -274,14 +274,18 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
 
     /** Holds the unrelated notification stream open until this test cancels its listener. */
     private object SilentNotifications : AppNotificationSubscription {
+        /** Suspends forever, so the stream never yields a notification until cancelled. */
         override suspend fun next(): Nothing = awaitCancellation()
 
+        /** Nothing to release, the stream holds no resources. */
         override fun close() = Unit
     }
 
     private object EmptyDraftPersistence : DraftPersistence {
+        /** Starts every run with no persisted drafts. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards draft writes, this test never reads them back. */
         override fun write(
             key: String,
             value: String?,

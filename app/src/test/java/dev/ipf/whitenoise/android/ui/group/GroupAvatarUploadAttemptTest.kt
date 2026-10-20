@@ -49,6 +49,9 @@ class GroupAvatarUploadAttemptTest {
                     var publishes = 0
                     var avatar = "previous avatar"
 
+                    /**
+                     * Prepares, uploads and publishes the picked raster once, returning whether the avatar was updated.
+                     */
                     suspend fun attempt(): Boolean =
                         GroupAvatarUploadAttempt({ true }, { 0 }).run(
                             prepare = {

@@ -478,6 +478,7 @@ internal class ConversationMediaDraftState(
             RestoredConversationAttachments(projection.media, projection.documents)
         }
 
+    /** Snapshots the composer's current shelf and prepared attachments for restoration planning. */
     private fun restorationInputs() =
         DraftRestorationInputs(
             currentSlots,
@@ -942,6 +943,7 @@ private data class DraftPhotoEdit(
     val quality: MediaQuality,
 )
 
+/** Commits [edit] to the native draft, guarded by the backed photo's expected digest. */
 private suspend fun PhotoEditorCommitter.commitPhoto(
     accountRef: String,
     groupIdHex: String,
@@ -958,6 +960,7 @@ private suspend fun PhotoEditorCommitter.commitPhoto(
         quality = edit.quality,
     )
 
+/** Deletes composer presentation copies, clearing every media temp file only when the draft is [empty]. */
 private fun releaseDraftPresentationFiles(
     context: Context,
     empty: Boolean,
@@ -969,6 +972,7 @@ private fun releaseDraftPresentationFiles(
     }
 }
 
+/** Stages a visual attachment the editor cannot open as a generic native draft attachment. */
 private suspend fun stageVisualDraft(
     drafts: MessageDraftRepository,
     groupIdHex: String,
@@ -984,6 +988,7 @@ private suspend fun stageVisualDraft(
         pending,
     )
 
+/** Picks the shelf description that explains why a staged photo cannot be edited. */
 private fun nonEditablePhotoDescription(
     result: PhotoDraftStageResult.NotEditable,
     messages: PhotoEditorMessages,

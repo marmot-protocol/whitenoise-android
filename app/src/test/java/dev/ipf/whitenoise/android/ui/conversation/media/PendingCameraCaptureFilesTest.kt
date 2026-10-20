@@ -26,6 +26,7 @@ import org.robolectric.annotation.Config
 class PendingCameraCaptureFilesTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    /** Holding a capture twice is idempotent and transfers it only to the native source it matches. */
     @Test
     fun restoredHoldIsIdempotentAndTransfersOnlyToTheMatchingNativeSource() {
         val directory = temporary.newFolder("camera")
@@ -47,6 +48,7 @@ class PendingCameraCaptureFilesTest {
         assertFalse(file.exists())
     }
 
+    /** Retiring the outgoing controller cannot delete a capture retained by the same group's new controller. */
     @Test
     fun retiringAnOutgoingControllerCannotDeleteARetainedSameGroupCapture() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -74,6 +76,7 @@ class PendingCameraCaptureFilesTest {
         app.mutationsScope.cancel()
     }
 
+    /** Retiring an owner deletes only its own pending capture and releases the hold. */
     @Test
     fun retiringAnOwnerDiscardsOnlyItsOwnPendingOutputAndReleasesTheHold() {
         val directory = temporary.newFolder("camera")
@@ -115,8 +118,10 @@ class PendingCameraCaptureFilesTest {
     }
 
     private object EmptyDrafts : DraftPersistence {
+        /** Starts every run with no persisted drafts. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards draft writes, the test never reads them back. */
         override fun write(
             key: String,
             value: String?,

@@ -69,6 +69,9 @@ class ProfileImageDraftRestorationTest {
         }
     }
 
+    /**
+     * Restores profile image drafts across a lock and native refresh, optionally after editing, settling or resetting.
+     */
     private fun exercise(
         edited: ProfileImageTarget? = null,
         settleEdit: Boolean = false,

@@ -103,6 +103,7 @@ internal class StartupDiagnosticsCloseOwner {
     private var generation: Int? = null
     private var owner = StartupDiagnosticsCloseState()
 
+    /** Returns the close state for [runtimeGeneration], replacing it when the native runtime changes. */
     operator fun invoke(runtimeGeneration: Int): StartupDiagnosticsCloseState {
         if (generation != runtimeGeneration) {
             generation = runtimeGeneration

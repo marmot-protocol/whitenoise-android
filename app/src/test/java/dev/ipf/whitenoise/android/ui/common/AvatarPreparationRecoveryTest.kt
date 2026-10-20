@@ -76,6 +76,7 @@ class AvatarPreparationRecoveryTest {
 
     @Test fun newGroupRetiredAccountGetsNoNoticeOrLateImage() = exercise(Surface.NewGroup, replaceAccount = true)
 
+    /** Runs one lock-interrupted avatar preparation on [surface] under the given timing and ownership variation. */
     private fun exercise(
         surface: Surface,
         completeBeforeLock: Boolean = false,
@@ -128,6 +129,7 @@ private class AvatarRecoveryFixture(
     private var image = "previous"
     private var needsReselection = false
 
+    /** Mounts, interrupts, unlocks and asserts the recovery outcome, always cancelling the retained scope. */
     fun exercise() {
         try {
             mount()
@@ -139,6 +141,7 @@ private class AvatarRecoveryFixture(
         }
     }
 
+    /** Composes the surface under the protected shell saved state so locking discards and restores it. */
     private fun mount() {
         composeRule.setContent {
             val protected = rememberProtectedShellSavedState(account.value, 1, suspended = locked.value)
@@ -198,6 +201,7 @@ private class AvatarRecoveryFixture(
         }
     }
 
+    /** Remembers recovery keyed by the captured account, counting notices and flagging new-group reselection. */
     @Composable
     private fun rememberRecovery(
         capturedAccount: String,
@@ -212,6 +216,7 @@ private class AvatarRecoveryFixture(
             },
         )
 
+    /** Runs the group avatar upload attempt, optionally suspending in preparation or failing the publish. */
     private suspend fun runGroupUpload(
         session: GroupCreationSession,
         recovery: AvatarPreparationRecovery,
@@ -250,6 +255,7 @@ private class AvatarRecoveryFixture(
         }
     }
 
+    /** Accepts the crop and, when requested, completes preparation before the lock. */
     private fun completeBeforeSuspension() {
         composeRule.runOnIdle { checkNotNull(acceptCrop).invoke() }
         if (completeBeforeLock) {
@@ -269,6 +275,7 @@ private class AvatarRecoveryFixture(
         }
     }
 
+    /** Locks the shell, optionally cancels or replaces the account, then completes preparation while locked. */
     private fun suspendAndDeliver() {
         if (deliberateCancel) composeRule.runOnIdle { checkNotNull(cancelCrop).invoke() }
         composeRule.runOnIdle { locked.value = true }
@@ -290,6 +297,7 @@ private class AvatarRecoveryFixture(
         }
     }
 
+    /** Unlocks and asserts the notice count, visible image and reselection flag the scenario expects. */
     private fun assertRecovered() {
         composeRule.runOnIdle { locked.value = false }
         composeRule.waitForIdle()

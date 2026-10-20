@@ -113,6 +113,9 @@ internal fun rememberDocumentSaveFallback(
     }
 }
 
+/**
+ * Copies [source] to the destination the user chooses, keeping it protected from cache cleanup until the copy finishes.
+ */
 private suspend fun saveDocumentToChosenDestination(
     context: Context,
     source: File,
@@ -142,6 +145,7 @@ internal fun discardEmptyCreatedDocument(
     }
 }
 
+/** Builds the system create-document request with a normalized MIME type and a safe suggested name. */
 internal fun createDocumentIntent(
     fileName: String,
     mediaType: String,
@@ -152,6 +156,10 @@ internal fun createDocumentIntent(
         putExtra(Intent.EXTRA_TITLE, safeDocumentDisplayName(fileName))
     }
 
+/**
+ * Runs [launch] and returns any expected platform launch failure, calling [onFailure] whenever the request was not
+ * dispatched.
+ */
 private inline fun launchDocumentDestination(
     launch: () -> Unit,
     onFailure: () -> Unit,

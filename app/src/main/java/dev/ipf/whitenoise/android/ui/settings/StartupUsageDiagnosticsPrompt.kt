@@ -30,6 +30,7 @@ internal fun StartupUsageDiagnosticsPrompt(
             )
     }
 
+    /** Saves the diagnostics opt-out for [attempt], applying it only while this runtime generation is current. */
     fun save(attempt: Long) {
         appState.launchMutation {
             owner.save(

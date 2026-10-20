@@ -98,6 +98,7 @@ class ProtectedShellSavedStateTest {
         exerciseVisibleRestore(changeRuntime = true, coldProcess = true, expected = 7)
     }
 
+    /** Edits visible saved state, recreates under the given owner change and asserts the [expected] restored value. */
     private fun exerciseVisibleRestore(
         changeAccount: Boolean = false,
         changeRuntime: Boolean = false,
@@ -129,6 +130,7 @@ class ProtectedShellSavedStateTest {
         composeRule.runOnIdle { assertEquals(expected, visible) }
     }
 
+    /** Edits, locks, applies [change] at the chosen point and unlocks, asserting the [expected] restored value. */
     private fun exerciseSnapshot(
         expected: Int = 1,
         changeAtLock: Boolean = false,
@@ -155,6 +157,7 @@ class ProtectedShellSavedStateTest {
         composeRule.runOnIdle { assertEquals(expected, fixture.observed) }
     }
 
+    /** Composes [fixture]'s saveable content under the protected shell saved state, hidden while locked. */
     private fun mount(fixture: ShellSnapshotFixture) {
         composeRule.setContent {
             val protected =

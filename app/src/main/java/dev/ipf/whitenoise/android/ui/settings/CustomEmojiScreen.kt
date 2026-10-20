@@ -263,6 +263,10 @@ private fun customEmojiSaveMessage(result: CustomEmojiSaveResult): Int? =
         -> R.string.custom_emoji_save_failed
     }
 
+/**
+ * Reads the selected image for the account and runtime that picked it, then stages it or reports a failure — dropping
+ * the result if ownership changed meanwhile.
+ */
 @Suppress("FunctionNaming")
 @Composable
 private fun PrepareSelectedEmoji(
@@ -280,6 +284,7 @@ private fun PrepareSelectedEmoji(
         if (selectedOwner != selectionIdentity) return@LaunchedEffect
         val uri = selectedUri?.let(Uri::parse) ?: return@LaunchedEffect
 
+        /** Reports [message] for this selection only if its account and runtime are still current. */
         fun failSelection(message: Int) {
             failCurrentEmojiSelection(appState, selectionAccount to selectionRuntime, uri, message, onFailed)
         }
@@ -312,6 +317,7 @@ private fun PrepareSelectedEmoji(
     }
 }
 
+/** Asks the user to confirm removing [emoji] from their custom emoji set. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ConfirmEmojiRemoval(
@@ -339,6 +345,7 @@ private data class EmojiPickers(
     val file: () -> Unit,
 )
 
+/** Creates photo and file pickers whose results are delivered only to the account and runtime that launched them. */
 @Composable
 private fun rememberEmojiPickers(
     appState: WhiteNoiseAppState,
@@ -347,6 +354,7 @@ private fun rememberEmojiPickers(
     var pickerOwner by rememberSaveable { mutableStateOf<String?>(null) }
     val identity = "${appState.runtimeGeneration}:${appState.activeAccountRef}"
 
+    /** Forwards a picked [uri] only when the launching owner is still the current account and runtime. */
     fun stage(uri: Uri?) {
         val owner = pickerOwner
         pickerOwner = null
@@ -368,6 +376,7 @@ private fun rememberEmojiPickers(
     )
 }
 
+/** Shows the naming dialog for a staged emoji and saves it to [store] on confirmation. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StagedEmojiDialog(
@@ -391,6 +400,7 @@ internal fun StagedEmojiDialog(
     }
 }
 
+/** Delivers a selection failure only when [owner] still matches the active account and runtime. */
 private fun failCurrentEmojiSelection(
     appState: WhiteNoiseAppState,
     owner: Pair<String?, Int>,

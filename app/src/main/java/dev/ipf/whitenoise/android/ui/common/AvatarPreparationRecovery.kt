@@ -14,6 +14,10 @@ internal class AvatarPreparationRecovery(
     val settled: () -> Unit,
 )
 
+/**
+ * Remembers whether an accepted avatar crop was still preparing when state was saved, and reports the interruption once
+ * on restore — only while [isCurrent] still owns the surface.
+ */
 @Composable
 internal fun rememberAvatarPreparationRecovery(
     origin: String,

@@ -53,6 +53,7 @@ class CustomEmojiSelectionRetryTest {
 
     @Test fun undecodableSelectionCanRetryTheSameUriAfterFileRecovery() = exercise(unreadable = false)
 
+    /** Replacing the account while a selection read is blocked neither restarts nor publishes the old selection. */
     @Test
     fun accountReplacementDoesNotRestartOrPublishTheOldBlockedSelection() {
         val uri = Uri.parse("content://emoji-retry/blocked.png")
@@ -64,6 +65,7 @@ class CustomEmojiSelectionRetryTest {
             reads.incrementAndGet()
             check(unblock.await(5, TimeUnit.SECONDS))
             object : ByteArrayInputStream(png) {
+                /** Records that the blocked read's stream was closed. */
                 override fun close() {
                     super.close()
                     closed.set(true)
@@ -104,6 +106,7 @@ class CustomEmojiSelectionRetryTest {
         }
     }
 
+    /** Picks an image that first fails, unreadable or undecodable, then retries the same URI to a staged emoji. */
     private fun exercise(unreadable: Boolean) {
         val uri = Uri.parse("content://emoji-retry/selected.png")
         val available = AtomicBoolean(false)
@@ -157,6 +160,7 @@ class CustomEmojiSelectionRetryTest {
         }
     }
 
+    /** Waits for [condition], failing with the read count and app state at [boundary] on timeout. */
     private fun waitForSelection(
         boundary: String,
         reads: AtomicInteger,
@@ -174,6 +178,7 @@ class CustomEmojiSelectionRetryTest {
         }
     }
 
+    /** Encodes a small PNG for the picker to return. */
     private fun imageBytes(): ByteArray =
         ByteArrayOutputStream()
             .also { output ->
@@ -183,8 +188,10 @@ class CustomEmojiSelectionRetryTest {
             }.toByteArray()
 
     private object EmptyDrafts : DraftPersistence {
+        /** Starts every run with no persisted drafts. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards draft writes, the test never reads them back. */
         override fun write(
             key: String,
             value: String?,
@@ -198,6 +205,7 @@ class CustomEmojiSelectionRetryTest {
         var launches = 0
         private var requestCode = 0
 
+        /** Records the launch instead of opening a picker, so the test can deliver the result later. */
         override fun <I, O> onLaunch(
             requestCode: Int,
             contract: ActivityResultContract<I, O>,
@@ -208,6 +216,7 @@ class CustomEmojiSelectionRetryTest {
             launches++
         }
 
+        /** Delivers [uri] to the launched picker, asserting the registry accepted it. */
         fun deliver(uri: Uri) {
             assertTrue("the launched file chooser must accept its delivered result", dispatchResult(requestCode, uri))
         }

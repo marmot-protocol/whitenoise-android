@@ -19,6 +19,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ConversationDraftRestorationPlanTest {
+    /** A restored photo removed from the native draft leaves the shelf and its prepared bytes. */
     @Test
     fun staleNativePhotoCannotKeepRemovedRestoredBytesOnTheShelf() {
         val stale = attachment("removed-photo")
@@ -39,6 +40,7 @@ class ConversationDraftRestorationPlanTest {
         assertEquals(mapOf(fresh.id to "fresh description"), projected.inputs.descriptions)
     }
 
+    /** A restored backed photo removed from the native draft loses its backing while fresh photos keep theirs. */
     @Test
     fun staleNativePhotoCannotKeepRemovedRestoredBacking() {
         val stale = attachment("removed-backing")
@@ -54,6 +56,7 @@ class ConversationDraftRestorationPlanTest {
         assertTrue(projected.inputs.preparedPhotos.isEmpty())
     }
 
+    /** A restored document removed from the native draft leaves the shelf and its prepared bytes. */
     @Test
     fun staleNativeDocumentCannotKeepRemovedRestoredBytes() {
         val stale = attachment("removed-document", "application/pdf")
@@ -74,6 +77,7 @@ class ConversationDraftRestorationPlanTest {
         assertEquals(mapOf(freshUri to inputs.preparedDocuments.getValue(freshUri)), projected.inputs.preparedDocuments)
     }
 
+    /** Plans and projects a restoration where [stale] was removed natively, asserting nothing is reconciled. */
     private fun restore(
         inputs: DraftRestorationInputs,
         stale: MessageDraftAttachmentFfi,
@@ -86,6 +90,7 @@ class ConversationDraftRestorationPlanTest {
         return projectDraftRestoration(inputs, plan, emptyList(), removedIds, "source unavailable")
     }
 
+    /** Builds restoration inputs with an empty shelf. */
     private fun emptyInputs() =
         DraftRestorationInputs(
             slots = emptyList(),
@@ -96,8 +101,10 @@ class ConversationDraftRestorationPlanTest {
             descriptions = emptyMap(),
         )
 
+    /** Builds a shelf slot for draft attachment [id]. */
     private fun slot(id: String) = PendingMediaSlot(id, Uri.parse("content://draft/$id"))
 
+    /** Builds a minimal native draft attachment with the given [mediaType]. */
     private fun attachment(
         id: String,
         mediaType: String = "image/png",
@@ -112,6 +119,7 @@ class ConversationDraftRestorationPlanTest {
         emptyList(),
     )
 
+    /** Builds a backed photo for [attachment], marked as restored from native when [restored]. */
     private fun backed(
         attachment: MessageDraftAttachmentFfi,
         restored: Boolean,
