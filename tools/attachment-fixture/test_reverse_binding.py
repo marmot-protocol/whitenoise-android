@@ -19,7 +19,7 @@ class ReverseBindingTest(unittest.TestCase):
         """Occupied device ports cannot block or redirect upload descriptors in either instrumentation process."""
         for restart in (False, True):
             with self.subTest(restart=restart), tempfile.TemporaryDirectory() as directory:
-                calls, allocated, host_ports, listeners = [], [], [], {}
+                calls, allocated, host_ports, listeners = [], [], [], {45001: "unrelated"}
 
                 def adb(binary, serial, *args, **options):
                     """Model independent device listeners, including contention at host-numbered device ports."""
@@ -32,11 +32,14 @@ class ReverseBindingTest(unittest.TestCase):
                         return "package:" + device_runner.APP
                     if args[:2] == ("reverse", "--no-rebind"):
                         host_port = int(args[3].removeprefix("tcp:"))
-                        host_ports.append(host_port)
+                        if host_port not in host_ports:
+                            host_ports.append(host_port)
                         listeners.setdefault(host_port, "unrelated")
-                        if args[2] != "tcp:0":
-                            raise subprocess.CalledProcessError(1, [binary, *args], stderr="Address already in use")
-                        port = next(p for p in range(45001, 65536) if p not in listeners)
+                        port = int(args[2].removeprefix("tcp:"))
+                        self.assertGreaterEqual(port, 32768)
+                        if port in listeners:
+                            raise subprocess.CalledProcessError(1, [binary, *args],
+                                stderr="cannot bind listener: Address already in use PRIVATE")
                         listeners[port] = "fixture"
                         allocated.append(port)
                         return f"{port}\n"
@@ -67,8 +70,10 @@ class ReverseBindingTest(unittest.TestCase):
 
                 output = Path(directory) / "report.json"
                 with patch.object(device_runner, "adb_command", side_effect=adb), \
+                        patch.object(device_runner.random, "SystemRandom") as random, \
                         patch.object(device_runner, "wait_for_ledger_completion",
                                      side_effect=lambda ledger, start: (ledger.snapshot()[start:], False)):
+                    random.return_value.sample.side_effect = [[45001, 45002, 45003, 45004], [45005, 45006, 45007, 45008]]
                     # Routing-only instrumentation has no measurements and must not qualify the app.
                     with self.assertRaises(RuntimeError):
                         device_runner.run("chosen-adb", "emulator-5554", Path(directory) / "server", output,
@@ -82,19 +87,21 @@ class ReverseBindingTest(unittest.TestCase):
                 self.assertEqual(2 if restart else 1, report["http_get_requests"])
                 self.assertEqual(2, len(allocated))
                 self.assertEqual({"unrelated"}, set(listeners.values()))
-                self.assertEqual(set(host_ports) - set(allocated), set(listeners))
+                self.assertEqual((set(host_ports) | {45001}) - set(allocated), set(listeners))
+                self.assertGreaterEqual(report["reverse_admission"][0]["occupied_ports"], 1)
+                self.assertEqual(["admitted", "admitted"], [r["status"] for r in report["reverse_admission"]])
                 self.assertEqual(2 if restart else 1, sum(c[:3] == ("shell", "am", "instrument") for c in calls))
                 self.assertEqual(restart, ("shell", "am", "force-stop", device_runner.APP) in calls)
                 self.assertFalse(any("--remove-all" in c or "uninstall" in c or "clear" in c for c in calls))
 
     def test_failed_second_bind_retains_failure_and_removes_only_the_first_allocation(self):
         """Partial setup never starts instrumentation or exposes raw ADB error text in the report."""
-        for second_response in (None, "PRIVATE-INVALID-PORT\n"):
-            with self.subTest(second_response=second_response), tempfile.TemporaryDirectory() as directory:
+        for failure in ("transport", "timeout", "occupied"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
                 calls, bindings = [], []
 
                 def adb(binary, serial, *args, **options):
-                    """Allocate once, then simulate a transport failure or malformed allocated-port output."""
+                    """Admit one mapping, then fail the second listener without running any instrumentation."""
                     calls.append(args)
                     if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                         return "1"
@@ -103,39 +110,65 @@ class ReverseBindingTest(unittest.TestCase):
                     if args[:2] == ("reverse", "--no-rebind"):
                         bindings.append(args)
                         if len(bindings) == 1:
-                            return "45001\n"
-                        if second_response is None:
-                            raise subprocess.CalledProcessError(1, [binary, *args], stderr="PRIVATE-TRANSPORT-ERROR")
-                        return second_response
+                            return ""
+                        if failure == "timeout":
+                            raise subprocess.TimeoutExpired("PRIVATE", 180)
+                        message = "cannot bind listener: Address already in use PRIVATE" if failure == "occupied" else "PRIVATE"
+                        raise subprocess.CalledProcessError(1, [binary, *args], stderr=message)
                     return ""
 
                 output = Path(directory) / "report.json"
                 with patch.object(device_runner, "adb_command", side_effect=adb), \
+                        patch.object(device_runner.random, "SystemRandom") as random, \
                         patch.object(device_runner, "wait_for_ledger_completion", return_value=([], False)), \
                         patch.object(device_runner.subprocess, "run") as capture:
+                    random.return_value.sample.side_effect = [[45001, 45002, 45003, 45004], [45005, 45006, 45007, 45008]]
                     with self.assertRaises(RuntimeError):
                         device_runner.run("chosen-adb", "emulator-5554", Path(directory) / "server", output)
                     capture.assert_not_called()
                 report = json.loads(output.read_text())
                 self.assertEqual("reverse-binding", report["failure_diagnostics"]["stage"])
-                self.assertEqual("CalledProcessError" if second_response is None else "ValueError", report["failure_class"])
+                self.assertEqual("TimeoutExpired" if failure == "timeout" else "CalledProcessError", report["failure_class"])
+                self.assertEqual(5 if failure == "occupied" else 2, len(bindings))
+                self.assertEqual("exhausted" if failure == "occupied" else "failed", report["reverse_admission"][1]["status"])
+                if failure == "occupied":
+                    self.assertEqual([f"tcp:{p}" for p in (45005, 45006, 45007, 45008)], [b[2] for b in bindings[1:]])
+                    self.assertEqual({"attempts": 4, "occupied_ports": 4, "status": "exhausted"}, report["reverse_admission"][1])
                 self.assertFalse(report["qualified"])
                 self.assertEqual([], report["metrics"])
                 self.assertNotIn("PRIVATE", output.read_text())
                 self.assertFalse(any(c[:3] == ("shell", "am", "instrument") for c in calls))
                 self.assertEqual([("reverse", "--remove", "tcp:45001")], [c for c in calls if c[:2] == ("reverse", "--remove")])
 
-    def test_allocated_port_output_is_a_single_valid_ascii_tcp_port(self):
-        """Reject empty, zero, signed, multiple, non-ASCII or out-of-range responses without echoing them."""
-        for response in ("", "0", "65536", "-1", "+123", "tcp:123", "123\n456", "１２３", "PRIVATE", "1" * 100):
-            with self.subTest(response=response), patch.object(device_runner, "adb_command", return_value=response):
-                with self.assertRaises(ValueError) as error:
-                    device_runner.bind_reverse_port("chosen-adb", "emulator-5554", 32100)
-                self.assertNotIn(response or "PRIVATE", str(error.exception))
-        for response, port in (("1\n", 1), ("65535\n", 65535)):
-            with self.subTest(response=response), patch.object(device_runner, "adb_command", return_value=response) as adb:
-                self.assertEqual(port, device_runner.bind_reverse_port("chosen-adb", "emulator-5554", 32100))
-                adb.assert_called_once_with("chosen-adb", "emulator-5554", "reverse", "--no-rebind", "tcp:0", "tcp:32100")
+    def test_only_confirmed_occupied_socket_advances_to_another_candidate(self):
+        """Explicit reservation owns the requested port; arbitrary stdout never selects a device listener."""
+        error = subprocess.CalledProcessError(1, "PRIVATE", stderr="cannot bind listener: Address already in use PRIVATE")
+        receipt = {}
+        with patch.object(device_runner.random, "SystemRandom") as random, \
+                patch.object(device_runner, "adb_command", side_effect=[error, "PRIVATE-NOT-A-PORT"]) as adb:
+            random.return_value.sample.return_value = [45001, 45002, 45003, 45004]
+            self.assertEqual(45002, device_runner.bind_reverse_port("chosen-adb", "emulator-5554", 32100, receipt))
+            random.return_value.sample.assert_called_once_with(range(32768, 61000), 4)
+            self.assertEqual([("chosen-adb", "emulator-5554", "reverse", "--no-rebind", f"tcp:{p}", "tcp:32100")
+                              for p in (45001, 45002)], [c.args for c in adb.call_args_list])
+        self.assertEqual({"attempts": 2, "occupied_ports": 1, "status": "admitted"}, receipt)
+        self.assertNotIn("PRIVATE", json.dumps(receipt))
+
+    def test_timeouts_transport_errors_and_unrecognized_collisions_fail_immediately(self):
+        """Only the complete known occupied-socket error permits another admission attempt."""
+        errors = [subprocess.TimeoutExpired("PRIVATE", 180), OSError("PRIVATE")]
+        for text in ("cannot bind listener", "Address already in use", "cannot rebind existing socket", "error: device offline"):
+            errors.append(subprocess.CalledProcessError(1, "PRIVATE", stderr=text))
+        errors.append(subprocess.CalledProcessError(255, "PRIVATE", stderr="cannot bind listener: Address already in use"))
+        for error in errors:
+            with self.subTest(error=repr(error)), patch.object(device_runner.random, "SystemRandom") as random, \
+                    patch.object(device_runner, "adb_command", side_effect=error) as adb:
+                random.return_value.sample.return_value = [45001, 45002, 45003, 45004]
+                receipt = {}
+                with self.assertRaises(type(error)):
+                    device_runner.bind_reverse_port("chosen-adb", "emulator-5554", 32100, receipt)
+                self.assertEqual(1, adb.call_count)
+                self.assertEqual({"attempts": 1, "occupied_ports": 0, "status": "failed"}, receipt)
 
     def test_client_upload_port_preserves_the_host_url_and_rejects_invalid_configuration(self):
         """Only upload descriptors change authority; failed configuration preserves the current valid port."""

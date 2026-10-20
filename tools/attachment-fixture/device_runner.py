@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import random
 import subprocess
 import threading
 import time
@@ -34,15 +35,27 @@ def adb_command(adb, serial, *args, timeout=180):
     return subprocess.run([adb, "-s", serial, *args], check=True, capture_output=True, text=True, timeout=timeout).stdout
 
 
-def bind_reverse_port(adb, serial, host_port):
-    """Let adbd reserve a free device port without replacing another task's listener."""
-    allocated = adb_command(adb, serial, "reverse", "--no-rebind", "tcp:0", f"tcp:{host_port}").strip()
-    if not allocated.isascii() or not allocated.isdecimal() or not 1 <= len(allocated) <= 5:
-        raise ValueError("adb reverse did not return an allocated TCP port")
-    port = int(allocated)
-    if not 1 <= port <= 65535:
-        raise ValueError("adb reverse returned an out-of-range TCP port")
-    return port
+def bind_reverse_port(adb, serial, host_port, receipt=None):
+    """Reserve one of four explicit device ports; advance only on confirmed address-in-use failures."""
+    if receipt is None:
+        receipt = {}
+    receipt.update(attempts=0, occupied_ports=0, status="failed")
+    candidates = random.SystemRandom().sample(range(32768, 61000), 4)
+    for index, port in enumerate(candidates):
+        receipt["attempts"] += 1
+        try:
+            adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{host_port}")
+            receipt["status"] = "admitted"
+            return port
+        except subprocess.CalledProcessError as error:
+            transcript = "\n".join(value for value in (error.stdout, error.stderr) if isinstance(value, str))
+            if error.returncode != 1 or "cannot bind listener" not in transcript or "Address already in use" not in transcript:
+                raise
+            receipt["occupied_ports"] += 1
+            if index == len(candidates) - 1:
+                receipt["status"] = "exhausted"
+                raise
+    raise ValueError("no fixture reverse-port candidates")
 
 
 def reverse_mapping_diagnostics(adb, serial, device_ports, host_ports):
@@ -237,9 +250,12 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             threads.append(thread)
             started_services.append(service)
         stage = "reverse-binding"
+        report["reverse_admission"] = []
         for port in (server.server_port, relay.port):
             # Host allocation says nothing about device availability; keep the two namespaces separate.
-            device_ports.append(bind_reverse_port(adb, serial, port))
+            admission = {}
+            report["reverse_admission"].append(admission)
+            device_ports.append(bind_reverse_port(adb, serial, port, admission))
         blob_port, relay_port = device_ports
         server.set_upload_port(blob_port)
         report["reverse_bindings_before_instrumentation"] = reverse_mapping_diagnostics(
