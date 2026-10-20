@@ -40,7 +40,7 @@ class AndroidCiGateTest(unittest.TestCase):
         cls.secondary = cls.job_block(cls.workflow, 'secondary-variant')
         cls.gate = cls.job_block(cls.workflow, 'validate')
         cls.app_build = APP_BUILD.read_text()
-        cls.script = textwrap.dedent(cls.gate.split('        run: |\n', 1)[1])
+        cls.script = cls.run_block(cls.gate)
         match = re.search(r'^    needs: \[([^\]]+)\]$', cls.gate, re.MULTILINE)
         cls.dependencies = [job.strip() for job in match.group(1).split(',')]
 
@@ -56,6 +56,21 @@ class AndroidCiGateTest(unittest.TestCase):
         if '    runs-on:' not in body or '    steps:\n' not in body:
             raise AssertionError(f'job {name!r} is incomplete')
         return marker + body
+
+    @staticmethod
+    def run_block(job):
+        """Read one inline shell block, stopping at the next YAML-level field."""
+        marker = '        run: |\n'
+        if marker not in job:
+            raise AssertionError('expected an inline aggregate run block')
+        body = []
+        for line in job.split(marker, 1)[1].splitlines(keepends=True):
+            if line.strip() and not line.startswith('          '):
+                break
+            body.append(line)
+        if not any(line.strip() for line in body):
+            raise AssertionError('aggregate run block is empty')
+        return textwrap.dedent(''.join(body))
 
     @staticmethod
     def named_step(job, name):
@@ -95,6 +110,27 @@ class AndroidCiGateTest(unittest.TestCase):
             outcomes['compose-compiler']['result'] = 'skipped'
         outcomes['compile-tests']['result'] = 'skipped'
         return outcomes
+
+    def test_aggregate_script_excludes_following_conditional_step(self):
+        """A later workflow-only step must never execute as aggregate shell."""
+        job = (
+            '    steps:\n'
+            '      - name: Aggregate\n'
+            '        run: |\n'
+            "          printf '%s\\n' aggregate-only\n"
+            '      # A conditional integration failure stays outside the gate.\n'
+            '      - name: Integration failure\n'
+            "        if: ${{ github.event_name == 'merge_group' }}\n"
+            '        shell: bash\n'
+            '        run: |\n'
+            '          exit 91\n'
+        )
+        script = self.run_block(job)
+        result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'aggregate-only\n')
+        self.assertNotIn('Integration failure', script)
+        self.assertNotIn('exit 91', script)
 
     def test_aggregate_covers_every_job_and_runs_after_failures(self):
         """Every producer must reach the aggregate even after a dependency fails."""
