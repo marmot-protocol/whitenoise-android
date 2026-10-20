@@ -285,6 +285,19 @@ def validate_exceptions(manifest, records, root, lock_names):
             raise ValueError('Reviewed dependency exception lacks scope, reason or evidence')
         if any(coordinate not in locked for coordinate in item.get('additional_coordinates', [])):
             raise ValueError('Dependency exception names a coordinate absent from committed locks')
+        if item.get('additional_coordinates') and item['scope'] in ['project', 'plugin']:
+            project = item.get('project')
+            configuration = item.get('configuration')
+            if (project not in [':', ':app', ':benchmark', ':cryptoBenchmark', ':fuzz'] or
+                    not isinstance(configuration, str) or not configuration):
+                raise ValueError('Dependency exception lacks exact project/configuration')
+            relative = (project[1:] + '/' if project != ':' else '')
+            relative += 'buildscript-gradle.lockfile' if item['scope'] == 'plugin' else 'gradle.lockfile'
+            selected = {line.split('=', 1)[0] for line in (root / relative).read_text().splitlines()
+                        if '=' in line and not line.startswith(('#', 'empty=')) and
+                        configuration in line.split('=', 1)[1].split(',')}
+            if any(coordinate not in selected for coordinate in item['additional_coordinates']):
+                raise ValueError('Dependency exception absent from declared project/configuration lock')
         if any(tuple(entry.split('/', 1)) not in records for entry in item.get('additional_metadata', [])):
             raise ValueError('Dependency exception names metadata without a checksum record')
         if 'retained' in item:
