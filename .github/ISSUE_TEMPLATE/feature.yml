@@ -1,8 +1,26 @@
 name: Feature request
 description: Propose a user-visible White Noise Android capability or improvement
-title: ""
 labels: []
 body:
+  - type: markdown
+    attributes:
+      value: |
+        <details>
+        <summary>Agent filing guidance</summary>
+
+        Before submitting an agent-researched issue, read [AGENTS.md](https://github.com/marmot-protocol/whitenoise-android/blob/master/AGENTS.md) and [the issue-triage guide](https://github.com/marmot-protocol/whitenoise-android/blob/master/.agents/issue-triage.md). Put a concise investigation in **Context and alternatives** below; this guidance is not included in the submitted issue body.
+
+        - [ ] Check current default-branch source. Separate reported observations, reproduced behavior, source findings and hypotheses. State missing evidence; never invent reproduction, device tests or results.
+        - [ ] Search open and closed issues and PRs, including merged fixes, by symptom and likely cause. Read plausible matches, link the canonical issue or regression history, and update existing scope when it covers the same cause.
+        - [ ] Trace affected entry points, the state owner and visible result. Check sibling callers, account/chat switches, cancellation, failure/recovery and lifecycle behavior. Cite immutable source links and say what you inspected.
+        - [ ] Establish Android versus MDK ownership. Android owns presentation and platform integration; MDK owns shared product rules, protocol state, persistence, queries and recovery. Link verified prerequisites; avoid a second Android store or cache for shared state.
+        - [ ] Describe the smallest sufficient outcome, alternatives and observable acceptance criteria. Name existing tests and proposed regression coverage; bugs need an applicable invariant gate or justified exemption. Separate proposed checks from checks actually performed.
+        - [ ] Follow current triage policy for native type, labels, Project fields and real parent/dependency relationships. Preserve active owners and evidence-based priority; apply `agent-ok` only with the required review and authorization. State metadata actions blocked by permissions.
+        - [ ] Obtain required review, sanitize private data, and read back the published issue and metadata. Reconcile an uncertain submission before retrying.
+
+        Ordinary reporters can submit their observations without completing this investigation. This checklist is guidance and cannot enforce agent compliance.
+
+        </details>
   - type: textarea
     id: need
     attributes:
