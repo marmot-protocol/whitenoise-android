@@ -38,10 +38,10 @@ class TtsSpeakerAnnouncementCoverageTest {
         val harness = TtsQueueHarness()
         val entry = ttsMessageWithId("a1", "alice", "Alice", "First.", "Second.").copy(conversationMemberCount = 2)
         harness.queue.start(listOf(entry), startSentenceIndex = 1)
-        assertEquals("Second.", harness.enqueued.last().first.text)
-        harness.queue.onStarted(harness.enqueued.last().second)
+        assertEquals("Second.", harness.spokenText(harness.enqueued.lastIndex))
+        harness.queue.onStarted(harness.utteranceId(harness.enqueued.lastIndex))
         harness.queue.start(listOf(message("b1", "bob", "Fresh.")))
-        assertEquals("Fresh.", harness.enqueued.last().first.text)
+        assertEquals("Fresh.", harness.spokenText(harness.enqueued.lastIndex))
     }
 
     /** Prebuffered speakers are never mistaken for the one the listener has heard. */
@@ -131,7 +131,7 @@ class TtsSpeakerAnnouncementCoverageTest {
                 TtsWindowSentenceTarget.First,
             ),
         )
-        assertEquals("Second.", harness.enqueued.last().first.text)
+        assertEquals("Second.", harness.spokenText(harness.enqueued.lastIndex))
         assertTrue(
             harness.queue.replaceWindow(
                 listOf(message("b1", "bob", "Reply.")),
@@ -139,7 +139,7 @@ class TtsSpeakerAnnouncementCoverageTest {
                 TtsWindowSentenceTarget.First,
             ),
         )
-        assertEquals("bob: Reply.", harness.enqueued.last().first.text)
+        assertEquals("bob: Reply.", harness.spokenText(harness.enqueued.lastIndex))
     }
 
     /** Old callback generations cannot overwrite the speaker heard in the current generation. */
@@ -150,7 +150,7 @@ class TtsSpeakerAnnouncementCoverageTest {
         val stale = harness.utteranceId(0)
         harness.queue.onStarted(stale)
         harness.queue.seekTo("b1", 0)
-        harness.queue.onStarted(harness.enqueued.last().second)
+        harness.queue.onStarted(harness.utteranceId(harness.enqueued.lastIndex))
         harness.queue.onStarted(stale)
         val first = harness.enqueued.size
         harness.queue.seekTo("b1", 0)
