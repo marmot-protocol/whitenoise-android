@@ -101,25 +101,30 @@ internal class AccountSetupCoordinator(
         return snapshot
     }
 
-    /** Gates all account-selection paths before legacy reactivation or chat preload. */
+    /**
+     * Gates all account-selection paths before legacy reactivation or chat preload. A selection that a newer one
+     * retired stands down as diverted, without touching setup state or failing its caller, while a replaced
+     * runtime still cancels the route.
+     */
     suspend fun routeIfPending(
         account: String,
         mayRoute: () -> Boolean = { true },
     ): Boolean {
-        if (!mayRoute()) throw CancellationException("Setup route was superseded")
-        if (needsRecovery(account)) return true
+        if (!mayRoute() || needsRecovery(account)) return true
         val owner = app.setupRuntimeOwner()
 
-        fun requireRoute() {
+        /** Cancels once the runtime is replaced, and reports whether a newer selection retired this route. */
+        fun superseded(): Boolean {
             app.requireSetupOwner(owner)
-            if (!mayRoute()) throw CancellationException("Setup route was superseded")
+            return !mayRoute()
         }
         val recoveryRead =
             withContext(Dispatchers.IO) {
                 runCatchingCancellable { owner.runtime.onboardingRecoveryRequired(account) }
             }
-        requireRoute()
         return when {
+            superseded() -> true
+
             recoveryRead.isFailure -> {
                 pending = pending + account
                 appStateDebug {
@@ -140,9 +145,10 @@ internal class AccountSetupCoordinator(
                     withContext(Dispatchers.IO) {
                         runCatchingCancellable { owner.runtime.onboardingSnapshot(account) }
                     }
-                requireRoute()
                 val snapshot = snapshotRead.getOrNull()
                 when {
+                    superseded() -> true
+
                     snapshotRead.isFailure -> {
                         pending = pending + account
                         appStateDebug {

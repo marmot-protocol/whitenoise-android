@@ -34,12 +34,23 @@ internal data class PreparedAccountSessionActivation(
 internal interface AppAccountSessionActivation {
     val activeAccount: String?
 
-    /** Restores sign-in and prepares local data without publishing a different active account. */
+    /** Restores sign-in inside the lifetime gate and captures its runtime, without publishing an account. */
     suspend fun prepare(
         request: AccountSessionActivationRequest,
         generation: Long,
         switchingAccounts: Boolean,
     ): PreparedAccountSessionActivation?
+
+    /**
+     * Reads the selection's local projection after the lifetime gate is released, so a slow superseded read
+     * cannot delay a newer selection — publication revalidates the selection and runtime afterwards.
+     */
+    suspend fun loadLocalProjection(
+        request: AccountSessionActivationRequest,
+        generation: Long,
+        switchingAccounts: Boolean,
+        restored: PreparedAccountSessionActivation,
+    ): PreparedAccountSessionActivation = restored
 
     /** Rejects deleted/signed-out identities and replacement runtimes at the publication boundary. */
     fun canPublish(
@@ -273,29 +284,61 @@ internal class AppAccountSessionCoordinator(
             return AccountSessionActivationReceipt(request.label, generation, prepared.runtimeGeneration)
         }
 
-        /** Owns only native local preparation and synchronous publication, without optional enrichment. */
+        /**
+         * Owns native restoration and synchronous publication, without optional enrichment. Each holds the lifetime
+         * gate, while the local projection read between them does not — a superseded slow read cannot hold the
+         * gate a newer selection needs, and publication revalidates the selection afterwards.
+         */
         suspend fun commitCurrentRequest(
             request: AccountSessionActivationRequest,
             generation: Long,
             onActivated: () -> Unit,
-        ): Pair<PreparedAccountSessionActivation, Boolean>? =
-            withLifetime {
-                if (!request.shouldActivate() || !handoff.isCurrent(generation)) return@withLifetime null
-                val switching = request.label != activation.activeAccount
-                val prepared = activation.prepare(request, generation, switching) ?: return@withLifetime null
-                val allowed = {
-                    request.shouldActivate() &&
-                        handoff.isCurrent(generation) &&
-                        activation.canPublish(request.label, prepared.runtimeGeneration)
-                }
-                if (!allowed()) return@withLifetime null
-                if (switching) activation.hidePreviousAccountShortcuts()
-                if (!allowed()) return@withLifetime null
+        ): Pair<PreparedAccountSessionActivation, Boolean>? {
+            val (restored, switching) = withLifetime { restoreIfCurrent(request, generation) } ?: return null
+            val prepared = activation.loadLocalProjection(request, generation, switching, restored)
+            // A superseded projection stands down instead of queueing behind a newer owner's gate, such as cleanup.
+            val stillWanted = request.shouldActivate() && handoff.isCurrent(generation)
+            return if (stillWanted) {
+                withLifetime { publishIfCurrent(request, generation, switching, prepared, onActivated) }
+            } else {
+                null
+            }
+        }
+
+        /** Restores a still-current selection inside the gate and records whether it replaces the active account. */
+        private suspend fun restoreIfCurrent(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+        ): Pair<PreparedAccountSessionActivation, Boolean>? {
+            if (!request.shouldActivate() || !handoff.isCurrent(generation)) return null
+            val switching = request.label != activation.activeAccount
+            return activation.prepare(request, generation, switching)?.let { it to switching }
+        }
+
+        /** Rechecks after the projection read and shortcut I/O, keeping publication atomic inside the gate. */
+        private suspend fun publishIfCurrent(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+            switching: Boolean,
+            prepared: PreparedAccountSessionActivation,
+            onActivated: () -> Unit,
+        ): Pair<PreparedAccountSessionActivation, Boolean>? {
+            val allowed = {
+                request.shouldActivate() &&
+                    handoff.isCurrent(generation) &&
+                    activation.canPublish(request.label, prepared.runtimeGeneration)
+            }
+            if (!allowed()) return null
+            if (switching) activation.hidePreviousAccountShortcuts()
+            return if (allowed()) {
                 activation.publish(request.label, generation, switching, prepared)
                 // The synchronous local-ready projection belongs to this same accepted publication.
                 onActivated()
                 prepared to switching
+            } else {
+                null
             }
+        }
 
         /** Each suspension can replace the account/runtime, so later effects must revalidate ownership. */
         @Suppress("ReturnCount") // Every suspending adapter is a separate stale-owner admission boundary.

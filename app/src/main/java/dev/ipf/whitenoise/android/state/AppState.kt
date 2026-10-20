@@ -5779,12 +5779,13 @@ class WhiteNoiseAppState private constructor(
         val trimmed = identity.trim()
         if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val originRuntime = marmot()
+            // Read without requiring a runtime, so an injected login seam reaches its engine calls unchanged.
+            val originRuntime = marmotRuntime?.marmot
             val originEpoch = runtimeGeneration
             val originSelection = accountSession.handoff.capture()
             val ownsOrigin = {
                 runtimeGeneration == originEpoch &&
-                    marmot() === originRuntime &&
+                    marmotRuntime?.marmot === originRuntime &&
                     accountSession.handoff.isCurrent(originSelection)
             }
             val setup = beginIdentitySetup(trimmed, originRuntime, originEpoch, ownsOrigin)
@@ -5816,12 +5817,12 @@ class WhiteNoiseAppState private constructor(
         val trimmed = identity.trim()
         if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val originRuntime = marmot()
+            val originRuntime = marmotRuntime?.marmot
             val originEpoch = runtimeGeneration
             val originSelection = accountSession.handoff.capture()
             val ownsOrigin = {
                 runtimeGeneration == originEpoch &&
-                    marmot() === originRuntime &&
+                    marmotRuntime?.marmot === originRuntime &&
                     accountSession.handoff.isCurrent(originSelection)
             }
             val summary = engineRecoveringLogin(trimmed, ownsOrigin)
@@ -5834,10 +5835,13 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** The import's captured runtime, failing like any native call when the import started without one. */
+    private fun requireImportRuntime(runtime: MarmotInterface?): MarmotInterface = requireNotNull(runtime) { "Marmot is not initialized" }
+
     /** Only MDK's explicit legacy-account refusal retains the consent-gated old login path. */
     private suspend fun beginIdentitySetup(
         nsec: String,
-        originRuntime: MarmotInterface,
+        originRuntime: MarmotInterface?,
         originEpoch: Int,
         ownsOrigin: () -> Boolean,
     ): OnboardingSnapshotFfi? {
@@ -5847,7 +5851,7 @@ class WhiteNoiseAppState private constructor(
                     if (!ownsOrigin()) throw CancellationException("Import origin was replaced")
                     calls.beginOnboarding(nsec)
                 }
-            snapshot?.let { accountSetup.open(it, originRuntime, originEpoch, ownsOrigin) }
+            snapshot?.let { accountSetup.open(it, requireImportRuntime(originRuntime), originEpoch, ownsOrigin) }
             return snapshot
         }
         return try {
@@ -5911,10 +5915,13 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Pending setup keeps its route; only a completed activation receipt can announce an imported identity. */
+    /**
+     * Pending setup keeps its route; only a completed activation receipt can announce an imported identity.
+     * An import that started without a runtime fails its ownership check like any native call.
+     */
     private suspend fun activateImportedIdentity(
         summary: AccountSummaryFfi,
-        expectedRuntime: MarmotInterface,
+        expectedRuntime: MarmotInterface?,
         expectedEpoch: Int,
         expectedSelection: Long? = null,
     ) {
@@ -6671,7 +6678,7 @@ class WhiteNoiseAppState private constructor(
     private inner class AccountSessionActivation : AppAccountSessionActivation {
         override val activeAccount: String? get() = activeAccountRef
 
-        /** Restores native sign-in and reads the selected policy's local projection before publication. */
+        /** Restores native sign-in and captures the runtime it ran against, leaving local reads to the projection. */
         override suspend fun prepare(
             request: AccountSessionActivationRequest,
             generation: Long,
@@ -6680,16 +6687,30 @@ class WhiteNoiseAppState private constructor(
             updatePendingAccountSwitchTrace(request.label, switchingAccounts)
             val target = accounts.firstOrNull { it.label == request.label }
             if (!restoreSignedOutAccountForActivation(target, request.label, request.deferUnreadRefresh)) return null
+            return PreparedAccountSessionActivation(
+                runtimeGeneration,
+                StartupSelfProfilePresentation(revision = null, seeds = emptyList()),
+                snapshot = null,
+            )
+        }
+
+        /** Reads the selected policy's local profile and rows outside the lifetime gate, before publication. */
+        override suspend fun loadLocalProjection(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+            switchingAccounts: Boolean,
+            restored: PreparedAccountSessionActivation,
+        ): PreparedAccountSessionActivation {
+            val target = accounts.firstOrNull { it.label == request.label }
             val activationStillWanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
             val plan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, request.preloadPolicy)
-            val activationRuntimeGeneration = runtimeGeneration
             val profile =
                 preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, activationStillWanted) {
                     loadAccountSwitchProfileSeed(it)
                 }
             val snapshot =
                 if (plan.loadLocalRows) loadAccountSwitchLocalSnapshot(request.label, generation, plan) else null
-            return PreparedAccountSessionActivation(activationRuntimeGeneration, profile, snapshot)
+            return restored.copy(profilePresentation = profile, snapshot = snapshot)
         }
 
         /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
