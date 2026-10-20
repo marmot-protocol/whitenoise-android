@@ -10,11 +10,42 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from scripts.check_ci_changes import classify, complete_diff, docs_only_diff, supplemental_campaigns, supplemental_campaigns_diff, precheck_mode, validation_mode, validation_selection, main
+from scripts.check_ci_changes import complete_diff, docs_only_diff, supplemental_campaigns_diff, validation_selection, main
 
 
 def entry(path, old='100644', new='100644', status='M'):
     return f':{old} {new} {"a" * 40} {"b" * 40} {status}\0{path}\0'.encode()
+
+
+def cli_outputs(event, mode='', labels=None, raw=None, base='a' * 40, head='b' * 40, observe=False):
+    """Exercise the emitted contract and require one complete-diff observation."""
+    stdout = io.StringIO()
+    environment = {'ANDROID_CI_MODE': mode, 'CI_CURRENT_LABELS': json.dumps(labels)}
+    with patch.dict(os.environ, environment, clear=True), contextlib.redirect_stdout(stdout), \
+         patch('sys.argv', ['classifier', '--event', event, '--base', base, '--head', head]):
+        if observe:
+            main()
+        else:
+            with patch('scripts.check_ci_changes.complete_diff', return_value=raw) as diff:
+                main()
+                diff.assert_called_once_with(event, base, head)
+    return dict(line.split('=', 1) for line in stdout.getvalue().splitlines())
+
+
+def precheck_mode(event, mode, labels, raw):
+    return cli_outputs(event, mode, labels, raw)['precheck'] == 'true'
+
+
+def validation_mode(event, mode, labels, raw):
+    return cli_outputs(event, mode, labels, raw)['ci_mode']
+
+
+def classify(event, base, head):
+    return cli_outputs(event, base=base, head=head, observe=True)['docs_only'] == 'true'
+
+
+def supplemental_campaigns(event, base, head):
+    return cli_outputs(event, base=base, head=head, observe=True)['supplemental_campaigns'] == 'true'
 
 
 class CiChangesTest(unittest.TestCase):
@@ -53,46 +84,37 @@ class CiChangesTest(unittest.TestCase):
                             self.assertEqual(mode, 'full')
                         self.assertEqual(precheck_mode(event, configured, labels, raw), mode == 'precheck')
 
-    def test_cli_modes_and_receipt_are_bound_to_exact_run(self):
+    def test_cli_core_and_supplemental_selection_are_independent(self):
         ordinary = entry('app/src/main/java/example/Screen.kt')
-        cases = [
-            ('pull_request', 'merge-queue', [], ordinary, 'true', 'false'),
-            ('pull_request', 'merge-queue', ['ci:full'], ordinary, 'false', 'true'),
-            ('pull_request', '', ['ci:full'], ordinary, 'false', 'true'),
-            ('pull_request', '', [], ordinary, 'false', 'false'),
-            ('pull_request', 'merge-queue', None, ordinary, 'false', 'true'),
-            ('pull_request', 'merge-queue', [], entry('gradle.properties'), 'false', 'true'),
-            ('pull_request', 'merge-queue', [], None, 'false', 'true'),
-            ('merge_group', 'merge-queue', [], entry('README.md'), 'false', 'true'),
-            ('workflow_dispatch', 'merge-queue', [], ordinary, 'false', 'true'),
-        ]
-        for event, mode, labels, raw, precheck, full_matrix in cases:
-            with self.subTest(event=event, mode=mode, labels=labels, raw=raw), tempfile.TemporaryDirectory() as directory:
-                receipt = Path(directory) / 'mode.json'
-                environment = {'ANDROID_CI_MODE': mode, 'CI_CURRENT_LABELS': json.dumps(labels),
-                               'CI_MODE_RECEIPT': str(receipt), 'GITHUB_RUN_ID': '123',
-                               'GITHUB_RUN_ATTEMPT': '2', 'GITHUB_SHA': 'c' * 40}
-                stdout = io.StringIO()
-                with patch.dict(os.environ, environment, clear=True), contextlib.redirect_stdout(stdout), \
-                     patch('sys.argv', ['classifier', '--event', event, '--base', 'a' * 40, '--head', 'b' * 40]), \
-                     patch('scripts.check_ci_changes.complete_diff', return_value=raw):
-                    main()
-                values = dict(line.split('=', 1) for line in stdout.getvalue().splitlines())
-                self.assertEqual(values['precheck'], precheck)
-                self.assertEqual(values['full_matrix'], full_matrix)
-                self.assertEqual(values['ci_mode'], 'precheck' if precheck == 'true' else 'full' if full_matrix == 'true' else 'legacy-pr')
-                if full_matrix == 'true':
+        for event, mode, labels, raw, full, campaigns in [
+            ('pull_request', 'merge-queue', [], ordinary, 'false', 'false'),
+            ('pull_request', 'merge-queue', ['ci:full'], ordinary, 'true', 'false'),
+            ('pull_request', 'merge-queue', None, ordinary, 'true', 'false'),
+            ('merge_group', '', [], ordinary, 'true', 'false'),
+            ('merge_group', '', [], entry('README.md'), 'true', 'false'),
+            ('merge_group', '', [], entry('gradle.properties'), 'true', 'true'),
+            ('workflow_dispatch', '', [], None, 'true', 'true'),
+        ]:
+            with self.subTest(event=event, labels=labels, raw=raw):
+                values = cli_outputs(event, mode, labels, raw)
+                self.assertEqual(values['full_matrix'], full)
+                self.assertEqual(values['supplemental_campaigns'], campaigns)
+                if full == 'true':
                     self.assertEqual(values['docs_only'], 'false')
-                    self.assertEqual(values['supplemental_campaigns'], 'true')
-                saved = json.loads(receipt.read_text())
-                self.assertEqual(saved['run']['GITHUB_RUN_ID'], '123')
-                self.assertEqual(saved['run']['GITHUB_RUN_ATTEMPT'], '2')
-                self.assertEqual(saved['run']['GITHUB_SHA'], 'c' * 40)
-                self.assertEqual(saved['event'], event)
-                self.assertEqual(saved['labels'], labels)
-                self.assertEqual(saved['base'], 'a' * 40)
-                self.assertEqual(saved['head'], 'b' * 40)
-                self.assertEqual(saved['precheck'], precheck)
+
+    def test_cli_github_output_matches_stdout_and_observes_diff_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'output'
+            stdout = io.StringIO()
+            with patch.dict(os.environ, {'GITHUB_OUTPUT': str(output)}, clear=True), \
+                 contextlib.redirect_stdout(stdout), \
+                 patch('sys.argv', ['classifier', '--event', 'merge_group', '--head', 'b' * 40]), \
+                 patch('scripts.check_ci_changes.complete_diff', return_value=entry('README.md')) as diff:
+                main()
+            diff.assert_called_once_with('merge_group', '', 'b' * 40)
+            self.assertEqual(output.read_text(), stdout.getvalue())
+            self.assertEqual(set(dict(line.split('=', 1) for line in stdout.getvalue().splitlines())),
+                             {'ci_mode', 'precheck', 'full_matrix', 'docs_only', 'supplemental_campaigns'})
 
     def test_only_known_plain_prose_files_skip_android(self):
         self.assertTrue(docs_only_diff(entry('README.md') + entry('docs/ci.md')))
@@ -126,7 +148,7 @@ class CiChangesTest(unittest.TestCase):
 
     def test_push_dispatch_and_missing_refs_are_full_without_git(self):
         with patch('scripts.check_ci_changes.subprocess.run') as run:
-            for event in ['push', 'workflow_dispatch', 'unknown']:
+            for event in ['workflow_dispatch', 'unknown']:
                 self.assertFalse(classify(event, 'a' * 40, 'b' * 40))
             self.assertFalse(classify('pull_request', '', 'b' * 40))
             self.assertFalse(classify('pull_request', '--bad-ref', 'b' * 40))

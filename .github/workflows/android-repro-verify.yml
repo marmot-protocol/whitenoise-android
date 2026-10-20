@@ -45,8 +45,8 @@ on:
     - cron: '17 3 * * *'
 
 concurrency:
-  group: android-repro-verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: android-repro-verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions:
   contents: read

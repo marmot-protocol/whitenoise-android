@@ -60,7 +60,8 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
 - Datawav PRs open draft until the draft fast lane passes, conflicts are absent
   and findings are addressed; marking ready runs the applicable ready lanes, which must
   also pass. In activated queue mode this remains a precheck unless full preflight
-  is selected; full integration and independent authorization remain mandatory. Recheck discussion before marking ready. Pending checks alone do not
+  is selected; full integration and independent authorization remain mandatory.
+  Recheck discussion before marking ready. Pending checks alone do not
   justify demoting a ready PR; readiness never authorizes merging.
 
 ## Task guides

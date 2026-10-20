@@ -72,25 +72,24 @@ Every pull request to `master` and every push to `master` starts
 `.github/workflows/android-ci.yml`. The workflow uses read-only credentials and public build inputs. Existing detekt findings remain frozen in
 `config/detekt/detekt-baseline.xml`.
 
-The [CI request policy](docs/ci-request-policy.md#queue-gated-pr-feedback-and-full-integration)
-defines the staged merge-queue mode. With `ANDROID_CI_MODE=merge-queue`, ordinary
-PRs compile Zapstore and Play main, unit-test and Android-test Kotlin/Java in
-separate per-flavor jobs. Each compile runner uses one active Gradle worker and
-the configured heaps; benchmark compilation runs with tooling. PRs also run
-ktlint/detekt, tooling/security and offline signer
-contracts. Full unit/screenshot execution, Kover, Android lint and baseline APK
-packaging move to the queue integration. The queue retains every regression test and screenshot baseline. The switch is enabled only after native queue enforcement,
-external integration authorization and source-owner failure recovery are verified.
-Merge authorization requires independently verified queue enforcement.
+With the queue precheck switch unset, ready PRs run the complete Zapstore unit,
+Roborazzi, coverage and Android lint checks. Play compilation and flavor-sensitive
+unit tests run separately. Both distributions retain Android-test Kotlin
+compilation. Tooling runs ktlint, detekt, signing/security contracts and Baseline
+Profile verification. Legacy drafts defer the heavier ready lanes. Master,
+scheduled and manual core runs execute both distributions. Separate runners
+shorten the serial path while repeating setup; compare wall time and summed
+runner minutes. Local contributors can use `-PciTestForks=3` when appropriate
+for their machine; agents run CI-covered checks on GitHub.
 
-Every merge group (including documentation-only integrations), master push,
-nightly and manual run executes the full core matrix for both distributions.
-`ci:full` requests that same matrix on a PR; labels are read live on reruns.
-Activated PRs with risky or unknown diff inputs also run full. Missing or unknown
-activation values preserve the prior Zapstore full PR suite/lint with Play
-compilation and flavor-sensitive tests; legacy drafts retain their earlier
-heavy-lane deferrals. Full suite jobs verify every committed Roborazzi golden,
-and Kover reuses the completed suite through identical verification inputs. Unit execution reserves ten minutes of the job budget for diagnostics.
+The [CI request policy](docs/ci-request-policy.md#queue-gated-pr-feedback-and-full-integration)
+describes the opt-in `ANDROID_CI_MODE=merge-queue` mode. Ordinary PRs then use
+separate Zapstore and Play main/unit/Android-test Kotlin/Java compile jobs plus
+style, tooling and security checks. Full suites, goldens, Kover, lint and baseline
+packaging run at integration. Every merge group runs the full core matrix;
+`ci:full`, risky inputs or unknown classification evidence also select it on PRs.
+Activation remains gated on native queue enforcement, independent integration
+authorization and verified source-owner recovery; this change does not activate it.
 
 The existing `Compile, test, ktlint, detekt, Android lint` aggregate remains the
 required context. It checks explicit mode and exact expected job outcomes;
@@ -103,8 +102,9 @@ integration validation plus independent authorization.
 Only ordinary Markdown changes in the complete PR diff can use the docs shortcut;
 tooling/manual-guide/metadata validators still run. The complete diff retains
 earlier code changes during docs fixups. Master stays fully checked in this
-first rollout. Full core runs also execute Compose reports. Separate
-release/reproduction campaigns retain their conservative policy;
+first rollout. Compose reports and unsigned reproduction remain risk-selected supplemental
+campaigns, including on merge groups. Separate release workflows retain their
+conservative qualification policy;
 release qualification remains tied to the exact release candidate.
 
 Coverage artifacts are `kover-coverage-report-Zapstore` and
@@ -117,7 +117,7 @@ reduce the serial critical path but repeat some setup/compilation; compare both
 wall time and summed job durations when measuring CI performance. Each Gradle job
 retains its own task outputs on master pushes and same-repository PRs; fork PRs
 restore caches read-only. Assertions execute on every fresh runner. The separate
-MarmotKit cache retains one writer: Zapstore unit tests, which every event runs. GitHub's ephemeral runner
+MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks and docs-only runs do not write it. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 

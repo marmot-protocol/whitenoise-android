@@ -2,9 +2,8 @@
 
 import argparse
 import json
-import hashlib
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 import re
 import subprocess
 
@@ -76,14 +75,6 @@ def complete_diff(event, base, head):
     return diff.stdout
 
 
-def classify(event, base, head):
-    if event != 'pull_request':
-        return False
-    diff = complete_diff(event, base, head)
-    return diff is not None and docs_only_diff(diff)
-
-
-
 def supplemental_campaigns_diff(raw):
     """Only known ordinary source/prose changes defer report/reproduction campaigns.
 
@@ -124,12 +115,6 @@ def supplemental_campaigns_diff(raw):
     return False
 
 
-def supplemental_campaigns(event, base, head):
-    diff = complete_diff(event, base, head)
-    return diff is None or supplemental_campaigns_diff(diff)
-
-
-
 def validation_selection(event, configured_mode, labels, raw):
     """Derive mutually exclusive modes from one complete-diff observation."""
     activated = configured_mode == 'merge-queue'
@@ -144,16 +129,7 @@ def validation_selection(event, configured_mode, labels, raw):
     docs = event == 'pull_request' and raw is not None and docs_only_diff(raw) and not full
     return {'ci_mode': mode, 'precheck': str(mode == 'precheck').lower(),
             'full_matrix': str(full).lower(), 'docs_only': str(docs).lower(),
-            'supplemental_campaigns': str(full or risky).lower()}
-
-
-def validation_mode(event, configured_mode, labels, raw):
-    return validation_selection(event, configured_mode, labels, raw)['ci_mode']
-
-
-def precheck_mode(event, configured_mode, labels, raw):
-    """Compatibility helper for callers needing the precheck predicate."""
-    return validation_mode(event, configured_mode, labels, raw) == 'precheck'
+            'supplemental_campaigns': str(risky).lower()}
 
 
 def main():
@@ -169,17 +145,6 @@ def main():
     raw = complete_diff(args.event, args.base, args.head)
     selection = validation_selection(args.event, os.environ.get('ANDROID_CI_MODE', ''), labels, raw)
     line = ''.join(f'{key}={value}\n' for key, value in selection.items())
-    # Retained diagnostics bind the selected mode to the observed run. External
-    # authorization must still verify authenticated workflow/job evidence itself.
-    if receipt := os.environ.get('CI_MODE_RECEIPT'):
-        payload = dict(item.split('=', 1) for item in line.splitlines())
-        payload.update(schema=1, event=args.event, base=args.base, head=args.head,
-                       diff_sha256=hashlib.sha256(raw).hexdigest() if raw is not None else None,
-                       labels=labels, configured_mode=os.environ.get('ANDROID_CI_MODE', ''))
-        payload['run'] = {key: os.environ.get(key, '') for key in
-                          ('GITHUB_REPOSITORY', 'GITHUB_SHA', 'GITHUB_WORKFLOW_REF',
-                           'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT')}
-        Path(receipt).write_text(json.dumps(payload, sort_keys=True, indent=2) + '\n')
     print(line, end='')
     if output := os.environ.get('GITHUB_OUTPUT'):
         with open(output, 'a', encoding='utf-8') as stream:

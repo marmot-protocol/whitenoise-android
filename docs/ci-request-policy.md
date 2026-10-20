@@ -80,16 +80,19 @@ the offline signer, ktlint/detekt and Kotlin/Java compilation of Zapstore and
 Play main, unit-test and Android-test sources. Separate per-flavor runners use
 one active Gradle worker and the existing configured heaps. Tooling owns benchmark
 source compilation in prechecks and benchmark assembly in full runs.
-The isolated compile matrix remains required in every code mode, including drafts
-and full integration. PR prechecks defer full unit/golden execution, Kover, Android lint, baseline packaging and
-the separate Play parity job to full integration CI. Existing complete suites remain the unit of integration testing. Required source regressions and
+The isolated compile matrix runs only in prechecks, including drafts. Legacy
+PR lanes retain Zapstore and Play Android-test Kotlin compilation; full suite
+runners compile Android-test Kotlin for their own flavor. PR prechecks defer
+full unit/golden execution, Kover, Android lint, baseline packaging and the
+separate Play parity job to integration CI. Complete suites remain the unit of
+integration testing. Required source regressions and
 baseline review remain unchanged. Drafts have the same precheck cost but retain
 the distinct draft aggregate context and require readiness before queue admission.
 
 Every merge group, master push, nightly and manual run uses the full core matrix:
 both complete unit/golden suites and comparison evidence, current coverage gates,
-both lint variants, compile/style/security/offline contracts, Compose reports
-and baseline packaging. Merge groups do not use the PR documentation shortcut. Master remains
+both lint variants, compile/style/security/offline contracts and baseline
+packaging. Compose reports remain risk-selected supplemental work. Merge groups do not use the PR documentation shortcut. Master remains
 full in this first rollout; removing duplicate master work requires separately
 reviewed accepted-integration provenance and a full fallback.
 
@@ -102,16 +105,16 @@ dependency, native, workflow or unknown inputs, the PR also gets the full matrix
 Independent review/controller full-preflight holds persist after label removal;
 verify their exact accepted run before admission.
 
-Only newer PR runs supersede prior PR work. Queue, master and manual executions
-use unique run IDs so a same-integration rerun cannot evict another pending run.
+Only merge-group executions use distinct run IDs and disable cancellation.
+PR, master, scheduled and manual runs retain same-ref supersession.
 Unit execution has a 30-minute step budget within the 40-minute job budget,
 leaving time to retain failure reports and timing evidence. A timeout fails the gate; every retry requires a retained diagnosis.
 
 The aggregate validates the explicit `precheck`, `full` or `legacy-pr` mode and
 the complete expected job set. `legacy-pr` retains the earlier primary-flavor
 suite; `full` identifies the complete two-flavor core matrix. Only
-the named precheck, docs or legacy draft skips are accepted; every core queue
-job must succeed. A green PR precheck admits source for integration. Merge qualification requires
+the named precheck, docs, supplemental or legacy draft skips are accepted.
+Queue core suite jobs must succeed; precheck-only compiler runners must skip. A green PR precheck admits source for integration. Merge qualification requires
 successful current integration CI and independent authorization.
 Activation, failure recovery and rollback are specified in the
 [serial queue contract](android-serial-merge-queue.md#pr-precheck-activation).
@@ -168,7 +171,8 @@ Do not rely on a green draft run for readiness; wait for the ready run.
 The visual-description updater follows opening, reopening and pushes and displays at most
 four inline comparisons, retaining links and the bounded list of all changes.
 
-Compose compiler reports run in every full core matrix. Independent unsigned
+Compose compiler reports remain risk-selected supplemental work, independent of
+the full core matrix. Independent unsigned
 APK reproduction remains a supplemental campaign. A complete raw diff permits
 its deferral for
 known ordinary Kotlin/Java source, main resources, committed goldens and prose.

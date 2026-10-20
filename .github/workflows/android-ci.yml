@@ -34,10 +34,10 @@ on:
 
 # Superseded PR runs retain normal cancellation. Queue integrations use their
 # run identity so two attempts for the same integration remain independent.
-# Manual/master runs are independent too; only superseded PR work is cancelled.
+# Other events retain same-ref cancellation of superseded work.
 concurrency:
-  group: android-ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: android-ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions:
   contents: read
@@ -87,21 +87,12 @@ jobs:
       - name: Classify complete PR diff
         id: classify
         env:
-          CI_MODE_RECEIPT: ${{ runner.temp }}/android-ci-mode.json
           ANDROID_CI_MODE: ${{ vars.ANDROID_CI_MODE }}
           CI_CURRENT_LABELS: ${{ steps.labels.outputs.labels }}
           CI_EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
         run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
-
-      - name: Retain exact-run CI mode diagnostics
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: android-ci-mode-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/android-ci-mode.json
-          if-no-files-found: error
-          retention-days: 14
 
   tooling-contracts:
     name: Validate tooling and documentation contracts
@@ -343,11 +334,15 @@ jobs:
       - name: Compile (Kotlin)
         env:
           CI_PRECHECK: ${{ needs.changes.outputs.precheck }}
+          CI_FULL_MATRIX: ${{ needs.changes.outputs.full_matrix }}
         if: matrix.phase == 'tooling'
         run: |
           if [[ "$CI_PRECHECK" == true ]]; then
             ./gradlew :benchmark:compileDevZapstoreBenchmarkReleaseKotlin --build-cache --profile --no-daemon --stacktrace
           else
+            if [[ "$CI_FULL_MATRIX" != true ]]; then
+              ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin --build-cache --profile --no-daemon --stacktrace
+            fi
             ./gradlew :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
           fi
 
@@ -597,7 +592,7 @@ jobs:
           retention-days: 14
   compile-tests:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck == 'true'
     name: Compile test sources (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -852,7 +847,14 @@ jobs:
       - name: Unit tests
         timeout-minutes: 30
         id: unit_tests
-        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+        env:
+          CI_FULL_MATRIX: ${{ needs.changes.outputs.full_matrix }}
+        run: |
+          compile_tasks=()
+          if [[ "$CI_FULL_MATRIX" == true ]]; then
+            compile_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)
+          fi
+          ./gradlew "${compile_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       - name: Require every committed screenshot golden to be compared
         run: >-
@@ -1035,7 +1037,7 @@ jobs:
             class="${class%.*}"
             filters+=(--tests "${class//\//.}")
           done
-          ./gradlew :app:testDevPlayDebugUnitTest "${filters[@]}" \
+          ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest "${filters[@]}" \
             -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       - name: Upload reports
@@ -1113,7 +1115,7 @@ jobs:
             (.changes.outputs.full_matrix == "true" or .changes.outputs.full_matrix == "false") and
             (.changes.outputs.ci_mode == (if $precheck then "precheck" elif $full then "full" else "legacy-pr" end)) and
             (($event == "pull_request") or $full) and
-            (($full | not) or ((.changes.outputs.docs_only == "false") and (.changes.outputs.supplemental_campaigns == "true") and ($precheck | not))) and
+            (($full | not) or ((.changes.outputs.docs_only == "false") and ($precheck | not))) and
             (.changes.outputs.precheck == "true" or .changes.outputs.precheck == "false") and
             (($precheck | not) or ($event == "pull_request" and $mode == "merge-queue" and .changes.outputs.supplemental_campaigns == "false")) and
             (.changes.result == "success") and
@@ -1126,6 +1128,7 @@ jobs:
                 else .value.result == "skipped" end)
             else all(to_entries[];
               if $precheck and (.key == "tests" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
+              elif .key == "compile-tests" then .value.result == (if $precheck then "success" else "skipped" end)
               elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft) then .value.result == "skipped"
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)
