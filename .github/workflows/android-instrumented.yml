@@ -18,6 +18,11 @@ name: Android Instrumented Tests
 on:
   workflow_dispatch:
     inputs:
+      mdk_qualification:
+        description: Populated current-master runtime upgrade, cold restart and both recovery modes
+        required: false
+        type: boolean
+        default: false
       mdk_adoption_only:
         description: Run real Welcome roles and explicitly enabled native diagnostic export acceptance
         required: false
@@ -242,7 +247,7 @@ jobs:
 
   attachment-fixture:
     needs: changes
-    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only))
+    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -298,7 +303,7 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only)
+    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only) && !inputs.mdk_qualification
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -786,3 +791,53 @@ jobs:
           path: build/maestro-campaign-summary.json
           if-no-files-found: error
           retention-days: 7
+
+  mdk-qualification:
+    name: Populated MarmotKit upgrade and recovery (emulator)
+    if: github.event_name == 'workflow_dispatch' && inputs.mdk_qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Reject mixed campaigns
+        if: inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix
+        run: exit 2
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Verify qualification evidence contracts
+        run: python3 -m unittest scripts.test_mdk_qualification scripts.test_maestro_apk
+      - name: Build baseline and candidate with one disposable signer
+        run: ./scripts/build-mdk-qualification.sh
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Qualify retained data and recovery
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 8G
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: python3 scripts/run_mdk_qualification.py
+      - name: Retain qualification evidence without account secrets
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mdk-qualification-${{ github.sha }}
+          path: build/mdk-qualification/
+          if-no-files-found: error
+          retention-days: 30

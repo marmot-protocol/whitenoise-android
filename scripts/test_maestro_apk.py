@@ -278,7 +278,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
     def enabled(self, name, event, selected, responsiveness=False, media_sandbox=False, outbound_share=False,
-                mdk_adoption=False):
+                mdk_adoption=False, mdk_qualification=False):
         """Evaluate the trusted job condition with restricted event/input fixtures.
 
         Lane narrowing is tested in test_select_instrumented_lanes.py; here the
@@ -288,9 +288,16 @@ class MaestroWorkflowTest(unittest.TestCase):
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         lanes = SimpleNamespace(outputs=SimpleNamespace(attachment_fixture='true', connected='true'))
         return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness, media_sandbox_only=media_sandbox, outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption),
+                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness, media_sandbox_only=media_sandbox, outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption, mdk_qualification=mdk_qualification),
                      'needs': SimpleNamespace(changes=lanes),
                      'startsWith': lambda value, prefix: value.startswith(prefix)})
+
+    def test_mdk_qualification_excludes_ordinary_instrumentation(self):
+        """The opt-in upgrade runner must not race another test job over its fixture or run unrelated suites."""
+        for name in ('instrumented', 'attachment-fixture'):
+            self.assertFalse(self.enabled(name, 'workflow_dispatch', False, mdk_qualification=True))
+        self.assertTrue(self.enabled('mdk-qualification', 'workflow_dispatch', False, mdk_qualification=True))
+        self.assertFalse(self.enabled('mdk-qualification', 'pull_request', False, mdk_qualification=True))
 
     def test_pilot_and_normal_jobs_are_exclusive_for_every_event(self):
         """Ensure only a selected manual pilot skips the normal instrumented jobs."""

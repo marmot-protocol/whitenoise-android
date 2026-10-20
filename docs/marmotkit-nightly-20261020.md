@@ -157,6 +157,31 @@ No physical-device access is authorized by this evaluation. Never uninstall,
 clear storage, alter migration rows or downgrade an existing physical install.
 Protocol, persistence, migration and recovery behavior stay owned by MDK.
 
+## Hosted upgrade campaign
+
+The opt-in `mdk_qualification` lane adds a separate `.mdkqualification` package.
+It builds the current-master source/runtime and candidate with one disposable
+signer, verifies package/version/native digests, seeds two generated accounts,
+three messages, sender legacy retention, receiver explicit retention and an
+uploaded-but-unsent body through MDK, then performs ordinary in-place updates.
+Baseline native reads are required before the update. The candidate must observe
+positive legacy bytes, pause migration through the public disk-reserve policy,
+retain readable bytes while paused, restore the policy, finish conversion and
+read the same bytes. It then promotes the pending baseline upload without a new
+upload. Production MainActivity must open the retained chat after update and
+again after full process stop; native readback checks the same account roster,
+history and attachment bytes in new processes. Both comparison-refusal and
+comparison-silence recovery runs require all four active cases; the two known
+upstream failures remain ignored and explicitly counted.
+
+This campaign is supplemental to the exact signed-preview handoff gate. No
+baseline with PR #3371's isolated package and preview certificate exists in the
+current evidence, and a debug-signed fixture cannot substitute for it. Precise
+interruption between native file publication and SQL deletion, corrupted/lost
+media fault injection and database compaction also require separate evidence;
+post-completion cold restart does not establish those outcomes. A raised policy
+reserve proves admission pause/resume, not an operating-system ENOSPC write.
+
 ## Retention and exit
 
 Upstream deletes nightly releases and tags after 30 days. This 20 October 2026

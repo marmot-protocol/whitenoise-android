@@ -1,0 +1,11 @@
+// Hosted disposable fixture only; ordinary APKs and their signing remain unchanged.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.plugins.withId('com.android.application') {
+            project.androidComponents.finalizeDsl { android ->
+                android.productFlavors.getByName('dev').applicationIdSuffix = '.mdkqualification'
+                android.productFlavors.getByName('dev').manifestPlaceholders['appName'] = 'MDK Qualification'
+            }
+        }
+    }
+}

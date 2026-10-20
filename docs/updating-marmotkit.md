@@ -54,8 +54,26 @@ Snapshot `88d1683e` adds typed outcomes that Android must not collapse into gene
 
 `MarmotKitRecoveryQualificationTest` checks a candidate's offline replay, epoch-gap fallback and lookup retry
 on recovered messages, against a loopback relay that clamps queries to 500 events and refuses history
-comparison. It is a manual device fixture of about five minutes; run it on an emulator before adopting a pin
+comparison. It is an opt-in fixture of about five minutes per comparison mode; run it on a hosted emulator before adopting a pin
 that touches replay or recovery:
+
+The populated upgrade campaign builds current master and the candidate with the
+same disposable signer and isolated `.mdkqualification` package, then runs both
+recovery modes without changing the two ignored upstream cases:
+
+```bash
+gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-android \
+  --ref <candidate-branch> -f mdk_qualification=true
+```
+
+The original encrypted synthetic root stays on the runner until job teardown;
+artifacts retain its digest, APK/native/signer provenance, storage states, UI
+observations and individual test outcomes without account secrets. A failed
+baseline prevents dependent upgrade claims. This fixture does not qualify a
+preview-signed APK or exact crash-window fault injection. Its baseline adapter
+fails closed unless master still uses the reviewed `88d1683e` artifact.
+
+For diagnosis within an already prepared disposable emulator only:
 
 ```bash
 adb shell am instrument -w -r \
