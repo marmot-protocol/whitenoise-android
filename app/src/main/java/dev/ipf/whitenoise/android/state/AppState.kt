@@ -1887,6 +1887,7 @@ class WhiteNoiseAppState private constructor(
                     message = record,
                     editedText = controller.editsByTarget[record.messageIdHex]?.latestText,
                     senderDisplayName = displayName(record.sender),
+                    conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
                     parseMarkdown = { parseMarkdownOrEmpty(it) },
                     mentionDisplayName = ::mentionSpeechName,
                     isGroupMember =

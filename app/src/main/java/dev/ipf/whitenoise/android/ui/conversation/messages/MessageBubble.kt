@@ -1075,11 +1075,13 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
+    /** Captures the resolved roster alongside the rendered speech projection for this request. */
     suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
         projectTtsSpeakableEntry(
             message = entryRecord,
             editedText = controller.editsByTarget[entryRecord.messageIdHex]?.latestText,
             senderDisplayName = appState.displayName(entryRecord.sender),
+            conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
             parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
             mentionDisplayName = appState::mentionSpeechName,
             isGroupMember =
