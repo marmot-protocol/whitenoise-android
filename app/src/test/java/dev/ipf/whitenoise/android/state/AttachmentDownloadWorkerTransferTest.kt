@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
 import androidx.work.ListenableWorker.Result
+import androidx.work.NetworkType
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
@@ -25,6 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.UUID
 
 /** The WorkManager fallback counts its transfer card while it runs and reports how each run ended. */
 @RunWith(RobolectricTestRunner::class)
@@ -43,12 +47,17 @@ class AttachmentDownloadWorkerTransferTest {
         appContext = application.applicationContext
         WorkManagerTestInitHelper.initializeTestWorkManager(application)
         AttachmentTransfers.installForTest(ledger)
+        // The Keystore-sealed registry cannot save under Robolectric, and a narrowing needs its wait recorded.
+        AutomaticAttachmentNetworkWaits.installForTest(
+            AutomaticAttachmentNetworkWaits(VolatileAttachmentInstallerHandoffRecordStore()),
+        )
     }
 
     /** Restores the inert ledger so later tests never see this one. */
     @After
     fun tearDown() {
         AttachmentTransfers.installForTest(null)
+        AutomaticAttachmentNetworkWaits.installForTest(null)
     }
 
     /** The endings recorded so far as outcome labels, in order. */
@@ -106,6 +115,91 @@ class AttachmentDownloadWorkerTransferTest {
             assertEquals(0, ledger.liveCount())
             assertEquals(listOf("retrying", "failed"), outcomes())
             assertEquals(listOf("0", "1"), lines.beginAttempts())
+        }
+
+    /** Automatic work the live policy now holds back finishes as success, so nothing retries it (#3308). */
+    @Test
+    fun automaticWorkDeferredByLivePolicyFinishesWithoutRetry() =
+        runTest {
+            AutomaticAttachmentHold.entries.filterNot { it.waits }.forEach { hold ->
+                val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                    throw AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video, hold)
+                }
+
+                assertEquals(hold.reason, Result.success(), worker(0, request, download).doWork())
+            }
+            assertFalse(attachmentIntentStore(appContext).hasSpentTransientRetry(request))
+            assertTrue(lines.isEmpty())
+        }
+
+    /** Work held because no account list has loaded yet retries rather than finishing without a download. */
+    @Test
+    fun workHeldByAnUnloadedAccountListRetries() =
+        runTest {
+            val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                throw AttachmentAutomaticPolicyDeferredException(null, AutomaticAttachmentHold.AccountsUnloaded)
+            }
+
+            assertEquals(Result.retry(), worker(0, request, download).doWork())
+        }
+
+    /**
+     * Work held only by the network keeps waiting for an allowed one however many runs that takes, without
+     * spending its failure retry, so a long stretch on a refused network never ends it without a download.
+     */
+    @Test
+    fun networkHeldAutomaticWorkNeverExpiresWithoutDownloading() =
+        runTest {
+            val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                throw AttachmentAutomaticPolicyDeferredException(
+                    MediaAutoDownloadType.Video,
+                    AutomaticAttachmentHold.Network,
+                    NetworkType.UNMETERED,
+                )
+            }
+
+            listOf(0, 1, 7, 8, 9, 40, 500).forEach { run ->
+                assertEquals("run $run", Result.retry(), worker(run, request, download).doWork())
+            }
+            assertFalse(attachmentIntentStore(appContext).hasSpentTransientRetry(request))
+        }
+
+    /**
+     * A network hold narrows the queued spec to the network its live policy could allow, so work queued wider,
+     * as on a cold start before the account loaded, waits in WorkManager instead of waking on a refused network.
+     */
+    @Test
+    fun networkHeldAutomaticWorkNarrowsItsQueuedNetworkConstraint() =
+        runTest {
+            AttachmentDownloadWorker.enqueue(appContext, request, networkType = NetworkType.CONNECTED)
+            val queued = queuedWork()
+            assertEquals(NetworkType.CONNECTED, queued.constraints.requiredNetworkType)
+            val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                throw AttachmentAutomaticPolicyDeferredException(
+                    MediaAutoDownloadType.Video,
+                    AutomaticAttachmentHold.Network,
+                    NetworkType.UNMETERED,
+                )
+            }
+
+            assertEquals(Result.retry(), worker(3, request, id = queued.id, download = download).doWork())
+
+            assertEquals(NetworkType.UNMETERED, queuedWork().constraints.requiredNetworkType)
+        }
+
+    /**
+     * An approval the runtime had not applied yet is a network change still settling: the work waits for it on
+     * every run without spending the failure retry, rather than failing after one follow-up (#3308).
+     */
+    @Test
+    fun pendingPermissionWaitsWithoutSpendingTheFailureRetry() =
+        runTest {
+            val download: PerformDurableAttachmentDownload = { _, _, _ -> throw AttachmentPermissionPendingException() }
+
+            listOf(0, 1, 2, 30).forEach { run ->
+                assertEquals("run $run", Result.retry(), worker(run, request, download).doWork())
+            }
+            assertFalse(attachmentIntentStore(appContext).hasSpentTransientRetry(request))
         }
 
     /** A body that is not retained ends the run as failed without leaving a live entry. */
@@ -221,10 +315,26 @@ class AttachmentDownloadWorkerTransferTest {
     /** Records the reader's explicit request so the worker runs at interactive priority. */
     private fun markInteractive() = attachmentIntentStore(appContext).also { it.setInteractive(request, true) }
 
+    /** The single WorkManager spec queued for [request]. */
+    private fun queuedWork(): WorkInfo =
+        WorkManager
+            .getInstance(appContext)
+            .getWorkInfosByTag(attachmentIdentityTag(request))
+            .get()
+            .single()
+
     /** A worker for [target] that runs [download] in place of the native fetch. */
     private fun worker(
         runAttemptCount: Int,
         target: AttachmentTransferRequest = request,
+        download: PerformDurableAttachmentDownload,
+    ): AttachmentDownloadWorker = worker(runAttemptCount, target, id = null, download = download)
+
+    /** A worker for [target] bound to the WorkManager spec [id], so its updates reach that queued spec. */
+    private fun worker(
+        runAttemptCount: Int,
+        target: AttachmentTransferRequest,
+        id: UUID?,
         download: PerformDurableAttachmentDownload,
     ): AttachmentDownloadWorker =
         TestListenableWorkerBuilder
@@ -244,6 +354,7 @@ class AttachmentDownloadWorkerTransferTest {
                 },
             ).setInputData(AttachmentDownloadWorkData.encode(target))
             .setRunAttemptCount(runAttemptCount)
+            .apply { if (id != null) setId(id) }
             .build()
 
     private val request =
