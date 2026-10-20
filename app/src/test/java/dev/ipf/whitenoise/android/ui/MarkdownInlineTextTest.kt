@@ -750,7 +750,14 @@ class MarkdownInlineTextTest {
             )
         // #2689 supersedes the old roster-dependent visual treatment; identity and navigation stay intact.
         assertEquals("@Alice", annotated.text)
-        assertEquals(FontWeight.Bold, annotated.spanStyles.single().item.fontWeight)
+        assertEquals(
+            FontWeight.Bold,
+            annotated
+                .spanStyles
+                .single()
+                .item
+                .fontWeight,
+        )
         // Still tappable through to the in-app profile sheet (#259 preserved).
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
         assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
@@ -841,7 +848,14 @@ class MarkdownInlineTextTest {
                 mentionDisplayName = { "Alice" },
             )
         assertEquals("@Alice", annotated.text)
-        assertEquals(FontWeight.Bold, annotated.spanStyles.single().item.fontWeight)
+        assertEquals(
+            FontWeight.Bold,
+            annotated
+                .spanStyles
+                .single()
+                .item
+                .fontWeight,
+        )
         // The username label keeps the original nprofile target and explicit visible link style.
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
         val clickable = link.item as LinkAnnotation.Clickable

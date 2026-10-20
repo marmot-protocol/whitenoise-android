@@ -40,11 +40,32 @@ class ProfileReferencePresentationCoverageTest {
                     isGroupMember = { error("Visual profile identity must not consult group membership") },
                 )
             assertEquals("@Alice", rendered.text)
-            assertEquals(TextDirection.Content, rendered.paragraphStyles.single().item.textDirection)
+            assertEquals(
+                TextDirection.Content,
+                rendered
+                    .paragraphStyles
+                    .single()
+                    .item
+                    .textDirection,
+            )
             val preview =
                 markdownDocumentToPreviewAnnotatedString(document(inline), codeStyle, mentionDisplayName = { "Alice" })
-            assertEquals(TextDirection.Content, preview.paragraphStyles.single().item.textDirection)
-            assertEquals(FontWeight.Bold, rendered.spanStyles.single().item.fontWeight)
+            assertEquals(
+                TextDirection.Content,
+                preview
+                    .paragraphStyles
+                    .single()
+                    .item
+                    .textDirection,
+            )
+            assertEquals(
+                FontWeight.Bold,
+                rendered
+                    .spanStyles
+                    .single()
+                    .item
+                    .fontWeight,
+            )
             assertEquals(
                 NOSTR_PROFILE_LINK_TAG_PREFIX + entity.bech32,
                 (rendered.getLinkAnnotations(0, rendered.length).single().item as LinkAnnotation.Clickable).tag,
@@ -128,7 +149,10 @@ class ProfileReferencePresentationCoverageTest {
                 resolveNotificationPreviewText(
                     raw = "authored identity text",
                     parseMarkdown = { parsed },
-                    mentionDisplayName = { calls += it; "Alice" },
+                    mentionDisplayName = {
+                        calls += it
+                        "Alice"
+                    },
                 )
             assertEquals(listOf(MEMBER_NPUB, MEMBER_NPROFILE), calls)
             assertEquals("@Alice".repeat(8), preview)
