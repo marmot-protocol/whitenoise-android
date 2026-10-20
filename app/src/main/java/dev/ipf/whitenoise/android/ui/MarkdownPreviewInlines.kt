@@ -86,7 +86,11 @@ private fun MarkdownPreviewBuilder.appendPreviewInline(
         // inert: the row's only tap target is the chat itself.
         is MarkdownInlineFfi.NostrMention -> appendPreviewMention(inline.entity.bech32, codeStyle, mentionDisplayName)
         is MarkdownInlineFfi.NostrUri ->
-            withStyle(codeStyle) { append(shortenedBech32(inline.entity.bech32)) }
+            if (inline.entity.isProfileReference()) {
+                appendPreviewMention(inline.entity.bech32, codeStyle, mentionDisplayName)
+            } else {
+                withStyle(codeStyle) { append(shortenedBech32(inline.entity.bech32)) }
+            }
     }
 }
 

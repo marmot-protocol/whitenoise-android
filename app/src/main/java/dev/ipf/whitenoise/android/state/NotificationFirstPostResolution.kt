@@ -15,7 +15,7 @@ import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS
-import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
+import dev.ipf.whitenoise.android.ui.markdownDocumentProfileReferenceBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
 import kotlinx.coroutines.CancellationException
 
@@ -76,7 +76,7 @@ internal fun profileLookupRelays(
  */
 internal const val NOTIFICATION_PREVIEW_MAX_UTF16_LENGTH = MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS * 2
 
-/** Flattens a parsed notification body while resolving each distinct mention once. */
+/** Flattens a parsed notification body while resolving each distinct profile reference once. */
 internal suspend fun resolveNotificationPreviewText(
     raw: String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
@@ -86,14 +86,14 @@ internal suspend fun resolveNotificationPreviewText(
     raw?.takeIf { it.isNotBlank() }?.let { text ->
         if (RemoteGiphyMedia.isEnvelopeText(text)) return@let giphyPreviewText
         val document = parseMarkdown(text).takeIf { it.blocks.isNotEmpty() } ?: return@let null
-        val mentionNames = mutableMapOf<String, String?>()
-        for (bech32 in markdownDocumentMentionBech32s(document)) {
-            mentionNames[bech32] = mentionDisplayName(bech32)
+        val profileNames = mutableMapOf<String, String?>()
+        for (bech32 in markdownDocumentProfileReferenceBech32s(document)) {
+            profileNames[bech32] = mentionDisplayName(bech32)
         }
         markdownDocumentToPreviewText(
             document = document,
             maxLength = NOTIFICATION_PREVIEW_MAX_UTF16_LENGTH,
-            mentionDisplayName = mentionNames::get,
+            mentionDisplayName = profileNames::get,
         ).takeIf { it.isNotBlank() }
     }
 

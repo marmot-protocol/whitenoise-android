@@ -731,7 +731,7 @@ class MarkdownInlineTextTest {
     }
 
     @Test
-    fun resolvedNonMemberMentionDropsTheAtPrefixButStaysTappable() {
+    fun resolvedExternalReferenceSharesMentionAppearanceAndStaysTappable() {
         val npub = "npub1" + "q".repeat(58)
         val annotated =
             markdownInlinesToAnnotatedString(
@@ -747,18 +747,16 @@ class MarkdownInlineTextTest {
                 // Resolves to a name, but the account is NOT in the active group.
                 isGroupMember = { false },
             )
-        // #1017: a non-member reference keeps the resolved name but NOT the "@";
-        // it reads as an inline profile link, not a mention.
-        assertEquals("Alice", annotated.text)
-        // No bold mention treatment — the name is styled as the (link) reference.
-        assertTrue(annotated.spanStyles.none { it.item.fontWeight == FontWeight.Bold })
+        // #2689 supersedes the old roster-dependent visual treatment; identity and navigation stay intact.
+        assertEquals("@Alice", annotated.text)
+        assertEquals(FontWeight.Bold, annotated.spanStyles.single().item.fontWeight)
         // Still tappable through to the in-app profile sheet (#259 preserved).
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
         assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
     }
 
     @Test
-    fun unresolvedNonMemberMentionDropsTheAtPrefixButStaysTappable() {
+    fun unresolvedExternalReferenceSharesMentionAppearanceAndStaysTappable() {
         val npub = "npub1" + "q".repeat(58)
         val annotated =
             markdownInlinesToAnnotatedString(
@@ -773,9 +771,8 @@ class MarkdownInlineTextTest {
                 mentionDisplayName = { null },
                 isGroupMember = { false },
             )
-        // The roster decision is independent of the profile cache: a known
-        // non-member cache miss must not render a transient false @ mention.
-        assertEquals("npub1qqqqqqq…qqqqqq", annotated.text)
+        // Unknown external profiles have the same bounded identity fallback as members.
+        assertEquals("@npub1qqqqqqq…qqqqqq", annotated.text)
         val code = annotated.spanStyles.single()
         assertEquals(FontFamily.Monospace, code.item.fontFamily)
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
@@ -783,7 +780,7 @@ class MarkdownInlineTextTest {
     }
 
     @Test
-    fun nonMemberNprofileMentionAlsoDropsTheAtPrefix() {
+    fun externalNprofileReferenceUsesTheSameUsernameAppearance() {
         val nprofile = "nprofile1" + "q".repeat(60)
         val annotated =
             markdownInlinesToAnnotatedString(
@@ -798,8 +795,8 @@ class MarkdownInlineTextTest {
                 mentionDisplayName = { "Bob" },
                 isGroupMember = { false },
             )
-        // Same non-member treatment for nprofile as for npub (#1017).
-        assertEquals("Bob", annotated.text)
+        // Encoding and roster membership do not change the visible username contract.
+        assertEquals("@Bob", annotated.text)
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
         assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + nprofile, (link.item as LinkAnnotation.Clickable).tag)
     }
@@ -825,7 +822,7 @@ class MarkdownInlineTextTest {
     }
 
     @Test
-    fun nostrUriRendersShortenedBech32WithoutAtSignAndIgnoresTheResolver() {
+    fun profileUriResolvesTheSameUsernameAndKeepsTheCanonicalTarget() {
         val nprofile = "nprofile1" + "q".repeat(60)
         val annotated =
             markdownInlinesToAnnotatedString(
@@ -839,19 +836,13 @@ class MarkdownInlineTextTest {
                 linkStyle = linkStyle,
                 mentionDisplayName = { "Alice" },
             )
-        assertEquals("nprofile1qqq…qqqqqq", annotated.text)
-        assertEquals(
-            FontFamily.Monospace,
-            annotated.spanStyles
-                .single()
-                .item.fontFamily,
-        )
-        // nprofile still routes to the profile callback, and the annotation
-        // carries the monospace style explicitly (visible on both bubbles).
+        assertEquals("@Alice", annotated.text)
+        assertEquals(FontWeight.Bold, annotated.spanStyles.single().item.fontWeight)
+        // The username label keeps the original nprofile target and explicit visible link style.
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
         val clickable = link.item as LinkAnnotation.Clickable
         assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + nprofile, clickable.tag)
-        assertEquals(FontFamily.Monospace, clickable.styles?.style?.fontFamily)
+        assertEquals(FontWeight.Bold, clickable.styles?.style?.fontWeight)
     }
 
     @Test

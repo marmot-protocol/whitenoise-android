@@ -150,6 +150,14 @@
           "RDR-001",
           "MSG-002"
         ]
+      },
+      {
+        "surface": "Canonical profile targets and uniform username labels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun markdownNostrEntityDisplay(",
+        "test_ids": [
+          "CON-011"
+        ]
       }
     ]
   },

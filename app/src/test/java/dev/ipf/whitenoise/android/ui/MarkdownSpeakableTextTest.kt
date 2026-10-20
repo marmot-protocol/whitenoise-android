@@ -377,7 +377,7 @@ class MarkdownSpeakableTextTest {
         // readable form, so speech omits it exactly as it omits a bare URL;
         // the bubble still shows the shortened bech32, which is selectable.
         assertEquals(
-            "@Alice Bob.",
+            "@Alice @Bob.",
             markdownDocumentToSpeakableText(
                 document = document,
                 mentionDisplayName = {
