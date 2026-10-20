@@ -38,6 +38,7 @@ internal class ConversationTranscriptSaveAction(
 /**
  * Binds Android's single document result to its requesting controller across recomposition.
  * Picker and coroutine callbacks stay together with the exact source owner they fence.
+ * A request orphaned by lock-driven disposal never blocks a later export once no result for it is waiting.
  */
 @Suppress("LongMethod", "CyclomaticComplexMethod", "TooGenericExceptionCaught")
 @Composable
@@ -133,9 +134,12 @@ internal fun rememberConversationTranscriptSave(
         }
     }
     return ConversationTranscriptSaveAction(requests) {
-        val request = if (pendingOrigin == null) requests.begin(owner) else null
+        // A saved origin whose request died with a disposed screen, and whose picker never answered, is stale.
+        val staleOrigin = pendingOrigin != null && !requests.busy && !resultReady
+        val request = if (pendingOrigin == null || staleOrigin) requests.begin(owner) else null
         if (request != null) {
             try {
+                acceptedDestination = null
                 pendingOrigin = origin
                 pendingAccount = accountRef
                 launcher.launch("white-noise-transcript-${groupId.take(TRANSCRIPT_FILENAME_GROUP_PREFIX_LENGTH)}.json")

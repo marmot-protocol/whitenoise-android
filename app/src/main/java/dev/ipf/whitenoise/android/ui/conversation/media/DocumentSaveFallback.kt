@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -33,6 +34,7 @@ import kotlin.coroutines.resumeWithException
  * Last-resort destination picker for general documents when MediaStore cannot
  * publish into Downloads. Picker cancellation propagates to the live caller.
  * Saved metadata, launcher registration and the original continuation share this composition owner.
+ * A request orphaned by lock-driven disposal never blocks a later save once no result for it is waiting.
  */
 @Suppress("LongMethod")
 @Composable
@@ -71,26 +73,25 @@ internal fun rememberDocumentSaveFallback(
         acceptedDestination = null
         resultReady = false
         val currentOrigin = "${appState.runtimeGeneration}:${appState.activeAccountRef}:$groupIdHex"
-        val currentOwner = owner == origin && owner == currentOrigin
-        if (continuation?.isActive == true && currentOwner) {
-            completeDocumentDestination(continuation, destination)
-            return@LaunchedEffect
-        }
-        // A caller still waiting under a stale owner must not suspend forever.
-        continuation?.cancel(DocumentDestinationCancelledException())
-        if (destination != null) {
-            // Lock disposal intentionally cancelled the source's lifetime/security
-            // guards. Do not revive stale plaintext or bypass message-expiry checks.
-            // Remove the empty CREATE_DOCUMENT output and invite a fresh guarded save.
-            if (account == appState.activeAccountRef) appState.present(R.string.document_save_interrupted)
-            withContext(Dispatchers.IO) { discardEmptyCreatedDocument(context, destination) }
-        }
+        settleDocumentDestination(
+            context = context,
+            continuation = continuation,
+            liveOwner = owner == origin && owner == currentOrigin,
+            destination = destination,
+            presentInterruption = {
+                if (account == appState.activeAccountRef) appState.present(R.string.document_save_interrupted)
+            },
+        )
     }
     val requestDestination: suspend (String, String) -> Uri = { fileName, mediaType ->
         suspendCancellableCoroutine { continuation ->
-            if (requestedOwner != null || !pending.compareAndSet(null, continuation)) {
+            // Only a live caller or an unprocessed lock-time result blocks a new save. A saved owner whose
+            // continuation died with the disposed screen, and whose picker never answered, is superseded.
+            val staleOwnerBlocks = requestedOwner != null && resultReady
+            if (staleOwnerBlocks || !pending.compareAndSet(null, continuation)) {
                 continuation.resumeWithException(IllegalStateException("another document save is pending"))
             } else {
+                acceptedDestination = null
                 requestedOwner = origin
                 requestedAccount = appState.activeAccountRef
                 continuation.invokeOnCancellation { pending.compareAndSet(continuation, null) }
@@ -174,6 +175,30 @@ private inline fun launchDocumentDestination(
     }
 }
 
+/** Completes a live owner's wait, or cancels a stale one and cleans up its unused destination. */
+private suspend fun settleDocumentDestination(
+    context: Context,
+    continuation: CancellableContinuation<Uri>?,
+    liveOwner: Boolean,
+    destination: Uri?,
+    presentInterruption: () -> Unit,
+) {
+    if (continuation?.isActive == true && liveOwner) {
+        completeDocumentDestination(continuation, destination)
+        return
+    }
+    // A caller still waiting under a stale owner must not suspend forever.
+    continuation?.cancel(DocumentDestinationCancelledException())
+    if (destination != null) {
+        // Lock disposal intentionally cancelled the source's lifetime/security
+        // guards. Do not revive stale plaintext or bypass message-expiry checks.
+        // Remove the empty CREATE_DOCUMENT output and invite a fresh guarded save.
+        presentInterruption()
+        withContext(Dispatchers.IO) { discardEmptyCreatedDocument(context, destination) }
+    }
+}
+
+/** Resumes the live caller with its destination, or cancels it when the picker returned none. */
 private fun completeDocumentDestination(
     continuation: kotlinx.coroutines.CancellableContinuation<Uri>,
     destination: Uri?,
