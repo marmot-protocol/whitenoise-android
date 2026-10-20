@@ -166,4 +166,68 @@ class StartupDiagnosticsPromptStateTest {
             assertEquals(StartupDiagnosticsPromptState.CLOSED, owner.prompt)
             assertFalse(owner.failed)
         }
+
+    /** A failed close can be left unsaved: no further write runs and the next launch asks again (#2820). */
+    @Test
+    fun failedCloseDismissesWithoutWritingAndAsksAgainNextLaunch() =
+        kotlinx.coroutines.runBlocking {
+            val owner = StartupDiagnosticsCloseState()
+            var usages = 0
+            val attempt = owner.begin(false, true)!!
+            owner.hidden()
+            owner.save(attempt, { true }, { error("No audit choice") }, {
+                usages++
+                false
+            })
+            assertEquals(StartupDiagnosticsPromptState.CLOSE_ERROR, owner.prompt)
+            owner.dismissFailed()
+            assertEquals(StartupDiagnosticsPromptState.CLOSED, owner.prompt)
+            assertFalse(owner.failed)
+            assertEquals(null, owner.retry())
+            assertEquals(owner.prompt, owner.prompt.refreshed(true, true, false))
+            assertEquals(1, usages)
+            val nextLaunch = StartupDiagnosticsCloseState()
+            assertEquals(
+                StartupDiagnosticsPromptState.CHOICE,
+                nextLaunch.prompt.refreshed(decisionLoaded = true, choiceRequired = true, readFailed = false),
+            )
+        }
+
+    /** A retry in flight pins the sheet, so dismissal cannot strand a write whose result is still due. */
+    @Test
+    fun failedCloseCannotBeDismissedWhileItsRetryRuns() =
+        kotlinx.coroutines.runBlocking {
+            val owner = StartupDiagnosticsCloseState()
+            val attempt = owner.begin(true, false)!!
+            owner.hidden()
+            owner.save(attempt, { true }, { false }, { error("No usage choice") })
+            val retry = owner.retry()!!
+            owner.dismissFailed()
+            assertTrue(owner.busy)
+            owner.save(retry, { true }, { true }, { error("No usage choice") })
+            assertEquals(StartupDiagnosticsPromptState.CLOSED, owner.prompt)
+            assertFalse(owner.failed)
+        }
+
+    /** After an ordinary update or restart, a settled receipt opens no sheet and a declined one stays closed. */
+    @Test
+    fun unchangedReceiptOpensNoStartupSheetAfterUpdateOrRestart() {
+        repeat(2) {
+            val relaunched = StartupDiagnosticsCloseState()
+            assertEquals(StartupDiagnosticsPromptState.AWAITING_RECEIPT, relaunched.prompt)
+            val settled = relaunched.prompt.refreshed(decisionLoaded = true, choiceRequired = false, readFailed = false)
+            assertEquals(StartupDiagnosticsPromptState.CLOSED, settled)
+            assertFalse(settled.visible)
+        }
+    }
+
+    /** A failed receipt read after an update shows a retry surface, never a silently settled grant. */
+    @Test
+    fun failedReadAfterUpdateStaysVisiblyRetryable() {
+        val relaunched = StartupDiagnosticsCloseState()
+        val error = relaunched.prompt.refreshed(decisionLoaded = true, choiceRequired = false, readFailed = true)
+        assertEquals(StartupDiagnosticsPromptState.READ_ERROR, error)
+        assertTrue(error.visible)
+        assertEquals(error, error.refreshed(decisionLoaded = true, choiceRequired = false, readFailed = true))
+    }
 }

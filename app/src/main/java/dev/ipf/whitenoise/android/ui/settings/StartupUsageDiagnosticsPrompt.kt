@@ -51,6 +51,7 @@ internal fun StartupUsageDiagnosticsPrompt(
                 closeFailed = owner.failed || owner.prompt == StartupDiagnosticsPromptState.CLOSE_ERROR,
                 closeBusy = owner.busy,
                 onRetryClose = { owner.retry()?.let(::save) },
+                onDismissFailedClose = owner::dismissFailed,
                 onDone = owner::hidden,
             )
         }

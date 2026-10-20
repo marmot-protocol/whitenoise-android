@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -98,12 +99,15 @@ class DiagnosticsChoiceDetailsScreenshotTest {
         assertEquals(0, changes)
     }
 
+    /** A failed startup close shows Retry beside an enabled close, in the light theme. */
     @Test
     fun failedStartupCloseLight() = captureCloseFailure(dark = false)
 
+    /** A failed startup close shows Retry beside an enabled close, in the dark theme. */
     @Test
     fun failedStartupCloseDark() = captureCloseFailure(dark = true)
 
+    /** A failed startup close keeps Retry and the enabled close reachable at large RTL text. */
     @Test
     @Config(qualifiers = "ar-w360dp-h780dp-mdpi")
     fun failedStartupCloseLargeRtl() = captureCloseFailure(dark = true, fontScale = 1.3f, suffix = "large_rtl")
@@ -133,6 +137,8 @@ class DiagnosticsChoiceDetailsScreenshotTest {
         }
         composeRule.onNodeWithText(context.getString(R.string.retry)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.usage_diagnostics_error)).assertIsDisplayed()
+        // A failed close can be left unsaved (#2820), so the close glyph is enabled rather than a trap.
+        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).assertIsEnabled()
         assertFalse(state.isUsageDiagnosticsGranted())
         assertNull(state.diagnostics.observations.ticket())
         composeRule.onRoot().captureRoboImage("src/test/snapshots/diagnostics_close_failure_$suffix.png")

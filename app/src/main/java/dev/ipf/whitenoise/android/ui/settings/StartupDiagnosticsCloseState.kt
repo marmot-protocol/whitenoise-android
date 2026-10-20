@@ -17,6 +17,7 @@ internal class StartupDiagnosticsCloseState {
     private var pendingAudit = false
     private var pendingUsage = false
 
+    /** An explicit choice supersedes any close in flight and pins the sheet open as a choice. */
     fun choiceStarted() {
         revision += 1
         closing = false
@@ -25,6 +26,7 @@ internal class StartupDiagnosticsCloseState {
         prompt = StartupDiagnosticsPromptState.CHOICE
     }
 
+    /** Starts one close transaction for the declines still pending, or returns null while one runs or failed. */
     fun begin(
         auditRequired: Boolean,
         usageRequired: Boolean,
@@ -39,12 +41,14 @@ internal class StartupDiagnosticsCloseState {
         return revision
     }
 
+    /** Records that the hide animation finished, publishing the close's result if it has settled. */
     fun hidden() {
         if (!closing) return
         hideFinished = true
         prompt = if (failed) StartupDiagnosticsPromptState.CLOSE_ERROR else StartupDiagnosticsPromptState.CLOSED
     }
 
+    /** Writes the pending audit decline before the usage decline, ignoring a superseded attempt. */
     suspend fun save(
         attempt: Long,
         current: () -> Boolean,
@@ -70,6 +74,22 @@ internal class StartupDiagnosticsCloseState {
         }
     }
 
+    /**
+     * Leaves a failed close unsaved for this runtime once no retry is running.
+     *
+     * Nothing is written and nothing is granted: MDK still reports the unsaved usage receipt as
+     * requiring a choice, and an unsaved audit acknowledgement keeps uploads off, so collection
+     * stays off and the next launch asks again. A newer close/choice/retry ignores this.
+     */
+    fun dismissFailed() {
+        if (!failed || busy) return
+        revision += 1
+        closing = false
+        failed = false
+        prompt = StartupDiagnosticsPromptState.CLOSED
+    }
+
+    /** Re-arms the failed close's pending writes for one more attempt, or returns null while busy. */
     fun retry(): Long? {
         if (!failed || busy) return null
         failed = false

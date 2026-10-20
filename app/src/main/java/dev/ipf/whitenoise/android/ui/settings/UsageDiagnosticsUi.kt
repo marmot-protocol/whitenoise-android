@@ -110,6 +110,10 @@ private fun UsageDiagnosticsFeedback(appState: WhiteNoiseAppState) {
  * disclosure. It carries no confirm button, so closing the sheet — by the glyph, a drag,
  * the scrim or back — is what records the receipt, and the sheet refuses to close while a
  * choice is still being written so no dismissal can lose one.
+ *
+ * Once a close has failed and no retry is running, the sheet can be dismissed again without
+ * writing anything: [onDismissFailedClose] leaves the decline unsaved, so MDK keeps collection
+ * off and the next launch asks again rather than trapping the reader behind a failing store.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,17 +124,22 @@ internal fun UsageDiagnosticsPrompt(
     closeFailed: Boolean = false,
     closeBusy: Boolean = false,
     onRetryClose: () -> Unit = {},
+    onDismissFailedClose: () -> Unit = {},
     onDone: () -> Unit,
 ) {
     val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
-    val settled = !state.busy && !state.failed && state.snapshot != null && !loggingBusy && !closeBusy && !closeFailed
+    val idle = !state.busy && !loggingBusy && !closeBusy
+    val settled = idle && !state.failed && state.snapshot != null && !closeFailed
+    // A failed close may be left unsaved: nothing is written, so collection stays off and the
+    // next launch asks again. A retry in flight still pins the sheet until it settles.
+    val abandonable = idle && closeFailed
     // `rememberModalBottomSheetState` keys its saved state on `confirmValueChange`, so a lambda that
     // captures `settled` gets a new identity the moment a choice starts writing — and the sheet state
     // is rebuilt underneath it, which the reader sees as the sheet closing and reopening on every tap.
     // The lambda is remembered once and reads the current value through a snapshot instead.
-    val settledNow by rememberUpdatedState(settled || closing)
+    val settledNow by rememberUpdatedState(settled || abandonable || closing)
     val confirmValueChange = remember { { value: SheetValue -> value != SheetValue.Hidden || settledNow } }
     val sheetState =
         rememberModalBottomSheetState(
@@ -139,11 +148,13 @@ internal fun UsageDiagnosticsPrompt(
         )
     val scope = rememberCoroutineScope()
     val onDoneNow by rememberUpdatedState(onDone)
+    val onDismissFailedCloseNow by rememberUpdatedState(onDismissFailedClose)
+    var abandoning by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
         onDispose {
             // A lock/overlay can remove the sheet before its hide animation finishes.
             // The runtime owner and its native save outlive this presentation scope.
-            if (closing) onDoneNow()
+            if (abandoning) onDismissFailedCloseNow() else if (closing) onDoneNow()
         }
     }
     // The sheet closes on the gesture and records the declined choices afterwards. Waiting for one or
@@ -158,11 +169,18 @@ internal fun UsageDiagnosticsPrompt(
                 sheetState.hide()
                 onDone()
             }
+        } else if (abandonable && !closing) {
+            closing = true
+            abandoning = true
+            scope.launch {
+                sheetState.hide()
+                onDismissFailedClose()
+            }
         }
         Unit
     }
     ModalBottomSheet(
-        onDismissRequest = { if (settled) finish() },
+        onDismissRequest = { if (settled || abandonable) finish() },
         containerColor = amoledSheetContainerColor(),
         sheetState = sheetState,
     ) {
@@ -170,7 +188,7 @@ internal fun UsageDiagnosticsPrompt(
             WhiteNoiseSheetHeader(
                 title = stringResource(R.string.usage_diagnostics_prompt_title),
                 onClose = finish,
-                closeEnabled = settled,
+                closeEnabled = settled || abandonable,
             )
             DiagnosticsCloseFailure(closeFailed, closeBusy, onRetryClose)
             UsageDiagnosticsPromptBody(

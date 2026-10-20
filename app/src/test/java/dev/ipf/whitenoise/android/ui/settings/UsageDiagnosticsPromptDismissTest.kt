@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -11,7 +12,11 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.UsageDiagnosticsController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -114,6 +119,61 @@ class UsageDiagnosticsPromptDismissTest {
         composeRule.onNodeWithContentDescription(CLOSE).assertDoesNotExist()
     }
 
+    /**
+     * A close whose decline keeps failing no longer traps the reader (#2820): the recovery sheet can be
+     * closed, nothing further is written or granted, and the unsaved choice is asked for again next launch.
+     */
+    @Test
+    fun repeatedlyFailingCloseCanBeLeftUnsavedAndAsksAgainNextLaunch() {
+        var writes = 0
+        val state =
+            privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, beforeSave = {
+                writes += 1
+                error("Rejected consent write")
+            })
+        val owner = StartupDiagnosticsCloseState()
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        composeRule.setContent { WhiteNoiseTheme { StartupUsageDiagnosticsPrompt(state, owner) } }
+        composeRule.onNodeWithContentDescription(CLOSE).performClick()
+        composeRule.waitUntil(timeoutMillis = TIMEOUT_MS) {
+            idleAnd { owner.prompt == StartupDiagnosticsPromptState.CLOSE_ERROR }
+        }
+        composeRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        composeRule.waitUntil(timeoutMillis = TIMEOUT_MS) { idleAnd { !owner.busy && owner.failed } }
+
+        composeRule.onNodeWithContentDescription(CLOSE).assertIsEnabled().performClick()
+        composeRule.waitUntil(timeoutMillis = TIMEOUT_MS) {
+            idleAnd { owner.prompt == StartupDiagnosticsPromptState.CLOSED }
+        }
+        composeRule.onNodeWithContentDescription(CLOSE).assertDoesNotExist()
+        assertEquals("dismissing a failed close writes nothing further", 2, writes)
+        assertEquals("Settings keeps the failed choice retryable", true, state.diagnostics.failed)
+        assertEquals(false, state.diagnostics.granted)
+        assertNull(state.diagnostics.observations.ticket())
+
+        val relaunched = UsageDiagnosticsController()
+        runBlocking { relaunched.refresh(nativeOf(state)) }
+        assertEquals("the unsaved decline is asked for again", true, relaunched.requiresChoice)
+        assertEquals(false, relaunched.granted)
+        assertEquals(
+            StartupDiagnosticsPromptState.CHOICE,
+            StartupDiagnosticsCloseState().prompt.refreshed(
+                decisionLoaded = true,
+                choiceRequired = relaunched.requiresChoice,
+                readFailed = false,
+            ),
+        )
+    }
+
+    /** Reads the fixture's native receipt store, standing in for the same store after a process restart. */
+    private fun nativeOf(state: WhiteNoiseAppState): MarmotInterface =
+        (
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("marmotRuntime")
+                .apply { isAccessible = true }
+                .get(state) as AppMarmotRuntime
+        ).marmot
+
     /** The production owner hides while a decline is pending, then restores a deliberate retry surface. */
     @Test
     fun slowRejectedCloseHidesBeforeFailureAndReopensRecovery() {
@@ -152,6 +212,7 @@ class UsageDiagnosticsPromptDismissTest {
     @Test
     fun removedPresentationRestoresFailedCloseForRetry() = removedPresentationSettlesClose(rejectFirst = true)
 
+    /** Removes the sheet mid-close, then returns to check the owner settled or offers Retry. */
     private fun removedPresentationSettlesClose(rejectFirst: Boolean) {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
@@ -234,6 +295,7 @@ class UsageDiagnosticsPromptDismissTest {
             assertEquals(StartupDiagnosticsPromptState.AWAITING_RECEIPT, newRuntime.prompt)
         }
 
+    /** Drains the main looper before evaluating a wait condition. */
     private fun idleAnd(condition: () -> Boolean): Boolean {
         Shadows.shadowOf(Looper.getMainLooper()).idle()
         return condition()
