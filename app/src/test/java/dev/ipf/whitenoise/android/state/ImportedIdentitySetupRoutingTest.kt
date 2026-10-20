@@ -195,11 +195,14 @@ class ImportedIdentitySetupRoutingTest {
         val state = fixture.state
         try {
             if (amber) {
-                state.loginWithAmber()
+                runWithMainLooperPumping { state.loginWithAmber() }
                 assertTrue(fixture.calls.contains("registerExternalSigner"))
                 assertNull(state.amberSignInStage)
             } else {
-                assertEquals(IdentityImportOutcome.Success, state.importIdentity("nsec1" + "q".repeat(58)))
+                assertEquals(
+                    IdentityImportOutcome.Success,
+                    runWithMainLooperPumping { state.importIdentity("nsec1" + "q".repeat(58)) },
+                )
                 assertTrue(fixture.calls.contains("login"))
             }
             shadowOf(Looper.getMainLooper()).idle()
