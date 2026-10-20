@@ -33,6 +33,18 @@ internal fun initialPresentationProfileSenders(
 }
 
 /**
+ * The local presentation a conversation's first page warms before the route shows it: sender profiles, and the
+ * messages whose public event cards should restore from MDK's cache on their first frame (#2238).
+ */
+internal data class InitialPresentationWarmWork(
+    val senders: List<String>,
+    val eventCardRecords: List<TimelineMessageRecordFfi> = emptyList(),
+) {
+    /** True when there is nothing to warm, so readiness need not wait. */
+    fun isEmpty(): Boolean = senders.isEmpty() && eventCardRecords.isEmpty()
+}
+
+/**
  * Owns the bounded local-profile barrier for a conversation's first visible page.
  * A newer authoritative page supersedes the older job, so stale work can never
  * release navigation for sender metadata that is no longer current.
@@ -40,7 +52,7 @@ internal fun initialPresentationProfileSenders(
 internal class ConversationInitialPresentationWarmCoordinator(
     private val scope: CoroutineScope,
     private val budgetMillis: Long,
-    private val warm: suspend (List<String>) -> Unit,
+    private val warm: suspend (InitialPresentationWarmWork) -> Unit,
     private val onReady: () -> Unit,
 ) {
     private val preparations = StalenessGuard()
@@ -57,12 +69,12 @@ internal class ConversationInitialPresentationWarmCoordinator(
         onReady()
     }
 
-    /** Replaces the pending warm and admits readiness only for the newest sender page. */
-    fun prepare(senders: List<String>) {
+    /** Replaces the pending warm and admits readiness only for the newest page. */
+    fun prepare(work: InitialPresentationWarmWork) {
         if (ready) return
         val token = preparations.advance()
         job?.cancel()
-        if (senders.isEmpty()) {
+        if (work.isEmpty()) {
             job = null
             markReady()
             return
@@ -79,7 +91,7 @@ internal class ConversationInitialPresentationWarmCoordinator(
         job =
             scope.launch {
                 try {
-                    warm(senders)
+                    warm(work)
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (_: Throwable) {

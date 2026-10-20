@@ -117,6 +117,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardSnapshots
+import dev.ipf.whitenoise.android.ui.conversation.nostr.mayRenderNostrEventCard
+import dev.ipf.whitenoise.android.ui.conversation.nostr.readCachedPublicEventCards
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -6683,11 +6686,14 @@ class ConversationController(
     private val timelineSession =
         ConversationTimelineSession(onTimelineRetired = { window.readySubscription = null })
     private val controllerScope = timelineSession.scope
+
+    /** First-frame snapshots of this conversation's public event cards, read from MDK before rows show (#2238). */
+    internal val eventCardSnapshots = NostrEventCardSnapshots()
     private val initialPresentationWarmCoordinator =
         ConversationInitialPresentationWarmCoordinator(
             scope = controllerScope,
             budgetMillis = INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS,
-            warm = appState::warmProfilePresentationsBlocking,
+            warm = { work -> warmInitialPresentation(work) },
             onReady = { hasPreparedInitialPresentation = true },
         )
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -12780,7 +12786,33 @@ class ConversationController(
         markInitialPresentationReady: Boolean,
     ) {
         if (!markInitialPresentationReady) return
-        initialPresentationWarmCoordinator.prepare(initialPresentationProfileSenders(records))
+        initialPresentationWarmCoordinator.prepare(
+            InitialPresentationWarmWork(
+                senders = initialPresentationProfileSenders(records),
+                eventCardRecords = records.filter(::mayRenderNostrEventCard),
+            ),
+        )
+    }
+
+    /** Warms sender profiles and cached event cards side by side, so neither waits for the other. */
+    private suspend fun warmInitialPresentation(work: InitialPresentationWarmWork) {
+        coroutineScope {
+            launch { warmEventCardSnapshots(work.eventCardRecords) }
+            appState.warmProfilePresentationsBlocking(work.senders)
+        }
+    }
+
+    /**
+     * Reads MDK's cached cards for [records] into [eventCardSnapshots] off the main thread, so their first frame is
+     * complete. A failed read leaves each card's own cache read and refresh in charge.
+     */
+    private suspend fun warmEventCardSnapshots(records: List<TimelineMessageRecordFfi>) {
+        if (records.isEmpty()) return
+        runCatchingCancellable {
+            eventCardSnapshots.warm(records, appState::parseMarkdownOrEmpty) { references ->
+                appState.readCachedPublicEventCards(conversationAccountRef, references)
+            }
+        }
     }
 
     private fun publishTimelinePageBeforeMarkdownHydration(records: List<TimelineMessageRecordFfi>) {
@@ -12793,7 +12825,12 @@ class ConversationController(
             scope = scope,
             records = records,
             publish = ::publishTimelineFromIndexes,
-            hydrate = ::hydrateTimelineMarkdown,
+            // Cards appear once their message's Markdown does, so their cached state is read before it applies.
+            hydrate = { pending ->
+                hydrateTimelineMarkdown(pending).also { hydrated ->
+                    warmEventCardSnapshots(hydrated.filter(::mayRenderNostrEventCard))
+                }
+            },
             applyHydrated = ::applyHydratedTimelineMarkdown,
         )
     }

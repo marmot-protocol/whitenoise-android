@@ -224,9 +224,9 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.rememberKeptMessageEn
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberKeptMessagesController
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
-import dev.ipf.whitenoise.android.ui.conversation.nostr.enrichPublicEventCardAuthor
-import dev.ipf.whitenoise.android.ui.conversation.nostr.publicEventCardRelays
-import dev.ipf.whitenoise.android.ui.conversation.nostr.readPublicEventCard
+import dev.ipf.whitenoise.android.ui.conversation.nostr.readCachedPublicEventCards
+import dev.ipf.whitenoise.android.ui.conversation.nostr.refreshPublicEventCard
+import dev.ipf.whitenoise.android.ui.conversation.nostr.refreshPublicEventCardAuthor
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
@@ -1710,13 +1710,13 @@ internal fun ConversationScreen(
 
     val eventCardResolver =
         remember(controller, appState, conversationAccountRef, appState.runtimeGeneration) {
+            // Seeded from the controller's snapshots, so a recreated resolver never flashes cards back to Loading.
             NostrEventCardResolver(
                 parentScope = scope,
-                relayProvider = appState::publicEventCardRelays,
-                nativePreview = { reference, refresh ->
-                    appState.readPublicEventCard(conversationAccountRef, reference, refresh)
-                },
-                nativeAuthor = appState::enrichPublicEventCardAuthor,
+                readCached = { references -> appState.readCachedPublicEventCards(conversationAccountRef, references) },
+                refresh = { reference -> appState.refreshPublicEventCard(conversationAccountRef, reference) },
+                refreshAuthor = { loaded -> appState.refreshPublicEventCardAuthor(loaded) },
+                snapshots = controller.eventCardSnapshots,
             )
         }
     DisposableEffect(eventCardResolver) {

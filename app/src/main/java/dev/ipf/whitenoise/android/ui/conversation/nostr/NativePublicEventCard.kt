@@ -1,65 +1,176 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import dev.ipf.marmotkit.PublicEventPreviewFfi
 import dev.ipf.marmotkit.PublicEventPreviewStateFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardState.Loaded
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
+import java.util.Locale
 
-/** MDK owns account-scoped persistence, signature verification, deletion and refresh policy. */
-internal suspend fun WhiteNoiseAppState.readPublicEventCard(
+/**
+ * MDK's network-free cached state for up to [NOSTR_EVENT_CACHE_BATCH] authored references, in input order, with
+ * cached author metadata and prepared preview text, so a restored card is complete on its first frame (#2238).
+ * A null entry means nothing is cached. MDK owns persistence, signature verification, deletion and refresh policy.
+ */
+internal suspend fun WhiteNoiseAppState.readCachedPublicEventCards(
+    accountRef: String?,
+    references: List<String>,
+): List<NostrEventCardState?> {
+    if (accountRef == null || references.isEmpty()) return references.map { null }
+    // A cold read may open the account's encrypted cache, so it always rides the binding IO hop.
+    val previews = marmotIo { cachedPublicEventPreviews(accountRef, references) }
+    return publicEventCardStates(previews)
+}
+
+/**
+ * Asks MDK to refresh one authored reference and returns the card for its local state afterwards. MDK keeps prior
+ * content when a fetch fails or finds nothing and only ever moves an addressable event forward.
+ */
+internal suspend fun WhiteNoiseAppState.refreshPublicEventCard(
     accountRef: String?,
     reference: String,
-    refresh: Boolean,
-): NostrEventCardState {
+): NostrEventCardState? {
     if (accountRef == null) return NostrEventCardState.Failed
-    return marmotIo {
-        val preview =
-            if (refresh) {
-                resolvePublicEventPreview(accountRef, reference)
-            } else {
-                cachedPublicEventPreviews(accountRef, listOf(reference)).single()
-            }
+    val preview = marmotIo { resolvePublicEventPreview(accountRef, reference) }
+    return publicEventCardStates(listOf(preview)).single()
+}
+
+/**
+ * Refreshes the card author's kind-0 profile at most once per [PublicEventAuthorRefreshThrottle] interval, then
+ * returns the card with MDK's cached author metadata. A cached card already carries that metadata, so this only
+ * updates the header in place when the profile itself changed.
+ */
+internal suspend fun WhiteNoiseAppState.refreshPublicEventCardAuthor(
+    loaded: Loaded,
+    throttle: PublicEventAuthorRefreshThrottle = PublicEventAuthorRefreshThrottle.shared,
+): Loaded {
+    val pubkey = loaded.card.authorPubkeyHex
+    if (!throttle.tryAcquire(pubkey)) return loaded
+    val relays = publicEventCardRelays()
+    val author =
+        marmotIo {
+            refreshProfile(pubkey, relays)
+            userProfile(pubkey)?.toEventAuthorMetadata()
+        }
+    return if (author == null || author == loaded.card.authorMetadata) {
+        loaded
+    } else {
+        loaded.copy(card = loaded.card.copy(authorMetadata = author))
+    }
+}
+
+/** Maps MDK previews to card states, enriching present events from one batched cached-identity read. */
+private suspend fun WhiteNoiseAppState.publicEventCardStates(previews: List<PublicEventPreviewFfi>): CardStates {
+    val events = previews.map { it.verifiedEvent() }
+    val authors = cachedEventAuthors(events.mapNotNull { it?.pubkey })
+    return previews.mapIndexed { index, preview ->
         when (preview.state) {
             PublicEventPreviewStateFfi.PRESENT ->
-                preview.eventJson
-                    ?.let { NostrEvent.fromJson(JSONObject(it)) }
-                    ?.let { event ->
-                        val author =
-                            try {
-                                userProfile(event.pubkey)?.toEventAuthorMetadata()
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                null
-                            }
-                        NostrEventCardState.Loaded(event.toCardModel().copy(authorMetadata = author))
-                    }
-                    ?: NostrEventCardState.Invalid
-            PublicEventPreviewStateFfi.DELETED,
-            PublicEventPreviewStateFfi.MISSING,
-            -> NostrEventCardState.NotFound
+                events[index]?.let { event ->
+                    val card =
+                        event.toCardModel().copy(authorMetadata = authors[event.pubkey.lowercase(Locale.ROOT)])
+                    Loaded(card, preparedPreview(card))
+                } ?: NostrEventCardState.Invalid
+            // MDK records an author's NIP-09 deletion durably, so it settles the card.
+            PublicEventPreviewStateFfi.DELETED -> NostrEventCardState.NotFound
+            PublicEventPreviewStateFfi.MISSING -> null
             PublicEventPreviewStateFfi.UNSUPPORTED -> NostrEventCardState.Invalid
         }
     }
 }
 
-/** Enrichment follows publication of the verified event, and MDK persists the profile. */
-internal suspend fun WhiteNoiseAppState.enrichPublicEventCardAuthor(loaded: Loaded): Loaded {
-    val relays = publicEventCardRelays()
-    val author =
-        marmotIo {
-            refreshProfile(loaded.card.authorPubkeyHex, relays)
-            userProfile(loaded.card.authorPubkeyHex)?.toEventAuthorMetadata()
+/** The signature-verified event MDK attached to a present preview, or null when it is absent or unreadable. */
+private fun PublicEventPreviewFfi.verifiedEvent(): NostrEvent? =
+    eventJson
+        ?.takeIf { state == PublicEventPreviewStateFfi.PRESENT }
+        ?.let { json -> runCatching { NostrEvent.fromJson(JSONObject(json)) }.getOrNull() }
+
+/** Cached kind-0 metadata for [pubkeys] from one cache-only read, keyed by lowercase pubkey. */
+private suspend fun WhiteNoiseAppState.cachedEventAuthors(pubkeys: List<String>): AuthorsByPubkey {
+    val distinct = pubkeys.map { it.lowercase(Locale.ROOT) }.distinct().take(MAX_IDENTITY_PAGE)
+    if (distinct.isEmpty()) return emptyMap()
+    val rows =
+        try {
+            marmotIo { cachedIdentityProjections(distinct) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Author metadata is enrichment: the verified event still renders without it.
+            emptyList()
         }
-    return if (author == null) loaded else loaded.copy(card = loaded.card.copy(authorMetadata = author))
+    return rows
+        .mapNotNull { row ->
+            row.profile?.toEventAuthorMetadata()?.let { row.requestedId.lowercase(Locale.ROOT) to it }
+        }.toMap()
 }
 
-private fun UserProfileMetadataFfi.toEventAuthorMetadata(): NostrEventAuthorMetadata =
+/** Parses [card]'s preview text now, off the main thread, so its first frame needs no second pass. */
+private suspend fun WhiteNoiseAppState.preparedPreview(card: NostrEventCardModel): NostrEventPreparedPreview? =
+    try {
+        prepareNostrEventPreview(card) { text -> parseMarkdownOrEmpty(text) }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
+
+/** Sanitized author label and picture, or null when the profile offers neither. */
+private fun UserProfileMetadataFfi.toEventAuthorMetadata(): NostrEventAuthorMetadata? =
     NostrEventAuthorMetadata(
         displayName = ProfileSanitizer.displayName(displayName) ?: ProfileSanitizer.displayName(name),
         pictureUrl = ProfileSanitizer.protocolImageUrl(picture),
-    )
+    ).takeIf { it.displayName != null || it.pictureUrl != null }
+
+/**
+ * Limits network author-profile refreshes for event cards to one per author per [intervalNanos], so reopening a
+ * conversation, or a card hitting the cache, does not refetch kind-0 metadata every time.
+ */
+internal class PublicEventAuthorRefreshThrottle(
+    private val intervalNanos: Long = DEFAULT_INTERVAL_NANOS,
+    private val capacity: Int = DEFAULT_CAPACITY,
+    private val nanoTime: () -> Long = System::nanoTime,
+) {
+    private val lastRefresh = LinkedHashMap<String, Long>(16, 0.75f, true)
+
+    /** True, and records the attempt, when [pubkey] has not been refreshed within the interval. */
+    fun tryAcquire(pubkey: String): Boolean {
+        val key = pubkey.lowercase(Locale.ROOT)
+        val now = nanoTime()
+        return synchronized(lastRefresh) {
+            val previous = lastRefresh[key]
+            if (previous != null && now - previous < intervalNanos) {
+                false
+            } else {
+                lastRefresh[key] = now
+                val iterator = lastRefresh.entries.iterator()
+                while (lastRefresh.size > capacity && iterator.hasNext()) {
+                    iterator.next()
+                    iterator.remove()
+                }
+                true
+            }
+        }
+    }
+
+    companion object {
+        /** The process-wide throttle production cards share across conversations and resolvers. */
+        val shared = PublicEventAuthorRefreshThrottle()
+
+        private const val DEFAULT_INTERVAL_NANOS = 30L * 60L * 1_000_000_000L
+        private const val DEFAULT_CAPACITY = 512
+    }
+}
+
+/** Card states in the order of the previews they were read from. */
+private typealias CardStates = List<NostrEventCardState?>
+
+/** Cached author metadata keyed by lowercase pubkey. */
+private typealias AuthorsByPubkey = Map<String, NostrEventAuthorMetadata>
+
+/** The most account IDs one cached-identity page accepts. */
+private const val MAX_IDENTITY_PAGE = 100
