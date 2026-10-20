@@ -38,6 +38,18 @@ class QualificationEvidenceTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.invoke(transcript([('retained', 0), ('unexpected', -2)]), {'retained'})
 
+    def test_component_disable_requires_the_reported_state(self):
+        """A zero-exit pm command reporting DEFAULT cannot satisfy the background isolation precondition."""
+        with patch.object(campaign, 'adb', return_value='Component fixture new state: default\n'):
+            with self.assertRaises(RuntimeError):
+                campaign.disable_background_entries()
+        with patch.object(campaign, 'adb', return_value='Component fixture new state: disabled\n') as shell:
+            campaign.disable_background_entries()
+            self.assertEqual(shell.call_count, 2)
+            for call in shell.call_args_list:
+                self.assertEqual(call.args[:5], ('shell', 'pm', 'disable', '--user', '0'))
+                self.assertTrue(call.args[5].startswith(campaign.APP + '/'))
+
 
 class QualificationPackageTest(unittest.TestCase):
     """AGP test manifests can omit versions, while app update identity must remain strict."""

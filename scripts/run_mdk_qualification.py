@@ -92,7 +92,10 @@ def disable_background_entries():
     """Reassert fixture ownership after production WorkManager initialization and before native instrumentation."""
     for component in ('androidx.work.impl.background.systemjob.SystemJobService',
                       'dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'):
-        adb('shell', 'pm', 'disable-user', '--user', '0', APP + '/' + component)
+        # disable-user is a package state; PackageManager rejects it for individual components.
+        output = adb('shell', 'pm', 'disable', '--user', '0', APP + '/' + component)
+        if not output.strip().endswith('new state: disabled'):
+            raise RuntimeError(f'Fixture background component {component} was not disabled')
 
 
 def usable_chat(name):
@@ -136,6 +139,8 @@ def main():
     """Keep upgrade phases dependent, but finish both independent recovery modes even if migration fails."""
     if os.environ.get('GITHUB_ACTIONS') != 'true' or adb('shell', 'getprop', 'ro.kernel.qemu').strip() != '1':
         raise RuntimeError('Hosted disposable emulator required')
+    if adb('shell', 'am', 'get-current-user').strip() != '0':
+        raise RuntimeError('The disposable emulator must use its primary user')
     if APP in adb('shell', 'pm', 'list', 'packages', APP):
         raise RuntimeError('A fresh isolated fixture package is required')
     REPORTS.mkdir(parents=True, exist_ok=True)
