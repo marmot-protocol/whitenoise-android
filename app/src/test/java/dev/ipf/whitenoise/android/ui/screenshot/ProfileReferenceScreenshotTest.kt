@@ -53,8 +53,9 @@ class ProfileReferenceScreenshotTest {
 
     /** RTL layout, AMOLED and 200 percent text retain identity and readable wrapping. */
     @Test
-    fun profileReferencesAmoledLargeRtl() =
+    fun profileReferencesAmoledLargeRtl() {
         capture("profile_references_amoled_large_rtl.png", dark = true, amoled = true, largeRtl = true)
+    }
 
     /** Captures resolved external URI/mention labels plus unresolved references using actual theme colors. */
     private fun capture(
