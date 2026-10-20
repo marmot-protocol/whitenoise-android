@@ -90,6 +90,7 @@ class NotificationReactionRemovalRaceTest {
                 awaitLatch(probe.queued)
                 probe.release.countDown()
                 awaitReactionText(SECRET)
+                awaitLatch(probe.written)
                 assertTrue(probe.writes.get() > 0)
             } finally {
                 probe.release.countDown()
@@ -280,6 +281,7 @@ class NotificationReactionRemovalRaceTest {
         val release = CountDownLatch(1)
         val removalWaiting = CountDownLatch(1)
         val removalCompleted = CountDownLatch(1)
+        val written = CountDownLatch(1)
         val removalRequested = AtomicBoolean(false)
         val removalObserved = AtomicBoolean(false)
         val writes = AtomicInteger(0)
@@ -328,6 +330,7 @@ class NotificationReactionRemovalRaceTest {
             if (barrier == ConversationCardBarrier.AFTER_WRITE) {
                 writes.incrementAndGet()
                 if (removalObserved.get() && activeReactionText().any { SECRET in it }) quotedWritesAfterRemoval.incrementAndGet()
+                written.countDown()
             }
         }
     }

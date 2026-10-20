@@ -41,8 +41,9 @@ internal fun removedNotificationMessages(event: MarmotEventFfi): List<RemovedNot
  * Messages whose notification content was removed in this process, so a queued post or a delayed enrichment for one
  * of them can never put its content back on a card (#3323). It is a small bounded guard of identities only, never
  * content or protocol state: each account keeps its own most recent [capacity] removals, so one account's burst
- * cannot evict another's. A removal older than that, or one from before a restart, is caught by the candidate's
- * timeline record, which is always read before posting.
+ * cannot evict another's. Governed message candidates also read their timeline record before posting, covering
+ * removals evicted from this guard or predating a restart. Reactions lack a quoted-target identity and bypass that
+ * read; their quote protection is limited to retained removals in this process until MDK #2366 supplies that contract.
  */
 internal class NotificationContentInvalidations(
     private val capacity: Int,
