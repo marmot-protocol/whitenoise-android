@@ -10,7 +10,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from scripts.check_ci_changes import classify, complete_diff, docs_only_diff, supplemental_campaigns, supplemental_campaigns_diff, precheck_mode, main
+from scripts.check_ci_changes import classify, complete_diff, docs_only_diff, supplemental_campaigns, supplemental_campaigns_diff, precheck_mode, validation_mode, validation_selection, main
 
 
 def entry(path, old='100644', new='100644', status='M'):
@@ -34,6 +34,24 @@ class CiChangesTest(unittest.TestCase):
                     ordinary + entry('build.gradle.kts'),
                     entry('app/src/main/java/example/Screen.kt', new='120000')):
             self.assertFalse(precheck_mode('pull_request', 'merge-queue', [], raw))
+
+    def test_modes_are_exclusive_and_activated_prs_have_one_lane(self):
+        for event in ('pull_request', 'merge_group', 'push', 'workflow_dispatch'):
+            for configured in ('merge-queue', '', 'unknown'):
+                for labels in (None, {}, [], ['ci:full'], ['bug'], [1], 'ci:full'):
+                    for raw in (None, b'', entry('gradle.properties'), entry('app/src/main/java/example/Screen.kt')):
+                        selected = validation_selection(event, configured, labels, raw)
+                        mode = selected['ci_mode']
+                        count = sum(selected[key] == 'true' for key in ('precheck', 'full_matrix'))
+                        self.assertLessEqual(count, 1)
+                        self.assertEqual(mode, validation_mode(event, configured, labels, raw))
+                        self.assertIn(mode, ('full', 'precheck', 'legacy-pr'))
+                        if event == 'pull_request' and configured == 'merge-queue':
+                            self.assertEqual(count, 1)
+                            self.assertIn(mode, ('full', 'precheck'))
+                        if event != 'pull_request':
+                            self.assertEqual(mode, 'full')
+                        self.assertEqual(precheck_mode(event, configured, labels, raw), mode == 'precheck')
 
     def test_cli_modes_and_receipt_are_bound_to_exact_run(self):
         ordinary = entry('app/src/main/java/example/Screen.kt')
@@ -62,6 +80,7 @@ class CiChangesTest(unittest.TestCase):
                 values = dict(line.split('=', 1) for line in stdout.getvalue().splitlines())
                 self.assertEqual(values['precheck'], precheck)
                 self.assertEqual(values['full_matrix'], full_matrix)
+                self.assertEqual(values['ci_mode'], 'precheck' if precheck == 'true' else 'full' if full_matrix == 'true' else 'legacy-pr')
                 if full_matrix == 'true':
                     self.assertEqual(values['docs_only'], 'false')
                     self.assertEqual(values['supplemental_campaigns'], 'true')

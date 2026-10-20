@@ -74,7 +74,7 @@ Every pull request to `master` and every push to `master` starts
 
 The [CI request policy](docs/ci-request-policy.md#queue-gated-pr-feedback-and-full-integration)
 defines the staged merge-queue mode. With `ANDROID_CI_MODE=merge-queue`, ordinary
-PRs compile Zapstore and Play main, unit-test and Android-test Kotlin plus
+PRs compile Zapstore and Play main, unit-test and Android-test Kotlin/Java plus
 benchmark sources, and run ktlint/detekt, tooling/security and offline signer
 contracts. Full unit/screenshot execution, Kover, Android lint and baseline APK
 packaging move to the queue integration. The queue retains every regression test and screenshot baseline. The switch is enabled only after native queue enforcement,
@@ -99,8 +99,10 @@ A direct merge requires full current-base qualification. The queue requires fres
 integration validation plus independent authorization.
 
 Only ordinary Markdown changes in the complete PR diff can use the docs shortcut;
-tooling/manual-guide/metadata validators still run. The complete diff retains earlier code changes during docs fixups. Master stays fully checked in this first rollout. Supplemental
-release/reproduction/Compose campaigns retain their separate conservative policy;
+tooling/manual-guide/metadata validators still run. The complete diff retains
+earlier code changes during docs fixups. Master stays fully checked in this
+first rollout. Full core runs also execute Compose reports. Separate
+release/reproduction campaigns retain their conservative policy;
 release qualification remains tied to the exact release candidate.
 
 Coverage artifacts are `kover-coverage-report-Zapstore` and

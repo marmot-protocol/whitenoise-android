@@ -76,7 +76,7 @@ verified. Unset and unknown values retain the prior PR lanes described below.
 Merge admission requires separate live proof of queue enforcement and authorization.
 
 In activated mode, ordinary code PRs run tooling, dependency/security contracts,
-the offline signer, ktlint/detekt and actual Kotlin compilation of Zapstore and
+the offline signer, ktlint/detekt and Kotlin/Java compilation of Zapstore and
 Play main, unit-test and Android-test sources, plus benchmark source compilation.
 They defer full unit/golden execution, Kover, Android lint, baseline packaging and
 the separate Play parity job to full integration CI. Existing complete suites remain the unit of integration testing. Required source regressions and
@@ -85,8 +85,8 @@ the distinct draft aggregate context and require readiness before queue admissio
 
 Every merge group, master push, nightly and manual run uses the full core matrix:
 both complete unit/golden suites and comparison evidence, current coverage gates,
-both lint variants, compile/style/security/offline contracts and baseline
-packaging. Merge groups do not use the PR documentation shortcut. Master remains
+both lint variants, compile/style/security/offline contracts, Compose reports
+and baseline packaging. Merge groups do not use the PR documentation shortcut. Master remains
 full in this first rollout; removing duplicate master work requires separately
 reviewed accepted-integration provenance and a full fallback.
 
@@ -104,7 +104,9 @@ use unique run IDs so a same-integration rerun cannot evict another pending run.
 Unit execution has a 30-minute step budget within the 40-minute job budget,
 leaving time to retain failure reports and timing evidence. A timeout fails the gate; every retry requires a retained diagnosis.
 
-The aggregate validates explicit mode and the complete expected job set. Only
+The aggregate validates the explicit `precheck`, `full` or `legacy-pr` mode and
+the complete expected job set. `legacy-pr` retains the earlier primary-flavor
+suite; `full` identifies the complete two-flavor core matrix. Only
 the named precheck, docs or legacy draft skips are accepted; every core queue
 job must succeed. A green PR precheck admits source for integration. Merge qualification requires
 successful current integration CI and independent authorization.
@@ -163,11 +165,12 @@ Do not rely on a green draft run for readiness; wait for the ready run.
 The visual-description updater follows opening, reopening and pushes and displays at most
 four inline comparisons, retaining links and the bounded list of all changes.
 
-Compose compiler reports and independent unsigned APK reproduction are
-supplemental campaigns. A complete raw diff permits their deferral only for
+Compose compiler reports run in every full core matrix. Independent unsigned
+APK reproduction remains a supplemental campaign. A complete raw diff permits
+its deferral for
 known ordinary Kotlin/Java source, main resources, committed goldens and prose.
 Build, packaging, native pins, manifests, CI/tooling, executable/symlink changes,
-unknown inputs or unavailable evidence run the campaigns. In full mode, all other compilation,
+unknown inputs or unavailable evidence run reproduction. In full mode, all other compilation,
 full-unit/golden/coverage, style and lint gates stay required for ready PRs.
 A mixed PR uses the most demanding classification of its entire diff.
 

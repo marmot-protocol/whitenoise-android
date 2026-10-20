@@ -130,20 +130,30 @@ def supplemental_campaigns(event, base, head):
 
 
 
-def precheck_mode(event, configured_mode, labels, raw):
-    """Only an explicitly activated queue may replace full PR CI.
+def validation_selection(event, configured_mode, labels, raw):
+    """Derive mutually exclusive modes from one complete-diff observation."""
+    activated = configured_mode == 'merge-queue'
+    labels_valid = isinstance(labels, list) and all(isinstance(label, str) for label in labels)
+    has_full_label = labels_valid and 'ci:full' in labels
+    risky = raw is None or supplemental_campaigns_diff(raw)
+    if event != 'pull_request' or has_full_label or (activated and (not labels_valid or risky)):
+        mode = 'full'
+    else:
+        mode = 'precheck' if activated else 'legacy-pr'
+    full = mode == 'full'
+    docs = event == 'pull_request' and raw is not None and docs_only_diff(raw) and not full
+    return {'ci_mode': mode, 'precheck': str(mode == 'precheck').lower(),
+            'full_matrix': str(full).lower(), 'docs_only': str(docs).lower(),
+            'supplemental_campaigns': str(full or risky).lower()}
 
-    Reuse the whole-diff conservative campaign classifier: unknown, executable,
-    build, dependency, native or workflow inputs all retain full PR validation.
-    Labels come from a current GitHub API read, not the possibly stale event.
-    """
-    if event != 'pull_request' or configured_mode != 'merge-queue':
-        return False
-    if not isinstance(labels, list) or not all(isinstance(label, str) for label in labels):
-        return False
-    if 'ci:full' in labels:
-        return False
-    return raw is not None and not supplemental_campaigns_diff(raw)
+
+def validation_mode(event, configured_mode, labels, raw):
+    return validation_selection(event, configured_mode, labels, raw)['ci_mode']
+
+
+def precheck_mode(event, configured_mode, labels, raw):
+    """Compatibility helper for callers needing the precheck predicate."""
+    return validation_mode(event, configured_mode, labels, raw) == 'precheck'
 
 
 def main():
@@ -152,24 +162,13 @@ def main():
     parser.add_argument('--base', default='')
     parser.add_argument('--head', required=True)
     args = parser.parse_args()
-    value = 'true' if classify(args.event, args.base, args.head) else 'false'
-    campaigns = 'true' if supplemental_campaigns(args.event, args.base, args.head) else 'false'
     try:
         labels = json.loads(os.environ.get('CI_CURRENT_LABELS', 'null'))
     except (ValueError, TypeError):
         labels = None
     raw = complete_diff(args.event, args.base, args.head)
-    activated = os.environ.get('ANDROID_CI_MODE', '') == 'merge-queue'
-    full_matrix = (args.event != 'pull_request' or
-                   (isinstance(labels, list) and 'ci:full' in labels) or
-                   (activated and (not isinstance(labels, list) or
-                                  not all(isinstance(label, str) for label in labels) or
-                                  raw is None or supplemental_campaigns_diff(raw))))
-    if full_matrix:
-        value, campaigns = 'false', 'true'
-    precheck = precheck_mode(args.event, os.environ.get('ANDROID_CI_MODE', ''),
-                             labels, raw)
-    line = f'docs_only={value}\nsupplemental_campaigns={campaigns}\nprecheck={str(precheck).lower()}\nfull_matrix={str(full_matrix).lower()}\nci_mode={"precheck" if precheck else "full"}\n'
+    selection = validation_selection(args.event, os.environ.get('ANDROID_CI_MODE', ''), labels, raw)
+    line = ''.join(f'{key}={value}\n' for key, value in selection.items())
     # Retained diagnostics bind the selected mode to the observed run. External
     # authorization must still verify authenticated workflow/job evidence itself.
     if receipt := os.environ.get('CI_MODE_RECEIPT'):

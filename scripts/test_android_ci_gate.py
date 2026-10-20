@@ -86,7 +86,7 @@ class AndroidCiGateTest(unittest.TestCase):
         Play matrix instead, and drafts also defer Compose reports.
         """
         outcomes = {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
-        outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true', 'precheck': 'false', 'ci_mode': 'full',
+        outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true', 'precheck': 'false', 'ci_mode': 'legacy-pr' if event == 'pull_request' else 'full',
                                          'full_matrix': 'false' if event == 'pull_request' else 'true'}
         if event != 'pull_request' or draft == 'true':
             outcomes['secondary-variant']['result'] = 'skipped'
@@ -650,7 +650,7 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn('${{ github.event_name }}-${{ github.event_name ==', workflow)
             self.assertIn("'pull_request' && github.ref || github.run_id", workflow)
             self.assertIn('  pull_request:\n    branches: [master]', events)
-            self.assertIn('    types: [opened, synchronize, reopened, ready_for_review', events)
+            self.assertIn('    types: [opened, synchronize, reopened, ready_for_review]\n', events)
 
     def test_drafts_defer_only_heavy_lanes(self):
         """Marking a draft ready re-runs CI; drafts keep primary lint/tests/style."""
@@ -678,7 +678,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_pull_requests_run_one_full_variant_and_compile_the_other(self):
         self.assertIn("github.event_name == 'pull_request'", self.secondary.split('    steps:', 1)[0])
         step = self.named_step(self.secondary, 'Compile Play and run its flavor-sensitive unit tests')
-        self.assertIn(':app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest', step)
+        self.assertIn(':app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :app:testDevPlayDebugUnitTest', step)
         self.assertIn("grep -rlF 'BuildConfig.SELF_UPDATE_ENABLED' app/src/test/java", step)
         self.assertNotIn('grep -q', step)
         flavor_tests = [path for path in (APP_BUILD.parent / 'src/test/java').rglob('*.kt')
@@ -773,7 +773,7 @@ class AndroidCiGateTest(unittest.TestCase):
         script = textwrap.dedent(step.split('        run: |\n', 1)[1])
         self.assertIn('issues: read', self.changes)
         self.assertNotIn('issues: write', self.changes)
-        self.assertNotIn('labeled,', self.workflow)
+        self.assertIn('    types: [opened, synchronize, reopened, ready_for_review]\n', self.workflow)
         for body, status, expected in [('[[]]', '0', []),
                                        ('[[{"name":"ci:full"}]]', '0', ['ci:full']),
                                        ('not-json', '0', None), ('', '1', None)]:
@@ -786,12 +786,21 @@ class AndroidCiGateTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(json.loads(output.read_text().split('=', 1)[1]), expected)
 
+    def test_full_draft_has_no_remaining_step_level_draft_deferral(self):
+        for job in (self.build_contracts, self.compose_compiler, self.static_analysis,
+                    self.tests_job, self.secondary, self.job_block(self.workflow, 'offline-zsp')):
+            for line in job.split('    steps:', 1)[1].splitlines():
+                if 'if:' in line and 'github.event.pull_request.draft' in line:
+                    self.assertIn("needs.changes.outputs.full_matrix == 'true'", line)
+
     def test_precheck_compiles_all_test_sources_without_benchmark_packaging(self):
         step = self.named_step(self.build_contracts, 'Compile (Kotlin)')
         precheck = step.split('if [[ "$CI_PRECHECK" == true ]]; then', 1)[1].split('else', 1)[0]
         for flavor in ('Play', 'Zapstore'):
             for source in ('Kotlin', 'UnitTestKotlin', 'AndroidTestKotlin'):
                 self.assertIn(f':app:compileDev{flavor}Debug{source}', precheck)
+            for source in ('', 'UnitTest', 'AndroidTest'):
+                self.assertIn(f':app:compileDev{flavor}Debug{source}JavaWithJavac', precheck)
         self.assertNotIn('assemble', precheck)
         self.assertIn("needs.changes.outputs.precheck == 'true'", self.build_contracts)
         for job in (self.static_analysis, self.tests_job, self.secondary, self.compose_compiler):

@@ -79,7 +79,7 @@ jobs:
         shell: bash
         run: |
           labels=null
-          if observed=$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/labels" --paginate --slurp 2>/dev/null); then
+          if observed=$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/labels" --paginate --slurp); then
             labels=$(printf '%s' "$observed" | jq -ce '[.[][] | .name]') || labels=null
           fi
           printf 'labels=%s\n' "$labels" >> "$GITHUB_OUTPUT"
@@ -346,9 +346,9 @@ jobs:
         if: matrix.phase == 'tooling'
         run: |
           if [[ "$CI_PRECHECK" == true ]]; then
-            ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevZapstoreDebugUnitTestKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :app:compileDevPlayDebugKotlin :app:compileDevPlayDebugUnitTestKotlin :app:compileDevPlayDebugAndroidTestKotlin :benchmark:compileDevZapstoreBenchmarkReleaseKotlin --build-cache --profile --no-daemon --stacktrace
+            ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevZapstoreDebugJavaWithJavac :app:compileDevZapstoreDebugUnitTestKotlin :app:compileDevZapstoreDebugUnitTestJavaWithJavac :app:compileDevZapstoreDebugAndroidTestKotlin :app:compileDevZapstoreDebugAndroidTestJavaWithJavac :app:compileDevPlayDebugKotlin :app:compileDevPlayDebugJavaWithJavac :app:compileDevPlayDebugUnitTestKotlin :app:compileDevPlayDebugUnitTestJavaWithJavac :app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :benchmark:compileDevZapstoreBenchmarkReleaseKotlin --build-cache --profile --no-daemon --stacktrace
           else
-            ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevZapstoreDebugUnitTestKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :app:compileDevPlayDebugKotlin :app:compileDevPlayDebugUnitTestKotlin :app:compileDevPlayDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+            ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevZapstoreDebugJavaWithJavac :app:compileDevZapstoreDebugUnitTestKotlin :app:compileDevZapstoreDebugUnitTestJavaWithJavac :app:compileDevZapstoreDebugAndroidTestKotlin :app:compileDevZapstoreDebugAndroidTestJavaWithJavac :app:compileDevPlayDebugKotlin :app:compileDevPlayDebugJavaWithJavac :app:compileDevPlayDebugUnitTestKotlin :app:compileDevPlayDebugUnitTestJavaWithJavac :app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
           fi
 
       - name: ktlint and detekt
@@ -929,7 +929,7 @@ jobs:
             class="${class%.*}"
             filters+=(--tests "${class//\//.}")
           done
-          ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest "${filters[@]}" \
+          ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:compileDevPlayDebugAndroidTestJavaWithJavac :app:testDevPlayDebugUnitTest "${filters[@]}" \
             -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       - name: Upload reports
@@ -1005,7 +1005,7 @@ jobs:
             ($draft == "true" or $draft == "false") and ($event == "pull_request" or $draft == "false") and
             (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
             (.changes.outputs.full_matrix == "true" or .changes.outputs.full_matrix == "false") and
-            (.changes.outputs.ci_mode == (if $precheck then "precheck" else "full" end)) and
+            (.changes.outputs.ci_mode == (if $precheck then "precheck" elif $full then "full" else "legacy-pr" end)) and
             (($event == "pull_request") or $full) and
             (($full | not) or ((.changes.outputs.docs_only == "false") and (.changes.outputs.supplemental_campaigns == "true") and ($precheck | not))) and
             (.changes.outputs.precheck == "true" or .changes.outputs.precheck == "false") and
