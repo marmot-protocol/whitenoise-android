@@ -12429,12 +12429,24 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
     ): Boolean =
-        isNotificationEnrichmentAllowed(
-            update = update,
-            postEpoch = firstPost.epoch,
-            accountCacheEpoch = firstPost.accountCacheEpoch,
-            engineMuted = firstPost.engineMuted,
-        )
+        isQueuedReactionQuoteCurrent(update, firstPost) &&
+            isNotificationEnrichmentAllowed(
+                update = update,
+                postEpoch = firstPost.epoch,
+                accountCacheEpoch = firstPost.accountCacheEpoch,
+                engineMuted = firstPost.engineMuted,
+            )
+
+    /**
+     * Identity eviction cannot make an already-captured opaque reaction quote eligible again. Any removal in the
+     * same account conservatively rejects its queued quotes; no quoted-target identity is available to narrow it.
+     */
+    private fun isQueuedReactionQuoteCurrent(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+    ): Boolean =
+        !LocalNotificationFormatter.isReaction(update) || update.reactedToPreview.isNullOrBlank() ||
+            notificationContentInvalidations.removalVersion(update.accountRef) == firstPost.contentRemovalVersion
 
     /**
      * Reads MDK's durable state for one message candidate right before it may alert or be enriched (#2065, #3323).
@@ -12760,12 +12772,7 @@ class WhiteNoiseAppState private constructor(
         content: NotificationFirstPostContent,
     ): Boolean {
         if (
-            !isNotificationEnrichmentAllowed(
-                update,
-                firstPost.epoch,
-                firstPost.accountCacheEpoch,
-                firstPost.engineMuted,
-            ) ||
+            !isNotificationEnrichmentAllowed(update, firstPost) ||
             !firstPost.lateCorrectionPermit.acquire()
         ) {
             return false
@@ -12789,12 +12796,7 @@ class WhiteNoiseAppState private constructor(
                         replaceCurrentMessage = true,
                         shortNpub = ::shortNpub,
                         isPostStillAllowed = {
-                            isNotificationEnrichmentAllowed(
-                                update,
-                                firstPost.epoch,
-                                firstPost.accountCacheEpoch,
-                                firstPost.engineMuted,
-                            )
+                            isNotificationEnrichmentAllowed(update, firstPost)
                         },
                     )
             }
@@ -13008,13 +13010,14 @@ class WhiteNoiseAppState private constructor(
             shortNpub = ::cachedShortNpubOrUnknown,
             onNotificationWritten = onNotificationWritten,
             isPostStillAllowed = {
-                isNotificationGenerationPostAllowed(
-                    update = update,
-                    postEpoch = firstPost.epoch,
-                    accountCacheEpoch = firstPost.accountCacheEpoch,
-                    engineMuted = firstPost.engineMuted,
-                    requireUnlocked = !redactContent,
-                )
+                isQueuedReactionQuoteCurrent(update, firstPost) &&
+                    isNotificationGenerationPostAllowed(
+                        update = update,
+                        postEpoch = firstPost.epoch,
+                        accountCacheEpoch = firstPost.accountCacheEpoch,
+                        engineMuted = firstPost.engineMuted,
+                        requireUnlocked = !redactContent,
+                    )
             },
         )
 
@@ -13030,13 +13033,14 @@ class WhiteNoiseAppState private constructor(
             shortNpub = ::cachedShortNpubOrUnknown,
             onNotificationWritten = onNotificationWritten,
             isPostStillAllowed = {
-                isNotificationGenerationPostAllowed(
-                    update = update,
-                    postEpoch = firstPost.epoch,
-                    accountCacheEpoch = firstPost.accountCacheEpoch,
-                    engineMuted = firstPost.engineMuted,
-                    requireUnlocked = false,
-                )
+                isQueuedReactionQuoteCurrent(update, firstPost) &&
+                    isNotificationGenerationPostAllowed(
+                        update = update,
+                        postEpoch = firstPost.epoch,
+                        accountCacheEpoch = firstPost.accountCacheEpoch,
+                        engineMuted = firstPost.engineMuted,
+                        requireUnlocked = false,
+                    )
             },
         )
 
@@ -13079,14 +13083,7 @@ class WhiteNoiseAppState private constructor(
             if (!isNotificationCandidateStillUnread(update, "enrich")) return@launch
             var latePicture: LateNotificationIdentity? = null
             notificationEnrichmentGate.withPermit {
-                if (
-                    !isNotificationEnrichmentAllowed(
-                        update,
-                        firstPost.epoch,
-                        firstPost.accountCacheEpoch,
-                        firstPost.engineMuted,
-                    )
-                ) {
+                if (!isNotificationEnrichmentAllowed(update, firstPost)) {
                     return@withPermit
                 }
                 val outcome = enrichPostedNotificationUpdate(update, firstPost) { latePicture = it }
@@ -13345,6 +13342,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Posts and enriches one update under a foreground/app-lock eligibility epoch. */
     private suspend fun processNotificationUpdate(incoming: NotificationUpdateFfi) {
+        val contentRemovalVersion = notificationContentInvalidations.removalVersion(incoming.accountRef)
         val update = withoutUnverifiableReactionQuote(incoming)
         PushWakeDiagnostics.event(PushWakeEvent.Candidate)
         val receivedAtElapsedMs = SystemClock.elapsedRealtime()
@@ -13372,7 +13370,7 @@ class WhiteNoiseAppState private constructor(
                 engineMuted,
                 shouldPost,
                 receivedAtElapsedMs,
-            )
+            ).copy(contentRemovalVersion = contentRemovalVersion)
         postBeforeNotificationEnrichment(
             post = { postInitialNotificationUpdate(update, firstPost, receivedAtElapsedMs) },
             scheduleEnrichment = {

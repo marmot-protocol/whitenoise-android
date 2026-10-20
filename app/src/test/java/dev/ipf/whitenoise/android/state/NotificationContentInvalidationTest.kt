@@ -97,6 +97,25 @@ class NotificationContentInvalidationTest {
         assertFalse(invalidations.hasRemovalInConversation(ACCOUNT, "ab1"))
     }
 
+    /** Dropping a bounded identity never restores an account version captured before its removal. */
+    @Test
+    fun removalVersionSurvivesIdentityEvictionWithoutAffectingAnotherAccount() {
+        val invalidations = NotificationContentInvalidations(capacity = 2)
+        val beforeRemoval = invalidations.removalVersion(ACCOUNT)
+        val otherAccountVersion = invalidations.removalVersion("account-b")
+        invalidations.markRemoved(RemovedNotificationMessage(ACCOUNT, "ab12", "cafe"))
+        val afterRemoval = invalidations.removalVersion(ACCOUNT)
+        repeat(2) { index ->
+            invalidations.markRemoved(RemovedNotificationMessage(ACCOUNT, "cd34", "other-$index"))
+        }
+
+        assertFalse(invalidations.hasRemovalInConversation(ACCOUNT, "ab12"))
+        assertFalse(invalidations.isRemoved(ACCOUNT, "ab12", "cafe"))
+        assertTrue(afterRemoval > beforeRemoval)
+        assertTrue(invalidations.removalVersion(ACCOUNT) > afterRemoval)
+        assertEquals(otherAccountVersion, invalidations.removalVersion("account-b"))
+    }
+
     /** Each account keeps its own bounded removals, so one account's burst never evicts another's. */
     @Test
     fun invalidationsAreBoundedPerAccount() {

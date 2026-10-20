@@ -43,17 +43,23 @@ internal fun removedNotificationMessages(event: MarmotEventFfi): List<RemovedNot
  * content or protocol state: each account keeps its own most recent [capacity] removals, so one account's burst
  * cannot evict another's. Governed message candidates also read their timeline record before posting, covering
  * removals evicted from this guard or predating a restart. Reactions lack a quoted-target identity and bypass that
- * read; their quote protection is limited to retained removals in this process until MDK #2366 supplies that contract.
+ * read. An account's removal version also fences already-queued quotes across identity eviction. Verifying a newly
+ * received opaque target after eviction or restart still requires MDK #2366.
  */
 internal class NotificationContentInvalidations(
     private val capacity: Int,
 ) {
-    private val removedByAccount = HashMap<String, LinkedHashSet<String>>()
+    private val removedByAccount = HashMap<String, AccountRemovals>()
+
+    /** Captures an account's removal version; identity eviction never resets it. */
+    fun removalVersion(accountRef: String): Long = synchronized(this) { removedByAccount[accountRef]?.version ?: 0L }
 
     /** Records [message] as removed. */
     fun markRemoved(message: RemovedNotificationMessage) {
         synchronized(this) {
-            val removed = removedByAccount.getOrPut(message.accountRef) { LinkedHashSet() }
+            val account = removedByAccount.getOrPut(message.accountRef) { AccountRemovals() }
+            account.version += 1L
+            val removed = account.messageKeys
             val key = key(message.groupIdHex, message.messageIdHex)
             removed.remove(key)
             removed.add(key)
@@ -68,7 +74,7 @@ internal class NotificationContentInvalidations(
         messageIdHex: String?,
     ): Boolean {
         val id = messageIdHex?.takeIf(String::isNotBlank) ?: return false
-        return synchronized(this) { removedByAccount[accountRef]?.contains(key(groupIdHex, id)) == true }
+        return synchronized(this) { removedByAccount[accountRef]?.messageKeys?.contains(key(groupIdHex, id)) == true }
     }
 
     /** Whether a retained removal makes an unidentified reaction quote unsafe in this account and conversation. */
@@ -77,7 +83,13 @@ internal class NotificationContentInvalidations(
         groupIdHex: String,
     ): Boolean {
         val prefix = "${groupIdHex.lowercase()}\u0000"
-        return synchronized(this) { removedByAccount[accountRef]?.any { it.startsWith(prefix) } == true }
+        return synchronized(this) { removedByAccount[accountRef]?.messageKeys?.any { it.startsWith(prefix) } == true }
+    }
+
+    /** Bounded identities and one version for the account, independent of how many conversations it has. */
+    private class AccountRemovals {
+        val messageKeys = LinkedHashSet<String>()
+        var version = 0L
     }
 
     /** One identity per case-insensitive conversation and message within an account. */

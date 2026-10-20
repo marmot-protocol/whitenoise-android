@@ -77,6 +77,26 @@ class NotificationReactionRemovalRaceTest {
     @Test
     fun acceptedDeletionFencesAQueuedReactionCorrection() = assertRace(localHide = false, lateCorrection = true)
 
+    /** Evicting the accepted target removal cannot revive a reaction that already captured its quote. */
+    @Test
+    fun acceptedDeletionFencesAnEvictedQueuedReactionFirstWrite() =
+        assertRace(localHide = false, lateCorrection = false, evictRemoval = true)
+
+    /** The captured removal version also survives eviction before a queued silent correction. */
+    @Test
+    fun acceptedDeletionFencesAnEvictedQueuedReactionCorrection() =
+        assertRace(localHide = false, lateCorrection = true, evictRemoval = true)
+
+    /** A local hide also invalidates the already-captured quote after its bounded identity is evicted. */
+    @Test
+    fun localHideFencesAnEvictedQueuedReactionFirstWrite() =
+        assertRace(localHide = true, lateCorrection = false, evictRemoval = true)
+
+    /** A queued correction cannot outlive a local hide by waiting for removal-identity eviction. */
+    @Test
+    fun localHideFencesAnEvictedQueuedReactionCorrection() =
+        assertRace(localHide = true, lateCorrection = true, evictRemoval = true)
+
     /** A matching queued reaction without a removal reaches the platform and retains its valid quote. */
     @Test
     fun queuedReactionWithoutRemovalStillPostsItsQuote() =
@@ -102,6 +122,7 @@ class NotificationReactionRemovalRaceTest {
     private fun assertRace(
         localHide: Boolean,
         lateCorrection: Boolean,
+        evictRemoval: Boolean = false,
     ) = runBlocking {
         val identityReady = CountDownLatch(if (lateCorrection) 1 else 0)
         val fixture = fixture(identityReady, lateCorrection)
@@ -127,10 +148,11 @@ class NotificationReactionRemovalRaceTest {
             // Retraction marks the removal before it tries to acquire a card lock held by the queued write.
             awaitLatch(probe.removalWaiting)
             probe.removalObserved.set(true)
+            if (evictRemoval) evictTargetRemoval(fixture)
             probe.release.countDown()
             hide?.let { assertTrue(it.await()) }
             awaitLatch(probe.removalCompleted)
-            assertScopeControls(fixture)
+            if (evictRemoval) assertOtherScopeControls(fixture) else assertScopeControls(fixture)
             assertEquals("no queued reaction quote may land after the removal", 0, probe.quotedWritesAfterRemoval.get())
             val payloadText = manager.activeNotifications.flatMap { allText(it.notification.extras) }
             assertFalse(payloadText.any { SECRET in it })
@@ -145,6 +167,15 @@ class NotificationReactionRemovalRaceTest {
     private suspend fun hideTarget(fixture: NotificationBootstrapTestFixture): Boolean =
         fixture.runOnMainLooperPumping { fixture.appState.hideMessageForMe(ACCOUNT, GROUP, TARGET) }
 
+    /** Exercises real removal admission beyond the 512-entry per-account capacity while the quote remains queued. */
+    private suspend fun evictTargetRemoval(fixture: NotificationBootstrapTestFixture) {
+        repeat(513) { index ->
+            fixture.appState.retractNotificationContent(
+                RemovedNotificationMessage(ACCOUNT, "ee00${index.toString(16).padStart(4, '0')}", TARGET),
+            )
+        }
+    }
+
     /** A later reaction remains usable without the unverifiable quote, and other scopes keep their valid quotes. */
     private suspend fun assertScopeControls(fixture: NotificationBootstrapTestFixture) {
         fixture.emitUpdate(
@@ -155,6 +186,11 @@ class NotificationReactionRemovalRaceTest {
         )
         awaitReactionText("👍", expectedMessageId = FRESH_REACTION)
         assertFalse(activeReactionText().any { SECRET in it })
+        assertOtherScopeControls(fixture)
+    }
+
+    /** Fresh notifications in other conversations and accounts keep valid quotes after the removal burst. */
+    private suspend fun assertOtherScopeControls(fixture: NotificationBootstrapTestFixture) {
         val otherGroup =
             reaction(fixture.update).copy(
                 groupIdHex = OTHER_GROUP,
@@ -332,7 +368,7 @@ class NotificationReactionRemovalRaceTest {
             val heldAttempt = if (lateCorrection) 2 else 1
             if (barrier == ConversationCardBarrier.BEFORE_PLATFORM_WRITE && attempts.incrementAndGet() == heldAttempt) {
                 queued.countDown()
-                check(release.await(5, TimeUnit.SECONDS))
+                check(release.await(WRITE_RELEASE_TIMEOUT_SECONDS, TimeUnit.SECONDS))
             }
             if (barrier == ConversationCardBarrier.AFTER_WRITE) {
                 writes.incrementAndGet()
@@ -354,5 +390,6 @@ class NotificationReactionRemovalRaceTest {
         val FRESH_REACTION = "ef".repeat(32)
         const val SECRET = "removed quoted secret"
         const val AWAIT_TIMEOUT_MS = 10_000L
+        const val WRITE_RELEASE_TIMEOUT_SECONDS = 30L
     }
 }
