@@ -22,11 +22,16 @@ from automatic_resume_checker import check_automatic_resume
 APP = "dev.ipf.whitenoise.android.medialatency"
 PROBE = "dev.ipf.whitenoise.android.media.MediaAttachmentLatencyProbe#measureControlledReceivedAttachment"
 LEDGER_COMPLETION_TIMEOUT_SECONDS = 5
+DIAGNOSTIC_EXCEPTIONS = ("kotlin.UninitializedPropertyAccessException", "java.lang.OutOfMemoryError",
+                         "java.lang.NullPointerException", "java.lang.IllegalStateException",
+                         "java.lang.SecurityException", "java.lang.UnsatisfiedLinkError",
+                         "java.lang.IllegalArgumentException", "android.os.DeadObjectException",
+                         "android.os.RemoteException", "java.io.IOException")
 
 
-def adb_command(adb, serial, *args):
+def adb_command(adb, serial, *args, timeout=180):
     """Use only the explicit verified device; never fall back to the default device."""
-    return subprocess.run([adb, "-s", serial, *args], check=True, capture_output=True, text=True, timeout=180).stdout
+    return subprocess.run([adb, "-s", serial, *args], check=True, capture_output=True, text=True, timeout=timeout).stdout
 
 
 def bind_reverse_port(adb, serial, host_port):
@@ -38,6 +43,39 @@ def bind_reverse_port(adb, serial, host_port):
     if not 1 <= port <= 65535:
         raise ValueError("adb reverse returned an out-of-range TCP port")
     return port
+
+
+def reverse_mapping_diagnostics(adb, serial, device_ports, host_ports):
+    """Record only whether this run's expected mappings exist; never export the device's reverse list."""
+    details = {"available": False, "blob": False, "relay": False}
+    try:
+        listing = adb_command(adb, serial, "reverse", "--list", timeout=10)
+        mappings = {tuple(line.split()[-2:]) for line in listing.splitlines() if len(line.split()) == 3}
+        details["available"] = True
+        for role, device_port, host_port in zip(("blob", "relay"), device_ports, host_ports):
+            details[role] = (f"tcp:{device_port}", f"tcp:{host_port}") in mappings
+    except (subprocess.SubprocessError, OSError):
+        pass
+    return details
+
+
+def device_failure_diagnostics(adb, serial):
+    """Read bounded emulator readiness facts without exporting package inventories or shell output."""
+    details = {}
+    for key, args in (("state", ("get-state",)), ("boot_completed", ("shell", "getprop", "sys.boot_completed")),
+                      ("fixture_registered", ("shell", "pm", "list", "instrumentation"))):
+        try:
+            value = adb_command(adb, serial, *args, timeout=10).strip()
+            if key == "state":
+                details[key] = value if value in ("device", "offline", "bootloader", "recovery") else "unknown"
+            elif key == "boot_completed":
+                details[key] = value == "1"
+            else:
+                component = "instrumentation:" + APP + ".test/androidx.test.runner.AndroidJUnitRunner"
+                details[key] = component in value.split()
+        except (subprocess.SubprocessError, OSError):
+            details[key] = None
+    return details
 
 
 def failure_diagnostics(error, stage, adb, serial, physical):
@@ -54,9 +92,16 @@ def failure_diagnostics(error, stage, adb, serial, physical):
                 (f"error: device '{serial}' not found", "device-missing"),
                 ("error: no devices/emulators found", "device-missing"),
                 ("error: closed", "transport-closed"), ("error: protocol fault", "transport-protocol-fault"),
+                ("cannot bind", "listener-bind-failed"), ("listener", "listener-error"),
+                ("Can't find service: activity", "activity-service-missing"),
+                ("Failure calling service activity", "activity-service-failed"),
+                ("java.lang.SecurityException", "security-exception"), ("Permission Denial", "permission-denied"),
+                ("Unknown option", "invalid-command-option"), ("Bad component name", "invalid-component"),
+                ("am: inaccessible or not found", "activity-command-missing"),
                 ("INSTRUMENTATION_ABORTED", "instrumentation-aborted"),
                 ("INSTRUMENTATION_FAILED", "instrumentation-failed"))
     details["subprocess_status"] = next((status for marker, status in statuses if marker in transcript), "unknown")
+    details["command_exception_class"] = next((name for name in DIAGNOSTIC_EXCEPTIONS if name in transcript), "unknown")
     if stage not in ("instrumentation", "restart-instrumentation") or physical:
         return details
     try:
@@ -67,10 +112,8 @@ def failure_diagnostics(error, stage, adb, serial, physical):
                   if f"Process: {APP}, PID:" in block]
         details["crash_capture"] = "captured"
         details["recent_app_crash"] = bool(blocks) or f">>> {APP} <<<" in capture.stdout
-        classes = ("kotlin.UninitializedPropertyAccessException", "java.lang.OutOfMemoryError",
-                   "java.lang.NullPointerException", "java.lang.IllegalStateException",
-                   "java.lang.SecurityException", "java.lang.UnsatisfiedLinkError")
-        details["recent_app_crash_class"] = next((name for name in classes if any(name in b for b in blocks)), "unknown")
+        details["recent_app_crash_class"] = next((name for name in DIAGNOSTIC_EXCEPTIONS
+                                                 if any(name in b for b in blocks)), "unknown")
     except (subprocess.SubprocessError, OSError):
         details["crash_capture"] = "unavailable"
     return details
@@ -199,6 +242,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             device_ports.append(bind_reverse_port(adb, serial, port))
         blob_port, relay_port = device_ports
         server.set_upload_port(blob_port)
+        report["reverse_bindings_before_instrumentation"] = reverse_mapping_diagnostics(
+            adb, serial, device_ports, (server.server_port, relay.port))
         stage = "instrumentation"
         result = adb_command(
             adb, serial, "shell", "am", "instrument", "-w", "-r",
@@ -250,6 +295,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
     except (subprocess.SubprocessError, OSError, ValueError) as error:
         failure = error
         report["failure_class"] = type(error).__name__
+        if stage in ("instrumentation", "restart-instrumentation") and not physical:
+            report["device_failure_diagnostics"] = device_failure_diagnostics(adb, serial)
         report["failure_diagnostics"] = failure_diagnostics(error, stage, adb, serial, physical)
     finally:
         # Retain failure/timeout evidence before cleanup; never discard failed attempts.
@@ -372,11 +419,16 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             report["deferred"].remove("physical-device")
         report["deferred"].extend(["manual-ui-flows", "representative-large-file-performance"])
         report["reverse_cleanup_failed"] = False
+        if failure is not None:
+            report["reverse_bindings_before_cleanup"] = reverse_mapping_diagnostics(
+                adb, serial, device_ports, (server.server_port, relay.port))
+        report["reverse_cleanup_errors"] = []
         for port in device_ports:
             try:
                 adb_command(adb, serial, "reverse", "--remove", f"tcp:{port}")
-            except (subprocess.SubprocessError, OSError):
+            except (subprocess.SubprocessError, OSError) as error:
                 report["reverse_cleanup_failed"] = True
+                report["reverse_cleanup_errors"].append(failure_diagnostics(error, "reverse-cleanup", adb, serial, physical))
         for service in (server, relay):
             if service in started_services:
                 service.shutdown()

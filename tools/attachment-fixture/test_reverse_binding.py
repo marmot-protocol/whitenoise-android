@@ -21,7 +21,7 @@ class ReverseBindingTest(unittest.TestCase):
             with self.subTest(restart=restart), tempfile.TemporaryDirectory() as directory:
                 calls, allocated, host_ports, listeners = [], [], [], {}
 
-                def adb(binary, serial, *args):
+                def adb(binary, serial, *args, **options):
                     """Model independent device listeners, including contention at host-numbered device ports."""
                     self.assertEqual(("chosen-adb", "emulator-5554"), (binary, serial))
                     calls.append(args)
@@ -43,6 +43,9 @@ class ReverseBindingTest(unittest.TestCase):
                     if args[:2] == ("reverse", "--remove"):
                         self.assertEqual("fixture", listeners.pop(int(args[2].removeprefix("tcp:"))))
                     elif args[:3] == ("shell", "am", "instrument"):
+                        self.assertEqual(("shell", "am", "instrument", "-w", "-r", "-e", "class", device_runner.PROBE,
+                                          "-e", "allowControlledAttachmentProbe", "true"), args[:11])
+                        self.assertEqual(device_runner.APP + ".test/androidx.test.runner.AndroidJUnitRunner", args[-1])
                         self.assertEqual(str(allocated[0]), args[args.index("fixtureBlobPort") + 1])
                         self.assertEqual(str(allocated[1]), args[args.index("fixtureRelayPort") + 1])
                         # Simulate the device namespace: resolve the advertised listener through its mapping.
@@ -90,7 +93,7 @@ class ReverseBindingTest(unittest.TestCase):
             with self.subTest(second_response=second_response), tempfile.TemporaryDirectory() as directory:
                 calls, bindings = [], []
 
-                def adb(binary, serial, *args):
+                def adb(binary, serial, *args, **options):
                     """Allocate once, then simulate a transport failure or malformed allocated-port output."""
                     calls.append(args)
                     if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):

@@ -109,7 +109,7 @@ class RunnerContractTest(unittest.TestCase):
 
     def test_timeout_and_cleanup_failure_preserve_failed_report(self):
         """An adb failure cannot discard the host evidence or become qualification."""
-        def adb(_, serial, *args):
+        def adb(_, serial, *args, **options):
             """Fail instrumentation and cleanup independently, after verified emulator setup."""
             self.assertEqual("emulator-5554", serial)
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
@@ -141,7 +141,7 @@ class RunnerContractTest(unittest.TestCase):
     def test_failed_instrumentation_keeps_redacted_diagnostics_and_never_qualifies(self):
         """Distinguish a crash from missing measurements without leaking captured messages or another process."""
         secret = "PRIVATE-FIXTURE-CONTENT"
-        def adb(binary, serial, *args):
+        def adb(binary, serial, *args, **options):
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                 return "1"
             if args[:4] == ("shell", "pm", "list", "packages"):
