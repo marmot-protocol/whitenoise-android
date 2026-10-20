@@ -8,8 +8,12 @@ private const val NOTIFICATION_TAG_LOG_LENGTH = 16
 /**
  * Runs optional card-picture work inline or through the presenter's existing process-owned launcher.
  *
- * Detached work retains the original show reference until its body finishes or launch fails. The caller
- * keeps ownership of the initial registration; content, eligibility and platform writes stay with it.
+ * Ready pictures run inline in the caller and take no extra reference. Remote pictures retain the show first, so a
+ * stale or dismissed show launches nothing, and the detached body releases that reference once when it finishes,
+ * fails or is cancelled. The caller keeps the initial registration, content, eligibility and platform writes.
+ *
+ * The launcher returns Unit, so a block it drops or a job cancelled before its body starts would keep its reference
+ * — the production scope is never cancelled, so neither happens today.
  */
 internal class NotificationEnrichmentRunner(
     private val enrichmentLauncher: (suspend () -> Unit) -> Unit,
