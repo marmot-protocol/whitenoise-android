@@ -23,11 +23,24 @@ for role in baseline candidate; do
     ./gradlew --init-script "$root/scripts/mdk-qualification.init.gradle" \
       -Pandroid.injected.build.abi=x86_64 -Pandroid.injected.testOnly=true \
       :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon --stacktrace
-    mapfile -t app_apks < <(find app/build/outputs/apk/devZapstore/debug -name '*x86_64*.apk')
-    test_dir=app/build/outputs/apk/androidTest/devZapstore/debug
-    [[ -d "$test_dir" ]] || test_dir=app/build/intermediates/apk/androidTest/devZapstore/debug
-    mapfile -t test_apks < <(find "$test_dir" -name '*.apk')
-    [[ ${#app_apks[@]} == 1 && ${#test_apks[@]} == 1 ]]
+    # Single-ABI (IDE-style) assembly uses intermediates for app and test APKs.
+    mapfile -t app_apks < <(
+      for base in app/build/outputs/apk app/build/intermediates/apk; do
+        [[ -d "$base/devZapstore/debug" ]] || continue
+        find "$base/devZapstore/debug" -maxdepth 1 -type f -name '*x86_64*.apk'
+      done
+    )
+    mapfile -t test_apks < <(
+      for base in app/build/outputs/apk app/build/intermediates/apk; do
+        [[ -d "$base/androidTest/devZapstore/debug" ]] || continue
+        find "$base/androidTest/devZapstore/debug" -maxdepth 1 -type f -name '*.apk'
+      done
+    )
+    if [[ ${#app_apks[@]} != 1 || ${#test_apks[@]} != 1 ]]; then
+      printf 'Expected one app and one test APK; found %d and %d\n' "${#app_apks[@]}" "${#test_apks[@]}" >&2
+      find app/build -name '*.apk' -print >&2
+      exit 1
+    fi
     cp "${app_apks[0]}" "$root/build/mdk-pair/$role/app.apk"
     cp "${test_apks[0]}" "$root/build/mdk-pair/$role/test.apk"
   )
