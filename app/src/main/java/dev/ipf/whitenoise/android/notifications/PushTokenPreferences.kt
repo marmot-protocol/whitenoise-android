@@ -77,11 +77,10 @@ internal class PushTokenPreferences(
             "Push state does not use preference listeners",
         )
 
-    /** A durable target receipt makes an unreadable leftover source irrelevant. */
+    /** Observes receipts without writing; the import owner must retain any failed-commit uncertainty. */
     fun hasImported(source: String): Boolean =
         synchronized(lock) {
-            val current = store.readAll()
-            source in stringSet(current[IMPORTED]) && store.replaceAllDurably(current)
+            source in stringSet(store.readAll()[IMPORTED])
         }
 
     /** A source is retired only after values and its import receipt are committed together. */

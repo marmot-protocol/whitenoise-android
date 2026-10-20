@@ -441,6 +441,11 @@ class PushTokenStore(
         private const val KEYSTORE_ALIAS = "whitenoise.push.tokens.keystore.key"
         private var keyProvider: SecureStoreKeyProvider = AndroidKeystoreSecretKeyProvider(KEYSTORE_ALIAS)
 
+        // commit=false may still expose an import receipt in SharedPreferences memory. Every store
+        // instance shares this uncertainty fence under LOCK until import positively commits again.
+        // After process death only the disk payload survives; no protocol data is cached here.
+        private val unconfirmedImports = mutableSetOf<Pair<String, String>>()
+
         /** JVM fixtures supply an AES key; null restores the production Keystore boundary. */
         @VisibleForTesting
         internal fun installKeyProvider(provider: SecureStoreKeyProvider?) {
@@ -464,7 +469,11 @@ class PushTokenStore(
             source: String,
             secure: PushTokenPreferences,
         ): LegacyImportResult {
-            val receipt = secure.hasImported(source)
+            val sourceKey = context.dataDir.absolutePath to source
+            if (secure.hasImported(source) && sourceKey !in unconfirmedImports) {
+                retireImportedSource(context, source)
+                return LegacyImportResult.IMPORTED
+            }
             val legacy =
                 runCatching {
                     if (source == SECURE_PREFS_NAME) {
@@ -474,20 +483,28 @@ class PushTokenStore(
                     }
                 }
             return when {
-                receipt -> {
-                    // Cleanup failure cannot invalidate a durable target receipt.
-                    runCatching { legacy.getOrNull()?.let(secure::cleanupImportedSource) }
-                    LegacyImportResult.IMPORTED
-                }
                 legacy.isFailure -> LegacyImportResult.BLOCKED
                 else ->
                     try {
-                        legacy.getOrNull()?.let { secure.importLegacy(source, it) }
+                        legacy.getOrNull()?.let {
+                            unconfirmedImports += sourceKey
+                            secure.importLegacy(source, it)
+                            unconfirmedImports -= sourceKey
+                            retireImportedSource(context, source)
+                        }
                         LegacyImportResult.IMPORTED
                     } catch (malformed: MalformedLegacyPushSource) {
                         if (malformed.cleanupRequired) LegacyImportResult.BLOCKED else LegacyImportResult.QUARANTINED
                     }
             }
+        }
+
+        /** Never opens a retired encrypted source; deletion failure cannot invalidate its durable receipt. */
+        private fun retireImportedSource(
+            context: Context,
+            source: String,
+        ) {
+            runCatching { context.deleteSharedPreferences(source) }
         }
 
         /** Constructs lazily so a locked Keystore cannot crash AppState initialization. */
@@ -497,6 +514,7 @@ class PushTokenStore(
                 val appContext = context.applicationContext
                 val safety = appContext.getSharedPreferences("whitenoise.push.safety", Context.MODE_PRIVATE)
                 var initialized = false
+                var forceLegacyRetry = false
                 var nextImportAttemptMs = 0L
                 lateinit var secure: PushTokenPreferences
                 secure =
@@ -509,11 +527,21 @@ class PushTokenStore(
                         LOCK,
                         prepare = {
                             if (!initialized && android.os.SystemClock.elapsedRealtime() >= nextImportAttemptMs) {
+                                val retainedQuarantine =
+                                    if (!forceLegacyRetry && !safety.getBoolean("quarantine_cleanup_unknown", false)) {
+                                        safety.getStringSet("quarantined_sources", emptySet()).orEmpty()
+                                    } else {
+                                        emptySet()
+                                    }
                                 val results =
                                     listOf(SECURE_PREFS_NAME, FALLBACK_PREFS_NAME, PREFS_NAME)
                                         .associateWith { source ->
-                                            runCatching { importSource(appContext, source, secure) }
-                                                .getOrDefault(LegacyImportResult.PENDING)
+                                            if (source in retainedQuarantine) {
+                                                LegacyImportResult.QUARANTINED
+                                            } else {
+                                                runCatching { importSource(appContext, source, secure) }
+                                                    .getOrDefault(LegacyImportResult.PENDING)
+                                            }
                                         }
                                 val pending = results.containsValue(LegacyImportResult.PENDING)
                                 val quarantined = results.filterValues { it.quarantined }.keys
@@ -527,7 +555,8 @@ class PushTokenStore(
                                             results.containsValue(LegacyImportResult.BLOCKED),
                                         ).commit(),
                                 )
-                                initialized = !pending && quarantined.isEmpty()
+                                forceLegacyRetry = false
+                                initialized = !pending && !results.containsValue(LegacyImportResult.BLOCKED)
                                 if (!initialized) {
                                     android.util.Log.w("PushTokenStorage", "legacy_import_deferred")
                                     nextImportAttemptMs = android.os.SystemClock.elapsedRealtime() + 30_000L
@@ -549,6 +578,7 @@ class PushTokenStore(
                         }
                     },
                     retryImport = {
+                        forceLegacyRetry = true
                         initialized = false
                         nextImportAttemptMs = 0L
                     },
