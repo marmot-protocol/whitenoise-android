@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.share
 import android.net.Uri
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import dev.ipf.whitenoise.android.ui.conversation.RestoredConversationAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
