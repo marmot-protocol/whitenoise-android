@@ -11164,13 +11164,15 @@ class WhiteNoiseAppState private constructor(
                 }.getOrNull()
             }
         val canonicalNpub = readNpubPresentation(accountIdHex)
-        if (profile != null || rawDisplayName != null || canonicalNpub != null) {
+        val hasProfileData = profile != null || rawDisplayName != null
+        if (hasProfileData || canonicalNpub != null) {
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
             withContext(Dispatchers.Main.immediate) {
                 if (profileCacheLifetime.isCurrent(epoch)) {
                     publishNpubPresentation(accountIdHex, canonicalNpub)
+                    if (!hasProfileData) return@withContext
                     val current =
                         synchronized(profilePresentationLock) {
                             profilePresentations[accountIdHex] ?: ProfilePresentation.Empty

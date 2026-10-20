@@ -918,13 +918,13 @@ internal fun ChatsScreen(
     // Capture restoration before the reset effect records a fresh dataset. Only an existing deep
     // viewport needs the complete body list to avoid clamping its retained message anchor.
     val preservePendingSearchAnchor =
-        remember(chatListDatasetKey, bodySearchRequest) {
-            preserveSearchBodyAnchor(
-                sameDataset = searchViewport?.resetState(showArchived)?.appliedDatasetKey == chatListDatasetKey,
-                firstVisibleIndex = chatListState.firstVisibleItemIndex,
-                firstVisibleOffset = chatListState.firstVisibleItemScrollOffset,
-            )
-        }
+        rememberSearchBodyAnchorRestoration(
+            datasetKey = chatListDatasetKey,
+            sameDataset = searchViewport?.resetState(showArchived)?.appliedDatasetKey == chatListDatasetKey,
+            firstVisibleIndex = chatListState.firstVisibleItemIndex,
+            firstVisibleOffset = chatListState.firstVisibleItemScrollOffset,
+            loading = bodySearchLoading,
+        )
     ChatListSearchTopResetEffect(
         listState = chatListState,
         datasetKey = chatListDatasetKey,

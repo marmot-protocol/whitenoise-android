@@ -7,10 +7,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ChatListSearchCandidate
 import dev.ipf.whitenoise.android.core.projectChatListSearchCandidates
@@ -35,13 +36,13 @@ class GlobalSearchStagedViewportTest {
         val listState = LazyListState(firstVisibleItemIndex = 40, firstVisibleItemScrollOffset = 9)
         composeRule.setContent {
             val preserve =
-                remember {
-                    preserveSearchBodyAnchor(
-                        sameDataset = savedOwner.appliedDatasetKey == dataset,
-                        firstVisibleIndex = listState.firstVisibleItemIndex,
-                        firstVisibleOffset = listState.firstVisibleItemScrollOffset,
-                    )
-                }
+                rememberSearchBodyAnchorRestoration(
+                    datasetKey = dataset,
+                    sameDataset = savedOwner.appliedDatasetKey == dataset,
+                    firstVisibleIndex = listState.firstVisibleItemIndex,
+                    firstVisibleOffset = listState.firstVisibleItemScrollOffset,
+                    loading = loading,
+                )
             ChatListSearchTopResetEffect(listState, dataset, searchActive = true, viewportState = savedOwner)
             if (blockLocalSearchRows(loading, hasLocalRows = true, preservePendingAnchor = preserve)) {
                 Text("Restoring message results")
@@ -63,6 +64,52 @@ class GlobalSearchStagedViewportTest {
                 .key,
         )
         assertEquals(9, listState.firstVisibleItemScrollOffset)
+    }
+
+    @Test
+    fun restoredAnchorWaitsForItsFirstLoadButDoesNotHideNamesOnRetry() {
+        val restoredDataset = ChatListDatasetKey(false, null, "name")
+        var dataset by mutableStateOf(restoredDataset)
+        var loading by mutableStateOf(false)
+        var mounted by mutableStateOf(true)
+        composeRule.setContent {
+            if (mounted) {
+                val preserve =
+                    rememberSearchBodyAnchorRestoration(
+                        datasetKey = dataset,
+                        sameDataset = dataset == restoredDataset,
+                        firstVisibleIndex = 40,
+                        firstVisibleOffset = 9,
+                        loading = loading,
+                    )
+                Text(if (preserve) "Restoration pending" else "Restoration finished")
+                if (!blockLocalSearchRows(loading, hasLocalRows = true, preservePendingAnchor = preserve)) {
+                    Text("Local name result")
+                }
+            }
+        }
+        composeRule.onNodeWithText("Restoration pending").assertIsDisplayed()
+        composeRule.runOnIdle { loading = true }
+        composeRule.onNodeWithText("Restoration pending").assertIsDisplayed()
+        composeRule.onNodeWithText("Local name result").assertDoesNotExist()
+        composeRule.runOnIdle { loading = false }
+        composeRule.onNodeWithText("Restoration finished").assertIsDisplayed()
+        composeRule.onNodeWithText("Local name result").assertIsDisplayed()
+
+        composeRule.runOnIdle { loading = true }
+        composeRule.onNodeWithText("Restoration finished").assertIsDisplayed()
+        composeRule.onNodeWithText("Local name result").assertIsDisplayed()
+        composeRule.runOnIdle { dataset = ChatListDatasetKey(false, null, "another") }
+        composeRule.onNodeWithText("Restoration finished").assertIsDisplayed()
+        composeRule.onNodeWithText("Local name result").assertIsDisplayed()
+
+        composeRule.runOnIdle { mounted = false }
+        composeRule.runOnIdle {
+            dataset = restoredDataset
+            mounted = true
+        }
+        composeRule.onNodeWithText("Restoration pending").assertIsDisplayed()
+        composeRule.onNodeWithText("Local name result").assertDoesNotExist()
     }
 
     @Test

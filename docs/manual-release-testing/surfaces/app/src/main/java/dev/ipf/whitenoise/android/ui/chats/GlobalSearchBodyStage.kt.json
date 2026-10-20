@@ -12,6 +12,14 @@
           "FIND-013",
           "FIND-015"
         ]
+      },
+      {
+        "surface": "Search viewport restoration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
+        "anchor": "fun rememberSearchBodyAnchorRestoration(",
+        "test_ids": [
+          "FIND-015"
+        ]
       }
     ],
     "settings_controls": [

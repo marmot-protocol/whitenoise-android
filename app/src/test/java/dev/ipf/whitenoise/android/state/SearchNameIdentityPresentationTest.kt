@@ -77,6 +77,32 @@ class SearchNameIdentityPresentationTest {
         }
 
     @Test
+    fun identityOnlyRefreshLeavesLaterLocalNameMaterializationAvailable() =
+        runTest {
+            var localName: String? = null
+            val nameReads = AtomicInteger()
+            val identityReads = AtomicInteger()
+            val appState =
+                appState(readDisplayName = {
+                    nameReads.incrementAndGet()
+                    localName
+                }) {
+                    identityReads.incrementAndGet()
+                    CANONICAL_NPUB
+                }
+            appState.refreshProfile(PEER)
+            assertEquals(1, nameReads.get())
+            assertEquals(1, identityReads.get())
+
+            localName = "Recently cached person"
+            appState.warmProfilePresentationsBlocking(listOf(PEER))
+
+            assertEquals("Recently cached person", appState.contactDisplayNameCached(PEER))
+            assertEquals(2, nameReads.get())
+            assertEquals(1, identityReads.get())
+        }
+
+    @Test
     fun staleRefreshCannotPublishAnIdentityIntoTheCurrentPresentationLifetime() =
         runTest {
             val appState = appState { CANONICAL_NPUB }
@@ -134,6 +160,7 @@ class SearchNameIdentityPresentationTest {
 
     private fun appState(
         native: MarmotInterface? = null,
+        readDisplayName: suspend (String) -> String? = { null },
         readIdentity: suspend (String) -> String?,
     ): WhiteNoiseAppState {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -144,7 +171,7 @@ class SearchNameIdentityPresentationTest {
             accounts = listOf(AccountSummaryFfi("search-owner", OWNER, true, false, false, true)),
             activeAccountRef = "search-owner",
             profileReader = { null },
-            profileDisplayNameReader = { null },
+            profileDisplayNameReader = readDisplayName,
             profileRefreshRequest = {},
             npubPresentationReader = readIdentity.takeIf { native == null },
             initialMarmotRuntime = native?.let { AppMarmotRuntime("search-native-fixture", it) },
