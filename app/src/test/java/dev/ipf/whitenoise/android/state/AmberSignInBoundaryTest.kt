@@ -30,7 +30,7 @@ class AmberSignInBoundaryTest {
         runBlocking {
             val fixture = fixture(legacyFallback = false)
             fixture.state.amberPublicKeyRequest = {
-                fixture.state.accountSession.publishCreatedIdentity("replacement") {}
+                runBlocking { fixture.state.accountSession.publishCreatedIdentity("replacement") {} }
                 ACCOUNT_ID
             }
             val result = runCatching { fixture.state.loginWithAmber() }

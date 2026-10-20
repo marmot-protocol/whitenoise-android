@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -51,36 +52,43 @@ class AppStateDraftOrderingIntegrationTest {
 
     /** Verifies only the newest account-fenced summary request can publish after an A-B-A race. */
     @Test
-    fun latestAccountFencedSummaryRefreshWinsAcrossDelayedABACompletions() {
-        val drafts = DraftStore(OrderingDraftPersistence, nowSeconds = { 100L })
-        val gateway = DelayedSummaryGateway()
-        val dispatcher = Executors.newFixedThreadPool(3).asCoroutineDispatcher()
-        try {
-            val appState = appState(drafts, repository(gateway, dispatcher))
+    fun latestAccountFencedSummaryRefreshWinsAcrossDelayedABACompletions() =
+        runBlocking {
+            val drafts = DraftStore(OrderingDraftPersistence, nowSeconds = { 100L })
+            val gateway = DelayedSummaryGateway()
+            val dispatcher = Executors.newFixedThreadPool(3).asCoroutineDispatcher()
+            try {
+                val appState = appState(drafts, repository(gateway, dispatcher))
 
-            appState.accountSession.publishCreatedIdentity(ACCOUNT_A) { appState.switchMediaSessionForTest(ACCOUNT_A) }
-            appState.refreshDraftSummaries(ACCOUNT_A)
-            gateway.awaitStarted(0)
-            appState.accountSession.publishCreatedIdentity(ACCOUNT_B) { appState.switchMediaSessionForTest(ACCOUNT_B) }
-            appState.refreshDraftSummaries(ACCOUNT_B)
-            gateway.awaitStarted(1)
-            appState.accountSession.publishCreatedIdentity(ACCOUNT_A) { appState.switchMediaSessionForTest(ACCOUNT_A) }
-            appState.refreshDraftSummaries(ACCOUNT_A)
-            gateway.awaitStarted(2)
+                appState.accountSession.publishCreatedIdentity(
+                    ACCOUNT_A,
+                ) { appState.switchMediaSessionForTest(ACCOUNT_A) }
+                appState.refreshDraftSummaries(ACCOUNT_A)
+                gateway.awaitStarted(0)
+                appState.accountSession.publishCreatedIdentity(
+                    ACCOUNT_B,
+                ) { appState.switchMediaSessionForTest(ACCOUNT_B) }
+                appState.refreshDraftSummaries(ACCOUNT_B)
+                gateway.awaitStarted(1)
+                appState.accountSession.publishCreatedIdentity(
+                    ACCOUNT_A,
+                ) { appState.switchMediaSessionForTest(ACCOUNT_A) }
+                appState.refreshDraftSummaries(ACCOUNT_A)
+                gateway.awaitStarted(2)
 
-            gateway.release(2)
-            awaitCondition { drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP) == 900uL }
-            gateway.release(0)
-            gateway.release(1)
-            awaitCondition { gateway.completed.get() == 3 }
+                gateway.release(2)
+                awaitCondition { drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP) == 900uL }
+                gateway.release(0)
+                gateway.release(1)
+                awaitCondition { gateway.completed.get() == 3 }
 
-            assertEquals(900uL, drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP))
-            assertNull(drafts.draftedAtSecondsFor(ACCOUNT_B, OTHER_GROUP))
-        } finally {
-            gateway.releaseAll()
-            dispatcher.close()
+                assertEquals(900uL, drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP))
+                assertNull(drafts.draftedAtSecondsFor(ACCOUNT_B, OTHER_GROUP))
+            } finally {
+                gateway.releaseAll()
+                dispatcher.close()
+            }
         }
-    }
 
     /** Builds a visible two-row projection whose ordering changes can be asserted synchronously. */
     private fun chats(appState: WhiteNoiseAppState): ChatsController =
