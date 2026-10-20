@@ -814,6 +814,7 @@
     <string name="toast_profile_published_detail">Votre profil est maintenant sur %1$d relais.</string>
     <string name="toast_couldnt_publish_profile">Impossible de publier le profil</string>
     <string name="toast_send_failed">Échec de l’envoi</string>
+    <string name="toast_send_storage_full">Espace de stockage insuffisant pour envoyer. Libérez de l’espace et réessayez.</string>
     <string name="toast_send_connection_failed">Impossible de joindre le relais. Vérifiez votre connexion et réessayez.</string>
     <string name="toast_send_queue_full">Trop de messages attendent d\'être envoyés dans cette discussion, le vôtre n\'a pas été envoyé. Réessayez une fois le retard rattrapé.</string>
     <string name="toast_send_chat_changed">La conversation a changé pendant l\'envoi, votre message n\'a donc pas été envoyé. Réessayez.</string>
