@@ -33,7 +33,7 @@ mapping assertions do not independently qualify every message's highlight.
 For an unknown emoji-name pronunciation report, run the opt-in
 `TtsSpeakerSynthesisDeviceTest#exportSyntheticSpeakerNameAudioControls` with
 `ttsEngine` on the isolated `dev.ipf.whitenoise.android.maestrolab` pair. It keeps
-six synthetic name/punctuation audio controls and `controls.json` in a unique
+ten synthetic name/punctuation audio controls and `controls.json` in a unique
 `tts-speaker-*` directory under that app's external files. Record the engine
 version separately. Export only those generated files and listen to the plain,
 leading/trailing emoji and joined-emoji cases, comparing colon and whitespace

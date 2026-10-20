@@ -51,7 +51,19 @@ class TtsRealEnginePositionAndroidTest {
         val packageName = args.getString("ttsEngine").orEmpty()
         assumeTrue("This case requires an explicitly selected installed speech engine", packageName.isNotEmpty())
         val expectedRanges = requireNotNull(args.getString("ttsExpectedRanges")).toBooleanStrict()
-        for (name in listOf("Alice", "🚀 Alice", "Al👩🏽‍💻ice", "Alice 🚀", "🇳🇬 Alice", "Jose\u0301", "ليلى", "👩🏽‍💻")) {
+        val names =
+            listOf(
+                "Alice",
+                "🚀 Alice",
+                "Al👩🏽‍💻ice",
+                "Alice 🚀",
+                "❤️ Alice",
+                "🇳🇬 Alice",
+                "José",
+                "ليلى",
+                "👩🏽‍💻",
+            )
+        for (name in names) {
             EngineProbe(packageName, name).use { probe ->
                 probe.speak()
                 probe.verify(expectedRanges)
@@ -138,7 +150,10 @@ private class EngineProbe(
                 utteranceId: String,
             ): Int {
                 assertEquals(expectedPayloads()[submissions.getAndIncrement()], text)
-                Log.i("TtsSyntheticSpeaker", "engine=$packageName voice=${tts.voice?.name} locale=${tts.voice?.locale} text=$text")
+                Log.i(
+                    "TtsSyntheticSpeaker",
+                    "engine=$packageName voice=${tts.voice?.name} locale=${tts.voice?.locale} text=$text",
+                )
                 return adapter.speak(text, utteranceId)
             }
 
@@ -187,7 +202,11 @@ private class EngineProbe(
 
     /** Expected synthetic payloads are independent of queue generation and callback bookkeeping. */
     private fun expectedPayloads(): List<String> =
-        if (twoMemberConversation) listOf(text, text, "Bob: $text", "$senderName: $text") else listOf("$senderName: $text")
+        if (twoMemberConversation) {
+            listOf(text, text, "Bob: $text", "$senderName: $text")
+        } else {
+            listOf("$senderName: $text")
+        }
 
     /** Supplies stable body mappings while changing only the roster and synthetic sender context. */
     private fun entry() =

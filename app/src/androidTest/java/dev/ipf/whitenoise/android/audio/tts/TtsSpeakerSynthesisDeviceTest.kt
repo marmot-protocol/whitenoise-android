@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Opt-in pronunciation evidence from synthetic controls; no live profile or message is recorded. */
 @ManualDeviceFixture
 class TtsSpeakerSynthesisDeviceTest {
-    /** Captures raw name/punctuation controls for listening, without asserting that an engine pronounced them correctly. */
+    /** Captures raw name/punctuation audio for listening; completion does not assert correct pronunciation. */
     @Test
     fun exportSyntheticSpeakerNameAudioControls() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -58,7 +58,19 @@ class TtsSpeakerSynthesisDeviceTest {
         directory: File,
     ) {
         check(directory.mkdirs())
-        val controls = listOf("Alice: Body.", "🚀 Alice: Body.", "Alice 🚀: Body.", "👩🏽‍💻: Body.", "Alice 🚀 Body.", "👩🏽‍💻 Body.")
+        val controls =
+            listOf(
+                "Alice: Body.",
+                "🚀 Alice: Body.",
+                "Al👩🏽‍💻ice: Body.",
+                "Alice 🚀: Body.",
+                "❤️ Alice: Body.",
+                "Alice ❤️: Body.",
+                "👩🏽‍💻: Body.",
+                "Alice 🚀 Body.",
+                "Alice ❤️ Body.",
+                "👩🏽‍💻 Body.",
+            )
         val utterances = JSONArray()
         controls.forEachIndexed { index, text ->
             val file = File(directory, "control-$index.wav")

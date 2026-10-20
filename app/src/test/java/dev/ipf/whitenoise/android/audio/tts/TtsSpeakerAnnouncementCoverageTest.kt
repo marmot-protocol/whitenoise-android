@@ -124,9 +124,21 @@ class TtsSpeakerAnnouncementCoverageTest {
         val harness = TtsQueueHarness()
         harness.queue.start(listOf(message("a1", "alice", "First.")))
         harness.queue.onStarted(harness.utteranceId(0))
-        assertTrue(harness.queue.replaceWindow(listOf(message("a2", "alice", "Second.")), "a2", TtsWindowSentenceTarget.First))
+        assertTrue(
+            harness.queue.replaceWindow(
+                listOf(message("a2", "alice", "Second.")),
+                "a2",
+                TtsWindowSentenceTarget.First,
+            ),
+        )
         assertEquals("Second.", harness.enqueued.last().first.text)
-        assertTrue(harness.queue.replaceWindow(listOf(message("b1", "bob", "Reply.")), "b1", TtsWindowSentenceTarget.First))
+        assertTrue(
+            harness.queue.replaceWindow(
+                listOf(message("b1", "bob", "Reply.")),
+                "b1",
+                TtsWindowSentenceTarget.First,
+            ),
+        )
         assertEquals("bob: Reply.", harness.enqueued.last().first.text)
     }
 
@@ -176,7 +188,9 @@ class TtsSpeakerAnnouncementCoverageTest {
         val text = "Body."
         val entry = TtsSpeakableEntry("alice", "Alice", text, conversationMemberCount = 2)
         val mapped =
-            entry.copy(spokenTextSpans = listOf(TtsSpokenTextSpan(TtsTextRange(0, 4), TtsVisibleTextSpan("body", 0, 4))))
+            entry.copy(
+                spokenTextSpans = listOf(TtsSpokenTextSpan(TtsTextRange(0, 4), TtsVisibleTextSpan("body", 0, 4))),
+            )
         for (source in listOf(entry, mapped)) {
             val queued = with(TtsQueuePreparation(4_000)) { source.toQueuedMessage(Locale.US) }!!
             assertEquals(2, queued.conversationMemberCount)
