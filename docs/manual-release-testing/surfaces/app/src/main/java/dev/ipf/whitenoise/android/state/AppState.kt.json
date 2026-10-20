@@ -169,9 +169,36 @@
       {
         "surface": "automatic-attachment-permission-commit-order",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "internal fun refreshNativeAttachmentPermissions()",
+        "anchor": "internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true)",
         "test_ids": [
           "SET-010",
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "incoming-attachment-receipt-scheduling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun scheduleIncomingAttachmentDownloads(",
+        "test_ids": [
+          "MED-036",
+          "SET-011"
+        ]
+      },
+      {
+        "surface": "durable-automatic-attachment-admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun awaitAutomaticAttachmentAdmission(",
+        "test_ids": [
+          "MED-036",
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "waiting-automatic-attachment-network-widening",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private fun widenWaitingAutomaticDownloads(",
+        "test_ids": [
+          "MED-036",
           "MED-022"
         ]
       },

@@ -223,6 +223,8 @@ class StalenessGuardCoverageTest {
             mapOf(
                 // NotificationJobSlot coalesces every canceller behind one monitor-owned completion.
                 "AppState.kt:cancelAndJoin" to "monitor-owned single cancellation completion",
+                // Each permission revision publishes only while NativeAttachmentPermissions.isCurrent still holds it.
+                "AppState.kt:applyNativeAttachmentPermissions" to "revision-checked permission generation",
                 // BootstrapAttemptCoordinator admits only one process-owned attempt.
                 "AppState.kt:bootstrap" to "single-flight bootstrap coordinator",
                 // Explicit retry only changes presentation, then delegates to the same single-flight coordinator.

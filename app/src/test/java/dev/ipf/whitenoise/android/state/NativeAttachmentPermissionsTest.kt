@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentAutomaticPermissionFfi
 import dev.ipf.marmotkit.MarmotInterface
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,6 +33,77 @@ class NativeAttachmentPermissionsTest {
         assertFalse(permission.audio || permission.videos || permission.files)
         assertEquals(denied, imagesOnly.nativePermission(wifi + MediaAutoDownloadNetwork.Metered, true, false))
     }
+
+    /**
+     * Waiting work is released only once its account's approval is applied for the latest host revision: a
+     * newer event reopens the wait, a failed grant never releases it, and other accounts are independent.
+     */
+    @Test
+    fun appliedApprovalReleasesOnlyItsAccountForTheLatestRevision() =
+        runTest {
+            val owner = NativeAttachmentPermissions()
+            var grant = true
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "generation"
+                        "setAttachmentAutomaticPermission" -> grant
+                        else -> error(method)
+                    }
+                }
+            val allow = AttachmentAutomaticPermissionFfi(true, true, true, true)
+            val waiting = async(start = CoroutineStart.UNDISPATCHED) { owner.awaitApplied("a") }
+            assertFalse(waiting.isCompleted)
+
+            owner.update(owner.invalidate(engine), engine, engine, listOf("b")) { allow }
+            yield()
+            assertFalse("another account's approval released the wait", waiting.isCompleted)
+
+            grant = false
+            owner.update(owner.invalidate(engine), engine, engine, listOf("a")) { allow }
+            yield()
+            assertFalse("a refused grant released the wait", waiting.isCompleted)
+
+            grant = true
+            val granted = owner.invalidate(engine)
+            owner.update(granted, engine, engine, listOf("a")) { allow }
+            assertEquals(granted, waiting.await())
+            assertEquals(granted, owner.appliedRevision("a"))
+            assertEquals(null, owner.appliedRevision("b"))
+
+            owner.invalidate(engine)
+            assertEquals("a revoked approval still reported as applied", null, owner.appliedRevision("a"))
+            val reopened = async(start = CoroutineStart.UNDISPATCHED) { owner.awaitApplied("a") }
+            assertFalse("a newer host revision kept the old approval", reopened.isCompleted)
+            reopened.cancel()
+        }
+
+    /** An applied denial for a type does not release a wait for that type; a later approval that allows it does. */
+    @Test
+    fun appliedDenialDoesNotReleaseAWaitForTheDeniedType() =
+        runTest {
+            val owner = NativeAttachmentPermissions()
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "generation"
+                        "setAttachmentAutomaticPermission" -> true
+                        else -> error(method)
+                    }
+                }
+            val imagesOnly = AttachmentAutomaticPermissionFfi(true, false, false, false)
+            val denied = owner.invalidate(engine)
+            owner.update(denied, engine, engine, listOf("a")) { imagesOnly }
+            val video = async(start = CoroutineStart.UNDISPATCHED) { owner.awaitApplied("a") { it.videos } }
+            yield()
+            assertFalse("an approval denying video released a video wait", video.isCompleted)
+            assertEquals(denied, owner.awaitApplied("a") { it.allows(MediaAutoDownloadType.Image) })
+
+            val everything = AttachmentAutomaticPermissionFfi(true, true, true, true)
+            val granted = owner.invalidate(engine)
+            owner.update(granted, engine, engine, listOf("a")) { everything }
+            assertEquals(granted, video.await())
+        }
 
     /** A newer host event invalidates old evaluation without minting another native generation. */
     @Test
