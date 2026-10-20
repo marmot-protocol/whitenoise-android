@@ -20,10 +20,10 @@ internal const val FILE_BACKED_TAG_BYTES = 16L
 internal const val FILE_BACKED_ATTACHMENT_MAX_BYTES: Long = 512L * 1024L * 1024L - FILE_BACKED_TAG_BYTES
 
 // A large send holds three copies on disk at once: this snapshot, MDK's private snapshot and its ciphertext.
-private const val FILE_BACKED_DISK_COPIES = 3L
+internal const val FILE_BACKED_DISK_COPIES = 3L
 
 // Headroom left for the account database and the rest of the app after the copies above.
-private const val FILE_BACKED_DISK_RESERVE_BYTES = 64L * 1024L * 1024L
+internal const val FILE_BACKED_DISK_RESERVE_BYTES = 64L * 1024L * 1024L
 
 /** Native upload bounds for picks sent from a private staged file. */
 internal data class FileBackedSendLimits(

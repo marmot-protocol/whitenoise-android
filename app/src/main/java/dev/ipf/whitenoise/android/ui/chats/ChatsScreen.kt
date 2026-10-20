@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
@@ -178,6 +179,7 @@ internal fun ChatsScreen(
     // item 0 without yanking an active on-list reader (issues #1313, #3280).
     conversationReturnHead: ChatListReturnHead? = null,
     onConversationReturnHeadHandled: () -> Unit = {},
+    retainedAvatarPreparation: RetainedGroupAvatarPreparation? = null,
     // Chat-list profile opens must capture the same visible filtered head used
     // by direct conversation opens so profile-sheet Message/shared-group routes
     // can arm the return snap (#1313).
@@ -1950,6 +1952,7 @@ internal fun ChatsScreen(
                             { it.selectedAvatarAsset },
                             accountRef = controller.boundAccountRef,
                             surfaceIdentity = controller,
+                            retainedPreparation = retainedAvatarPreparation,
                         ) {
                             LazyColumn(
                                 modifier =

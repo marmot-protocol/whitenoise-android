@@ -7,6 +7,7 @@ import org.junit.Test
 import java.io.File
 
 class ForwardProductionBoundaryCoverageTest {
+    /** Production forwarding reads plaintext under the source account and publishes only destination references. */
     @Test
     fun productionTransportMaterializesFromSourceAndPublishesOnlyDestinationReferences() {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
@@ -20,6 +21,36 @@ class ForwardProductionBoundaryCoverageTest {
         assertFalse(
             Regex("sendMediaAttachments\\([^)]*source\\.reference", RegexOption.DOT_MATCHES_ALL).containsMatchIn(body),
         )
+    }
+
+    /**
+     * The destination upload runs on MDK's file path under the start watchdog, so a transfer that never starts cannot
+     * hang for minutes (#2556), and messages the file path cannot take keep the in-memory upload. The staged-disk
+     * claim is taken outside the off-thread read, so a cancellation on the way back cannot leak it.
+     */
+    @Test
+    fun productionUploadIsWatchedForStalls() {
+        val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
+        val fileBacked =
+            body
+                .substringAfter("private suspend fun uploadFileBacked(")
+                .substringBefore("private suspend fun uploadInMemory(")
+
+        assertTrue("uploadMediaFiles(account, targetGroupIdHex, request, control)" in fileBacked)
+        assertTrue("withUploadStartWatchdog(" in fileBacked)
+        assertTrue("startMillis = FORWARD_UPLOAD_START_MILLIS" in fileBacked)
+        assertTrue("cancel = control::cancel" in fileBacked)
+        assertTrue("withNativeTransferControl(" in fileBacked)
+        assertTrue("uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes)" in body)
+        assertTrue("fileUploadFits(message.attachments, batch, available)" in body)
+        assertTrue("diskClaims.claimIf(copyBytes, usableBytes)" in body)
+        assertTrue("claim?.shrinkBy(snapshotBytes)" in body)
+        assertTrue("claim?.release()" in body)
+        assertTrue("uploadInMemory(targetGroupIdHex, message)" in body)
+        // withContext drops its result when the caller is cancelled on the way back, so a claim taken inside it leaks.
+        val offThread = body.substringAfter("withContext(Dispatchers.IO) {\n").substringBefore("\n                }\n")
+        assertTrue("nativeFileBackedSendLimits()" in offThread)
+        assertFalse("claimIf" in offThread)
     }
 
     /** The transport declares both owner guards and batch serialization. */

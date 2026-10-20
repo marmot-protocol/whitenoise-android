@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
+  "legacy_sha256": "2f6899e10ec6287bb60c2f7c48cec8b72f8d4b279578deaec0a075a8685c7ddf",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Forward source read from MarmotKit's retained copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
+        "anchor": "internal suspend fun readRetainedForwardPlaintext(",
+        "test_ids": [
+          "MSG-010",
+          "MED-020"
+        ]
+      },
+      {
+        "surface": "Forward upload through the cancellable native file path",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
+        "anchor": "uploadMediaFiles(account, targetGroupIdHex, request, control)",
+        "test_ids": [
+          "MSG-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

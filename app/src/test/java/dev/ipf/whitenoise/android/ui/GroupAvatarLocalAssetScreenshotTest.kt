@@ -90,6 +90,7 @@ import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.state.conversationSourceGroup
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.chats.ChatRow
@@ -182,7 +183,7 @@ class GroupAvatarLocalAssetScreenshotTest {
             for (index in 0..3) {
                 composeRule.runOnIdle { step.value = index }
                 composeRule.waitForIdle()
-                assertBlueAvatarPixels()
+                assertBlueAvatarPixels(composeRule.onRoot())
                 if (index == 3) {
                     val context = ApplicationProvider.getApplicationContext<Context>()
                     composeRule.onNodeWithText(context.getString(R.string.change_photo)).assertExists()
@@ -204,18 +205,6 @@ class GroupAvatarLocalAssetScreenshotTest {
             surface.controller.onCleared()
             surface.chats.onCleared()
         }
-    }
-
-    /** Tests rendered pixels, rather than inferring the result from a helper's returned bitmap. */
-    private fun assertBlueAvatarPixels(node: SemanticsNodeInteraction = composeRule.onRoot()) {
-        val bitmap = node.captureToImage().asAndroidBitmap()
-        var bluePixels = 0
-        for (y in 0 until bitmap.height) {
-            for (x in 0 until bitmap.width) {
-                if (bitmap.getPixel(x, y) == Color.rgb(0x1E, 0x88, 0xE5)) bluePixels += 1
-            }
-        }
-        assertTrue("Selected group picture must be rendered on the production surface", bluePixels > 300)
     }
 
     /** Opens the real editor's picture action and records its immediately supplied image, without refetching. */
@@ -752,6 +741,77 @@ class GroupAvatarLocalAssetScreenshotTest {
     }
 }
 
+/** Frozen route entry binds the selected picture before the live conversation header hydrates. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+class GroupAvatarFrozenEntryScreenshotTest {
+    @get:Rule val composeRule = createComposeRule()
+
+    /** Retires only process-local test pixels and adapters between independent screenshot cases. */
+    @Before
+    @After
+    fun clearLoaders() {
+        AvatarImageLoader.resetProfileImageFetcherForTests()
+        AvatarImageLoader.clear()
+        GroupAvatarImageLoader.clear()
+    }
+
+    /** The opening transition uses the tapped display row while preserving the selected peer's warm pixels. */
+    @Test
+    fun peerDisplayPictureSurvivesFrozenConversationEntry() {
+        val fixture = AvatarLocalFixture(withRuntime = false)
+        val production =
+            productionSurfaceFixture(
+                fixture,
+                encrypted = false,
+                sourceGroup = group().copy(name = "", avatarUrl = null),
+                selectedPresentation = selectedPicture(PresentationSourceFfi.PEER_PROFILE),
+                fromDisplayRow = true,
+            )
+        assertEquals(SELECTED_PICTURE_URL, production.item.group.avatarUrl)
+        assertNull(production.controller.group.avatarUrl)
+        val tapped = production.item.copy(group = production.item.group.copy(name = "Opening title", archived = true))
+        val normalized = fixture.state.conversationSourceGroup(tapped, ACCOUNT_REF)
+        assertEquals("Opening title", normalized.name)
+        assertTrue(normalized.archived)
+        assertNull(normalized.avatarUrl)
+        assertEquals(
+            production.item.group,
+            fixture.state.conversationSourceGroup(production.item, "another-account"),
+        )
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(color = MaterialTheme.colorScheme.background) {
+                        ProductionAvatarSurface(1, fixture.state, production.item, production.controller, freeze = true)
+                    }
+                }
+            }
+            composeRule.waitForIdle()
+            assertBlueAvatarPixels(composeRule.onNodeWithTag("conversation.header.avatar", useUnmergedTree = true))
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_stored_peer_avatar_frozen_entry.png")
+            assertEquals(0, fixture.reads.get())
+            assertEquals(0, fixture.requests.get())
+        } finally {
+            production.controller.onCleared()
+            production.chats.onCleared()
+        }
+    }
+}
+
+/** Tests rendered pixels, rather than inferring the result from a helper's returned bitmap. */
+private fun assertBlueAvatarPixels(node: SemanticsNodeInteraction) {
+    val bitmap = node.captureToImage().asAndroidBitmap()
+    var bluePixels = 0
+    for (y in 0 until bitmap.height) {
+        for (x in 0 until bitmap.width) {
+            if (bitmap.getPixel(x, y) == Color.rgb(0x1E, 0x88, 0xE5)) bluePixels += 1
+        }
+    }
+    assertTrue("Selected group picture must be rendered on the production surface", bluePixels > 300)
+}
+
 /** Header selection comes from the native frame, even before the Android roster hydrates. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -952,6 +1012,7 @@ private fun productionSurfaceFixture(
     sourceGroup: AppGroupRecordFfi? = null,
     selectedPresentation: ConversationPresentationFfi? = null,
     members: List<dev.ipf.marmotkit.AppGroupMemberRecordFfi> = emptyList(),
+    fromDisplayRow: Boolean = false,
 ): ProductionSurfaceFixture {
     val selected = asset()
     val record =
@@ -989,7 +1050,7 @@ private fun productionSurfaceFixture(
     val controller =
         ConversationController(
             fixture.state,
-            initialGroup = record,
+            initialGroup = if (fromDisplayRow) fixture.state.conversationSourceGroup(item, ACCOUNT_REF) else record,
             initialMemberSnapshot = GroupMemberSnapshot(members),
         )
     assertNotNull(
@@ -1022,6 +1083,7 @@ private fun ProductionAvatarSurface(
     state: WhiteNoiseAppState,
     item: ChatListItem,
     controller: ConversationController,
+    freeze: Boolean = false,
 ) {
     when (step) {
         0 -> ChatRow(item, state, onClick = {}, onOpenProfile = {}, interactionsEnabled = false)
@@ -1039,6 +1101,7 @@ private fun ProductionAvatarSurface(
                 searchFocusRequester = remember { FocusRequester() },
                 appState = state,
                 controller = controller,
+                freezeRoutePresentation = freeze,
                 groupTitleCopy = GroupTitleCopy.Default,
                 openedAsDmHint = false,
                 openDetailsDescription = "Group details",
