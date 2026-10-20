@@ -55,7 +55,7 @@ private val CustomEmojiRowImageSize = 32.dp
 private val CustomEmojiPreviewSize = 64.dp
 
 /** A picked image waiting for its shortcode. */
-private class StagedEmoji(
+internal class StagedEmoji(
     val bytes: ByteArray,
     val preview: ImageBitmap,
     val suggestedCode: String,
@@ -314,7 +314,7 @@ private fun PrepareSelectedEmoji(
 
 @Suppress("FunctionNaming")
 @Composable
-private fun ConfirmEmojiRemoval(
+internal fun ConfirmEmojiRemoval(
     emoji: CustomEmoji,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
@@ -370,7 +370,7 @@ private fun rememberEmojiPickers(
 
 @Suppress("FunctionNaming")
 @Composable
-private fun StagedEmojiDialog(
+internal fun StagedEmojiDialog(
     appState: WhiteNoiseAppState,
     store: CustomEmojiStore,
     pending: StagedEmoji?,

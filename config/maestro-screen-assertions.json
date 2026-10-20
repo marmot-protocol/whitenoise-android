@@ -3543,14 +3543,58 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
       "symbol": "ConfirmEmojiRemoval",
-      "bindings": [],
-      "remaining": "Removal confirmation requires direct rendered coverage. Opening the dialog must expose its controls. Exercise Cancel and verify retained artwork, then exercise Remove and verify its dispatch. The current destination case stops before this dialog."
+      "bindings": [
+        {
+          "case": "presentation-extra-modal-emoji-wrapper-remove-cancel",
+          "selector": {
+            "text": "Remove :fixture:[?]"
+          },
+          "entry_assertion": {
+            "text": "Remove :fixture:[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Removal Cancel retains fixture artwork; scope covers wrapper dispatch only."
+        },
+        {
+          "case": "presentation-extra-modal-emoji-wrapper-remove-confirm",
+          "selector": {
+            "text": "Remove :fixture:[?]"
+          },
+          "entry_assertion": {
+            "text": "Remove :fixture:[?]"
+          },
+          "visible_on_entry": true,
+          "scope": "Confirmation Remove deletes fixture artwork through its controlled callback."
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
       "symbol": "StagedEmojiDialog",
-      "bindings": [],
-      "remaining": "The staged-selection wrapper requires direct rendered coverage. Exercise dismissal, then verify accepted save dispatch. Current presentation fixtures render CustomEmojiNameDialog directly. They leave wrapper behavior and persistence unproven."
+      "bindings": [
+        {
+          "case": "presentation-extra-modal-emoji-wrapper-staged-dismiss",
+          "selector": {
+            "text": "Name this emoji"
+          },
+          "entry_assertion": {
+            "text": "Name this emoji"
+          },
+          "visible_on_entry": true,
+          "scope": "Staged dismissal keeps its task-owned store empty."
+        },
+        {
+          "case": "presentation-extra-modal-emoji-wrapper-staged-save",
+          "selector": {
+            "text": "Name this emoji"
+          },
+          "entry_assertion": {
+            "text": "Name this emoji"
+          },
+          "visible_on_entry": true,
+          "scope": "Accepted staged Save persists exact artwork in its task-owned store."
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
