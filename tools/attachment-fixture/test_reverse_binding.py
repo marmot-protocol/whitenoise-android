@@ -64,7 +64,8 @@ class ReverseBindingTest(unittest.TestCase):
 
                 output = Path(directory) / "report.json"
                 with patch.object(device_runner, "adb_command", side_effect=adb), \
-                        patch.object(device_runner, "wait_for_ledger_completion", return_value=([], False)):
+                        patch.object(device_runner, "wait_for_ledger_completion",
+                                     side_effect=lambda ledger, start: (ledger.snapshot()[start:], False)):
                     # Routing-only instrumentation has no measurements and must not qualify the app.
                     with self.assertRaises(RuntimeError):
                         device_runner.run("chosen-adb", "emulator-5554", Path(directory) / "server", output,
