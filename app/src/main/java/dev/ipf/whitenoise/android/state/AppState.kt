@@ -12545,7 +12545,7 @@ class WhiteNoiseAppState private constructor(
      * card; other valid entries stay. Reconciliation is silent: it only rewrites or cancels and never alerts.
      */
     internal suspend fun retractNotificationContent(message: RemovedNotificationMessage) {
-        notificationContentInvalidations.markRemoved(message)
+        recordNotificationContentRemoval(message)
         withNotificationReconcileLock(message.accountRef, message.groupIdHex) {
             withContext(Dispatchers.Default) {
                 localNotificationPresenter.reconcileConversationContent(
@@ -12558,6 +12558,11 @@ class WhiteNoiseAppState private constructor(
                 }
             }
         }
+    }
+
+    /** Records an accepted removal before any platform card lock can delay its retraction. */
+    internal fun recordNotificationContentRemoval(message: RemovedNotificationMessage) {
+        notificationContentInvalidations.markRemoved(message)
     }
 
     /**
@@ -13221,7 +13226,7 @@ class WhiteNoiseAppState private constructor(
         marmot: MarmotInterface,
     ) {
         removedNotificationMessages(event).forEach { message ->
-            notificationContentInvalidations.markRemoved(message)
+            recordNotificationContentRemoval(message)
             launch {
                 runCatchingCancellable { retractNotificationContent(message) }
                     .onFailure { appStateDebug(it) { "notification retraction failed" } }

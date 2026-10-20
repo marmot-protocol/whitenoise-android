@@ -167,10 +167,10 @@ class NotificationReactionRemovalRaceTest {
     private suspend fun hideTarget(fixture: NotificationBootstrapTestFixture): Boolean =
         fixture.runOnMainLooperPumping { fixture.appState.hideMessageForMe(ACCOUNT, GROUP, TARGET) }
 
-    /** Exercises real removal admission beyond the 512-entry per-account capacity while the quote remains queued. */
-    private suspend fun evictTargetRemoval(fixture: NotificationBootstrapTestFixture) {
+    /** Admits the receipt loop's removals without waiting on platform locks held by the queued quote. */
+    private fun evictTargetRemoval(fixture: NotificationBootstrapTestFixture) {
         repeat(513) { index ->
-            fixture.appState.retractNotificationContent(
+            fixture.appState.recordNotificationContentRemoval(
                 RemovedNotificationMessage(ACCOUNT, "ee00${index.toString(16).padStart(4, '0')}", TARGET),
             )
         }
@@ -368,7 +368,7 @@ class NotificationReactionRemovalRaceTest {
             val heldAttempt = if (lateCorrection) 2 else 1
             if (barrier == ConversationCardBarrier.BEFORE_PLATFORM_WRITE && attempts.incrementAndGet() == heldAttempt) {
                 queued.countDown()
-                check(release.await(WRITE_RELEASE_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                check(release.await(5, TimeUnit.SECONDS))
             }
             if (barrier == ConversationCardBarrier.AFTER_WRITE) {
                 writes.incrementAndGet()
@@ -390,6 +390,5 @@ class NotificationReactionRemovalRaceTest {
         val FRESH_REACTION = "ef".repeat(32)
         const val SECRET = "removed quoted secret"
         const val AWAIT_TIMEOUT_MS = 10_000L
-        const val WRITE_RELEASE_TIMEOUT_SECONDS = 30L
     }
 }
