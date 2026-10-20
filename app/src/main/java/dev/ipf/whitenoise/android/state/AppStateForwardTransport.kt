@@ -100,18 +100,21 @@ internal fun WhiteNoiseAppState.forwardTransport(
             requireDestinationAccount()
             val copyBytes = fileUploadCopyBytes(message.attachments)
             val snapshotBytes = fileUploadSnapshotBytes(message.attachments)
-            var claim: StagedDiskClaims.Claim? = null
-            val batchCiphertextBytes =
+            val batchAndUsableBytes =
                 withContext(Dispatchers.IO) {
-                    nativeFileBackedSendLimits()?.batchCiphertextBytes?.takeIf { batch ->
-                        val usableBytes = usableSpaceFor(uploadSourcesDirectory(appContext.cacheDir))
-                        claim =
-                            diskClaims.claimIf(copyBytes, usableBytes) { available ->
-                                fileUploadFits(message.attachments, batch, available)
-                            }
-                        claim != null
+                    nativeFileBackedSendLimits()?.let { limits ->
+                        limits.batchCiphertextBytes to usableSpaceFor(uploadSourcesDirectory(appContext.cacheDir))
                     }
                 }
+            // Claimed here, not inside withContext, which drops its result when the caller is cancelled on the way
+            // back: no suspension point may sit between the claim and the try that releases it.
+            val claim =
+                batchAndUsableBytes?.let { (batch, usableBytes) ->
+                    diskClaims.claimIf(copyBytes, usableBytes) { available ->
+                        fileUploadFits(message.attachments, batch, available)
+                    }
+                }
+            val batchCiphertextBytes = batchAndUsableBytes?.first?.takeIf { claim != null }
             val uploaded =
                 try {
                     diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
