@@ -716,6 +716,7 @@ class TtsController internal constructor(
             ?.let { target -> installPreparedSeekTarget(entry, sentenceOrdinal, target) } ?: false
     }
 
+    /** Installs fresh target context separately from chronological retained entries. */
     private fun installPreparedSeekTarget(
         entry: TtsSpeakableEntry,
         sentenceOrdinal: Int,
@@ -733,7 +734,14 @@ class TtsController internal constructor(
         val merged = TtsHistoryWindow.merge(current, listOf(target), direction, entry.messageIdHex)
         val wasPaused = state.value is TtsState.Paused
         if (wasPaused && !acquireAudioFocus()) return false
-        val installed = queue.replaceWindow(merged, entry.messageIdHex, TtsWindowSentenceTarget.First, sentenceOrdinal)
+        val installed =
+            queue.replaceWindow(
+                merged,
+                entry.messageIdHex,
+                TtsWindowSentenceTarget.First,
+                sentenceOrdinal,
+                resolvedMemberCount = target.conversationMemberCount,
+            )
         if (installed && wasPaused) queue.resume()
         if (!installed && wasPaused) audioFocus.release()
         return installed
@@ -781,7 +789,12 @@ class TtsController internal constructor(
                     direction = direction,
                     targetMessageIdHex = targetMessageIdHex,
                 )
-            queue.replaceWindow(merged, targetMessageIdHex, targetSentence)
+            queue.replaceWindow(
+                merged,
+                targetMessageIdHex,
+                targetSentence,
+                resolvedMemberCount = incoming.asReversed().firstNotNullOfOrNull { it.conversationMemberCount },
+            )
         }
     }
 
@@ -834,6 +847,7 @@ class TtsController internal constructor(
         // arms a schedule nor opens a calibration window.
         val activeUtteranceId = utteranceId ?: return
         val chunk = queue.submittedChunk(activeUtteranceId) ?: return
+        queue.onStarted(activeUtteranceId)
         rangeProbe.onUtteranceStart()
         val appliedRate = utteranceRates[activeUtteranceId] ?: speechRate()
         val startedAt = clock()
