@@ -50,6 +50,9 @@ internal enum class ForwardFailureStage {
     Materialize,
     PreparationTimeout,
     Upload,
+
+    /** The destination upload never started; Retry is the user's choice, never automatic (#2556). */
+    UploadTimeout,
     Publish,
     PayloadTooLarge,
     Expired,
@@ -86,11 +89,17 @@ internal data class ForwardOperationSnapshot(
                         target.failureStage != ForwardFailureStage.SessionChanged
                 }
 
-    /** Timeout is user-recoverable but must not immediately re-enter the same stalled source work. */
+    /**
+     * Timeout is user-recoverable but must not immediately re-enter the same stalled work, so a forward that already
+     * waited out a preparation or upload bound fails with Retry instead of going back to in progress.
+     */
     val canAutomaticallyRetry: Boolean
         get() =
             canRetry &&
-                targets.none { target -> target.failureStage == ForwardFailureStage.PreparationTimeout }
+                targets.none { target ->
+                    target.failureStage == ForwardFailureStage.PreparationTimeout ||
+                        target.failureStage == ForwardFailureStage.UploadTimeout
+                }
     val canCancel: Boolean
         get() =
             (phase == ForwardOperationPhase.Preparing || phase == ForwardOperationPhase.Running) &&
@@ -501,6 +510,7 @@ internal class ForwardSession(
             prepared
         }
 
+    /** Uploads and publishes every destination in parallel, at most [targetFanout] at a time. */
     private suspend fun runTargets(
         targetIds: List<String>,
         prepared: List<PreparedForwardMessage>,
@@ -516,7 +526,10 @@ internal class ForwardSession(
             }.awaitAll()
     }
 
-    // Each destination converts all non-cancellation transport failures into retry state.
+    /**
+     * Uploads and publishes one destination, converting every non-cancellation transport failure into retry state
+     * at the stage it reached. An upload that never started fails as [ForwardFailureStage.UploadTimeout].
+     */
     @Suppress("LongMethod", "ThrowsCount", "TooGenericExceptionCaught")
     private suspend fun processTarget(
         targetGroupIdHex: String,
@@ -593,8 +606,7 @@ internal class ForwardSession(
             if (failure is ForwardPublishUncertainException) {
                 uncertainPublishByTarget[targetGroupIdHex] = failure.evidence
             }
-            if (failure is ForwardAttachmentExpiredException) failureStage = ForwardFailureStage.Expired
-            if (failure is ForwardSessionInvalidatedException) failureStage = ForwardFailureStage.SessionChanged
+            failureStage = targetFailureStage(failureStage, failure)
             onFailure(targetGroupIdHex, failureStage, failure)
             updateForwardTarget(_state, targetGroupIdHex) {
                 it.copy(phase = ForwardTargetPhase.Failed, failureStage = failureStage)
@@ -774,6 +786,7 @@ internal class ForwardOperationOwner(
             false
         }
 
+    /** Stops observing the active forward, releases its session and clears the published state. */
     private fun clearActiveSession() {
         monitor?.cancel()
         stateCollector?.cancel()
@@ -784,6 +797,18 @@ internal class ForwardOperationOwner(
         _state.value = null
     }
 }
+
+/** The stage a destination's [failure] reports: the stage it [reached], unless the failure names a more exact one. */
+private fun targetFailureStage(
+    reached: ForwardFailureStage,
+    failure: Exception,
+): ForwardFailureStage =
+    when (failure) {
+        is ForwardUploadStalledException -> ForwardFailureStage.UploadTimeout
+        is ForwardAttachmentExpiredException -> ForwardFailureStage.Expired
+        is ForwardSessionInvalidatedException -> ForwardFailureStage.SessionChanged
+        else -> reached
+    }
 
 private fun ensureForwardAttachmentNotExpired(
     expiresAtSeconds: ULong?,
