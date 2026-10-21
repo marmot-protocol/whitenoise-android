@@ -97,16 +97,33 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
     @Test
     fun customReplySurfacesAmoled() = captureCustomReplySurfaces("amoled", AppThemeMode.Amoled)
 
-    /** Runs the actual dispatcher with account defaults and a winning per-chat received color. */
+    /** Light replies use the global received fill when the conversation has no override. */
+    @Test
+    fun globalReceivedReplySurfacesLight() = captureCustomReplySurfaces("global_received_light", AppThemeMode.Light, useChatReceivedColor = false)
+
+    /** Dark replies resolve the global near-black received fill through the production dispatcher. */
+    @Test
+    fun globalReceivedReplySurfacesDark() = captureCustomReplySurfaces("global_received_dark", AppThemeMode.Dark, useChatReceivedColor = false)
+
+    /** AMOLED resolves the global received outline while retaining its black reply interiors. */
+    @Test
+    fun globalReceivedReplySurfacesAmoled() = captureCustomReplySurfaces("global_received_amoled", AppThemeMode.Amoled, useChatReceivedColor = false)
+
+    /** Runs the actual dispatcher with global colors and an optional winning per-chat received override. */
     private fun captureCustomReplySurfaces(
         name: String,
         mode: AppThemeMode,
+        useChatReceivedColor: Boolean = true,
     ) {
         appState.updateThemeMode(mode)
         val theme = BubbleTheme.resolve(mode, mode != AppThemeMode.Light)
         appState.updateGlobalBubbleColor(theme, BubbleSide.Mine, 0xFFFFFFFFL)
         appState.updateGlobalBubbleColor(theme, BubbleSide.Other, 0xFF040404L)
-        appState.updateChatBubbleColor(controller.group.groupIdHex, BubbleSide.Other, 0xFF999999L)
+        appState.updateChatBubbleColor(
+            controller.group.groupIdHex,
+            BubbleSide.Other,
+            if (useChatReceivedColor) 0xFF999999L else null,
+        )
         val rows = customReplyRows()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = mode != AppThemeMode.Light, amoled = mode == AppThemeMode.Amoled) {
