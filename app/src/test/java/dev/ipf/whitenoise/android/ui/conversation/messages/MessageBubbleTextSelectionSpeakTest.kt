@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ResolveInfo
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -85,6 +86,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -630,76 +632,105 @@ class MessageBubbleTextSelectionSpeakTest {
     /** Selecting a scrolled filename keeps the source viewport and copies the visible word through the native menu. */
     @Test
     @Suppress("LongMethod")
+    @Config(qualifiers = "en-w360dp-h240dp-mdpi")
     fun codePathNativeSelectionKeepsScrolledFilename() {
-        val appState = appStateWithTts(FakeSessionEngine())
-        val path = "directory/".repeat(12) + "ENDTARGET"
-        val original = timelineMessage("```\n$path\n```")
-        val item =
-            original.copy(
-                record =
-                    original.record.copy(
-                        contentTokens =
-                            MarkdownDocumentFfi(
-                                listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", path)),
-                                false,
-                                byteArrayOf(),
-                            ),
-                    ),
-            )
-        val controller = conversationController(appState)
-        var textSelectionMode by mutableStateOf(false)
-        var actionMenuOpen by mutableStateOf(false)
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
-                    messageBubbleHost(
-                        item = item,
-                        controller = controller,
-                        appState = appState,
-                        textSelectionMode = textSelectionMode,
-                        onTextSelectionModeChange = { textSelectionMode = it },
-                        isActionMenuOpen = actionMenuOpen,
-                        onActionMenuOpenChange = { actionMenuOpen = it },
-                    )
+        withCodePathClock {
+            val appState = appStateWithTts(FakeSessionEngine())
+            val path = "directory/".repeat(12) + "ENDTARGET"
+            val original = timelineMessage("```\n$path\n```")
+            val item =
+                original.copy(
+                    record =
+                        original.record.copy(
+                            contentTokens =
+                                MarkdownDocumentFfi(
+                                    listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", path)),
+                                    false,
+                                    byteArrayOf(),
+                                ),
+                        ),
+                )
+            val controller = conversationController(appState)
+            var textSelectionMode by mutableStateOf(false)
+            var actionMenuOpen by mutableStateOf(false)
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                        messageBubbleHost(
+                            item = item,
+                            controller = controller,
+                            appState = appState,
+                            textSelectionMode = textSelectionMode,
+                            onTextSelectionModeChange = { textSelectionMode = it },
+                            isActionMenuOpen = actionMenuOpen,
+                            onActionMenuOpenChange = { actionMenuOpen = it },
+                        )
+                    }
                 }
             }
+            composeRule.waitForIdle()
+            val node = composeRule.onNodeWithText(path, useUnmergedTree = true)
+            val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+            node.performSemanticsAction(SemanticsActions.ScrollBy) { action ->
+                assertTrue(action(range.maxValue(), 0f))
+            }
+            composeRule.waitForIdle()
+            composeRule
+                .onNodeWithTag(MESSAGE_HOST_TAG)
+                .captureRoboImage("src/test/snapshots/message_bubble_code_path_end.png")
+            val host = composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
+            val hostBounds = host.fetchSemanticsNode().boundsInRoot
+            val textBounds = node.fetchSemanticsNode().boundsInRoot
+            host.performTouchInput {
+                down(Offset(textBounds.right - hostBounds.left - 20f, textBounds.center.y - hostBounds.top))
+                advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+                up()
+            }
+            composeRule.waitForIdle()
+            assertTrue(actionMenuOpen)
+            composeRule.onNodeWithText(app.getString(R.string.select_text)).performScrollTo().performClick()
+            composeRule.waitForIdle()
+            assertTrue(textSelectionMode)
+            val selectedRange = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+            assertEquals(selectedRange.maxValue(), selectedRange.value(), 1f)
+            composeRule.waitUntil(timeoutMillis = 5_000) { nativeTextMenuProvider.dataProvider != null }
+            composeRule
+                .onNodeWithTag(MESSAGE_HOST_TAG)
+                .captureRoboImage("src/test/snapshots/message_bubble_code_path_selection.png")
+            composeRule.runOnIdle {
+                val copy =
+                    checkNotNull(nativeTextMenuProvider.dataProvider)
+                        .data()
+                        .components
+                        .filterIsInstance<TextContextMenuItem>()
+                        .single { it.label == app.getString(android.R.string.copy) }
+                copy.onClick(nativeTextMenuSession)
+            }
+            val clipboard = app.getSystemService(ClipboardManager::class.java)
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.coerceToText(app)
+                    ?.toString() == "ENDTARGET"
+            }
         }
-        composeRule.waitForIdle()
-        val node = composeRule.onNodeWithText(path, useUnmergedTree = true)
-        val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
-        node.performSemanticsAction(SemanticsActions.ScrollBy) { action -> assertTrue(action(range.maxValue(), 0f)) }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
-            .captureRoboImage("src/test/snapshots/message_bubble_code_path_end.png")
-        val host = composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
-        val hostBounds = host.fetchSemanticsNode().boundsInRoot
-        val textBounds = node.fetchSemanticsNode().boundsInRoot
-        host.performTouchInput {
-            down(Offset(textBounds.right - hostBounds.left - 20f, textBounds.center.y - hostBounds.top))
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            up()
-        }
-        composeRule.waitForIdle()
-        assertTrue(actionMenuOpen)
-        composeRule.onNodeWithText(app.getString(R.string.select_text)).performScrollTo().performClick()
-        composeRule.waitForIdle()
-        assertTrue(textSelectionMode)
-        val selectedRange = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
-        assertEquals(selectedRange.maxValue(), selectedRange.value(), 1f)
-        composeRule.waitUntil(timeoutMillis = 5_000) { nativeTextMenuProvider.dataProvider != null }
-        composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
-            .captureRoboImage("src/test/snapshots/message_bubble_code_path_selection.png")
-        composeRule.runOnIdle {
-            val copy =
-                checkNotNull(nativeTextMenuProvider.dataProvider).data().components
-                    .filterIsInstance<TextContextMenuItem>()
-                    .single { it.label == app.getString(android.R.string.copy) }
-            copy.onClick(nativeTextMenuSession)
-        }
-        val clipboard = app.getSystemService(ClipboardManager::class.java)
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            shadowOf(android.os.Looper.getMainLooper()).idle()
-            clipboard.primaryClip?.getItemAt(0)?.coerceToText(app)?.toString() == "ENDTARGET"
+    }
+
+    /** Pins only this golden's clock inputs and restores them even if capture or native selection fails. */
+    private inline fun withCodePathClock(block: () -> Unit) {
+        val originalZone = TimeZone.getDefault()
+        val originalTimeFormat = Settings.System.getString(app.contentResolver, Settings.System.TIME_12_24)
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            Settings.System.putString(app.contentResolver, Settings.System.TIME_12_24, "12")
+            block()
+        } finally {
+            try {
+                Settings.System.putString(app.contentResolver, Settings.System.TIME_12_24, originalTimeFormat)
+            } finally {
+                TimeZone.setDefault(originalZone)
+            }
         }
     }
 

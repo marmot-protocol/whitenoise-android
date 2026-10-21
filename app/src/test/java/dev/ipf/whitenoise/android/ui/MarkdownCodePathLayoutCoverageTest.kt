@@ -75,7 +75,14 @@ class MarkdownCodePathLayoutCoverageTest {
         composeRule.onNodeWithText(path).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
             assertTrue(action(measured))
         }
-        assertEquals(path, measured.single().layoutInput.text.text)
+        assertEquals(
+            path,
+            measured
+                .single()
+                .layoutInput
+                .text
+                .text,
+        )
         assertEquals(1, measured.single().lineCount)
         scrollToEnd(path)
     }
@@ -178,7 +185,10 @@ class MarkdownCodePathLayoutCoverageTest {
     }
 
     /** Renders one native block through the production selection and speech reporting callbacks. */
-    private fun render(block: MarkdownBlockFfi, scale: Float = 1f) {
+    private fun render(
+        block: MarkdownBlockFfi,
+        scale: Float = 1f,
+    ) {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(

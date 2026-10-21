@@ -140,7 +140,10 @@ class MarkdownCodePathScreenshotTest {
     }
 
     /** Couples the visual baseline to unchanged source bytes, authored newlines and the leading slash's position. */
-    private fun assertSourceLayout(layout: TextLayoutResult, content: String) {
+    private fun assertSourceLayout(
+        layout: TextLayoutResult,
+        content: String,
+    ) {
         assertEquals("Code display must preserve authored characters", content, layout.layoutInput.text.text)
         assertEquals("Only the explicit source newline may break these paths", 2, layout.lineCount)
         assertEquals(

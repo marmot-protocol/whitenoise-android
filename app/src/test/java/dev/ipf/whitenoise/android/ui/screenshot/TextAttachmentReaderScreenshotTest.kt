@@ -96,7 +96,8 @@ class TextAttachmentReaderScreenshotTest {
         node.performSemanticsAction(SemanticsActions.ScrollBy) { action -> assertTrue(action(range.maxValue(), 0f)) }
         composeRule.waitForIdle()
         assertEquals(range.maxValue(), range.value(), 1f)
-        composeRule.onNodeWithTag(TEXT_ATTACHMENT_READER_TAG)
+        composeRule
+            .onNodeWithTag(TEXT_ATTACHMENT_READER_TAG)
             .captureRoboImage("src/test/snapshots/text_attachment_reader_code_path_end.png")
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
         assertEquals(source, copied)
