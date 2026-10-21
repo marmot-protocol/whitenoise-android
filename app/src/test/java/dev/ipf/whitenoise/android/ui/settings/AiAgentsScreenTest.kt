@@ -117,6 +117,27 @@ class AiAgentsScreenTest {
         composeRule.onNodeWithTag("ai_agents.copy_feedback").assertExists()
     }
 
+    /** First-time setup identifies the real host and preserves approval and pairing boundaries. */
+    @Test
+    fun claudePromptExplainsHostPrerequisitesAndHomeRelativeFolder() {
+        val prompt = app.getString(R.string.agent_connector_claude_prompt, TEST_NPUB)
+
+        assertTrue(prompt.contains("Claude Code in a terminal on the computer where the agent will run"))
+        assertTrue(prompt.contains("cloud sessions cannot install the connector on that computer"))
+        assertTrue(prompt.contains("https://code.claude.com/docs/en/setup"))
+        assertTrue(prompt.contains("check on my phone"))
+        assertFalse(prompt.contains("this machine uses the same public relay set as my phone"))
+        assertTrue(prompt.contains("/Claude selects \$HOME/Claude, not /Users/me/Claude"))
+        assertTrue(prompt.contains("bash install-claude-marmot.sh"))
+        assertTrue(prompt.contains("that npub as the only allowed welcomer"))
+        assertTrue(prompt.indexOf("bash install-claude-marmot.sh") < prompt.indexOf("invite it from White Noise"))
+        assertTrue(prompt.indexOf("invite it from White Noise") < prompt.indexOf("/Claude selects"))
+        assertTrue(prompt.indexOf("/Claude selects") < prompt.indexOf("send a test message"))
+        assertTrue(prompt.indexOf("send a test message") < prompt.indexOf("Do not report setup complete"))
+        assertTrue(prompt.contains("ask for my approval before making any changes"))
+        assertTrue(prompt.contains("Do not report setup complete until wn-claude returns a reply through White Noise"))
+    }
+
     /** Goose copies only the active public key and explains the harness's execution limitations. */
     @Test
     fun gooseSetupCopiesTheExactActiveAccountPrompt() {

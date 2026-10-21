@@ -748,7 +748,19 @@ class LocalizationResourceTest {
         }
 
     private fun claudeConnectorPromptTokenViolations(prompt: String): List<String> {
-        val required = listOf(CLAUDE_HARNESS_README_URL, CLAUDE_INSTALLER_SCRIPT, "wn-claude --version", "wn-agent")
+        val required =
+            listOf(
+                CLAUDE_HARNESS_README_URL,
+                CLAUDE_INSTALLER_SCRIPT,
+                "wn-claude --version",
+                "wn-agent",
+                "https://code.claude.com/docs/en/setup",
+                "wss://relay.eu.whitenoise.chat",
+                "wss://relay.us.whitenoise.chat",
+                "/Claude",
+                "\$HOME/Claude",
+                "bash install-claude-marmot.sh",
+            )
         val violations = required.filterNot(prompt::contains).map { "missing $it" }.toMutableList()
         if (prompt.windowed(CLAUDE_HARNESS_README_URL.length).count { it == CLAUDE_HARNESS_README_URL } != 1) {
             violations += "missing single Claude harness README URL"
@@ -790,7 +802,16 @@ class LocalizationResourceTest {
         ) {
             violations += "missing single %1\$s placeholder"
         }
-        if (!prompt.startsWith(requirements.promptPrefix)) {
+        val promptPrefix =
+            if (
+                mode == AgentConnectorPromptGuardMode.Claude &&
+                requirements.promptPrefix == "This is an installation prompt"
+            ) {
+                "Installation prompt"
+            } else {
+                requirements.promptPrefix
+            }
+        if (!prompt.startsWith(promptPrefix)) {
             violations += "missing installation-prompt introduction"
         }
         val approvedInstaller =
