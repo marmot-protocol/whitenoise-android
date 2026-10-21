@@ -7,12 +7,15 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 /** Captured when the action opens the dialog, not recreated by later composition. */
 internal class PendingLocalChatDelete private constructor(
     val groupIds: List<String>,
+    val reviewItems: List<ChatListItem>,
     private val controller: ChatsController,
     private val ownerState: WhiteNoiseAppState,
     private val account: String?,
     private val runtime: Int,
     private val bindEpoch: Long,
 ) {
+    val actingAccountRef: String? get() = account
+
     fun isCurrent(
         appState: WhiteNoiseAppState,
         currentController: ChatsController,
@@ -34,6 +37,7 @@ internal class PendingLocalChatDelete private constructor(
     fun remaining(deleted: Int) =
         PendingLocalChatDelete(
             groupIds.drop(deleted),
+            reviewItems.filter { it.group.groupIdHex in groupIds.drop(deleted) },
             controller,
             ownerState,
             account,
@@ -48,6 +52,7 @@ internal class PendingLocalChatDelete private constructor(
             appState: WhiteNoiseAppState,
         ) = PendingLocalChatDelete(
             items.map { it.group.groupIdHex }.distinctBy { it.lowercase() },
+            items.distinctBy { it.group.groupIdHex.lowercase() }.toList(),
             controller,
             appState,
             controller.accountRef,

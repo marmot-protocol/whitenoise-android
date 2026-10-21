@@ -113,6 +113,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
+import dev.ipf.whitenoise.android.ui.chats.newchat.groupReviewAddMembersLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.chats.newchat.withDmCreationOwner
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
@@ -1511,7 +1512,7 @@ internal fun ProfileAddToGroupsContent(
             groups = reviewGroups,
             members = listOf(target),
             busy = busy,
-            confirmLabel = stringResource(R.string.profile_add_to_groups_confirm_label),
+            confirmLabel = stringResource(groupReviewAddMembersLabel(1)),
             onConfirm = {
                 confirmSelection = null
                 onAdd(targets)
@@ -1832,6 +1833,7 @@ private fun ProfileSheetAdminActions(
             busy = busy,
             title = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
             confirmLabel = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
+            description = if (promoting) null else stringResource(R.string.group_action_revoke_explanation),
             onConfirm = {
                 confirmRoleChange = null
                 runMutation(roleChange) {
@@ -1875,6 +1877,7 @@ private fun ProfileSheetModerationConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
+    description: String? = null,
 ) {
     GroupMembersReviewDialog(
         appState = appState,
@@ -1882,7 +1885,7 @@ private fun ProfileSheetModerationConfirmDialog(
         members = listOf(member),
         busy = busy,
         title = title,
-        description = null,
+        description = description,
         invitation = false,
         dismissEnabled = true,
         showProgress = false,

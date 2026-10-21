@@ -111,13 +111,15 @@ class BudgetContractTest(unittest.TestCase):
             owned["server"].ledger.event = record
             return owned["server"]
 
-        def adb(_, serial, *args):
+        def adb(_, serial, *args, **options):
             """Simulate successful Android instrumentation after real host HTTP exchanges."""
             properties = {"ro.kernel.qemu": "1", "ro.build.version.sdk": "30", "ro.product.cpu.abi": "arm64-v8a"}
             if args[:2] == ("shell", "getprop"):
                 return properties[args[2]]
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:3] != ("shell", "am", "instrument"):
                 return ""
             client = http.client.HTTPConnection("127.0.0.1", owned["server"].server_port, timeout=5)

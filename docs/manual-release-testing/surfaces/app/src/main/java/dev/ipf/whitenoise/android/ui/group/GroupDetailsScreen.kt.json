@@ -56,7 +56,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun GroupDetailsLocalDeleteControl(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-034"
         ]
       },
       {
@@ -65,7 +66,8 @@
         "anchor": "fun GroupDetailsScreen(",
         "test_ids": [
           "GRP-001",
-          "GRP-005"
+          "GRP-005",
+          "GRP-034"
         ]
       },
       {
@@ -854,6 +856,14 @@
         "test_ids": [
           "GRP-001"
         ]
+      },
+      {
+        "surface": "Reviewed group action context: R.plurals.selected_members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.plurals.selected_members_count",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ],
     "source_coverage": [
@@ -1132,9 +1142,10 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "surface": "Invitation retry preserves recipients and roles",
-        "anchor": "fun submitSelectedInvites()",
+        "anchor": "fun submitSelectedInvites(",
         "test_ids": [
-          "GRP-030"
+          "GRP-030",
+          "GRP-034"
         ]
       }
     ]

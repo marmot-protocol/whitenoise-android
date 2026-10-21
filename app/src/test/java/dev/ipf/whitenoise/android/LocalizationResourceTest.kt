@@ -748,10 +748,44 @@ class LocalizationResourceTest {
         }
 
     private fun claudeConnectorPromptTokenViolations(prompt: String): List<String> {
-        val required = listOf(CLAUDE_HARNESS_README_URL, CLAUDE_INSTALLER_SCRIPT, "wn-claude --version", "wn-agent")
+        val required =
+            listOf(
+                CLAUDE_HARNESS_README_URL,
+                CLAUDE_INSTALLER_SCRIPT,
+                "wn-claude --version",
+                "wn-agent",
+                "https://code.claude.com/docs/en/setup",
+                "wss://relay.eu.whitenoise.chat",
+                "wss://relay.us.whitenoise.chat",
+                "/Claude",
+                "\$HOME/Claude",
+                "bash install-claude-marmot.sh",
+            )
         val violations = required.filterNot(prompt::contains).map { "missing $it" }.toMutableList()
         if (prompt.windowed(CLAUDE_HARNESS_README_URL.length).count { it == CLAUDE_HARNESS_README_URL } != 1) {
             violations += "missing single Claude harness README URL"
+        }
+        val prerequisiteStart = prompt.indexOf("https://code.claude.com/docs/en/setup")
+        val phoneCheck = prompt.indexOf("wss://relay.eu.whitenoise.chat")
+        val prerequisiteApprovalPatterns =
+            listOf(
+                "ask for my approval before any host changes",
+                "bitte vor jeder Rechneränderung um meine Zustimmung",
+                "pide mi aprobación antes de cualquier cambio",
+                "peça minha aprovação antes de qualquer alteração",
+                "demandez mon approbation avant toute modification",
+                "chiedi la mia approvazione prima di qualsiasi modifica",
+                "запросите моё одобрение до любых изменений",
+                "her değişiklikten önce onayımı isteyin",
+                "任何更改之前请求我的批准",
+                "任何變更之前請求我的核准",
+            )
+        if (
+            prerequisiteStart < 0 ||
+            phoneCheck <= prerequisiteStart ||
+            prerequisiteApprovalPatterns.none { prompt.substring(prerequisiteStart, phoneCheck).contains(it) }
+        ) {
+            violations += "missing approval before prerequisite host changes"
         }
         if (Regex("""\bwn-claude\b""").findAll(prompt).count() < 2) {
             violations += "missing connector round-trip verification"
@@ -790,7 +824,38 @@ class LocalizationResourceTest {
         ) {
             violations += "missing single %1\$s placeholder"
         }
-        if (!prompt.startsWith(requirements.promptPrefix)) {
+        violations += agentConnectorInstallationFlowViolations(prompt, requirements, mode)
+        val forbiddenPatterns =
+            when (mode) {
+                AgentConnectorPromptGuardMode.Generic -> agentConnectorForbiddenPatterns
+                AgentConnectorPromptGuardMode.Codex,
+                AgentConnectorPromptGuardMode.Claude,
+                -> agentConnectorCodexForbiddenPatterns
+            }
+        forbiddenPatterns.forEach { (label, pattern) ->
+            if (pattern.containsMatchIn(prompt)) {
+                violations += label
+            }
+        }
+        return violations
+    }
+
+    private fun agentConnectorInstallationFlowViolations(
+        prompt: String,
+        requirements: AgentConnectorCopyRequirements,
+        mode: AgentConnectorPromptGuardMode,
+    ): List<String> {
+        val violations = mutableListOf<String>()
+        val promptPrefix =
+            if (
+                mode == AgentConnectorPromptGuardMode.Claude &&
+                requirements.promptPrefix == "This is an installation prompt"
+            ) {
+                "Installation prompt"
+            } else {
+                requirements.promptPrefix
+            }
+        if (!prompt.startsWith(promptPrefix)) {
             violations += "missing installation-prompt introduction"
         }
         val approvedInstaller =
@@ -816,18 +881,6 @@ class LocalizationResourceTest {
         }
         if (segmentIndexes.all { it >= 0 } && segmentIndexes.zipWithNext().any { (first, second) -> first >= second }) {
             violations += "not explanation-first"
-        }
-        val forbiddenPatterns =
-            when (mode) {
-                AgentConnectorPromptGuardMode.Generic -> agentConnectorForbiddenPatterns
-                AgentConnectorPromptGuardMode.Codex,
-                AgentConnectorPromptGuardMode.Claude,
-                -> agentConnectorCodexForbiddenPatterns
-            }
-        forbiddenPatterns.forEach { (label, pattern) ->
-            if (pattern.containsMatchIn(prompt)) {
-                violations += label
-            }
         }
         return violations
     }

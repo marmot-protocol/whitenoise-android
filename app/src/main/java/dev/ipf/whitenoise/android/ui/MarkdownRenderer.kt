@@ -84,6 +84,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSearchHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighlight
@@ -1198,7 +1199,7 @@ private fun MarkdownBlockQuoteView(
     depth: Int,
     path: String,
 ) {
-    Row(Modifier.height(IntrinsicSize.Min)) {
+    Row(Modifier.boundedIntrinsicHeight(IntrinsicSize.Min)) {
         Box(
             Modifier
                 .width(3.dp)

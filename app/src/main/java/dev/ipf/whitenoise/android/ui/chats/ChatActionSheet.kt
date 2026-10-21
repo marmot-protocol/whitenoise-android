@@ -182,9 +182,13 @@ internal fun ChatDeleteConfirmationDialog(
     count: Int,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    identity: (@Composable () -> Unit)? = null,
+    confirmEnabled: Boolean = true,
 ) {
     ConfirmDialog(
         title = stringResource(R.string.delete_from_device),
+        identity = identity,
+        confirmEnabled = confirmEnabled,
         message =
             if (count == 1) {
                 stringResource(R.string.delete_local_does_not_leave)

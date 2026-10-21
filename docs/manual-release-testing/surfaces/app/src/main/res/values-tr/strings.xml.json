@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/res/values-tr/strings.xml",
+  "legacy_sha256": "35203bbc6e518a8094e0fb5cc9062db06f665c5c453cc920d7ee50706ca4555d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Turkish local deletion keeps the user in the conversation",
+        "source": "app/src/main/res/values-tr/strings.xml",
+        "anchor": "<string name=\"delete_local_does_not_leave\">",
+        "test_ids": [
+          "CHL-010"
+        ]
+      },
+      {
+        "surface": "Turkish bulk local deletion keeps the user in the conversations",
+        "source": "app/src/main/res/values-tr/strings.xml",
+        "anchor": "<plurals name=\"chat_list_bulk_delete_confirm\">",
+        "test_ids": [
+          "CHL-010"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Claude Code first-installation prompt, approval boundaries and phone setup guidance",
+        "source": "app/src/main/res/values-tr/strings.xml",
+        "anchor": "name=\"agent_connector_claude_prompt\"",
+        "test_ids": [
+          "SET-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

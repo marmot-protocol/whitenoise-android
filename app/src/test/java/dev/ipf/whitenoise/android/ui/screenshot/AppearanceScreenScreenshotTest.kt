@@ -54,6 +54,20 @@ class AppearanceScreenScreenshotTest {
         capture("amoled")
     }
 
+    /** The restored AMOLED bubble destination stays readable at 200% in RTL. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h2400dp-mdpi")
+    fun appearanceAmoledLargeRtl() {
+        render(
+            mode = AppThemeMode.Amoled,
+            darkTheme = true,
+            amoled = true,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+        capture("amoled_large_rtl")
+    }
+
     /** Titles, subtitles and the long colour descriptions at 200% font scale. */
     @Test
     fun appearanceLargeFont() {

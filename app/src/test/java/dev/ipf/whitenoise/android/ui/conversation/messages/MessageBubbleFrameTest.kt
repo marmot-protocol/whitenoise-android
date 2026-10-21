@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -277,7 +278,7 @@ class MessageBubbleFrameTest {
     @Test
     fun replyFooterPinsToQuoteWidenedBubbleEnd() {
         composeRule.setContent {
-            Column(Modifier.width(IntrinsicSize.Max).testTag(REPLY_BUBBLE_TAG)) {
+            Column(Modifier.boundedIntrinsicWidth(IntrinsicSize.Max).testTag(REPLY_BUBBLE_TAG)) {
                 Box(Modifier.width(220.dp).height(1.dp))
                 BubbleFooterLayout(
                     footer = {
