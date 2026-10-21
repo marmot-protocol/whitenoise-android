@@ -5,7 +5,7 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [20 October 2026 nightly evaluation](marmotkit-nightly-20261020.md) records its
+The [21 October 2026 nightly evaluation](marmotkit-nightly-20261021.md) records its
 artifact verification, API changes, migration qualification and 30-day retention
 limits. It is testing-only and does not authorize production adoption.
 

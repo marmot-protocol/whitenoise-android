@@ -1,5 +1,8 @@
 # MarmotKit nightly 20261020 evaluation
 
+Historical evaluation, superseded by the [21 October nightly](marmotkit-nightly-20261021.md).
+Its successful hosted campaign at Android `755d06e1f` qualifies only the 20 October bytes.
+
 This candidate evaluates the published nightly for [Android #3370](https://github.com/marmot-protocol/whitenoise-android/issues/3370).
 It stays draft and is not approved for merging, production adoption or release.
 Follow [the update guide](updating-marmotkit.md) and [CI request policy](ci-request-policy.md).

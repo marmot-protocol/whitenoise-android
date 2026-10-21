@@ -50,19 +50,29 @@ internal suspend fun verifyUpgradeStorage(
         for ((account, policy) in savedUpgradePolicies) runtime.setAttachmentDownloadPolicy(account, policy)
     }
     try {
-        withTimeout(120_000L) {
-            while (accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes } != pendingLegacyBytes) {
-                delay(250L)
-            }
-        }
+        awaitUpgradeStorage(runtime, accounts, pendingLegacyBytes)
     } finally {
         reportUpgradeStorage(runtime, accounts, phase, "completion-observation")
     }
-    for (account in accounts) {
-        val state = runtime.attachmentStorageUsage(account).migration
-        check(state in setOf(AttachmentMigrationStateFfi.COMPLETE, AttachmentMigrationStateFfi.NOT_NEEDED))
-    }
     reportUpgradeStorage(runtime, accounts, phase, "complete")
+}
+
+/** Waits for the expected legacy balance and settled native states; COMPACTING cannot count as completion. */
+private suspend fun awaitUpgradeStorage(
+    runtime: Marmot,
+    accounts: List<String>,
+    pendingLegacyBytes: ULong,
+) {
+    withTimeout(120_000L) {
+        val settled = setOf(AttachmentMigrationStateFfi.COMPLETE, AttachmentMigrationStateFfi.NOT_NEEDED)
+        while (true) {
+            val usage = accounts.map { runtime.attachmentStorageUsage(it) }
+            if (usage.sumOf { it.legacyBytes } == pendingLegacyBytes && usage.all { it.migration in settled }) {
+                return@withTimeout
+            }
+            delay(250L)
+        }
+    }
 }
 
 /** Reports only byte counts and migration state, with no account identifiers or key material. */
