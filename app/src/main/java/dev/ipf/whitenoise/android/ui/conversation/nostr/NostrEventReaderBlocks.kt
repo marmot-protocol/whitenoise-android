@@ -16,14 +16,18 @@ internal fun nostrReaderBlocks(document: MarkdownDocumentFfi): List<MarkdownBloc
         when (block) {
             is MarkdownBlockFfi.Paragraph -> readerInlineGroups(block.inlines).map { block.copy(inlines = it) }
             is MarkdownBlockFfi.Heading -> readerInlineGroups(block.inlines).map { block.copy(inlines = it) }
-            is MarkdownBlockFfi.CodeBlock -> nostrReaderTextChunks(block.content).map { block.copy(content = it) }
+            is MarkdownBlockFfi.CodeBlock ->
+                nostrReaderTextChunks(block.content, keepSlashWithFollowingText = true).map { block.copy(content = it) }
             is MarkdownBlockFfi.MathBlock -> nostrReaderTextChunks(block.content).map { block.copy(content = it) }
             else -> listOf(block)
         }
     }
 
-/** Splits text at word/line boundaries where possible without losing whitespace or surrogate pairs. */
-internal fun nostrReaderTextChunks(text: String): List<String> {
+/** Bounds lazy-item work without losing text; code chunks keep a slash beside its following source character. */
+internal fun nostrReaderTextChunks(
+    text: String,
+    keepSlashWithFollowingText: Boolean = false,
+): List<String> {
     if (text.isEmpty()) return emptyList()
     val chunks = mutableListOf<String>()
     var start = 0
@@ -33,6 +37,7 @@ internal fun nostrReaderTextChunks(text: String): List<String> {
             val boundary = maxOf(text.lastIndexOf('\n', end - 1), text.lastIndexOf(' ', end - 1))
             if (boundary >= start + READER_TEXT_BUDGET / 2) end = boundary + 1
             if (Character.isLowSurrogate(text[end]) && Character.isHighSurrogate(text[end - 1])) end--
+            if (keepSlashWithFollowingText && end > start + 1 && text[end - 1] == '/' && text[end] !in "\r\n") end--
         }
         chunks += text.substring(start, end)
         start = end

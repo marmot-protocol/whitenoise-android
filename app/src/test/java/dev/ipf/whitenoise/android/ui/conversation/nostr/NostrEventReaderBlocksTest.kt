@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
@@ -12,6 +13,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NostrEventReaderBlocksTest {
+    /** Artificial lazy-item boundaries cannot strand a path's slash on the preceding item. */
+    @Test
+    fun codePathChunksKeepSlashWithTheFilenameAndRetainEveryCharacter() {
+        val content = "a".repeat(4095) + "/" + "\uD83D\uDE00_filename".repeat(900)
+        val block = MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", content)
+        val document = MarkdownDocumentFfi(listOf(block), false, byteArrayOf())
+        val chunks = nostrReaderBlocks(document).map { (it as MarkdownBlockFfi.CodeBlock).content }
+        assertTrue(chunks.size > 1)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals("a".repeat(4095), chunks.first())
+        assertTrue(chunks[1].startsWith("/\uD83D\uDE00_filename"))
+        assertTrue(chunks.all { it.length <= 4096 && !it.first().isLowSurrogate() && !it.last().isHighSurrogate() })
+    }
+
+    /** Source newlines remain intentional break opportunities even immediately after a slash. */
+    @Test
+    fun codeChunkingPreservesAnExplicitNewlineAfterTheSlash() {
+        val content = "a".repeat(4095) + "/\nfilename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals("a".repeat(4095) + "/", chunks.first())
+        assertEquals("\nfilename", chunks.last())
+    }
+
     @Test
     fun oversizedNestedMarkdownFallsBackRatherThanElidingEventContent() {
         val paragraph = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("context ".repeat(1000))))

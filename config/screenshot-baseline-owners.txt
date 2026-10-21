@@ -9,6 +9,8 @@
 
 *ScreenshotTest
 
+*.MessageBubbleTextSelectionSpeakTest.codePathNativeSelectionKeepsScrolledFilename
+
 *.StartupReadyRecoveryRouteTest.rootRendersRecoveryWithoutRemountingTheBindOrRestoringProtectedContent
 
 *.AutoDownloadBacklogControlTest

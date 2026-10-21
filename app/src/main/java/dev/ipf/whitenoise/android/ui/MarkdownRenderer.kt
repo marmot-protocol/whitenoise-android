@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -46,6 +48,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -70,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
@@ -849,6 +853,7 @@ internal fun markdownHeadingTextStyle(
         else -> typography.bodyMedium
     }.copy(fontWeight = FontWeight.SemiBold)
 
+/** Keeps source punctuation in LTR order and exposes long code/math lines inside a bounded scroll viewport. */
 @Composable
 private fun MarkdownCodeBlockView(
     content: String,
@@ -860,18 +865,32 @@ private fun MarkdownCodeBlockView(
     // cache the sanitization work instead of repeating it on every recomposition.
     val text = remember(content) { markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n') }
 
-    MarkdownBodyText(
-        leafId = leafId,
-        text = AnnotatedString(text),
-        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    if (useDecorativeBackground) LocalContentColor.current.copy(alpha = 0.08f) else Color.Transparent,
-                    RoundedCornerShape(8.dp),
-                ).padding(horizontal = 10.dp, vertical = 8.dp),
-    )
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        if (useDecorativeBackground) {
+                            LocalContentColor.current.copy(alpha = 0.08f)
+                        } else {
+                            Color.Transparent
+                        },
+                        RoundedCornerShape(8.dp),
+                    ).padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            MarkdownBodyText(
+                leafId = leafId,
+                text = AnnotatedString(text),
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        textDirection = TextDirection.Ltr,
+                    ),
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            )
+        }
+    }
 }
 
 /** One recognized `<details>` disclosure: optional summary label + the collapsed inline content. */

@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -18,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -64,6 +68,48 @@ class TextAttachmentReaderScreenshotTest {
     val composeRule = createComposeRule()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
+
+    /** Horizontal code movement keeps the complete attachment source available to its existing Copy action. */
+    @Test
+    fun codePathRemainsReachableAndCopiesTheOriginalAttachment() {
+        val path = "directory/".repeat(12) + "ENDTARGET"
+        val source = "```text\n$path\n```"
+        val preview =
+            TextAttachmentPreview(
+                candidate = markdownCandidate,
+                text = source,
+                markdownDocument =
+                    MarkdownDocumentFfi(
+                        listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "text", path)),
+                        false,
+                        byteArrayOf(),
+                    ),
+            )
+        var copied = ""
+        render(
+            candidate = markdownCandidate,
+            state = TextAttachmentReaderState.Ready(preview),
+            onCopy = { copied = it },
+        )
+        val node = composeRule.onNodeWithText(path)
+        val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+        node.performSemanticsAction(SemanticsActions.ScrollBy) { action -> assertTrue(action(range.maxValue(), 0f)) }
+        composeRule.waitForIdle()
+        assertEquals(range.maxValue(), range.value(), 1f)
+        composeRule.onNodeWithTag(TEXT_ATTACHMENT_READER_TAG)
+            .captureRoboImage("src/test/snapshots/text_attachment_reader_code_path_end.png")
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
+        assertEquals(source, copied)
+        val root = composeRule.onNodeWithTag(TEXT_ATTACHMENT_READER_TAG)
+        val rootBounds = root.fetchSemanticsNode().boundsInRoot
+        val bounds = node.fetchSemanticsNode().boundsInRoot
+        root.performTouchInput {
+            longClick(Offset(bounds.right - rootBounds.left - 20f, bounds.center.y - rootBounds.top))
+        }
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
+        assertEquals("ENDTARGET", copied)
+        root.captureRoboImage("src/test/snapshots/text_attachment_reader_code_path_selection.png")
+    }
 
     @Test
     fun mixedMarkdownLight() {

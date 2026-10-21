@@ -21,8 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -268,6 +270,9 @@ internal fun MessageFullScreenBody(
             onSelectableTextLayoutChanged = selection.selectableTextLayoutReporter,
         )
     }
+    // Reparent the same leaves when selection activates, preserving code scroll positions and hit geometry.
+    val latestContent by rememberUpdatedState(content)
+    val movableContent = remember(selection, body, markdownDocument) { movableContentOf { latestContent() } }
     Box(
         modifier =
             modifier
@@ -278,10 +283,10 @@ internal fun MessageFullScreenBody(
     ) {
         if (selection.active) {
             SelectionContainer(state = selection.selectionState) {
-                content()
+                movableContent()
             }
         } else {
-            content()
+            movableContent()
         }
     }
 }

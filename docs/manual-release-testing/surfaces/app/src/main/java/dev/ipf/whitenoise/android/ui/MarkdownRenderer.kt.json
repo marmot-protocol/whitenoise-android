@@ -167,6 +167,14 @@
           "RDR-001",
           "MSG-006"
         ]
+      },
+      {
+        "surface": "Code path layout and selection lifetime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownCodeBlockView(",
+        "test_ids": [
+          "RDR-006"
+        ]
       }
     ]
   },
