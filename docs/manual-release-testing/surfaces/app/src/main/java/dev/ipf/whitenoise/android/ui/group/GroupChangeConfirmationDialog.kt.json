@@ -74,7 +74,42 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
         "anchor": "fun GroupChangeConfirmationDialog(",
         "test_ids": [
-          "GRP-032"
+          "GRP-032",
+          "GRP-034"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Reviewed group action context: R.string.disappearing_confirm_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.disappearing_confirm_message",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_revoke_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_action_revoke_explanation",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.plurals.selected_members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.plurals.selected_members_count",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.remove_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.remove_admin",
+        "test_ids": [
+          "GRP-034"
         ]
       }
     ]

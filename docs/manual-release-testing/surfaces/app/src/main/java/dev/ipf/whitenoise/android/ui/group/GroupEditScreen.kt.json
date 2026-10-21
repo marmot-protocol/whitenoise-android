@@ -9,7 +9,8 @@
         "anchor": "fun GroupEditPhotoMenu(",
         "test_ids": [
           "GRP-001",
-          "GRP-025"
+          "GRP-025",
+          "GRP-034"
         ]
       },
       {
@@ -28,7 +29,8 @@
         "test_ids": [
           "GRP-001",
           "GRP-025",
-          "PRO-010"
+          "PRO-010",
+          "GRP-034"
         ]
       }
     ],

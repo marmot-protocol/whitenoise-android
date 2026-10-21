@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -25,6 +27,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -160,15 +163,44 @@ class GroupEditNameEmojiPickerTest {
         composeRule.onNode(hasSetTextAction() and hasText(draftName)).assertExists()
     }
 
-    private fun render(admin: Boolean) {
+    /** The same emoji action remains available in Change photo, with its existing callback and ordering. */
+    @Test
+    fun changePhotoEmojiMenuDark() {
+        render(admin = true, dark = true, hasImage = true)
+        composeRule.onNodeWithText(string(R.string.change_photo)).performClick()
+        composeRule.onNodeWithText(string(R.string.group_emoji_create)).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_info_emoji_image_entry_dark.png")
+        composeRule.onNodeWithText(string(R.string.group_emoji_create)).performClick()
+        composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertIsDisplayed()
+    }
+
+    /** Large RTL text keeps the labelled emoji-picture option reachable. */
+    @Test
+    fun addPhotoEmojiMenuLargeRtl() {
+        render(admin = true, rtl = true, fontScale = 2f)
+        composeRule.onNodeWithText(string(R.string.add_photo)).performClick()
+        composeRule.onNodeWithText(string(R.string.group_emoji_create)).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_info_emoji_image_entry_large_rtl.png")
+    }
+
+    private fun render(
+        admin: Boolean,
+        dark: Boolean = false,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
+        hasImage: Boolean = false,
+    ) {
         val appState = appState()
         composeRule.setContent {
-            WhiteNoiseTheme {
-                GroupEditScreen(
-                    appState = appState,
-                    controller = controller(appState, admin),
-                    onBack = {},
-                )
+            val layoutDirection = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
+                    GroupEditScreen(
+                        appState = appState,
+                        controller = controller(appState, admin, hasImage),
+                        onBack = {},
+                    )
+                }
             }
         }
     }
@@ -209,9 +241,10 @@ class GroupEditNameEmojiPickerTest {
     private fun controller(
         appState: WhiteNoiseAppState,
         admin: Boolean,
+        hasImage: Boolean = false,
     ) = ConversationController(
         appState = appState,
-        initialGroup = group(admin),
+        initialGroup = group(admin, hasImage),
         initialMemberSnapshot =
             GroupMemberSnapshot(
                 listOf(
@@ -228,50 +261,52 @@ class GroupEditNameEmojiPickerTest {
         hasContentDescription(string(R.string.open_emoji_picker)) and
             hasAnyAncestor(hasText(string(R.string.group_name)))
 
-    private fun group(admin: Boolean) =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Marmot team",
-            description = "Group description",
-            admins = if (admin) listOf(ACCOUNT_ID) else emptyList(),
-            relays = emptyList(),
-            nostrGroupIdHex = "03".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
+    private fun group(
+        admin: Boolean,
+        hasImage: Boolean = false,
+    ) = AppGroupRecordFfi(
+        groupIdHex = GROUP_ID,
+        protocolProfile = AppProtocolProfileFfi.LEGACY,
+        endpoint = "wss://relay.example",
+        profilePresent = true,
+        name = "Marmot team",
+        description = "Group description",
+        admins = if (admin) listOf(ACCOUNT_ID) else emptyList(),
+        relays = emptyList(),
+        nostrGroupIdHex = "03".repeat(32),
+        avatarUrl = if (hasImage) "https://example.com/group-photo.png" else null,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = null,
+        encryptedMedia =
+            AppGroupEncryptedMediaComponentFfi(
+                componentId = 0x8008u,
+                component = "marmot.group.encrypted-media.v1",
+                required = true,
+                version = EncryptedMediaVersionFfi.V1,
+                mediaFormat = "encrypted-media-v1",
+                allowedLocatorKinds = listOf("blossom-v1"),
+                defaultBlobEndpoints =
+                    listOf(
+                        AppBlobEndpointFfi(
+                            locatorKind = "blossom-v1",
+                            baseUrl = "https://blossom.example",
                         ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
+                    ),
+            ),
+        disappearingMessageSecs = 0uL,
+        archived = false,
+        pendingConfirmation = false,
+        unrecoverable = false,
+        selfMembership = SelfMembershipFfi.MEMBER,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        disbanding = false,
+        disbandRequest = null,
+        disbanded = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+    )
 
     private class EmptyDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()

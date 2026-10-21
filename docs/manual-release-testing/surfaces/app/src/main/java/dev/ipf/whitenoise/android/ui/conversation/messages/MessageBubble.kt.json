@@ -22,7 +22,8 @@
           "MSG-013",
           "MSG-015",
           "MSG-019",
-          "CON-017"
+          "CON-017",
+          "MSG-006"
         ]
       },
       {
@@ -155,6 +156,14 @@
         "test_ids": [
           "MSG-004",
           "CON-005"
+        ]
+      },
+      {
+        "surface": "Bounded Compose measurement and preview safety",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "boundedIntrinsicWidth(",
+        "test_ids": [
+          "MSG-006"
         ]
       }
     ],

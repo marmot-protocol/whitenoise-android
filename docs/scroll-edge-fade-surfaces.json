@@ -1723,6 +1723,21 @@
         "SCR-003",
         "SCR-004"
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "GRP-034",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
     }
   ],
   "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."

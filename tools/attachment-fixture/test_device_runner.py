@@ -109,13 +109,15 @@ class RunnerContractTest(unittest.TestCase):
 
     def test_timeout_and_cleanup_failure_preserve_failed_report(self):
         """An adb failure cannot discard the host evidence or become qualification."""
-        def adb(_, serial, *args):
+        def adb(_, serial, *args, **options):
             """Fail instrumentation and cleanup independently, after verified emulator setup."""
             self.assertEqual("emulator-5554", serial)
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                 return "1\n"
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP + "\n"
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:2] == ("reverse", "--remove"):
                 raise subprocess.CalledProcessError(1, "adb")
             if args[:3] == ("shell", "am", "instrument"):
@@ -139,12 +141,14 @@ class RunnerContractTest(unittest.TestCase):
     def test_failed_instrumentation_keeps_redacted_diagnostics_and_never_qualifies(self):
         """Distinguish a crash from missing measurements without leaking captured messages or another process."""
         secret = "PRIVATE-FIXTURE-CONTENT"
-        def adb(binary, serial, *args):
+        def adb(binary, serial, *args, **options):
             """Admit the emulator fixture, then return a crash carrying private text that must be redacted."""
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                 return "1"
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:3] == ("shell", "am", "instrument"):
                 raise subprocess.CalledProcessError(1, [binary, "-s", serial, *args],
                     output="INSTRUMENTATION_RESULT: shortMsg=Process crashed.\n" + secret, stderr=secret)
@@ -206,19 +210,21 @@ class RunnerContractTest(unittest.TestCase):
                 capture.assert_not_called()
 
     def test_second_reverse_failure_cleans_only_the_owned_first_mapping(self):
-        """Keep failure evidence and do not remove the occupied mapping or start instrumentation."""
+        """Exhausting the second mapping preserves evidence and cleans only the owned first mapping."""
         bindings, removed = [], []
 
-        def adb(binary, serial, *args):
-            """Model a collision on the second mapping and reject any attempt to run the device probe."""
+        def adb(binary, serial, *args, **options):
+            """Reject every second-mapping candidate while allowing bounded mapping diagnostics and owned cleanup."""
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                 return "1"
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP
             if args[:2] == ("reverse", "--no-rebind"):
                 bindings.append(args[2])
-                if len(bindings) == 2:
+                if len(bindings) > 1:
                     raise subprocess.CalledProcessError(1, [], stderr="cannot bind listener: Address already in use")
+            elif args == ("reverse", "--list"):
+                return ""
             elif args[:2] == ("reverse", "--remove"):
                 removed.append(args[2])
             else:
@@ -231,6 +237,11 @@ class RunnerContractTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 device_runner.run("adb", "emulator-5554", Path(root) / "server", output)
             report = json.loads(output.read_text())
+            self.assertEqual(5, len(bindings))
+            self.assertEqual([
+                {"attempts": 1, "occupied_ports": 0, "status": "admitted"},
+                {"attempts": 4, "occupied_ports": 4, "status": "exhausted"},
+            ], report["reverse_admission"])
             self.assertEqual({"role": "relay", "owned_success_count_before_attempt": 1}, report["reverse_binding"])
             self.assertEqual("reverse-address-in-use", report["failure_diagnostics"]["subprocess_status"])
             self.assertEqual(bindings[:1], removed)

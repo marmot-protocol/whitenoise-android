@@ -150,6 +150,15 @@
           "RDR-001",
           "MSG-002"
         ]
+      },
+      {
+        "surface": "Bounded Compose measurement and preview safety",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "boundedIntrinsicHeight(",
+        "test_ids": [
+          "RDR-001",
+          "MSG-006"
+        ]
       }
     ]
   },

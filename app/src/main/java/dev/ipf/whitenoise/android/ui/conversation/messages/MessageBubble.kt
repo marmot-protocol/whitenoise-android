@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
@@ -120,6 +119,7 @@ import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
@@ -457,19 +457,16 @@ internal fun MessageBubble(
         )
     val bubbleBackgroundColor = colorFromArgb(bubblePresentation.backgroundArgb)
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
-    val outgoingReply = mine && bubbleTheme != BubbleTheme.Amoled
-    val replyFillColor =
-        when {
-            customBubbleColorActive -> Color.Transparent
-            outgoingReply -> bubbleContentColor.copy(alpha = REPLY_QUOTE_FILL_ALPHA)
-            else -> colorScheme.surface
-        }
-    val replySecondaryColor =
-        if (outgoingReply || customBubbleColorActive) {
-            bubbleContentColor.copy(alpha = REPLY_QUOTE_SECONDARY_ALPHA)
-        } else {
-            colorScheme.onSurfaceVariant
-        }
+    val replyQuoteColors =
+        messageReplyQuoteColors(
+            customBubbleColorActive = customBubbleColorActive,
+            outgoingReply = mine && bubbleTheme != BubbleTheme.Amoled,
+            background = bubbleBackgroundColor,
+            content = bubbleContentColor,
+            colorScheme = colorScheme,
+        )
+    val replyFillColor = replyQuoteColors.container
+    val replySecondaryColor = replyQuoteColors.secondary
     // #414: "you were mentioned" treatment. A received (not mine), live
     // message whose markdown body @-mentions the current
     // account gets a logical-start outer-frame accent so a self-mention is
@@ -2279,6 +2276,7 @@ internal fun MessageBubble(
                             contentColor = bubbleContentColor.takeIf { insideBubble },
                             accentColor = replyAccentArgb?.let(::colorFromArgb) ?: pairedReplyAccent,
                             secondaryColor = replySecondaryColor.takeIf { insideBubble },
+                            warningColor = replyQuoteColors.warning.takeIf { insideBubble },
                         )
                     }
                 }
@@ -2594,7 +2592,12 @@ internal fun MessageBubble(
                         // text and leaving a gap on the right (#428). Non-reply
                         // bubbles keep the wrap-content path untouched, so only
                         // reply-bubble measurement changes.
-                        contentModifier = if (replyPreview != null) Modifier.width(IntrinsicSize.Max) else Modifier,
+                        contentModifier =
+                            if (replyPreview != null) {
+                                Modifier.boundedIntrinsicWidth(IntrinsicSize.Max)
+                            } else {
+                                Modifier
+                            },
                     ) {
                         senderNameLabel(true)
                         replyPreviewCard(true)
@@ -2932,6 +2935,7 @@ internal fun MessageBubble(
                                                     )?.let(::colorFromArgb)
                                                         ?: bubbleContentColor.takeUnless { hasMedia },
                                                 secondaryColor = replySecondaryColor.takeUnless { hasMedia },
+                                                warningColor = replyQuoteColors.warning.takeUnless { hasMedia },
                                             )
                                         }
                                     },
@@ -3278,6 +3282,3 @@ internal fun MessageBubble(
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
 internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 52
-
-private const val REPLY_QUOTE_FILL_ALPHA = 0.16f
-private const val REPLY_QUOTE_SECONDARY_ALPHA = 0.78f
