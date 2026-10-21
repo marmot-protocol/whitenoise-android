@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -310,4 +311,58 @@ func readOfflineFrame(t *testing.T, ctx context.Context, conn *websocket.Conn, k
 		t.Fatalf("expected %s, received %s", kind, payload)
 	}
 	return frame
+}
+
+// TestOfflineSignerDiagnosticsCannotWaitForTheRelayLock guards failure-path liveness.
+func TestOfflineSignerDiagnosticsCannotWaitForTheRelayLock(t *testing.T) {
+	relay := newOfflineSignerRelay(context.Background(), nil, "private-client-marker")
+	relay.mu.Lock()
+	done := make(chan string, 1)
+	go func() { done <- relay.diagnostics() }()
+	select {
+	case got := <-done:
+		relay.mu.Unlock()
+		if got != "relay_counters=busy" {
+			t.Fatalf("locked diagnostics must report unavailable counters: %q", got)
+		}
+	case <-time.After(time.Second):
+		relay.mu.Unlock()
+		t.Fatal("diagnostics waited for the relay lock")
+	}
+}
+
+// TestOfflineSignerDiagnosticsContainOnlyCounters prevents sensitive fixture output.
+func TestOfflineSignerDiagnosticsContainOnlyCounters(t *testing.T) {
+	relay := newOfflineSignerRelay(context.Background(), nil, "private-client-marker")
+	relay.mu.Lock()
+	relay.requests = 3
+	relay.forbidden = 2
+	relay.peers[nil] = offlineSignerSubscription{id: "private-subscription-marker"}
+	relay.responses = []nostr.Event{{ID: "private-event-marker", PubKey: "private-signer-marker", Content: "private-payload-marker"}}
+	relay.mu.Unlock()
+	got := relay.diagnostics()
+	if got != "relay_requests=3 relay_forbidden=2 relay_subscribers=1 relay_responses=1" {
+		t.Fatalf("unexpected diagnostic fields: %q", got)
+	}
+	if strings.Contains(got, "private-") {
+		t.Fatal("diagnostics exposed a fixture identity or payload")
+	}
+}
+
+// TestOfflinePublisherDeadlineDiagnostic uses an already expired context, without a timer hook.
+func TestOfflinePublisherDeadlineDiagnostic(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	relay := newOfflineSignerRelay(ctx, nil, "private-client-marker")
+	commandErr := errors.New("command terminated")
+	started := time.Now().Add(-time.Second)
+	err := relay.publishFailure(ctx, commandErr, started, started, "")
+	if !errors.Is(err, commandErr) {
+		t.Fatal("diagnostic discarded the original command error")
+	}
+	for _, field := range []string{"phase=publish", "elapsed=", "total_elapsed=", "context=context deadline exceeded", "relay_requests=0"} {
+		if !strings.Contains(err.Error(), field) {
+			t.Fatalf("missing diagnostic field %q: %v", field, err)
+		}
+	}
 }
