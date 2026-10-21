@@ -73,7 +73,8 @@ internal suspend fun verifyUpgradeStorage(
         check(initialLegacyBytes > 0uL) { "Baseline did not contain a completed legacy SQL attachment body" }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val reserve = context.filesDir.usableSpace.toULong() + 1024uL * 1024uL * 1024uL
-        val crashWitness = JSONObject(File(context.filesDir, "upgrade-fixture.json").readText()).optBoolean("crashWitness")
+        val crashWitness =
+            JSONObject(File(context.filesDir, "upgrade-fixture.json").readText()).optBoolean("crashWitness")
         // A committed file needs no new allocation: native crash recovery correctly bypasses reserve admission.
         if (!crashWitness) {
             for (account in accounts) {

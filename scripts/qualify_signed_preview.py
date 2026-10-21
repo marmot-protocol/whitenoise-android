@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -185,6 +186,12 @@ def stop():
         raise RuntimeError('Preview process survived force-stop')
 
 
+def offline(phase):
+    """Retain the existing fail-closed radio/default-network proof so relay recovery cannot conceal data loss."""
+    evidence = subprocess.check_output([sys.executable, 'scripts/maestro_apk.py', 'offline'], text=True, timeout=180)
+    (REPORTS / f'{phase}-network.txt').write_text(evidence)
+
+
 def main():
     """Run dependent baseline, in-place upgrade and same-data cold-restart checks on the exact signed pair."""
     if os.environ.get('GITHUB_ACTIONS') != 'true' or adb('shell', 'getprop', 'ro.kernel.qemu').strip() != '1':
@@ -219,11 +226,13 @@ def main():
         facts['public_identity_sha256'] = identity
         facts['phases']['baseline'] = 'passed'
         stop()
+        offline('before-upgrade')
         adb('install', '-r', str(PAIR / 'candidate.apk'), timeout=180)
         launch()
         ui.retained_chat('upgrade')
         facts['phases']['upgrade'] = 'passed'
         stop()
+        offline('before-cold-restart')
         launch()
         ui.retained_chat('cold-restart')
         facts['phases']['cold_restart'] = 'passed'
@@ -231,6 +240,7 @@ def main():
         ui.click('Open settings')
         if ui.public_identity() != identity:
             raise RuntimeError('Public fixture identity changed across the upgrade')
+        offline('after-retained-identity')
         facts['phases']['retained_identity'] = 'passed'
     finally:
         (REPORTS / 'qualification.json').write_text(json.dumps(facts, indent=2) + '\n')

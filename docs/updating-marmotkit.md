@@ -72,8 +72,10 @@ omits Application scheduling; UI checks launch the normal manifest Application.
 The original encrypted synthetic root stays on the runner until job teardown;
 artifacts retain its digest, APK/native/signer provenance, storage states, UI
 observations and individual test outcomes without account secrets. A failed
-baseline prevents dependent upgrade claims. This fixture does not qualify a
-preview-signed APK or exact crash-window fault injection. Its baseline adapter
+baseline prevents dependent upgrade claims. The expanded fixture also requires
+large-database shrinkage and controlled native faults as described in the nightly
+evaluation record. The separate `mdk_preview_qualification` campaign must qualify
+the exact trusted signed APK through ordinary release UI. The baseline adapter
 fails closed unless master still uses the reviewed `88d1683e` artifact.
 
 For diagnosis within an already prepared disposable emulator only:

@@ -206,7 +206,8 @@ class MarmotUpgradeFixtureTest {
                     )
                 val reference = requireNotNull(assets.single().reference) { "retained attachment became unavailable" }
                 for (offset in 0 until PAYLOAD_SIZE step READ_SIZE) {
-                    val bytes = runtime.readAttachmentAsset(account, reference, offset.toULong(), READ_SIZE.toUInt()).bytes
+                    val bytes =
+                        runtime.readAttachmentAsset(account, reference, offset.toULong(), READ_SIZE.toUInt()).bytes
                     assertArrayEquals(ByteArray(READ_SIZE) { ((it + offset) % 251).toByte() }, bytes)
                 }
             } finally {
@@ -296,6 +297,7 @@ class MarmotUpgradeFixtureTest {
         const val READ_SIZE = 1024 * 1024
 
         /** Deterministic synthetic bytes let both runtime generations assert content, not just attachment counts. */
-        fun payload(offset: Int = 0): ByteArray = ByteArray(if (offset == 0) PAYLOAD_SIZE else PENDING_SIZE) { ((it + offset) % 251).toByte() }
+        fun payload(offset: Int = 0): ByteArray =
+            ByteArray(if (offset == 0) PAYLOAD_SIZE else PENDING_SIZE) { ((it + offset) % 251).toByte() }
     }
 }

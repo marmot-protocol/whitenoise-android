@@ -80,7 +80,7 @@ most 64 MiB live data. Later maintenance/removals reclaim freed pages. Native
 reads/writes can wait during compaction; usage reports the preceding snapshot.
 Android must not implement VACUUM, change schema rows or invent recovery logic.
 
-Rerun the seven-phase hosted campaign against current master: populated baseline,
+Rerun the populated hosted campaign against current master: populated baseline,
 in-place upgrade, cold restart, pending-upload promotion, post-promotion restart,
 and recovery with comparison refusal and silence. Preserve exact accounts/history
 and both payloads; do not count ignored cases as passes. The two ignored cases
@@ -97,8 +97,8 @@ passed. Retained individual test evidence includes compaction shrink/incremental
 reclaim (Rust shard 3), free-page threshold/blocked WAL truncate/closing storage
 (shard 1), size/space limits/rollback retry/new incremental databases (shard 5),
 transaction refusal (shard 2)
-and interruption before copy (shard 4). These are upstream tests. The small
-Android fixture does not establish large-database compaction, actual OS ENOSPC,
+and interruption before copy (shard 4). These are upstream tests. The prior small
+Android fixture did not establish large-database compaction, actual OS ENOSPC,
 corrupt/lost-media handling or the file-publication/SQL-deletion crash window.
 Do not infer compaction happened merely because migration settled.
 
@@ -108,9 +108,9 @@ Android passes cannot by themselves clear that separate gap. Real public-broker
 QUIC connectivity also needs separate qualification.
 
 The disposable debug-signed `.mdkqualification` pair does not clear the trusted
-preview handoff gate. There is still no matching populated baseline with PR3371's
-isolated preview package and preview signer in this evidence. Do not distribute
-the historical preview as a qualified candidate.
+preview handoff gate. A matching signed baseline is now retained as described
+below; populated upgrade and cold-restart evidence on the final signed candidate
+is still required. Do not distribute the historical preview as a qualified candidate.
 
 ### Remaining qualification campaign
 
@@ -128,6 +128,9 @@ the worker blocks there and the host sends SIGKILL. On reopening without startin
 workers, MDK must report a committed ready media file and its still-retained legacy
 body in the same account. Ordinary subsequent native migration must recover it.
 No SQL, schema or native library is patched.
+After this witness, the already-published file bypasses new-allocation reserve
+admission, so this campaign does not repeat the earlier reserve-paused-read case.
+Its required kernel-ENOSPC pause and retained legacy-body evidence are separate.
 
 A separate write barrier fills only a bounded 64 MiB tmpfs at one synthetic media
 directory, after native admission and before the actual write. The real syscall
@@ -144,9 +147,11 @@ publisher, with the same `.preview.pr3371` package and version. The signed basel
 must be retained before the fixed candidate asset is replaced. The separate
 `mdk_preview_qualification` campaign compares signed application bytes with the
 exact-head unsigned build, requires ARM64 support from the hosted emulator image,
-and creates synthetic history through ordinary release UI. It then performs the
-in-place candidate upgrade and cold restart. Neither a re-signed APK nor the debug
-instrumentation pair can substitute for these exact signed bytes. Only after these
+and creates synthetic history through ordinary release UI. It disables emulator
+networking and verifies that no default network remains before the in-place
+candidate upgrade, again before cold restart, and after the retained identity
+check. Relay recovery cannot substitute for retained local history. Neither a
+re-signed APK nor the debug instrumentation pair can substitute for these exact signed bytes. Only after these
 hosted smokes may the selected Pixel 9a receive the isolated candidate for its
 separate device check; its existing production/dev packages remain untouched.
 
