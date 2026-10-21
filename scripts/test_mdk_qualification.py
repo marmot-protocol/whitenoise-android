@@ -281,17 +281,68 @@ class QualificationUiTest(unittest.TestCase):
                     ui.retained_chat('baseline')
                     reopen.assert_called_once_with()
 
-    def test_two_profile_settings_opens_settings_without_selecting_an_account(self):
-        """The observed two-profile avatar opens a selector whose Settings action preserves the active identity."""
-        window = ('<hierarchy><node content-desc="Switch Profile, PR3371 qualification" enabled="true" '
-                  'bounds="[12,32][60,80]"/></hierarchy>')
-        with patch.object(preview, 'adb', return_value=window):
+    def test_settings_requires_arrival_after_a_lost_signup_navigation_tap(self):
+        """A visible original avatar and a dispatched tap do not prove that Settings opened."""
+        chat = ('<hierarchy><node content-desc="Open settings, PR3371 qualification" enabled="true" '
+                'bounds="[12,32][60,80]"/></hierarchy>')
+        settings = ('<hierarchy><node text="Settings" enabled="true"/>'
+                    '<node content-desc="Back" enabled="true"/>'
+                    '<node text="Profile Keys" enabled="true"/></hierarchy>')
+        windows = iter([chat, chat, settings])
+
+        def fixture_adb(*args, **kwargs):
+            """Keep the first tap on the chat list; only the second reaches the observed destination."""
+            return next(windows) if args[:2] == ('shell', 'cat') else ''
+
+        with patch.object(preview, 'adb', side_effect=fixture_adb), patch.object(preview.time, 'sleep'):
             ui = preview.PreviewUi()
-            with patch.object(ui, 'tap_node') as tap, patch.object(ui, 'click') as click:
+            with patch.object(ui, 'tap_node') as tap:
                 ui.open_settings()
-                tap.assert_called_once()
-                self.assertEqual(tap.call_args.args[0].get('content-desc'), 'Switch Profile, PR3371 qualification')
-                click.assert_called_once_with('Settings')
+                self.assertEqual(tap.call_count, 2)
+                self.assertTrue(ui.matches('Profile Keys'))
+
+    def test_two_profile_settings_opens_settings_without_selecting_an_account(self):
+        """The selector's Settings row cannot count as arrival, and no profile row may be selected."""
+        windows = iter([
+            '<hierarchy><node content-desc="Switch Profile, PR3371 qualification" enabled="true"/></hierarchy>',
+            '<hierarchy><node text="Switch Profile" enabled="true"/><node text="Settings" enabled="true"/>'
+            '<node text="Johnny Appleseed" enabled="true"/></hierarchy>',
+            '<hierarchy><node text="Settings" enabled="true"/><node content-desc="Back" enabled="true"/>'
+            '<node text="Profile Keys" enabled="true"/></hierarchy>',
+        ])
+
+        def fixture_adb(*args, **kwargs):
+            """Advance the three distinct screens only when the driver refreshes the visible hierarchy."""
+            return next(windows) if args[:2] == ('shell', 'cat') else ''
+
+        with patch.object(preview, 'adb', side_effect=fixture_adb), patch.object(preview.time, 'sleep'):
+            ui = preview.PreviewUi()
+            with patch.object(ui, 'tap_node') as tap:
+                ui.open_settings()
+                labels = [call.args[0].get('text') or call.args[0].get('content-desc') for call in tap.call_args_list]
+                self.assertEqual(labels, ['Switch Profile, PR3371 qualification', 'Settings'])
+                self.assertTrue(ui.matches('Profile Keys'))
+
+    def test_settings_restored_viewport_returns_to_public_key_row(self):
+        """A retained lower Settings viewport must scroll upward before public identity capture."""
+        windows = iter([
+            '<hierarchy><node text="Settings" enabled="true"/><node content-desc="Back" enabled="true"/>'
+            '<node text="Developer Tools" enabled="true"/></hierarchy>',
+            '<hierarchy><node text="Settings" enabled="true"/><node content-desc="Back" enabled="true"/>'
+            '<node text="Profile Keys" enabled="true"/></hierarchy>',
+        ])
+
+        def fixture_adb(*args, **kwargs):
+            """Supply the actual small emulator geometry and record the direction of its settings scroll."""
+            if args[:2] == ('shell', 'cat'):
+                return next(windows)
+            return 'Physical size: 320x640' if args == ('shell', 'wm', 'size') else ''
+
+        with patch.object(preview, 'adb', side_effect=fixture_adb) as command, patch.object(preview.time, 'sleep'):
+            ui = preview.PreviewUi()
+            with patch.object(ui, 'tap_node', side_effect=AssertionError('Unexpected navigation')):
+                ui.open_settings()
+                command.assert_any_call('shell', 'input', 'swipe', '160', '213', '160', '512', '400')
 
     def test_demo_reopen_requires_enabled_ready_action_and_ready_status(self):
         """A running or disabled demo action cannot qualify coordinator completion."""

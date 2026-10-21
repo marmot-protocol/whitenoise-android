@@ -133,6 +133,12 @@ the worker blocks there and the host sends SIGKILL. On reopening without startin
 workers, MDK must report a committed ready media file and its still-retained legacy
 body in the same account. Ordinary subsequent native migration must recover it.
 No SQL, schema or native library is patched.
+The pinned Frida 17.5.1 server uses `--disable-preload`: its default Android
+preload injects spawning agents into `system_server` and zygote, which this
+campaign does not need because it attaches directly to the fixture PID.
+The option prevents that unnecessary startup path after a hosted run recorded
+a zygote abort before any app hook armed. See the pinned upstream
+[preload implementation](https://github.com/frida/frida-core/blob/17.5.1/src/linux/linux-host-session.vala#L91-L96).
 After this witness, the already-published file bypasses new-allocation reserve
 admission, so this campaign does not repeat the earlier reserve-paused-read case.
 Its required kernel-ENOSPC pause and retained legacy-body evidence are separate.
@@ -152,7 +158,10 @@ publisher, with the same `.preview.pr3371` package and version. The signed basel
 must be retained before the fixed candidate asset is replaced. The separate
 `mdk_preview_qualification` campaign compares signed application bytes with the
 exact-head unsigned build, requires ARM64 support from the hosted emulator image,
-and creates synthetic history through ordinary release UI. It disables emulator
+and creates synthetic history through ordinary release UI. The driver verifies
+Settings arrival instead of treating an avatar tap as navigation success; it
+preserves the original profile and restores the account-row viewport before
+reading only its public key. It disables emulator
 networking and verifies that no default network remains before the in-place
 candidate upgrade, again before cold restart, and after the retained identity
 check. Relay recovery cannot substitute for retained local history. Neither a

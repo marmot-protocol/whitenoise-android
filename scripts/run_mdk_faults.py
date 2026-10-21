@@ -63,8 +63,9 @@ def run_faults(adb, instrument, stop, ports, reports, runner, test_class):
         raise RuntimeError('Rootable disposable emulator required')
     adb('push', str(Path(os.environ['RUNNER_TEMP']) / 'mdk-frida-server'), '/data/local/tmp/mdk-frida-server')
     adb('shell', 'chmod', '700', '/data/local/tmp/mdk-frida-server')
+    # Direct PID attachment needs no Android spawning helpers. Default preload injects zygote/system_server.
     # Detach all three descriptors: daemonization alone can leave adb's captured shell pipe open.
-    server_pid = adb('shell', 'nohup /data/local/tmp/mdk-frida-server -l 127.0.0.1:27042 '
+    server_pid = adb('shell', 'nohup /data/local/tmp/mdk-frida-server --disable-preload -l 127.0.0.1:27042 '
                      '</dev/null >/data/local/tmp/mdk-frida-server.log 2>&1 & echo $!').strip()
     if not re.fullmatch(r'[1-9][0-9]*', server_pid):
         raise RuntimeError('Fault injector did not report its owned process')

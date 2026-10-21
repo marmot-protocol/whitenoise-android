@@ -144,22 +144,35 @@ class PreviewUi:
             adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
         raise RuntimeError('Baseline demo setup remained unavailable after bounded screen re-entry')
 
-    def open_settings(self):
-        """Open settings for the original fixture profile, including the two-profile selector route."""
-        deadline = time.monotonic() + 90
+    def open_settings(self, timeout=90):
+        """Verify the Settings destination; retry only visible routes belonging to the original profile."""
+        deadline = time.monotonic() + timeout
+        swipes = 0
         while time.monotonic() < deadline:
             self.snapshot()
             direct = self.matches(f'Open settings, {FIXTURE_NAME}')
             selector = self.matches(f'Switch Profile, {FIXTURE_NAME}')
-            if direct:
+            # The selector also has a Settings label, but no settings-home Back action or Profile Keys row.
+            if self.matches('Settings') and self.matches('Back'):
+                if self.matches('Profile Keys'):
+                    return
+                # Settings restores its viewport: return to the account rows before reading the public key.
+                if swipes < 8:
+                    size = re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size'))[-1]
+                    width, height = map(int, size)
+                    adb('shell', 'input', 'swipe', str(width // 2), str(height // 3),
+                        str(width // 2), str(height * 4 // 5), '400')
+                    swipes += 1
+            elif self.matches('Switch Profile') and self.matches('Settings'):
+                self.tap_node(self.matches('Settings')[0])
+            elif self.matches('Help Improve White Noise') and self.matches('Close'):
+                self.tap_node(self.matches('Close')[0])
+            elif direct:
                 self.tap_node(direct[0])
-                return
-            if selector:
+            elif selector:
                 self.tap_node(selector[0])
-                self.click('Settings')
-                return
-            time.sleep(1)
-        raise RuntimeError('Original fixture profile settings unavailable')
+            time.sleep(2)
+        raise RuntimeError('Original fixture profile Settings destination unavailable')
 
     def open_completed_demo(self):
         """Observe the coordinator's explicit Ready action after account changes dismiss its original screen."""
@@ -305,7 +318,7 @@ def main():
         adb('shell', 'input', 'text', FIXTURE_NAME.replace(' ', '%s'))
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
         ui.click('Sign Up', last=True)
-        ui.click(f'Open settings, {FIXTURE_NAME}', timeout=300)
+        ui.open_settings(timeout=300)
         identity = ui.public_identity()
         ui.open_demo_setup()
         ui.retained_chat('baseline')
