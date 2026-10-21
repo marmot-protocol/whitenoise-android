@@ -13,6 +13,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NostrEventReaderBlocksTest {
+    /** A URL's double slash moves together when the lazy-item budget lands immediately after it. */
+    @Test
+    fun codeChunkingKeepsDoubleSlashWithItsFollowingText() {
+        val prefix = "a".repeat(4088) + "https:"
+        val content = prefix + "//example.com/filename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals(prefix, chunks.first())
+        assertEquals("//example.com/filename", chunks.last())
+        assertTrue(chunks.all { it.length <= 4096 })
+    }
+
+    /** Even a slash-only run larger than one item must make progress without losing or growing source. */
+    @Test
+    fun oversizedSlashRunsRemainBoundedAndReconstructExactly() {
+        val content = "/".repeat(4200) + "filename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertTrue(chunks.all { it.isNotEmpty() && it.length <= 4096 })
+    }
+
     /** Artificial lazy-item boundaries cannot strand a path's slash on the preceding item. */
     @Test
     fun codePathChunksKeepSlashWithTheFilenameAndRetainEveryCharacter() {

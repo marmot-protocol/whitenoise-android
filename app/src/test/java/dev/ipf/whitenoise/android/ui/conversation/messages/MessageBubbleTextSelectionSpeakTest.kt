@@ -66,6 +66,8 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
+import dev.ipf.whitenoise.android.state.SwipeAction
+import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -73,6 +75,8 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -85,8 +89,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.util.Locale
-import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -720,18 +722,60 @@ class MessageBubbleTextSelectionSpeakTest {
     /** A fitting code leaf must leave horizontal movement available to the bubble's real reply action. */
     @Test
     fun swipeOnFittingCodeBlockBeginsReply() {
+        val controller = renderSwipeBlock(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", "ls -la"))
+        swipeSource("ls -la", right = true)
+        assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+    }
+
+    /** Math shares the code viewport and must not absorb a reply gesture when all source fits. */
+    @Test
+    fun swipeOnFittingMathBlockBeginsReply() {
+        val controller = renderSwipeBlock(MarkdownBlockFfi.MathBlock("a + b"))
+        swipeSource("a + b", right = true)
+        assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+    }
+
+    /** Overflow keeps both horizontal directions, even at an edge, without falling through to reply. */
+    @Test
+    fun overflowingCodeOwnsHorizontalDragsAtBothEdges() {
+        val path = "directory/".repeat(20) + "ENDTARGET"
+        val controller = renderSwipeBlock(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", path))
+        val node = composeRule.onNodeWithText(path, useUnmergedTree = true)
+        val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+        assertTrue(range.maxValue() > 0f)
+        swipeSource(path, right = true)
+        assertEquals(null, controller.replyingTo)
+        assertEquals(0f, range.value(), 1f)
+        swipeSource(path, right = false)
+        assertTrue(range.value() > 0f)
+        assertEquals(null, controller.replyingTo)
+        node.performSemanticsAction(SemanticsActions.ScrollBy) { action -> assertTrue(action(range.maxValue(), 0f)) }
+        composeRule.waitForIdle()
+        swipeSource(path, right = false)
+        assertEquals(range.maxValue(), range.value(), 1f)
+        assertEquals(null, controller.replyingTo)
+        swipeSource(path, right = true)
+        assertTrue(range.value() < range.maxValue())
+        assertEquals(null, controller.replyingTo)
+    }
+
+    /** Uses the real bubble host with both physical swipe bindings set to Reply to detect accidental fallthrough. */
+    private fun renderSwipeBlock(block: MarkdownBlockFfi): ConversationController {
         val appState = appStateWithTts(FakeSessionEngine())
-        val original = timelineMessage("```\nls -la\n```")
+        appState.swipePreferences.set(SwipeBinding.MessageLeft, SwipeAction.Reply)
+        appState.swipePreferences.set(SwipeBinding.MessageRight, SwipeAction.Reply)
+        val source =
+            when (block) {
+                is MarkdownBlockFfi.CodeBlock -> "```\n${block.content}\n```"
+                is MarkdownBlockFfi.MathBlock -> "\$\$\n${block.content}\n\$\$"
+                else -> error("The swipe fixture requires code or math source")
+            }
+        val original = timelineMessage(source)
         val item =
             original.copy(
                 record =
                     original.record.copy(
-                        contentTokens =
-                            MarkdownDocumentFfi(
-                                listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", "ls -la")),
-                                false,
-                                byteArrayOf(),
-                            ),
+                        contentTokens = MarkdownDocumentFfi(listOf(block), false, byteArrayOf()),
                     ),
             )
         val controller = conversationController(appState)
@@ -743,16 +787,24 @@ class MessageBubbleTextSelectionSpeakTest {
             }
         }
         composeRule.waitForIdle()
-        val text = composeRule.onNodeWithText("ls -la", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        return controller
+    }
+
+    /** Starts on the source's clipped visible text, rather than the outer bubble gutter. */
+    private fun swipeSource(
+        text: String,
+        right: Boolean,
+    ) {
+        val source = composeRule.onNodeWithText(text, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val host = composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
         val bounds = host.fetchSemanticsNode().boundsInRoot
         host.performTouchInput {
-            down(Offset(text.left - bounds.left + 8f, text.center.y - bounds.top))
-            repeat(4) { moveBy(Offset(30f, 0f), delayMillis = 40) }
+            val startX = if (right) source.left + 8f else source.right - 8f
+            down(Offset(startX - bounds.left, source.center.y - bounds.top))
+            repeat(4) { moveBy(Offset(if (right) 30f else -30f, 0f), delayMillis = 40) }
             up()
         }
         composeRule.waitForIdle()
-        assertEquals(item.record.messageIdHex, controller.replyingTo?.messageIdHex)
     }
 
     /** Pins only this golden's clock inputs and restores them even if capture or native selection fails. */

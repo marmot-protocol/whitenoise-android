@@ -132,6 +132,12 @@ class MarkdownCodePathScreenshotTest {
         val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
         assertTrue("Every clipped path must be reachable", range.maxValue() > 0f)
         node.performSemanticsAction(SemanticsActions.ScrollBy) { action ->
+            assertTrue(action(range.maxValue() / 2f, 0f))
+        }
+        composeRule.waitForIdle()
+        assertTrue(range.value() > 0f && range.value() < range.maxValue())
+        fixture.captureRoboImage("src/test/snapshots/markdown_code_paths_${snapshot.name}_middle.png")
+        node.performSemanticsAction(SemanticsActions.ScrollBy) { action ->
             assertTrue(action(if (range.reverseScrolling) -range.maxValue() else range.maxValue(), 0f))
         }
         composeRule.waitForIdle()

@@ -28,7 +28,9 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenBody
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderTextSelectionController
+import dev.ipf.whitenoise.android.ui.conversation.messages.SelectableTextLayout
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReaderTextSelectionController
+import dev.ipf.whitenoise.android.ui.conversation.messages.textSelectionSeedRange
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventReaderBlock
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -161,6 +163,29 @@ class MarkdownCodePathLayoutCoverageTest {
                 requireNotNull(speechCoordinates).localToWindow(spoken.getBoundingBox(content.lastIndex).center)
             assertEquals(position, spokenPosition)
             assertTrue(requireNotNull(speechCoordinates).boundsInWindow().contains(spokenPosition))
+        }
+    }
+
+    /** A press in the left gutter selects the visible edge word, never an earlier clipped source column. */
+    @Test
+    fun scrolledCodeGutterSelectionClampsToTheVisibleLeaf() {
+        val content = "hidden ".repeat(40) + "visible ending words"
+        render(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", content))
+        scrollToEnd(content)
+        composeRule.runOnIdle {
+            val placed = requireNotNull(coordinates)
+            val measured = requireNotNull(layout)
+            val visible = placed.boundsInWindow()
+            val localEdge = placed.windowToLocal(visible.centerLeft)
+            val edgeOffset = measured.getOffsetForPosition(localEdge)
+            assertTrue("The visible left edge must be past the original source start", edgeOffset > 0)
+            assertEquals(
+                measured.getWordBoundary(edgeOffset),
+                textSelectionSeedRange(
+                    listOf(SelectableTextLayout(Any(), measured, placed)),
+                    visible.centerLeft.copy(x = visible.left - 30f),
+                ),
+            )
         }
     }
 

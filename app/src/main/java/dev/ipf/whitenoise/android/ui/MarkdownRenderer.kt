@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -41,9 +42,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -853,7 +859,12 @@ internal fun markdownHeadingTextStyle(
         else -> typography.bodyMedium
     }.copy(fontWeight = FontWeight.SemiBold)
 
-/** Keeps source punctuation in LTR order and exposes long code/math lines inside a bounded scroll viewport. */
+/**
+ * Keeps code/math source in LTR order within a bounded viewport, including in RTL conversations.
+ * Fitting source leaves horizontal drags to the bubble's swipe action. Overflowing source owns
+ * horizontal drags in either direction, including at its edges, so panning never unexpectedly replies.
+ * Fades indicate only the edges with more source to read; source text and selection remain unchanged.
+ */
 @Composable
 private fun MarkdownCodeBlockView(
     content: String,
@@ -864,6 +875,7 @@ private fun MarkdownCodeBlockView(
     // phantom empty line inside the chip. Code/math blocks can be large, so
     // cache the sanitization work instead of repeating it on every recomposition.
     val text = remember(content) { markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n') }
+    val scrollState = rememberScrollState()
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(
@@ -887,11 +899,42 @@ private fun MarkdownCodeBlockView(
                         fontFamily = FontFamily.Monospace,
                         textDirection = TextDirection.Ltr,
                     ),
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                modifier =
+                    Modifier
+                        .codeOverflowFade(scrollState)
+                        .horizontalScroll(scrollState, enabled = scrollState.maxValue > 0),
             )
         }
     }
 }
+
+/** Masks just the scroll viewport's text edges, retaining the caller's background in every theme. */
+private fun Modifier.codeOverflowFade(scrollState: ScrollState): Modifier =
+    if (scrollState.maxValue == 0) {
+        this
+    } else {
+        graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+            drawContent()
+            val width = minOf(16.dp.toPx(), size.width / 2f)
+            if (scrollState.canScrollBackward) {
+                drawRect(
+                    brush = Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), endX = width),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            if (scrollState.canScrollForward) {
+                drawRect(
+                    brush =
+                        Brush.horizontalGradient(
+                            listOf(Color.Black, Color.Transparent),
+                            startX = size.width - width,
+                            endX = size.width,
+                        ),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+        }
+    }
 
 /** One recognized `<details>` disclosure: optional summary label + the collapsed inline content. */
 internal data class MarkdownDetailsSection(

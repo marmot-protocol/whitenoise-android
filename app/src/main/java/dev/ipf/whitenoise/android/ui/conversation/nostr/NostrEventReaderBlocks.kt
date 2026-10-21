@@ -23,7 +23,7 @@ internal fun nostrReaderBlocks(document: MarkdownDocumentFfi): List<MarkdownBloc
         }
     }
 
-/** Bounds lazy-item work without losing text; code chunks keep a slash beside its following source character. */
+/** Bounds lazy-item work without losing text; slash runs stay with following code unless they exceed the budget. */
 internal fun nostrReaderTextChunks(
     text: String,
     keepSlashWithFollowingText: Boolean = false,
@@ -37,8 +37,8 @@ internal fun nostrReaderTextChunks(
             val boundary = maxOf(text.lastIndexOf('\n', end - 1), text.lastIndexOf(' ', end - 1))
             if (boundary >= start + READER_TEXT_BUDGET / 2) end = boundary + 1
             if (Character.isLowSurrogate(text[end]) && Character.isHighSurrogate(text[end - 1])) end--
-            if (keepSlashWithFollowingText && end > start + 1) {
-                if (text[end - 1] == '/' && text[end] !in "\r\n") end--
+            if (keepSlashWithFollowingText) {
+                while (end > start + 1 && text[end - 1] == '/' && text[end] !in "\r\n") end--
             }
         }
         chunks += text.substring(start, end)
