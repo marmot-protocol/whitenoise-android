@@ -868,6 +868,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.mdk_preview_qualification
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      PREVIEW_EMULATOR_OPTIONS: -no-snapshot-save -no-window -gpu swiftshader -feature -Vulkan -noaudio -no-boot-anim -camera-back none
     permissions:
       contents: read
       actions: read
@@ -907,8 +909,12 @@ jobs:
           arch: x86_64
           ram-size: 4096M
           disk-size: 8G
-          emulator-options: -no-snapshot-save -no-window -gpu software -noaudio -no-boot-anim -camera-back none
+          emulator-options: ${{ env.PREVIEW_EMULATOR_OPTIONS }}
           disable-animations: true
+          pre-emulator-launch-script: |
+            mkdir -p build/mdk-signed-preview
+            "$ANDROID_HOME/emulator/emulator" -version > build/mdk-signed-preview/emulator-version.txt 2>&1
+            printf '%s\n' "$PREVIEW_EMULATOR_OPTIONS" > build/mdk-signed-preview/emulator-options.txt
           script: python3 scripts/qualify_signed_preview.py
       - name: Retain preview host diagnostics
         if: always()

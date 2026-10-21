@@ -194,13 +194,18 @@ re-signed APK nor the debug instrumentation pair can substitute for these exact 
 hosted smokes may the selected Pixel 9a receive the isolated candidate for its
 separate device check; its existing production/dev packages remain untouched.
 
-The signed-preview lane uses the supported `software` rendering mode described
-in [Android's emulator guide](https://developer.android.com/studio/run/emulator-acceleration).
-Repeated emulator loss with preceding color-buffer errors occurred before the
-candidate upgrade on the former `swiftshader_indirect` configuration. Host
-memory, process RSS and kernel diagnostics are retained to distinguish resource
-termination from renderer failures; a renderer change alone is not qualification
-evidence. These diagnostics contain no process arguments or emulator memory dumps.
+The signed-preview lane explicitly selects `-gpu swiftshader -feature -Vulkan`,
+supported by [Android's emulator troubleshooting guide](https://developer.android.com/studio/run/emulator-troubleshooting).
+Two attempts on emulator 37.2.12 with automatic `software` rendering lost the
+emulator at the baseline composer, before candidate installation. Startup selected
+Lavapipe Vulkan and SwANGLE GLES; color-buffer errors preceded the loss, but the
+exact exit cause remains unproven. The retained kernel tail has no OOM entry;
+post-failure free memory does not exclude earlier pressure. The explicit renderer
+is an infrastructure experiment, not passing qualification evidence. It preserves
+the signed APKs, ARM64 bridge and all upgrade, cold-restart and keyboard assertions.
+Emulator version, requested options, allowlisted guest graphics properties, host
+memory, process RSS and kernel diagnostics are retained. These diagnostics contain
+no process arguments or emulator memory dumps.
 
 ## Retention
 

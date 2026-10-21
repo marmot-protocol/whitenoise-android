@@ -325,6 +325,10 @@ def main():
     try:
         facts['emulator_abis'] = adb('shell', 'getprop', 'ro.product.cpu.abilist').strip()
         facts['native_bridge'] = adb('shell', 'getprop', 'ro.dalvik.vm.native.bridge').strip()
+        facts['guest_graphics'] = {
+            name: adb('shell', 'getprop', name).strip()
+            for name in ('ro.hardware.egl', 'ro.hardware.vulkan', 'debug.hwui.renderer')
+        }
         if 'arm64-v8a' not in facts['emulator_abis'].split(','):
             raise RuntimeError('Hosted image does not advertise support for the unchanged ARM64 preview')
         adb('shell', 'settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '1')
