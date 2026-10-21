@@ -431,7 +431,17 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             val request = requestFrom(manifest.getJSONObject("request"))
             val manager = WorkManager.getInstance(context)
             val name = attachmentDownloadWorkName(request)
-            val beforeBind = manager.getWorkInfosForUniqueWork(name).get().map { it.state }
+            val beforeBindInfos = manager.getWorkInfosForUniqueWork(name).get()
+            val observedAtElapsedMillis = android.os.SystemClock.elapsedRealtime()
+            val stoppedAtMillis = manifest.getLong("stopped_at_ms")
+            BackgroundReceiptFixtureSupport.reportWorkSnapshot(
+                "background-receipt-before-bind",
+                beforeBindInfos,
+                beforeBindInfos,
+                stoppedAtMillis,
+                observedAtElapsedMillis,
+            )
+            val beforeBind = beforeBindInfos.map { it.state }
             check(WorkInfo.State.ENQUEUED in beforeBind && beforeBind.none { it == WorkInfo.State.SUCCEEDED }) {
                 "the stopped work ran before the fixture bound its account: $beforeBind"
             }
@@ -440,9 +450,23 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             val receiver = runtime.listAccounts().single { it.label == manifest.getString("receiver") }
             bindReceiver(runtime, receiver)
             withContext(Dispatchers.Main.immediate) { requireNotNull(state).setAppInForeground(false) }
+            BackgroundReceiptFixtureSupport.reportCurrentWorkSnapshot(
+                context,
+                request,
+                "background-receipt-after-bind",
+                beforeBindInfos,
+                stoppedAtMillis,
+                observedAtElapsedMillis,
+            )
             val backoffEnds = manifest.getLong("stopped_at_ms") + AttachmentDownloadWorker.BACKOFF_SECONDS * 1_000L
             val marginMillis = backoffEnds - System.currentTimeMillis()
-            awaitResumedWork(receiver, request)
+            awaitResumedWork(
+                receiver,
+                request,
+                beforeBindInfos,
+                stoppedAtMillis,
+                observedAtElapsedMillis,
+            )
             val visible = visibleActivities()
             assertEquals("an Activity came to the foreground", 0, visible)
             requireNotNull(state).openNativeAttachment(request).use { local ->
@@ -470,6 +494,9 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
     private suspend fun awaitResumedWork(
         receiver: AccountSummaryFfi,
         request: AttachmentTransferRequest,
+        beforeBindInfos: List<WorkInfo>,
+        stoppedAtMillis: Long,
+        observedAtElapsedMillis: Long,
     ) {
         val manager = WorkManager.getInstance(context)
         val name = attachmentDownloadWorkName(request)
@@ -480,15 +507,30 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 }
             }
         } catch (stalled: kotlinx.coroutines.TimeoutCancellationException) {
-            reportStall(
-                context,
-                requireNotNull(state),
-                requireNotNull(marmot),
-                receiver,
-                request.groupIdHex,
-                listOf(request),
-            )
-            throw stalled
+            try {
+                BackgroundReceiptFixtureSupport.reportCurrentWorkSnapshot(
+                    context,
+                    request,
+                    "background-receipt-timeout",
+                    beforeBindInfos,
+                    stoppedAtMillis,
+                    observedAtElapsedMillis,
+                )
+            } catch (diagnosticFailure: Exception) {
+                // The original timeout remains authoritative even if its optional diagnostic fails.
+            }
+            try {
+                reportStall(
+                    context,
+                    requireNotNull(state),
+                    requireNotNull(marmot),
+                    receiver,
+                    request.groupIdHex,
+                    listOf(request),
+                )
+            } finally {
+                throw stalled
+            }
         }
     }
 
