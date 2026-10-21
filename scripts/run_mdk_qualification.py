@@ -37,17 +37,44 @@ def adb(*arguments, timeout=120, binary=False):
     return result.stdout
 
 
+def retain_command_failure(name, error):
+    """Preserve bounded adb diagnostics so transport, platform and app failures remain distinguishable."""
+    parts = [type(error).__name__]
+    for label, value in (('stdout', getattr(error, 'stdout', None)), ('stderr', getattr(error, 'stderr', None))):
+        if isinstance(value, bytes):
+            value = value.decode('utf-8', errors='replace')
+        parts.append(label + ':\n' + (value or '')[-32768:])
+    (REPORTS / f'{name}-command-error.txt').write_text('\n'.join(parts) + '\n')
+
+
+def retain_device_health():
+    """Observe disposable emulator services and crash diagnostics without restarting or repairing them."""
+    for name, command in (
+        ('activity-service', ('shell', 'service', 'check', 'activity')),
+        ('package-service', ('shell', 'service', 'check', 'package')),
+        ('boot-completed', ('shell', 'getprop', 'sys.boot_completed')),
+        ('crash-log', ('logcat', '-b', 'crash', '-d', '-t', '120')),
+    ):
+        try:
+            output = adb(*command, timeout=10)
+        except subprocess.SubprocessError as error:
+            retain_command_failure(name, error)
+        else:
+            (REPORTS / f'{name}.txt').write_text(output[-32768:])
+
+
 def instrument(name, test_class, expected, extra=()):
     """Require each named case's terminal PASS; a zero adb exit or ignored test cannot qualify it."""
     print(f'{name}: starting native qualification', flush=True)
     try:
         output = adb('shell', 'am', 'instrument', '-w', '-r', '-e', 'class', test_class,
                      *extra, RUNNER, timeout=1200)
-    except subprocess.TimeoutExpired as error:
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+        retain_command_failure(name, error)
         partial = error.stdout or b''
         if isinstance(partial, bytes):
             partial = partial.decode('utf-8', errors='replace')
-        (REPORTS / f'{name}.txt').write_text(partial + '\nHOST_TIMEOUT: qualification incomplete\n')
+        (REPORTS / f'{name}.txt').write_text(partial + '\nHOST_COMMAND_FAILED: qualification incomplete\n')
         raise
     (REPORTS / f'{name}.txt').write_text(output)
     statuses = {}
@@ -85,7 +112,11 @@ def stop():
 def install(role):
     """Both app generations use the same package and signer, and every update is an ordinary -r install."""
     for name in ('app', 'test'):
-        adb('install', '-r', '-t', str(Path('build/mdk-pair') / role / f'{name}.apk'), timeout=180)
+        try:
+            adb('install', '-r', '-t', str(Path('build/mdk-pair') / role / f'{name}.apk'), timeout=180)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+            retain_command_failure(f'install-{role}-{name}', error)
+            raise
     disable_background_entries()
 
 
@@ -212,17 +243,23 @@ def main():
             except (RuntimeError, subprocess.SubprocessError) as error:
                 facts['phases']['pending_promotion_campaign'] = type(error).__name__ + ': ' + str(error)
         # Separate generated roots in the maintained recovery fixture do not depend on upgrade success.
-        install('candidate')
-        for comparison in ('refuse', 'ignore'):
-            try:
-                stop()
-                instrument('recovery-' + comparison, RECOVERY, RECOVERY_CASES,
-                           ('-e', 'comparison', comparison))
-                facts['phases']['recovery_' + comparison] = 'passed'
-            except (RuntimeError, subprocess.SubprocessError) as error:
-                facts['phases']['recovery_' + comparison] = type(error).__name__ + ': ' + str(error)
+        try:
+            install('candidate')
+        except (RuntimeError, subprocess.SubprocessError) as error:
+            facts['phases']['recovery_setup'] = type(error).__name__ + ': ' + str(error)
+        else:
+            for comparison in ('refuse', 'ignore'):
+                try:
+                    stop()
+                    instrument('recovery-' + comparison, RECOVERY, RECOVERY_CASES,
+                               ('-e', 'comparison', comparison))
+                    facts['phases']['recovery_' + comparison] = 'passed'
+                except (RuntimeError, subprocess.SubprocessError) as error:
+                    facts['phases']['recovery_' + comparison] = type(error).__name__ + ': ' + str(error)
     finally:
         (REPORTS / 'qualification.json').write_text(json.dumps(facts, indent=2) + '\n')
+        if any(value != 'passed' for value in facts['phases'].values()):
+            retain_device_health()
         for server in (relay, blob):
             server.shutdown()
             server.server_close()

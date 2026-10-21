@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import queue
+import subprocess
 import zipfile
 from unittest.mock import patch
 
@@ -46,6 +47,30 @@ class QualificationEvidenceTest(unittest.TestCase):
         """Upgrade phases allow no skipped cases, even when every required case also passed."""
         with self.assertRaises(RuntimeError):
             self.invoke(transcript([('retained', 0), ('unexpected', -3)]), {'retained'})
+
+    def test_failed_instrumentation_retains_adb_diagnostics_and_cannot_pass(self):
+        """A failed adb command must preserve the actual platform error instead of only its exit status."""
+        failure = subprocess.CalledProcessError(1, ['adb'], output='partial status', stderr='activity service unavailable')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', side_effect=failure):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    campaign.instrument('fixture', campaign.UPGRADE, {'retained'})
+                evidence = (Path(directory) / 'fixture-command-error.txt').read_text()
+                self.assertIn('partial status', evidence)
+                self.assertIn('activity service unavailable', evidence)
+                self.assertFalse((Path(directory) / 'fixture.json').exists())
+
+    def test_diagnostic_capture_is_bounded_and_health_errors_remain_evidence(self):
+        """Broken service probes cannot replace the original failure, and captured output stays bounded."""
+        failure = subprocess.TimeoutExpired(['adb'], 10, output=b'x' * 65536, stderr=b'transport timeout')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', side_effect=failure):
+                campaign.retain_device_health()
+                evidence = (Path(directory) / 'activity-service-command-error.txt').read_text()
+                captured_stdout = evidence.split('stdout:\n', 1)[1].split('\nstderr:\n', 1)[0]
+                self.assertEqual(len(captured_stdout), 32768)
+                self.assertIn('transport timeout', evidence)
+                self.assertEqual(len(list(Path(directory).glob('*-command-error.txt'))), 4)
 
     def test_recovery_allows_only_the_two_documented_upstream_ignores(self):
         """A changed recovery skip set needs explicit review rather than silently passing the campaign."""
@@ -227,6 +252,70 @@ class QualificationUiTest(unittest.TestCase):
                     ui.retained_chat('baseline')
                     focus.assert_called_once_with('baseline')
                     self.assertTrue((Path(directory) / 'baseline.png').exists())
+
+    def test_baseline_returned_chat_list_reopens_explicit_demo_ready_action(self):
+        """Returning to the original profile's list is a navigation recovery, never permission to switch accounts."""
+        windows = iter([
+            '<hierarchy><node text="Johnny Appleseed" enabled="true"/>'
+            '<node content-desc="Chats" enabled="true"/>'
+            '<node content-desc="Switch Profile, PR3371 qualification" enabled="true"/>'
+            '<node text="Great — the demo conversation is ready to explore." enabled="true"/></hierarchy>',
+            '<hierarchy><node text="Replies and reactions work across both profiles." enabled="true"/>'
+            '<node text="Great — the demo conversation is ready to explore." enabled="true"/>'
+            '<node text="Message" enabled="true"/><node content-desc="Add attachment" enabled="true"/>'
+            '<node content-desc="Dictate text" enabled="true"/></hierarchy>',
+        ])
+
+        def fixture_adb(*args, **kwargs):
+            """Expose the completed demo through its user action while rejecting direct profile-row taps."""
+            if args[:2] == ('shell', 'cat'):
+                return next(windows)
+            return b'image' if kwargs.get('binary') else ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(preview, 'REPORTS', Path(directory)), \
+                    patch.object(preview, 'adb', side_effect=fixture_adb), patch.object(preview.time, 'sleep'):
+                ui = preview.PreviewUi()
+                with patch.object(ui, 'tap_node', side_effect=AssertionError('Direct profile navigation')), \
+                        patch.object(ui, 'open_completed_demo') as reopen, patch.object(ui, 'focus_composer'):
+                    ui.retained_chat('baseline')
+                    reopen.assert_called_once_with()
+
+    def test_two_profile_settings_opens_settings_without_selecting_an_account(self):
+        """The observed two-profile avatar opens a selector whose Settings action preserves the active identity."""
+        window = ('<hierarchy><node content-desc="Switch Profile, PR3371 qualification" enabled="true" '
+                  'bounds="[12,32][60,80]"/></hierarchy>')
+        with patch.object(preview, 'adb', return_value=window):
+            ui = preview.PreviewUi()
+            with patch.object(ui, 'tap_node') as tap, patch.object(ui, 'click') as click:
+                ui.open_settings()
+                tap.assert_called_once()
+                self.assertEqual(tap.call_args.args[0].get('content-desc'), 'Switch Profile, PR3371 qualification')
+                click.assert_called_once_with('Settings')
+
+    def test_demo_reopen_requires_enabled_ready_action_and_ready_status(self):
+        """A running or disabled demo action cannot qualify coordinator completion."""
+        windows = iter([
+            '<hierarchy><node text="Open demo conversation" enabled="true"/></hierarchy>',
+            '<hierarchy><node text="Open demo conversation" enabled="false"/>'
+            '<node text="The real two-profile conversation is ready." enabled="true"/></hierarchy>',
+            '<hierarchy><node text="Open demo conversation" enabled="true"/>'
+            '<node text="The real two-profile conversation is ready." enabled="true"/></hierarchy>',
+        ])
+
+        def fixture_adb(*args, **kwargs):
+            """Advance asynchronous coordinator status without executing any demo action."""
+            return next(windows) if args[:2] == ('shell', 'cat') else ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(preview, 'REPORTS', Path(directory)), \
+                    patch.object(preview, 'adb', side_effect=fixture_adb), patch.object(preview.time, 'sleep'):
+                ui = preview.PreviewUi()
+                with patch.object(ui, 'open_settings'), patch.object(ui, 'click'), patch.object(ui, 'tap_node') as tap:
+                    ui.open_completed_demo()
+                    tap.assert_called_once()
+                    self.assertEqual(tap.call_args.args[0].get('enabled'), 'true')
+                    self.assertTrue((Path(directory) / 'baseline-demo-ready.xml').exists())
 
 
 if __name__ == '__main__':

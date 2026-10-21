@@ -144,6 +144,38 @@ class PreviewUi:
             adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
         raise RuntimeError('Baseline demo setup remained unavailable after bounded screen re-entry')
 
+    def open_settings(self):
+        """Open settings for the original fixture profile, including the two-profile selector route."""
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            self.snapshot()
+            direct = self.matches(f'Open settings, {FIXTURE_NAME}')
+            selector = self.matches(f'Switch Profile, {FIXTURE_NAME}')
+            if direct:
+                self.tap_node(direct[0])
+                return
+            if selector:
+                self.tap_node(selector[0])
+                self.click('Settings')
+                return
+            time.sleep(1)
+        raise RuntimeError('Original fixture profile settings unavailable')
+
+    def open_completed_demo(self):
+        """Observe the coordinator's explicit Ready action after account changes dismiss its original screen."""
+        self.open_settings()
+        self.click('Developer Tools', scroll=True)
+        deadline = time.monotonic() + 180
+        while time.monotonic() < deadline:
+            self.snapshot()
+            ready = self.matches('Open demo conversation')
+            if ready and self.matches('The real two-profile conversation is ready.'):
+                (REPORTS / 'baseline-demo-ready.xml').write_text(self.xml)
+                self.tap_node(ready[0])
+                return
+            time.sleep(1)
+        raise RuntimeError('Baseline demo coordinator did not report Ready')
+
     def tap_node(self, node):
         """Use the freshly observed node bounds and refuse malformed geometry."""
         bounds = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
@@ -195,8 +227,13 @@ class PreviewUi:
                 (REPORTS / f'{phase}.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
                 self.focus_composer(phase)
                 return
-            # During baseline setup, only the demo coordinator may navigate or switch its owned profiles.
-            if phase != 'baseline' and self.matches('Johnny Appleseed') and not composer:
+            # Account changes dismiss the original Developer Tools scope. Reopen its explicit Ready action,
+            # but never select a profile or a transient Johnny label while the coordinator owns setup.
+            original_chat_list = (self.matches('Chats') and self.matches(f'Switch Profile, {FIXTURE_NAME}')
+                                  and self.matches('Johnny Appleseed') and self.matches(HISTORY[1]))
+            if phase == 'baseline' and original_chat_list and not composer:
+                self.open_completed_demo()
+            elif phase != 'baseline' and self.matches('Johnny Appleseed') and not composer:
                 self.tap_node(self.matches('Johnny Appleseed')[0])
             elif self.matches('Help Improve White Noise') and self.matches('Close'):
                 self.tap_node(self.matches('Close')[0])
@@ -286,7 +323,7 @@ def main():
         ui.retained_chat('cold-restart')
         facts['phases']['cold_restart'] = 'passed'
         ui.click('Back')
-        ui.click(f'Open settings, {FIXTURE_NAME}')
+        ui.open_settings()
         if ui.public_identity() != identity:
             raise RuntimeError('Public fixture identity changed across the upgrade')
         offline('after-retained-identity')
