@@ -433,11 +433,26 @@ jobs:
           retention-days: 7
 
       - name: Record instrumentation checkout revision
-        if: success()
-        run: git rev-parse HEAD > app/build/outputs/apk/source-revision.txt
+        id: instrumentation_apk_revision
+        if: success() || (failure() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.media_sandbox_only)
+        shell: bash
+        env:
+          RETAIN_FAILED_MEDIA: ${{ job.status != 'success' }}
+        run: |
+          if [[ "$RETAIN_FAILED_MEDIA" == 'true' ]]; then
+            shopt -s nullglob
+            app_apks=(app/build/outputs/apk/devZapstore/debug/*-universal-debug.apk)
+            test_apks=(app/build/outputs/apk/androidTest/devZapstore/debug/*.apk)
+            if [[ ${#app_apks[@]} != 1 || ${#test_apks[@]} != 1 ]]; then
+              echo "Focused failure capture requires exactly one built app and test APK" >&2
+              exit 1
+            fi
+            [[ -f "${app_apks[0]}" && -f "${test_apks[0]}" ]]
+          fi
+          git rev-parse HEAD > app/build/outputs/apk/source-revision.txt
 
       - name: Retain built-revision instrumentation APKs
-        if: success()
+        if: success() || (failure() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.media_sandbox_only && steps.instrumentation_apk_revision.outcome == 'success')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: android-instrumented-apks-${{ github.sha }}

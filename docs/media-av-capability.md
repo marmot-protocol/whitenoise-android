@@ -18,7 +18,11 @@ existing waveform algorithm. Complete playback and decoding require separate evi
 `no_result` leaves the failing internal call unknown.
 
 The worker reports isolation checks through the existing primitive reply frame.
-The parent stamps the actual Binder caller UID and rejects same-UID replies,
+A bounded debug READY transaction precedes platform construction. The parent
+checks the immutable endpoint generation, reply capability, run token, case and
+request, then records the kernel Binder UID and synchronous PID. A later terminal
+reply must match that capability and UID; its one-way PID can be unavailable.
+The experiment rejects same-UID replies,
 network permission, initialized application state, a readable private canary or a
 writable selected input. The production reply format retains its existing fields; correlated diagnostics
 use a separate fixed log tag.
@@ -29,7 +33,10 @@ The test fixture registers the exact endpoint's death recipient before sending
 any descriptor. It revokes the reply capability and requests retirement before
 waiting for observed Binder death. Only then can it read poster pixels into a
 bounded parent-owned Bitmap or admit another case. Startup without an observed
-Binder, missing death and malformed replies stop the campaign as unqualified.
+Binder, missing READY identity, missing death and malformed replies stop the
+campaign as unqualified. A failed close or unbind keeps the generation held.
+The next case requires positive closure of both selected handle scopes, revocation
+and successful once-only unbind and disposal of that exact generation.
 The fixture treats disconnect, unbind, a retirement request and elapsed time as
 unresolved lifetime observations.
 
@@ -54,9 +61,15 @@ directory alongside the existing baseline artifacts.
 Every run has a fresh synthetic token. Worker diagnostics contain that token,
 case/request IDs, fixed phases, outcomes, exception class/code, reported process
 identity and monotonic time. Capture reads only the fixed tag, validates the
-correlation and compares reported UID with the actual reply UID. It excludes
+correlation and compares reported UID/PID with the accepted READY kernel identity. It excludes
 exception messages, input paths and unrelated logs. Missing or ambiguous records
 make the case unqualified; platform denial requires an attributable failure.
+
+A typed terminal-reply deadline can be recorded after READY, exact death and
+successful cleanup, allowing a fresh worker for the next independent case. It
+reads no output. The failed case remains unqualified and the final test fails
+after capture. Cancellation, unexpected errors and uncertain lifetime or cleanup
+stop the remaining cases; they never enter this continuation path.
 
 A successful test means the finite characterization completed with valid evidence.
 Individual phases may report success, an exception or untyped `no_result`.

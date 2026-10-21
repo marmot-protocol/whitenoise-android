@@ -62,6 +62,13 @@ class MediaAvCapabilityService : Service() {
                 Process.killProcess(Process.myPid())
             }, ceiling, TimeUnit.MILLISECONDS)
         try {
+            val tuple =
+                AvProbeTuple(
+                    checkNotNull(data.getString("runToken")),
+                    checkNotNull(data.getString("caseId")),
+                    requestId,
+                )
+            sendAvProbeReady(checkNotNull(reply), tuple)
             val result = descriptors(data, trace)
             reply?.let { sendMediaDecodeReply(it, requestId, result) }
         } catch (failure: Exception) {

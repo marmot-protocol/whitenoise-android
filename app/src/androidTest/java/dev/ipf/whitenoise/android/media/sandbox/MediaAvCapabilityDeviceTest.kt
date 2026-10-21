@@ -20,6 +20,7 @@ class MediaAvCapabilityDeviceTest {
     fun characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        checkAvBindingWiring(context)
         val token = UUID.randomUUID().toString().replace("-", "")
         val output = checkNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir"))
         val directory = File(output)
@@ -34,6 +35,7 @@ class MediaAvCapabilityDeviceTest {
             report.writeText(
                 JSONObject()
                     .put("type", "header")
+                    .put("capture_schema", 2)
                     .put("run_token", token)
                     .put("api", Build.VERSION.SDK_INT)
                     .put("fingerprint", Build.FINGERPRINT)
@@ -60,7 +62,9 @@ private class AvCapabilityCampaign(
 
     fun run() {
         try {
-            cases().forEachIndexed { index, case -> record(index, case) }
+            var failedCases = 0
+            cases().forEachIndexed { index, case -> if (record(index, case)) failedCases++ }
+            check(failedCases == 0) { "A/V deadline observations remain unqualified" }
         } finally {
             binding.close()
         }
@@ -86,7 +90,7 @@ private class AvCapabilityCampaign(
     private fun record(
         index: Int,
         case: ProbeCase,
-    ) {
+    ): Boolean {
         fixture.writeBytes(case.bytes)
         val length = if (case.id == "overflow_range") Long.MAX_VALUE else fixture.length()
         val row =
@@ -96,25 +100,43 @@ private class AvCapabilityCampaign(
                 .put("run_token", token)
                 .put("request", index + 1)
                 .put("stage", case.stage)
-        if (!validMediaRange(fixture.length(), 0, length)) {
-            row.put("outcome", "parent_range_rejected").put("worker_started", false)
-        } else {
-            try {
+        var failed = false
+        var emitted = false
+        try {
+            if (!validMediaRange(fixture.length(), 0, length)) {
+                row.put("outcome", "parent_range_rejected").put("worker_started", false)
+            } else {
                 val observed = binding.run(fixture, request(index + 1, case.stage, case.id, length))
-                row.put("observation", observed)
-                val logs = AvCapabilityLogs.read(token, case.id, index + 1, observed.getInt("kernel_reply_uid"))
-                row.put("worker_diagnostics", logs)
-                row.put("outcome", if (observed.getBoolean("success")) "success" else "no_result")
-            } catch (failure: Throwable) {
-                row.put("outcome", "unqualified").put("failure_class", failure.javaClass.simpleName.take(64))
-                row.put("diagnostics_qualified", false)
-                val diagnostics = runCatching { AvCapabilityLogs.read(token, case.id, index + 1, -1) }.getOrNull()
-                row.put("worker_diagnostics", diagnostics ?: JSONObject.NULL)
+                val evidence = observed.observation
+                row.put("observation", evidence)
+                val logs =
+                    AvCapabilityLogs.read(
+                        token,
+                        case.id,
+                        index + 1,
+                        evidence.getInt("kernel_ready_uid"),
+                        evidence.getInt("kernel_ready_pid"),
+                    )
+                row.put("worker_diagnostics", logs).put("diagnostics_qualified", true)
+                when (observed) {
+                    is AvCapabilityCase.Terminal -> {
+                        row.put("outcome", if (evidence.getBoolean("success")) "success" else "no_result")
+                    }
+                    is AvCapabilityCase.ReplyDeadline -> {
+                        row.put("outcome", "reply_deadline_unqualified")
+                        failed = true
+                    }
+                }
+            }
+            emitted = true
+            emit(row)
+        } finally {
+            if (!emitted) {
+                row.put("outcome", "unqualified").put("diagnostics_qualified", false)
                 emit(row)
-                throw failure
             }
         }
-        emit(row)
+        return failed
     }
 
     private fun request(
@@ -157,6 +179,7 @@ private object AvCapabilityLogs {
         case: String,
         request: Int,
         uid: Int,
+        pid: Int,
     ): JSONArray {
         val prefix = "$token|$case|$request|"
         val records =
@@ -167,7 +190,7 @@ private object AvCapabilityLogs {
                 .toList()
         check(records.size in 2..32) { "Missing or ambiguous correlated diagnostics" }
         check(records.map { it.split('|').getOrNull(3) }.toSet().size == 1) { "Mixed worker identities" }
-        val rows = records.map { parse(it, uid) }
+        val rows = records.map { parse(it, uid, pid) }
         check(rows.count { it.getString("outcome") != "begin" } == 1) { "Ambiguous terminal diagnostics" }
         return JSONArray(rows)
     }
@@ -199,11 +222,12 @@ private object AvCapabilityLogs {
     private fun parse(
         line: String,
         uid: Int,
+        pid: Int,
     ): JSONObject {
         val fields = line.split('|')
         check(fields.size == 10)
         check(fields[3].toInt() > 0 && fields[4].toInt() > 0)
-        if (uid >= 0) check(fields[4].toInt() == uid)
+        check(uid > 0 && pid > 0 && fields[4].toInt() == uid && fields[3].toInt() == pid)
         check(
             fields[5] in
                 setOf(
@@ -229,7 +253,8 @@ private object AvCapabilityLogs {
         return JSONObject()
             .put("worker_reported_pid", fields[3].toInt())
             .put("worker_reported_uid", fields[4].toInt())
-            .put("reply_uid", if (uid >= 0) uid else JSONObject.NULL)
+            .put("ready_kernel_uid", uid)
+            .put("ready_kernel_pid", pid)
             .put("phase", fields[5])
             .put("outcome", fields[6])
             .put("error_class", fields[7])

@@ -11,6 +11,7 @@ import android.os.Message
 import android.os.Messenger
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
+import android.os.RemoteException
 import android.os.SharedMemory
 import android.os.SystemClock
 import android.system.Os
@@ -20,16 +21,35 @@ import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
-/** One finite test fixture retains uncertain startup; close cannot manufacture a second generation. */
+/** Each case is either complete or a typed failed observation; neither grants production support. */
+internal sealed interface AvCapabilityCase {
+    val observation: JSONObject
+
+    data class Terminal(
+        override val observation: JSONObject,
+    ) : AvCapabilityCase
+
+    data class ReplyDeadline(
+        override val observation: JSONObject,
+    ) : AvCapabilityCase
+}
+
+private class AvReplyDeadline : Exception("Terminal reply deadline")
+
+/** One owner retains uncertain startup, handles or cleanup; close cannot create another generation. */
 internal class MediaAvCapabilityBinding(
     private val context: Context,
+    private val callerIdentity: () -> AvProbeIdentity = {
+        AvProbeIdentity(Binder.getCallingUid(), Binder.getCallingPid())
+    },
+    private val now: () -> Long = SystemClock::elapsedRealtime,
 ) : AutoCloseable {
     private val lock = Any()
     private val callbacks = Executors.newSingleThreadExecutor()
     private var selected: AvCapabilityWorker? = null
-    private var closed = false
+
+    @Volatile private var closed = false
 
     private companion object {
         const val DEATH_GRACE_MS = 2_000L
@@ -38,49 +58,168 @@ internal class MediaAvCapabilityBinding(
     fun run(
         file: File,
         request: Bundle,
-    ): JSONObject {
-        val started = SystemClock.elapsedRealtime()
+    ): AvCapabilityCase {
+        val started = now()
+        val worker = reserve(request, started)
+        val connection = connection(worker)
+        worker.dispose = { dispose(worker, connection) }
+        var deadline = false
+        var retirementStarted: Long? = null
+        var operationElapsed = 0L
+        try {
+            bind(worker, connection)
+            val connected = worker.connected.await(worker.remaining(), TimeUnit.MILLISECONDS)
+            check(connected) { "Unobserved startup remains held" }
+            checkNotNull(worker.remote)
+            withHandles(worker, file) { input, output ->
+                exchange(worker, input, output, request)
+                check(worker.remaining() > 0) { "Late reply remains unqualified" }
+                operationElapsed = now() - started
+                retirementStarted = now()
+                retire(worker)
+                check(worker.dead.await(DEATH_GRACE_MS, TimeUnit.MILLISECONDS)) { "Exact Binder death missing" }
+                AvCapabilityEvidence.validate(checkNotNull(worker.result), output)
+            }
+        } catch (failure: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw failure
+        } catch (_: AvReplyDeadline) {
+            deadline = true
+            retirementStarted = now()
+            operationElapsed = now() - started
+        } finally {
+            worker.revoke()
+            retire(worker)
+            worker.cleanup.finished()
+            worker.releaseIfFinished()
+        }
+        awaitCleanup(worker, retirementStarted)
+        return observation(worker, started, deadline, operationElapsed, retirementStarted)
+    }
+
+    private fun reserve(
+        request: Bundle,
+        started: Long,
+    ): AvCapabilityWorker {
         val ceiling =
             if (request.getString("probeStage") == "waveform") {
                 MediaDecodePolicy.WAVEFORM_DEADLINE_MS
             } else {
                 MediaDecodePolicy.DEADLINE_MS
             }
-        val worker =
-            synchronized(lock) {
-                check(!closed && selected == null) { "Prior worker lifetime is unresolved" }
-                AvCapabilityWorker(request.getInt("requestId"), started + ceiling).also { selected = it }
+        val tuple =
+            AvProbeTuple(
+                checkNotNull(request.getString("runToken")),
+                checkNotNull(request.getString("caseId")),
+                request.getInt("requestId"),
+            )
+        return synchronized(lock) {
+            check(!closed && selected == null) { "Prior worker lifetime is unresolved" }
+            AvCapabilityWorker(tuple, started + ceiling, ::withCurrent, callerIdentity, now).also { selected = it }
+        }
+    }
+
+    private fun awaitCleanup(
+        worker: AvCapabilityWorker,
+        retirementStarted: Long?,
+    ) {
+        retirementStarted?.let {
+            val remaining = (it + DEATH_GRACE_MS - now()).coerceAtLeast(0)
+            check(worker.cleanupDone.await(remaining, TimeUnit.MILLISECONDS)) { heldState(worker) }
+        }
+        check(
+            worker.control.canReleaseCase(
+                worker.cleanup.state(),
+                worker.deathRegistered,
+                worker.dead.count == 0L,
+                worker.cleanupDone.count == 0L,
+            ),
+        ) {
+            heldState(worker)
+        }
+    }
+
+    private fun heldState(worker: AvCapabilityWorker): String =
+        "ready=${worker.control.identity != null}, protocolAbort=${worker.protocolAborted}, " +
+            "deathRegistered=${worker.deathRegistered}, dead=${worker.dead.count == 0L}, " +
+            "cleanupAttemptFinished=${worker.cleanupDone.count == 0L}, handleCleanup=${worker.cleanup.holdReason()}"
+
+    private fun observation(
+        worker: AvCapabilityWorker,
+        started: Long,
+        deadline: Boolean,
+        operationElapsed: Long,
+        retirementStarted: Long?,
+    ): AvCapabilityCase {
+        val identity = checkNotNull(worker.control.identity) { "READY identity missing" }
+        check(worker.deathRegistered && worker.dead.count == 0L) { "Exact Binder death missing" }
+        val retired = retirementStarted?.let { now() - it } ?: 0L
+        val observation =
+            if (deadline) {
+                JSONObject()
+                    .put("request", worker.tuple.request)
+                    .put("timely_terminal_reply", false)
+                    .put("terminal_reply_seen", worker.result != null)
+                    .put("output_read", false)
+                    .put("elapsed_ms", now() - started)
+                    .put("operation_elapsed_ms", operationElapsed)
+                    .put("retirement_elapsed_ms", retired)
+            } else {
+                AvCapabilityEvidence.row(
+                    worker.tuple.request,
+                    checkNotNull(worker.result),
+                    now() - started,
+                    operationElapsed,
+                    retired,
+                )
             }
-        val connection = connection(worker)
-        worker.cleanup = { dispose(worker, connection) }
+        observation
+            .put("kernel_ready_uid", identity.uid)
+            .put("kernel_ready_pid", identity.pid)
+            .put("death_observed", true)
+            .put("capability_revoked", true)
+            .put("selected_scopes_closed", true)
+            .put("unbind_succeeded", true)
+            .put("cleanup_succeeded", true)
+        return if (deadline) AvCapabilityCase.ReplyDeadline(observation) else AvCapabilityCase.Terminal(observation)
+    }
+
+    private fun withCurrent(
+        worker: AvCapabilityWorker,
+        accept: () -> Boolean,
+    ): Boolean =
+        synchronized(lock) {
+            val currentOwner = !closed && selected === worker
+            val currentEndpoint = worker.remote != null && worker.deathRegistered
+            val live = worker.dead.count != 0L && worker.remaining() > 0
+            if (currentOwner && currentEndpoint && live) accept() else false
+        }
+
+    private fun withHandles(
+        worker: AvCapabilityWorker,
+        file: File,
+        action: (ParcelFileDescriptor, SharedMemory) -> Unit,
+    ) {
+        val input = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        worker.input = input
+        worker.cleanup.inputScopeClosed(false)
         try {
-            bind(worker, connection)
-            val connected = worker.connected.await(worker.remaining(), TimeUnit.MILLISECONDS)
-            check(connected) { "Unobserved startup remains held" }
-            checkNotNull(worker.remote)
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { input ->
-                val mode = Os.fcntlInt(input.fileDescriptor, OsConstants.F_GETFL, 0) and OsConstants.O_ACCMODE
-                check(mode == OsConstants.O_RDONLY)
-                val capacity = checkNotNull(MediaDecodePolicy.outputCapacity(128))
-                SharedMemory.create("av-capability", capacity).use { output ->
-                    exchange(worker, input, output, request)
-                    check(worker.remaining() > 0) { "Reply deadline; lifetime held" }
-                    val operationElapsed = SystemClock.elapsedRealtime() - started
-                    val retirementStarted = SystemClock.elapsedRealtime()
-                    retire(worker)
-                    check(worker.dead.await(DEATH_GRACE_MS, TimeUnit.MILLISECONDS)) { "Exact Binder death missing" }
-                    val retirementElapsed = SystemClock.elapsedRealtime() - retirementStarted
-                    checkNotNull(worker.result).let { result ->
-                        AvCapabilityEvidence.validate(result, output)
-                        return AvCapabilityEvidence.row(worker.id, result, started, operationElapsed, retirementElapsed)
-                    }
-                }
+            val mode = Os.fcntlInt(input.fileDescriptor, OsConstants.F_GETFL, 0) and OsConstants.O_ACCMODE
+            check(mode == OsConstants.O_RDONLY)
+            val output = SharedMemory.create("av-capability", checkNotNull(MediaDecodePolicy.outputCapacity(128)))
+            worker.output = output
+            worker.cleanup.outputScopeClosed(false)
+            try {
+                action(input, output)
+            } finally {
+                output.close()
+                worker.cleanup.outputScopeClosed(true)
+                worker.output = null
             }
         } finally {
-            worker.accepting.set(false)
-            retire(worker)
-            worker.finished.set(true)
-            worker.releaseIfFinished()
+            input.close()
+            worker.cleanup.inputScopeClosed(true)
+            worker.input = null
         }
     }
 
@@ -90,16 +229,21 @@ internal class MediaAvCapabilityBinding(
     ) {
         val intent = Intent().setClassName(context, "dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityService")
         try {
-            val instance = workerInstanceName("av", worker.id)
-            val flags = Context.BIND_AUTO_CREATE
-            val accepted = context.bindIsolatedService(intent, flags, instance, callbacks, connection)
+            val accepted =
+                context.bindIsolatedService(
+                    intent,
+                    Context.BIND_AUTO_CREATE,
+                    workerInstanceName("av", worker.tuple.request),
+                    callbacks,
+                    connection,
+                )
             synchronized(lock) {
                 worker.bound = worker.bound || accepted
-                worker.definitiveRefusal = !accepted && !worker.bound
+                if (!accepted && !worker.bound) worker.cleanup.lifetimeProven()
             }
             check(accepted) { "Binding refused; no capability result" }
         } finally {
-            worker.bindComplete = true
+            worker.cleanup.bindComplete()
         }
     }
 
@@ -115,12 +259,14 @@ internal class MediaAvCapabilityBinding(
                     worker.remote = service
                 }
                 worker.deathRegistered =
-                    runCatching {
+                    try {
                         service.linkToDeath(worker.death, 0)
                         true
-                    }.getOrDefault(false)
+                    } catch (_: RemoteException) {
+                        false
+                    }
                 worker.connected.countDown()
-                if (!worker.deathRegistered || !worker.accepting.get()) retire(worker)
+                if (!worker.deathRegistered || closed) retire(worker)
             }
 
             override fun onServiceDisconnected(name: ComponentName) = Unit
@@ -136,33 +282,69 @@ internal class MediaAvCapabilityBinding(
         request.putInt("version", MediaDecodePolicy.VERSION)
         request.putParcelable("input", input)
         request.putParcelable("output", output)
-        check(worker.dead.count != 0L && worker.accepting.get()) { "Worker is already retired" }
+        check(worker.dead.count != 0L) { "Worker is already retired" }
         val message =
-            Message.obtain(null, MediaDecodePolicy.DECODE, worker.id, 0).apply {
+            Message.obtain(null, MediaDecodePolicy.DECODE, worker.tuple.request, 0).apply {
                 data = request
                 replyTo = Messenger(worker.reply)
             }
-        Messenger(checkNotNull(worker.remote)).send(message)
-        check(worker.replied.await(worker.remaining(), TimeUnit.MILLISECONDS)) { "Reply deadline; lifetime held" }
-        worker.accepting.set(false)
+        synchronized(lock) {
+            val currentOwner = !closed && selected === worker
+            check(currentOwner && worker.control.canDispatch() && worker.dead.count != 0L) { "Revoked request" }
+            Messenger(checkNotNull(worker.remote)).send(message)
+        }
+        if (!worker.replied.await(worker.remaining(), TimeUnit.MILLISECONDS)) {
+            worker.revoke()
+            throw AvReplyDeadline()
+        }
+        check(!worker.protocolAborted) { "Current terminal protocol or identity rejected" }
+        worker.revoke()
     }
 
     private fun retire(worker: AvCapabilityWorker) {
-        worker.accepting.set(false)
-        worker.remote?.let { runCatching { Messenger(it).send(Message.obtain(null, MediaDecodePolicy.RETIRE)) } }
+        worker.revoke()
+        worker.remote?.let {
+            try {
+                Messenger(it).send(Message.obtain(null, MediaDecodePolicy.RETIRE))
+            } catch (_: RemoteException) {
+                // A failed send does not establish death or successful cleanup.
+            }
+        }
     }
 
     private fun dispose(
         worker: AvCapabilityWorker,
         connection: ServiceConnection,
     ) {
-        runCatching { context.unbindService(connection) }
-        worker.remote?.let { runCatching { it.unlinkToDeath(worker.death, 0) } }
+        var success = false
+        try {
+            context.unbindService(connection)
+            success = true
+        } catch (_: IllegalArgumentException) {
+            // A failed exact unbind is a held lane, never a successful disposal.
+        } catch (_: SecurityException) {
+            // Preserve the selected generation and its handles for diagnosis.
+        } finally {
+            worker.cleanup.unbound(success)
+            if (!success) worker.cleanupDone.countDown()
+        }
+        if (worker.cleanup.state() != AvProbeCleanup.State.SUCCESS) {
+            worker.cleanupDone.countDown()
+            return
+        }
+        worker.remote?.let {
+            try {
+                it.unlinkToDeath(worker.death, 0)
+            } catch (_: NoSuchElementException) {
+                // A dead endpoint may already have removed this recipient.
+            }
+        }
         val terminal =
             synchronized(lock) {
                 if (selected === worker) selected = null
                 closed
             }
+        worker.cleanupDone.countDown()
         if (terminal) callbacks.shutdown()
     }
 
@@ -173,38 +355,42 @@ internal class MediaAvCapabilityBinding(
                 selected
             }
         if (worker == null) callbacks.shutdown() else retire(worker)
-        // An uncertain live generation and its callback executor stay retained; no replacement is permitted.
     }
 }
 
 private class AvCapabilityWorker(
-    val id: Int,
+    val tuple: AvProbeTuple,
     private val deadline: Long,
+    private val withCurrent: (AvCapabilityWorker, () -> Boolean) -> Boolean,
+    private val callerIdentity: () -> AvProbeIdentity,
+    private val now: () -> Long,
 ) {
     val connected = CountDownLatch(1)
     val replied = CountDownLatch(1)
     val dead = CountDownLatch(1)
-    val accepting = AtomicBoolean(true)
-    val finished = AtomicBoolean(false)
-    private val disposed = AtomicBoolean(false)
-    var cleanup: (() -> Unit)? = null
-
-    @Volatile var bindComplete = false
-    val death =
-        IBinder.DeathRecipient {
-            dead.countDown()
-            releaseIfFinished()
-        }
+    val cleanupDone = CountDownLatch(1)
+    val control = AvProbeControl(tuple)
+    val cleanup = AvProbeCleanup()
+    var dispose: (() -> Unit)? = null
+    var input: ParcelFileDescriptor? = null
+    var output: SharedMemory? = null
 
     @Volatile var remote: IBinder? = null
 
     @Volatile var bound = false
 
-    @Volatile var definitiveRefusal = false
-
     @Volatile var deathRegistered = false
 
     @Volatile var result: Bundle? = null
+
+    @Volatile var protocolAborted = false
+    private var readyEndpoint: IBinder? = null
+    val death =
+        IBinder.DeathRecipient {
+            cleanup.lifetimeProven()
+            dead.countDown()
+            releaseIfFinished()
+        }
     val reply =
         object : Binder() {
             override fun onTransact(
@@ -213,39 +399,95 @@ private class AvCapabilityWorker(
                 response: Parcel?,
                 flags: Int,
             ): Boolean =
-                when {
-                    code != IBinder.FIRST_CALL_TRANSACTION -> super.onTransact(code, data, response, flags)
-                    !accepting.get() || data.dataAvail() > MediaDecodePolicy.MAX_REPLY_BYTES -> false
-                    else -> accept(data)
+                when (code) {
+                    AV_READY_TRANSACTION -> ready(data, response, flags)
+                    IBinder.FIRST_CALL_TRANSACTION -> terminal(data)
+                    else -> super.onTransact(code, data, response, flags)
                 }
 
-            private fun accept(data: Parcel): Boolean {
+            private fun ready(
+                data: Parcel,
+                response: Parcel?,
+                flags: Int,
+            ): Boolean {
+                if (response == null || flags and IBinder.FLAG_ONEWAY != 0) return rejectTerminal()
+                val frame =
+                    try {
+                        readAvProbeReady(data)
+                    } catch (_: RuntimeException) {
+                        return rejectTerminal()
+                    }
+                val identity = callerIdentity()
+                val accepted =
+                    withCurrent(this@AvCapabilityWorker) {
+                        control
+                            .ready(
+                                frame,
+                                identity.uid,
+                                identity.pid,
+                                android.os.Process.myUid(),
+                            ).also {
+                                if (it) readyEndpoint = remote else abortTerminal()
+                            }
+                    }
+                if (accepted) {
+                    response.writeNoException()
+                    response.writeInt(1)
+                }
+                return accepted
+            }
+
+            private fun rejectTerminal(): Boolean {
+                withCurrent(this@AvCapabilityWorker) { abortTerminal() }
+                return false
+            }
+
+            private fun abortTerminal(): Boolean {
+                val aborted = control.abortProtocol()
+                if (aborted) {
+                    protocolAborted = true
+                    replied.countDown()
+                }
+                return aborted
+            }
+
+            private fun terminal(data: Parcel): Boolean {
+                if (data.hasFileDescriptors() || data.dataAvail() > MediaDecodePolicy.MAX_REPLY_BYTES) {
+                    return rejectTerminal()
+                }
                 val parsed =
                     try {
                         data.enforceInterface(MEDIA_REPLY_DESCRIPTOR)
-                        require(data.readInt() == id)
+                        require(data.readInt() == tuple.request)
                         readMediaDecodeReply(data)
                     } catch (_: RuntimeException) {
-                        return false
+                        return rejectTerminal()
                     }
-                parsed.putInt("uid", Binder.getCallingUid())
-                return if (accepting.compareAndSet(true, false)) {
-                    result = parsed
-                    replied.countDown()
-                    true
-                } else {
-                    false
+                val uid = callerIdentity().uid
+                return withCurrent(this@AvCapabilityWorker) {
+                    if (readyEndpoint !== remote || !control.terminal(tuple.request, uid)) {
+                        abortTerminal()
+                        false
+                    } else {
+                        parsed.putInt("uid", uid)
+                        result = parsed
+                        replied.countDown()
+                        true
+                    }
                 }
             }
         }
 
-    fun releaseIfFinished() {
-        val proven = dead.count == 0L || definitiveRefusal
-        val ready = finished.get() && bindComplete && proven
-        if (ready && disposed.compareAndSet(false, true)) cleanup?.invoke()
+    fun revoke() {
+        control.revoke()
+        cleanup.revoked()
     }
 
-    fun remaining(): Long = (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+    fun releaseIfFinished() {
+        if (cleanup.beginUnbind()) dispose?.invoke()
+    }
+
+    fun remaining(): Long = (deadline - now()).coerceAtLeast(0)
 }
 
 /** Consume only the bounded primitive reply and copy pixels after the caller's exact-death barrier. */
@@ -282,7 +524,7 @@ private object AvCapabilityEvidence {
     fun row(
         id: Int,
         result: Bundle,
-        started: Long,
+        elapsed: Long,
         operationElapsed: Long,
         retirementElapsed: Long,
     ): JSONObject =
@@ -291,7 +533,7 @@ private object AvCapabilityEvidence {
             .put("kernel_reply_uid", result.getInt("uid"))
             .put("success", result.getBoolean("success"))
             .put("death_observed_before_output_read", true)
-            .put("elapsed_ms", SystemClock.elapsedRealtime() - started)
+            .put("elapsed_ms", elapsed)
             .put("operation_elapsed_ms", operationElapsed)
             .put("retirement_elapsed_ms", retirementElapsed)
             .put("pixels", result.getBoolean("pixels"))
