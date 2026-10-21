@@ -49,7 +49,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: android-release-runtime-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.sha || github.ref }}
+  group: android-release-runtime-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.run_id || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions:
