@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Reactions cannot restore a removed target's excerpt through a queued initial or correction write (#3323). */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], shadows = [ReactionWriteRecordingNotificationManager::class])
 class NotificationReactionRemovalRaceTest {
     private val context: Application = RuntimeEnvironment.getApplication()
     private val manager: NotificationManager = context.getSystemService(NotificationManager::class.java)
@@ -56,6 +56,7 @@ class NotificationReactionRemovalRaceTest {
     fun setUp() {
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager.cancelAll()
+        ReactionWriteRecordingNotificationManager.writes.clear()
     }
 
     /** Releases the shared test hook and removes fixture notifications. */
@@ -63,6 +64,7 @@ class NotificationReactionRemovalRaceTest {
     fun tearDown() {
         ConversationCardPostSynchronizer.testHook = null
         manager.cancelAll()
+        ReactionWriteRecordingNotificationManager.writes.clear()
     }
 
     /** A local hide wins after an initial reaction's content is resolved but before its final platform fence. */
@@ -161,19 +163,19 @@ class NotificationReactionRemovalRaceTest {
             try {
                 fixture.bootstrap()
                 ConversationCardPostSynchronizer.testHook = probe
-                fixture.emitUpdate(reaction(fixture.update))
+                val processing =
+                    async {
+                        fixture.runOnMainLooperPumping {
+                            fixture.appState.processNotificationUpdateForTest(reaction(fixture.update))
+                        }
+                    }
                 awaitLatch(probe.queued)
                 fixture.appState.recordNotificationContentRemoval(
                     RemovedNotificationMessage(ACCOUNT, "other-chat", TARGET),
                 )
                 ConversationCardPostSynchronizer.markDismissed(reactionKey.tag, reactionKey.id)
                 probe.release.countDown()
-                fixture.awaitUpdateConsumed()
-                val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(500)
-                while (System.nanoTime() < until) {
-                    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
-                    delay(1L)
-                }
+                processing.await()
                 assertTrue(activeReactionText().isEmpty())
                 assertEquals(0, probe.writes.get())
             } finally {
@@ -190,7 +192,7 @@ class NotificationReactionRemovalRaceTest {
             val fetchStarted = CountDownLatch(1)
             val reached = CountDownLatch(1)
             val removed = AtomicBoolean(false)
-            val copiedQuoteWrites = AtomicInteger()
+            val writesAtRemoval = AtomicInteger(-1)
             val fixture =
                 NotificationBootstrapTestFixture(
                     context = context,
@@ -218,7 +220,7 @@ class NotificationReactionRemovalRaceTest {
                 awaitReactionText(SECRET)
                 awaitLatch(fetchStarted)
                 ConversationCardPostSynchronizer.testHook =
-                    avatarRemovalProbe(fixture, removed, reached, copiedQuoteWrites)
+                    avatarRemovalProbe(fixture, removed, reached, writesAtRemoval)
                 release.countDown()
                 awaitLatch(reached)
                 val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(500)
@@ -226,7 +228,12 @@ class NotificationReactionRemovalRaceTest {
                     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                     delay(1L)
                 }
-                assertEquals("inspect writes while the old live card still exists", 0, copiedQuoteWrites.get())
+                val writtenAfterRemoval = ReactionWriteRecordingNotificationManager.writes.drop(writesAtRemoval.get())
+                val quotedWrites =
+                    writtenAfterRemoval.filter { it.tag == reactionKey.tag && it.id == reactionKey.id }.filter {
+                        allText(it.notification.extras).any { text -> SECRET in text }
+                    }
+                assertTrue("actual platform writes must never restore the quote", quotedWrites.isEmpty())
                 assertTrue("no cancellation hides a stale rewrite", activeReactionText().any { SECRET in it })
             } finally {
                 release.countDown()
@@ -236,15 +243,15 @@ class NotificationReactionRemovalRaceTest {
             }
         }
 
-    /** Commits only the removal mark at the actual final platform boundary, then audits every later write. */
+    /** Captures the platform-write index and removal mark at the last permission boundary. */
     private fun avatarRemovalProbe(
         fixture: NotificationBootstrapTestFixture,
         removed: AtomicBoolean,
         reached: CountDownLatch,
-        quotedWrites: AtomicInteger,
+        writesAtRemoval: AtomicInteger,
     ): ConversationCardTestHook =
         object : ConversationCardTestHook {
-            /** Marks before the last permission callback and counts any actual stale payload written afterwards. */
+            /** Leaves the old live card intact so its presence cannot conceal a new stale write. */
             override fun onBarrier(
                 op: ConversationCardOp,
                 barrier: ConversationCardBarrier,
@@ -253,13 +260,11 @@ class NotificationReactionRemovalRaceTest {
             ) {
                 if (notificationTag != reactionKey.tag || notificationId != reactionKey.id) return
                 if (barrier == ConversationCardBarrier.BEFORE_PLATFORM_WRITE && removed.compareAndSet(false, true)) {
+                    writesAtRemoval.set(ReactionWriteRecordingNotificationManager.writes.size)
                     fixture.appState.recordNotificationContentRemoval(
                         RemovedNotificationMessage(ACCOUNT, GROUP, TARGET),
                     )
                     reached.countDown()
-                }
-                if (barrier == ConversationCardBarrier.AFTER_WRITE && removed.get()) {
-                    if (activeReactionText().any { SECRET in it }) quotedWrites.incrementAndGet()
                 }
             }
         }
