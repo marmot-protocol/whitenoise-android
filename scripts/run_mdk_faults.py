@@ -8,6 +8,7 @@ from pathlib import Path
 import queue
 import re
 import shlex
+import subprocess
 import time
 import zipfile
 
@@ -51,7 +52,15 @@ def run_faults(adb, instrument, stop, ports, reports, runner, test_class):
         raise RuntimeError('Rootable disposable emulator required')
     adb('push', str(Path(os.environ['RUNNER_TEMP']) / 'mdk-frida-server'), '/data/local/tmp/mdk-frida-server')
     adb('shell', 'chmod', '700', '/data/local/tmp/mdk-frida-server')
-    adb('shell', '/data/local/tmp/mdk-frida-server -D -l 127.0.0.1:27042')
+    # Detach all three descriptors: daemonization alone can leave adb's captured shell pipe open.
+    server_pid = adb('shell', 'nohup /data/local/tmp/mdk-frida-server -l 127.0.0.1:27042 '
+                     '</dev/null >/data/local/tmp/mdk-frida-server.log 2>&1 & echo $!').strip()
+    if not re.fullmatch(r'[1-9][0-9]*', server_pid):
+        raise RuntimeError('Fault injector did not report its owned process')
+    try:
+        adb('shell', 'kill', '-0', server_pid)
+    finally:
+        retain_startup_log(adb, reports)
     adb('forward', 'tcp:27042', 'tcp:27042')
     device = frida.get_device_manager().add_remote_device('127.0.0.1:27042')
     root = f'/data/user/0/{APP}/files'
@@ -84,10 +93,21 @@ def run_faults(adb, instrument, stop, ports, reports, runner, test_class):
                    (*ports, '-e', 'qualificationPhase', 'fault-witness'))
         facts['ready_file_and_legacy_coexist'] = True
     finally:
+        retain_startup_log(adb, reports)
         stop()
         if mounted:
             adb('shell', 'umount', media)
         (reports / 'native-faults.json').write_text(json.dumps(facts, indent=2) + '\n')
+        adb('shell', f'if kill -0 {server_pid} 2>/dev/null; then kill {server_pid}; fi')
+
+
+def retain_startup_log(adb, reports):
+    """Keep bounded disposable-emulator startup diagnostics without masking the actual qualification failure."""
+    try:
+        output = adb('shell', 'tail', '-c', '32768', '/data/local/tmp/mdk-frida-server.log', timeout=10)
+    except subprocess.SubprocessError as error:
+        output = 'Injector log unavailable: ' + type(error).__name__ + '\n'
+    (reports / 'injector-startup.txt').write_text(output)
 
 
 def run_one(mode, device, adb, instrument, stop, ports, reports, runner, test_class, media, facts):
