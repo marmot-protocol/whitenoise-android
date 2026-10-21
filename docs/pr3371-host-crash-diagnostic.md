@@ -6,8 +6,9 @@ driver still verifies the trusted builder, signer, package, native bytes and eve
 signed ZIP entry for `e701aee19f969298f977bd9df31ac866676bb501`. The report separately
 records this diagnostic workflow source and `diagnostic_only: true`.
 
-Keep emulator 37.1.11/build 15917651, API 34, renderer, resources, both APKs and UI
-assertions fixed. A GDB sidecar attaches only after boot to the observed AVD PID,
+Keep emulator 37.1.11/build 15917651, API 34, resources, both APKs and UI
+assertions fixed. The initial observations used legacy `swiftshader`; the controlled
+comparison below changes only renderer selection. A GDB sidecar attaches only after boot to the observed AVD PID,
 after verifying `/proc/PID/exe` resolves to the SDK's real QEMU binary. The driver
 waits for a resume receipt before application operations. Raw GDB output is
 discarded; startup files, auto-loading and debuginfod are disabled. At a fatal-type
@@ -44,3 +45,20 @@ The separate `attachment_diagnostic` dispatch runs only the unchanged first two
 attachment scenarios after hosted failure-contract tests. It classifies reverse
 binding failures with fixed categories and binding roles, retaining no raw ADB
 errors or ports. This partial campaign cannot replace complete attachment CI.
+
+## Explicit ANGLE comparison
+
+Run 39628873246 confirmed host SIGSEGV at a PC in an executable mapping with no
+retained filesystem module. The remaining unmapped frames are failed unwinding,
+not reliable callers. Legacy SwiftShader GLES 4.0.0.1 was active. This supports a
+graphics/JIT hypothesis but does not establish its owner or root cause.
+
+One comparison now selects `-gpu swangle` (ANGLE with SwiftShader), retaining
+`-feature -Vulkan` and every other setting. Inspect startup renderer/ICD logs to
+confirm the requested backend actually ran; fallback does not test this hypothesis.
+The previous `software` comparison selected Lavapipe on emulator 37.2.12 and is
+not this controlled comparison. See the official [renderer definitions](https://developer.android.com/studio/run/emulator-acceleration#command-gpu).
+Bounded mapping metadata distinguishes file, anonymous and special mappings,
+retaining only the exact known `swiftshader_jit` label and no arbitrary bracket
+label. Anonymous mapping offsets are not presented as file offsets. This remains
+diagnostic-only even if it passes; normal qualification without GDB is still required.

@@ -876,7 +876,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      PREVIEW_EMULATOR_OPTIONS: -no-snapshot-save -no-window -gpu swiftshader -feature -Vulkan -noaudio -no-boot-anim -camera-back none
+      PREVIEW_EMULATOR_OPTIONS: -no-snapshot-save -no-window -gpu swangle -feature -Vulkan -noaudio -no-boot-anim -camera-back none
       PREVIEW_EMULATOR_REVISION: '37.1.11'
     permissions:
       contents: read

@@ -51,7 +51,8 @@ assert received == [signal.SIGSEGV]
                     self.assertTrue(result['frames'])
                     mapped = [frame['mapping'] for frame in result['frames'] if frame['mapping']]
                     self.assertTrue(mapped)
-                    self.assertTrue(all(int(frame['file_offset'], 16) >= 0 for frame in mapped))
+                    self.assertTrue(all(int(frame['mapping_offset'], 16) >= 0 for frame in mapped))
+                    self.assertTrue(all(int(frame['file_offset'], 16) >= 0 for frame in mapped if frame['module']))
                     self.assertTrue(all('/' not in (frame['module'] or '') for frame in mapped))
                     self.assertNotIn('error_type', result)
                     self.assertNotIn('PRIVATE_ARGUMENT_VALUE_MUST_NOT_APPEAR', json.dumps(result))
