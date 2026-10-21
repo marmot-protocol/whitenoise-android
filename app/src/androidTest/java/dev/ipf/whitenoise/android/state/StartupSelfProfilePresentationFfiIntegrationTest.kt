@@ -9,7 +9,6 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import kotlinx.coroutines.CancellationException
@@ -42,7 +41,7 @@ class StartupSelfProfilePresentationFfiIntegrationTest {
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "startup-self-profile-${UUID.randomUUID()}").apply { mkdirs() }
             val relay = "wss://startup-self-profile.invalid"
-            val native = Marmot(root.absolutePath, listOf(relay), marmotDeploymentWhiteNoise())
+            val native = Marmot(root.absolutePath, listOf(relay))
             try {
                 withTimeout(30_000) {
                     native.start()
@@ -53,7 +52,7 @@ class StartupSelfProfilePresentationFfiIntegrationTest {
                     // Only fixture preparation touches the closed synthetic database. Production reads through MDK.
                     seedRetainedAvatar(root, account.accountIdHex)
                     val profile = created.profile.copy(picture = AVATAR)
-                    val reopened = Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise())
+                    val reopened = Marmot(root.absolutePath, emptyList())
                     var receiverJob: Job? = null
                     try {
                         assertEquals(profile, reopened.userProfile(account.accountIdHex))

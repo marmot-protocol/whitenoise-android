@@ -8,7 +8,6 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -39,7 +38,7 @@ class ForwardMediaReferenceFfiIntegrationTest {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "forward-media-ffi-${UUID.randomUUID()}").apply { mkdirs() }
-            val marmot = Marmot(root.absolutePath, MarmotClient.bootstrapRelays, marmotDeploymentWhiteNoise())
+            val marmot = Marmot(root.absolutePath, MarmotClient.bootstrapRelays)
             var accountRef: String? = null
             var closed = false
 

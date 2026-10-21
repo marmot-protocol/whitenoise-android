@@ -14,7 +14,6 @@ import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -93,7 +92,6 @@ internal object MediaLifecycleAttachmentProbe {
                 root.absolutePath,
                 relays,
                 MarmotOptions(
-                    deployment = marmotDeploymentWhiteNoise(),
                     relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
                     attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
                 ),

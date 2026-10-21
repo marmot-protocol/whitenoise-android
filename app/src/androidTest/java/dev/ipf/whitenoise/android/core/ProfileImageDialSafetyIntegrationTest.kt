@@ -7,7 +7,6 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.marmotkit.parseMediaImetaTag
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import kotlinx.coroutines.runBlocking
@@ -29,7 +28,7 @@ class ProfileImageDialSafetyIntegrationTest {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "profile-image-safety-${UUID.randomUUID()}").apply { mkdirs() }
-            val marmot = Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise())
+            val marmot = Marmot(root.absolutePath, emptyList())
 
             val failure =
                 try {
@@ -119,7 +118,7 @@ class ProfileImageDialSafetyIntegrationTest {
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "profile-image-safety-${UUID.randomUUID()}").apply { mkdirs() }
             try {
-                Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise()).use { marmot -> block(marmot) }
+                Marmot(root.absolutePath, emptyList()).use { marmot -> block(marmot) }
             } finally {
                 root.deleteRecursively()
             }

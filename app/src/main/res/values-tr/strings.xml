@@ -814,7 +814,6 @@
     <string name="toast_profile_published_detail">Profiliniz artık %1$d rölede yayında.</string>
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
-    <string name="toast_send_storage_full">Göndermek için yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="toast_send_connection_failed">Aktarıcıya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="toast_send_queue_full">Bu sohbette gönderilmeyi bekleyen çok fazla mesaj var, bu yüzden mesajınız gönderilmedi. Sıra ilerleyince yeniden deneyin.</string>
     <string name="toast_send_chat_changed">Mesajın gönderilirken sohbet değişti, bu yüzden gönderilmedi. Tekrar dene.</string>

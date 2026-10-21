@@ -10,7 +10,6 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -27,7 +26,7 @@ class MarkdownAutolinkIntegrationTest {
         val root = File(context.cacheDir, "markdown-autolink-${UUID.randomUUID()}").apply { mkdirs() }
         val destinations =
             try {
-                Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise()).use { marmot ->
+                Marmot(root.absolutePath, emptyList()).use { marmot ->
                     listOf(
                         "https://example.com/path?q=1#section",
                         "See http://example.com/a_(b)?q=two#three.",

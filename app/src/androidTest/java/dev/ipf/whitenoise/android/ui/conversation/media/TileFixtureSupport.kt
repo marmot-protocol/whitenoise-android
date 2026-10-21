@@ -7,7 +7,6 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.media.FixtureSession
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -32,7 +31,6 @@ internal object TileFixtureSupport {
             root.absolutePath,
             relays,
             MarmotOptions(
-                deployment = marmotDeploymentWhiteNoise(),
                 relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
                 attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
             ),

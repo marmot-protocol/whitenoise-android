@@ -57,14 +57,12 @@ internal fun WhiteNoiseAppState.dismissSendFailureNotice(attempt: SendFailureAtt
  * A hydration-pending group is the opposite case — transient by design, the
  * runtime promotes it shortly after account readiness — so that one gets
  * wording that invites the retry instead of announcing a failure.
- * A native disk-capacity refusal happens before upload; the user must free space before retrying.
  */
 @StringRes
 internal fun sendFailureMessageRes(throwable: Throwable): Int =
     when (throwable) {
         is MarmotKitException.GroupSendQueueFull -> R.string.toast_send_queue_full
         is MarmotKitException.GroupHydrationPending -> R.string.toast_chat_still_loading
-        is MarmotKitException.StorageFull -> R.string.toast_send_storage_full
         is EmojiChatChangedException -> R.string.toast_send_chat_changed
         is EmojiSendLimitException -> R.string.toast_send_emoji_limit
         else ->

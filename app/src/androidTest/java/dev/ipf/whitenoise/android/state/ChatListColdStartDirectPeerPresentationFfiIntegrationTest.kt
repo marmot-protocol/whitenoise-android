@@ -13,7 +13,6 @@ import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.chatListItemTitle
@@ -180,11 +179,7 @@ class ChatListColdStartDirectPeerPresentationFfiIntegrationTest {
         )
 
     /** Loopback relays are allowed only in this fixture's native configuration. */
-    private fun loopbackOptions() =
-        MarmotOptions(
-            relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
-            deployment = marmotDeploymentWhiteNoise(),
-        )
+    private fun loopbackOptions() = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
 
     /** What the first process established and the relaunched process must reproduce offline. */
     private data class EstablishedChat(

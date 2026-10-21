@@ -19,7 +19,6 @@ import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.OnboardingOptionsFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.amber.AmberSignerController
@@ -192,10 +191,7 @@ class LateSignerRuntimeDeviceTest {
             Marmot.newWithConfiguration(
                 root.path,
                 listOf(relay),
-                MarmotOptions(
-                    relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
-                    deployment = marmotDeploymentWhiteNoise(),
-                ),
+                MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
             )
         val app =
             withContext(Dispatchers.Main.immediate) {

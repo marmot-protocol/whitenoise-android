@@ -21,7 +21,6 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.R
@@ -83,10 +82,7 @@ class RelaySetupLifecycleDeviceTest {
                     Marmot.newWithConfiguration(
                         root.path,
                         listOf(relay.url),
-                        MarmotOptions(
-                            relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
-                            deployment = marmotDeploymentWhiteNoise(),
-                        ),
+                        MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
                     )
                 var state: WhiteNoiseAppState? = null
                 var activity: ActivityScenario<MainActivity>? = null

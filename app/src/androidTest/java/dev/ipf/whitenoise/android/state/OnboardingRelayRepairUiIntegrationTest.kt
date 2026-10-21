@@ -16,7 +16,6 @@ import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingOptionsFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.MarmotAccountSetupClient
@@ -53,10 +52,7 @@ class OnboardingRelayRepairUiIntegrationTest {
                         Marmot.newWithConfiguration(
                             root.path,
                             listOf(relay.url),
-                            MarmotOptions(
-                                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
-                                deployment = marmotDeploymentWhiteNoise(),
-                            ),
+                            MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
                         )
                     var controller: AccountSetupController? = null
                     try {

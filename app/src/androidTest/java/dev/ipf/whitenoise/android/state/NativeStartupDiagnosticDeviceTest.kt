@@ -17,7 +17,6 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.MdkAdoptionDeviceAcceptance
@@ -294,10 +293,7 @@ class NativeStartupDiagnosticDeviceTest {
                         Marmot.newWithConfiguration(
                             root.path,
                             listOf(relay.url),
-                            MarmotOptions(
-                                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
-                                deployment = marmotDeploymentWhiteNoise(),
-                            ),
+                            MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
                         )
                     observed =
                         object : MarmotInterface by native {

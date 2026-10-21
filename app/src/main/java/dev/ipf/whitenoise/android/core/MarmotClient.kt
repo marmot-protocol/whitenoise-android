@@ -6,7 +6,6 @@ import dev.ipf.marmotkit.CursorPersistenceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import kotlinx.coroutines.sync.Mutex
@@ -43,7 +42,6 @@ class MarmotClient(
                 relayUrls = relayUrls,
                 options =
                     MarmotOptions(
-                        deployment = marmotDeploymentWhiteNoise(),
                         clientName = CLIENT_NAME,
                         cursorPersistence = CursorPersistenceFfi.ADVANCE,
                         attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,

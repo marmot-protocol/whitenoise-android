@@ -10,7 +10,6 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -96,7 +95,6 @@ internal object MatrixAttachmentProbe {
                 root.absolutePath,
                 relays,
                 MarmotOptions(
-                    deployment = marmotDeploymentWhiteNoise(),
                     relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
                     attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
                 ),

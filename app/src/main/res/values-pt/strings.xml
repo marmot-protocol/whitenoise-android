@@ -814,7 +814,6 @@
     <string name="toast_profile_published_detail">Seu perfil agora está em %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Não foi possível publicar o perfil</string>
     <string name="toast_send_failed">Falha no envio</string>
-    <string name="toast_send_storage_full">Não há espaço suficiente para enviar. Libere espaço e tente novamente.</string>
     <string name="toast_send_connection_failed">Não foi possível acessar o relay. Verifique sua conexão e tente novamente.</string>
     <string name="toast_send_queue_full">Esta conversa tem mensagens demais aguardando envio, então a sua não foi enviada. Tente de novo quando ela se atualizar.</string>
     <string name="toast_send_chat_changed">A conversa mudou durante o envio, então a mensagem não foi enviada. Tente de novo.</string>

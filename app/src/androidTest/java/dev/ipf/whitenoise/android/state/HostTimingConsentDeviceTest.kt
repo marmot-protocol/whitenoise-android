@@ -10,7 +10,6 @@ import dev.ipf.marmotkit.ProductAnalyticsMetadataFfi
 import dev.ipf.marmotkit.ProductAnalyticsRuntimeConfigFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
-import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -37,7 +36,7 @@ class HostTimingConsentDeviceTest {
             try {
                 // An isolated empty store and loopback-only destination never use app data or operator credentials.
                 ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { server ->
-                    Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise()).use { marmot ->
+                    Marmot(root.absolutePath, emptyList()).use { marmot ->
                         val config =
                             ProductAnalyticsRuntimeConfigFfi(
                                 eventsEndpoint = null,
@@ -116,7 +115,7 @@ class HostTimingConsentDeviceTest {
                     operator = "test_operator",
                 )
             try {
-                Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise()).use { previous ->
+                Marmot(root.absolutePath, emptyList()).use { previous ->
                     previous.setProductAnalyticsRuntimeConfig(config)
                     previous.start()
                     try {
@@ -127,7 +126,7 @@ class HostTimingConsentDeviceTest {
                         assertTrue(previous.storageIsClosed())
                     }
                 }
-                Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise()).use { upgraded ->
+                Marmot(root.absolutePath, emptyList()).use { upgraded ->
                     upgraded.setProductAnalyticsRuntimeConfig(config.copy(registry = androidProductRegistry))
                     upgraded.start()
                     try {
