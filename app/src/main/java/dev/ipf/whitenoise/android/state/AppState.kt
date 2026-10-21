@@ -233,7 +233,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.net.IDN
 import java.net.InetAddress
@@ -12799,29 +12798,30 @@ class WhiteNoiseAppState private constructor(
         }
         var posted = false
         try {
-            posted = withVerifiedReactionQuote(update, firstPost) { candidate, isNotDismissed ->
-                if (!isNotDismissed() || !isNotificationEnrichmentAllowed(candidate, firstPost)) {
-                    return@withVerifiedReactionQuote false
+            posted =
+                withVerifiedReactionQuote(update, firstPost) { candidate, isNotDismissed ->
+                    if (!isNotDismissed() || !isNotificationEnrichmentAllowed(candidate, firstPost)) {
+                        return@withVerifiedReactionQuote false
+                    }
+                    localNotificationPresenter.show(
+                        update = candidate,
+                        conversationTitleOverride = content.conversationTitle,
+                        senderNameOverride = content.senderName,
+                        previewTextOverride = content.previewText,
+                        reactedToPreviewOverride = verifiedReactionPreview(candidate, content.reactedToPreview),
+                        mediaKind = content.mediaKind,
+                        recipientAccountSubtext = content.recipientAccountSubtext,
+                        directShareEligible = candidate.accountRef == activeAccountRef,
+                        conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
+                        senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
+                        silentUpdate = true,
+                        replaceCurrentMessage = true,
+                        shortNpub = ::shortNpub,
+                        isPostStillAllowed = {
+                            isNotDismissed() && isNotificationEnrichmentAllowed(candidate, firstPost)
+                        },
+                    )
                 }
-                localNotificationPresenter.show(
-                    update = candidate,
-                    conversationTitleOverride = content.conversationTitle,
-                    senderNameOverride = content.senderName,
-                    previewTextOverride = content.previewText,
-                    reactedToPreviewOverride = verifiedReactionPreview(candidate, content.reactedToPreview),
-                    mediaKind = content.mediaKind,
-                    recipientAccountSubtext = content.recipientAccountSubtext,
-                    directShareEligible = candidate.accountRef == activeAccountRef,
-                    conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
-                    senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
-                    silentUpdate = true,
-                    replaceCurrentMessage = true,
-                    shortNpub = ::shortNpub,
-                    isPostStillAllowed = {
-                        isNotDismissed() && isNotificationEnrichmentAllowed(candidate, firstPost)
-                    },
-                )
-            }
         } finally {
             firstPost.lateCorrectionPermit.complete(posted)
         }
@@ -12858,7 +12858,10 @@ class WhiteNoiseAppState private constructor(
                     NotificationLateCorrectionOutcome.Stale
                 else ->
                     enrichResolvedNotificationUpdate(
-                        withoutStaleQueuedReactionQuote(candidate, firstPost), firstPost, content, deferPicture,
+                        withoutStaleQueuedReactionQuote(candidate, firstPost),
+                        firstPost,
+                        content,
+                        deferPicture,
                     )
             }
         }
@@ -13050,7 +13053,8 @@ class WhiteNoiseAppState private constructor(
                 shortNpub = ::cachedShortNpubOrUnknown,
                 onNotificationWritten = onNotificationWritten,
                 isPostStillAllowed = {
-                    isNotDismissed() && isQueuedReactionQuoteCurrent(candidate, firstPost) &&
+                    isNotDismissed() &&
+                        isQueuedReactionQuoteCurrent(candidate, firstPost) &&
                         isNotificationGenerationPostAllowed(
                             update = candidate,
                             postEpoch = firstPost.epoch,
@@ -13436,8 +13440,11 @@ class WhiteNoiseAppState private constructor(
     private fun verifiedReactionPreview(
         update: NotificationUpdateFfi,
         preview: String?,
-    ): String? =
-        preview.takeUnless { LocalNotificationFormatter.isReaction(update) && update.reactedToPreview.isNullOrBlank() }
+    ): String? {
+        return preview.takeUnless {
+            LocalNotificationFormatter.isReaction(update) && update.reactedToPreview.isNullOrBlank()
+        }
+    }
 
     /** Drops only an unverified quote; unrelated removals must not discard the reaction itself. */
     private fun withoutStaleQueuedReactionQuote(

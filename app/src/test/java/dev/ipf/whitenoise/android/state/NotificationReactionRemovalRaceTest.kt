@@ -219,10 +219,12 @@ class NotificationReactionRemovalRaceTest {
                 fixture.emitUpdate(reaction(fixture.update))
                 awaitReactionText(SECRET)
                 awaitLatch(fetchStarted)
+                assertTrue("the actual recorder saw the initial quoted card", recordedReactionHasQuote())
                 ConversationCardPostSynchronizer.testHook =
                     avatarRemovalProbe(fixture, removed, reached, writesAtRemoval)
                 release.countDown()
                 awaitLatch(reached)
+                assertTrue("the removal follows a recorded platform post", writesAtRemoval.get() > 0)
                 val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(500)
                 while (System.nanoTime() < until) {
                     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
@@ -242,6 +244,14 @@ class NotificationReactionRemovalRaceTest {
                 AvatarImageLoader.resetProfileImageFetcherForTests()
             }
         }
+
+    /** Positive control proving the recorder intercepted the known initial payload before the race starts. */
+    private fun recordedReactionHasQuote(): Boolean {
+        return ReactionWriteRecordingNotificationManager.writes.any {
+            it.tag == reactionKey.tag && it.id == reactionKey.id &&
+                allText(it.notification.extras).any { text -> SECRET in text }
+        }
+    }
 
     /** Captures the platform-write index and removal mark at the last permission boundary. */
     private fun avatarRemovalProbe(
