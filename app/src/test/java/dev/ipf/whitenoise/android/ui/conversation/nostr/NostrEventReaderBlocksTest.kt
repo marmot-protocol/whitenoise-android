@@ -25,6 +25,17 @@ class NostrEventReaderBlocksTest {
         assertTrue(chunks.all { it.length <= 4096 })
     }
 
+    /** Raw math uses separate reader items and preserves the same slash boundary as fenced source. */
+    @Test
+    fun mathChunksKeepDoubleSlashWithItsFollowingText() {
+        val prefix = "a".repeat(4094)
+        val content = prefix + "//filename"
+        val document = MarkdownDocumentFfi(listOf(MarkdownBlockFfi.MathBlock(content)), false, byteArrayOf())
+        val chunks = nostrReaderBlocks(document).map { (it as MarkdownBlockFfi.MathBlock).content }
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals(listOf(prefix, "//filename"), chunks)
+    }
+
     /** Even a slash-only run larger than one item must make progress without losing or growing source. */
     @Test
     fun oversizedSlashRunsRemainBoundedAndReconstructExactly() {

@@ -52,6 +52,7 @@ import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
@@ -722,17 +723,21 @@ class MessageBubbleTextSelectionSpeakTest {
     /** A fitting code leaf must leave horizontal movement available to the bubble's real reply action. */
     @Test
     fun swipeOnFittingCodeBlockBeginsReply() {
-        val controller = renderSwipeBlock(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", "ls -la"))
-        swipeSource("ls -la", right = true)
-        assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+        withCodePathClock {
+            val controller = renderSwipeBlock(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", "ls -la"))
+            swipeSource("ls -la", right = true, captureFile = "message_bubble_fitting_code_reply_swipe.png")
+            assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+        }
     }
 
     /** Math shares the code viewport and must not absorb a reply gesture when all source fits. */
     @Test
     fun swipeOnFittingMathBlockBeginsReply() {
-        val controller = renderSwipeBlock(MarkdownBlockFfi.MathBlock("a + b"))
-        swipeSource("a + b", right = true)
-        assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+        withCodePathClock {
+            val controller = renderSwipeBlock(MarkdownBlockFfi.MathBlock("a + b"))
+            swipeSource("a + b", right = true, captureFile = "message_bubble_fitting_math_reply_swipe.png")
+            assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+        }
     }
 
     /** Overflow keeps both horizontal directions, even at an edge, without falling through to reply. */
@@ -770,15 +775,18 @@ class MessageBubbleTextSelectionSpeakTest {
                 is MarkdownBlockFfi.MathBlock -> "\$\$\n${block.content}\n\$\$"
                 else -> error("The swipe fixture requires code or math source")
             }
-        val original = timelineMessage(source)
-        val item =
-            original.copy(
-                record =
-                    original.record.copy(
-                        contentTokens = MarkdownDocumentFfi(listOf(block), false, byteArrayOf()),
-                    ),
+        val record =
+            swipeTestProjectedRecord(reacted = false, mine = false, media = false).copy(
+                plaintext = source,
+                contentTokens = MarkdownDocumentFfi(listOf(block), false, byteArrayOf()),
             )
         val controller = conversationController(appState)
+        runBlocking {
+            controller.testRefreshCurrentTimeline(ACCOUNT_REF) {
+                TimelinePageFfi(listOf(record), hasMoreBefore = false, hasMoreAfter = false)
+            }
+        }
+        val item = controller.timeline.single()
         composeRule.setContent {
             WhiteNoiseTheme {
                 Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
@@ -794,6 +802,7 @@ class MessageBubbleTextSelectionSpeakTest {
     private fun swipeSource(
         text: String,
         right: Boolean,
+        captureFile: String? = null,
     ) {
         val source = composeRule.onNodeWithText(text, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val host = composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
@@ -802,8 +811,10 @@ class MessageBubbleTextSelectionSpeakTest {
             val startX = if (right) source.left + 8f else source.right - 8f
             down(Offset(startX - bounds.left, source.center.y - bounds.top))
             repeat(4) { moveBy(Offset(if (right) 30f else -30f, 0f), delayMillis = 40) }
-            up()
         }
+        composeRule.waitForIdle()
+        if (captureFile != null) host.captureRoboImage("src/test/snapshots/$captureFile")
+        host.performTouchInput { up() }
         composeRule.waitForIdle()
     }
 

@@ -18,7 +18,8 @@ internal fun nostrReaderBlocks(document: MarkdownDocumentFfi): List<MarkdownBloc
             is MarkdownBlockFfi.Heading -> readerInlineGroups(block.inlines).map { block.copy(inlines = it) }
             is MarkdownBlockFfi.CodeBlock ->
                 nostrReaderTextChunks(block.content, keepSlashWithFollowingText = true).map { block.copy(content = it) }
-            is MarkdownBlockFfi.MathBlock -> nostrReaderTextChunks(block.content).map { block.copy(content = it) }
+            is MarkdownBlockFfi.MathBlock ->
+                nostrReaderTextChunks(block.content, keepSlashWithFollowingText = true).map { block.copy(content = it) }
             else -> listOf(block)
         }
     }

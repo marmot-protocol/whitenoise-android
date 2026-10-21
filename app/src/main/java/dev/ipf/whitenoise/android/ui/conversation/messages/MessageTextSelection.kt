@@ -179,14 +179,7 @@ internal fun textSelectionSeedRange(
         if (pressInWindow == null) {
             0
         } else {
-            val visible = target.coordinates.boundsInWindow()
-            val local =
-                target.coordinates.windowToLocal(
-                    Offset(
-                        pressInWindow.x.coerceIn(visible.left, visible.right),
-                        pressInWindow.y.coerceIn(visible.top, visible.bottom),
-                    ),
-                )
+            val local = target.coordinates.visibleLocalPosition(pressInWindow)
             target.layoutResult.getOffsetForPosition(
                 Offset(
                     x =
@@ -215,6 +208,17 @@ internal fun textSelectionSeedRange(
     return TextRange(
         start = precedingLength + localRange.start,
         end = precedingLength + localRange.end,
+    )
+}
+
+/** Converts a gutter press through the clipped viewport before mapping it to the scrolled text leaf. */
+private fun LayoutCoordinates.visibleLocalPosition(pressInWindow: Offset): Offset {
+    val visible = boundsInWindow()
+    return windowToLocal(
+        Offset(
+            pressInWindow.x.coerceIn(visible.left, visible.right),
+            pressInWindow.y.coerceIn(visible.top, visible.bottom),
+        ),
     )
 }
 
