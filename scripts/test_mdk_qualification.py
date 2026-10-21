@@ -42,6 +42,24 @@ class QualificationEvidenceTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.invoke(transcript([('retained', 0), ('unexpected', -2)]), {'retained'})
 
+    def test_extra_ignored_case_cannot_hide_behind_expected_pass(self):
+        """Upgrade phases allow no skipped cases, even when every required case also passed."""
+        with self.assertRaises(RuntimeError):
+            self.invoke(transcript([('retained', 0), ('unexpected', -3)]), {'retained'})
+
+    def test_recovery_allows_only_the_two_documented_upstream_ignores(self):
+        """A changed recovery skip set needs explicit review rather than silently passing the campaign."""
+        passed = [(name, 0) for name in campaign.RECOVERY_CASES]
+        for skipped in (campaign.IGNORED, set(), campaign.IGNORED | {'unexpected'}):
+            output = transcript(passed + [(name, -3) for name in skipped])
+            with tempfile.TemporaryDirectory() as directory:
+                with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', return_value=output):
+                    if skipped == campaign.IGNORED:
+                        campaign.instrument('recovery', campaign.RECOVERY, campaign.RECOVERY_CASES)
+                    else:
+                        with self.assertRaises(RuntimeError):
+                            campaign.instrument('recovery', campaign.RECOVERY, campaign.RECOVERY_CASES)
+
     def test_component_disable_requires_the_reported_state(self):
         """A zero-exit pm command reporting DEFAULT cannot satisfy the background isolation precondition."""
         with patch.object(campaign, 'adb', return_value='Component fixture new state: default\n'):

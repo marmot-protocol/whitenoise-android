@@ -87,17 +87,21 @@ internal suspend fun verifyUpgradeStorage(
     reportUpgradeStorage(runtime, accounts, phase, if (beforeStart) "before-start" else "before-resume")
     if (beforeStart) return
     if (phase == "upgrade" && savedUpgradePolicies.isNotEmpty()) {
-        withTimeout(120_000L) {
-            while (accounts.none { isUpgradeMigrationPaused(runtime, it) }) {
-                delay(250L)
+        try {
+            withTimeout(120_000L) {
+                while (accounts.none { isUpgradeMigrationPaused(runtime, it) }) {
+                    delay(250L)
+                }
             }
+            check(accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes } == initialLegacyBytes)
+            check(accounts.any { runtime.attachmentStorageUsage(it).migrationBytes > 0uL })
+            reportUpgradeStorage(runtime, accounts, phase, "reserve-paused")
+            readWhilePaused()
+            reportUpgradeStorage(runtime, accounts, phase, "paused-read-passed")
+        } finally {
+            for ((account, policy) in savedUpgradePolicies) runtime.setAttachmentDownloadPolicy(account, policy)
+            savedUpgradePolicies.clear()
         }
-        check(accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes } == initialLegacyBytes)
-        check(accounts.any { runtime.attachmentStorageUsage(it).migrationBytes > 0uL })
-        reportUpgradeStorage(runtime, accounts, phase, "reserve-paused")
-        readWhilePaused()
-        reportUpgradeStorage(runtime, accounts, phase, "paused-read-passed")
-        for ((account, policy) in savedUpgradePolicies) runtime.setAttachmentDownloadPolicy(account, policy)
     }
     try {
         awaitUpgradeStorage(runtime, accounts, pendingLegacyBytes)

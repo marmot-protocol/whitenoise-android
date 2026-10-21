@@ -66,7 +66,8 @@ def instrument(name, test_class, expected, extra=()):
     unexpected = {case: code for case, code in statuses.items() if code not in (0, -3)}
     fact = {'passed': sorted(passed), 'skipped': sorted(skipped), 'failed': unexpected}
     (REPORTS / f'{name}.json').write_text(json.dumps(fact, indent=2) + '\n')
-    if passed != expected or unexpected or (test_class == RECOVERY and skipped != IGNORED):
+    expected_skipped = IGNORED if test_class == RECOVERY else set()
+    if passed != expected or unexpected or skipped != expected_skipped:
         raise RuntimeError(f'{name}: required cases did not all pass; see retained transcript')
     if 'INSTRUMENTATION_CODE: -1' not in output:
         raise RuntimeError(f'{name}: runner did not finish successfully')
