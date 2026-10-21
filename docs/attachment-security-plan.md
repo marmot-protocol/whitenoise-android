@@ -1,10 +1,14 @@
 # Attachment security plan
 
-PR #3382 begins with test-only still-image worker characterization. Production
-decoding, worker reuse, upload preparation and download policy remain unchanged.
-All five issues below remain open. The API 30 and API 36 characterization
-campaigns, matched performance comparison and production-payload inspection are
-**NOT_RUN**. Latency and resource regression budgets await measurement and approval.
+PR #3382 began with test-only still-image worker characterization. This source
+candidate adds a retained still-worker lifetime owner, per-input retirement and
+an exact Binder-death barrier before the existing parent-owned pixel copy.
+Upload preparation, download policy, animation and platform audio/video remain
+unchanged. All five issues below remain open. API 30/API 36 qualification,
+matched performance comparison and production-payload inspection remain pending.
+The earlier API 30 diagnostic run failed its full-corpus assertion; it supplies
+failure evidence only. Default adoption awaits successful platform evidence,
+measured regression budgets and review.
 
 The baseline procedure and its measurement limits are recorded in
 [Still-image worker baseline](media-worker-baseline.md). Its 100-request corpus
@@ -22,7 +26,7 @@ descriptor, output, admission and storage bounds documented in
 
 | Issue | Owning source boundary | Confirmed gap and evidence limit | Next stage and acceptance | Dependency |
 | --- | --- | --- | --- | --- |
-| [#3373](https://github.com/marmot-protocol/whitenoise-android/issues/3373), still-worker lifetime | `IsolatedMediaDecoder`, `IsolatedMediaTransport` and `MediaDecodeService` | Successful requests reuse one worker across distinct inputs. Persistence after a parser compromise is a threat scenario; exploitability and sandbox escape remain unproven. | Retain one lifetime owner across reset/clear/install, deliver one input per bound worker host, revoke reply capabilities and require that exact Binder-host death before replacement dispatch or output handling. Qualify bounded parent-private pixel copying and failure holds. | Matched baseline measurements, reviewed death/reset semantics and supported-platform tests. Complete descendant termination remains a separate proof obligation. |
+| [#3373](https://github.com/marmot-protocol/whitenoise-android/issues/3373), still-worker lifetime | `IsolatedMediaDecoder`, `IsolatedMediaTransport` and `MediaDecodeService` | The earlier transport reused one worker across distinct inputs. This candidate retains the lifetime owner and waits for exact Binder-host death per input. Persistence and sandbox escape remain threat scenarios with explicit descendant limits. | Review and qualify the implemented lifetime/reset fence, one-input binding generations, reply revocation, exact Binder-death barrier, bounded parent-private pixel copy and failure holds. | Matched baseline measurements, reviewed death/reset semantics and supported-platform tests. Complete descendant termination remains a separate proof obligation. |
 | [#3374](https://github.com/marmot-protocol/whitenoise-android/issues/3374), audio/video containment | `PlatformMediaTransport`, `BoundedMediaExecutor`, waveform extraction and Media3 playback | Automatic media work has app-process clients; Media3 extraction runs in the player process. Existing platform services provide some isolation. Exploitability remains unproven. | Publish an API/format/process capability matrix and a minimal automatic-probe prototype on API 30 and API 36. Record denied services, selected-FD/output behavior, cancellation and hung-call limits; decide playback separately. | Actual platform feasibility. A same-UID service can contain some crashes while retaining app-private-data and permission access. |
 | [#3375](https://github.com/marmot-protocol/whitenoise-android/issues/3375), trusted automatic downloads | MDK acquisition policy and Android `MediaAutoDownloadMatrix`, `AppState`, Data usage and identity selection | Existing controls cover network/type permission. Trusted-sender policy requires shared enforcement across background/retry acquisition. | Adopt the published shared contract, then add account-scoped explicit pubkey selection, restricted-empty behavior, truthful save/error states and a separate Download once action. Prove enforcement before remote reads across every attachment type. | [MDK #2512](https://github.com/marmot-protocol/mdk/issues/2512), including storage, admission, retry/revocation and per-item manual permission. An effective toggle requires publication and adoption of the MarmotKit contract. |
 | [#3376](https://github.com/marmot-protocol/whitenoise-android/issues/3376), outgoing video privacy | `MediaPipeline.readVideoForUpload`, `ConversationMediaSender` staging and accepted draft/share payloads | Current paths probe and upload original container bytes. Which private fields occur in production payloads remains unmeasured. | Prepare one new bounded file before attachment acceptance. Inspect the exact final bytes passed to MDK for policy compliance and playback preservation; refuse unsupported or failed preparation without silent original-byte fallback. | Reviewed container/track/metadata capability table, real platform fixtures and accounting for input plus output staging. App-process parser exposure remains tracked by #3374. |
@@ -45,16 +49,17 @@ and [Data usage](../app/src/main/java/dev/ipf/whitenoise/android/ui/settings/Dat
 
 ## Still-worker retirement and output handling
 
-The next production slice should use the existing serialized transport and
-binding monitor. Reserve a generation before binding, register death on the
-framework-delivered remote Binder before sending descriptors, and dispatch one
-request to that generation. Each terminal result revokes its reply capability.
-A successful response remains provisional while retirement is unresolved.
+This source candidate uses the existing serialized transport and binding monitor.
+It reserves a generation before binding, registers death on the framework-delivered
+remote Binder before sending descriptors and dispatches one request to that
+generation. Each terminal result revokes its reply capability. A successful
+response remains provisional while retirement is unresolved. The
+[still-image lifetime candidate](media-worker-lifetime.md) records the implemented
+owner, deadline and test boundaries; platform qualification remains pending.
 
-Keep the generation and death recipient through cancellation, account reset,
-clear and reinstall. A process-owned lifetime owner must survive facade
-replacement so those operations cannot allocate a replacement around a held
-generation. Late replies and late connections have generation-specific cleanup
+The candidate keeps the generation and death recipient through cancellation,
+account reset, clear and reinstall. Its process-owned lifetime owner survives
+facade replacement, preserving the held generation across those operations. Late replies and late connections have generation-specific cleanup
 paths and receive no new source. Waiting must occur outside the binding monitor,
 and bind, reply and retirement share a bounded monotonic operation deadline.
 
@@ -82,7 +87,7 @@ on the proposed proof; they do not establish a UID-reuse vulnerability.
 `IsolatedMediaTransport.copyPixels` already validates dimensions and byte extent
 through `MediaDecodePolicy.pixelBytes`, copies the bounded shared pixels into a
 new parent-owned `Bitmap`, then unmaps the shared buffer. Reuse that validated
-private copy. The proposed lifetime change places exact Binder-host death before
+private copy. The candidate places exact Binder-host death before
 this existing copy; an extra `ByteArray` or second pixel copy would require a
 separate identified defect.
 
@@ -211,9 +216,10 @@ payload inspection.
    reports and matching input hashes. Obtain separate visible-UI and worker-memory
    measurements where the baseline does not measure them. Agree on measured
    regression budgets before changing the default.
-2. Implement and review the bounded still-worker lifetime owner, death fence and
-   private output snapshot with the failure matrix above. Keep unresolved
-   startup/death admission closed and preserve animation behavior.
+2. Review the implemented still-worker lifetime candidate against the failure
+   matrix above, then obtain exact-head platform and matched performance evidence.
+   Keep default adoption held while those gates remain pending. Preserve unresolved
+   startup/death admission and the separate animation behavior.
 3. Run the A/V capability prototype and publish its API/format decision. Review
    a narrow video preparation table, then integrate one exact-byte preparation
    owner across all outgoing routes without raw fallback.

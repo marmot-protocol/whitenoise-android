@@ -14,6 +14,7 @@ internal object IsolatedMediaDecoder {
 
     @Volatile private var mediaTransport: MediaDecodeTransport? = null
     private var installedContext: Context? = null
+    private var imageOwner: IsolatedMediaTransport? = null
 
     @Volatile internal var lastIsolation: WorkerIsolation? = null
         private set
@@ -31,21 +32,30 @@ internal object IsolatedMediaDecoder {
             )
     }
 
+    @Synchronized
     fun install(context: Context) {
         if (!Process.isIsolated()) {
             clear()
             installedContext = context.applicationContext
-            transport = IsolatedMediaTransport(context.applicationContext, "images")
+            val owner =
+                imageOwner ?: IsolatedMediaTransport(context.applicationContext, "images").also {
+                    imageOwner = it
+                }
+            owner.activateSession()
+            transport = owner
             mediaTransport = PlatformMediaTransport(context.applicationContext)
         }
     }
 
     /** Explicit test seam; production initialization always installs the real IPC transport. */
+    @Synchronized
     internal fun installTestTransport(next: MediaDecodeTransport?) {
+        imageOwner?.invalidateSession()
         transport = next
         mediaTransport = next
     }
 
+    @Synchronized
     internal fun resetForAccount() {
         if (transport is IsolatedMediaTransport) {
             val currentContext = installedContext ?: return
@@ -54,9 +64,14 @@ internal object IsolatedMediaDecoder {
         }
     }
 
+    @Synchronized
     fun clear() {
         IsolatedAnimationSession.retireActive()
-        (transport as? java.io.Closeable)?.close()
+        if (transport === imageOwner) {
+            imageOwner?.invalidateSession()
+        } else {
+            (transport as? java.io.Closeable)?.close()
+        }
         (mediaTransport as? java.io.Closeable)?.close()
         transport = null
         mediaTransport = null

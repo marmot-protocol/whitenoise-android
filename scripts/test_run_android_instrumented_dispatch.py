@@ -103,6 +103,26 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("MediaContainmentAcceptance", smoke)
         self.assertNotIn(case, smoke)
 
+    def test_av_capability_capture_is_required_only_by_containment_selection(self):
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        source = (directory / "MediaAvCapabilityDeviceTest.kt").read_text()
+        self.assertIn("@MediaContainmentAcceptance", source)
+        self.assertNotIn("@PullRequestDeviceSmoke", source)
+        method = "characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid"
+        self.assertIn("fun " + method + "()", source)
+        case = "dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityDeviceTest#" + method
+        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        self.assertIn(case, focused)
+        required = (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
+        names = ("IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest",
+                 "MediaCodecCorpusDeviceTest", "MediaWorkerBaselineDeviceTest")
+        for line in required:
+            if any("." + name + "#" in line for name in names):
+                self.assertIn(line, focused)
+        smoke = self.run_dispatch("pull_request")
+        self.assertNotIn(case, smoke)
+        self.assertIn("RunnerArguments.annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke", smoke)
+
     def test_outbound_share_dispatch_is_focused_and_rejects_overlapping_suites(self):
         """Real package visibility uses its own emulator users without also running the full suite."""
         self.assertEqual(

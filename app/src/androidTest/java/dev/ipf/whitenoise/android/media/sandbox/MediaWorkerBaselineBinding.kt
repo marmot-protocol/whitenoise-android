@@ -63,6 +63,12 @@ internal class MediaWorkerBaselineBinding(
         super.unbindService(checkNotNull(observer))
     }
 
+    fun isEndpointAlive(generation: Int): Boolean =
+        synchronized(monitor) {
+            val endpoint = witnesses.single { it.generation == generation }
+            endpoint.binder.isBinderAlive
+        }
+
     fun snapshot(): JSONObject =
         synchronized(monitor) {
             JSONObject()

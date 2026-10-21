@@ -1,7 +1,9 @@
 # Still-image worker baseline
 
-This first attachment-security slice adds tests and measurements only. The
-production transport still reuses its worker after successful requests. Worker-per-input retirement and the isolation goals of #3373 remain pending.
+This characterization was introduced before worker-per-input retirement, when
+the production transport reused its worker after successful requests. Preserve
+those measurements separately from successor lifetime candidates. The full
+isolation goals of #3373 remain pending qualification.
 The audio/video containment, sender-trust, video-metadata and document-privacy
 work in #3374–#3377 remains pending.
 
@@ -15,7 +17,7 @@ The existing workflow collects connected-test additional output without a new
 workflow, permissions or qualification threshold.
 
 `MediaWorkerBaselineDeviceTest.characterizeDirectStillTransportWithFixedSyntheticCorpus`
-runs 100 requests against the real unchanged transport. The fixed ordering cycles
+runs 100 requests against the real transport for that exact source. The fixed ordering cycles
 through PNG thumbnail, JPEG viewer, PNG inspection, JPEG EXIF, PNG region and SVG
 operations. Inputs are a synthetic 256×256 gradient encoded as PNG/JPEG and a
 fixed blue SVG; no account, contact, downloaded image or user media is used.
@@ -50,14 +52,17 @@ Operation timings exclude input hashing, report writing and caller-resource
 sampling. Resource probes record their own duration. The first request is kept
 separate from subsequent requests in summaries; there is only one first-request
 sample, so it cannot establish a cold-start latency distribution. Percentiles
-use nearest-rank observations per operation, outcome and request phase. Refused results have their own outcome group.
+use nearest-rank observations per operation, outcome and request phase.
+The transport does not type refusal, startup failure or timeout; failed sample
+predicates remain in the `no_result` outcome group.
 
 Every call reaches the direct transport. App pixel-cache behavior, chat-scroll,
 notification and visible-viewer frame timings require separate measurements.
 Only complete operation time is available for codec/IPC/copy work. The read-only binding wrapper adds
 a death observer and timestamps; use the same observer for later comparisons.
-Production admission remains unchanged. Only a kernel Binder death callback
-marks a witness as dead; connection callbacks and numeric UIDs stay distinct.
+This observer records the admission behavior of its exact source. Only a kernel
+Binder death callback marks a witness as dead; connection callbacks and numeric
+UIDs stay distinct.
 
 Caller `/proc/self/fd` count and `VmRSS` are sampled when readable; unavailable
 values are null. Their scope is the caller process. Isolated-worker memory,
@@ -67,19 +72,23 @@ required for the worker-resource acceptance gate.
 
 ## What this baseline can establish
 
-`MediaBindingRecoveryTest.completedReplyBaselineReusesTheCurrentBindingAcrossDistinctInputs`
-records the current reusable-binding behavior using completed same-UID fixture
-replies. Those replies remain rejected as isolation attestations. Update this assertion with the reviewed disposable-worker implementation.
-Current reuse remains the behavior tracked by #3373.
+The historical baseline on source `643605a36b3d` characterized reusable bindings.
+Its completed-reply fixture recorded that behavior while rejecting same-UID
+replies as isolation attestations. The lifetime candidate replaces that fixture
+with controlled session, retirement, exact-death and held-URI cases in
+`MediaBindingRecoveryTest`. Those tests exercise owner ordering; hosted device
+execution supplies the platform evidence.
 
 Review raw healthy and negative samples before choosing a regression budget.
-Measured results and performance-budget approval remain pending. The
-proposed worker-per-input gate must preserve retirement authority across account
-reset/install and wait for authenticated process death before copying shared
-output. A worker ignoring retirement must keep replacement admission closed. That implementation and API30/current-API evidence
-are separate future work in this draft.
+Historical baseline measurements remain separate from the candidate's per-input
+lifetime behavior. Matched performance-budget approval, worker-resource evidence
+and platform qualification for the lifetime candidate remain pending. Default
+adoption stays held until those gates are reviewed.
 
-Invariant gate exemption for this baseline slice: `non-production`. This slice
-changes test characterization and documentation. All five issues remain open.
-Manual checklist and surface fragments stay unchanged until the behavior update;
-existing permanent IDs and unchecked results are retained.
+The original `non-production` invariant exemption applies to the historical
+test-only baseline slice. The lifetime implementation has separate behavioral
+tests and platform requirements. All five issues remain open. Existing permanent
+manual IDs and unchecked results are retained.
+
+The [still-image lifetime candidate](media-worker-lifetime.md) documents the
+successor owner and its separate qualification requirements.

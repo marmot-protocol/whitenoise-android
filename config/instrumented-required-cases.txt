@@ -125,3 +125,9 @@ dev.ipf.whitenoise.android.media.sandbox.MediaCodecCorpusDeviceTest#rotatedWebpI
 
 # Fixed-corpus still-worker characterization; focused containment and full suites, never PR smoke.
 dev.ipf.whitenoise.android.media.sandbox.MediaWorkerBaselineDeviceTest#characterizeDirectStillTransportWithFixedSyntheticCorpus
+
+# Still-worker death witness: PR smoke and focused containment.
+dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#eachStillInputWaitsForItsExactBinderDeathBeforeReturningPixels
+
+# Debug-only selected-descriptor A/V capability capture; focused containment and full suites.
+dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityDeviceTest#characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid

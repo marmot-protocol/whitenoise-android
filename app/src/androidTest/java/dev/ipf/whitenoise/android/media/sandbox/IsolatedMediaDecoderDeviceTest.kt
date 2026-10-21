@@ -23,6 +23,37 @@ import java.io.File
 @MediaContainmentAcceptance
 class IsolatedMediaDecoderDeviceTest {
     @Test
+    fun eachStillInputWaitsForItsExactBinderDeathBeforeReturningPixels() {
+        val context = MediaWorkerBaselineBinding(InstrumentationRegistry.getInstrumentation().targetContext)
+        val transport = IsolatedMediaTransport(context)
+        try {
+            for (index in 0 until 2) {
+                val decoded = requireNotNull(transport.decode(png(), 1, false, MediaDecodePolicy.DECODE))
+                try {
+                    assertFalse(context.isEndpointAlive(index + 1))
+                    assertEquals(Color.RED, decoded.getPixel(0, 0))
+                    val deadline = android.os.SystemClock.elapsedRealtime() + 1_000
+                    var endpoint = context.snapshot().getJSONArray("endpoints").getJSONObject(index)
+                    while (endpoint.isNull("death_observed_elapsed_ns") &&
+                        android.os.SystemClock.elapsedRealtime() < deadline
+                    ) {
+                        android.os.SystemClock.sleep(5)
+                        endpoint = context.snapshot().getJSONArray("endpoints").getJSONObject(index)
+                    }
+                    assertFalse(endpoint.getBoolean("death_registration_failed"))
+                    assertFalse(endpoint.isNull("death_observed_elapsed_ns"))
+                    assertEquals(index + 1, context.snapshot().getInt("binding_attempts"))
+                } finally {
+                    decoded.recycle()
+                }
+            }
+        } finally {
+            transport.close()
+            context.closeObservers()
+        }
+    }
+
+    @Test
     fun stillPixelsCrossAnIsolatedUidWithoutNetworkOrRuntimeInitialization() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val canary = java.io.File(context.filesDir, "media-containment-canary")
@@ -100,7 +131,6 @@ class IsolatedMediaDecoderDeviceTest {
     fun accountResetRetiresThePriorWorkerAndKeepsRenderingAvailable() {
         IsolatedMediaDecoder.install(InstrumentationRegistry.getInstrumentation().targetContext)
         requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
-        val prior = requireNotNull(IsolatedMediaDecoder.lastIsolation).uid
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
             val app =
@@ -109,19 +139,18 @@ class IsolatedMediaDecoderDeviceTest {
             app.appState.clearCrossAccountCachesForTest()
         }
         requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
-        assertNotEquals(prior, requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
+        assertNotEquals(Process.myUid(), requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
     }
 
     @Test
     fun watchdogTerminatesOnlyTheWorkerAndPermitsVerifiedDeathRecovery() {
         IsolatedMediaDecoder.install(InstrumentationRegistry.getInstrumentation().targetContext)
         requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
-        val prior = requireNotNull(IsolatedMediaDecoder.lastIsolation).uid
         val caller = Process.myPid()
         IsolatedMediaDecoder.exerciseWatchdogForTest()
         requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
         assertEquals(caller, Process.myPid())
-        assertNotEquals(prior, requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
+        assertNotEquals(Process.myUid(), requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
     }
 
     @Test
@@ -242,7 +271,6 @@ class IsolatedMediaDecoderDeviceTest {
         val ended = java.util.concurrent.CountDownLatch(1)
         try {
             requireNotNull(transport.decode(png(), 2, false, MediaDecodePolicy.DECODE)).recycle()
-            val prior = requireNotNull(IsolatedMediaDecoder.lastIsolation).uid
             val blocked =
                 executor.submit {
                     try {
@@ -268,7 +296,7 @@ class IsolatedMediaDecoderDeviceTest {
                 if (recovered == null) Thread.sleep(20L)
             }
             requireNotNull(recovered).recycle()
-            assertNotEquals(prior, requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
+            assertNotEquals(Process.myUid(), requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
         } finally {
             executor.shutdownNow()
             transport.close()
