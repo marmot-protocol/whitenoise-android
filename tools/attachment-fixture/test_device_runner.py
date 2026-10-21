@@ -109,13 +109,15 @@ class RunnerContractTest(unittest.TestCase):
 
     def test_timeout_and_cleanup_failure_preserve_failed_report(self):
         """An adb failure cannot discard the host evidence or become qualification."""
-        def adb(_, serial, *args):
+        def adb(_, serial, *args, **options):
             """Fail instrumentation and cleanup independently, after verified emulator setup."""
             self.assertEqual("emulator-5554", serial)
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                 return "1\n"
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP + "\n"
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:2] == ("reverse", "--remove"):
                 raise subprocess.CalledProcessError(1, "adb")
             if args[:3] == ("shell", "am", "instrument"):
@@ -139,11 +141,13 @@ class RunnerContractTest(unittest.TestCase):
     def test_failed_instrumentation_keeps_redacted_diagnostics_and_never_qualifies(self):
         """Distinguish a crash from missing measurements without leaking captured messages or another process."""
         secret = "PRIVATE-FIXTURE-CONTENT"
-        def adb(binary, serial, *args):
+        def adb(binary, serial, *args, **options):
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                 return "1"
             if args[:4] == ("shell", "pm", "list", "packages"):
                 return "package:" + device_runner.APP
+            if args[:2] == ("reverse", "--no-rebind"):
+                return args[3].removeprefix("tcp:") + "\n"
             if args[:3] == ("shell", "am", "instrument"):
                 raise subprocess.CalledProcessError(1, [binary, "-s", serial, *args],
                     output="INSTRUMENTATION_RESULT: shortMsg=Process crashed.\n" + secret, stderr=secret)
