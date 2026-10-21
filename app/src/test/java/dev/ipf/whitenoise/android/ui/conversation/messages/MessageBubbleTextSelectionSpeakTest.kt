@@ -76,8 +76,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import java.util.Locale
-import java.util.TimeZone
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -90,6 +88,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Locale
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
