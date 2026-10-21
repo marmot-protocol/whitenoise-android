@@ -218,6 +218,30 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('android-ci-gradle-profiles-static-analysis-${{ matrix.flavor }}', self.static_analysis)
         self.assertIn('cache-read-only:', self.static_analysis)
 
+    def test_unit_deadline_reserves_early_failure_artifact_upload(self):
+        self.assertIn('timeout-minutes: 40', self.tests_job)
+        anchor = self.named_step(self.tests_job, 'Reserve unit-test diagnostics and upload time')
+        self.assertIn('time.monotonic() + 32 * 60', anchor)
+        self.assertLess(self.tests_job.index('      - name: Reserve unit-test'),
+                        self.tests_job.index('      - name: Checkout'))
+        unit = self.named_step(self.tests_job, 'Unit tests')
+        self.assertIn('python3 scripts/run_unit_tests_with_diagnostics.py --', unit)
+        self.assertIn('--no-daemon', unit)
+        self.assertNotIn('continue-on-error', unit)
+        upload = self.named_step(self.tests_job, 'Upload reports')
+        self.assertIn('if: always()', upload)
+        self.assertIn('timeout-minutes: 3', upload)
+        self.assertIn('app/build/outputs/roborazzi/', upload)
+        self.assertIn('app/build/reports/', upload)
+        self.assertIn('app/build/test-results/', upload)
+        self.assertIn('build/reports/profile/', upload)
+        self.assertIn('scripts/test_unit_test_diagnostics.py', self.workflow)
+        self.assertEqual(self.tests_job.count('      - name: Upload reports\n'), 1)
+        self.assertLess(self.tests_job.index('      - name: Unit tests'),
+                        self.tests_job.index('      - name: Upload reports'))
+        self.assertLess(self.tests_job.index('      - name: Upload reports'),
+                        self.tests_job.index('      - name: Require every committed screenshot'))
+
     def test_full_unit_suite_verifies_goldens_and_is_reused_by_coverage(self):
         """Identical verification inputs let coverage reuse the complete suite."""
         expected_steps = {
@@ -448,6 +472,10 @@ class AndroidCiGateTest(unittest.TestCase):
         """Measured lightweight steps reuse a JVM; heavier tooling stays isolated."""
         invocations = self.gradle_steps(self.tests_job)
         self.assertGreaterEqual(len(invocations), 3)
+        # Only the supervised full-suite invocation needs its own daemon lifetime.
+        unit = self.named_step(self.tests_job, 'Unit tests')
+        self.assertIn('--no-daemon', unit)
+        invocations = [step for step in invocations if '      - name: Unit tests' not in step]
         tooling = [step for step in self.gradle_steps(self.build_contracts)
                    if "if: matrix.phase == 'tooling'" in step and
                    '- name: Capture dependency-control bootstrap candidates' not in step]
