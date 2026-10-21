@@ -2533,4 +2533,9 @@
     <string name="group_action_add_members">Add members</string>
     <string name="group_action_transfer_and_leave">Transfer admin and leave</string>
     <string name="group_action_step_down_and_leave">Step down and leave</string>
+    <plurals name="group_review_add_members">
+        <item quantity="one">Add member</item>
+        <item quantity="other">Add members</item>
+    </plurals>
+    <string name="group_review_invitation_visibility">Visible to all members.</string>
 </resources>

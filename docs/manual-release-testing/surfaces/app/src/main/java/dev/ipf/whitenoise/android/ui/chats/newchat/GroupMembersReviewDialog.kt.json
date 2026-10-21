@@ -20,17 +20,25 @@
           "GRP-030",
           "GRP-034"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "GroupMembersReviewTitle",
+        "anchor": "fun GroupMembersReviewTitle(",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "GroupReviewDestinations",
+        "anchor": "fun GroupReviewDestinations(",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ],
     "source_coverage": [
-      {
-        "surface": "Review invitation identities and controls",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "anchor": "R.string.profile_add_to_groups_confirm_message",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
       {
         "surface": "Invitation review scroll boundaries",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
@@ -51,38 +59,6 @@
         ]
       },
       {
-        "surface": "R.string.remove_member_named",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "anchor": "R.string.remove_member_named",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "surface": "R.string.add_member",
-        "anchor": "R.string.add_member",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "surface": "R.string.chat_list_search_groups",
-        "anchor": "R.string.chat_list_search_groups",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "surface": "R.string.group_name",
-        "anchor": "R.string.group_name",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
         "surface": "R.string.member",
         "anchor": "R.string.member",
@@ -91,35 +67,29 @@
         ]
       },
       {
+        "surface": "R.plurals.group_review_add_members",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "surface": "R.string.members",
-        "anchor": "R.string.members",
+        "anchor": "R.plurals.group_review_add_members",
         "test_ids": [
-          "GRP-030"
+          "GRP-030",
+          "GRP-034"
         ]
       },
       {
+        "surface": "R.string.group_review_invitation_visibility",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "surface": "R.string.remove_member",
-        "anchor": "R.string.remove_member",
+        "anchor": "R.string.group_review_invitation_visibility",
         "test_ids": [
-          "GRP-030"
+          "GRP-030",
+          "GRP-034"
         ]
       }
     ],
     "settings_controls": [
       {
-        "surface": "Reviewed group action context: R.plurals.selected_members_count",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "anchor": "R.plurals.selected_members_count",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.plurals.group_action_groups_count",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "anchor": "R.plurals.group_action_groups_count",
+        "surface": "R.string.unknown",
+        "anchor": "R.string.unknown",
         "test_ids": [
           "GRP-034"
         ]

@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -1511,7 +1512,7 @@ internal fun ProfileAddToGroupsContent(
             groups = reviewGroups,
             members = listOf(target),
             busy = busy,
-            confirmLabel = stringResource(R.string.profile_add_to_groups_confirm_label),
+            confirmLabel = pluralStringResource(R.plurals.group_review_add_members, 1),
             onConfirm = {
                 confirmSelection = null
                 onAdd(targets)

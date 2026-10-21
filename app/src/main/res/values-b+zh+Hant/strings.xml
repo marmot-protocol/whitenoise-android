@@ -2334,4 +2334,8 @@
     <plurals name="group_action_groups_count">
         <item quantity="other">%1$d 個群組</item>
     </plurals>
+    <plurals name="group_review_add_members">
+        <item quantity="other">新增成員</item>
+    </plurals>
+    <string name="group_review_invitation_visibility">所有成員皆可見。</string>
 </resources>

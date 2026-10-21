@@ -26,6 +26,14 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "GroupReviewNpub",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupReviewNpub(",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ],
     "settings_controls": [
@@ -46,33 +54,25 @@
         ]
       },
       {
-        "surface": "Reviewed group action context: R.string.group_id",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
-        "anchor": "R.string.group_id",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.public_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
-        "anchor": "R.string.public_key",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Public key hex fallback disclosure",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
-        "anchor": "R.string.group_action_public_key_hex",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
         "surface": "Explicit local account label fallback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
         "anchor": "R.string.group_action_account_label",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "surface": "R.string.copy",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "surface": "R.string.unknown",
+        "anchor": "R.string.unknown",
         "test_ids": [
           "GRP-034"
         ]

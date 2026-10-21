@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.GroupChangeCaution
 import dev.ipf.whitenoise.android.state.GroupChangeConfirmation
 import dev.ipf.whitenoise.android.state.GroupChangeTarget
+import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
 import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
@@ -80,7 +81,9 @@ class GroupChangeConfirmationScreenshotTest {
         fontScale: Float = 1f,
     ): CompletableDeferred<Boolean> {
         val decision = CompletableDeferred<Boolean>()
-        val state = emptyAppState(accounts = listOf(testAccount("alice", "a".repeat(64))), activeAccountRef = "alice")
+        val state =
+            emptyAppState(accounts = listOf(testAccount("alice", "a".repeat(64))), activeAccountRef = "alice")
+                .withGroupReviewActorNpub()
         val target =
             TARGET.copy(
                 actionLabel = if (invite) R.string.group_action_add_members else R.string.make_admin,

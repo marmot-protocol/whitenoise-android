@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
+import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -89,7 +90,9 @@ class GroupActionIdentityScreenshotTest {
         amoled: Boolean = false,
         remove: Boolean = false,
     ) {
-        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
         val hex = "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
         val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
         var submitted = 0
@@ -127,11 +130,12 @@ class GroupActionIdentityScreenshotTest {
         }
         rule.onNodeWithTag("group.action.acting_account").assertExists()
         rule.onNodeWithText("Public Alice").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Garden club").assertIsDisplayed()
+        rule.onNodeWithText("Garden club").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Private alias").assertDoesNotExist()
         rule.onAllNodesWithText(npub).assertCountEquals(0)
         rule.onAllNodesWithText(IdentityFormatter.short(npub, prefix = 10, suffix = 8)).assertCountEquals(1)
         rule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
+        rule.onNodeWithTag("confirmation.cancel").assertIsDisplayed()
         rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_action_identity_$name.png")
         rule.onNodeWithTag("confirmation.confirm").performClick()
         assertEquals(1, submitted)

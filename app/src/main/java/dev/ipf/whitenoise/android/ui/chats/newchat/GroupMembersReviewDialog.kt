@@ -3,12 +3,11 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -20,18 +19,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -62,16 +64,10 @@ internal fun GroupMembersReviewDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     confirmLabel: String,
-    onRemove: ((RecipientSearch.Candidate) -> Unit)? = null,
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
-    title: String = stringResource(R.string.add_member),
-    description: String? =
-        stringResource(
-            R.string.profile_add_to_groups_confirm_message,
-            stringResource(if (members.size == 1) R.string.member else R.string.members),
-            groups.joinToString { it.name },
-        ),
+    title: String = pluralStringResource(R.plurals.group_review_add_members, members.size),
+    description: String? = stringResource(R.string.group_review_invitation_visibility),
     invitation: Boolean = true,
     dismissEnabled: Boolean = !busy,
     showProgress: Boolean = busy,
@@ -104,7 +100,7 @@ internal fun GroupMembersReviewDialog(
                 onDismiss()
             }
         },
-        title = { Text(title) },
+        title = { GroupMembersReviewTitle(appState, title, actingAccount) },
         confirmButton = {
             TextButton(
                 onClick = {
@@ -147,12 +143,9 @@ internal fun GroupMembersReviewDialog(
         text = {
             Column(
                 Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 description?.let { EmojiLabel(it) }
-                GroupActingAccountIdentity(appState, actingAccount)
-                Text(pluralStringResource(R.plurals.selected_members_count, members.size, members.size))
-                Text(pluralStringResource(R.plurals.group_action_groups_count, groups.size, groups.size))
                 groups.firstOrNull()?.let { firstGroup ->
                     members.forEachIndexed { index, member ->
                         key(member.accountIdHex) {
@@ -162,7 +155,6 @@ internal fun GroupMembersReviewDialog(
                                 group = firstGroup,
                                 member = member,
                                 busy = busy,
-                                onRemove = onRemove,
                                 initialAdminIds = initialAdminIds,
                                 onInitialAdminChange = onInitialAdminChange,
                                 otherGroups = groups.drop(1),
@@ -176,6 +168,38 @@ internal fun GroupMembersReviewDialog(
     )
 }
 
+/** Keep the captured actor at the top end and reflow a title that cannot share its line. */
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupMembersReviewTitle(
+    appState: WhiteNoiseAppState,
+    title: String,
+    actingAccount: String?,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val fontScale = LocalDensity.current.fontScale
+        var titleNeedsLine by remember(title, actingAccount, fontScale, maxWidth) { mutableStateOf(false) }
+        val largeText =
+            fontScale > GROUP_REVIEW_LARGE_FONT_SCALE || MaterialTheme.typography.bodyMedium.fontSize >= 20.sp
+        if (largeText || maxWidth < GroupReviewPairedMinWidth || titleNeedsLine) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                GroupActingAccountIdentity(appState, actingAccount)
+                Text(title)
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    Modifier.weight(1f),
+                    maxLines = 1,
+                    onTextLayout = { if (it.hasVisualOverflow) titleNeedsLine = true },
+                )
+                GroupActingAccountIdentity(appState, actingAccount, Modifier)
+            }
+        }
+    }
+}
+
 /** Shows one public identity beside its destinations; arrows are reserved for invitations. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -184,7 +208,6 @@ internal fun GroupMemberReviewPair(
     group: MemberReviewGroup,
     member: RecipientSearch.Candidate,
     busy: Boolean = false,
-    onRemove: ((RecipientSearch.Candidate) -> Unit)? = null,
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
     otherGroups: List<MemberReviewGroup> = emptyList(),
@@ -199,43 +222,44 @@ internal fun GroupMemberReviewPair(
             ?: reviewMemberPublicName(member.searchProfile?.name)
             ?: reviewMemberPublicName(member.searchProfile?.displayName)
     val shortIdentifier = IdentityFormatter.short(identifier, prefix = 10, suffix = 8)
-    val label = name ?: shortIdentifier
+    val label = name ?: shortIdentifier.ifBlank { stringResource(R.string.unknown) }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            GroupReviewPersonIdentity(
-                appState = appState,
-                member = member,
-                role = stringResource(R.string.member),
-                modifier = Modifier.weight(1f).testTag("group.members.review.member"),
-            )
-            if (showDirection) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp).align(Alignment.CenterVertically),
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val stacked =
+                LocalDensity.current.fontScale > GROUP_REVIEW_LARGE_FONT_SCALE ||
+                    MaterialTheme.typography.bodyMedium.fontSize >= 20.sp ||
+                    maxWidth < GroupReviewPairedMinWidth
+            val person: @Composable () -> Unit = {
+                GroupReviewPersonIdentity(
+                    appState = appState,
+                    member = member,
+                    role = stringResource(R.string.member),
+                    modifier = Modifier.testTag("group.members.review.member"),
                 )
-            } else {
-                Spacer(Modifier.width(20.dp))
             }
-            Column(
-                Modifier.weight(1f).testTag("group.members.review.destination"),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    stringResource(
-                        if (otherGroups.isEmpty()) R.string.group_name else R.string.chat_list_search_groups,
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                (listOf(group) + otherGroups).forEach { destination ->
-                    key(destination.id) {
-                        GroupReviewDestinationIdentity(destination)
+            val destinations: @Composable () -> Unit = {
+                GroupReviewDestinations(listOf(group) + otherGroups)
+            }
+            if (stacked) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    person()
+                    destinations()
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(Modifier.weight(1f)) { person() }
+                    if (showDirection) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp).align(Alignment.CenterVertically),
+                        )
                     }
+                    Column(Modifier.weight(1f)) { destinations() }
                 }
             }
         }
@@ -247,18 +271,25 @@ internal fun GroupMemberReviewPair(
                 onChange = { change(member, it) },
             )
         }
-        onRemove?.let { remove ->
-            val removeDescription = stringResource(R.string.remove_member_named, label)
-            TextButton(
-                onClick = { remove(member) },
-                enabled = !busy,
-                modifier = Modifier.semantics { contentDescription = removeDescription },
-            ) {
-                Text(stringResource(R.string.remove_member))
-            }
+    }
+}
+
+/** Preserve each frozen destination and its order, even when names are identical. */
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupReviewDestinations(groups: List<MemberReviewGroup>) {
+    Column(
+        Modifier.testTag("group.members.review.destination"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        groups.forEach { destination ->
+            key(destination.id) { GroupReviewDestinationIdentity(destination) }
         }
     }
 }
+
+private const val GROUP_REVIEW_LARGE_FONT_SCALE = 1.3f
+private val GroupReviewPairedMinWidth = 250.dp
 
 /** Rejects identity placeholders as names so an unnamed person has one abbreviated identifier. */
 internal fun reviewMemberPublicName(value: String?): String? {

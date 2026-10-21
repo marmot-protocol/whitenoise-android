@@ -136,12 +136,7 @@ internal fun ContactPickerScreen(
                 reviewingSelection = false
                 onConfirm()
             },
-            confirmLabel = confirmLabel,
-            onRemove = { member ->
-                onInitialAdminChange?.invoke(member, false)
-                selected.removeAll { it.accountIdHex.equals(member.accountIdHex, ignoreCase = true) }
-                if (selected.isEmpty()) reviewingSelection = false
-            },
+            confirmLabel = pluralStringResource(R.plurals.group_review_add_members, selected.size),
             initialAdminIds = initialAdminIds,
             onInitialAdminChange = onInitialAdminChange,
         )
