@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** Controlled state-machine assertions, never kernel identity/death or platform qualification. */
 internal fun checkAvBindingWiring(context: Context) {
+    checkAvDiagnosticAdmission()
     val fixture = File.createTempFile("av-wiring-", ".bin", context.cacheDir)
     try {
         fixture.writeBytes(byteArrayOf(1))
@@ -25,6 +26,39 @@ internal fun checkAvBindingWiring(context: Context) {
     } finally {
         check(fixture.delete())
     }
+}
+
+private fun checkAvDiagnosticAdmission() {
+    val token = "a".repeat(32)
+    val begin = "$token|video_construct|1|4242|99001|retriever_construct|begin|none|0|1"
+    val terminal = "$token|video_construct|1|4242|99001|retriever_construct|success|none|0|2"
+
+    fun admit(
+        text: String,
+        deadline: Boolean,
+    ) = AvCapabilityLogs.admit(text, AvProbeTuple(token, "video_construct", 1), 99001, 4242, deadline)
+    check(admit(begin, true).length() == 1)
+    check(admit("$begin\n$terminal", true).length() == 2)
+    check(admit("$begin\n$terminal", false).length() == 2)
+    check(runCatching { admit(begin, false) }.isFailure)
+    check(admit(terminal, true).length() == 1)
+    check(runCatching { admit("$begin\n$terminal\n$terminal", true) }.isFailure)
+    check(runCatching { admit(List(33) { begin }.joinToString("\n"), true) }.isFailure)
+    check(runCatching { admit(begin.replace("|99001|", "|99002|"), true) }.isFailure)
+    check(runCatching { admit(begin.replace("|4242|", "|4243|"), true) }.isFailure)
+    check(runCatching { admit(begin.replace("retriever_construct", "untrusted"), true) }.isFailure)
+    check(runCatching { admit(begin.replace("video_construct", "another_case"), true) }.isFailure)
+    var visited = 0
+    val campaign =
+        runCatching {
+            runAvCapabilityCases(2) { index ->
+                visited++
+                admit(if (index == 0) begin else "$begin\n$terminal", index == 0)
+                index == 0
+            }
+        }
+    check(visited == 2) { "A typed deadline must not skip the next case" }
+    check(campaign.exceptionOrNull()?.message == "A/V deadline observations remain unqualified")
 }
 
 private fun checkAvBindingMode(

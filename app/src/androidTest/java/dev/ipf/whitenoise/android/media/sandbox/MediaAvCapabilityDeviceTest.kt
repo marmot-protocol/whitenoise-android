@@ -62,9 +62,8 @@ private class AvCapabilityCampaign(
 
     fun run() {
         try {
-            var failedCases = 0
-            cases().forEachIndexed { index, case -> if (record(index, case)) failedCases++ }
-            check(failedCases == 0) { "A/V deadline observations remain unqualified" }
+            val cases = cases()
+            runAvCapabilityCases(cases.size) { index -> record(index, cases[index]) }
         } finally {
             binding.close()
         }
@@ -111,11 +110,10 @@ private class AvCapabilityCampaign(
                 row.put("observation", evidence)
                 val logs =
                     AvCapabilityLogs.read(
-                        token,
-                        case.id,
-                        index + 1,
+                        AvProbeTuple(token, case.id, index + 1),
                         evidence.getInt("kernel_ready_uid"),
                         evidence.getInt("kernel_ready_pid"),
+                        observed is AvCapabilityCase.ReplyDeadline,
                     )
                 row.put("worker_diagnostics", logs).put("diagnostics_qualified", true)
                 when (observed) {
@@ -166,6 +164,15 @@ private class AvCapabilityCampaign(
     }
 }
 
+internal fun runAvCapabilityCases(
+    count: Int,
+    record: (Int) -> Boolean,
+) {
+    var failedCases = 0
+    repeat(count) { index -> if (record(index)) failedCases++ }
+    check(failedCases == 0) { "A/V deadline observations remain unqualified" }
+}
+
 private class ProbeCase(
     val id: String,
     val stage: String,
@@ -173,25 +180,35 @@ private class ProbeCase(
 )
 
 /** Bounded fixed-tag read, scoped to a fresh random token and this exact request and kernel reply UID. */
-private object AvCapabilityLogs {
+internal object AvCapabilityLogs {
     fun read(
-        token: String,
-        case: String,
-        request: Int,
+        tuple: AvProbeTuple,
         uid: Int,
         pid: Int,
+        replyDeadline: Boolean,
+    ): JSONArray = admit(bytes().toString(Charsets.UTF_8), tuple, uid, pid, replyDeadline)
+
+    fun admit(
+        text: String,
+        tuple: AvProbeTuple,
+        uid: Int,
+        pid: Int,
+        replyDeadline: Boolean,
     ): JSONArray {
-        val prefix = "$token|$case|$request|"
-        val records =
-            bytes()
-                .toString(Charsets.UTF_8)
-                .lineSequence()
-                .filter { it.startsWith(prefix) }
-                .toList()
-        check(records.size in 2..32) { "Missing or ambiguous correlated diagnostics" }
+        val prefix = "${tuple.token}|${tuple.case}|${tuple.request}|"
+        val records = text.lineSequence().filter { it.startsWith(prefix) }.toList()
+        check(records.size in (if (replyDeadline) 1 else 2)..32) { "Missing or ambiguous correlated diagnostics" }
         check(records.map { it.split('|').getOrNull(3) }.toSet().size == 1) { "Mixed worker identities" }
         val rows = records.map { parse(it, uid, pid) }
-        check(rows.count { it.getString("outcome") != "begin" } == 1) { "Ambiguous terminal diagnostics" }
+        val terminalCount = rows.count { it.getString("outcome") != "begin" }
+        if (replyDeadline) {
+            check(terminalCount <= 1) { "Ambiguous terminal diagnostics" }
+            check(terminalCount == 1 || rows.any { it.getString("outcome") == "begin" }) {
+                "Missing begin diagnostics"
+            }
+        } else {
+            check(terminalCount == 1) { "Ambiguous terminal diagnostics" }
+        }
         return JSONArray(rows)
     }
 

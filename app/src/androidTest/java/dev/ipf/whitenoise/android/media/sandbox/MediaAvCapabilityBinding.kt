@@ -410,9 +410,9 @@ private class AvCapabilityWorker(
                 response: Parcel?,
                 flags: Int,
             ): Boolean {
-                if (response == null || flags and IBinder.FLAG_ONEWAY != 0) return rejectTerminal()
                 val frame =
                     try {
+                        require(response != null && flags and IBinder.FLAG_ONEWAY == 0)
                         readAvProbeReady(data)
                     } catch (_: RuntimeException) {
                         return rejectTerminal()
@@ -431,7 +431,7 @@ private class AvCapabilityWorker(
                             }
                     }
                 if (accepted) {
-                    response.writeNoException()
+                    checkNotNull(response).writeNoException()
                     response.writeInt(1)
                 }
                 return accepted
@@ -452,11 +452,9 @@ private class AvCapabilityWorker(
             }
 
             private fun terminal(data: Parcel): Boolean {
-                if (data.hasFileDescriptors() || data.dataAvail() > MediaDecodePolicy.MAX_REPLY_BYTES) {
-                    return rejectTerminal()
-                }
                 val parsed =
                     try {
+                        require(!data.hasFileDescriptors() && data.dataAvail() <= MediaDecodePolicy.MAX_REPLY_BYTES)
                         data.enforceInterface(MEDIA_REPLY_DESCRIPTOR)
                         require(data.readInt() == tuple.request)
                         readMediaDecodeReply(data)
