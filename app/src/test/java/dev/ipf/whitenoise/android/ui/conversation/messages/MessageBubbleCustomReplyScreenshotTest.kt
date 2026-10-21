@@ -117,7 +117,8 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
                 }
             }
         }
-        rows.filter { it.record.direction == "sent" && requireNotNull(it.projected).media.isNotEmpty() }
+        rows
+            .filter { it.record.direction == "sent" && requireNotNull(it.projected).media.isNotEmpty() }
             .forEach(::cacheCanonicalOwnFiles)
         composeRule.onAllNodesWithText("Parent message").assertCountEquals(rows.size)
         composeRule.onNodeWithText("Custom sent text").assertExists()
