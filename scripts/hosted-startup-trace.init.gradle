@@ -1,0 +1,22 @@
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
+
+abstract class StartupTraceExecution {
+    @Inject
+    abstract ExecOperations getExecOperations()
+}
+
+// Opt-in only: start after compilation dependencies, before the connected test task.
+gradle.projectsEvaluated {
+    def selected = gradle.rootProject.findProject(':app')
+    def execution = selected.objects.newInstance(StartupTraceExecution)
+    def workspace = gradle.rootProject.projectDir
+    selected.tasks.named('connectedDevZapstoreDebugAndroidTest').configure {
+        doFirst {
+            execution.execOperations.exec { spec ->
+                spec.commandLine 'python3', 'scripts/hosted-startup-trace.py', 'start'
+                spec.workingDir(workspace)
+            }
+        }
+    }
+}

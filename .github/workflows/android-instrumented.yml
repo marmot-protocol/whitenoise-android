@@ -39,6 +39,11 @@ on:
         required: false
         type: boolean
         default: false
+      media_startup_trace:
+        description: Trace only the fixed image baseline on hosted API 30
+        required: false
+        type: boolean
+        default: false
       media_sandbox_api:
         description: Android API for focused decoder compatibility
         required: false
@@ -210,8 +215,8 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
-  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.media_startup_trace && 'android-media-startup-trace' || github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.media_startup_trace)) }}
 
 permissions:
   contents: read
@@ -242,7 +247,7 @@ jobs:
 
   attachment-fixture:
     needs: changes
-    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only))
+    if: ${{ !inputs.media_startup_trace && needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) }}
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -298,7 +303,7 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only)
+    if: needs.changes.outputs.connected == 'true' && (inputs.media_startup_trace || github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only)
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -307,6 +312,10 @@ jobs:
       RELEASE_VERIFY_REPORT_DIR: app/build/reports/outbound-share-contract
 
     steps:
+      - name: Reject incompatible startup trace inputs
+        if: inputs.media_startup_trace && (github.event_name != 'workflow_dispatch' || !inputs.media_sandbox_only || inputs.media_sandbox_api != '30' || inputs.maestro_pilot || inputs.responsiveness_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.review_demo_e2e || inputs.document_provider_matrix)
+        run: exit 2
+
       - name: Reject incompatible MDK acceptance inputs
         if: inputs.mdk_adoption_only && (inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix)
         run: |
@@ -414,7 +423,7 @@ jobs:
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}" "${{ inputs.outbound_share_only }}" "${{ inputs.mdk_adoption_only }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}" "${{ inputs.outbound_share_only }}" "${{ inputs.mdk_adoption_only }}" "${{ inputs.media_startup_trace }}" "${{ inputs.media_sandbox_api }}"
 
       - name: Upload instrumented test reports
         if: always()
@@ -429,6 +438,7 @@ jobs:
             cryptoBenchmark/build/outputs/androidTest-results/
             app/build/reports/document-provider-matrix/
             app/build/reports/outbound-share-contract/
+            app/build/reports/media-startup-trace/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -466,7 +476,7 @@ jobs:
 
   maestro-pilot:
     name: Optional Maestro onboarding pilot
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !startsWith(inputs.maestro_suite, 'runtime-')
+    if: ${{ !inputs.media_startup_trace && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !startsWith(inputs.maestro_suite, 'runtime-') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -578,7 +588,7 @@ jobs:
 
   maestro-runtime-build:
     name: Build isolated Maestro fixture pair
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && startsWith(inputs.maestro_suite, 'runtime-')
+    if: ${{ !inputs.media_startup_trace && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && startsWith(inputs.maestro_suite, 'runtime-') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -634,6 +644,7 @@ jobs:
           retention-days: 7
 
   maestro-runtime:
+    if: ${{ !inputs.media_startup_trace }}
     name: Maestro generated accounts (${{ matrix.slice }} ${{ matrix.partition }}/${{ matrix.partitions }})
     needs: maestro-runtime-build
     runs-on: ubuntu-latest
@@ -770,7 +781,7 @@ jobs:
 
   maestro-runtime-summary:
     name: Reconcile every selected Maestro runtime case
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && startsWith(inputs.maestro_suite, 'runtime-')
+    if: ${{ !inputs.media_startup_trace && always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && startsWith(inputs.maestro_suite, 'runtime-') }}
     needs: [maestro-runtime-build, maestro-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 5

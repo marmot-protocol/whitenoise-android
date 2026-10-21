@@ -10,6 +10,16 @@ responsiveness_only="${4:-false}"
 media_sandbox_only="${5:-false}"
 outbound_share_only="${6:-false}"
 mdk_adoption_only="${7:-false}"
+media_startup_trace="${8:-false}"
+media_startup_api="${9:-30}"
+
+if [[ "$media_startup_trace" == "true" ]]; then
+  if [[ "$event_name" != "workflow_dispatch" || "$media_sandbox_only" != "true" || "$media_startup_api" != "30" || "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$outbound_share_only" == "true" || "$mdk_adoption_only" == "true" ]]; then
+    echo "Startup tracing requires the exclusive hosted API 30 media dispatch" >&2
+    exit 2
+  fi
+  exec python3 scripts/hosted-startup-trace.py run
+fi
 
 if [[ "$event_name" == "workflow_dispatch" && "$mdk_adoption_only" == "true" ]]; then
   if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$media_sandbox_only" == "true" || "$outbound_share_only" == "true" ]]; then

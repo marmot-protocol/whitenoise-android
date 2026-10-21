@@ -87,7 +87,7 @@ class InstrumentedArtifactRetentionTest(unittest.TestCase):
         commands = textwrap.dedent(block.split('        run: |\n', 1)[1]).strip().splitlines()
         self.assertEqual(commands, [
             'python3 -m unittest scripts/test_run_android_instrumented_dispatch.py '
-            'scripts/test_instrumented_artifact_retention.py',
+            'scripts/test_hosted_startup_trace.py scripts/test_instrumented_artifact_retention.py',
             'python3 -m unittest scripts/test_outbound_share_visibility.py',
             'python3 -m unittest scripts/test_select_android_cmdline_tools.py',
             'python3 -m unittest scripts/test_check_instrumented_required_cases.py',
