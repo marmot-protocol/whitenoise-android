@@ -72,6 +72,25 @@ class QualificationEvidenceTest(unittest.TestCase):
                 faults.event(events, 'published-before-legacy-delete', facts)
             self.assertEqual(facts['events'], [])
 
+    def test_fault_volume_follows_the_legacy_sender_not_account_sort_order(self):
+        """The first account can be the already-file-backed receiver and must never own the write barrier."""
+        root = '/data/user/0/' + faults.APP + '/files'
+        paths = [root + '/Marmot/a-receiver/session.sqlite', root + '/Marmot/z-sender/session.sqlite']
+        self.assertEqual(faults.legacy_media_root(paths, root, {'sender': 'z-sender'}),
+                         root + '/Marmot/z-sender/media')
+        for receipt in ({}, {'sender': 'missing'}, {'sender': None}):
+            with self.subTest(receipt=receipt), self.assertRaises(RuntimeError):
+                faults.legacy_media_root(paths, root, receipt)
+
+    def test_hook_timeout_is_a_recordable_failure_not_an_uncaught_queue_error(self):
+        """A missing write barrier must fail upgrade while allowing independent recovery cases to run."""
+        events = queue.Queue()
+        facts = {'events': []}
+        with patch.object(events, 'get', side_effect=queue.Empty):
+            with self.assertRaisesRegex(RuntimeError, 'timed out waiting for admitted-media-write-blocked'):
+                faults.event(events, 'admitted-media-write-blocked', facts)
+        self.assertEqual(facts['events'], [])
+
 
 class QualificationPackageTest(unittest.TestCase):
     """AGP test manifests can omit versions, while app update identity must remain strict."""

@@ -37,6 +37,17 @@ def wait_until(probe, timeout=120):
     raise RuntimeError('Native fault barrier timed out')
 
 
+def legacy_media_root(paths, root, receipt):
+    """Target the baseline sender's legacy upload body; the receiver is already file-backed on master."""
+    sender = receipt.get('sender')
+    if len(paths) != 2 or any(not path.startswith(root + '/Marmot/') for path in paths):
+        raise RuntimeError('Expected only the two synthetic account databases')
+    accounts = [Path(path).parent for path in paths if Path(path).parent.name == sender]
+    if not isinstance(sender, str) or len(accounts) != 1:
+        raise RuntimeError('Could not identify the synthetic sender media directory')
+    return str(accounts[0] / 'media')
+
+
 def run_faults(adb, instrument, stop, ports, reports, runner, test_class):
     """Keep faults before ordinary upgrade so its independent read/cold phases prove native recovery."""
     if os.environ.get('GITHUB_ACTIONS') != 'true' or adb('shell', 'getprop', 'ro.kernel.qemu').strip() != '1':
@@ -65,9 +76,8 @@ def run_faults(adb, instrument, stop, ports, reports, runner, test_class):
     device = frida.get_device_manager().add_remote_device('127.0.0.1:27042')
     root = f'/data/user/0/{APP}/files'
     paths = adb('shell', 'find', root + '/Marmot', '-name', 'session.sqlite').splitlines()
-    if len(paths) != 2 or any(not path.startswith(root + '/Marmot/') for path in paths):
-        raise RuntimeError('Expected only the two synthetic account databases')
-    media = str(Path(sorted(paths)[0]).parent / 'media')
+    receipt = json.loads(adb('shell', 'run-as', APP, 'cat', 'files/upgrade-fixture.json'))
+    media = legacy_media_root(paths, root, receipt)
     adb('shell', 'run-as', APP, 'mkdir', '-p', media)
     uid = adb('shell', 'stat', '-c', '%u', media).strip()
     label = adb('shell', 'ls', '-Zd', media).split()[0]
@@ -164,7 +174,10 @@ def run_one(mode, device, adb, instrument, stop, ports, reports, runner, test_cl
 
 def event(events, expected, facts):
     """Record only fixed hook metadata; never expose paths, SQL, account identities or native arguments."""
-    message = events.get(timeout=120)
+    try:
+        message = events.get(timeout=120)
+    except queue.Empty as error:
+        raise RuntimeError(f'Native hook timed out waiting for {expected}') from error
     if message.get('type') != 'send' or message.get('payload', {}).get('event') != expected:
         raise RuntimeError(f'Native hook did not report {expected}: {message.get("type")}')
     payload = message['payload']
