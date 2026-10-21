@@ -72,7 +72,7 @@ class MarmotUpgradeFixtureTest {
                     if (phase == "seed") {
                         seed(runtime, relay, requireNotNull(arguments.getString("blobPort")), receipt)
                     } else if (phase in setOf("corrupt", "lost")) {
-                        recoverDamagedMedia(runtime, receipt)
+                        recoverDamagedMedia(runtime, root, receipt)
                     } else {
                         verify(runtime, receipt, phase)
                         verifyUpgradeStorage(
@@ -239,6 +239,7 @@ class MarmotUpgradeFixtureTest {
     /** A damaged local body must never return unauthenticated bytes; only explicit native acquisition restores it. */
     private suspend fun recoverDamagedMedia(
         runtime: Marmot,
+        root: File,
         receipt: File,
     ) {
         val value = JSONObject(receipt.readText())
@@ -248,12 +249,18 @@ class MarmotUpgradeFixtureTest {
         val reference = runtime.attachmentLocalAssets(account, group, listOf(target)).single().reference
         if (reference != null) {
             val read = runCatching { runtime.readAttachmentAsset(account, reference, 0uL, READ_SIZE.toUInt()) }
-            check(read.isFailure) { "Damaged local file returned bytes without an explicit download" }
+            check(read.isFailure || read.getOrNull()?.let { !it.available && it.bytes.isEmpty() } == true) {
+                "Damaged local file returned bytes without an explicit download"
+            }
         }
-        runtime.requestExplicitAttachment(account, group, target)
+        requireNotNull(runtime.downloadAttachmentAgain(account, group, target)) {
+            "Native Retry did not admit the unavailable receiver attachment"
+        }
         withTimeout(120_000L) {
             while (runCatching { verifyRetained(runtime, value) }.isFailure) delay(250L)
         }
+        awaitUpgradeMediaCleanup(root, receipt)
+        verifyRetained(runtime, value)
         verifyHistory(runtime, value)
     }
 

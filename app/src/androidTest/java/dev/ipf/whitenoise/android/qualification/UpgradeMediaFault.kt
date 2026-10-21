@@ -16,9 +16,7 @@ internal fun damageUpgradeMedia(
 ) {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     check(context.packageName == "dev.ipf.whitenoise.android.mdkqualification")
-    val receiver = JSONObject(receipt.readText()).getString("receiver")
-    val account = root.walkTopDown().single { it.isDirectory && it.name == receiver }
-    val body = File(account, "media").walkTopDown().single { it.isFile && it.name.matches(Regex("[0-9a-f]{32}")) }
+    val body = upgradeReceiverMediaBodies(root, receipt).single()
     check(body.length() > 16 * 1024 * 1024)
     if (phase == "lost") {
         check(body.delete()) { "Could not remove the isolated synthetic media body" }
@@ -32,6 +30,39 @@ internal fun damageUpgradeMedia(
             it.writeByte(original xor 1)
             it.fd.sync()
         }
+    }
+}
+
+/** Identifies only the disposable receiver's native body files; account labels and paths stay off reports. */
+private fun upgradeReceiverMediaBodies(
+    root: File,
+    receipt: File,
+): List<File> {
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    check(context.packageName == "dev.ipf.whitenoise.android.mdkqualification")
+    val receiver = JSONObject(receipt.readText()).getString("receiver")
+    val account = root.walkTopDown().single { it.isDirectory && it.name == receiver }
+    return File(account, "media").walkTopDown().filter { it.isFile && it.name.matches(Regex("[0-9a-f]{32}")) }.toList()
+}
+
+/** Lets MDK unlink a replaced corrupt orphan before the next fault selects the sole recovered receiver body. */
+internal suspend fun awaitUpgradeMediaCleanup(
+    root: File,
+    receipt: File,
+) {
+    try {
+        withTimeout(120_000L) {
+            while (upgradeReceiverMediaBodies(root, receipt).size != 1) delay(250L)
+        }
+    } finally {
+        val report =
+            JSONObject()
+                .put("stage", "native-receiver-cleanup")
+                .put("bodyCount", upgradeReceiverMediaBodies(root, receipt).size)
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply { putString("qualification_media", report.toString()) },
+        )
     }
 }
 

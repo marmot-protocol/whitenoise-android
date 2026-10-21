@@ -149,6 +149,14 @@ must fail with errno 28, and native state must pause with the legacy body retain
 The fixture then removes only its filler, unmounts that disposable volume, and
 lets MDK recover. Corrupted and removed synthetic receiver files must never return
 unauthenticated plaintext; explicit native acquisition must restore exact bytes.
+The damaged-body fixture follows Android's deliberate Retry path,
+`downloadAttachmentAgain`, because initial `requestExplicitAttachment` demand
+does not reset an already-completed acquisition. A failed read or an explicit
+unavailable result with empty bytes is valid rejection; any returned plaintext
+fails qualification. Both accounts' full plaintext and history are checked after
+recovery. MDK remains running until its own sweep removes a replaced orphan,
+then plaintext is checked again before the next fault selects the sole receiver
+body. The fixture never deletes that orphan or repairs native records itself.
 Pending-upload observations retain native send disposition, confirmation/history
 presence and local-reference availability separately; a returned message ID alone
 does not prove publication. A promotion failure keeps the campaign failed but
