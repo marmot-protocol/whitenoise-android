@@ -907,9 +907,16 @@ jobs:
           arch: x86_64
           ram-size: 4096M
           disk-size: 8G
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot-save -no-window -gpu software -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: python3 scripts/qualify_signed_preview.py
+      - name: Retain preview host diagnostics
+        if: always()
+        run: |
+          mkdir -p build/mdk-signed-preview
+          free -m > build/mdk-signed-preview/host-memory.txt || true
+          ps -eo pid,comm,rss --sort=-rss > build/mdk-signed-preview/host-processes.txt || true
+          sudo dmesg --ctime | tail -n 200 > build/mdk-signed-preview/host-kernel.txt || true
       - name: Retain signed preview qualification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

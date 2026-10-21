@@ -36,7 +36,8 @@ internal suspend fun reportUpgradePending(
         try {
             val entries = page.entries.filter { it.messageIdHex == message }
             report.put("historyEntries", page.entries.size).put("historyMatches", entries.size)
-            val target = entries.singleOrNull()?.let { AttachmentLocalTargetFfi(it.messageIdHex, it.sourceMessageIdHex, 0u) }
+            val target =
+                entries.singleOrNull()?.let { AttachmentLocalTargetFfi(it.messageIdHex, it.sourceMessageIdHex, 0u) }
             report.put(
                 "localReferenceAvailable",
                 target?.let { runtime.attachmentLocalAssets(account, group, listOf(it)).single().reference != null }

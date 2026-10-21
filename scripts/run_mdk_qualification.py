@@ -130,6 +130,34 @@ def disable_background_entries():
             raise RuntimeError(f'Fixture background component {component} was not disabled')
 
 
+def verify_fixture_transports(servers, phase):
+    """Require both device-to-host mappings so a lost adb transport cannot masquerade as a native failure."""
+    expected = {f'tcp:{server.server_address[1]}' for server in servers}
+    observed = {tuple(line.split()[-2:]) for line in adb('reverse', '--list').splitlines()}
+    available = sorted(port for port in expected if (port, port) in observed)
+    (REPORTS / f'{phase}-fixture-transports.json').write_text(
+        json.dumps({'expected': sorted(expected), 'available': available}, indent=2) + '\n')
+    if set(available) != expected:
+        raise RuntimeError(f'{phase}: fixture relay/blob reverse transport unavailable')
+
+
+def start_fixture_services(servers, started_servers):
+    """Restart adbd as root before creating any fixture mapping; root transitions discard reverse listeners."""
+    root_response = adb('root').strip()
+    adb('wait-for-device')
+    uid = adb('shell', 'id', '-u').strip()
+    (REPORTS / 'fixture-root.json').write_text(
+        json.dumps({'response': root_response, 'uid': uid}, indent=2) + '\n')
+    if uid != '0':
+        raise RuntimeError('Rootable disposable emulator required before fixture setup')
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        started_servers.append(server)
+        port = server.server_address[1]
+        adb('reverse', '--no-rebind', f'tcp:{port}', f'tcp:{port}')
+    verify_fixture_transports(servers, 'initial')
+
+
 def usable_chat(name):
     """Observe production MainActivity after real bootstrap, then open retained synthetic conversation history."""
     print(f'{name}: opening retained conversation through MainActivity', flush=True)
@@ -212,12 +240,14 @@ def main():
              'api': adb('shell', 'getprop', 'ro.build.version.sdk').strip(),
              'abi': adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
              'package': APP, 'exact_signed_preview_qualified': False, 'phases': {}}
-    for server in (relay, blob):
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        port = server.server_address[1]
-        adb('reverse', '--no-rebind', f'tcp:{port}', f'tcp:{port}')
     ports = ('-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port))
+    started_servers = []
     try:
+        try:
+            start_fixture_services((relay, blob), started_servers)
+        except (RuntimeError, subprocess.SubprocessError) as error:
+            facts['phases']['fixture_setup'] = type(error).__name__ + ': ' + str(error)
+            raise
         try:
             install('baseline')
             instrument('baseline-seed', UPGRADE, {'retainedAccountHistoryAndMedia'},
@@ -234,6 +264,7 @@ def main():
             install('candidate')
             from run_mdk_faults import run_faults
             run_faults(adb, instrument, stop, ports, REPORTS, RUNNER, UPGRADE)
+            verify_fixture_transports((relay, blob), 'after-native-faults')
             facts['phases']['kernel_enospc'] = 'passed'
             facts['phases']['pre_delete_crash'] = 'passed'
             instrument('upgrade-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
@@ -271,7 +302,9 @@ def main():
         if any(value != 'passed' for value in facts['phases'].values()):
             retain_device_health()
         for server in (relay, blob):
-            server.shutdown()
+            # BaseServer.shutdown waits forever if serve_forever never started.
+            if server in started_servers:
+                server.shutdown()
             server.server_close()
     required = {'baseline', 'upgrade', 'cold_restart', 'pending_promotion', 'promoted_cold_restart',
                 'recovery_refuse', 'recovery_ignore', 'kernel_enospc', 'pre_delete_crash',

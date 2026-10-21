@@ -157,6 +157,13 @@ restart. No re-send, replacement download or persistence repair satisfies the
 pending-upload assertion. These remain proposed assertions until a linked hosted
 run passes.
 
+The disposable emulator becomes root before its relay/blob reverse ports are
+created. Fault injection requires that existing root state and never restarts
+`adbd`; transport mappings are verified initially and after native faults.
+Restarting `adbd` after mapping setup discards the listeners and prevents both
+send confirmation and explicit blob recovery, which cannot qualify native
+promotion or damaged-file recovery.
+
 The trusted baseline was obtained from the genuine temporary PR3371 head whose
 application/build tree is master `b3b66afefb7459e9ae9206c85c3a85627345cf2c`.
 The baseline and final candidate are signed by the unchanged trusted default-branch
@@ -178,6 +185,14 @@ check. Relay recovery cannot substitute for retained local history. Neither a
 re-signed APK nor the debug instrumentation pair can substitute for these exact signed bytes. Only after these
 hosted smokes may the selected Pixel 9a receive the isolated candidate for its
 separate device check; its existing production/dev packages remain untouched.
+
+The signed-preview lane uses the supported `software` rendering mode described
+in [Android's emulator guide](https://developer.android.com/studio/run/emulator-acceleration).
+Repeated emulator loss with preceding color-buffer errors occurred before the
+candidate upgrade on the former `swiftshader_indirect` configuration. Host
+memory, process RSS and kernel diagnostics are retained to distinguish resource
+termination from renderer failures; a renderer change alone is not qualification
+evidence. These diagnostics contain no process arguments or emulator memory dumps.
 
 ## Retention
 

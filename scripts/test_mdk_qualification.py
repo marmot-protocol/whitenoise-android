@@ -30,6 +30,58 @@ class QualificationEvidenceTest(unittest.TestCase):
             with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', return_value=output):
                 campaign.instrument('fixture', campaign.UPGRADE, expected)
 
+    def test_fixture_transports_survive_the_root_transition_and_detect_a_later_restart(self):
+        """Model adbd dropping every reverse listener on restart; both fixture services must remain reachable."""
+        servers = [Mock(server_address=('127.0.0.1', port)) for port in (12345, 12346)]
+        mappings = set()
+
+        def device(*args):
+            """Expose only root identity and daemon-owned reverse mappings, clearing listeners when adbd restarts."""
+            if args == ('root',):
+                mappings.clear()
+                return 'restarting adbd as root\n'
+            elif args == ('shell', 'id', '-u'):
+                return '0\n'
+            elif args[:2] == ('reverse', '--no-rebind'):
+                mappings.add((args[2], args[3]))
+            elif args == ('reverse', '--list'):
+                return '\n'.join('(reverse) ' + ' '.join(pair) for pair in mappings)
+            return ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', side_effect=device), \
+                    patch.object(campaign.threading, 'Thread') as thread:
+                started_servers = []
+                campaign.start_fixture_services(servers, started_servers)
+                self.assertEqual(mappings, {('tcp:12345', 'tcp:12345'), ('tcp:12346', 'tcp:12346')})
+                self.assertEqual(started_servers, servers)
+                root = json.loads((Path(directory) / 'fixture-root.json').read_text())
+                self.assertEqual(root, {'response': 'restarting adbd as root', 'uid': '0'})
+                self.assertEqual(thread.return_value.start.call_count, 2)
+                device('root')
+                with self.assertRaisesRegex(RuntimeError, 'reverse transport unavailable'):
+                    campaign.verify_fixture_transports(servers, 'after-native-faults')
+            observation = json.loads((Path(directory) / 'after-native-faults-fixture-transports.json').read_text())
+            self.assertEqual(observation['available'], [])
+
+    def test_fixture_transports_reject_wrong_destination_and_missing_root(self):
+        """A same-named port aimed at the wrong host service cannot pass, nor may setup continue without root."""
+        servers = [Mock(server_address=('127.0.0.1', port)) for port in (12345, 12346)]
+        wrong = 'emulator-5554 tcp:12345 tcp:9999\nemulator-5554 tcp:12346 tcp:12346\n'
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', return_value=wrong):
+                with self.assertRaisesRegex(RuntimeError, 'reverse transport unavailable'):
+                    campaign.verify_fixture_transports(servers, 'initial')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', return_value='2000\n'), \
+                    patch.object(campaign.threading, 'Thread') as thread:
+                started_servers = []
+                with self.assertRaisesRegex(RuntimeError, 'Rootable disposable emulator required'):
+                    campaign.start_fixture_services(servers, started_servers)
+                thread.assert_not_called()
+                self.assertEqual(started_servers, [])
+
     def test_pending_upload_failure_stays_failed_while_original_media_recovery_runs(self):
         """Independent receiver-file checks must not hide a failed sender promotion or require it to pass."""
         facts = {'phases': {'cold_restart': 'passed'}}

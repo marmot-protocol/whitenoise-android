@@ -57,10 +57,8 @@ def run_faults(adb, instrument, stop, ports, reports, runner, test_class):
     if frida.__version__ != '17.5.1':
         raise RuntimeError('Unreviewed fault injector version')
     stop()
-    adb('root')
-    adb('wait-for-device')
     if adb('shell', 'id', '-u').strip() != '0':
-        raise RuntimeError('Rootable disposable emulator required')
+        raise RuntimeError('Emulator must be rooted before creating fixture relay/blob transports')
     adb('push', str(Path(os.environ['RUNNER_TEMP']) / 'mdk-frida-server'), '/data/local/tmp/mdk-frida-server')
     adb('shell', 'chmod', '700', '/data/local/tmp/mdk-frida-server')
     # Direct PID attachment needs no Android spawning helpers. Default preload injects zygote/system_server.
