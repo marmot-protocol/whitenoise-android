@@ -59,6 +59,6 @@ confirm the requested backend actually ran; fallback does not test this hypothes
 The previous `software` comparison selected Lavapipe on emulator 37.2.12 and is
 not this controlled comparison. See the official [renderer definitions](https://developer.android.com/studio/run/emulator-acceleration#command-gpu).
 Bounded mapping metadata distinguishes file, anonymous and special mappings,
-retaining only the exact known `swiftshader_jit` label and no arbitrary bracket
-label. Anonymous mapping offsets are not presented as file offsets. This remains
+retaining only the exact known `swiftshader_jit` anonymous/memfd label and no
+arbitrary anonymous labels. Missing labels remain inconclusive. Anonymous mapping offsets are not presented as file offsets. This remains
 diagnostic-only even if it passes; normal qualification without GDB is still required.

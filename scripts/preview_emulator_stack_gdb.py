@@ -19,14 +19,16 @@ def mapped_frame(pid, pc):
                 continue
             path = fields[5].strip() if len(fields) == 6 else ''
             offset = int(fields[2], 16)
-            facts = {'module': Path(path).name if path.startswith('/') else None,
-                     'kind': 'file' if path.startswith('/') else
-                             'anonymous' if not path or path.startswith('[anon:') else 'special',
+            anonymous = not path or path.startswith(('[anon:', '/memfd:'))
+            file_backed = path.startswith('/') and not anonymous
+            known_jit = path in {'[anon:swiftshader_jit]', '/memfd:swiftshader_jit (deleted)'}
+            facts = {'module': Path(path).name if file_backed else None,
+                     'kind': 'file' if file_backed else 'anonymous' if anonymous else 'special',
                      'mapping_start': hex(start), 'mapping_file_offset': hex(offset),
                      'mapping_offset': hex(pc - start),
-                     'file_offset': hex(pc - start + offset) if path.startswith('/') else None,
+                     'file_offset': hex(pc - start + offset) if file_backed else None,
                      'permissions': fields[1],
-                     'known_anonymous_label': 'swiftshader_jit' if path == '[anon:swiftshader_jit]' else None}
+                     'known_anonymous_label': 'swiftshader_jit' if known_jit else None}
             # Hash only the verified SDK executable, never anonymous mappings or fixture files.
             executable = Path(f'/proc/{pid}/exe').resolve(strict=True)
             if path == str(executable):
