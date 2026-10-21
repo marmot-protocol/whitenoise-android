@@ -19,7 +19,7 @@ REPOSITORY_ID = 1249490895
 ACTOR_ID = 222291538
 AUTH_CONTEXT = 'Android merge authorization'
 CI_CONTEXT = 'Compile, test, ktlint, detekt, Android lint'
-POLICY_VERSION = 2
+POLICY_VERSION = 1
 MAX_ENTRIES = 5
 SHA = re.compile(r'[a-f0-9]{40}')
 DIGEST = re.compile(r'[a-f0-9]{64}')
@@ -64,24 +64,10 @@ class Identity:
             if (not SHA.fullmatch(self.integration) or not isinstance(self.entry_id, str)
                     or not self.entry_id or self.integration in {self.source, self.base}):
                 raise Held('invalid-integration')
-        elif self.entry_id is not None:
-            raise Held('partial-integration')
+        elif self.entry_id is not None and (
+                not isinstance(self.entry_id, str) or not self.entry_id):
+            raise Held('invalid-entry')
         return self
-
-
-@dataclass(frozen=True)
-class WaitingIdentity(Identity):
-    """Exact server membership without inventing an integration commit."""
-    def validate(self):
-        Identity(self.number,self.pull_request_id,self.source,self.base).validate()
-        if self.integration is not None or not isinstance(self.entry_id,str) or not self.entry_id:raise Held('waiting-entry-invalid')
-        return self
-
-
-def identity_from_payload(payload):
-    value=payload['identity']
-    cls=WaitingIdentity if payload['kind']=='dequeue' and value.get('integration') is None and value.get('entry_id') is not None else Identity
-    return cls(**value).validate()
 
 
 @dataclass(frozen=True)
@@ -90,7 +76,6 @@ class Effect:
     identity: Identity
     proof_sha256: str
     generation: int = 0
-    queue_guard: str = ""
 
     def payload(self):
         self.identity.validate()
@@ -102,9 +87,9 @@ class Effect:
             raise Held('unsupported-effect')
         if self.kind in {'authorize-integration', 'revoke-integration'} and self.identity.integration is None:
             raise Held('missing-integration')
-        if self.kind in {'authorize-source', 'enqueue'} and self.identity.integration is not None:
+        if self.kind in {'authorize-source', 'enqueue'} and (
+                self.identity.integration is not None or self.identity.entry_id is not None):
             raise Held('unexpected-integration')
-        if not DIGEST.fullmatch(self.queue_guard): raise Held('queue-guard-required')
         return {'schema': POLICY_VERSION, 'repo': REPO, **asdict(self)}
 
     def key(self):
@@ -121,98 +106,117 @@ def serial_configuration(configuration):
 
 
 def validate_snapshot(snapshot):
-    if (not isinstance(snapshot,dict) or snapshot.get('repo')!=REPO
-            or snapshot.get('repository_id')!=REPOSITORY_ID or snapshot.get('actor_id')!=ACTOR_ID
-            or snapshot.get('protection_verified') is not True or snapshot.get('prerequisites_verified') is not True
+    """Validate complete ordered inventory, including unmapped waiting entries."""
+    if (not isinstance(snapshot, dict) or snapshot.get('repo') != REPO
+            or snapshot.get('repository_id') != REPOSITORY_ID
+            or snapshot.get('actor_id') != ACTOR_ID
+            or snapshot.get('protection_verified') is not True
+            or snapshot.get('prerequisites_verified') is not True
             or not serial_configuration(snapshot.get('configuration'))
-            or not SHA.fullmatch(str(snapshot.get('master','')))
-            or not DIGEST.fullmatch(str(snapshot.get('rules_sha256','')))
+            or not SHA.fullmatch(str(snapshot.get('master', '')))
+            or not DIGEST.fullmatch(str(snapshot.get('rules_sha256', '')))
             or snapshot.get('has_next_page') is not False
             or type(snapshot.get('total_count')) is not int
-            or not isinstance(snapshot.get('entries'),list)
-            or snapshot['total_count']!=len(snapshot['entries']) or not 0<=snapshot['total_count']<=MAX_ENTRIES):
+            or not isinstance(snapshot.get('entries'), list)
+            or snapshot['total_count'] != len(snapshot['entries'])
+            or not 0 <= snapshot['total_count'] <= MAX_ENTRIES):
         raise Held('queue-proof-held')
-    prs=set();ids=set();numbers=set()
-    for position,entry in enumerate(snapshot['entries'],1):
-        if (set(entry)!={'number','pull_request_id','source','base','integration','entry_id','position','jump','state'}
-                or type(entry['position']) is not int or entry['position']!=position or entry['jump'] is not False
-                or entry['state'] not in {'QUEUED','AWAITING_CHECKS','MERGEABLE'}
-                or type(entry['number']) is not int or not 0<entry['number']<2**31
-                or not isinstance(entry['pull_request_id'],str) or not entry['pull_request_id']
-                or not isinstance(entry['entry_id'],str) or not entry['entry_id']
-                or not SHA.fullmatch(str(entry['source']))
-                or any(entry[k] is not None and not SHA.fullmatch(str(entry[k])) for k in ('base','integration'))
-                or (entry['integration'] is not None and entry['base'] is None)
-                or (entry['integration'] is not None and entry['integration'] in (entry['source'],entry['base']))
-                or entry['pull_request_id'] in prs or entry['entry_id'] in ids or entry['number'] in numbers):
+    numbers, nodes, entries = set(), set(), set()
+    for position, entry in enumerate(snapshot['entries'], 1):
+        if (not isinstance(entry, dict)
+                or type(entry.get('position')) is not int
+                or entry['position'] != position
+                or entry.get('jump') is not False
+                or entry.get('state') not in {'QUEUED', 'AWAITING_CHECKS', 'MERGEABLE'}
+                or type(entry.get('number')) is not int
+                or not 0 < entry['number'] < 2**31
+                or not isinstance(entry.get('pull_request_id'), str)
+                or not entry['pull_request_id']
+                or not isinstance(entry.get('entry_id'), str) or not entry['entry_id']
+                or not SHA.fullmatch(str(entry.get('source', '')))
+                or any(entry.get(k) is not None and not SHA.fullmatch(str(entry[k]))
+                       for k in ('base', 'integration'))
+                or (entry.get('integration') is not None and entry.get('base') is None)
+                or (entry.get('integration') is not None
+                    and entry['integration'] in {entry['source'], entry['base']})
+                or entry['number'] in numbers or entry['pull_request_id'] in nodes
+                or entry['entry_id'] in entries):
             raise Held('queue-entry-held')
-        prs.add(entry['pull_request_id']);ids.add(entry['entry_id']);numbers.add(entry['number'])
+        numbers.add(entry['number'])
+        nodes.add(entry['pull_request_id'])
+        entries.add(entry['entry_id'])
     return snapshot
 
 
-def queue_fingerprint(snapshot):
+def entry_identity(snapshot, entry=None):
+    """Return integration identity only for a mapped current front."""
+    if entry is None:
+        validate_snapshot(snapshot)
+        entry = snapshot['entries'][0] if snapshot['entries'] else None
+    if (entry is None or entry['position'] != 1
+            or entry.get('base') is None or entry.get('integration') is None):
+        return None
+    if entry['base'] != snapshot['master']:
+        raise Held('queue-entry-held')
+    return Identity(entry['number'], entry['pull_request_id'], entry['source'],
+                    entry['base'], entry['integration'], entry['entry_id']).validate()
+
+
+def plan(snapshot, candidate, verify_source, verify_integration):
+    """Evidence verifiers return immutable digests, never bare approval flags.
+
+    The source verifier checks source review, signatures, applicable CI,
+    discussion and required feature evidence. Source admission evidence and
+    native queue rules remain separate from integration authorization. The
+    integration verifier additionally binds exact entry/H/B/G, current discussion,
+    reviewed compatibility, actual G tree mapping and successful current G CI.
+    These are trusted local adapters, not data supplied by a PR or workflow.
+    """
     validate_snapshot(snapshot)
-    return digest({k:snapshot[k] for k in ('repo','repository_id','actor_id','master','configuration','entries','rules_sha256')})
-
-
-def entry_for_pr(snapshot,number):
-    validate_snapshot(snapshot)
-    return next((e for e in snapshot['entries'] if e['number']==number),None)
-
-
-def entry_identity(snapshot):
-    """Only the explicit target at the mapped current front has integration credit."""
-    validate_snapshot(snapshot)
-    target=snapshot.get('candidate')
-    if not target: return None
-    entry=entry_for_pr(snapshot,target['number'])
-    if entry is None or entry['position']!=1 or entry['base'] is None or entry['integration'] is None:return None
-    if entry['base']!=snapshot['master']:raise Held('front-base-changed')
-    if (entry['pull_request_id'],entry['source'])!=(target['pull_request_id'],target['source']):raise Held('target-source-changed')
-    return Identity(**{k:entry[k] for k in ('number','pull_request_id','source','base','integration','entry_id')}).validate()
-
-
-def plan(snapshot,candidate,verify_source,verify_integration):
-    validate_snapshot(snapshot)
-    if candidate is None:return None
+    generation = snapshot.get('generation', 0)
+    if candidate is None:
+        return None
     candidate.validate()
-    if candidate.integration is not None or snapshot.get('candidate')!=asdict(candidate):raise Held('candidate-changed')
-    guard=queue_fingerprint(snapshot);generation=snapshot.get('generation',0)
-    target=entry_for_pr(snapshot,candidate.number)
-    if target is not None:
-        if (target['pull_request_id'],target['source'])!=(candidate.pull_request_id,candidate.source):raise Held('target-source-changed')
-        if target['position']!=1:return None
-        identity=entry_identity(snapshot)
-        if identity is None:return None
-        proof=verify_integration(identity,snapshot)
-        if not isinstance(proof,str) or not DIGEST.fullmatch(proof):raise Held('integration-evidence-held')
-        return Effect('authorize-integration',identity,proof,generation,guard)
-    if len(snapshot['entries'])>=MAX_ENTRIES:raise Held('queue-capacity-held')
-    if candidate.base!=snapshot['master']:raise Held('candidate-changed')
-    proof=verify_source(candidate,snapshot)
-    if not isinstance(proof,str) or not DIGEST.fullmatch(proof):raise Held('source-evidence-held')
-    expected=Effect('authorize-source',candidate,proof,generation,guard)
-    authorized=snapshot.get('source_authorization')
+    if (candidate.integration is not None or candidate.entry_id is not None
+            or snapshot.get('candidate') != asdict(candidate)):
+        raise Held('candidate-changed')
+    entry = next((item for item in snapshot['entries']
+                  if item['number'] == candidate.number), None)
+    if entry is not None:
+        if (entry['pull_request_id'], entry['source']) != (candidate.pull_request_id, candidate.source):
+            raise Held('candidate-changed')
+        identity = entry_identity(snapshot, entry)
+        if identity is None:
+            return None
+        proof = verify_integration(identity, snapshot)
+        if not isinstance(proof, str) or not DIGEST.fullmatch(proof):
+            raise Held('integration-evidence-held')
+        return Effect('authorize-integration', identity, proof, generation)
+    if len(snapshot['entries']) >= MAX_ENTRIES:
+        raise Held('queue-capacity-held')
+    if candidate.base != snapshot['master']:
+        raise Held('candidate-changed')
+    proof = verify_source(candidate, snapshot)
+    if not isinstance(proof, str) or not DIGEST.fullmatch(proof):
+        raise Held('source-evidence-held')
+    authorized = snapshot.get('source_authorization')
     if authorized is not None:
-        if (not isinstance(authorized,dict) or authorized.get('source')!=candidate.source
-                or authorized.get('creator_id')!=ACTOR_ID or authorized.get('state')!='success'
-                or not DIGEST.fullmatch(str(authorized.get('effect_key','')))):raise Held('source-authorization-changed')
-        if authorized['effect_key']==expected.key():return Effect('enqueue',candidate,proof,generation,guard)
-    return expected
+        expected = Effect('authorize-source', candidate, proof, generation)
+        if (not isinstance(authorized, dict) or authorized.get('source') != candidate.source
+                or authorized.get('creator_id') != ACTOR_ID
+                or authorized.get('state') != 'success'
+                or not DIGEST.fullmatch(str(authorized.get('effect_key', '')))):
+            raise Held('source-authorization-changed')
+        if authorized['effect_key'] == expected.key():
+            return Effect('enqueue', candidate, proof, generation)
+    return Effect('authorize-source', candidate, proof, generation)
 
 
 def validate_journal(journal):
     if (not isinstance(journal, dict) or journal.get('schema') != POLICY_VERSION
             or not isinstance(journal.get('effects'), dict)):
         raise Held('invalid-journal')
-    try:
-        from . import v1_policy
-    except ImportError:
-        import v1_policy
     for key, record in journal['effects'].items():
-        if record.get('payload',{}).get('schema')==1:
-            v1_policy.validate_journal({'schema':1,'effects':{key:record}})
-            continue
         if (not isinstance(record, dict) or record.get('state') not in
                 {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed',
                  'not-sent', 'not-sent-exhausted'}
@@ -240,8 +244,8 @@ def validate_journal(journal):
         if record.get('state')=='retired-closed' and (not DIGEST.fullmatch(str(record.get('terminal_proof_sha256',''))) or not isinstance(record.get('retired_by'),dict) or record.get('terminal_unmerged') is not True):
             raise Held('retired-terminal-proof-required')
         payload = record['payload']
-        identity = identity_from_payload(payload)
-        rebuilt = Effect(payload['kind'], identity, payload['proof_sha256'], payload['generation'],payload['queue_guard'])
+        identity = Identity(**payload['identity'])
+        rebuilt = Effect(payload['kind'], identity, payload['proof_sha256'], payload['generation'])
         if rebuilt.payload() != payload:
             raise Held('invalid-journal-payload')
     return journal
@@ -282,6 +286,23 @@ def exhaustion_unresolved(journal, record):
         for newer in journal['effects'].values())
 
 
+def refused_selection_result(journal, effect):
+    """A known refusal holds its PR until a reviewed newer admission generation."""
+    if effect is None:
+        return None
+    for record in journal['effects'].values():
+        previous = record['payload']
+        if (record['state'] == 'refused'
+                and previous['identity']['number'] == effect.identity.number
+                and previous['identity']['pull_request_id'] == effect.identity.pull_request_id
+                and previous['generation'] >= effect.generation
+                and (effect.kind not in {'revoke-integration', 'dequeue'}
+                     or (previous['kind'] == effect.kind
+                         and previous['identity'] == asdict(effect.identity)))):
+            return 'known-refusal-held'
+    return None
+
+
 def exhausted_selection_result(journal, effect):
     """An exhausted selection cannot silently become another PR or proof key."""
     # Cleanup bypasses admission holds, not its own exhausted retry budget.
@@ -300,9 +321,10 @@ def exhausted_selection_result(journal, effect):
             continue
         previous = record['payload']
         identity = previous['identity']
-        if (effect is None or effect.identity.number != identity['number']
-                or effect.identity.pull_request_id != identity['pull_request_id']
-                or effect.generation <= previous['generation']):
+        if (effect is not None
+                and effect.identity.number == identity['number']
+                and effect.identity.pull_request_id == identity['pull_request_id']
+                and effect.generation <= previous['generation']):
             return 'not-sent-exhausted-held'
     return None
 
@@ -326,11 +348,13 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
                 record['state'] = 'confirmed'
                 persist()
         return 'reconciled' if all(r['state'] == 'confirmed' for _, r in uncertain) else 'unknown-held'
-    if any(r['state']=='refused' for r in journal['effects'].values()):return 'known-refusal-held'
     if not lease_held():
         return 'lease-held'
-    first = validate_snapshot(observe())
+    first = observe()
     effect = plan(first, candidate, verify_source, verify_integration)
+    held = refused_selection_result(journal, effect)
+    if held:
+        return held
     held = exhausted_selection_result(journal, effect)
     if held:
         return held
@@ -344,9 +368,10 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
         return 'shadow-eligible'
     # A second full fresh read and proof verification must agree. Unknown reads
     # raise before intent persistence; no mutation is attempted on uncertainty.
-    second = validate_snapshot(observe())
+    second = observe()
     current = plan(second, candidate, verify_source, verify_integration)
-    if current != effect or not lease_held():
+    if (current != effect or first['rules_sha256'] != second['rules_sha256']
+            or not lease_held()):
         return 'identity-changed'
     return execute(journal, effect, write, readback, persist)
 
@@ -357,6 +382,9 @@ def execute(journal, effect, write, readback, persist):
     key = effect.key()
     if any(r['state'] in UNCERTAIN for r in journal['effects'].values()):
         return 'unknown-held'
+    held = refused_selection_result(journal, effect)
+    if held:
+        return held
     held = exhausted_selection_result(journal, effect)
     if held:
         return held
