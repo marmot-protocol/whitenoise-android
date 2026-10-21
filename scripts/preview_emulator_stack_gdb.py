@@ -35,13 +35,18 @@ def collect():
     try:
         for command in ('set pagination off', 'set confirm off', 'set print frame-arguments none',
                         'set print entry-values no', 'set print thread-events off',
-                        'handle SIGPIPE nostop noprint pass', 'handle SIGSEGV stop print pass',
+                        'handle SIGPIPE nostop noprint pass', 'handle SIGUSR1 nostop noprint pass',
+                        'handle SIGUSR2 nostop noprint pass', 'handle SIGSEGV stop print pass',
                         'handle SIGBUS stop print pass', 'handle SIGABRT stop print pass'):
             gdb.execute(command, to_string=True)
         gdb.execute(f'attach {pid}', to_string=True)
         gdb.events.stop.connect(on_stop)
         gdb.events.cont.connect(on_continue)
-        gdb.execute('continue', to_string=True)
+        while gdb.selected_inferior().pid:
+            stopped.clear()
+            gdb.execute('continue', to_string=True)
+            if stopped.get('signal') in {'SIGSEGV', 'SIGBUS', 'SIGABRT', 'SIGINT'}:
+                break
         signum = stopped.get('signal')
         facts['signal'] = signum
         facts['observed_at'] = datetime.now(timezone.utc).isoformat()
@@ -52,7 +57,7 @@ def collect():
                 if frame is None:
                     break
                 pc = frame.pc()
-                module = gdb.solib_name(pc) or gdb.current_progspace().filename
+                module = gdb.solib_name(pc)
                 facts['frames'].append({'function': (frame.name() or '<unknown>')[:256],
                                         'pc': hex(pc), 'module': Path(module).name if module else None})
                 frame = frame.older()

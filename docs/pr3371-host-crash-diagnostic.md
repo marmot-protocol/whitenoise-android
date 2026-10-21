@@ -15,6 +15,11 @@ signal stop, retain at most 24 explicit faulting-thread function names, PCs and
 module basenames. No arguments, locals, register dumps, core files, raw Crashpad
 databases or target memory are retained.
 
+Routine SIGUSR1/SIGUSR2 signals pass through without ending observation. Other
+nonfatal stops resume until a fatal-type signal or debugger cleanup. Unknown
+module ownership stays null; it is never guessed to belong to QEMU. Hosted
+controls include SIGUSR1 before SIGSEGV and progress after debugger cleanup.
+
 The original stopped thread receives its pending signal when GDB detaches. A
 signal stop is not termination evidence: the unchanged parent process observer's
 `Popen.wait()` result remains authoritative. Hosted synthetic child tests prove
