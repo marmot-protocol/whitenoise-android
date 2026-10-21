@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
@@ -120,6 +119,7 @@ import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
@@ -2594,7 +2594,7 @@ internal fun MessageBubble(
                         // text and leaving a gap on the right (#428). Non-reply
                         // bubbles keep the wrap-content path untouched, so only
                         // reply-bubble measurement changes.
-                        contentModifier = if (replyPreview != null) Modifier.width(IntrinsicSize.Max) else Modifier,
+                        contentModifier = if (replyPreview != null) Modifier.boundedIntrinsicWidth(IntrinsicSize.Max) else Modifier,
                     ) {
                         senderNameLabel(true)
                         replyPreviewCard(true)

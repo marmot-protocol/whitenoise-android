@@ -156,6 +156,14 @@
           "MSG-004",
           "CON-005"
         ]
+      },
+      {
+        "surface": "Bounded Compose measurement and preview safety",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "boundedIntrinsicWidth(",
+        "test_ids": [
+          "MSG-006"
+        ]
       }
     ],
     "message_rendering_contracts": [

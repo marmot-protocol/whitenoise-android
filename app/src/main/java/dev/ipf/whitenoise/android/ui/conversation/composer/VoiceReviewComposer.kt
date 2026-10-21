@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +38,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.AudioWaveformExtractor
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.conversation.media.VoiceWaveform
 import dev.ipf.whitenoise.android.ui.conversation.media.formatVoiceTime
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -205,7 +205,7 @@ internal fun VoiceReviewComposerContent(
                     formatVoiceTime((durationMs - positionMs).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()),
                     // Hug the digits: an LTR run inside an RTL row is otherwise laid out across the whole
                     // remaining width to be aligned, which reads as visual overflow at large type.
-                    modifier = Modifier.padding(horizontal = 12.dp).width(IntrinsicSize.Max),
+                    modifier = Modifier.padding(horizontal = 12.dp).boundedIntrinsicWidth(IntrinsicSize.Max),
                     maxLines = 1,
                     softWrap = false,
                     style =
