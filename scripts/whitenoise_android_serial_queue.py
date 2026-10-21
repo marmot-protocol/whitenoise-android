@@ -162,6 +162,18 @@ def entry_identity(snapshot, entry=None):
                     entry['base'], entry['integration'], entry['entry_id']).validate()
 
 
+def generation_for(snapshot, identity):
+    """Bind a positive recovery generation to the PR receiving the effect."""
+    generation = snapshot.get('generation', 0)
+    if type(generation) is not int or generation < 0:
+        raise Held('generation-held')
+    if generation > 0:
+        number = snapshot.get('generation_number')
+        if type(number) is not int or number <= 0 or number != identity.number:
+            raise Held('generation-held')
+    return generation
+
+
 def plan(snapshot, candidate, verify_source, verify_integration, *, target_number=None):
     """Evidence verifiers return immutable digests, never bare approval flags.
 
@@ -173,7 +185,6 @@ def plan(snapshot, candidate, verify_source, verify_integration, *, target_numbe
     These are trusted local adapters, not data supplied by a PR or workflow.
     """
     validate_snapshot(snapshot)
-    generation = snapshot.get('generation', 0)
     if target_number is not None:
         if (type(target_number) is not int or target_number <= 0
                 or candidate is None or candidate.number != target_number):
@@ -187,6 +198,7 @@ def plan(snapshot, candidate, verify_source, verify_integration, *, target_numbe
         if (target_number is not None
                 and (front.pull_request_id, front.source) != (candidate.pull_request_id, candidate.source)):
             raise Held('candidate-changed')
+        generation = generation_for(snapshot, front)
         proof = verify_integration(front, snapshot)
         if not isinstance(proof, str) or not DIGEST.fullmatch(proof):
             raise Held('integration-evidence-held')
@@ -207,6 +219,7 @@ def plan(snapshot, candidate, verify_source, verify_integration, *, target_numbe
         raise Held('queue-capacity-held')
     if candidate.base != snapshot['master']:
         raise Held('candidate-changed')
+    generation = generation_for(snapshot, candidate)
     proof = verify_source(candidate, snapshot)
     if not isinstance(proof, str) or not DIGEST.fullmatch(proof):
         raise Held('source-evidence-held')

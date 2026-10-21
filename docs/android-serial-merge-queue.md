@@ -36,13 +36,15 @@ input.
 The policy accepts a complete, ordered inventory of up to five entries. Waiting
 entries await their integration mapping. Integration authorization is reserved
 for a mapped current front. Duplicate entries, incomplete
-inventories, reordered positions and a sixth entry hold admission.
+inventories, reordered positions and a sixth entry hold all planning, including
+front authorization.
 
 The journal format and effect keys remain unchanged. Queue membership and entry
 state are validated afresh for each action. A follower joining or leaving, or a
 front state transition, retains the existing effect key and retry counts for an
-unchanged identity, proof and admission generation. Effective
-protection rules are checked on both reads before a new effect is attempted.
+unchanged identity, proof and admission generation. The policy detects a rules
+digest changing between its two reads. Trusted adapters verify that the rules
+match the reviewed configuration before supplying the snapshot.
 
 There are two separate authorization transitions:
 
@@ -82,6 +84,11 @@ A host caller holding one admitted PR’s lease can pass `target_number` to
 `plan()` or `tick()`; it must match the source candidate. This scopes work to
 that PR while validating the complete queue, so admitting a peer cannot borrow
 the front’s integration proof or lease.
+
+A positive `generation` requires an exact positive integer `generation_number`
+matching the PR receiving the effect. Trusted adapters bind this pair to that
+PR’s owner-qualified recovery grant; another PR’s bump cannot change its key or
+release its holds. Generation zero remains valid for legacy unbound snapshots.
 
 Uncertain sent effects remain a global read-only reconciliation hold.
 A positive local receipt that no

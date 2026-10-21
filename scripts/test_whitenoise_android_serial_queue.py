@@ -143,6 +143,84 @@ class QueueTest(unittest.TestCase):
                          'authorize-source-confirmed')
         self.assertEqual(self.journal['effects'][effect.key()]['not_sent_attempts'], 3)
 
+    def test_generation_binding_does_not_release_another_pr_hold(self):
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        for state in ('refused', 'not-sent-exhausted'):
+            with self.subTest(state=state):
+                held = q.Effect('authorize-source', other, 'c' * 64)
+                record = {'payload': held.payload(), 'state': state}
+                if state == 'not-sent-exhausted':
+                    record.update(not_sent_attempts=3, not_sent_budget=3,
+                                  response_sha256='e' * 64, retry_after=0)
+                self.journal = {'schema': 1, 'effects': {held.key(): record}}
+                original = copy.deepcopy(self.journal)
+                self.snapshot.update(generation=1, generation_number=10,
+                                     candidate=asdict(other))
+                with self.assertRaisesRegex(q.Held, 'generation-held'):
+                    self.tick(candidate=other,
+                              verify_source=lambda *_: self.fail('borrowed generation proof'))
+                self.assertEqual(self.journal, original)
+                self.snapshot['generation'] = 0
+                expected = 'known-refusal-held' if state == 'refused' else 'not-sent-exhausted-held'
+                self.assertEqual(self.tick(candidate=other), expected)
+                self.assertEqual(self.journal, original)
+        self.assertFalse(self.writes)
+
+    def test_named_recovery_releases_its_pr_without_releasing_peer(self):
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        for state in ('refused', 'not-sent-exhausted'):
+            with self.subTest(state=state):
+                effects = [q.Effect('authorize-source', identity, 'c' * 64)
+                           for identity in (self.identity, other)]
+                records = {}
+                for effect in effects:
+                    record = {'payload': effect.payload(), 'state': state}
+                    if state == 'not-sent-exhausted':
+                        record.update(not_sent_attempts=3, not_sent_budget=3,
+                                      response_sha256='e' * 64, retry_after=0)
+                    records[effect.key()] = record
+                self.journal = {'schema': 1, 'effects': records}
+                original = copy.deepcopy(self.journal)
+                self.snapshot.update(generation=1, generation_number=10,
+                                     candidate=asdict(self.identity))
+                self.assertEqual(self.tick(target_number=10), 'authorize-source-confirmed')
+                for key, record in original['effects'].items():
+                    self.assertEqual(self.journal['effects'][key], record)
+                self.snapshot.update(generation=0, candidate=asdict(other))
+                expected = 'known-refusal-held' if state == 'refused' else 'not-sent-exhausted-held'
+                self.assertEqual(self.tick(candidate=other, target_number=11), expected)
+                self.assertEqual(self.journal['effects'][effects[1].key()],
+                                 original['effects'][effects[1].key()])
+        self.assertEqual(len(self.writes), 2)
+
+    def test_foreign_generation_cannot_reauthorize_default_front(self):
+        self.queued()
+        self.integration = lambda *_: 'e' * 64
+        self.assertEqual(self.tick(), 'authorize-integration-confirmed')
+        original = copy.deepcopy(self.journal)
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        self.snapshot.update(generation=1, generation_number=11,
+                             candidate=asdict(other))
+        for candidate in (None, other):
+            with self.subTest(candidate=candidate), self.assertRaisesRegex(q.Held, 'generation-held'):
+                self.tick(candidate=candidate,
+                          verify_integration=lambda *_: self.fail('borrowed generation proof'))
+        self.assertEqual(self.journal, original)
+        self.assertEqual(len(self.writes), 1)
+
+    def test_positive_generation_requires_exact_positive_pr_binding(self):
+        self.snapshot['generation'] = 1
+        for number in (None, True, False, 0, -1, '10', 11):
+            self.snapshot['generation_number'] = number
+            with self.subTest(number=number), self.assertRaisesRegex(q.Held, 'generation-held'):
+                self.tick(verify_source=lambda *_: self.fail('unbound generation proof'))
+        for generation in (True, False, -1, '1'):
+            self.snapshot.update(generation=generation, generation_number=10)
+            with self.subTest(generation=generation), self.assertRaisesRegex(q.Held, 'generation-held'):
+                self.tick(verify_source=lambda *_: self.fail('invalid generation proof'))
+        self.assertFalse(self.writes)
+        self.assertFalse(self.journal['effects'])
+
     def test_source_authorization_is_a_separate_effect_before_enqueue(self):
         self.assertEqual(self.tick(), 'authorize-source-confirmed')
         source_effect = self.writes[0][0]
@@ -411,6 +489,7 @@ class QueueTest(unittest.TestCase):
         self.exhaust_never_sent_budget()
         old_key = next(iter(self.journal['effects']))
         self.snapshot['generation'] = 1
+        self.snapshot['generation_number'] = self.snapshot['candidate']['number']
         with self.assertRaises(q.Held):
             self.tick(verify_source=lambda *_: None)
         self.assertFalse(self.writes)
@@ -424,6 +503,7 @@ class QueueTest(unittest.TestCase):
     def test_generation_change_does_not_release_unknown_sent_effect(self):
         self.assertEqual(self.tick(readback=lambda *_: False), 'unknown-held')
         self.snapshot['generation'] = 1
+        self.snapshot['generation_number'] = self.snapshot['candidate']['number']
         self.assertEqual(self.tick(readback=lambda *_: False), 'unknown-held')
         self.assertEqual(len(self.writes), 1)
 
@@ -433,6 +513,7 @@ class QueueTest(unittest.TestCase):
         other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
         self.snapshot['candidate'] = asdict(other)
         self.snapshot['generation'] = 1
+        self.snapshot['generation_number'] = self.snapshot['candidate']['number']
         self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
         effect = q.Effect('enqueue', other, 'c' * 64, 1)
         self.assertEqual(q.execute(self.journal, effect, self.write,
@@ -447,9 +528,11 @@ class QueueTest(unittest.TestCase):
         self.exhaust_never_sent_budget()
         old_key = next(iter(self.journal['effects']))
         self.snapshot['generation'] = 1
+        self.snapshot['generation_number'] = self.snapshot['candidate']['number']
         self.assertEqual(self.tick(), 'authorize-source-confirmed')
         other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
         self.snapshot['candidate'] = asdict(other)
+        self.snapshot['generation'] = 0
         self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
         self.assertEqual(self.journal['effects'][old_key]['state'], 'not-sent-exhausted')
         self.assertEqual(len(self.writes), 2)
@@ -457,10 +540,12 @@ class QueueTest(unittest.TestCase):
     def test_never_sent_recovery_keeps_own_history_and_allows_other_pr(self):
         self.exhaust_never_sent_budget()
         self.snapshot['generation'] = 1
+        self.snapshot['generation_number'] = self.snapshot['candidate']['number']
         self.assertEqual(self.tick(write=lambda *_: (_ for _ in ()).throw(q.NotSent('e' * 64))),
                          'not-sent-backoff')
         other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
         self.snapshot['candidate'] = asdict(other)
+        self.snapshot['generation'] = 0
         self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
         self.assertEqual(len(self.writes), 1)
 
@@ -663,6 +748,7 @@ class QueueTest(unittest.TestCase):
             'source':self.identity.source,'creator_id':q.ACTOR_ID,'state':'success'}
         self.tick()
         self.snapshot['generation'] = 1
+        self.snapshot['generation_number'] = self.snapshot['candidate']['number']
         self.assertEqual(self.tick(),'authorize-source-confirmed')
         new = self.writes[-1][0]
         self.assertNotEqual(first.key(),new.key())
@@ -752,6 +838,7 @@ class QueueTest(unittest.TestCase):
                                   self.readback, self.save), 'known-refusal-held')
         self.snapshot['candidate'] = asdict(self.identity)
         self.snapshot['generation'] = 1
+        self.snapshot['generation_number'] = self.snapshot['candidate']['number']
         self.assertEqual(self.tick(), 'authorize-source-confirmed')
         for key, record in prior['effects'].items():
             self.assertEqual(self.journal['effects'][key], record)
