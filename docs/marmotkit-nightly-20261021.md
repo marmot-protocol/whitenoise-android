@@ -207,6 +207,19 @@ Emulator version, requested options, allowlisted guest graphics properties, host
 memory, process RSS and kernel diagnostics are retained. These diagnostics contain
 no process arguments or emulator memory dumps.
 
+The first explicit-renderer run passed the baseline and displayed upgraded
+history, then lost the emulator during composer focus. It did not qualify the
+upgrade or cold restart. A separate diagnostic command, `emulator -version`,
+also failed because its graphical launcher required an unavailable audio library.
+Version evidence now reads only `Pkg.Revision` from the installed SDK metadata.
+A hosted-Linux-only observer wraps the same SDK launcher in place and preserves
+its bytes, directory, arguments and inherited environment. It records child exit
+status or signal, timestamps, peak child RSS and available cgroup OOM counters,
+and distinguishes exit before driver completion from normal action teardown.
+Kernel core dumps are disabled; raw crash databases and memory are never uploaded.
+The observer never restarts a dead emulator or changes a qualification assertion.
+The renderer, image and resource allocation stay fixed while this diagnosis runs.
+
 ## Retention
 
 This nightly can become eligible for deletion around **20 November 2026** (30

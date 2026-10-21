@@ -6,12 +6,15 @@ import json
 import unittest
 import queue
 import subprocess
+import sys
+import signal
 import zipfile
 from unittest.mock import Mock, patch
 
 from scripts import run_mdk_qualification as campaign
 from scripts import run_mdk_faults as faults
 from scripts import qualify_signed_preview as preview
+from scripts import observe_preview_emulator as observer
 from scripts.verify_mdk_qualification_pair import APP, fixture_certificate, package_identity
 
 
@@ -505,6 +508,62 @@ class QualificationUiTest(unittest.TestCase):
                     tap.assert_called_once()
                     self.assertEqual(tap.call_args.args[0].get('enabled'), 'true')
                     self.assertTrue((Path(directory) / 'baseline-demo-ready.xml').exists())
+
+
+class EmulatorProcessEvidenceTest(unittest.TestCase):
+    """Actual short-lived host children prove that failed and signalled emulator exits cannot become success."""
+
+    def test_child_exit_and_signal_are_retained_without_arguments(self):
+        """Keep status, signal and teardown order while omitting command arguments and process memory."""
+        for command, expected, signum in [
+            ([sys.executable, '-c', 'pass'], 0, None),
+            ([sys.executable, '-c', 'raise SystemExit(17)'], 17, None),
+            ([sys.executable, '-c', 'import os,signal; os.kill(os.getpid(),signal.SIGTERM)'],
+             128 + signal.SIGTERM, 'SIGTERM'),
+        ]:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as directory:
+                reports = Path(directory)
+                if expected == 0:
+                    (reports / 'driver-finished.json').write_text('{}\n')
+                self.assertEqual(observer.observe(command, reports), expected)
+                result = json.loads((reports / 'emulator-process.json').read_text())
+                self.assertEqual(result['signal'], signum)
+                self.assertEqual(result['returncode'], -signal.SIGTERM if signum else expected)
+                self.assertEqual(result['driver_finished_before_exit'], expected == 0)
+                self.assertGreater(result['pid'], 0)
+                self.assertNotIn('command', result)
+                self.assertNotIn('argv', result)
+
+    def test_sdk_hook_preserves_arguments_and_refuses_double_install(self):
+        """A fixture launcher in a path with spaces receives arguments verbatim and remains byte-identical."""
+        with tempfile.TemporaryDirectory(prefix='emulator observer ') as directory:
+            root = Path(directory)
+            sdk = root / 'sdk' / 'emulator'
+            sdk.mkdir(parents=True)
+            launcher = sdk / 'emulator'
+            original = '#!' + sys.executable + '\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n'
+            launcher.write_text(original)
+            launcher.chmod(0o755)
+            (sdk / 'source.properties').write_text('Pkg.Revision=37.2.12\nPrivate.Value=not-retained\n')
+            with patch.dict(observer.os.environ, {'GITHUB_ACTIONS': 'true', 'RUNNER_OS': 'Linux',
+                                                 'ANDROID_HOME': str(sdk.parent),
+                                                 'PREVIEW_EMULATOR_OPTIONS': '-no-window -gpu swiftshader'}), \
+                    patch.object(observer, 'REPORTS', root / 'reports'):
+                observer.install()
+                self.assertEqual((sdk / 'emulator.observed-original').read_text(), original)
+                arguments = ['--avd', 'fixture with spaces', 'literal;value', '$not-expanded']
+                output = subprocess.check_output([str(launcher), *arguments], text=True, timeout=15)
+                self.assertEqual(json.loads(output), arguments)
+                self.assertEqual((root / 'reports/emulator-version.txt').read_text(), '37.2.12\n')
+                self.assertNotIn('Private.Value', (root / 'reports/emulator-version.txt').read_text())
+                with self.assertRaisesRegex(RuntimeError, 'unmodified'):
+                    observer.install()
+
+    def test_personal_machine_cannot_install_observer(self):
+        """SDK changes fail before reading paths when the hosted Linux identity is absent."""
+        with patch.dict(observer.os.environ, {'GITHUB_ACTIONS': 'false', 'RUNNER_OS': 'Linux'}):
+            with self.assertRaisesRegex(RuntimeError, 'Hosted Linux'):
+                observer.install()
 
 
 if __name__ == '__main__':

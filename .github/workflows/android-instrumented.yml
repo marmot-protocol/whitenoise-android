@@ -911,11 +911,8 @@ jobs:
           disk-size: 8G
           emulator-options: ${{ env.PREVIEW_EMULATOR_OPTIONS }}
           disable-animations: true
-          pre-emulator-launch-script: |
-            mkdir -p build/mdk-signed-preview
-            "$ANDROID_HOME/emulator/emulator" -version > build/mdk-signed-preview/emulator-version.txt 2>&1
-            printf '%s\n' "$PREVIEW_EMULATOR_OPTIONS" > build/mdk-signed-preview/emulator-options.txt
-          script: python3 scripts/qualify_signed_preview.py
+          pre-emulator-launch-script: python3 scripts/observe_preview_emulator.py install
+          script: python3 scripts/observe_preview_emulator.py driver
       - name: Retain preview host diagnostics
         if: always()
         run: |
