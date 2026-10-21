@@ -1133,4 +1133,3 @@ jobs:
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)
           ' > /dev/null
-      # QUEUE_CANARY_EVENT: temporary production fence; retain through held invalidation.
