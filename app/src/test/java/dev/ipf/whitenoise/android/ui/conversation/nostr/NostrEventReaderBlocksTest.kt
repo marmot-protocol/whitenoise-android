@@ -31,6 +31,17 @@ class NostrEventReaderBlocksTest {
         val content = "/".repeat(4200) + "filename"
         val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
         assertEquals(content, chunks.joinToString(""))
+        assertEquals(2, chunks.size)
+        assertTrue(chunks.all { it.isNotEmpty() && it.length <= 4096 })
+    }
+
+    /** Very long slash runs keep item count proportional to the text budget, rather than character count. */
+    @Test
+    fun largeSlashRunDoesNotAmplifyLazyItems() {
+        val content = "/".repeat(100_000) + "filename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals((content.length + 4095) / 4096, chunks.size)
         assertTrue(chunks.all { it.isNotEmpty() && it.length <= 4096 })
     }
 

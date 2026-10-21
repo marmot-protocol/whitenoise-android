@@ -38,7 +38,10 @@ internal fun nostrReaderTextChunks(
             if (boundary >= start + READER_TEXT_BUDGET / 2) end = boundary + 1
             if (Character.isLowSurrogate(text[end]) && Character.isHighSurrogate(text[end - 1])) end--
             if (keepSlashWithFollowingText) {
+                val boundedEnd = end
                 while (end > start + 1 && text[end - 1] == '/' && text[end] !in "\r\n") end--
+                // A run larger than one item cannot stay atomic; retain the budget instead of emitting singleton items.
+                if (end == start + 1 && text[start] == '/') end = boundedEnd
             }
         }
         chunks += text.substring(start, end)
