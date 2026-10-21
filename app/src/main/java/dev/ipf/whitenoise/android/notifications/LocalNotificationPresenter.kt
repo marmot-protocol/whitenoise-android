@@ -441,6 +441,8 @@ class LocalNotificationPresenter(
         key: NotificationDismissalKey,
         isEntryValid: (entryMessageIdHex: String?, shownAtMs: Long) -> Boolean,
     ): CardContentOutcome =
+        // This label groups dismiss/reconcile test barriers only. Ordering uses the same tag/id lock;
+        // a silent rewrite must not advance the dismissal generation of the entries it retains.
         ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
             val manager =
                 context.getSystemService(NotificationManager::class.java)

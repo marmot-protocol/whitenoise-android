@@ -122,6 +122,32 @@ class NotificationReactionRemovalRaceTest {
             }
         }
 
+    /** An unrelated chat's deletion strips only the opaque quote from a reaction already being prepared. */
+    @Test
+    fun deletionInAnotherChatStillPostsTheQueuedReactionWithoutItsQuote() =
+        runBlocking {
+            val fixture = fixture(CountDownLatch(0))
+            val probe = ReactionWriteProbe(lateCorrection = false)
+            try {
+                fixture.bootstrap()
+                ConversationCardPostSynchronizer.testHook = probe
+                fixture.emitUpdate(reaction(fixture.update))
+                awaitLatch(probe.queued)
+                fixture.appState.recordNotificationContentRemoval(
+                    RemovedNotificationMessage(ACCOUNT, "other-chat", TARGET),
+                )
+                probe.removalObserved.set(true)
+                probe.release.countDown()
+                awaitLatch(probe.written)
+                assertTrue("the reaction itself remains posted", activeReactionText().isNotEmpty())
+                assertFalse(activeReactionText().any { SECRET in it })
+                assertEquals(0, probe.quotedWritesAfterRemoval.get())
+            } finally {
+                probe.release.countDown()
+                fixture.close()
+            }
+        }
+
     /** Holds the exact final write, commits the removal, then proves no post-removal payload carries the quote. */
     private fun assertRace(
         localHide: Boolean,

@@ -706,26 +706,103 @@ class NotificationContentRetractionTest {
             }
         }
 
-    /** A stalled read-state read is bounded: the first write is withheld instead of waiting on it (#2065). */
+    /** A historical local hide alone does not suppress an unrelated new quote in a fresh app-state owner. */
     @Test
-    fun aStalledReadStateCheckIsBounded() =
+    fun aPersistedHideDoesNotPermanentlyDisableReactionQuotes() =
         runBlocking {
+            val preferences = context.getSharedPreferences("whitenoise", 0)
+            val key = requireNotNull(MessageHidePreferences.preferenceKey(ACCOUNT_REF, GROUP_ID))
+            val previous = MessageHidePreferences.readHiddenMessageIdsByKey(preferences, key)
             val fixture =
                 NotificationBootstrapTestFixture(
                     context = context,
                     groupIdHex = GROUP_ID,
                     messageIdHex = MESSAGE_ID,
-                    onChatListRow = { _, _ ->
-                        Thread.sleep(STALLED_READ_MS)
+                    emitStartupNotification = false,
+                )
+            try {
+                assertTrue(MessageHidePreferences.writeHiddenMessageIdsByKey(preferences, key, setOf(OLDER_ID)))
+                fixture.bootstrap()
+                assertTrue(OLDER_ID in fixture.appState.hiddenMessageIdsInGroup(ACCOUNT_REF, GROUP_ID))
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = "ef".repeat(32),
+                        notificationKey = "reaction:account-a",
+                        reactionEmoji = "👍",
+                        reactedToPreview = "valid new quote",
+                    ),
+                )
+                val reactionKey = LocalNotificationFormatter.reactionDismissalKey(ACCOUNT_REF, GROUP_ID)
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (
+                        manager().activeNotifications.none { it.tag == reactionKey.tag && it.id == reactionKey.id }
+                    ) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                val card = manager().activeNotifications.first { it.tag == reactionKey.tag && it.id == reactionKey.id }
+                assertTrue(card.notification.extras.toString().contains("valid new quote"))
+            } finally {
+                fixture.close()
+                assertTrue(MessageHidePreferences.writeHiddenMessageIdsByKey(preferences, key, previous))
+            }
+        }
+
+    /** A synchronous binding remains blocked after the gate has returned its two bounded awaits. */
+    @Test
+    fun aStalledReadStateCheckIsBounded() = assertStalledReadBound(checkNextConversation = false)
+
+    /** The real serial listener posts another chat's message while the first native read is still blocked. */
+    @Test
+    fun aSecondConversationPostsWhileTheFirstReadIsStalled() = assertStalledReadBound(checkNextConversation = true)
+
+    /** Holds the binding until all deadline and platform assertions finish, then always releases it for cleanup. */
+    private fun assertStalledReadBound(checkNextConversation: Boolean) =
+        runBlocking {
+            val entered = CountDownLatch(1)
+            val completed = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val nextGroup = "a1b2c3d4"
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                    onChatListRow = { _, group ->
+                        if (group == GROUP_ID) {
+                            entered.countDown()
+                            check(release.await(15, TimeUnit.SECONDS))
+                        }
                         null
+                    },
+                    notificationFirstPostTimingObserver = { event ->
+                        if (event.stage == NotificationFirstPostTimingStage.CandidateGateComplete) completed.countDown()
                     },
                 )
             try {
                 fixture.bootstrap()
-                fixture.awaitUpdateConsumed()
-
-                assertFalse("a stalled check must not post late", pumpFor(STALLED_READ_MS + NO_POST_WINDOW_MS))
+                val started = System.nanoTime()
+                fixture.emitUpdate(fixture.update)
+                awaitLatch(entered)
+                if (checkNextConversation) fixture.emitUpdate(fixture.update.copy(groupIdHex = nextGroup))
+                withTimeout(4_500L) { awaitLatch(completed) }
+                val elapsed = (System.nanoTime() - started) / 1_000_000
+                assertTrue("the first gate must finish near its 3s budget, actual=$elapsed", elapsed < 4_500L)
+                assertFalse(manager().activeNotifications.any { it.tag == cardKey.tag && it.id == cardKey.id })
+                if (checkNextConversation) {
+                    val nextKey = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT_REF, nextGroup)
+                    withTimeout(2_000L) {
+                        while (manager().activeNotifications.none { it.tag == nextKey.tag && it.id == nextKey.id }) {
+                            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                            delay(1L)
+                        }
+                    }
+                }
+                assertEquals("assertions run before releasing the binding", 1L, release.count)
             } finally {
+                release.countDown()
                 fixture.close()
             }
         }
@@ -946,7 +1023,6 @@ class NotificationContentRetractionTest {
         val OLDER_ID = "aa".repeat(32)
         val NEWER_ID = "cd".repeat(32)
         const val NO_POST_WINDOW_MS = 500L
-        const val STALLED_READ_MS = 4_000L
         const val PUMP_STEP_MS = 10L
         const val AWAIT_TIMEOUT_MS = 60_000L
     }

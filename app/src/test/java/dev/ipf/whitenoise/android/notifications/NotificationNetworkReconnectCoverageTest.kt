@@ -334,8 +334,8 @@ class NotificationNetworkReconnectCoverageTest {
             ).find(appState)?.groupValues?.get(1).orEmpty()
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
-            "isNotificationEnrichmentAllowed(update, firstPost)" in enrichment &&
-                "isNotificationEnrichmentAllowed(update, firstPost)" in latePost &&
+            "isNotificationEnrichmentAllowed(candidate, firstPost)" in enrichment &&
+                "isNotificationEnrichmentAllowed(candidate, firstPost)" in latePost &&
                 "isQueuedReactionQuoteCurrent(update, firstPost)" in capturedEnrichmentGate &&
                 "isNotificationEnrichmentAllowed(" in capturedEnrichmentGate &&
                 "firstPost.epoch" in capturedEnrichmentGate &&

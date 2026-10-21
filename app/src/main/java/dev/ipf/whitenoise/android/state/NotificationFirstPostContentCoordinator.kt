@@ -49,6 +49,7 @@ internal enum class NotificationFirstPostTimingStage {
     Received,
     EligibilityComplete,
     ContentComplete,
+    CandidateGateComplete,
     NotifyWritten,
 }
 

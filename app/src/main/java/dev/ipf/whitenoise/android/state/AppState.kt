@@ -1682,7 +1682,7 @@ class WhiteNoiseAppState private constructor(
         )
     private val notificationContentInvalidations =
         NotificationContentInvalidations(NOTIFICATION_CONTENT_INVALIDATION_CAPACITY)
-    private val notificationReconcileLocks = ConcurrentHashMap<String, Mutex>()
+    private val notificationReconcileLocks = Array(64) { Mutex() }
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
@@ -2714,6 +2714,7 @@ class WhiteNoiseAppState private constructor(
         )
     private val notificationScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val notificationCandidateReads = NotificationCandidateReadCoordinator(notificationScope, Dispatchers.IO)
     private val notificationFirstPostContentCoordinator =
         NotificationFirstPostContentCoordinator(notificationScope, notificationDispatcher, SystemClock::elapsedRealtime)
     private val notificationContentResolution by lazy {
@@ -12481,8 +12482,8 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Reads one candidate's state within [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS] per attempt, at most
-     * [NOTIFICATION_CANDIDATE_ATTEMPTS] times, so a stalled MDK read can never hold the first alert indefinitely.
+     * Bounds each await to [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS], at most [NOTIFICATION_CANDIDATE_ATTEMPTS]
+     * times. A synchronous binding may keep running; retries join it and its slot stays occupied until completion.
      */
     private suspend fun readNotificationCandidateStateWithinBudget(
         update: NotificationUpdateFfi,
@@ -12490,9 +12491,17 @@ class WhiteNoiseAppState private constructor(
     ): NotificationCandidateState {
         repeat(NOTIFICATION_CANDIDATE_ATTEMPTS) {
             runCatchingCancellable {
-                withTimeoutOrNull(NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS) {
-                    readNotificationCandidateState(update, messageIdHex)
-                }
+                notificationCandidateReads.read(
+                    key =
+                        NotificationCandidateReadKey(
+                            update.accountRef,
+                            update.groupIdHex.lowercase(),
+                            messageIdHex.lowercase(),
+                            notificationPostEpoch.capture(),
+                            profileCacheLifetime.capture(),
+                        ),
+                    timeoutMillis = NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS,
+                ) { readNotificationCandidateState(update, messageIdHex) }
             }.getOrNull()?.let { return it }
         }
         return NotificationCandidateState.Unknown
@@ -12571,16 +12580,18 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Serializes card reconciliation per account and conversation, so a deletion, a read change and a stream-open
-     * pass for the same conversation apply in order while other conversations proceed independently.
+     * pass for the same conversation apply in order. Fixed stripes bound memory; hash collisions may serialize
+     * unrelated conversations without losing mutual exclusion for existing waiters.
      */
     private suspend fun <T> withNotificationReconcileLock(
         accountRef: String,
         groupIdHex: String,
         block: suspend () -> T,
-    ): T =
-        notificationReconcileLocks
-            .computeIfAbsent("$accountRef\u0000${groupIdHex.lowercase()}") { Mutex() }
-            .withLock { block() }
+    ): T {
+        val key = "$accountRef\u0000${groupIdHex.lowercase()}"
+        val stripe = (key.hashCode() and Int.MAX_VALUE) % notificationReconcileLocks.size
+        return notificationReconcileLocks[stripe].withLock { block() }
+    }
 
     /**
      * Reconciles each conversation with an active card against MDK's bounded state (#3323, #2065), on every runtime
@@ -12781,33 +12792,33 @@ class WhiteNoiseAppState private constructor(
         content: NotificationFirstPostContent,
     ): Boolean {
         if (
-            !isNotificationEnrichmentAllowed(update, firstPost) ||
+            !isNotificationEnrichmentAllowed(withoutStaleQueuedReactionQuote(update, firstPost), firstPost) ||
             !firstPost.lateCorrectionPermit.acquire()
         ) {
             return false
         }
         var posted = false
         try {
-            if (isNotificationEnrichmentAllowed(update, firstPost)) {
-                posted =
-                    localNotificationPresenter.show(
-                        update = update,
-                        conversationTitleOverride = content.conversationTitle,
-                        senderNameOverride = content.senderName,
-                        previewTextOverride = content.previewText,
-                        reactedToPreviewOverride = content.reactedToPreview,
-                        mediaKind = content.mediaKind,
-                        recipientAccountSubtext = content.recipientAccountSubtext,
-                        directShareEligible = update.accountRef == activeAccountRef,
-                        conversationAvatarBitmap = firstPost.avatars.conversationBitmap(update.isDm),
-                        senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
-                        silentUpdate = true,
-                        replaceCurrentMessage = true,
-                        shortNpub = ::shortNpub,
-                        isPostStillAllowed = {
-                            isNotificationEnrichmentAllowed(update, firstPost)
-                        },
-                    )
+            posted = withVerifiedReactionQuote(update, firstPost) { candidate ->
+                if (!isNotificationEnrichmentAllowed(candidate, firstPost)) return@withVerifiedReactionQuote false
+                localNotificationPresenter.show(
+                    update = candidate,
+                    conversationTitleOverride = content.conversationTitle,
+                    senderNameOverride = content.senderName,
+                    previewTextOverride = content.previewText,
+                    reactedToPreviewOverride = verifiedReactionPreview(candidate, content.reactedToPreview),
+                    mediaKind = content.mediaKind,
+                    recipientAccountSubtext = content.recipientAccountSubtext,
+                    directShareEligible = candidate.accountRef == activeAccountRef,
+                    conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
+                    senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
+                    silentUpdate = true,
+                    replaceCurrentMessage = true,
+                    shortNpub = ::shortNpub,
+                    isPostStillAllowed = {
+                        isNotificationEnrichmentAllowed(candidate, firstPost)
+                    },
+                )
             }
         } finally {
             firstPost.lateCorrectionPermit.complete(posted)
@@ -12827,8 +12838,9 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         deferPicture: (LateNotificationIdentity) -> Unit,
-    ): NotificationLateCorrectionOutcome =
-        if (!isNotificationEnrichmentAllowed(update, firstPost)) {
+    ): NotificationLateCorrectionOutcome {
+        val candidate = withoutStaleQueuedReactionQuote(update, firstPost)
+        return if (!isNotificationEnrichmentAllowed(candidate, firstPost)) {
             NotificationLateCorrectionOutcome.Stale
         } else {
             // Always run the post-deadline resolver. Even a complete local first
@@ -12836,14 +12848,19 @@ class WhiteNoiseAppState private constructor(
             // start ordinary profile hydration after the first notify has returned.
             val content =
                 runCatchingCancellable {
-                    notificationContentResolution.firstPost.resolve(update, localOnly = false)
+                    notificationContentResolution.firstPost.resolve(candidate, localOnly = false)
                 }.getOrNull() ?: firstPost.content
             when {
                 content == null -> NotificationLateCorrectionOutcome.Failed
-                !isNotificationEnrichmentAllowed(update, firstPost) -> NotificationLateCorrectionOutcome.Stale
-                else -> enrichResolvedNotificationUpdate(update, firstPost, content, deferPicture)
+                !isNotificationEnrichmentAllowed(withoutStaleQueuedReactionQuote(candidate, firstPost), firstPost) ->
+                    NotificationLateCorrectionOutcome.Stale
+                else ->
+                    enrichResolvedNotificationUpdate(
+                        withoutStaleQueuedReactionQuote(candidate, firstPost), firstPost, content, deferPicture,
+                    )
             }
         }
+    }
 
     /** Routes a stable resolved presentation to its single permitted correction type. */
     private suspend fun enrichResolvedNotificationUpdate(
@@ -12856,7 +12873,7 @@ class WhiteNoiseAppState private constructor(
             notificationContentPresentation(
                 context = appContext,
                 update = update,
-                content = content,
+                content = content.copy(reactedToPreview = verifiedReactionPreview(update, content.reactedToPreview)),
                 shortNpub = ::shortNpub,
             )
         val outcome =
@@ -12951,14 +12968,28 @@ class WhiteNoiseAppState private constructor(
         firstPost: NotificationFirstPost,
         late: LateNotificationIdentity,
     ) {
-        if (!isNotificationEnrichmentAllowed(update, firstPost)) return
-        localNotificationPresenter.refreshLateIdentityImage(
-            update = update,
-            content = late.content,
-            pictures = late.sources,
-            directShareEligible = update.accountRef == activeAccountRef,
-            isRefreshCurrent = { isNotificationEnrichmentAllowed(update, firstPost) },
-        )
+        withVerifiedReactionQuote(update, firstPost) { candidate ->
+            if (!isNotificationEnrichmentAllowed(candidate, firstPost)) return@withVerifiedReactionQuote false
+            val content =
+                if (candidate == update) {
+                    late.content
+                } else {
+                    LocalNotificationFormatter.content(
+                        update = candidate,
+                        context = appContext,
+                        senderNameOverride = late.content.senderName,
+                        conversationTitleOverride = late.content.conversationTitle,
+                        shortNpub = ::cachedShortNpubOrUnknown,
+                    ) ?: return@withVerifiedReactionQuote false
+                }
+            localNotificationPresenter.refreshLateIdentityImage(
+                update = candidate,
+                content = content,
+                pictures = late.sources,
+                directShareEligible = candidate.accountRef == activeAccountRef,
+                isRefreshCurrent = { isNotificationEnrichmentAllowed(candidate, firstPost) },
+            )
+        }
     }
 
     /** Posts either the resolved first-draw value or the existing safe fallback. */
@@ -12971,7 +13002,16 @@ class WhiteNoiseAppState private constructor(
             "notification eligibility outcome=${if (firstPost.shouldPost) "post" else "skip"} " +
                 "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=${firstPost.engineMuted}"
         }
-        if (!firstPost.shouldPost || notificationCandidateGate(update, "post") != NotificationCandidateState.Unread) {
+        val gateStartedAt = SystemClock.elapsedRealtime()
+        val candidateState =
+            if (firstPost.shouldPost) notificationCandidateGate(update, "post") else NotificationCandidateState.Unknown
+        recordNotificationFirstPostTiming(
+            stage = NotificationFirstPostTimingStage.CandidateGateComplete,
+            receivedAtElapsedMs = receivedAtElapsedMs,
+            stageStartedAtElapsedMs = gateStartedAt,
+            outcome = candidateState.logValue,
+        )
+        if (!firstPost.shouldPost || candidateState != NotificationCandidateState.Unread) {
             PushWakeDiagnostics.event(PushWakeEvent.Suppressed)
             return false
         }
@@ -13004,31 +13044,33 @@ class WhiteNoiseAppState private constructor(
         redactContent: Boolean,
         onNotificationWritten: () -> Unit,
     ): Boolean =
-        localNotificationPresenter.show(
-            update = update,
-            conversationTitleOverride = firstPost.content?.conversationTitle,
-            senderNameOverride = firstPost.content?.senderName,
-            previewTextOverride = firstPost.content?.previewText,
-            reactedToPreviewOverride = firstPost.content?.reactedToPreview,
-            mediaKind = firstPost.content?.mediaKind ?: ReplyMediaKind.None,
-            recipientAccountSubtext = firstPost.content?.recipientAccountSubtext,
-            conversationAvatarBitmap = firstPost.avatars.conversationBitmap(update.isDm),
-            senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
-            redactContent = redactContent,
-            directShareEligible = !redactContent && update.accountRef == activeAccountRef,
-            shortNpub = ::cachedShortNpubOrUnknown,
-            onNotificationWritten = onNotificationWritten,
-            isPostStillAllowed = {
-                isQueuedReactionQuoteCurrent(update, firstPost) &&
-                    isNotificationGenerationPostAllowed(
-                        update = update,
-                        postEpoch = firstPost.epoch,
-                        accountCacheEpoch = firstPost.accountCacheEpoch,
-                        engineMuted = firstPost.engineMuted,
-                        requireUnlocked = !redactContent,
-                    )
-            },
-        )
+        withVerifiedReactionQuote(update, firstPost) { candidate ->
+            localNotificationPresenter.show(
+                update = candidate,
+                conversationTitleOverride = firstPost.content?.conversationTitle,
+                senderNameOverride = firstPost.content?.senderName,
+                previewTextOverride = firstPost.content?.previewText,
+                reactedToPreviewOverride = verifiedReactionPreview(candidate, firstPost.content?.reactedToPreview),
+                mediaKind = firstPost.content?.mediaKind ?: ReplyMediaKind.None,
+                recipientAccountSubtext = firstPost.content?.recipientAccountSubtext,
+                conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
+                senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
+                redactContent = redactContent,
+                directShareEligible = !redactContent && candidate.accountRef == activeAccountRef,
+                shortNpub = ::cachedShortNpubOrUnknown,
+                onNotificationWritten = onNotificationWritten,
+                isPostStillAllowed = {
+                    isQueuedReactionQuoteCurrent(candidate, firstPost) &&
+                        isNotificationGenerationPostAllowed(
+                            update = candidate,
+                            postEpoch = firstPost.epoch,
+                            accountCacheEpoch = firstPost.accountCacheEpoch,
+                            engineMuted = firstPost.engineMuted,
+                            requireUnlocked = !redactContent,
+                        )
+                },
+            )
+        }
 
     /** Retries a lock-raced initial write without carrying any decrypted content. */
     private suspend fun showRedactedNotificationUpdate(
@@ -13037,19 +13079,18 @@ class WhiteNoiseAppState private constructor(
         onNotificationWritten: () -> Unit,
     ): Boolean =
         localNotificationPresenter.show(
-            update = update,
+            update = update.copy(reactedToPreview = null),
             redactContent = true,
             shortNpub = ::cachedShortNpubOrUnknown,
             onNotificationWritten = onNotificationWritten,
             isPostStillAllowed = {
-                isQueuedReactionQuoteCurrent(update, firstPost) &&
-                    isNotificationGenerationPostAllowed(
-                        update = update,
-                        postEpoch = firstPost.epoch,
-                        accountCacheEpoch = firstPost.accountCacheEpoch,
-                        engineMuted = firstPost.engineMuted,
-                        requireUnlocked = false,
-                    )
+                isNotificationGenerationPostAllowed(
+                    update = update.copy(reactedToPreview = null),
+                    postEpoch = firstPost.epoch,
+                    accountCacheEpoch = firstPost.accountCacheEpoch,
+                    engineMuted = firstPost.engineMuted,
+                    requireUnlocked = false,
+                )
             },
         )
 
@@ -13092,7 +13133,7 @@ class WhiteNoiseAppState private constructor(
             if (!isNotificationCandidateStillUnread(update, "enrich")) return@launch
             var latePicture: LateNotificationIdentity? = null
             notificationEnrichmentGate.withPermit {
-                if (!isNotificationEnrichmentAllowed(update, firstPost)) {
+                if (!isNotificationEnrichmentAllowed(withoutStaleQueuedReactionQuote(update, firstPost), firstPost)) {
                     return@withPermit
                 }
                 val outcome = enrichPostedNotificationUpdate(update, firstPost) { latePicture = it }
@@ -13102,11 +13143,10 @@ class WhiteNoiseAppState private constructor(
                         "outcome=${outcome.timingValue}"
                 }
             }
-            // A late picture may wait for its download, so it runs outside the
-            // permit and never delays other messages' text corrections.
-            latePicture
-                ?.takeIf { isNotificationCandidateStillUnread(update, "picture") }
-                ?.let { refreshLateNotificationIdentity(update, firstPost, it) }
+            // Reuse this enrichment pass's candidate result for its picture work. Runtime events reconcile
+            // subsequent read/removal changes, and every picture write still checks the live generation fences.
+            // Picture downloads run outside the permit and never delay another message's text correction.
+            latePicture?.let { refreshLateNotificationIdentity(update, firstPost, it) }
         }
     }
 
@@ -13390,15 +13430,46 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Drops a reaction's quoted excerpt when its conversation holds a local hide or a retained removal (#3323).
-     * The update names no quoted target, so the excerpt cannot be verified. Newly received reactions still post
-     * without it; the final write fence rejects an older queued excerpt when a removal lands after this check.
+     * Drops an opaque quote after a removal observed in this process (#3323). Persisted hides alone do not
+     * permanently suppress all later quotes. Verifying a new target after restart/eviction awaits MDK #2366.
      */
-    private suspend fun withoutUnverifiableReactionQuote(update: NotificationUpdateFfi): NotificationUpdateFfi {
-        if (!LocalNotificationFormatter.isReaction(update) || update.reactedToPreview.isNullOrBlank()) return update
-        val hidden = withContext(Dispatchers.IO) { hiddenMessageIdsInGroup(update.accountRef, update.groupIdHex) }
+    private fun withoutUnverifiableReactionQuote(update: NotificationUpdateFfi): NotificationUpdateFfi {
         val removed = notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)
-        return if (hidden.isEmpty() && !removed) update else update.copy(reactedToPreview = null)
+        return if (LocalNotificationFormatter.isReaction(update) && removed) {
+            update.copy(reactedToPreview = null)
+        } else {
+            update
+        }
+    }
+
+    /** Resolved overrides must obey the same quote removal as the original typed update. */
+    private fun verifiedReactionPreview(
+        update: NotificationUpdateFfi,
+        preview: String?,
+    ): String? =
+        preview.takeUnless { LocalNotificationFormatter.isReaction(update) && update.reactedToPreview.isNullOrBlank() }
+
+    /** Drops only an unverified quote; unrelated removals must not discard the reaction itself. */
+    private fun withoutStaleQueuedReactionQuote(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+    ): NotificationUpdateFfi =
+        if (isQueuedReactionQuoteCurrent(update, firstPost)) {
+            withoutUnverifiableReactionQuote(update)
+        } else {
+            update.copy(reactedToPreview = null)
+        }
+
+    /** Retries once without its quote if a removal races the final write; every other fence is checked again. */
+    private suspend fun withVerifiedReactionQuote(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        post: suspend (NotificationUpdateFfi) -> Boolean,
+    ): Boolean {
+        val current = withoutStaleQueuedReactionQuote(update, firstPost)
+        if (post(current)) return true
+        val unquoted = withoutStaleQueuedReactionQuote(current, firstPost)
+        return unquoted != current && post(unquoted)
     }
 
     /** Exercises the exact typed-update production path from JVM or instrumentation acceptance tests. */
