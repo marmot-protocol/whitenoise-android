@@ -765,6 +765,27 @@ class LocalizationResourceTest {
         if (prompt.windowed(CLAUDE_HARNESS_README_URL.length).count { it == CLAUDE_HARNESS_README_URL } != 1) {
             violations += "missing single Claude harness README URL"
         }
+        val prerequisiteStart = prompt.indexOf("https://code.claude.com/docs/en/setup")
+        val phoneCheck = prompt.indexOf("wss://relay.eu.whitenoise.chat")
+        val prerequisiteApprovalPatterns =
+            listOf(
+                "ask for my approval before any host changes",
+                "bitte vor jeder Rechneränderung um meine Zustimmung",
+                "pide mi aprobación antes de cualquier cambio",
+                "peça minha aprovação antes de qualquer alteração",
+                "demandez mon approbation avant toute modification",
+                "chiedi la mia approvazione prima di qualsiasi modifica",
+                "запросите моё одобрение до любых изменений",
+                "her değişiklikten önce onayımı isteyin",
+                "任何更改之前请求我的批准",
+                "任何變更之前請求我的核准",
+            )
+        if (
+            prerequisiteStart < 0 || phoneCheck <= prerequisiteStart ||
+            prerequisiteApprovalPatterns.none { prompt.substring(prerequisiteStart, phoneCheck).contains(it) }
+        ) {
+            violations += "missing approval before prerequisite host changes"
+        }
         if (Regex("""\bwn-claude\b""").findAll(prompt).count() < 2) {
             violations += "missing connector round-trip verification"
         }
