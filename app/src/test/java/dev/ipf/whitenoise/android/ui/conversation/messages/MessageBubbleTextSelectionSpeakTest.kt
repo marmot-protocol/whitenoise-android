@@ -717,6 +717,44 @@ class MessageBubbleTextSelectionSpeakTest {
         }
     }
 
+    /** A fitting code leaf must leave horizontal movement available to the bubble's real reply action. */
+    @Test
+    fun swipeOnFittingCodeBlockBeginsReply() {
+        val appState = appStateWithTts(FakeSessionEngine())
+        val original = timelineMessage("```\nls -la\n```")
+        val item =
+            original.copy(
+                record =
+                    original.record.copy(
+                        contentTokens =
+                            MarkdownDocumentFfi(
+                                listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", "ls -la")),
+                                false,
+                                byteArrayOf(),
+                            ),
+                    ),
+            )
+        val controller = conversationController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val text = composeRule.onNodeWithText("ls -la", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val host = composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
+        val bounds = host.fetchSemanticsNode().boundsInRoot
+        host.performTouchInput {
+            down(Offset(text.left - bounds.left + 8f, text.center.y - bounds.top))
+            repeat(4) { moveBy(Offset(30f, 0f), delayMillis = 40) }
+            up()
+        }
+        composeRule.waitForIdle()
+        assertEquals(item.record.messageIdHex, controller.replyingTo?.messageIdHex)
+    }
+
     /** Pins only this golden's clock inputs and restores them even if capture or native selection fails. */
     private inline fun withCodePathClock(block: () -> Unit) {
         val originalZone = TimeZone.getDefault()
