@@ -58,8 +58,8 @@ class ComposerDeferredPaddingTest {
             Layout(content = {
                 Box(
                     Modifier
-                        .deferredPadding(start = { 12.dp }, end = { 12.dp }, top = { 8.dp }, bottom = { 8.dp })
-                        .testTag("padded"),
+                        .testTag("padded")
+                        .deferredPadding(start = { 12.dp }, end = { 12.dp }, top = { 8.dp }, bottom = { 8.dp }),
                 ) {
                     Layout(content = {}) { _, constraints ->
                         observed.set(constraints)
