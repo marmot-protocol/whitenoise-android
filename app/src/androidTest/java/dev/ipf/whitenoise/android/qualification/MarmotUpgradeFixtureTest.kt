@@ -37,10 +37,19 @@ class MarmotUpgradeFixtureTest {
             val arguments = InstrumentationRegistry.getArguments()
             val phase = requireNotNull(arguments.getString("qualificationPhase"))
             require(
-                phase in setOf(
-                    "seed", "upgrade", "cold", "promote", "promoted-cold",
-                    "fault-enospc", "fault-crash", "fault-witness", "corrupt", "lost",
-                ),
+                phase in
+                    setOf(
+                        "seed",
+                        "upgrade",
+                        "cold",
+                        "promote",
+                        "promoted-cold",
+                        "fault-enospc",
+                        "fault-crash",
+                        "fault-witness",
+                        "corrupt",
+                        "lost",
+                    ),
             )
             val receipt = File(context.filesDir, "upgrade-fixture.json")
             val root = File(context.filesDir, "Marmot")
@@ -297,7 +306,9 @@ class MarmotUpgradeFixtureTest {
         const val READ_SIZE = 1024 * 1024
 
         /** Deterministic synthetic bytes let both runtime generations assert content, not just attachment counts. */
-        fun payload(offset: Int = 0): ByteArray =
-            ByteArray(if (offset == 0) PAYLOAD_SIZE else PENDING_SIZE) { ((it + offset) % 251).toByte() }
+        fun payload(offset: Int = 0): ByteArray {
+            val size = if (offset == 0) PAYLOAD_SIZE else PENDING_SIZE
+            return ByteArray(size) { ((it + offset) % 251).toByte() }
+        }
     }
 }

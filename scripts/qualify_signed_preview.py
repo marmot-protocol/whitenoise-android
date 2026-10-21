@@ -217,7 +217,7 @@ def main():
         adb('shell', 'input', 'text', FIXTURE_NAME.replace(' ', '%s'))
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
         ui.click('Sign Up', last=True)
-        ui.click('Open settings', timeout=300)
+        ui.click(f'Open settings, {FIXTURE_NAME}', timeout=300)
         identity = ui.public_identity()
         ui.click('Developer Tools', scroll=True)
         ui.click('Create demo conversation')
@@ -237,7 +237,7 @@ def main():
         ui.retained_chat('cold-restart')
         facts['phases']['cold_restart'] = 'passed'
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
-        ui.click('Open settings')
+        ui.click(f'Open settings, {FIXTURE_NAME}')
         if ui.public_identity() != identity:
             raise RuntimeError('Public fixture identity changed across the upgrade')
         offline('after-retained-identity')
@@ -246,6 +246,11 @@ def main():
         (REPORTS / 'qualification.json').write_text(json.dumps(facts, indent=2) + '\n')
         if hasattr(ui, 'xml'):
             (REPORTS / 'last-window.xml').write_text(ui.xml)
+            # Failure screenshots diagnose visible selectors without replacing the original qualification error.
+            try:
+                (REPORTS / 'last-window.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True, timeout=10))
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+                (REPORTS / 'last-window-capture-error.txt').write_text(type(error).__name__ + '\n')
 
 
 if __name__ == '__main__':
