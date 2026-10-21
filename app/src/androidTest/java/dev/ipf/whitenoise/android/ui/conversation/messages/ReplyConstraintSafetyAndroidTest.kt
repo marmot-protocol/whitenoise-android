@@ -112,7 +112,10 @@ class ReplyConstraintSafetyAndroidTest {
         val bubble = composeRule.onNodeWithTag(BUBBLE).assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue("reply overflowed its container: $bubble outside $container", bubble.left >= container.left)
         assertTrue("reply overflowed its container: $bubble outside $container", bubble.right <= container.right)
-        assertTrue("reply must occupy a visible area", bubble.width > 0.dp && bubble.height > 0.dp)
+        assertTrue(
+            "reply must occupy a visible area",
+            bubble.right > bubble.left && bubble.bottom > bubble.top,
+        )
         saveScreenshot(evidenceName)
     }
 
