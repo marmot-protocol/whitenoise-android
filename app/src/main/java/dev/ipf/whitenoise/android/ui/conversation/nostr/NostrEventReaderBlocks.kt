@@ -37,7 +37,9 @@ internal fun nostrReaderTextChunks(
             val boundary = maxOf(text.lastIndexOf('\n', end - 1), text.lastIndexOf(' ', end - 1))
             if (boundary >= start + READER_TEXT_BUDGET / 2) end = boundary + 1
             if (Character.isLowSurrogate(text[end]) && Character.isHighSurrogate(text[end - 1])) end--
-            if (keepSlashWithFollowingText && end > start + 1 && text[end - 1] == '/' && text[end] !in "\r\n") end--
+            if (keepSlashWithFollowingText && end > start + 1) {
+                if (text[end - 1] == '/' && text[end] !in "\r\n") end--
+            }
         }
         chunks += text.substring(start, end)
         start = end

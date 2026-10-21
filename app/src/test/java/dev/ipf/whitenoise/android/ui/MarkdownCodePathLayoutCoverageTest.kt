@@ -84,6 +84,7 @@ class MarkdownCodePathLayoutCoverageTest {
     @Test
     fun changingReaderSourceRetiresThePreviousCodeViewport() {
         val original = "/" + "directory/".repeat(40) + "old.md"
+        val replacement = "/" + "different/".repeat(40) + "new.md"
         var source by mutableStateOf(original)
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -105,11 +106,11 @@ class MarkdownCodePathLayoutCoverageTest {
         }
         composeRule.waitForIdle()
         scrollToEnd(original)
-        composeRule.runOnIdle { source = "/new.md" }
+        composeRule.runOnIdle { source = replacement }
         composeRule.waitForIdle()
-        val range = horizontalRange("/new.md")
+        val range = horizontalRange(replacement)
+        assertTrue(range.maxValue() > 0f)
         assertEquals(0f, range.value(), 0.1f)
-        assertEquals(0f, range.maxValue(), 0.1f)
         composeRule.onNodeWithText(original).assertDoesNotExist()
     }
 
