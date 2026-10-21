@@ -19,14 +19,14 @@ import androidx.compose.ui.unit.constrainWidth
  * Long peer-provided text can have a natural width larger than Compose can represent, even when
  * its parent is screen-sized. Keep ordinary wrap-content sizing and clamp before packing.
  */
-internal fun Modifier.boundedIntrinsicWidth(
-    size: IntrinsicSize,
-): Modifier = this.then(BoundedIntrinsicSizeElement(size, width = true))
+internal fun Modifier.boundedIntrinsicWidth(size: IntrinsicSize): Modifier {
+    return this.then(BoundedIntrinsicSizeElement(size, width = true))
+}
 
 /** The height counterpart, including tall blockquotes measured inside a scrolling container. */
-internal fun Modifier.boundedIntrinsicHeight(
-    size: IntrinsicSize,
-): Modifier = this.then(BoundedIntrinsicSizeElement(size, width = false))
+internal fun Modifier.boundedIntrinsicHeight(size: IntrinsicSize): Modifier {
+    return this.then(BoundedIntrinsicSizeElement(size, width = false))
+}
 
 /** Preserves the incoming height budget while fitting a desired width into Compose's packed range. */
 internal fun boundedIntrinsicWidthConstraints(
