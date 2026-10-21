@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,8 +41,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.MARKDOWN_PREVIEW_MAX_LENGTH
 import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -54,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Description
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.icons.filled.Mic
 import dev.ipf.whitenoise.android.ui.icons.filled.Movie
+import dev.ipf.whitenoise.android.ui.previewTake
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -151,7 +153,7 @@ internal fun ReplyPreviewCard(
     // mention runs, so resolve them to match the bubble's rendering (#615/#1090).
     val bodyText =
         remember(body, mediaLabel, mentionDisplayName) {
-            mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
+            mediaLabel ?: replyFallbackPreviewText(body, mentionDisplayName)
         }
     var bodyDocument by remember(body, appState, appState?.activeAccount?.accountIdHex) {
         mutableStateOf<MarkdownDocumentFfi?>(null)
@@ -188,7 +190,7 @@ internal fun ReplyPreviewCard(
                 modifier =
                     Modifier
                         .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
-                        .height(IntrinsicSize.Min)
+                        .boundedIntrinsicHeight(IntrinsicSize.Min)
                         .padding(start = 12.dp, top = 8.dp, end = quoteEndPadding, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -261,3 +263,9 @@ internal fun replyAttachmentPreviewText(
     val displayName = safeAttachmentDisplayName(fileName) ?: return presentation.formatLabel
     return presentation.formatLabel?.let { "$displayName · $it" } ?: displayName
 }
+
+/** Bounds the first-frame plaintext quote before asynchronous Markdown projection becomes available. */
+internal fun replyFallbackPreviewText(
+    body: String,
+    mentionDisplayName: ((String) -> String?)?,
+): String = resolveMentionsInPlaintext(body, mentionDisplayName).previewTake(MARKDOWN_PREVIEW_MAX_LENGTH)
