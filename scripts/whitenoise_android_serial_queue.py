@@ -114,7 +114,8 @@ def validate_snapshot(snapshot):
             or snapshot.get('prerequisites_verified') is not True
             or not serial_configuration(snapshot.get('configuration'))
             or not SHA.fullmatch(str(snapshot.get('master', '')))
-            or not DIGEST.fullmatch(str(snapshot.get('rules_sha256', '')))
+            or ('rules_sha256' in snapshot
+                and not DIGEST.fullmatch(str(snapshot['rules_sha256'])))
             or snapshot.get('has_next_page') is not False
             or type(snapshot.get('total_count')) is not int
             or not isinstance(snapshot.get('entries'), list)
@@ -148,12 +149,11 @@ def validate_snapshot(snapshot):
     return snapshot
 
 
-def entry_identity(snapshot, entry=None):
+def entry_identity(snapshot):
     """Return integration identity only for a mapped current front."""
-    if entry is None:
-        validate_snapshot(snapshot)
-        entry = snapshot['entries'][0] if snapshot['entries'] else None
-    if (entry is None or entry['position'] != 1
+    validate_snapshot(snapshot)
+    entry = snapshot['entries'][0] if snapshot['entries'] else None
+    if (entry is None
             or entry.get('base') is None or entry.get('integration') is None):
         return None
     if entry['base'] != snapshot['master']:
@@ -163,14 +163,31 @@ def entry_identity(snapshot, entry=None):
 
 
 def generation_for(snapshot, identity):
-    """Bind a positive recovery generation to the PR receiving the effect."""
+    """Read a PR's recovery generation without borrowing another PR's grant."""
+    if 'generations' in snapshot:
+        generations = snapshot['generations']
+        if (not isinstance(generations, dict) or any(
+                not isinstance(number, str) or not 1 <= len(number) <= 10
+                or not number.isascii() or not number.isdecimal()
+                or not 0 < int(number) < 2**31 or str(int(number)) != number
+                or type(value) is not int or value < 0
+                for number, value in generations.items())):
+            raise Held('generations-held')
+        return generations.get(str(identity.number), 0)
     generation = snapshot.get('generation', 0)
     if type(generation) is not int or generation < 0:
         raise Held('generation-held')
     if generation > 0:
-        number = snapshot.get('generation_number')
-        if type(number) is not int or number <= 0 or number != identity.number:
-            raise Held('generation-held')
+        identities = {(entry['number'], entry['pull_request_id']) for entry in snapshot['entries']}
+        identities.add((identity.number, identity.pull_request_id))
+        candidate = snapshot.get('candidate')
+        if candidate is not None:
+            if (not isinstance(candidate, dict) or type(candidate.get('number')) is not int
+                    or not isinstance(candidate.get('pull_request_id'), str)):
+                raise Held('generation-map-required')
+            identities.add((candidate['number'], candidate['pull_request_id']))
+        if len(identities) != 1:
+            raise Held('generation-map-required')
     return generation
 
 
@@ -184,19 +201,20 @@ def plan(snapshot, candidate, verify_source, verify_integration, *, target_numbe
     reviewed compatibility, actual G tree mapping and successful current G CI.
     These are trusted local adapters, not data supplied by a PR or workflow.
     """
-    validate_snapshot(snapshot)
-    if target_number is not None:
-        if (type(target_number) is not int or target_number <= 0
-                or candidate is None or candidate.number != target_number):
-            raise Held('target-candidate-changed')
+    front = entry_identity(snapshot)
+    scoped = target_number is not None
+    if scoped and (type(target_number) is not int or target_number <= 0
+                   or candidate is None or candidate.number != target_number):
+        raise Held('target-candidate-changed')
+    use_front = front is not None and (not scoped or front.number == target_number)
+    if candidate is not None and (scoped or not use_front):
         candidate.validate()
         if (candidate.integration is not None or candidate.entry_id is not None
                 or snapshot.get('candidate') != asdict(candidate)):
             raise Held('candidate-changed')
-    front = entry_identity(snapshot)
-    if front is not None and (target_number is None or front.number == target_number):
-        if (target_number is not None
-                and (front.pull_request_id, front.source) != (candidate.pull_request_id, candidate.source)):
+    if use_front:
+        if (scoped and (front.pull_request_id, front.source)
+                != (candidate.pull_request_id, candidate.source)):
             raise Held('candidate-changed')
         generation = generation_for(snapshot, front)
         proof = verify_integration(front, snapshot)
@@ -205,10 +223,6 @@ def plan(snapshot, candidate, verify_source, verify_integration, *, target_numbe
         return Effect('authorize-integration', front, proof, generation)
     if candidate is None:
         return None
-    candidate.validate()
-    if (candidate.integration is not None or candidate.entry_id is not None
-            or snapshot.get('candidate') != asdict(candidate)):
-        raise Held('candidate-changed')
     entry = next((item for item in snapshot['entries']
                   if item['number'] == candidate.number), None)
     if entry is not None:
@@ -329,7 +343,7 @@ def refused_selection_result(journal, effect):
 
 
 def exhausted_selection_result(journal, effect):
-    """An exhausted selection cannot silently become another PR or proof key."""
+    """Keep exhausted retry budgets attached to their PR and generation."""
     # Cleanup bypasses admission holds, not its own exhausted retry budget.
     # A changed proof is fresh validation rather than explicit recovery.
     if effect is not None and effect.kind in {'revoke-integration', 'dequeue'}:
@@ -375,8 +389,19 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
         return 'reconciled' if all(r['state'] == 'confirmed' for _, r in uncertain) else 'unknown-held'
     if not lease_held():
         return 'lease-held'
+    def choose(snapshot):
+        effect = plan(snapshot, candidate, verify_source, verify_integration,
+                      target_number=target_number)
+        if (target_number is None and candidate is not None and effect is not None
+                and effect.kind == 'authorize-integration'
+                and effect.identity.number != candidate.number
+                and journal['effects'].get(effect.key(), {}).get('state') == 'confirmed'):
+            return plan(snapshot, candidate, verify_source, verify_integration,
+                        target_number=candidate.number)
+        return effect
+
     first = observe()
-    effect = plan(first, candidate, verify_source, verify_integration, target_number=target_number)
+    effect = choose(first)
     held = refused_selection_result(journal, effect)
     if held:
         return held
@@ -394,8 +419,9 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
     # A second full fresh read and proof verification must agree. Unknown reads
     # raise before intent persistence; no mutation is attempted on uncertainty.
     second = observe()
-    current = plan(second, candidate, verify_source, verify_integration, target_number=target_number)
-    if (current != effect or first['rules_sha256'] != second['rules_sha256']
+    current = choose(second)
+    if (current != effect or ('rules_sha256' in first, first.get('rules_sha256'))
+            != ('rules_sha256' in second, second.get('rules_sha256'))
             or not lease_held()):
         return 'identity-changed'
     return execute(journal, effect, write, readback, persist)
