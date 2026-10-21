@@ -1890,12 +1890,6 @@ class WhiteNoiseAppState private constructor(
                     conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
                     parseMarkdown = { parseMarkdownOrEmpty(it) },
                     mentionDisplayName = ::mentionSpeechName,
-                    isGroupMember =
-                        if (controller.membersLoaded) {
-                            { bech32 -> isRosterMember(bech32, controller.members) }
-                        } else {
-                            null
-                        },
                 )
         }
     }

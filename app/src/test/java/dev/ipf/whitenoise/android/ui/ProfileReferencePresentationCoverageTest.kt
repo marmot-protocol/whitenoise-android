@@ -37,7 +37,6 @@ class ProfileReferencePresentationCoverageTest {
                     codeStyle = codeStyle,
                     linkStyle = SpanStyle(),
                     mentionDisplayName = { "Alice" },
-                    isGroupMember = { error("Visual profile identity must not consult group membership") },
                 )
             assertEquals("@Alice", rendered.text)
             assertEquals(
@@ -97,11 +96,11 @@ class ProfileReferencePresentationCoverageTest {
         for (inline in profiles()) {
             val entity = entity(inline)
             val display =
-                markdownNostrEntityDisplay(entity, inline is MarkdownInlineFfi.NostrMention, { null }, { false })
+                markdownNostrEntityDisplay(entity, inline is MarkdownInlineFfi.NostrMention, { null })
             assertEquals("@" + shortenedBech32(entity.bech32), display.visibleText)
             assertTrue(display.opensProfile)
             assertEquals(display.visibleText, markdownDocumentToPreviewText(document(inline)))
-            assertEquals("@Alice", markdownNostrEntityDisplay(entity, false, { "Alice" }, { false }).visibleText)
+            assertEquals("@Alice", markdownNostrEntityDisplay(entity, false, { "Alice" }).visibleText)
         }
     }
 
@@ -180,8 +179,8 @@ class ProfileReferencePresentationCoverageTest {
                 blankLinesBefore = byteArrayOf(),
             )
         assertEquals(emptySet<String>(), markdownDocumentProfileReferenceBech32s(parsed))
-        assertEquals(null, markdownNostrEntityDisplay(note, false, { error("Event is not a profile") }, null).name)
-        assertFalse(markdownNostrEntityDisplay(note, false, null, null).opensProfile)
+        assertEquals(null, markdownNostrEntityDisplay(note, false, { error("Event is not a profile") }).name)
+        assertFalse(markdownNostrEntityDisplay(note, false, null).opensProfile)
     }
 
     /** Presentation collection obeys the same sibling/depth budgets as the visible Markdown projection. */

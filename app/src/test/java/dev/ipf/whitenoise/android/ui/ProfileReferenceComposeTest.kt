@@ -86,7 +86,6 @@ class ProfileReferenceComposeTest {
                 MarkdownMessageBody(
                     document = document,
                     mentionDisplayName = { name },
-                    isGroupMember = { false },
                     onNostrProfileTap = { tapped = it },
                 )
             }

@@ -6,11 +6,6 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 
-/** Collects distinct profile mentions from only the renderer-visible inline tree. */
-internal fun markdownInlineMentionBech32s(inlines: List<MarkdownInlineFfi>): Set<String> =
-    mutableSetOf<String>()
-        .also { collectReferenceBech32s(inlines, it, depth = 0, includeProfileUris = false) }
-
 /** Walks bounded inline containers without constructing any styled text. */
 private fun collectReferenceBech32s(
     inlines: List<MarkdownInlineFfi>,

@@ -393,14 +393,20 @@ class MarkdownPreviewTextTest {
         assertEquals(setOf(npub), markdownDocumentMentionBech32s(document))
     }
 
+    /** The production document collector cannot hydrate semantic mentions beyond its visible inline budget. */
     @Test
-    fun inlineMentionCollectorStopsAtBreadthCap() {
+    fun nestedDocumentMentionCollectorStopsAtInlineBreadthCap() {
         val npub = "npub1" + "q".repeat(58)
         val inlines =
             List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownInlineFfi.Text("") } +
                 MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub))
 
-        assertEquals(emptySet<String>(), markdownInlineMentionBech32s(inlines))
+        assertEquals(
+            emptySet<String>(),
+            markdownDocumentMentionBech32s(
+                MarkdownDocumentFfi(listOf(MarkdownBlockFfi.Paragraph(inlines)), false, byteArrayOf()),
+            ),
+        )
     }
 
     @Test

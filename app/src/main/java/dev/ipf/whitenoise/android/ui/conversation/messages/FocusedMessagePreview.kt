@@ -51,7 +51,6 @@ internal fun focusedMessagePreviewText(
     source: String,
     document: MarkdownDocumentFfi?,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
 ): AnnotatedString {
     if (document == null || document.blocks.isEmpty()) return EmojiShortcodes.annotate(AnnotatedString(source))
     val paragraph = document.blocks.singleOrNull() as? MarkdownBlockFfi.Paragraph
@@ -63,7 +62,6 @@ internal fun focusedMessagePreviewText(
                     codeStyle = SpanStyle(fontFamily = FontFamily.Monospace),
                     linkStyle = SpanStyle(textDecoration = TextDecoration.Underline),
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     useDecorativeBackgrounds = false,
                 )
             val inertLinkStyles =
@@ -140,7 +138,6 @@ internal fun FocusedTextMessagePreview(
     showStatus: Boolean,
     senderName: String? = null,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
     reply: (@Composable () -> Unit)? = null,
     media: (@Composable () -> Unit)? = null,
     warning: String? = null,
@@ -152,8 +149,8 @@ internal fun FocusedTextMessagePreview(
     val timestampRevision =
         rememberTimestampRevision(remember(document) { document?.let(::markdownDocumentTimestamps).orEmpty() })
     val excerpt =
-        remember(text, document, mentionDisplayName, isGroupMember, timestampRevision) {
-            focusedMessagePreviewText(text, document, mentionDisplayName, isGroupMember)
+        remember(text, document, mentionDisplayName, timestampRevision) {
+            focusedMessagePreviewText(text, document, mentionDisplayName)
         }
     var lastLineWidth by remember(excerpt) { mutableStateOf<Int?>(null) }
     var lastLineBaseline by remember(excerpt) { mutableStateOf<Int?>(null) }

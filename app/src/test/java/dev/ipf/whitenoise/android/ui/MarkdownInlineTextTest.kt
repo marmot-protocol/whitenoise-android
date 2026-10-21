@@ -694,7 +694,6 @@ class MarkdownInlineTextTest {
                 codeStyle = codeStyle,
                 linkStyle = linkStyle,
                 mentionDisplayName = { "Alice" },
-                isGroupMember = { bech32 -> bech32 == npub },
             )
         // A current member is addressed: the "@" mention treatment stays.
         assertEquals("@Alice", annotated.text)
@@ -718,7 +717,6 @@ class MarkdownInlineTextTest {
                 codeStyle = codeStyle,
                 linkStyle = SpanStyle(color = Color.Black),
                 mentionDisplayName = { "Alice" },
-                isGroupMember = { true },
                 useDecorativeBackgrounds = false,
             )
 
@@ -746,7 +744,6 @@ class MarkdownInlineTextTest {
                 linkStyle = linkStyle,
                 mentionDisplayName = { "Alice" },
                 // Resolves to a name, but the account is NOT in the active group.
-                isGroupMember = { false },
             )
         // #2689 supersedes the old roster-dependent visual treatment; identity and navigation stay intact.
         assertEquals("@Alice", annotated.text)
@@ -778,7 +775,6 @@ class MarkdownInlineTextTest {
                 codeStyle = codeStyle,
                 linkStyle = linkStyle,
                 mentionDisplayName = { null },
-                isGroupMember = { false },
             )
         // Unknown external profiles have the same bounded identity fallback as members.
         assertEquals("@npub1qqqqqqq…qqqqqq", annotated.text)
@@ -803,7 +799,6 @@ class MarkdownInlineTextTest {
                 codeStyle = codeStyle,
                 linkStyle = linkStyle,
                 mentionDisplayName = { "Bob" },
-                isGroupMember = { false },
             )
         // Encoding and roster membership do not change the visible username contract.
         assertEquals("@Bob", annotated.text)
@@ -825,7 +820,7 @@ class MarkdownInlineTextTest {
                 codeStyle = codeStyle,
                 linkStyle = linkStyle,
                 mentionDisplayName = { "Alice" },
-                // No roster available (isGroupMember == null): keep pre-#1017
+                // Profile identity is independent of roster availability:
                 // behavior so roster-less callers are unchanged.
             )
         assertEquals("@Alice", annotated.text)

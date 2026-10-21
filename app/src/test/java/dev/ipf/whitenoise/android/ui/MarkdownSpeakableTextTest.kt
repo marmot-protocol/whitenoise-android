@@ -308,19 +308,16 @@ class MarkdownSpeakableTextTest {
             markdownDocumentToSpeakableProjection(
                 document = document,
                 mentionDisplayName = { "Alice" },
-                isGroupMember = { true },
             )
         val repeated =
             markdownDocumentToSpeakableProjection(
                 document = document,
                 mentionDisplayName = { "Alice" },
-                isGroupMember = { true },
             )
         val renamed =
             markdownDocumentToSpeakableProjection(
                 document = document,
                 mentionDisplayName = { "Alicia" },
-                isGroupMember = { true },
             )
 
         assertEquals("item. code. head. cell. @Alice.", projection.text)
@@ -389,7 +386,6 @@ class MarkdownSpeakableTextTest {
                         else -> null
                     }
                 },
-                isGroupMember = { it == alice || it == unknownMember },
             ),
         )
     }
@@ -444,7 +440,6 @@ class MarkdownSpeakableTextTest {
             markdownDocumentToSpeakableText(
                 document = mentionOnly,
                 mentionDisplayName = { "Someone" },
-                isGroupMember = { true },
             ),
         )
     }

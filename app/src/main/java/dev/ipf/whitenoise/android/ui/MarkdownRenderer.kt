@@ -127,8 +127,6 @@ internal fun MarkdownMessageBody(
     document: MarkdownDocumentFfi,
     modifier: Modifier = Modifier,
     mentionDisplayName: ((String) -> String?)? = null,
-    // Retained for existing callers; roster membership does not select profile-reference appearance.
-    isGroupMember: ((String) -> Boolean)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
     useDecorativeBackgrounds: Boolean = true,
     // Reports the layout of the final rendered text line so a caller can place
@@ -192,11 +190,10 @@ internal fun MarkdownMessageBody(
             }
         }
     val bodyContext =
-        remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds, hiddenEventIds) {
+        remember(linkListener, mentionDisplayName, useDecorativeBackgrounds, hiddenEventIds) {
             MarkdownBodyContext(
                 linkListener,
                 mentionDisplayName,
-                isGroupMember,
                 useDecorativeBackgrounds,
                 hiddenEventIds,
             )
@@ -281,7 +278,6 @@ internal const val MARKDOWN_MAX_EXTRA_BLANK_LINES = 6
 private data class MarkdownBodyContext(
     val linkListener: LinkInteractionListener,
     val mentionDisplayName: ((String) -> String?)?,
-    val isGroupMember: ((String) -> Boolean)?,
     val useDecorativeBackgrounds: Boolean,
     val hiddenEventIds: Set<String> = emptySet(),
 )
@@ -1402,7 +1398,6 @@ private fun rememberMarkdownInlineText(
                 ),
             linkListener = ctx.linkListener,
             mentionDisplayName = profileNames::get,
-            isGroupMember = ctx.isGroupMember,
             useDecorativeBackgrounds = ctx.useDecorativeBackgrounds,
             hiddenEventIds = hiddenEventIds,
         )
@@ -1466,6 +1461,8 @@ internal const val CONFIRM_LINK_TAG_PREFIX = "confirm-link:"
  * Parsed profile mentions and URIs share the bold "@Name" label, including external identities.
  * Unresolved profiles keep a short "@" identity fallback. Roster membership, self-mention detection
  * and native notification classification remain separate from this visual projection.
+ * Profile-bearing runs use first-strong Content direction for readable resolved names; other body
+ * runs retain their existing ambient direction. Composite previews set direction on their complete Text.
  */
 internal fun markdownInlinesToAnnotatedString(
     inlines: List<MarkdownInlineFfi>,
@@ -1473,7 +1470,6 @@ internal fun markdownInlinesToAnnotatedString(
     linkStyle: SpanStyle,
     linkListener: LinkInteractionListener? = null,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
     useDecorativeBackgrounds: Boolean = true,
     hiddenEventIds: Set<String> = emptySet(),
 ): AnnotatedString =
@@ -1485,7 +1481,6 @@ internal fun markdownInlinesToAnnotatedString(
                 linkStyle,
                 linkListener,
                 mentionDisplayName,
-                isGroupMember,
                 useDecorativeBackgrounds,
                 hiddenEventIds,
             ),
@@ -1502,7 +1497,6 @@ private class MarkdownInlineRenderContext(
     val linkStyle: SpanStyle,
     val linkListener: LinkInteractionListener?,
     val mentionDisplayName: ((String) -> String?)?,
-    val isGroupMember: ((String) -> Boolean)?,
     val useDecorativeBackgrounds: Boolean,
     val hiddenEventIds: Set<String>,
 ) {
@@ -1519,7 +1513,6 @@ private class MarkdownInlineRenderContext(
                 linkStyle,
                 linkListener,
                 mentionDisplayName,
-                isGroupMember,
                 useDecorativeBackgrounds,
                 hiddenEventIds = emptySet(),
             )
@@ -1608,15 +1601,12 @@ internal data class MarkdownNostrEntityDisplay(
 }
 
 /**
- * Shares profile labels between visible text and speech. The roster callback remains source-compatible
- * with existing callers; membership and native notification classification never choose visual identity.
+ * Shares profile labels between visible text and speech without acquiring roster or notification authority.
  */
-@Suppress("UNUSED_PARAMETER")
 internal fun markdownNostrEntityDisplay(
     entity: MarkdownNostrEntityFfi,
     mention: Boolean,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
 ): MarkdownNostrEntityDisplay {
     val opensProfile = entity.isProfileReference()
     val name = if (opensProfile || mention) mentionDisplayName?.invoke(entity.bech32) else null
@@ -1635,7 +1625,7 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     mention: Boolean,
     ctx: MarkdownInlineRenderContext,
 ) {
-    val display = markdownNostrEntityDisplay(entity, mention, ctx.mentionDisplayName, ctx.isGroupMember)
+    val display = markdownNostrEntityDisplay(entity, mention, ctx.mentionDisplayName)
     val name = display.name
     val opensProfile = display.opensProfile
     val resolvedMention = display.resolvedMention
@@ -1878,10 +1868,14 @@ internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
         walk(inlines)
     }
 
-/** [markdownDocumentToPreviewAnnotatedString] with the chat-row code-chip style. */
+/**
+ * [markdownDocumentToPreviewAnnotatedString] with preview code-chip styling and live profile hydration.
+ * Concatenating callers disable [applyProfileDirection] and set direction on their complete Text instead.
+ */
 @Composable
 internal fun rememberMarkdownPreviewText(
     document: MarkdownDocumentFfi,
+    applyProfileDirection: Boolean = true,
     mentionDisplayName: ((String) -> String?)? = null,
 ): AnnotatedString {
     val contentColor = LocalContentColor.current
@@ -1896,7 +1890,7 @@ internal fun rememberMarkdownPreviewText(
             profileReferences.associateWith(mentionDisplayName)
         }
     val timestampRevision = rememberTimestampRevision(remember(document) { markdownDocumentTimestamps(document) })
-    return remember(document, contentColor, profileNames, timestampRevision) {
+    return remember(document, contentColor, profileNames, timestampRevision, applyProfileDirection) {
         markdownDocumentToPreviewAnnotatedString(
             document = document,
             codeStyle =
@@ -1905,6 +1899,7 @@ internal fun rememberMarkdownPreviewText(
                     background = contentColor.copy(alpha = 0.08f),
                 ),
             mentionDisplayName = profileNames::get,
+            applyProfileDirection = applyProfileDirection,
         )
     }
 }

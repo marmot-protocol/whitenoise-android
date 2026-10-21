@@ -8,14 +8,13 @@ import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.parseMarkdownOrEmptyDocument
 
 /** Builds the single active message projection consumed by every TTS entry point. */
-@Suppress("ReturnCount", "LongParameterList") // Explicit rendering and roster inputs share this one speech projection.
+@Suppress("ReturnCount", "LongParameterList") // Explicit rendering and conversation inputs share this one speech projection.
 internal suspend fun projectTtsSpeakableEntry(
     message: AppMessageRecordFfi,
     editedText: String?,
     senderDisplayName: String,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
     conversationMemberCount: Int? = null,
 ): TtsSpeakableEntry? {
     val source = resolveTtsSpeakableSource(message, editedText) ?: return null
@@ -26,7 +25,6 @@ internal suspend fun projectTtsSpeakableEntry(
             parseMarkdown = parseMarkdown,
         )
     val names = linkedMapOf<String, String?>()
-    val members = linkedMapOf<String, Boolean>()
     val projection =
         speakableProjectionFromDocument(
             source = source.text,
@@ -35,7 +33,6 @@ internal suspend fun projectTtsSpeakableEntry(
                 if (!names.containsKey(key)) names[key] = mentionDisplayName?.invoke(key)
                 names[key]
             },
-            isGroupMember = isGroupMember?.let { resolve -> { key -> members.getOrPut(key) { resolve(key) } } },
         ) ?: return null
     return projection.text
         .takeIf(String::isNotBlank)
@@ -52,24 +49,12 @@ internal suspend fun projectTtsSpeakableEntry(
                 speechRoles = projection.speechRoles,
                 visibleLeaves = projection.visibleLeaves,
                 sourceText = source.text,
-                mentionPresentation =
-                    snapshotTtsMentionPresentation(names, members, isGroupMember),
+                mentionPresentation = TtsMentionPresentation(names.toMap()),
             )
         }
 }
 
-/** Freezes roster facts for projected identities independently of the visual label's membership-free policy. */
-private fun snapshotTtsMentionPresentation(
-    names: Map<String, String?>,
-    members: MutableMap<String, Boolean>,
-    isGroupMember: ((String) -> Boolean)?,
-): TtsMentionPresentation {
-    if (isGroupMember != null) {
-        names.keys.forEach { key -> members.getOrPut(key) { isGroupMember(key) } }
-    }
-    return TtsMentionPresentation(names.toMap(), members.toMap().takeIf { isGroupMember != null })
-}
-
+/** Uses stored native tokens until an edit supplies a different authored source. */
 internal suspend fun resolveTtsSpeakableDocument(
     message: AppMessageRecordFfi,
     source: TtsSpeakableSource,
@@ -79,11 +64,11 @@ internal suspend fun resolveTtsSpeakableDocument(
     return parseMarkdownOrEmptyDocument(source.text, parseMarkdown)
 }
 
+/** Keeps the legacy plain-text fallback when native parsing produced no blocks. */
 internal fun speakableProjectionFromDocument(
     source: String,
     document: MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
 ): SpeakableTextProjection? {
     if (source.isBlank()) return null
     return if (document.blocks.isEmpty()) {
@@ -92,7 +77,6 @@ internal fun speakableProjectionFromDocument(
         markdownDocumentToSpeakableProjection(
             document = document,
             mentionDisplayName = mentionDisplayName,
-            isGroupMember = isGroupMember,
         )
     }
 }

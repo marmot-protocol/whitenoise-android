@@ -693,30 +693,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     modifier = bodyMeasurementModifier,
                 ) {
                     traceConversationUiSection(ConversationUiTrace.TEXT) {
-                        val mentionMemberSnapshot =
-                            remember(record.messageIdHex, controller.membersLoaded) {
-                                if (controller.membersLoaded) controller.members else null
-                            }
-                        val mentionMembershipResolver =
-                            remember(appState, mentionMemberSnapshot) {
-                                mentionMemberSnapshot?.let { members ->
-                                    { bech32: String -> appState.isRosterMember(bech32, members) }
-                                }
-                            }
                         MarkdownMessageBody(
                             checkNotNull(markdownDocument),
                             mentionDisplayName =
                                 remember(appState, ttsMentionPresentation) {
                                     ttsMentionPresentation?.let { snapshot -> snapshot::displayName }
                                         ?: { bech32: String -> appState.mentionDisplayName(bech32) }
-                                },
-                            isGroupMember =
-                                remember(ttsMentionPresentation, mentionMembershipResolver) {
-                                    if (ttsMentionPresentation != null) {
-                                        ttsMentionPresentation.membershipResolver()
-                                    } else {
-                                        mentionMembershipResolver
-                                    }
                                 },
                             useDecorativeBackgrounds = !customBubbleColorActive,
                             onNostrProfileTap =
