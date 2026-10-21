@@ -12,7 +12,10 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 
-from verify_mdk_qualification_pair import fixture_certificate
+if __package__:
+    from .verify_mdk_qualification_pair import fixture_certificate
+else:
+    from verify_mdk_qualification_pair import fixture_certificate
 
 APP = 'dev.ipf.whitenoise.android.preview.pr3371'
 REPORTS = Path('build/mdk-signed-preview')
@@ -186,17 +189,37 @@ class PreviewUi:
         while time.monotonic() < deadline:
             self.snapshot()
             texts = '\n'.join(node.get('text', '') for node in self.nodes)
-            composer = any(node.get('class') == 'android.widget.EditText' for node in self.nodes)
+            composer = all(self.matches(label) for label in ('Message', 'Add attachment', 'Dictate text'))
             if all(text in texts for text in HISTORY) and composer:
                 (REPORTS / f'{phase}.xml').write_text(self.xml)
                 (REPORTS / f'{phase}.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
+                self.focus_composer(phase)
                 return
-            if self.matches('Johnny Appleseed') and not composer:
+            # During baseline setup, only the demo coordinator may navigate or switch its owned profiles.
+            if phase != 'baseline' and self.matches('Johnny Appleseed') and not composer:
                 self.tap_node(self.matches('Johnny Appleseed')[0])
             elif self.matches('Help Improve White Noise') and self.matches('Close'):
                 self.tap_node(self.matches('Close')[0])
             time.sleep(2)
         raise RuntimeError(f'{phase}: retained demo history and composer did not become usable')
+
+    def focus_composer(self, phase):
+        """Exercise the empty compact composer without sending or deleting any fixture data."""
+        self.click('Message')
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            self.snapshot()
+            focused = any(node.get('class') == 'android.widget.EditText' and node.get('focused') == 'true'
+                          for node in self.nodes)
+            keyboard = adb('shell', 'dumpsys', 'input_method')
+            if focused and re.search(r'\bmInputShown=true\b', keyboard):
+                (REPORTS / f'{phase}-composer.xml').write_text(self.xml)
+                (REPORTS / f'{phase}-composer.json').write_text(
+                    json.dumps({'focused_editable': True, 'keyboard_shown': True}) + '\n')
+                adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+                return
+            time.sleep(1)
+        raise RuntimeError(f'{phase}: compact composer did not accept focus and show its keyboard')
 
 
 def launch():
@@ -230,6 +253,9 @@ def main():
         facts['native_bridge'] = adb('shell', 'getprop', 'ro.dalvik.vm.native.bridge').strip()
         if 'arm64-v8a' not in facts['emulator_abis'].split(','):
             raise RuntimeError('Hosted image does not advertise support for the unchanged ARM64 preview')
+        adb('shell', 'settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '1')
+        if adb('shell', 'settings', 'get', 'secure', 'show_ime_with_hard_keyboard').strip() != '1':
+            raise RuntimeError('Hosted emulator did not enable its visible keyboard')
         adb('install', '-r', str(PAIR / 'baseline.apk'), timeout=180)
         adb('shell', 'pm', 'grant', APP, 'android.permission.POST_NOTIFICATIONS')
         launch()
@@ -259,7 +285,7 @@ def main():
         launch()
         ui.retained_chat('cold-restart')
         facts['phases']['cold_restart'] = 'passed'
-        adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+        ui.click('Back')
         ui.click(f'Open settings, {FIXTURE_NAME}')
         if ui.public_identity() != identity:
             raise RuntimeError('Public fixture identity changed across the upgrade')

@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from scripts import run_mdk_qualification as campaign
 from scripts import run_mdk_faults as faults
+from scripts import qualify_signed_preview as preview
 from scripts.verify_mdk_qualification_pair import APP, fixture_certificate, package_identity
 
 
@@ -173,6 +174,41 @@ class QualificationUiTest(unittest.TestCase):
                     patch.object(campaign, 'adb', side_effect=fixture_adb):
                 campaign.usable_chat('restored')
                 self.assertTrue((Path(directory) / 'restored.png').exists())
+
+    def test_preview_text_child_cannot_enable_its_disabled_compose_action(self):
+        """The observed baseline demo label is enabled even while its clickable parent is disabled."""
+        window = ('<hierarchy><node enabled="false" clickable="true">'
+                  '<node text="Create demo conversation" enabled="true"/></node></hierarchy>')
+        with patch.object(preview, 'adb', return_value=window):
+            ui = preview.PreviewUi()
+            ui.snapshot()
+            self.assertEqual(ui.matches('Create demo conversation'), [])
+
+    def test_baseline_demo_navigation_waits_for_coordinator_completion(self):
+        """A transient profile label must not interrupt demo setup; compact input is then exercised explicitly."""
+        windows = iter([
+            '<hierarchy><node text="Johnny Appleseed" enabled="true"/></hierarchy>',
+            '<hierarchy><node text="Replies and reactions work across both profiles." enabled="true"/>'
+            '<node text="Great — the demo conversation is ready to explore." enabled="true"/>'
+            '<node text="Message" enabled="true"/><node content-desc="Add attachment" enabled="true"/>'
+            '<node content-desc="Dictate text" enabled="true"/></hierarchy>',
+        ])
+
+        def fixture_adb(*args, **kwargs):
+            """Advance only on fresh UI reads, never by tapping a profile while setup owns it."""
+            if args[:2] == ('shell', 'cat'):
+                return next(windows)
+            return b'image' if kwargs.get('binary') else ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(preview, 'REPORTS', Path(directory)), \
+                    patch.object(preview, 'adb', side_effect=fixture_adb), patch.object(preview.time, 'sleep'):
+                ui = preview.PreviewUi()
+                with patch.object(ui, 'tap_node', side_effect=AssertionError('Premature profile navigation')), \
+                        patch.object(ui, 'focus_composer') as focus:
+                    ui.retained_chat('baseline')
+                    focus.assert_called_once_with('baseline')
+                    self.assertTrue((Path(directory) / 'baseline.png').exists())
 
 
 if __name__ == '__main__':
