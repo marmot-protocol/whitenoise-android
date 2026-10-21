@@ -1776,8 +1776,8 @@
     <string name="developer_tools_already_enabled">Las herramientas de desarrollador ya están activadas</string>
     <string name="appearance_outline_colors_fixed">AMOLED usa blanco fijo para los botones de acción. Los contornos de los globos se pueden personalizar en Colores de globos.</string>
     <string name="appearance_theme">Tema</string>
-    <string name="appearance_theme_help">El valor predeterminado del sistema sigue tu dispositivo. Claro y Oscuro mantienen la apariencia seleccionada. AMOLED usa un fondo negro con contornos blancos.</string>
-    <string name="appearance_amoled_detail">Negro puro con contornos blancos nítidos.</string>
+    <string name="appearance_theme_help">El valor predeterminado del sistema sigue tu dispositivo. Claro y Oscuro mantienen la apariencia seleccionada. AMOLED conserva fondos negros, contornos de burbujas personalizables y botones de acción blancos.</string>
+    <string name="appearance_amoled_detail">Fondos negros con contornos de burbujas personalizables.</string>
     <string name="appearance_font_size_help">El tamaño del texto se suma al ajuste de tamaño de fuente de tu dispositivo.</string>
     <string name="appearance_enter_help">Shift+Enter siempre inserta una nueva línea en un teclado físico.</string>
     <string name="appearance_font_system">Sistema</string>

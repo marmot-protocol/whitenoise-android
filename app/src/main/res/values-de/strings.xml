@@ -1774,8 +1774,8 @@
     <string name="developer_tools_already_enabled">Entwicklertools sind bereits aktiviert</string>
     <string name="appearance_outline_colors_fixed">AMOLED verwendet festes Weiß für Aktionsschaltflächen. Die Umrissfarben von Sprechblasen lassen sich unter „Sprechblasenfarben“ anpassen.</string>
     <string name="appearance_theme">Design</string>
-    <string name="appearance_theme_help">Systemstandard folgt deinem Gerät. Hell und Dunkel behalten das gewählte Erscheinungsbild. AMOLED verwendet einen schwarzen Hintergrund mit weißen Konturen.</string>
-    <string name="appearance_amoled_detail">Reines Schwarz mit klaren weißen Konturen.</string>
+    <string name="appearance_theme_help">Systemstandard folgt deinem Gerät. Hell und Dunkel behalten das gewählte Erscheinungsbild. AMOLED behält tiefschwarze Hintergründe, anpassbare Blasenkonturen und weiße Aktionsschaltflächen.</string>
+    <string name="appearance_amoled_detail">Tiefschwarze Hintergründe mit anpassbaren Blasenkonturen.</string>
     <string name="appearance_font_size_help">Die Textgröße wird zur Schriftgrößeneinstellung deines Geräts addiert.</string>
     <string name="appearance_enter_help">Shift+Enter fügt auf einer Hardwaretastatur immer eine neue Zeile ein.</string>
     <string name="appearance_font_system">System</string>
