@@ -48,7 +48,7 @@ on:
       - 'settings.gradle.kts'
 
 concurrency:
-  group: fuzz-pr-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.sha || github.ref }}
+  group: fuzz-pr-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.run_id || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions:
