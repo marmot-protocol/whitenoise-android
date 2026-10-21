@@ -63,7 +63,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
         "anchor": "fun ChatDeleteConfirmationDialog(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "GRP-034"
         ]
       },
       {

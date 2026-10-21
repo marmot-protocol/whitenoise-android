@@ -241,6 +241,74 @@ class ProfileAddToGroupsFlowTest {
         composeRule.runOnIdle { assertEquals("friends", promotedGroupId) }
     }
 
+    /** A failed invitation returns to its picker and opens a fresh, cancellable review. */
+    @Test
+    fun inviteFailureCanReopenCancelAndRetryFreshReview() = failedMutationCanReopenReview(promoting = false)
+
+    /** A failed cross-group promotion does not retain a consumed review ticket. */
+    @Test
+    fun promotionFailureCanReopenCancelAndRetryFreshReview() = failedMutationCanReopenReview(promoting = true)
+
+    private fun failedMutationCanReopenReview(promoting: Boolean) {
+        val appState = testAppState()
+        val busy = mutableStateOf(false)
+        var submissions = 0
+        val target = RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE)
+        val picker =
+            ProfileGroupPickerState(
+                groups = listOf(groupItem("friends", "Friends")),
+                pendingGroupIds = emptySet(),
+                loadState = ProfileGroupPickerLoadState.READY,
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (promoting) {
+                    ProfileMakeAdminContent(
+                        appState,
+                        "Alice",
+                        target,
+                        picker,
+                        busy.value,
+                        {},
+                        {},
+                        onPromote = {
+                            submissions++
+                            busy.value = true
+                        },
+                    )
+                } else {
+                    ProfileAddToGroupsContent(
+                        appState,
+                        target,
+                        picker,
+                        busy.value,
+                        {},
+                        {},
+                        onAdd = {
+                            submissions++
+                            busy.value = true
+                        },
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText("Friends").performClick()
+        val action = app.getString(if (promoting) R.string.make_admin else R.string.profile_add_to_groups_confirm_label)
+        composeRule.onNode(hasText(action) and hasClickAction()).performClick()
+        composeRule.onNodeWithTag("selected_members_confirm").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
+        assertEquals(1, submissions)
+        // The native operation failed without changing the selected group; the caller releases busy.
+        composeRule.runOnIdle { busy.value = false }
+        composeRule.onNode(hasText(action) and hasClickAction()).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
+        assertEquals(1, submissions)
+        composeRule.onNode(hasText(action) and hasClickAction()).performClick()
+        composeRule.onNodeWithTag("selected_members_confirm").performClick()
+        assertEquals(2, submissions)
+    }
+
     /** Keeps the bottom action fixed while scrolling to the last eligible group. */
     @Test
     fun overflowingListKeepsActionAtBottomAndLastGroupReachable() {

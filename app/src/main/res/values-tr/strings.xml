@@ -2354,4 +2354,18 @@
     <string name="group_change_invite_anyway">Yine de davet et</string>
     <string name="starting_as">Şu hesapla başlat</string>
     <string name="starting_as_account">Şu hesapla başlat: %1$s</string>
+    <string name="group_action_acting_account">İşlemi yapan hesap</string>
+    <string name="group_action_local_nickname">Yerel takma ad: %1$s</string>
+    <string name="group_action_public_key_hex">Açık anahtar (onaltılık)</string>
+    <string name="group_action_account_label">Yerel hesap etiketi: %1$s</string>
+    <string name="group_action_revoke_explanation">Bu işlem yönetici haklarını kaldırır. Kişi üye olarak kalır.</string>
+    <string name="group_action_add_members">Üye ekle</string>
+    <string name="group_action_transfer_and_leave">Yöneticiliği devret ve ayrıl</string>
+    <string name="group_action_step_down_and_leave">Yöneticilikten çekil ve ayrıl</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d grup</item>
+        <item quantity="other">%1$d grup</item>
+    </plurals>
+    <string name="group_review_add_member">Üye ekle</string>
+    <string name="group_review_invitation_visibility">Tüm üyeler görebilir.</string>
 </resources>

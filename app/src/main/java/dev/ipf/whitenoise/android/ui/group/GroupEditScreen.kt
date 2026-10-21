@@ -574,7 +574,13 @@ private fun GroupEditPhotoMenu(
                 add(WhiteNoiseMenuItem(stringResource(R.string.choose_photos), onChoosePhoto, R.drawable.ic_image))
                 add(WhiteNoiseMenuItem(stringResource(R.string.choose_files), onChooseFile, R.drawable.ic_description))
                 add(WhiteNoiseMenuItem(stringResource(R.string.find_web_image), onFindWebImage, R.drawable.ic_search))
-                add(WhiteNoiseMenuItem(stringResource(R.string.group_emoji_create), onCreateEmoji, R.drawable.ic_add))
+                add(
+                    WhiteNoiseMenuItem(
+                        stringResource(R.string.group_emoji_create),
+                        onCreateEmoji,
+                        R.drawable.ic_emoji_smileys,
+                    ),
+                )
                 if (hasImage) {
                     add(
                         WhiteNoiseMenuItem(

@@ -122,6 +122,22 @@
           "SEC-012",
           "SEC-013"
         ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.group_action_add_members",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.make_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ],
     "source_coverage": [
