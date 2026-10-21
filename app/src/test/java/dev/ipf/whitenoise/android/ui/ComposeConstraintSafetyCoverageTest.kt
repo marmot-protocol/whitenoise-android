@@ -14,9 +14,12 @@ class ComposeConstraintSafetyCoverageTest {
             Regex("""\.(?:width|height|requiredWidth|requiredHeight)\s*\(\s*IntrinsicSize\s*\.""")
         val root = uiRoot()
         val offenders =
-            root.walkTopDown().filter { it.extension == "kt" }.filter {
-                unsafeIntrinsic.containsMatchIn(it.readText())
-            }.map { it.relativeTo(root).path }.toList()
+            root
+                .walkTopDown()
+                .filter { it.extension == "kt" }
+                .filter { unsafeIntrinsic.containsMatchIn(it.readText()) }
+                .map { it.relativeTo(root).path }
+                .toList()
         assertTrue("Intrinsic sizing must use the bounded policy: $offenders", offenders.isEmpty())
         val owners =
             mapOf(

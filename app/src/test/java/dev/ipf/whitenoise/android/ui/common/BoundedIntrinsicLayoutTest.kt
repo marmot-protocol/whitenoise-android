@@ -59,7 +59,12 @@ class BoundedIntrinsicLayoutTest {
         assertWithinWidth("bubble", 300)
         composeRule.runOnIdle { body.value = "OK" }
         composeRule.onNodeWithText("OK").assertIsDisplayed()
-        val width = composeRule.onNodeWithTag("bubble").fetchSemanticsNode().boundsInRoot.width
+        val width =
+            composeRule
+                .onNodeWithTag("bubble")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .width
         assertTrue("short replies should still hug their content", width < 300f)
     }
 
