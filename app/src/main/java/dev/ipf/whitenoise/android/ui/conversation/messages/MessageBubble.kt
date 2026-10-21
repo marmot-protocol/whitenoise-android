@@ -2594,7 +2594,12 @@ internal fun MessageBubble(
                         // text and leaving a gap on the right (#428). Non-reply
                         // bubbles keep the wrap-content path untouched, so only
                         // reply-bubble measurement changes.
-                        contentModifier = if (replyPreview != null) Modifier.boundedIntrinsicWidth(IntrinsicSize.Max) else Modifier,
+                        contentModifier =
+                            if (replyPreview != null) {
+                                Modifier.boundedIntrinsicWidth(IntrinsicSize.Max)
+                            } else {
+                                Modifier
+                            },
                     ) {
                         senderNameLabel(true)
                         replyPreviewCard(true)

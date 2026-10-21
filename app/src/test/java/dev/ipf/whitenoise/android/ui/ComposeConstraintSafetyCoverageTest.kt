@@ -27,7 +27,10 @@ class ComposeConstraintSafetyCoverageTest {
                 "MarkdownRenderer.kt" to "boundedIntrinsicHeight",
             )
         owners.forEach { (path, modifier) ->
-            assertTrue("$path must retain bounded intrinsic sizing", root.resolve(path).readText().contains(".$modifier("))
+            assertTrue(
+                "$path must retain bounded intrinsic sizing",
+                root.resolve(path).readText().contains(".$modifier("),
+            )
         }
     }
 

@@ -89,8 +89,10 @@ private class BoundedIntrinsicSizeNode(
             when {
                 isWidth && constraints.hasFixedWidth -> constraints
                 !isWidth && constraints.hasFixedHeight -> constraints
-                isWidth -> boundedIntrinsicWidthConstraints(constraints, intrinsicWidth(measurable, constraints.maxHeight))
-                else -> boundedIntrinsicHeightConstraints(constraints, intrinsicHeight(measurable, constraints.maxWidth))
+                isWidth ->
+                    boundedIntrinsicWidthConstraints(constraints, intrinsicWidth(measurable, constraints.maxHeight))
+                else ->
+                    boundedIntrinsicHeightConstraints(constraints, intrinsicHeight(measurable, constraints.maxWidth))
             }
         val placeable = measurable.measure(childConstraints)
         return layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
