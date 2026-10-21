@@ -1,9 +1,10 @@
 # Serial Android merge queue
 
 A serial GitHub merge queue tests the reviewed PR against the current `master`
-without adding a base-refresh commit to every remaining PR. One candidate is
-built and merged at a time. The next candidate starts after the preceding merge
-is verified.
+through an integration commit, preserving the remaining PR source branches. Up to five reviewed
+PRs may wait in the queue: one active front and four waiting entries. One
+candidate is built and merged at a time. The next candidate is qualified against
+the new base after the preceding merge is verified.
 
 ## CI contract
 
@@ -28,9 +29,29 @@ The existing required aggregate check remains
 ## Authorization contract
 
 `scripts/whitenoise_android_serial_queue.py` is the pure policy used by the
-external watchdog. It performs no GitHub calls, inference, scheduling or branch
-writes. Authenticated live reads and independently verified evidence are trusted
-adapter responsibilities, never values accepted from a PR description.
+external watchdog. The trusted external adapter owns GitHub calls, inference,
+scheduling and branch writes. Authenticated live reads and independently verified
+evidence supply authority; PR descriptions remain untrusted input.
+
+### Bounded backlog and retained state
+
+State version 2 keeps separate source-owner and admission records for each of
+up to five queued PRs. Waiting entries retain a source-only disposition until
+their integration mapping and evidence qualify. Only the current front can receive
+integration authorization. Every prepared effect binds the complete ordered
+queue, current base, configuration and effective protection rules. A changed
+observation invalidates it. Incomplete inventories, duplicate entries, reordered
+positions and a sixth entry hold admission.
+
+The host adapter retains the exact original version 1 payloads, keys, budgets
+and history. Unknown effects reconcile read-only before new work. Source
+failure and feedback remain attached to their own PR and clear only through
+verification linked to that PR. Recovery, withdrawal and retirement address the named
+source, preserve other entries and retain complete stable survivor observations.
+A front merge invalidates downstream integration evidence. Promotion requires
+fresh base compatibility review, independently verified current merge-tree
+mapping and full integration checks while retaining the reviewed source head
+through the preceding merge.
 
 There are two separate authorization transitions:
 
@@ -58,15 +79,15 @@ Each effect has an immutable payload hash. The existing single producer must
 hold its lease, read identity/proof twice, and fsync an attempted intent before
 calling GitHub. Lost responses and process death enter read-only reconciliation;
 authoritative absence does not permit automatic replay. Queue failures keep the
-selected PR with its existing source owner. They do not launch a competing
-branch writer or advance another PR. Obsolete integration authorization is
+affected PR with its existing source owner. They do not launch a competing
+branch writer or grant authorization to another PR. Obsolete integration authorization is
 revoked before reassessment. Final squash signature, parent and tree must match
 before releasing the slot. A known timeout/refusal can receive a new
 logged admission generation from the original source owner after fresh proof;
 this never replays an uncertain effect. A positive local receipt that no
 request reached GitHub permits at most three invocations for the same effect
 (the initial invocation and two retries), with persisted attempt counts,
-backoff and full fresh identity/proof checks. A third never-sent failure persists
+backoff and full fresh identity/proof checks. The third never-sent failure persists
 `not-sent-exhausted` and holds subsequent ticks and process restarts, including
 direct execution of the same effect. After repairing the local fault, the
 original owner may explicitly record a new admission generation; the exhausted
@@ -88,11 +109,11 @@ The companion host adapter must use `exhaustion_unresolved` when retiring a
 selection. Explicit recovery may rebind the same PR to freshly verified current
 source/base commits, retaining the exhausted payload and double-checking new
 source evidence. A receipt-bound owner withdrawal releases exhaustion only
-after matching live empty-queue/PR observations and absence of outstanding
+after matching live target-absence/PR and survivor observations and absence of outstanding
 integration authorization. It retains the attempt counter, exhaustion and
 withdrawal proof. Closed selected PRs retain their owner handle until positive
-closed/empty retirement; historical retirement never clears a different current
-selection. Confirmed recovery and withdrawal use the same exhaustion predicate
+closed/target-absent retirement; historical retirement never clears a different
+source record. Confirmed recovery and withdrawal use the same exhaustion predicate
 as candidate retirement. These live observations and owner receipts are trusted
 host-adapter responsibilities; the pure policy validates the retained record,
 but cannot authenticate an owner or query GitHub itself.
@@ -100,7 +121,7 @@ Changing generation never releases an uncertain sent write. A remote API refusal
 recovery; a sent request with a lost response stays uncertain. The CLI child
 verifies the journal intent and its actual ancestor producer lock.
 An explicit owner recovery can retire a positively closed, unmerged PR after
-two matching reads of the PR and an empty queue. It preserves the uncertain
+two matching reads of the PR, target absence and the complete survivor queue. It preserves the uncertain
 effect as terminal evidence, excludes the PR from future selection and never
 retries that write.
 Queue holds, their age, uncertain effects and API budget are exposed through
@@ -108,13 +129,13 @@ the existing watchdog health report.
 
 ## Controlled activation
 
-Merging these workflow and policy changes does not activate the queue. The
-host operator must adopt the reviewed adapter and existing-watchdog changes as
+Queue activation requires a separate operational deployment after these
+workflow and policy changes merge. The host operator must adopt the reviewed adapter and existing-watchdog changes as
 one deployment, retaining all old uncertain intents and independent review
-receipts. No additional scheduler or merge producer is introduced.
+receipts. Deployment reuses the existing scheduler and sole merge producer.
 
-The deployment configures GitHub's native queue for one entry to build and
-merge, minimum one, zero grouping wait, squash, `ALLGREEN`, and a 120-minute
+The deployment permits five queued PRs while configuring GitHub's native queue
+for one entry to build and merge, minimum one, zero grouping wait, squash, `ALLGREEN`, and a 120-minute
 check timeout. Existing signature, discussion and zero-formal-approval rules
 remain. Strict source-branch base checks become integration checks through the
 queue; the required CI and authorization contexts remain enforced.
@@ -125,9 +146,12 @@ integration authorization. A canary mode is restricted to one pinned PR head
 and requires an additional canary hold in live branch rules. The operator
 satisfies that hold on the source head only; it stays unsatisfied on generated
 integrations, preventing the canary from merging even after authorization.
-Workflow job names cannot claim either authorization or canary hold. Verify that green CI alone cannot merge, then observe three
-natural shadow ticks. Finally admit one qualified PR, verify its signed squash
-and an empty queue, and confirm the existing watchdog remains healthy.
+Workflow job names cannot claim either authorization or canary hold. Verify that green CI alone cannot merge, then verify the existing
+shadow-read contract. Finally admit a qualified PR, verify its signed squash
+and retirement, and confirm the existing watchdog remains healthy. Capacity
+activation additionally verifies multiple exact source entries, waiting entries
+without integration credit, target-only cleanup and fresh qualification after
+front promotion.
 
 If a canary fails or a read is incomplete, keep authorization closed. Rollback
 first enters draining mode to revoke known live integrations and withdraw pinned
