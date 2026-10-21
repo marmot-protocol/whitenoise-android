@@ -119,6 +119,11 @@ and the original 1 KiB pending upload. It requires at least 24 MiB of actual
 closed-database shrinkage, zero retained WAL bytes, exact plaintext through
 bounded reads, and the retained accounts/history after migration and restart.
 It does not infer compaction from a settled status alone.
+After migration settles, it keeps MDK running for up to 120 seconds for the
+separate 15-second maintenance tick to compact eligible databases. It observes
+file sizes, then rechecks settled native state and exact retained bytes before
+closing. The same 24 MiB shrink and zero closed-WAL assertions remain required;
+the fixture never invokes VACUUM or changes database rows itself.
 
 External instrumentation is confined to the rootable GitHub emulator and the
 disposable `.mdkqualification` process. It verifies the complete published

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.qualification
 
 import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import java.io.File
 import java.io.RandomAccessFile
@@ -33,6 +35,31 @@ internal fun damageUpgradeMedia(
     }
 }
 
+/** Leaves MDK running for its next maintenance tick; settled migration alone precedes native compaction. */
+internal suspend fun awaitUpgradeCompaction(
+    root: File,
+    receipt: File,
+) {
+    val baselineBytes = JSONObject(receipt.readText()).getLong("baselineDatabaseBytes")
+    val databases = root.walkTopDown().filter { it.isFile && it.name == "session.sqlite" }.toList()
+    check(databases.size == 2)
+    try {
+        withTimeout(120_000L) {
+            while (baselineBytes - databases.sumOf { it.length() } < 24L * 1024L * 1024L) delay(250L)
+        }
+    } finally {
+        val report =
+            JSONObject()
+                .put("phase", "upgrade-compaction")
+                .put("baselineDatabaseBytes", baselineBytes)
+                .put("databaseBytes", databases.sumOf { it.length() })
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply { putString("qualification_database", report.toString()) },
+        )
+    }
+}
+
 /** Measures real closed database files; substantial shrink plus intact content proves native reclamation. */
 internal fun recordUpgradeDatabase(
     root: File,
@@ -45,6 +72,11 @@ internal fun recordUpgradeDatabase(
     val bytes = databases.sumOf { it.length() }
     val walBytes = databases.sumOf { File(it.path + "-wal").let { wal -> if (wal.exists()) wal.length() else 0L } }
     val value = JSONObject(receipt.readText())
+    val report = JSONObject().put("phase", phase).put("databaseBytes", bytes).put("walBytes", walBytes)
+    InstrumentationRegistry.getInstrumentation().sendStatus(
+        0,
+        Bundle().apply { putString("qualification_database", report.toString()) },
+    )
     if (phase == "seed") {
         check(bytes >= 32L * 1024L * 1024L) { "Baseline did not persist the large legacy fixture" }
         value.put("baselineDatabaseBytes", bytes)
@@ -55,9 +87,4 @@ internal fun recordUpgradeDatabase(
         }
         check(walBytes == 0L) { "Closed native runtime retained an untruncated WAL" }
     }
-    val report = JSONObject().put("phase", phase).put("databaseBytes", bytes).put("walBytes", walBytes)
-    InstrumentationRegistry.getInstrumentation().sendStatus(
-        0,
-        Bundle().apply { putString("qualification_database", report.toString()) },
-    )
 }

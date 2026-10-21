@@ -92,6 +92,16 @@ class MarmotUpgradeFixtureTest {
                         } else if (phase == "promoted-cold") {
                             verifyPendingUpload(runtime, receipt, phase)
                         }
+                        if (phase == "upgrade") {
+                            awaitUpgradeCompaction(root, receipt)
+                            verifyUpgradeStorage(
+                                runtime,
+                                "compacted",
+                                beforeStart = false,
+                                pendingLegacyBytes = PENDING_SIZE.toULong(),
+                            )
+                            verifyRetained(runtime, JSONObject(receipt.readText()))
+                        }
                     }
                 }
             } finally {
