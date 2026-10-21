@@ -106,15 +106,40 @@ class PreviewUi:
         adb('shell', 'uiautomator', 'dump', '/sdcard/pr3371-preview.xml')
         xml = adb('shell', 'cat', '/sdcard/pr3371-preview.xml')
         self.xml = xml
-        self.nodes = list(ET.fromstring(xml).iter('node'))
+        root = ET.fromstring(xml)
+        self.nodes = list(root.iter('node'))
+        self.parents = {child: parent for parent in root.iter() for child in parent}
         if re.search(r'migration.*(?:failed|error)|database.*(?:newer|incompatible)', xml, re.I):
             raise RuntimeError('Preview showed a bootstrap/migration error')
         return self.nodes
 
     def matches(self, text):
-        """Match a label, not arbitrary substring coordinates from a stale screenshot."""
+        """Reject labels whose Compose action ancestor is disabled, even when the text itself is enabled."""
         return [node for node in self.nodes if text in (node.get('text'), node.get('content-desc'))
-                and node.get('enabled') == 'true']
+                and self.enabled(node)]
+
+    def enabled(self, node):
+        """A visible text child does not override the enabled state of its containing action."""
+        while node is not None:
+            if node.get('enabled') == 'false':
+                return False
+            node = self.parents.get(node)
+        return True
+
+    def open_demo_setup(self):
+        """Re-enter the baseline screen after its asynchronous saved-demo receipt has loaded."""
+        for _ in range(6):
+            self.click('Developer Tools', scroll=True)
+            self.snapshot()
+            if self.matches('Create demo conversation'):
+                self.click('Create demo conversation')
+                self.click('Create demo')
+                return
+            # Baseline canBegin reads Job.isCompleted, which does not itself trigger recomposition.
+            # Normal back/re-entry observes completion without changing the signed baseline or its data.
+            time.sleep(2)
+            adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+        raise RuntimeError('Baseline demo setup remained unavailable after bounded screen re-entry')
 
     def tap_node(self, node):
         """Use the freshly observed node bounds and refuse malformed geometry."""
@@ -219,9 +244,7 @@ def main():
         ui.click('Sign Up', last=True)
         ui.click(f'Open settings, {FIXTURE_NAME}', timeout=300)
         identity = ui.public_identity()
-        ui.click('Developer Tools', scroll=True)
-        ui.click('Create demo conversation')
-        ui.click('Create demo')
+        ui.open_demo_setup()
         ui.retained_chat('baseline')
         facts['public_identity_sha256'] = identity
         facts['phases']['baseline'] = 'passed'
