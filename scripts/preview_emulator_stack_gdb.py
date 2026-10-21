@@ -1,11 +1,35 @@
 """GDB-only sidecar: retain explicit frame fields, then detach with the original pending signal."""
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
 
 import gdb
+
+
+def mapped_frame(pid, pc):
+    """Resolve only the mapping containing this PC; never infer module ownership from an unknown symbol."""
+    with Path(f'/proc/{pid}/maps').open() as mappings:
+        for line in mappings:
+            fields = line.split(maxsplit=5)
+            start, end = (int(value, 16) for value in fields[0].split('-'))
+            if not start <= pc < end:
+                continue
+            path = fields[5].strip() if len(fields) == 6 else ''
+            offset = int(fields[2], 16)
+            facts = {'module': Path(path).name if path.startswith('/') else None,
+                     'mapping_start': hex(start), 'mapping_file_offset': hex(offset),
+                     'file_offset': hex(pc - start + offset), 'permissions': fields[1]}
+            # Hash only the verified SDK executable, never anonymous mappings or fixture files.
+            executable = Path(f'/proc/{pid}/exe').resolve(strict=True)
+            if path == str(executable):
+                with executable.open('rb') as binary:
+                    facts['executable_sha256'] = hashlib.file_digest(binary, 'sha256').hexdigest()
+                facts['main_executable'] = True
+            return facts
+    return None
 
 
 def write_receipt(path, value):
@@ -59,7 +83,8 @@ def collect():
                 pc = frame.pc()
                 module = gdb.solib_name(pc)
                 facts['frames'].append({'function': (frame.name() or '<unknown>')[:256],
-                                        'pc': hex(pc), 'module': Path(module).name if module else None})
+                                        'pc': hex(pc), 'module': Path(module).name if module else None,
+                                        'mapping': mapped_frame(pid, pc)})
                 frame = frame.older()
             facts['truncated'] = frame is not None
             faulting_thread.switch()

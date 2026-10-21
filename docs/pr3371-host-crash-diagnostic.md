@@ -20,6 +20,14 @@ nonfatal stops resume until a fatal-type signal or debugger cleanup. Unknown
 module ownership stays null; it is never guessed to belong to QEMU. Hosted
 controls include SIGUSR1 before SIGSEGV and progress after debugger cleanup.
 
+Run 39627518249 captured SIGSEGV and the parent confirmed actual termination,
+but stripped symbols left the fault location unresolved. Each frame now records
+only its containing `/proc/PID/maps` mapping's basename, start, file offset and
+permissions (or null when unmapped). A PC in the main executable also records
+that executable's SHA-256. These fields allow static analysis of the published
+SDK binary without collecting a memory dump or guessing that an unknown PC is
+inside QEMU. No complete mapping list or host paths are retained.
+
 The original stopped thread receives its pending signal when GDB detaches. A
 signal stop is not termination evidence: the unchanged parent process observer's
 `Popen.wait()` result remains authoritative. Hosted synthetic child tests prove
