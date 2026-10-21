@@ -194,7 +194,7 @@ re-signed APK nor the debug instrumentation pair can substitute for these exact 
 hosted smokes may the selected Pixel 9a receive the isolated candidate for its
 separate device check; its existing production/dev packages remain untouched.
 
-The signed-preview lane explicitly selects `-gpu swiftshader -feature -Vulkan`,
+The initial explicit comparison selected `-gpu swiftshader -feature -Vulkan`,
 supported by [Android's emulator troubleshooting guide](https://developer.android.com/studio/run/emulator-troubleshooting).
 Two attempts on emulator 37.2.12 with automatic `software` rendering lost the
 emulator at the baseline composer, before candidate installation. Startup selected
@@ -224,7 +224,7 @@ Their cgroup OOM counters stayed zero. Neither completed a qualification phase;
 the underlying crashing function is still unknown. The same baseline, driver and
 renderer had passed at `9b47cf9`, so another unchanged retry is not the next step.
 
-The signed-preview lane now makes one controlled version comparison with
+The signed-preview lane retains the controlled comparison version,
 **37.1.11 stable**, the nearest prior stable release in
 [Android's release notes](https://developer.android.com/studio/releases/emulator).
 The [official archive](https://developer.android.com/studio/emulator_archive)
@@ -234,11 +234,10 @@ The pinned action's `emulator-build` input selects that build; the prelaunch hoo
 fails before modifying the launcher unless installed `Pkg.Revision` is exactly
 `37.1.11`. Because the action continues after a failed prelaunch hook, the driver
 independently rechecks that revision and the observer installation before any
-qualification or device operation. The action does not verify the archive checksum, so the published digest
-is provenance, not a claimed local checksum verification. API 34, the system-image
-selection, ARM64 bridge, SwiftShader options, 4 GiB guest RAM and all application
-assertions remain unchanged. This is an infrastructure comparison, not a known
-emulator fix or passing qualification evidence.
+qualification or device operation. The archive was separately downloaded and its
+SHA-256 verified during static diagnosis; the action itself does not verify that
+archive digest. API 34, the system-image selection, ARM64 bridge, 4 GiB guest RAM
+and all application assertions remain unchanged.
 
 Each launcher invocation now retains an atomic `emulator-process-<pid>.json`,
 including whether it launched an AVD. A later teardown helper cannot overwrite
@@ -246,6 +245,35 @@ the primary process's exit evidence. Regression coverage preserves the first
 failed child's record across a successful helper and rejects a version mismatch
 before changing SDK files or running qualification. Raw arguments, memory and
 crash databases remain excluded.
+
+### Explicit ANGLE renderer comparison
+
+The 37.1.11 legacy SwiftShader comparison also terminated with host SIGSEGV.
+Separate bounded debugger runs confirmed an executable fault address without a
+retained filesystem module; they did not establish a root cause or an MDK crash.
+The signed-preview lane now explicitly selects `-gpu swangle -feature -Vulkan`.
+[Android documents SwANGLE](https://developer.android.com/studio/run/emulator-acceleration)
+as ANGLE with SwiftShader, distinct from automatic software selection.
+
+Diagnostic [39631114045](https://github.com/marmot-protocol/whitenoise-android/actions/runs/39631114045)
+kept the same emulator build, system image, e701aee APKs and assertions. Its logs
+confirmed `vulkan_mode_selected:swiftshader gles_mode_selected:swangle`, ANGLE
+2.1.17841 and SwiftShader 5.0.0. Baseline, in-place upgrade, full cold restart and
+retained identity passed; the primary emulator exited normally after driver
+completion. Artifact `12359786449` retains the evidence. This supports the
+renderer configuration as an infrastructure workaround, not proof of the original
+fault's root cause. The comparison was debugger-assisted and remains diagnostic;
+the current signed candidate must pass all phases without GDB before Pixel use.
+No debugger or diagnostic-source override is part of this PR's normal workflow.
+
+The ready-head attachment campaign separately failed at ADB reverse binding before
+controller-resume instrumentation. Its first native receive probe passed. Failure
+reports now retain only fixed binding/transport categories, the attempted service
+role and the owned mapping count before that attempt. They preserve `--no-rebind`,
+fail closed, and clean up only successfully owned mappings. The two unchanged
+scenarios passed diagnostic [39629420667](https://github.com/marmot-protocol/whitenoise-android/actions/runs/39629420667);
+the original binding cause is unknown and the full attachment campaign is still
+required. No transport reset, occupied-port overwrite or failure retry was added.
 
 ## Retention
 

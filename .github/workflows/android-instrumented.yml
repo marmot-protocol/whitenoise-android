@@ -869,7 +869,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      PREVIEW_EMULATOR_OPTIONS: -no-snapshot-save -no-window -gpu swiftshader -feature -Vulkan -noaudio -no-boot-anim -camera-back none
+      PREVIEW_EMULATOR_OPTIONS: -no-snapshot-save -no-window -gpu swangle -feature -Vulkan -noaudio -no-boot-anim -camera-back none
       PREVIEW_EMULATOR_REVISION: '37.1.11'
     permissions:
       contents: read
@@ -907,7 +907,7 @@ jobs:
       - name: Exercise unchanged ARM64 release bytes through ordinary UI
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          # Nearest prior stable: controlled comparison after repeated 37.2.12 host SIGSEGVs.
+          # Retain the version used by the passing explicit ANGLE/SwiftShader comparison.
           emulator-build: '15917651'
           api-level: 34
           target: google_apis
