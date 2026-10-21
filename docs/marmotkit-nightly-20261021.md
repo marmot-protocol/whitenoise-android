@@ -266,6 +266,17 @@ fault's root cause. The comparison was debugger-assisted and remains diagnostic;
 the current signed candidate must pass all phases without GDB before Pixel use.
 No debugger or diagnostic-source override is part of this PR's normal workflow.
 
+Normal signed-preview [39634706490](https://github.com/marmot-protocol/whitenoise-android/actions/runs/39634706490)
+then passed all four phases without a debugger at Android `7a0eed58567d531d7216337682c3aec1710a0ac7`.
+Artifact `12361720426` binds the result to APK SHA-256
+`f6f02a0749d4a506ed9e1a6febad53a47504bd86b47bf73fc319771ceabf5612`.
+The primary QEMU process exited zero after driver completion, with no signal or
+recorded cgroup OOM. That exact APK also passed the authorized Pixel 9a in-place
+upgrade, full process-stop/cold restart, retained history/composer, profile and
+relay-state checks. Its original installation time and all other White Noise
+package versions/timestamps were preserved. These results qualify that recorded
+revision; subsequent candidates still require their own exact signed smoke.
+
 The ready-head attachment campaign separately failed at ADB reverse binding before
 controller-resume instrumentation. Its first native receive probe passed. Failure
 reports now retain only fixed binding/transport categories, the attempted service
@@ -274,6 +285,26 @@ fail closed, and clean up only successfully owned mappings. The two unchanged
 scenarios passed diagnostic [39629420667](https://github.com/marmot-protocol/whitenoise-android/actions/runs/39629420667);
 the original binding cause is unknown and the full attachment campaign is still
 required. No transport reset, occupied-port overwrite or failure retry was added.
+
+### Forward fixture and native content reuse
+
+At `7a0eed5`, the full attachment campaign reached its forward verifier after all
+other scenarios passed. All fifteen forwards delivered exact bytes, but the
+verifier required seven GETs and observed five. Both accounts publish identical
+source bytes before the matrix. This nightly's
+[native acquisition](https://github.com/marmot-protocol/mdk/blob/8c214fee07466b0b7b63f8dfa39877cce1f63573/crates/marmot-app/src/runtime/account_worker/attachments.rs#L636)
+attaches an existing plaintext-digest twin before downloading. The author's first
+receipt and the forwarder's retained-source setup therefore need no HTTP. A
+slot-specific retained lookup can still miss before that explicit attachment.
+
+The verifier now requires exactly five complete source GETs, one for each
+uncached compatibility read, and zero redundant GETs during setup or receipts.
+It preserves all fifteen exact-byte receipts, source-state and timing assertions,
+twenty-two uploads and distinct-message counts. Negative controls reject missing
+required reads, redundant reads, and a wrong-token read substituted at the same
+total count. Fresh-recipient transfer remains covered by the separate receive
+fixtures. The original report remains failed; this contract repair requires a
+fresh full hosted campaign and changes no Android or MDK acquisition behavior.
 
 ## Retention
 

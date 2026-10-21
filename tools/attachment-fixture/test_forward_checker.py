@@ -3,7 +3,7 @@
 from copy import deepcopy
 import unittest
 
-from forward_checker import (CEILING_MS, CIPHERTEXT_OVERHEAD, FINAL_MARKER, FIRST_FORWARD, MARKERS, PAYLOAD_BYTES,
+from forward_checker import (CEILING_MS, CIPHERTEXT_OVERHEAD, FINAL_MARKER, MARKERS, PAYLOAD_BYTES,
                              PHASE_FIELDS, REPETITIONS, SOURCE, VARIANTS, check_forward, expected_gets, expected_uploads)
 
 MIB = 1024 * 1024
@@ -83,8 +83,8 @@ class LedgerBuilder:
         self.event("marker", number)
 
 
-def events():
-    """The whole ledger of one passing run, in the probe's order."""
+def events(extra_get_marker=None, omit_source_marker=None):
+    """Build the complete ledger, optionally adding a redundant read or omitting one required source download."""
     ledger = LedgerBuilder()
     ledger.upload("upload-source")
     ledger.upload("upload-own")
@@ -95,14 +95,16 @@ def events():
         source = "upload-own" if variant == "cached" else "upload-source"
         if variant == "retained":
             ledger.marker(MARKERS["retained"])
-            ledger.get("upload-source")
+            if extra_get_marker == MARKERS["retained"]:
+                ledger.get("upload-source")
         for rep in range(1, REPETITIONS + 1):
-            ledger.marker(MARKERS[variant] + rep)
+            marker = MARKERS[variant] + rep
+            ledger.marker(marker)
             token = f"upload-{variant}-{rep}"
             ledger.upload(token)
-            if SOURCE[variant]["download"]:
+            if SOURCE[variant]["download"] and marker != omit_source_marker:
                 ledger.get(source)
-            if (variant, rep) == FIRST_FORWARD:
+            if marker == extra_get_marker:
                 ledger.get(token)
     ledger.marker(FINAL_MARKER)
     return ledger.rows
@@ -255,22 +257,34 @@ class ForwardEvidenceTest(unittest.TestCase):
         self.assertFalse(check_forward(rows + [dict(sample("cached", 1), variant="other")], events())["passed"])
         self.assertFalse(check_forward(["not a metric"], events())["passed"])
 
-    def test_a_later_copy_acquired_again_or_a_first_copy_never_acquired_fails(self):
-        """The author holds the forwarded bytes after the first receipt, so refetching a later copy is a violation,
-        and a first copy that never reached the server leaves its receipt unproven."""
-        ledger = events()
-        position = next(i for i, e in enumerate(ledger)
-                        if e["kind"] == "marker" and e["value"] == MARKERS["retained"] + 3)
-        refetch = LedgerBuilder()
-        refetch.rows = deepcopy(ledger[:position])
-        refetch.get("upload-retained-2")
-        moved = refetch.rows + deepcopy(ledger[position:])
-        for index, event in enumerate(moved):
-            event["seq"] = index + 1
-        self.assertFalse(check_forward(metrics(), moved)["passed"])
-        first = next(e for e in ledger if e["kind"] == "get" and e["fixture"] == "upload-uncached-1")
-        missing = [e for e in ledger if e["seq"] != first["seq"] and e.get("request") != first["seq"]]
-        self.assertFalse(check_forward(metrics(), missing)["passed"])
+    def test_every_uncached_source_download_is_required(self):
+        """Native receipt reuse cannot excuse a missing HTTP source read in any uncached forward."""
+        for rep in range(1, REPETITIONS + 1):
+            with self.subTest(rep=rep):
+                result = check_forward(metrics(), events(omit_source_marker=MARKERS["uncached"] + rep))
+                self.assertFalse(result["passed"])
+                self.assertIn(f"uncached {rep}: unexpected acquisition pattern", result["violations"])
+
+    def test_retained_setup_and_every_destination_receipt_must_reuse_owned_content(self):
+        """Even the first receipt already has a native content twin; any complete redundant GET fails."""
+        markers = [MARKERS["retained"]] + [MARKERS[v] + rep for v in VARIANTS
+                                          for rep in range(1, REPETITIONS + 1)]
+        for marker in markers:
+            with self.subTest(marker=marker):
+                result = check_forward(metrics(), events(extra_get_marker=marker))
+                self.assertFalse(result["passed"])
+                self.assertTrue(any("unexpected acquisition pattern" in v for v in result["violations"]), result)
+
+    def test_a_redundant_receipt_cannot_replace_a_required_source_download(self):
+        """A correct total GET count cannot hide the wrong acquisition token in an uncached sample."""
+        for rep in range(1, REPETITIONS + 1):
+            marker = MARKERS["uncached"] + rep
+            ledger = events(extra_get_marker=marker, omit_source_marker=marker)
+            with self.subTest(rep=rep):
+                self.assertEqual(5, sum(e["kind"] == "get" for e in ledger))
+                result = check_forward(metrics(), ledger)
+                self.assertFalse(result["passed"])
+                self.assertIn(f"uncached {rep}: unexpected acquisition pattern", result["violations"])
 
     def test_unexpected_requests_fail(self):
         """An extra acquisition inside a sample or after the final marker, a HEAD or a disconnect fails the ledger."""

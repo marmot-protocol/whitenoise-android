@@ -189,6 +189,11 @@ each with the source **uncached** (never opened), **retained** (opened once, so 
 local diagnostics session and records the app's own `op=message_forward` phase lines (source lookup, source download,
 materialization, destination upload, commit-lock wait, publication, terminal), the time to the terminal state, and the
 author's genuine receipt and exact read of the forwarded copy. A numbered ledger marker brackets every sample.
+Both accounts have already published the same plaintext during setup. Native acquisition attaches that retained
+content to the source or destination slot without HTTP, including the first destination receipt. The ledger therefore
+requires exactly five GETs, one complete source download per uncached compatibility read, and no GET during retained
+setup or any destination receipt. All fifteen destination reads must still return the exact bytes. Fresh-recipient
+download coverage belongs to the separate receive fixtures.
 `forward_checker.py` requires every phase to be timed, exactly one completed message and one attachment per forward with
 no retry or convergence, the memory, host-disk and native layers in the state the variant declares, a source download
 only for the uncached source (a retained or host-cached source is served locally and never crosses the network again),
