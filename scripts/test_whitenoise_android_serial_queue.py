@@ -8,6 +8,18 @@ from scripts import whitenoise_android_serial_queue as q
 
 
 class QueueTest(unittest.TestCase):
+    def test_journal_rejects_non_mapping_payload_and_record(self):
+        for payload in (None, 7, 'payload', [], True):
+            with self.subTest(payload=payload):
+                record = {'state': 'confirmed', 'payload': payload}
+                journal = {'schema': 1, 'effects': {q.digest(payload): record}}
+                with self.assertRaisesRegex(q.Held, 'invalid-journal-record'):
+                    q.validate_journal(journal)
+        for record in (None, 7, 'record', [], True):
+            with self.subTest(record=record):
+                with self.assertRaisesRegex(q.Held, 'invalid-journal-record'):
+                    q.validate_journal({'schema': 1, 'effects': {'a' * 64: record}})
+
     def setUp(self):
         self.identity = q.Identity(10, 'PR_node', 'a' * 40, 'b' * 40)
         self.journal = {'schema': 1, 'effects': {}}
@@ -48,6 +60,88 @@ class QueueTest(unittest.TestCase):
             'jump': False, 'number': 10,
             'pull_request_id': 'PR_node', 'source': 'a' * 40,
             'integration': head, 'entry_id': 'ENTRY_node'}])
+
+    def test_default_mapped_front_precedes_absent_or_different_candidate(self):
+        self.queued()
+        front = q.entry_identity(self.snapshot)
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        for candidate in (None, other):
+            with self.subTest(candidate=candidate):
+                self.snapshot['candidate'] = asdict(candidate) if candidate else None
+                effect = q.plan(self.snapshot, candidate,
+                                lambda *_: self.fail('source must not precede front'),
+                                lambda identity, _: 'e' * 64 if identity == front else None)
+                self.assertEqual(effect.kind, 'authorize-integration')
+                self.assertEqual(effect.identity, front)
+
+    def test_named_target_front_then_peer_admission_keeps_front_key(self):
+        self.queued()
+        self.integration = lambda identity, _: 'e' * 64 if identity.number == 10 else None
+        self.assertEqual(self.tick(target_number=10), 'authorize-integration-confirmed')
+        original = copy.deepcopy(self.journal)
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.assertEqual(self.tick(candidate=other, target_number=11,
+                                  verify_integration=lambda *_: self.fail('foreign front credit')),
+                         'authorize-source-confirmed')
+        peer = self.writes[-1][0]
+        self.snapshot['source_authorization'] = {'effect_key': peer.key(),
+            'source': other.source, 'creator_id': q.ACTOR_ID, 'state': 'success'}
+        self.assertEqual(self.tick(candidate=other, target_number=11,
+                                  verify_integration=lambda *_: self.fail('foreign front credit')),
+                         'enqueue-confirmed')
+        for key, record in original['effects'].items():
+            self.assertEqual(self.journal['effects'][key], record)
+        self.assertEqual([effect.kind for effect, _ in self.writes],
+                         ['authorize-integration', 'authorize-source', 'enqueue'])
+
+    def test_named_front_must_match_candidate_source_and_node(self):
+        self.queued()
+        for source, node in (('f' * 40, self.identity.pull_request_id),
+                             (self.identity.source, 'different-node')):
+            candidate = q.Identity(10, node, source, self.identity.base)
+            self.snapshot['candidate'] = asdict(candidate)
+            with self.subTest(source=source, node=node), self.assertRaisesRegex(q.Held, 'candidate-changed'):
+                self.tick(candidate=candidate, target_number=10,
+                          verify_source=lambda *_: self.fail('unbound source proof'),
+                          verify_integration=lambda *_: self.fail('unbound integration proof'))
+        self.assertFalse(self.writes)
+        self.assertFalse(self.journal['effects'])
+
+    def test_named_target_is_exact_positive_integer_bound_to_candidate(self):
+        for target in (True, False, 0, -1, '10', 11):
+            with self.subTest(target=target), self.assertRaises(q.Held):
+                self.tick(target_number=target)
+        with self.assertRaises(q.Held):
+            self.tick(candidate=None, target_number=10)
+        self.assertFalse(self.writes)
+
+    def test_exhausted_peer_does_not_hold_default_front(self):
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        effect = q.Effect('authorize-source', other, 'c' * 64)
+        self.journal['effects'][effect.key()] = {'payload': effect.payload(),
+            'state': 'not-sent-exhausted', 'not_sent_attempts': 3,
+            'not_sent_budget': 3, 'response_sha256': 'e' * 64, 'retry_after': 0}
+        self.queued()
+        self.integration = lambda *_: 'e' * 64
+        self.assertEqual(self.tick(candidate=None), 'authorize-integration-confirmed')
+        self.assertEqual(self.journal['effects'][effect.key()]['not_sent_attempts'], 3)
+
+    def test_exhausted_front_does_not_hold_named_peer(self):
+        self.queued()
+        front = q.entry_identity(self.snapshot)
+        effect = q.Effect('authorize-integration', front, 'e' * 64)
+        self.journal['effects'][effect.key()] = {'payload': effect.payload(),
+            'state': 'not-sent-exhausted', 'not_sent_attempts': 3,
+            'not_sent_budget': 3, 'response_sha256': 'e' * 64, 'retry_after': 0}
+        self.assertEqual(self.tick(candidate=None, verify_integration=lambda *_: 'e' * 64),
+                         'not-sent-exhausted-held')
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.assertEqual(self.tick(candidate=other, target_number=11,
+                                  verify_integration=lambda *_: self.fail('foreign front credit')),
+                         'authorize-source-confirmed')
+        self.assertEqual(self.journal['effects'][effect.key()]['not_sent_attempts'], 3)
 
     def test_source_authorization_is_a_separate_effect_before_enqueue(self):
         self.assertEqual(self.tick(), 'authorize-source-confirmed')

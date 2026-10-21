@@ -77,12 +77,18 @@ before releasing the slot. A known timeout/refusal can receive a new
 logged admission generation from the original source owner after fresh proof;
 this never replays an uncertain effect. Known refusals and exhausted retries hold
 the affected PR and admission generation; other qualified PRs may advance.
+The default planner authorizes a mapped front before considering admission.
+A host caller holding one admitted PR’s lease can pass `target_number` to
+`plan()` or `tick()`; it must match the source candidate. This scopes work to
+that PR while validating the complete queue, so admitting a peer cannot borrow
+the front’s integration proof or lease.
+
 Uncertain sent effects remain a global read-only reconciliation hold.
 A positive local receipt that no
 request reached GitHub permits at most three invocations for the same effect
 (the initial invocation and two retries), with persisted attempt counts,
 backoff and full fresh identity/proof checks. A third never-sent failure persists
-`not-sent-exhausted` and holds subsequent ticks and process restarts, including
+`not-sent-exhausted` and holds the affected PR and generation across process restarts, including
 direct execution of the same effect. After repairing the local fault, the
 original owner may explicitly record a new admission generation; the exhausted
 record is retained, and the new effect still requires fresh identity/proof checks.

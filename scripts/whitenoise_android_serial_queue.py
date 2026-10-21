@@ -162,7 +162,7 @@ def entry_identity(snapshot, entry=None):
                     entry['base'], entry['integration'], entry['entry_id']).validate()
 
 
-def plan(snapshot, candidate, verify_source, verify_integration):
+def plan(snapshot, candidate, verify_source, verify_integration, *, target_number=None):
     """Evidence verifiers return immutable digests, never bare approval flags.
 
     The source verifier checks source review, signatures, applicable CI,
@@ -174,6 +174,23 @@ def plan(snapshot, candidate, verify_source, verify_integration):
     """
     validate_snapshot(snapshot)
     generation = snapshot.get('generation', 0)
+    if target_number is not None:
+        if (type(target_number) is not int or target_number <= 0
+                or candidate is None or candidate.number != target_number):
+            raise Held('target-candidate-changed')
+        candidate.validate()
+        if (candidate.integration is not None or candidate.entry_id is not None
+                or snapshot.get('candidate') != asdict(candidate)):
+            raise Held('candidate-changed')
+    front = entry_identity(snapshot)
+    if front is not None and (target_number is None or front.number == target_number):
+        if (target_number is not None
+                and (front.pull_request_id, front.source) != (candidate.pull_request_id, candidate.source)):
+            raise Held('candidate-changed')
+        proof = verify_integration(front, snapshot)
+        if not isinstance(proof, str) or not DIGEST.fullmatch(proof):
+            raise Held('integration-evidence-held')
+        return Effect('authorize-integration', front, proof, generation)
     if candidate is None:
         return None
     candidate.validate()
@@ -185,13 +202,7 @@ def plan(snapshot, candidate, verify_source, verify_integration):
     if entry is not None:
         if (entry['pull_request_id'], entry['source']) != (candidate.pull_request_id, candidate.source):
             raise Held('candidate-changed')
-        identity = entry_identity(snapshot, entry)
-        if identity is None:
-            return None
-        proof = verify_integration(identity, snapshot)
-        if not isinstance(proof, str) or not DIGEST.fullmatch(proof):
-            raise Held('integration-evidence-held')
-        return Effect('authorize-integration', identity, proof, generation)
+        return None
     if len(snapshot['entries']) >= MAX_ENTRIES:
         raise Held('queue-capacity-held')
     if candidate.base != snapshot['master']:
@@ -217,7 +228,8 @@ def validate_journal(journal):
             or not isinstance(journal.get('effects'), dict)):
         raise Held('invalid-journal')
     for key, record in journal['effects'].items():
-        if (not isinstance(record, dict) or record.get('state') not in
+        if (not isinstance(record, dict) or not isinstance(record.get('payload'), dict)
+                or record.get('state') not in
                 {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed',
                  'not-sent', 'not-sent-exhausted'}
                 or digest(record.get('payload')) != key
@@ -331,7 +343,7 @@ def exhausted_selection_result(journal, effect):
 
 def tick(journal, observe: Callable, candidate, verify_source: Callable,
          verify_integration: Callable, write: Callable, readback: Callable,
-         persist: Callable, lease_held: Callable, *, shadow=False):
+         persist: Callable, lease_held: Callable, *, shadow=False, target_number=None):
     """Fsync through canonical persist before invocation; never repeat attempts.
 
     A write exception leaves its intent attempted, including process death.
@@ -351,7 +363,7 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
     if not lease_held():
         return 'lease-held'
     first = observe()
-    effect = plan(first, candidate, verify_source, verify_integration)
+    effect = plan(first, candidate, verify_source, verify_integration, target_number=target_number)
     held = refused_selection_result(journal, effect)
     if held:
         return held
@@ -369,7 +381,7 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
     # A second full fresh read and proof verification must agree. Unknown reads
     # raise before intent persistence; no mutation is attempted on uncertainty.
     second = observe()
-    current = plan(second, candidate, verify_source, verify_integration)
+    current = plan(second, candidate, verify_source, verify_integration, target_number=target_number)
     if (current != effect or first['rules_sha256'] != second['rules_sha256']
             or not lease_held()):
         return 'identity-changed'
