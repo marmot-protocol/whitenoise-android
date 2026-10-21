@@ -55,7 +55,7 @@ Snapshot `88d1683e` adds typed outcomes that Android must not collapse into gene
 `MarmotKitRecoveryQualificationTest` checks a candidate's offline replay, epoch-gap fallback and lookup retry
 on recovered messages, against a loopback relay that clamps queries to 500 events and refuses history
 comparison. It is an opt-in fixture of about five minutes per comparison mode; run it on a hosted emulator before adopting a pin
-that touches replay or recovery:
+that touches replay or recovery.
 
 The populated upgrade campaign builds current master and the candidate with the
 same disposable signer and isolated `.mdkqualification` package, then runs both

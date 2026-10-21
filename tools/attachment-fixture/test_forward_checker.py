@@ -58,6 +58,7 @@ class LedgerBuilder:
     """Builds the server ledger the probe's marker plan produces, with independently committed events."""
 
     def __init__(self):
+        """Start an empty ledger so event sequence numbers belong only to this fixture."""
         self.rows = []
 
     def event(self, kind, value=0, fixture="control", request=None):

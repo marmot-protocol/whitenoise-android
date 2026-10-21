@@ -55,6 +55,23 @@ class DiagnosticFormatterTest {
         }
     }
 
+    /** Direct and wrapped disk-full failures retain their category without copying native or wrapper details. */
+    @Test
+    fun storageFullReportIsClassifiedAndPrivate() {
+        val failure = MarmotKitException.StorageFull("private database path")
+        listOf(failure, java.io.IOException("private wrapper", failure)).forEach { throwable ->
+            val report =
+                DiagnosticFormatter.errorReport(
+                    "MESSAGE_SEND",
+                    throwable,
+                    DiagnosticFormatter.ErrorReportContext("test", "17", "now"),
+                )
+            assertTrue(report.contains("error=STORAGE_FULL"))
+            assertTrue(report.contains("marmot=StorageFull"))
+            assertFalse(report.contains("private"))
+        }
+    }
+
     /** Caller-selected details retain precedence over the automatic contention subtype. */
     @Test
     fun explicitTechnicalDetailTakesPrecedenceOverContention() {

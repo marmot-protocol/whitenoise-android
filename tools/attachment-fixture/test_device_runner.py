@@ -140,6 +140,7 @@ class RunnerContractTest(unittest.TestCase):
         """Distinguish a crash from missing measurements without leaking captured messages or another process."""
         secret = "PRIVATE-FIXTURE-CONTENT"
         def adb(binary, serial, *args):
+            """Admit the emulator fixture, then return a crash carrying private text that must be redacted."""
             if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
                 return "1"
             if args[:4] == ("shell", "pm", "list", "packages"):

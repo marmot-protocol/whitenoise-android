@@ -114,16 +114,19 @@ class QualificationEvidenceTest(unittest.TestCase):
             run.assert_not_called()
 
     def test_pass_requires_each_named_case(self):
+        """Missing, skipped, failed or substituted cases cannot satisfy a required case."""
         self.invoke(transcript([('retained', 0)]), {'retained'})
         for cases in ([], [('retained', -3)], [('retained', -2)], [('different', 0)]):
             with self.subTest(cases=cases), self.assertRaises(RuntimeError):
                 self.invoke(transcript(cases), {'retained'})
 
     def test_process_abort_after_a_case_cannot_pass(self):
+        """A process abort invalidates the run even after the required case reports success."""
         with self.assertRaises(RuntimeError):
             self.invoke(transcript([('retained', 0)], 'INSTRUMENTATION_FAILED: crashed'), {'retained'})
 
     def test_extra_failure_cannot_hide_behind_expected_pass(self):
+        """An unexpected failing case invalidates an otherwise complete required-case pass."""
         with self.assertRaises(RuntimeError):
             self.invoke(transcript([('retained', 0), ('unexpected', -2)]), {'retained'})
 
