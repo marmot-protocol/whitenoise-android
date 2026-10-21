@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.ui.onboarding.setup.MarmotAccountSetupClient
 import dev.ipf.whitenoise.android.ui.onboarding.setup.SetupRequest
 import kotlinx.coroutines.CancellationException
@@ -206,7 +207,10 @@ class OnboardingRelayRepairFfiIntegrationTest {
             .newWithConfiguration(
                 root.path,
                 listOf(relay),
-                MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+                MarmotOptions(
+                    relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                    deployment = marmotDeploymentWhiteNoise(),
+                ),
             ).also { it.start() }
 
     private companion object {

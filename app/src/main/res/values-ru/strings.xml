@@ -850,6 +850,7 @@
     <string name="toast_profile_published_detail">Ваш профиль теперь доступен на %1$d реле.</string>
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
+    <string name="toast_send_storage_full">Недостаточно места для отправки. Освободите место и попробуйте снова.</string>
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>
     <string name="toast_send_queue_full">В этом чате слишком много сообщений ожидает отправки, поэтому ваше не отправлено. Повторите попытку, когда очередь разберётся.</string>
     <string name="toast_send_chat_changed">Чат изменился во время отправки, поэтому сообщение не отправлено. Повторите попытку.</string>

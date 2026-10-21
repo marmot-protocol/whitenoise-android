@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MarmotClient.kt",
+  "legacy_sha256": "17dab54adf7f7e94aa4bafbdae25bf3b1248e7eb58722399b71c0db5d9f2e4ec",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "New-account and import relay defaults",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MarmotClient.kt",
+        "anchor": "val accountRelays = bootstrapRelays + generalPurposeRelays",
+        "test_ids": [
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Explicit MDK White Noise deployment preserves existing keychain service and host runtime policies on upgrade",
+        "anchor": "deployment = marmotDeploymentWhiteNoise()",
+        "test_ids": [
+          "INT-010",
+          "ONB-006",
+          "SEC-007"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MarmotClient.kt"
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -92,7 +93,11 @@ class DiscoveryInvitationRejectionFfiTest {
                 LoopbackNostrRelay().use { discovery ->
                     LoopbackNostrRelay().use { advertised ->
                         advertised.hiddenKinds = setOf(KEY_PACKAGE)
-                        val options = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
+                        val options =
+                            MarmotOptions(
+                                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                                deployment = marmotDeploymentWhiteNoise(),
+                            )
                         val relays = listOf(discovery.url)
                         val sender = Marmot.newWithConfiguration(File(root, "sender").path, relays, options)
                         val peer = Marmot.newWithConfiguration(File(root, "peer").path, relays, options)

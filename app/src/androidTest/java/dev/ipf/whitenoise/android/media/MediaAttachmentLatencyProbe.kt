@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.state.AttachmentDownloadGate
@@ -84,7 +85,8 @@ class MediaAttachmentLatencyProbe {
             assumeTrue(InstrumentationRegistry.getArguments().getString("allowMediaSizeMatrix") == "true")
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "media-size-probe-${UUID.randomUUID()}").apply { mkdirs() }
-            val marmot = Marmot(File(root, "native").absolutePath, MarmotClient.bootstrapRelays)
+            val marmot =
+                Marmot(File(root, "native").absolutePath, MarmotClient.bootstrapRelays, marmotDeploymentWhiteNoise())
             try {
                 withTimeout(900_000L) {
                     marmot.start()
@@ -246,7 +248,8 @@ class MediaAttachmentLatencyProbe {
             val context = isolatedContext()
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "media-probe-${UUID.randomUUID()}").apply { mkdirs() }
-            val marmot = Marmot(File(root, "native").absolutePath, MarmotClient.bootstrapRelays)
+            val marmot =
+                Marmot(File(root, "native").absolutePath, MarmotClient.bootstrapRelays, marmotDeploymentWhiteNoise())
             try {
                 withTimeout(600_000L) {
                     marmot.start()

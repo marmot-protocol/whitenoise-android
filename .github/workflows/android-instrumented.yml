@@ -18,6 +18,20 @@ name: Android Instrumented Tests
 on:
   workflow_dispatch:
     inputs:
+      mdk_qualification:
+        description: Populated current-master runtime upgrade, cold restart and both recovery modes
+        required: false
+        type: boolean
+        default: false
+      mdk_preview_qualification:
+        description: Qualify the unchanged trusted PR3371 signed preview pair through release UI
+        required: false
+        type: boolean
+        default: false
+      mdk_preview_build_run:
+        description: Successful trusted-dispatch Android PR APK run for this exact candidate
+        required: false
+        type: string
       mdk_adoption_only:
         description: Run real Welcome roles and explicitly enabled native diagnostic export acceptance
         required: false
@@ -210,8 +224,8 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
-  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.mdk_preview_qualification && 'mdk-signed-preview' || inputs.mdk_qualification && 'mdk-qualification' || inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.mdk_qualification || inputs.mdk_preview_qualification)) }}
 
 permissions:
   contents: read
@@ -220,7 +234,7 @@ jobs:
   # Draft PRs boot no emulators; ready_for_review starts the run.
   changes:
     name: Select emulator lanes
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ !github.event.pull_request.draft && !inputs.mdk_preview_qualification }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -242,7 +256,7 @@ jobs:
 
   attachment-fixture:
     needs: changes
-    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only))
+    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -298,7 +312,7 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only)
+    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only) && !inputs.mdk_qualification
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -786,3 +800,129 @@ jobs:
           path: build/maestro-campaign-summary.json
           if-no-files-found: error
           retention-days: 7
+
+  mdk-qualification:
+    name: Populated MarmotKit upgrade and recovery (emulator)
+    if: github.event_name == 'workflow_dispatch' && inputs.mdk_qualification && !inputs.mdk_preview_qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Reject mixed campaigns
+        if: inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix
+        run: exit 2
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Verify qualification evidence contracts
+        run: python3 -m unittest scripts.test_mdk_qualification scripts.test_maestro_apk
+      - name: Build baseline and candidate with one disposable signer
+        run: ./scripts/build-mdk-qualification.sh
+      - name: Prepare pinned emulator-only native fault injector
+        run: |
+          python3 -m pip install --require-hashes -r scripts/mdk-fault-requirements.txt
+          python3 scripts/prepare_mdk_faults.py
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Qualify retained data and recovery
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 8G
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: python3 scripts/run_mdk_qualification.py
+      - name: Retain sanitized qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mdk-qualification-${{ github.sha }}
+          path: build/mdk-qualification/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Retain exact disposable qualification APKs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mdk-qualification-apks-${{ github.sha }}
+          path: build/mdk-pair/
+          if-no-files-found: warn
+          retention-days: 30
+
+  mdk-signed-preview:
+    name: Exact trusted preview upgrade and cold restart
+    if: github.event_name == 'workflow_dispatch' && inputs.mdk_preview_qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Reject mixed campaigns
+        if: inputs.mdk_qualification || inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix
+        run: exit 2
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Retain exact unsigned build provenance for comparison with the trusted signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_BUILD_RUN: ${{ inputs.mdk_preview_build_run }}
+        run: |
+          set -euo pipefail
+          [[ "$PREVIEW_BUILD_RUN" =~ ^[1-9][0-9]*$ ]]
+          mkdir -p build/mdk-preview-unsigned
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREVIEW_BUILD_RUN" > build/mdk-preview-build-run.json
+          gh run download "$PREVIEW_BUILD_RUN" --repo "$GITHUB_REPOSITORY" -n pr-preview-isolated -D build/mdk-preview-unsigned
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Exercise unchanged ARM64 release bytes through ordinary UI
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 8G
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: python3 scripts/qualify_signed_preview.py
+      - name: Retain signed preview qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mdk-signed-preview-${{ github.sha }}
+          path: build/mdk-signed-preview/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Retain exact signed preview pair
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mdk-signed-preview-apks-${{ github.sha }}
+          path: build/mdk-signed-preview-apks/
+          if-no-files-found: warn
+          retention-days: 30
