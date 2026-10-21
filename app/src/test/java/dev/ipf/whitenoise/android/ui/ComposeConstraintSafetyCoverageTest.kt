@@ -5,14 +5,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Prevents unsafe intrinsic sizing and infinity arithmetic from returning to production UI callers. */
+/** Prevents unsafe intrinsic sizing across app production sources and infinity arithmetic in UI callers. */
 class ComposeConstraintSafetyCoverageTest {
     /** Intrinsic sizing clamps its scalar result before constructing packed constraints. */
     @Test
     fun productionIntrinsicSizingUsesBoundedModifiers() {
         val unsafeIntrinsic =
             Regex("""\.(?:width|height|requiredWidth|requiredHeight)\s*\(\s*IntrinsicSize\s*\.""")
-        val root = uiRoot()
+        val root = productionRoot()
         val offenders =
             root
                 .walkTopDown()
@@ -32,7 +32,7 @@ class ComposeConstraintSafetyCoverageTest {
         owners.forEach { (path, modifier) ->
             assertTrue(
                 "$path must retain bounded intrinsic sizing",
-                root.resolve(path).readText().contains(".$modifier("),
+                uiRoot().resolve(path).readText().contains(".$modifier("),
             )
         }
     }
@@ -55,10 +55,13 @@ class ComposeConstraintSafetyCoverageTest {
         assertTrue(uiRoot().resolve("conversation/composer/ComposerPills.kt").readText().contains(".deferredPadding("))
     }
 
-    /** Supports both the Gradle app working directory and a repository-root invocation. */
-    private fun uiRoot(): File =
+    /** Locates known UI owners within the complete production source tree. */
+    private fun uiRoot(): File = productionRoot().resolve("dev/ipf/whitenoise/android/ui")
+
+    /** Scans all app production packages from either the Gradle app directory or repository root. */
+    private fun productionRoot(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui"),
+            File("src/main/java"),
+            File("app/src/main/java"),
         ).first { it.isDirectory }
 }
