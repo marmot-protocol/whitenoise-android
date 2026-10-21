@@ -823,6 +823,28 @@ class LocalizationResourceTest {
         ) {
             violations += "missing single %1\$s placeholder"
         }
+        violations += agentConnectorInstallationFlowViolations(prompt, requirements, mode)
+        val forbiddenPatterns =
+            when (mode) {
+                AgentConnectorPromptGuardMode.Generic -> agentConnectorForbiddenPatterns
+                AgentConnectorPromptGuardMode.Codex,
+                AgentConnectorPromptGuardMode.Claude,
+                -> agentConnectorCodexForbiddenPatterns
+            }
+        forbiddenPatterns.forEach { (label, pattern) ->
+            if (pattern.containsMatchIn(prompt)) {
+                violations += label
+            }
+        }
+        return violations
+    }
+
+    private fun agentConnectorInstallationFlowViolations(
+        prompt: String,
+        requirements: AgentConnectorCopyRequirements,
+        mode: AgentConnectorPromptGuardMode,
+    ): List<String> {
+        val violations = mutableListOf<String>()
         val promptPrefix =
             if (
                 mode == AgentConnectorPromptGuardMode.Claude &&
@@ -858,18 +880,6 @@ class LocalizationResourceTest {
         }
         if (segmentIndexes.all { it >= 0 } && segmentIndexes.zipWithNext().any { (first, second) -> first >= second }) {
             violations += "not explanation-first"
-        }
-        val forbiddenPatterns =
-            when (mode) {
-                AgentConnectorPromptGuardMode.Generic -> agentConnectorForbiddenPatterns
-                AgentConnectorPromptGuardMode.Codex,
-                AgentConnectorPromptGuardMode.Claude,
-                -> agentConnectorCodexForbiddenPatterns
-            }
-        forbiddenPatterns.forEach { (label, pattern) ->
-            if (pattern.containsMatchIn(prompt)) {
-                violations += label
-            }
         }
         return violations
     }

@@ -128,7 +128,7 @@ class AiAgentsScreenTest {
         val prerequisiteApproval = prompt.indexOf("ask for my approval before any host changes")
         assertTrue(prerequisiteApproval > prompt.indexOf("https://code.claude.com/docs/en/setup"))
         assertTrue(prerequisiteApproval < prompt.indexOf("including installing Claude Code"))
-        assertTrue(prompt.contains("changing PATH or login setup"))
+        assertTrue(prompt.contains("changing PATH or sign-in setup"))
         assertTrue(prompt.contains("check on my phone"))
         assertFalse(prompt.contains("this machine uses the same public relay set as my phone"))
         assertTrue(prompt.contains("/Claude selects \$HOME/Claude, not /Users/me/Claude"))

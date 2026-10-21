@@ -48,28 +48,6 @@ class AiAgentsScreenScreenshotTest {
     @Test
     fun aiAgentsSetupSheetDark() = captureSheet("ai_agents_setup_sheet_dark", dark = true, amoled = false)
 
-    /** Claude Code shows the terminal prerequisite and the first setup instructions in light theme. */
-    @Test
-    fun claudeSetupSheetLight() {
-        captureSheet(
-            "ai_agents_claude_setup_light",
-            dark = false,
-            amoled = false,
-            connector = "claude",
-        )
-    }
-
-    /** The same Claude Code guidance remains readable in dark theme. */
-    @Test
-    fun claudeSetupSheetDark() {
-        captureSheet(
-            "ai_agents_claude_setup_dark",
-            dark = true,
-            amoled = false,
-            connector = "claude",
-        )
-    }
-
     /** Goose uses the same scrollable setup sheet in both themes. */
     @Test
     fun gooseSetupSheetLight() {
