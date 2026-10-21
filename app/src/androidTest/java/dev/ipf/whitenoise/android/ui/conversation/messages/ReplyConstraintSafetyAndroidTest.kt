@@ -62,6 +62,28 @@ class ReplyConstraintSafetyAndroidTest {
         }
     }
 
+    /** Oversized blockquotes exercise the intrinsic-height boundary and recover under narrow, large-font RTL. */
+    @Test
+    fun oversizedMarkdownBlockquoteFitsAndReturnsToNormalSize() {
+        val body = mutableStateOf("OK")
+        composeRule.setContent {
+            ReplyFixture(
+                body = body.value,
+                fontScale = 2f,
+                direction = LayoutDirection.Rtl,
+                narrow = true,
+                blockquoteBody = true,
+            )
+        }
+        val normalBounds = composeRule.onNodeWithTag(BUBBLE).getUnclippedBoundsInRoot()
+        composeRule.runOnIdle { body.value = HUGE_TEXT }
+        assertBounded("huge-markdown-blockquote-large-font-narrow-rtl")
+        composeRule.onNodeWithText("Read more").assertIsDisplayed()
+        composeRule.runOnIdle { body.value = "OK" }
+        composeRule.onNodeWithText("OK").assertIsDisplayed()
+        assertEquals(normalBounds, composeRule.onNodeWithTag(BUBBLE).getUnclippedBoundsInRoot())
+    }
+
     /** The first-frame quote fallback clips before an asynchronous preview can replace it. */
     @Test
     fun oversizedQuoteFitsOnFirstFrame() {
@@ -146,6 +168,7 @@ class ReplyConstraintSafetyAndroidTest {
         fontScale: Float = 1f,
         direction: LayoutDirection = LayoutDirection.Ltr,
         narrow: Boolean = false,
+        blockquoteBody: Boolean = false,
     ) {
         CompositionLocalProvider(
             LocalDensity provides Density(LocalDensity.current.density, fontScale),
@@ -153,7 +176,7 @@ class ReplyConstraintSafetyAndroidTest {
         ) {
             WhiteNoiseTheme {
                 Box(Modifier.width(if (narrow) 180.dp else 300.dp).testTag(CONTAINER)) {
-                    ReplyContents(body, quote, sender)
+                    ReplyContents(body, quote, sender, blockquoteBody)
                 }
             }
         }
@@ -165,7 +188,15 @@ class ReplyConstraintSafetyAndroidTest {
         body: String,
         quote: String,
         sender: String,
+        blockquoteBody: Boolean,
     ) {
+        val paragraph = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(body)))
+        val bodyBlock =
+            if (blockquoteBody) {
+                MarkdownBlockFfi.BlockQuote(blocks = listOf(paragraph), blankLinesBefore = byteArrayOf())
+            } else {
+                paragraph
+            }
         MessageBubbleFrame(
             presentation = messageBubblePresentation(deleted = false, mine = false),
             highlighted = false,
@@ -193,7 +224,7 @@ class ReplyConstraintSafetyAndroidTest {
                         MarkdownDocumentFfi(
                             truncated = false,
                             blankLinesBefore = byteArrayOf(),
-                            blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(body)))),
+                            blocks = listOf(bodyBlock),
                         ),
                 )
             }
