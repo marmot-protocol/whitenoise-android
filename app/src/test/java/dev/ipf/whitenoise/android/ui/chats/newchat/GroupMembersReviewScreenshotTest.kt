@@ -1,17 +1,17 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
-import android.graphics.Bitmap
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -23,10 +23,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -62,13 +63,16 @@ class GroupMembersReviewScreenshotTest {
     fun busyConfirmationCannotSubmitOrDismiss() {
         var submits = 0
         var dismisses = 0
-        val state = emptyAppState()
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
         rule.setContent {
             WhiteNoiseTheme {
                 GroupMembersReviewDialog(
                     appState = state,
                     groups = listOf(MemberReviewGroup("group", "Garden club")),
-                    members = listOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "npub1alice")),
+                    members =
+                        listOf(RecipientSearch.Candidate(REVIEW_SECOND_MEMBER_HEX, "Alice", REVIEW_SECOND_MEMBER_NPUB)),
                     busy = true,
                     onDismiss = { dismisses += 1 },
                     onConfirm = { submits += 1 },
@@ -80,12 +84,264 @@ class GroupMembersReviewScreenshotTest {
         rule.onNodeWithText("Cancel").assertIsNotEnabled().performClick()
         assertEquals(0, submits)
         assertEquals(0, dismisses)
+        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_member_review_busy.png")
+    }
+
+    /** A callback retained by the old dialog cannot submit after the same account gets a new runtime. */
+    @Test
+    fun retainedReviewCallbackRejectsRuntimeReplacement() {
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
+        var submitted = 0
+        rule.setContent {
+            WhiteNoiseTheme {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members = listOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "")),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = { submitted++ },
+                    confirmLabel = "Add members",
+                )
+            }
+        }
+        val retained =
+            rule
+                .onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        rule.runOnIdle {
+            state.advanceLocalDeleteTestRuntime()
+            retained()
+        }
+        assertEquals(0, submitted)
+    }
+
+    /** Even a retained semantics callback can claim its review only once. */
+    @Test
+    fun retainedCallbackCannotRepeatCompletedSubmission() {
+        retainedCallbackIsInvalidated(submitFirst = true)
+    }
+
+    /** Dismissal and an identical reopening never revive the old presentation. */
+    @Test
+    fun retainedCallbackCannotSubmitIdenticallyReopenedReview() {
+        retainedCallbackIsInvalidated(submitFirst = false)
+    }
+
+    private fun retainedCallbackIsInvalidated(submitFirst: Boolean) {
+        val state = emptyAppState()
+        val visible = mutableStateOf(true)
+        var submitted = 0
+        rule.setContent {
+            WhiteNoiseTheme {
+                if (visible.value) {
+                    GroupMembersReviewDialog(
+                        appState = state,
+                        groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                        members = listOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "")),
+                        busy = false,
+                        onDismiss = { visible.value = false },
+                        onConfirm = { submitted++ },
+                        confirmLabel = "Add members",
+                    )
+                }
+            }
+        }
+        val retained =
+            rule
+                .onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        if (submitFirst) {
+            rule.runOnIdle {
+                retained()
+                retained()
+            }
+            assertEquals(1, submitted)
+        } else {
+            rule.onNodeWithText("Cancel").performClick()
+            rule.waitForIdle()
+            rule.runOnIdle { visible.value = true }
+            rule.waitForIdle()
+            rule.runOnIdle { invokeDetachedReviewClick(retained) }
+            assertEquals(0, submitted)
+            rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+            assertEquals(1, submitted)
+        }
+    }
+
+    /** An unavailable formatter never leaks raw keys or operational group identifiers. */
+    @Test
+    fun unavailableFormatterHidesRawKeysAndKeepsLocalActorLabel() {
+        val actor = "a".repeat(64)
+        val member = "b".repeat(64)
+        val state = emptyAppState(accounts = listOf(testAccount("Owner", actor)), activeAccountRef = "Owner")
+        rule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members = listOf(RecipientSearch.Candidate(member, "", "")),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add member",
+                )
+            }
+        }
+        rule.onNodeWithText("Local account label: Owner").assertExists()
+        rule.onAllNodesWithText(actor, substring = true).assertCountEquals(0)
+        rule.onAllNodesWithText(member, substring = true).assertCountEquals(0)
+        rule.onAllNodesWithText("Public key", substring = true).assertCountEquals(0)
+        rule.onAllNodesWithText("Group ID", substring = true).assertCountEquals(0)
+        rule.onAllNodesWithText("1 group").assertCountEquals(0)
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_action_missing_public_metadata_dark.png")
+    }
+
+    /** An opaque runtime reference never becomes a public key; its local account label stays explicit. */
+    @Test
+    fun opaqueActorReferenceUsesExplicitLocalLabel() {
+        val state =
+            emptyAppState(
+                accounts = listOf(testAccount("Owner", "private-runtime-reference")),
+                activeAccountRef = "Owner",
+            )
+        rule.setContent {
+            WhiteNoiseTheme { GroupActingAccountIdentity(state, "Owner") }
+        }
+        rule.onNodeWithText("Local account label: Owner").assertIsDisplayed()
+        rule.onAllNodesWithText("private-runtime-reference").assertCountEquals(0)
+        rule.onAllNodesWithText("Public key (hex)").assertCountEquals(0)
+    }
+
+    /** Revoking admin rights explicitly keeps membership and identifies the account performing it. */
+    @Test
+    fun revokeReviewExplainsMembershipAndActorDark() {
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
+        rule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members =
+                        listOf(
+                            RecipientSearch.Candidate(
+                                "b".repeat(64),
+                                "Private Alice",
+                                "",
+                                searchProfile =
+                                    UserProfileMetadataFfi("Public Alice", null, null, null, null, null, null),
+                            ),
+                        ),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Remove admin",
+                    title = "Remove admin",
+                    description = "This removes admin rights. The person stays a member.",
+                    invitation = false,
+                )
+            }
+        }
+        rule.onNodeWithTag("group.action.acting_account").assertExists()
+        rule.onNodeWithText("This removes admin rights. The person stays a member.").assertIsDisplayed()
+        rule.onNodeWithText("Public Alice").performScrollTo().assertIsDisplayed()
+        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_action_revoke_review_dark.png")
+    }
+
+    /** Same-named destinations remain separate rows while their operational IDs stay hidden. */
+    @Test
+    fun duplicateGroupNamesKeepSeparateRowsWithoutIdentifiers() {
+        val state = emptyAppState().withGroupReviewActorNpub()
+        rule.setContent {
+            WhiteNoiseTheme {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups =
+                        listOf(
+                            MemberReviewGroup("garden-one", "Garden club"),
+                            MemberReviewGroup("garden-two", "Garden club"),
+                        ),
+                    members = listOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "")),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add member",
+                )
+            }
+        }
+        rule.onAllNodesWithText("Garden club").assertCountEquals(2)
+        rule.onNodeWithContentDescription("Group ID, garden-one").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Group ID, garden-two").assertDoesNotExist()
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+    }
+
+    /** Duplicate public names remain distinguishable and copy the complete canonical npub. */
+    @Test
+    fun sameNamedPeopleKeepSeparateCopyableNpubs() {
+        val state = emptyAppState().withGroupReviewActorNpub()
+        rule.setContent {
+            WhiteNoiseTheme {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members =
+                        listOf(
+                            RecipientSearch.Candidate(
+                                REVIEW_FIRST_MEMBER_HEX,
+                                "Alex",
+                                REVIEW_FIRST_MEMBER_NPUB,
+                                searchProfile = UserProfileMetadataFfi("Alex", null, null, null, null, null, null),
+                            ),
+                            RecipientSearch.Candidate(
+                                REVIEW_SECOND_MEMBER_HEX,
+                                "Alex",
+                                REVIEW_SECOND_MEMBER_NPUB,
+                                searchProfile = UserProfileMetadataFfi("Alex", null, null, null, null, null, null),
+                            ),
+                        ),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add members",
+                )
+            }
+        }
+        rule.onAllNodesWithText("Alex").assertCountEquals(2)
+        val clipboard =
+            ApplicationProvider
+                .getApplicationContext<Context>()
+                .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        listOf(REVIEW_FIRST_MEMBER_NPUB, REVIEW_SECOND_MEMBER_NPUB).forEach { npub ->
+            val memberCopy = rule.onNodeWithContentDescription("Member, $npub")
+            memberCopy.performScrollTo()
+            val memberBounds = memberCopy.fetchSemanticsNode().boundsInRoot
+            assertTrue(memberBounds.height >= 48f && memberBounds.width >= 48f)
+            memberCopy.performClick()
+            assertEquals(
+                npub,
+                clipboard.primaryClip!!
+                    .getItemAt(0)
+                    .text
+                    .toString(),
+            )
+        }
     }
 
     /** Keeps review actions and the final member reachable when the list overflows. */
     @Test
     fun overflowingReviewKeepsActionsAndLastMemberReachable() {
-        val state = emptyAppState()
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
         val members =
             (1..8).map {
                 RecipientSearch.Candidate(
@@ -122,8 +378,19 @@ class GroupMembersReviewScreenshotTest {
     /** Retains selection on cancellation and closes review when its destination changes. */
     @Test
     fun cancellingPreservesSelectionAndChangingGroupClosesReview() {
-        val state = emptyAppState()
-        val selected = mutableStateListOf(RecipientSearch.Candidate("b".repeat(64), "Alice", "npub1alice"))
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
+        val selected =
+            mutableStateListOf(
+                RecipientSearch.Candidate(
+                    REVIEW_FIRST_MEMBER_HEX,
+                    "Alice",
+                    REVIEW_FIRST_MEMBER_NPUB,
+                    searchProfile = UserProfileMetadataFfi("Alice", null, null, null, null, null, null),
+                ),
+            )
+        val admins = mutableStateListOf<String>()
         val group = mutableStateOf(MemberReviewGroup("garden", "Garden club"))
         var submits = 0
         rule.setContent {
@@ -136,15 +403,22 @@ class GroupMembersReviewScreenshotTest {
                     onConfirm = { submits += 1 },
                     confirmLabel = "Add member",
                     reviewGroup = group.value,
+                    initialAdminIds = admins.toSet(),
+                    onInitialAdminChange = { person, admin ->
+                        if (admin) admins.add(person.accountIdHex) else admins.remove(person.accountIdHex)
+                    },
                 )
             }
         }
         rule.onNodeWithContentDescription("Review selected members").performClick()
+        rule.onNodeWithContentDescription("Admin, Alice").performClick()
         rule.onNodeWithText("Cancel").performClick()
         rule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
         assertEquals(1, selected.size)
+        assertEquals(listOf(REVIEW_FIRST_MEMBER_HEX), admins.toList())
         assertEquals(0, submits)
         rule.onNodeWithContentDescription("Review selected members").performClick()
+        rule.onNodeWithContentDescription("Admin, Alice").assertIsOn()
         rule.runOnIdle { group.value = MemberReviewGroup("orchard", "Orchard club") }
         rule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
         assertEquals(0, submits)
@@ -153,7 +427,9 @@ class GroupMembersReviewScreenshotTest {
     /** Changing one member's role never transfers that privilege to another person after removal. */
     @Test
     fun removingMemberDoesNotMoveTheirAdminRoleToAnotherPerson() {
-        val state = emptyAppState()
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
 
         /** Creates a stable public member identity for the role-menu ownership check. */
         fun member(
@@ -195,7 +471,9 @@ class GroupMembersReviewScreenshotTest {
     @Test
     fun unrelatedWorkStillAllowsCancellingRoleReview() {
         var dismisses = 0
-        val state = emptyAppState()
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
         rule.setContent {
             WhiteNoiseTheme {
                 GroupMembersReviewDialog(
@@ -229,7 +507,9 @@ class GroupMembersReviewScreenshotTest {
     /** An unresolved public name shows exactly one shortened npub, with person before destination. */
     @Test
     fun unnamedMemberHasOneAbbreviatedIdentity() {
-        val state = emptyAppState()
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
         val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
         rule.setContent {
             WhiteNoiseTheme {
@@ -251,8 +531,7 @@ class GroupMembersReviewScreenshotTest {
                     busy = false,
                     onDismiss = {},
                     onConfirm = {},
-                    confirmLabel = "Add members",
-                    onRemove = {},
+                    confirmLabel = "Add member",
                 )
             }
         }
@@ -269,7 +548,7 @@ class GroupMembersReviewScreenshotTest {
             .captureRoboImage("src/test/snapshots/group_member_review_unnamed.png")
     }
 
-    /** Separates each member's own role and remove controls at large font sizes. */
+    /** Separates each member's own role control at large font sizes. */
     @Test
     @Config(qualifiers = "en-w360dp-h1280dp-mdpi")
     fun multipleMembersLarge() = captureMultipleMembers(false)
@@ -280,13 +559,15 @@ class GroupMembersReviewScreenshotTest {
     fun multipleMembersLargeRtl() = captureMultipleMembers(true)
 
     private fun captureMultipleMembers(rtl: Boolean) {
-        val state = emptyAppState()
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
         val members =
             listOf("Alice", "Bob").mapIndexed { index, name ->
                 RecipientSearch.Candidate(
-                    (index + 1).toString(16).padStart(64, '0'),
+                    if (index == 0) REVIEW_FIRST_MEMBER_HEX else REVIEW_SECOND_MEMBER_HEX,
                     name,
-                    "npub1member$index",
+                    if (index == 0) REVIEW_FIRST_MEMBER_NPUB else REVIEW_SECOND_MEMBER_NPUB,
                     searchProfile = UserProfileMetadataFfi(name, null, null, null, null, null, null),
                 )
             }
@@ -303,13 +584,13 @@ class GroupMembersReviewScreenshotTest {
                         onDismiss = {},
                         onConfirm = {},
                         confirmLabel = "Add members",
-                        onRemove = {},
                         initialAdminIds = setOf(members.first().accountIdHex),
                         onInitialAdminChange = { _, _ -> },
                     )
                 }
             }
         }
+        rule.onAllNodesWithText("Add members").assertCountEquals(2)
         rule.onNodeWithContentDescription("Admin, Alice").assertIsOn()
         rule.onNodeWithContentDescription("Admin, Bob").performScrollTo().assertIsOff()
         val suffix = if (rtl) "rtl" else "ltr"
@@ -323,72 +604,24 @@ class GroupMembersReviewScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
     ) {
-        val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
-        val id = "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
-        val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
-        val pictureUrl = "https://example.com/alice-review.png"
-        val memberImage = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).apply { eraseColor(0xff008080.toInt()) }
-        val groupImage = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).apply { eraseColor(0xff1565c0.toInt()) }
-        AvatarImageLoader.putCached(pictureUrl, memberImage.asImageBitmap())
-        val member =
-            RecipientSearch.Candidate(
-                id,
-                "Private Alice",
-                npub,
-                searchProfile = UserProfileMetadataFfi("alice", "Alice Public", null, pictureUrl, null, null, null),
-            )
-        val selected = mutableStateListOf(member)
         var submits = 0
-        val admins = mutableStateListOf<String>()
-        rule.setContent {
-            CompositionLocalProvider(
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-            ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
-                    ContactPickerScreen(
-                        appState = state,
-                        title = "Choose people",
-                        selected = selected,
-                        onBack = {},
-                        onConfirm = { submits += 1 },
-                        confirmLabel = "Add member",
-                        reviewGroup = MemberReviewGroup("garden", "Garden club", image = groupImage.asImageBitmap()),
-                        initialAdminIds = admins.toSet(),
-                        onInitialAdminChange = { person, admin ->
-                            if (admin) admins.add(person.accountIdHex) else admins.remove(person.accountIdHex)
-                        },
-                    )
-                }
-            }
-        }
-        rule.onNodeWithContentDescription("Review selected members").performClick()
-        rule.onNode(isDialog()).assertExists()
-        assertPublicReviewIdentity(npub, rtl)
+        rule.showGroupMembersReview(dark, amoled, rtl) { submits += 1 }
+        rule.assertGroupMembersReview(rtl)
         rule
             .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_$name.png")
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed().performClick()
         assertEquals(1, submits)
     }
+}
 
-    /** Verifies public identity, privacy and logical column order before the golden is captured. */
-    private fun assertPublicReviewIdentity(
-        npub: String,
-        rtl: Boolean,
-    ) {
-        rule.onNodeWithText("Garden club").assertIsDisplayed()
-        rule.onNodeWithText("alice").performScrollTo().assertIsDisplayed()
-        rule
-            .onNodeWithText(
-                dev.ipf.whitenoise.android.core.IdentityFormatter
-                    .short(npub, prefix = 10, suffix = 8),
-            ).performScrollTo()
-            .assertIsDisplayed()
-        rule
-            .onNode(hasText("Private Alice") and hasAnyAncestor(hasTestTag("group.members.review.member")))
-            .assertDoesNotExist()
-        val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
-        val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
-        assertTrue(if (rtl) person.center.x > group.center.x else person.center.x < group.center.x)
+/** A disposed UI node rejects the saved semantics action before invoking application code. */
+private fun invokeDetachedReviewClick(action: () -> Boolean) {
+    try {
+        action()
+    } catch (failure: IllegalStateException) {
+        if (failure.message != "Cannot read CompositionLocal because the Modifier node is not currently attached.") {
+            throw failure
+        }
     }
 }

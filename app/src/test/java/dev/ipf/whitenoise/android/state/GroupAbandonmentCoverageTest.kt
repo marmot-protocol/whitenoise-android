@@ -96,6 +96,15 @@ class GroupAbandonmentCoverageTest {
         assertTrue("confirm is disabled while the forget runs", "enabled = !running" in dialog)
         val chatHost = source("ui/chats/ChatAbandonment.kt")
         assertEquals("every surface shares one confirmation", 3, sharedDialogUses())
+        val wrappers =
+            dialog
+                .substringAfter("internal fun GroupAbandonmentDialog(")
+                .substringBefore("/** The review for one or several chats")
+        assertEquals(
+            "both wrapper overloads delegate to the shared review renderer",
+            2,
+            Regex("""\)\s*=\s*GroupAbandonmentReviewDialog\(""").findAll(wrappers).count(),
+        )
         assertTrue(
             "chat-list confirm closes before submitting and fences its captured owner",
             chatHost.indexOf("onDismiss()") < chatHost.indexOf("request.owner.isCurrent(appState, controller)"),
@@ -223,7 +232,7 @@ class GroupAbandonmentCoverageTest {
             "ui/chats/ChatAbandonment.kt",
             "ui/chats/ChatDepartureBatchDialog.kt",
         ).count {
-            "GroupAbandonmentDialog(" in source(it)
+            SHARED_ABANDONMENT_DIALOG_CALL.containsMatchIn(source(it))
         }
 
     /** Reads one production source relative to the app package root. */
@@ -237,6 +246,8 @@ class GroupAbandonmentCoverageTest {
         ).firstOrNull { it.exists() } ?: error("Missing main source root")
 
     private companion object {
+        val SHARED_ABANDONMENT_DIALOG_CALL =
+            Regex("""(?m)^\s*(?:GroupAbandonmentDialog|GroupAbandonmentReviewDialog)\(""")
         val NATIVE_FORGET_CALL = Regex("""\bforgetGroupLocal\(\s*[^)\s]""")
         val FORGET_DECLARATION_PREFIX = Regex("""\bfun\s+(?:[\w.<>]+\.)?$""")
         val DEPARTURES =

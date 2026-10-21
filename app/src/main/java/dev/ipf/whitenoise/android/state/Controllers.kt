@@ -4803,7 +4803,11 @@ class ChatsController private constructor(
      * starts, it and the leave after it run to completion together.
      */
     private suspend fun demoteAndLeaveChat(attempt: ChatListDepartureAttempt) {
-        appState.runGroupChange(attempt.account, attempt.groupId) {
+        appState.runGroupChange(
+            attempt.account,
+            attempt.groupId,
+            actionLabel = R.string.group_action_step_down_and_leave,
+        ) {
             withContext(NonCancellable) {
                 val demotion =
                     appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
@@ -5103,7 +5107,12 @@ class ChatsController private constructor(
                             "Administrator successor changed"
                         }
                         val promoted =
-                            appState.runGroupChange(account, groupIdHex) {
+                            appState.runGroupChange(
+                                account,
+                                groupIdHex,
+                                actionLabel = R.string.group_action_transfer_and_leave,
+                                affectedMemberIds = listOf(newAdmin.memberIdHex),
+                            ) {
                                 appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
                                     promoteAdminDetailed(account, groupIdHex, newAdmin.memberIdHex)
                                 }
@@ -6233,7 +6242,7 @@ class ConversationController(
         },
     private val groupProfileUpdater: suspend (String, String, String?, String?) -> Unit =
         { account, groupIdHex, name, description ->
-            appState.runGroupChange(account, groupIdHex) {
+            appState.runGroupChange(account, groupIdHex, actionLabel = R.string.edit_group_info_title) {
                 appState.marmotIo { updateGroupProfile(account, groupIdHex, name, description) }
             }
         },
@@ -6251,7 +6260,14 @@ class ConversationController(
     private val initialAdminInviteWriter:
         suspend (String, String, List<String>, List<String>) -> dev.ipf.marmotkit.GroupMutationResultFfi =
         { account, groupId, members, admins ->
-            appState.runGroupChange(account, groupId, invite = true) {
+            appState.runGroupChange(
+                account,
+                groupId,
+                invite = true,
+                actionLabel = R.string.group_action_add_members,
+                affectedMemberIds = members,
+                initialAdminIds = admins.toSet(),
+            ) {
                 appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                     inviteMembersDetailedWithInitialAdmins(account, groupId, members, admins)
                 }
@@ -11066,7 +11082,7 @@ class ConversationController(
         account: String,
         onDemoted: () -> Unit,
     ) {
-        appState.runGroupChange(account, group.groupIdHex) {
+        appState.runGroupChange(account, group.groupIdHex, actionLabel = R.string.group_action_step_down_and_leave) {
             withContext(NonCancellable) {
                 val demoteResult =
                     appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
@@ -11400,7 +11416,12 @@ class ConversationController(
                         // Queuing behind another commit can outlive this editor or account.
                         if (!commitIfCurrent()) return@withGroupCommitLock false
                         val wroteAvatar =
-                            appState.runGroupChange(account, group.groupIdHex, stillWanted = commitIfCurrent) {
+                            appState.runGroupChange(
+                                account,
+                                group.groupIdHex,
+                                stillWanted = commitIfCurrent,
+                                actionLabel = if (normalized == null) R.string.remove_photo else R.string.change_photo,
+                            ) {
                                 // A retry the user continued past must reach MDK, or its acknowledgement outlives it.
                                 val admitted = isAdmittedGroupChange()
                                 appState.marmotIo {
@@ -11440,7 +11461,7 @@ class ConversationController(
      */
     private suspend fun clearSupersededGroupImage(account: String): Boolean =
         runCatchingCancellable {
-            appState.runGroupChange(account, group.groupIdHex, askUser = false) {
+            appState.runGroupChange(account, group.groupIdHex, askUser = false, actionLabel = R.string.remove_photo) {
                 appState.marmotIo { clearGroupImage(account, group.groupIdHex) }
             }
         }.onFailure {
@@ -11520,7 +11541,12 @@ class ConversationController(
                 pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
                 onLegacyClearAttempt()
                 try {
-                    appState.runGroupChange(account, capturedGroupId, stillWanted = { change.stillOwned() }) {
+                    appState.runGroupChange(
+                        account,
+                        capturedGroupId,
+                        stillWanted = { change.stillOwned() },
+                        actionLabel = R.string.change_photo,
+                    ) {
                         val admitted = isAdmittedGroupChange()
                         appState.marmotIo {
                             if (!admitted && !change.stillOwned()) throw CancellationException("Viewer owner replaced")
@@ -11562,7 +11588,17 @@ class ConversationController(
         draft: ImageUploadDraft?,
         change: ScopedGroupImageMutation<ImageUploadDraft?>,
     ) {
-        appState.runGroupChange(account, groupId, stillWanted = { change.stillOwned() }) {
+        appState.runGroupChange(
+            account,
+            groupId,
+            stillWanted = { change.stillOwned() },
+            actionLabel =
+                if (draft == null) {
+                    R.string.remove_photo
+                } else {
+                    R.string.change_photo
+                },
+        ) {
             // A retry the user continued past must reach MDK, or its acknowledgement outlives it.
             val admitted = isAdmittedGroupChange()
             appState.marmotIo {
@@ -11824,7 +11860,12 @@ class ConversationController(
                             authoritativeAdministrationTarget(target)
                                 ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             val result =
-                                appState.runGroupChange(account, group.groupIdHex) {
+                                appState.runGroupChange(
+                                    account,
+                                    group.groupIdHex,
+                                    actionLabel = R.string.remove_member,
+                                    affectedMemberIds = listOf(target),
+                                ) {
                                     appState.marmotIo(MarmotTraceSection.REMOVE_MEMBERS) {
                                         removeMembersDetailed(account, group.groupIdHex, listOf(target))
                                     }
@@ -11887,7 +11928,12 @@ class ConversationController(
                             }
                             if (admin) {
                                 val result =
-                                    appState.runGroupChange(account, group.groupIdHex) {
+                                    appState.runGroupChange(
+                                        account,
+                                        group.groupIdHex,
+                                        actionLabel = R.string.make_admin,
+                                        affectedMemberIds = listOf(target),
+                                    ) {
                                         appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
                                             promoteAdminDetailed(account, group.groupIdHex, target)
                                         }
@@ -11895,7 +11941,12 @@ class ConversationController(
                                 applyMutationDetails(account, result.details)
                             } else {
                                 val result =
-                                    appState.runGroupChange(account, group.groupIdHex) {
+                                    appState.runGroupChange(
+                                        account,
+                                        group.groupIdHex,
+                                        actionLabel = R.string.remove_admin,
+                                        affectedMemberIds = listOf(target),
+                                    ) {
                                         appState.marmotIo(MarmotTraceSection.DEMOTE_ADMIN) {
                                             demoteAdminDetailed(account, group.groupIdHex, target)
                                         }
@@ -11926,7 +11977,12 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.runGroupChange(account, group.groupIdHex) {
+                    appState.runGroupChange(
+                        account,
+                        group.groupIdHex,
+                        actionLabel = R.string.disappearing_messages,
+                        retentionSeconds = disappearingMessageSecs,
+                    ) {
                         appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
                     }
                 }
@@ -11998,7 +12054,11 @@ class ConversationController(
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val result =
-                        appState.runGroupChange(account, group.groupIdHex) {
+                        appState.runGroupChange(
+                            account,
+                            group.groupIdHex,
+                            actionLabel = R.string.group_disband_enable_action,
+                        ) {
                             appState.marmotIo { enableGroupDisbanding(account, group.groupIdHex) }
                         }
                     applyMutationDetails(account, result.details)
@@ -12020,7 +12080,7 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.runGroupChange(account, group.groupIdHex) {
+                    appState.runGroupChange(account, group.groupIdHex, actionLabel = R.string.group_disband_action) {
                         appState.marmotIo { disbandGroup(account, group.groupIdHex) }
                     }
                 }
@@ -12065,7 +12125,11 @@ class ConversationController(
                             return@withGroupCommitLock GroupAdministrationCommitOutcome.KEEP_ONE_ADMIN
                         }
                         val result =
-                            appState.runGroupChange(account, group.groupIdHex) {
+                            appState.runGroupChange(
+                                account,
+                                group.groupIdHex,
+                                actionLabel = R.string.step_down_as_admin,
+                            ) {
                                 appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
                                     selfDemoteAdminDetailed(account, group.groupIdHex)
                                 }
@@ -12119,7 +12183,12 @@ class ConversationController(
                             return@withGroupCommitLock false
                         }
                         val promoteResult =
-                            appState.runGroupChange(account, group.groupIdHex) {
+                            appState.runGroupChange(
+                                account,
+                                group.groupIdHex,
+                                actionLabel = R.string.transfer_admin,
+                                affectedMemberIds = listOf(target),
+                            ) {
                                 appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
                                     promoteAdminDetailed(account, group.groupIdHex, target)
                                 }
@@ -12130,20 +12199,7 @@ class ConversationController(
                         // cancelled now, skipping the demote would strand both accounts as
                         // admin without telling the caller (runCatchingCancellable propagates
                         // cancellation past the partial-state branch). Run it to completion.
-                        withContext(NonCancellable) {
-                            val demoteResult =
-                                try {
-                                    appState.runGroupChange(account, group.groupIdHex) {
-                                        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                            selfDemoteAdminDetailed(account, group.groupIdHex)
-                                        }
-                                    }
-                                } catch (declined: GroupChangeDeclinedException) {
-                                    // Waiting leaves both admins: report the partial transfer, not a quiet cancel.
-                                    throw declined.refusal
-                                }
-                            applyMutationDetails(account, demoteResult.details)
-                        }
+                        completeAdminTransfer(account, target)
                         true
                     }
                 if (!transferCommitted) {
@@ -12166,6 +12222,32 @@ class ConversationController(
                 }
             }.getOrDefault(false)
         }
+
+    /** Finish the already-granted transfer even if its caller is cancelled. */
+    private suspend fun completeAdminTransfer(
+        account: String,
+        target: String,
+    ) {
+        withContext(NonCancellable) {
+            val demoteResult =
+                try {
+                    appState.runGroupChange(
+                        account,
+                        group.groupIdHex,
+                        actionLabel = R.string.transfer_admin,
+                        affectedMemberIds = listOf(target),
+                    ) {
+                        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                            selfDemoteAdminDetailed(account, group.groupIdHex)
+                        }
+                    }
+                } catch (declined: GroupChangeDeclinedException) {
+                    // Waiting leaves both admins: report the partial transfer, not a quiet cancel.
+                    throw declined.refusal
+                }
+            applyMutationDetails(account, demoteResult.details)
+        }
+    }
 
     fun isAdmin(member: AppGroupMemberRecordFfi): Boolean =
         projectedGroupAdmin(

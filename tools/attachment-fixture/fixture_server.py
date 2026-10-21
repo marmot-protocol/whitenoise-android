@@ -133,6 +133,7 @@ class FixtureServer(ThreadingHTTPServer):
         if upload_extension not in ("", ".bin"):
             raise ValueError("unsupported fixture upload extension")
         self.upload_extension = upload_extension
+        self.upload_port = None
         self.ledger = Ledger(root)
         self.controls = {}
         self.payloads = {}
@@ -146,6 +147,17 @@ class FixtureServer(ThreadingHTTPServer):
     def url(self):
         """Return the loopback URL for explicit test configuration only."""
         return f"http://127.0.0.1:{self.server_port}"
+
+    def set_upload_port(self, port):
+        """Advertise a validated client-facing listener while retaining the host control URL."""
+        if type(port) is not int or not 1 <= port <= 65535:
+            raise ValueError("invalid fixture upload port")
+        self.upload_port = port
+
+    @property
+    def upload_url(self):
+        """Use the client's listener in descriptors so native reads follow the same reverse mapping."""
+        return f"http://127.0.0.1:{self.upload_port}" if self.upload_port is not None else self.url
 
     def set_shape(self, down_kbps, up_kbps, latency_ms):
         """Apply a bounded link shape and record it in the ledger; an invalid shape changes nothing."""
@@ -379,7 +391,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.ledger.register(token, locator, size)
                 self.server.controls[token] = Control()
             self.server.ledger.event(request, token, "upload_complete")
-            self.reply(200, {"url": f"{self.server.url}/{locator}{self.server.upload_extension}", "sha256": locator,
+            self.reply(200, {"url": f"{self.server.upload_url}/{locator}{self.server.upload_extension}", "sha256": locator,
                              "size": size, "type": "application/octet-stream",
                              "uploaded": int(time.time())})
         except (OSError, TimeoutError):

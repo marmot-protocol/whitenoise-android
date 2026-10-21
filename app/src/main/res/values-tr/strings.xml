@@ -1774,8 +1774,8 @@
     <string name="developer_tools_already_enabled">Geliştirici araçları zaten açık</string>
     <string name="appearance_outline_colors_fixed">AMOLED, eylem düğmeleri için sabit beyaz kullanır. Mesaj balonu dış çizgileri Balon renkleri bölümünden özelleştirilebilir.</string>
     <string name="appearance_theme">Tema</string>
-    <string name="appearance_theme_help">Sistem varsayılanı cihazınızı takip eder. Açık ve Koyu, seçilen görünümü korur. AMOLED, beyaz çizgili siyah bir arka plan kullanır.</string>
-    <string name="appearance_amoled_detail">Keskin beyaz çizgilerle saf siyah.</string>
+    <string name="appearance_theme_help">Sistem varsayılanı cihazınızı takip eder. Açık ve Koyu, seçilen görünümü korur. AMOLED; siyah arka planları, özelleştirilebilir mesaj kenarlıklarını ve beyaz işlem düğmelerini korur.</string>
+    <string name="appearance_amoled_detail">Özelleştirilebilir mesaj kenarlıklarıyla siyah arka planlar.</string>
     <string name="appearance_font_size_help">Metin boyutu, cihazınızın yazı tipi boyutu ayarına eklenir.</string>
     <string name="appearance_enter_help">Shift+Enter, donanım klavyesine her zaman yeni bir satır ekler.</string>
     <string name="appearance_font_system">Sistem</string>
@@ -2259,7 +2259,7 @@
     <string name="profile_readiness_recommended">Önerilen</string>
     <string name="profile_readiness_field_optional">İsteğe bağlı</string>
     <string name="agent_connector_claude_subtitle">Claude Code CLI kodlama aracısı</string>
-    <string name="agent_connector_claude_prompt">Bu bir kurulum istemidir; bu Claude Code kurulumunu Marmot üzerinden White Noise’a bağlar. https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md adresindeki yetkili Claude Code harness kılavuzunu ve https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki kalıcı bağlayıcı kılavuzunu okuyun. Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini bana açıklayın. Önkoşulları doğrulayın: Claude Code CLI kurulu, kimliği doğrulanmış ve PATH üzerinde kullanılabilir durumda; bu makine telefonumla aynı genel relay kümesini kullanıyor. Ardından genel npub’ım için kurulum adımlarını önerin: %1$s ve herhangi bir değişiklik yapmadan önce onayımı isteyin. Ben onayladıktan sonra sağlama toplamıyla doğrulanmış install-claude-marmot.sh sürüm akışını kullanın, izin verilen welcomer ile o npub için wn-agent önyüklemesini yapın ve wn-claude --version komutunu doğrulayın. Ardından ajan npub’ınızla yanıt verin; benden onu White Noise üzerinden davet etmemi ve yapılandırılmış relay’ler aracılığıyla bu izin verilen npub’dan bir test mesajı göndermemi isteyin. wn-claude White Noise üzerinden yanıt verene kadar kurulumun tamamlandığını bildirmeyin; bu gidiş dönüş otomatik olarak doğrulanamıyorsa cihaz doğrulaması gerektiğini açıkça belirtin.</string>
+    <string name="agent_connector_claude_prompt">Bu bir kurulum istemidir; bu Claude Code kurulumunu Marmot üzerinden White Noise’a bağlar. Bunu, ajanın çalışacağı bilgisayarda bir terminal içindeki Claude Code’a yapıştırın. Claude mobil uygulaması ve bulut oturumları bağlayıcıyı o bilgisayara kuramaz. https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md adresindeki yetkili Claude Code harness kılavuzunu ve https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki kalıcı bağlayıcı kılavuzunu okuyun. Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini bana açıklayın. Önkoşulları doğrulayın: Claude Code CLI kurulu, kimliği doğrulanmış ve PATH üzerinde kullanılabilir durumda. Eksik varsa https://code.claude.com/docs/en/setup ile gerekli kurulum, PATH veya giriş adımlarını açıklayın ve Claude Code kurulumu ya da PATH veya giriş ayarları dahil bilgisayardaki her değişiklikten önce onayımı isteyin. Telefonumdaki genel relay listesinde wss://relay.eu.whitenoise.chat ve wss://relay.us.whitenoise.chat bulunduğunu kontrol etmemi isteyin; telefon ayarlarını bilgisayardan doğruladığınızı söylemeyin. Ardından genel npub’ım için kurulum adımlarını önerin: %1$s ve herhangi bir değişiklik yapmadan önce onayımı isteyin. Ben onayladıktan sonra sağlama toplamıyla doğrulanmış install-claude-marmot.sh sürüm akışını kullanın, yalnızca o npub’ı izin verilen welcomer olarak kullanarak wn-agent önyüklemesini yapın ve wn-claude --version komutunu doğrulayın. İndirilen betiğin çift tıklama yerine bash install-claude-marmot.sh ile çalıştırıldığını açıklayın. Ardından ajan npub’ınızla yanıt verin; benden onu White Noise üzerinden davet etmemi isteyin. Davet edilen gruptaki ilk mesajım, ajan bilgisayarının ev dizinine göre mevcut bir klasör seçmelidir: /Claude, $HOME/Claude demektir; /Users/me/Claude değil. Sonra yapılandırılmış relay’ler aracılığıyla bu izin verilen npub’dan bir test mesajı göndermemi isteyin. wn-claude White Noise üzerinden yanıt verene kadar kurulumun tamamlandığını bildirmeyin; bu gidiş dönüş otomatik olarak doğrulanamıyorsa cihaz doğrulaması gerektiğini açıkça belirtin.</string>
     <string name="ai_agents_project_groups_tip">Her proje için ayrı bir grup kullan ve proje konumu ile bağlamını vererek başla. Oturum komutları bağlayıcıya göre değişir; sürdürme veya dallandırma komutlarından önce kılavuzunu kontrol et.</string>
     <string name="nostr_event_view_image">Görseli görüntüle</string>
     <string name="nostr_event_image_failed">Bu görsel yüklenemedi. Tekrar deneyin.</string>
@@ -2354,4 +2354,18 @@
     <string name="group_change_invite_anyway">Yine de davet et</string>
     <string name="starting_as">Şu hesapla başlat</string>
     <string name="starting_as_account">Şu hesapla başlat: %1$s</string>
+    <string name="group_action_acting_account">İşlemi yapan hesap</string>
+    <string name="group_action_local_nickname">Yerel takma ad: %1$s</string>
+    <string name="group_action_public_key_hex">Açık anahtar (onaltılık)</string>
+    <string name="group_action_account_label">Yerel hesap etiketi: %1$s</string>
+    <string name="group_action_revoke_explanation">Bu işlem yönetici haklarını kaldırır. Kişi üye olarak kalır.</string>
+    <string name="group_action_add_members">Üye ekle</string>
+    <string name="group_action_transfer_and_leave">Yöneticiliği devret ve ayrıl</string>
+    <string name="group_action_step_down_and_leave">Yöneticilikten çekil ve ayrıl</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d grup</item>
+        <item quantity="other">%1$d grup</item>
+    </plurals>
+    <string name="group_review_add_member">Üye ekle</string>
+    <string name="group_review_invitation_visibility">Tüm üyeler görebilir.</string>
 </resources>

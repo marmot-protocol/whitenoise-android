@@ -741,6 +741,9 @@ class AmberActivityCoordinatorTest {
         shadowOf(Looper.getMainLooper()).idleFor(
             Duration.ofMillis(AmberActivityCoordinator.GROUPED_SESSION_BOOTSTRAP_MS + 1),
         )
+        // Pending admission precedes session registration on each worker.
+        // Drain late registration posts before asserting the complete warm burst.
+        awaitLaunchCount(requestIds.size, signer.launched)
         assertEquals(1, signer.onCreateCount)
         assertEquals(requestIds.size - 1, signer.onNewIntentCount)
         assertEquals(requestIds.size, signer.launched.size)

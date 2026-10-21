@@ -57,8 +57,10 @@ class QuickAccountSwitchingScreenshotTest {
     /** Off: the active avatar stands alone with no other accounts beside it. */
     @Test fun off() = capture("quick_account_switching_off", enabled = false)
 
-    /** The Appearance row after the user turns off quick switching. */
-    @Test fun appearance() = capture("quick_account_switching_appearance_light", settings = true, enabled = false)
+    /** Full Appearance content preserves the editor rows without text straddling the bottom edge fade. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w360dp-h1600dp-mdpi")
+    fun appearance() = capture("quick_account_switching_appearance_light", settings = true, enabled = false)
 
     /** The default-on Appearance preference in AMOLED right-to-left. */
     @Test

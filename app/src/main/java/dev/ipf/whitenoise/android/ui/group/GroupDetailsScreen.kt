@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -107,6 +108,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -280,6 +282,7 @@ internal fun GroupDetailsScreen(
         controller.boundAccountRef,
         surfaceIdentity = controller,
     ) {
+        val reviewRuntime = remember(controller) { appState.runtimeGeneration }
         val detailsScrollState = key(controller) { rememberScrollState() }
         val membersScrollState = key(controller) { rememberScrollState() }
         var showChatRelays by remember(controller) { mutableStateOf(false) }
@@ -317,7 +320,13 @@ internal fun GroupDetailsScreen(
             }
         }
         var showLargeGroupInviteConfirmation by
-            rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+            remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+        var reviewedLargeInviteMembers by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<List<RecipientSearch.Candidate>>(emptyList())
+        }
+        var reviewedLargeInviteAdmins by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<Set<String>>(emptySet())
+        }
         val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
         var membersExpanded by remember(controller) { mutableStateOf(false) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
@@ -329,7 +338,9 @@ internal fun GroupDetailsScreen(
         // leave path and the Admins prompt so a trapped sole admin can hand the
         // role to another member (issue #417).
         var showTransferAdmin by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var disbandConfirmOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var disbandConfirmOpen by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf(false)
+        }
         // #1131: when set, the transfer-admin picker is being used as the first step
         // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
         // rather than the standalone transfer-only action. Holds the group name for
@@ -352,7 +363,11 @@ internal fun GroupDetailsScreen(
         // Tap-time archive direction, recorded before the mutation coroutine is
         // dispatched so the menu's progress label can never read the pre-intent
         // presented state and show the opposite direction.
-        var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
+        val pendingReview =
+            remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
+                DetailsReviewSlot()
+            }
+        var pendingConfirm by pendingReview
         // #3310: the reviewed local-abandonment target and a Leave that did not finish, scoped to this account.
         val abandonment = remember(controller, appState.activeAccountRef) { GroupAbandonmentReview() }
         val scope = rememberCoroutineScope()
@@ -378,7 +393,8 @@ internal fun GroupDetailsScreen(
             !isDm &&
                 canEdit &&
                 memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
-        val mutationsBlocked = activeMutation != null || controller.mutationInFlight
+        val mutationOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, reviewRuntime)
+        val mutationsBlocked = activeMutation != null || controller.mutationInFlight || !mutationOwnerCurrent
         val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
         var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         LaunchedEffect(canAdministerMembers) {
@@ -411,6 +427,7 @@ internal fun GroupDetailsScreen(
         val actingMemberHex = controller.boundAccountIdHex?.takeIf(String::isNotBlank)
         val reviewIdentity: @Composable (String) -> Unit = { memberHex ->
             val avatar = rememberConversationGroupAvatar(appState, controller)
+            GroupActingAccountIdentity(appState, controller.boundAccountRef)
             GroupMemberReviewPair(
                 appState = appState,
                 group =
@@ -561,14 +578,21 @@ internal fun GroupDetailsScreen(
             mutation: suspend () -> Boolean,
             target: String? = null,
             onSuccess: () -> Unit = {},
+            onAccepted: () -> Unit = {},
         ) {
             // Launched on a process-lifetime scope so the MLS commit + Nostr
             // publish complete even if the user dismisses this sheet mid-flight.
             // The refreshMembers() + appState.present(toast) inside each
             // ConversationController.* method then always run, regardless of
             // whether this composable is still on screen.
+            val canRun =
+                activeMutation == null &&
+                    !controller.mutationInFlight &&
+                    controller.isCurrentGroupMutationOwner(appState, reviewRuntime)
+            if (!canRun) return
             activeMutation = ActiveGroupMutation(action, target)
             controller.clearLastMutationError()
+            onAccepted()
             appState.launchMutation {
                 try {
                     val succeeded = mutation()
@@ -722,7 +746,9 @@ internal fun GroupDetailsScreen(
         var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showTranslationPicker by remember(controller) { mutableStateOf(false) }
         var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
+        var pendingDisappearingSecs by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<Long?>(null)
+        }
         var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showFolderCreate by remember(controller.group.groupIdHex) { mutableStateOf(false) }
 
@@ -848,10 +874,13 @@ internal fun GroupDetailsScreen(
                 )
 
             /** Submits the currently staged, normalized recipients and closes the picker only after native success. */
-            fun submitSelectedInvites() {
-                if (!canAdministerMembers) return
-                val refs = addSelection.map { it.accountIdHex }
-                val admins = refs.filter { id -> addAdminSelection.any { it.equals(id, ignoreCase = true) } }
+            fun submitSelectedInvites(
+                selected: List<RecipientSearch.Candidate> = addSelection.toList(),
+                selectedAdmins: Set<String> = addAdminSelection.toSet(),
+            ) {
+                if (!canAdministerMembers || !rosterReady) return
+                val refs = selected.map { it.accountIdHex }
+                val admins = refs.filter { id -> selectedAdmins.any { it.equals(id, ignoreCase = true) } }
                 runGroupMutation(
                     action = GroupMutationAction.InviteMember,
                     mutation = { controller.inviteMembers(refs, initialAdminRefs = admins) },
@@ -889,6 +918,8 @@ internal fun GroupDetailsScreen(
                 onConfirm = confirm@{
                     if (!canAdministerMembers || !rosterReady) return@confirm
                     if (inviteProjection?.shouldWarn == true) {
+                        reviewedLargeInviteMembers = addSelection.toList()
+                        reviewedLargeInviteAdmins = addAdminSelection.toSet()
                         showLargeGroupInviteConfirmation = true
                     } else {
                         submitSelectedInvites()
@@ -923,12 +954,57 @@ internal fun GroupDetailsScreen(
                 },
             )
             if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == true) {
+                val warningTicket = remember { GroupInviteWarningTicket() }
+                val warningMembers = remember(warningTicket) { reviewedLargeInviteMembers.toList() }
+                val warningAdmins = remember(warningTicket) { reviewedLargeInviteAdmins.toSet() }
+                DisposableEffect(warningTicket) {
+                    onDispose { warningTicket.active = false }
+                }
                 LargeGroupInviteConfirmationDialog(
                     onContinue = {
-                        showLargeGroupInviteConfirmation = false
-                        submitSelectedInvites()
+                        if (warningTicket.active && showLargeGroupInviteConfirmation) {
+                            warningTicket.active = false
+                            showLargeGroupInviteConfirmation = false
+                            if (warningMembers.map { it.accountIdHex } ==
+                                addSelection.map { it.accountIdHex } &&
+                                warningAdmins == addAdminSelection.toSet()
+                            ) {
+                                submitSelectedInvites(warningMembers, warningAdmins)
+                            }
+                        }
                     },
-                    onDismiss = { showLargeGroupInviteConfirmation = false },
+                    onDismiss = {
+                        if (warningTicket.active) {
+                            warningTicket.active = false
+                            showLargeGroupInviteConfirmation = false
+                        }
+                    },
+                    identity = {
+                        GroupActingAccountIdentity(appState, controller.boundAccountRef)
+                        Text(
+                            pluralStringResource(
+                                R.plurals.selected_members_count,
+                                warningMembers.size,
+                                warningMembers.size,
+                            ),
+                        )
+                        warningMembers.forEach { member ->
+                            GroupMemberReviewPair(
+                                appState = appState,
+                                group =
+                                    MemberReviewGroup(
+                                        controller.group.groupIdHex,
+                                        conversationTitle,
+                                        reviewAvatar.pictureUrl,
+                                        reviewAvatar.image,
+                                    ),
+                                member = member,
+                                busy = true,
+                                initialAdminIds = warningAdmins,
+                                onInitialAdminChange = { _, _ -> },
+                            )
+                        }
+                    },
                 )
             }
             return@PreparedGroupAvatarContent
@@ -969,6 +1045,52 @@ internal fun GroupDetailsScreen(
         }
 
         pendingConfirm?.let { confirm ->
+            val memberIds = controller.members.map { it.memberIdHex.lowercase(Locale.ROOT) }.toSet()
+            val adminIds =
+                controller.group.admins
+                    .map { it.lowercase(Locale.ROOT) }
+                    .toSet()
+            val reviewTicket = pendingReview.ticket
+            val reviewedRoster = remember(reviewTicket) { memberIds to adminIds }
+            val administration =
+                confirm is DetailsConfirm.RemoveMember ||
+                    confirm is DetailsConfirm.TransferAdmin ||
+                    confirm is DetailsConfirm.StepDownAdmin ||
+                    confirm == DetailsConfirm.StepDownSoleAdmin ||
+                    confirm is DetailsConfirm.LeaveSoleAdminTransfer
+            val departureHandover = confirm is DetailsConfirm.LeaveSoleAdminTransfer
+            val currentReview =
+                controller.boundAccountRef == appState.activeAccountRef &&
+                    reviewRuntime == appState.runtimeGeneration &&
+                    reviewedRoster == (memberIds to adminIds) &&
+                    controller.isSelfMember &&
+                    (!administration || controller.canClaimAdministrationReview(allowDmDeparture = departureHandover))
+            LaunchedEffect(currentReview, reviewTicket) {
+                if (!currentReview && pendingReview.ticket === reviewTicket) pendingConfirm = null
+            }
+
+            fun claimReview(): Boolean {
+                val liveMembers = controller.members.map { it.memberIdHex.lowercase(Locale.ROOT) }.toSet()
+                val liveAdmins =
+                    controller.group.admins
+                        .map { it.lowercase(Locale.ROOT) }
+                        .toSet()
+                return when {
+                    pendingReview.ticket !== reviewTicket || pendingConfirm == null -> false
+                    controller.boundAccountRef != appState.activeAccountRef -> false
+                    reviewRuntime != appState.runtimeGeneration -> false
+                    reviewedRoster != (liveMembers to liveAdmins) || !controller.isSelfMember -> false
+                    administration &&
+                        !controller.canClaimAdministrationReview(allowDmDeparture = departureHandover) -> false
+                    activeMutation != null || controller.mutationInFlight -> false
+                    appState.signOutInProgress || appState.wipeInProgress -> false
+                    else -> {
+                        pendingConfirm = null
+                        true
+                    }
+                }
+            }
+
             val kind =
                 when (confirm) {
                     is DetailsConfirm.RemoveMember -> GroupDetailsConfirmationKind.RemoveMember
@@ -994,12 +1116,12 @@ internal fun GroupDetailsScreen(
                 is DetailsConfirm.RemoveMember ->
                     GroupDetailsConfirmation(
                         identity = identity,
-                        confirmEnabled = memberHex != null,
+                        confirmEnabled = memberHex != null && currentReview && !mutationsBlocked,
                         model =
                             GroupDetailsConfirmationState.RemoveMember(
                                 memberName = controller.memberDisplayName(confirm.member),
-                                onConfirm = {
-                                    pendingConfirm = null
+                                onConfirm = confirmAction@{
+                                    if (!claimReview()) return@confirmAction
                                     runGroupMutation(
                                         action = GroupMutationAction.RemoveMember,
                                         mutation = { controller.removeMember(confirm.member) },
@@ -1007,17 +1129,17 @@ internal fun GroupDetailsScreen(
                                     )
                                 },
                             ),
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
                 is DetailsConfirm.TransferAdmin ->
                     GroupDetailsConfirmation(
                         identity = identity,
-                        confirmEnabled = memberHex != null,
+                        confirmEnabled = memberHex != null && currentReview && !mutationsBlocked,
                         model =
                             GroupDetailsConfirmationState.TransferAdmin(
                                 memberName = controller.memberDisplayName(confirm.member),
-                                onConfirm = {
-                                    pendingConfirm = null
+                                onConfirm = confirmAction@{
+                                    if (!claimReview()) return@confirmAction
                                     runGroupMutation(
                                         action = GroupMutationAction.TransferAdmin,
                                         mutation = { controller.transferAdmin(confirm.member) },
@@ -1025,16 +1147,16 @@ internal fun GroupDetailsScreen(
                                     )
                                 },
                             ),
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
                 is DetailsConfirm.StepDownAdmin ->
                     GroupDetailsConfirmation(
                         identity = identity,
-                        confirmEnabled = memberHex != null,
+                        confirmEnabled = memberHex != null && currentReview && !mutationsBlocked,
                         model =
                             GroupDetailsConfirmationState.StepDown(
-                                onConfirm = {
-                                    pendingConfirm = null
+                                onConfirm = confirmAction@{
+                                    if (!claimReview()) return@confirmAction
                                     runGroupMutation(
                                         action = GroupMutationAction.SelfDemoteAdmin,
                                         mutation = { controller.stepDownAsAdmin() },
@@ -1042,30 +1164,30 @@ internal fun GroupDetailsScreen(
                                     )
                                 },
                             ),
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
                 DetailsConfirm.StepDownSoleAdmin ->
                     GroupDetailsConfirmation(
                         identity = identity,
-                        confirmEnabled = memberHex != null,
+                        confirmEnabled = memberHex != null && currentReview && !mutationsBlocked,
                         model =
                             GroupDetailsConfirmationState.StepDownSoleAdmin(
-                                onConfirm = {
-                                    pendingConfirm = null
+                                onConfirm = confirmAction@{
+                                    if (!claimReview()) return@confirmAction
                                     showTransferAdmin = true
                                 },
                             ),
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
                 is DetailsConfirm.Leave ->
                     GroupDetailsConfirmation(
                         identity = identity,
-                        confirmEnabled = memberHex != null,
+                        confirmEnabled = memberHex != null && currentReview && !mutationsBlocked,
                         model =
                             GroupDetailsConfirmationState.Leave(
                                 groupName = confirm.groupName,
-                                onConfirm = {
-                                    pendingConfirm = null
+                                onConfirm = confirmAction@{
+                                    if (!claimReview()) return@confirmAction
                                     // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
                                     // kill the toast/refresh; onDismiss + onLeft are safe Compose
                                     // state writes from Main.immediate.
@@ -1078,18 +1200,18 @@ internal fun GroupDetailsScreen(
                                     )
                                 },
                             ),
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
                 // A sole member dissolves the group instead of choosing an impossible successor.
                 is DetailsConfirm.LeaveSoleMember ->
                     GroupDetailsConfirmation(
                         identity = identity,
-                        confirmEnabled = memberHex != null,
+                        confirmEnabled = memberHex != null && currentReview && !mutationsBlocked,
                         model =
                             GroupDetailsConfirmationState.LeaveSoleMember(
                                 groupName = confirm.groupName,
-                                onConfirm = {
-                                    pendingConfirm = null
+                                onConfirm = confirmAction@{
+                                    if (!claimReview()) return@confirmAction
                                     runGroupMutation(
                                         action = GroupMutationAction.Leave,
                                         mutation = { controller.leaveGroup(displayName = confirm.groupName) },
@@ -1099,7 +1221,7 @@ internal fun GroupDetailsScreen(
                                     )
                                 },
                             ),
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
                 is DetailsConfirm.LeaveSoleAdmin ->
                     // Fallback for the (unexpected) no-transfer-candidate case. The normal sole-admin Leave
@@ -1109,21 +1231,21 @@ internal fun GroupDetailsScreen(
                         groupName = confirm.groupName,
                         isDm = isDm,
                         identity = identity,
-                        onAbandon = {
-                            pendingConfirm = null
+                        onAbandon = abandonAction@{
+                            if (!claimReview()) return@abandonAction
                             requestAbandonment()
                         },
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
                 is DetailsConfirm.LeaveSoleAdminTransfer ->
                     GroupDetailsConfirmation(
                         identity = identity,
-                        confirmEnabled = memberHex != null,
+                        confirmEnabled = memberHex != null && currentReview && !mutationsBlocked,
                         model =
                             GroupDetailsConfirmationState.TransferThenLeave(
                                 memberName = controller.memberDisplayName(confirm.newAdmin),
-                                onConfirm = {
-                                    pendingConfirm = null
+                                onConfirm = confirmAction@{
+                                    if (!claimReview()) return@confirmAction
                                     runGroupMutation(
                                         action = GroupMutationAction.Leave,
                                         mutation = {
@@ -1134,15 +1256,15 @@ internal fun GroupDetailsScreen(
                                     )
                                 },
                             ),
-                        onDismiss = { pendingConfirm = null },
+                        onDismiss = { if (pendingReview.ticket === reviewTicket) pendingConfirm = null },
                     )
             }
         }
 
         abandonment.target?.let { target ->
-            GroupAbandonmentDialog(
+            GroupAbandonmentReviewDialog(
                 // The acting account's name resolves while the review shows, as the group-action identity does.
-                target = target.copy(accountName = abandonmentAccountName(appState, target.accountRef)),
+                targets = listOf(target.copy(accountName = abandonmentAccountName(appState, target.accountRef))),
                 status =
                     when {
                         activeMutation?.action == GroupMutationAction.Reset -> GroupAbandonmentStatus.Running
@@ -1154,10 +1276,10 @@ internal fun GroupDetailsScreen(
                     if (!abandonment.targets(actingAccount, controller.group.groupIdHex)) {
                         abandonment.dismiss()
                     } else if (activeMutation == null && !controller.mutationInFlight) {
-                        abandonment.attempted = true
                         runGroupMutation(
                             action = GroupMutationAction.Reset,
                             mutation = { controller.forgetGroupLocal() },
+                            onAccepted = { abandonment.attempted = true },
                             onSuccess = {
                                 abandonment.dismiss()
                                 onLeft()
@@ -1168,6 +1290,8 @@ internal fun GroupDetailsScreen(
                 onDismiss = abandonment::dismiss,
                 // The screen's error banner sits behind this modal, so the failed review carries its Copy action.
                 error = controller.lastMutationError.takeIf { abandonment.attempted },
+                identity = ownIdentity,
+                confirmEnabled = mutationOwnerCurrent,
             )
         }
         // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.
@@ -1843,6 +1967,8 @@ internal fun GroupDetailsScreen(
                         },
                         onDismiss = { pendingDisappearingSecs = null },
                         destructive = true,
+                        identity = ownIdentity,
+                        confirmEnabled = canEdit && !mutationsBlocked,
                     )
                 }
 
@@ -2648,3 +2774,36 @@ internal fun GroupManagementSnapshotRefreshEffect(controller: ConversationContro
         controller.refreshManagementState()
     }
 }
+
+/** Each opening, including equal singleton actions, gets a fresh one-use presentation identity. */
+private class DetailsReviewSlot {
+    private var value by mutableStateOf<DetailsConfirm?>(null)
+    var ticket: Any by mutableStateOf(Any())
+        private set
+
+    operator fun getValue(
+        thisRef: Any?,
+        property: kotlin.reflect.KProperty<*>,
+    ): DetailsConfirm? = value
+
+    operator fun setValue(
+        thisRef: Any?,
+        property: kotlin.reflect.KProperty<*>,
+        next: DetailsConfirm?,
+    ) {
+        ticket = Any()
+        value = next
+    }
+}
+
+private class GroupInviteWarningTicket {
+    var active: Boolean = true
+}
+
+/** Re-read each authority fence when claiming an administration confirmation. */
+private fun ConversationController.canClaimAdministrationReview(allowDmDeparture: Boolean = false): Boolean =
+    when {
+        !isSelfAdmin || (isDm && !allowDmDeparture) -> false
+        group.pendingConfirmation || group.disbanding || group.disbanded -> false
+        else -> memberAdministrationPresentable(memberRosterState, seededSelfMember)
+    }

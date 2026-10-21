@@ -95,7 +95,7 @@ class LargeGroupInviteWarningUiTest {
             assertEquals(1, cancels)
             open = true
         }
-        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.onNodeWithText("Add members").performClick()
         composeRule.runOnIdle {
             assertEquals(1, continues)
             assertEquals(1, cancels)

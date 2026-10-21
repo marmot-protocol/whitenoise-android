@@ -1,0 +1,85 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+  "legacy_sha256": "b9a688b0c2fefb6e495237fb4d95cf5b106ef94a0706a6a5bb21ac4f0a726e86",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "LargeGroupInviteConfirmationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "fun LargeGroupInviteConfirmationDialog(",
+        "test_ids": [
+          "GRP-005",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "LargeGroupInviteWarningBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "fun LargeGroupInviteWarningBanner(",
+        "test_ids": [
+          "GRP-005"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "string:group_continue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "R.string.group_action_add_members",
+        "test_ids": [
+          "GRP-005",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "150-member invitation warning threshold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "LARGE_GROUP_INVITE_WARNING_THRESHOLD = 150",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "string:large_group_invite_confirm_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "R.string.large_group_invite_confirm_message",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "string:large_group_invite_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "R.string.large_group_invite_confirm_title",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "string:large_group_invite_warning_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "R.string.large_group_invite_warning_message",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "string:large_group_invite_warning_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "R.string.large_group_invite_warning_title",
+        "test_ids": [
+          "GRP-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
