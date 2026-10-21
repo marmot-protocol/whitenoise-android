@@ -42,6 +42,8 @@ class MediaAvCapabilityService : Service() {
         return true
     }
 
+    // Debug request boundary records bounded platform/parser failures; watchdog and retirement remain active.
+    @Suppress("TooGenericExceptionCaught")
     private fun execute(
         data: Bundle,
         reply: android.os.IBinder?,
@@ -150,6 +152,8 @@ internal class AvCapabilityTrace private constructor(
         record(value, "begin")
     }
 
+    // Experimental probe boundary retains only the Exception class/code, excluding messages and Throwable.
+    @Suppress("TooGenericExceptionCaught")
     fun run(
         result: Bundle,
         action: () -> Unit,
@@ -256,9 +260,9 @@ internal object AvCapabilityOperations {
         result.putInt("sourceHeight", probe.height)
         probe.poster?.let { bitmap ->
             try {
-                val count = MediaDecodePolicy.pixelBytes(bitmap.width, bitmap.height, AV_EDGE, output.size) ?: return
+                val count = MediaDecodePolicy.pixelBytes(bitmap.width, bitmap.height, AV_EDGE, output.size)
                 val packed = bitmap.rowBytes == bitmap.width * Int.SIZE_BYTES
-                if (bitmap.config != android.graphics.Bitmap.Config.ARGB_8888 || !packed) return
+                if (count == null || bitmap.config != android.graphics.Bitmap.Config.ARGB_8888 || !packed) return
                 val buffer = output.mapReadWrite()
                 try {
                     buffer.limit(count)

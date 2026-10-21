@@ -218,14 +218,13 @@ internal class IsolatedMediaTransport(
     }
 
     private fun dispose(selected: Worker) {
-        val unbind =
-            synchronized(bindingLock) {
-                if (selected.dead.count != 0L || !selected.bindComplete || selected.disposed) return
-                selected.disposed = true
-                if (worker === selected) worker = null
-                selected.bound
-            }
-        if (unbind) runCatching { context.unbindService(selected.connection) }
+        synchronized(bindingLock) {
+            if (selected.dead.count != 0L || !selected.bindComplete || selected.disposed) return
+            selected.disposed = true
+            if (worker === selected) worker = null
+        }
+        // A definitive false bind still registers a connection that must be released.
+        runCatching { context.unbindService(selected.connection) }
         selected.binder?.let { binder -> runCatching { binder.unlinkToDeath(selected.deathRecipient, 0) } }
         if (closed && callbackThread.isInitialized()) callbacks.quitSafely()
     }
@@ -312,21 +311,24 @@ internal class IsolatedMediaTransport(
     ): T? {
         if (selected == null || closed) return null
         val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS)
-        if (!gate.tryAcquire(remaining(ticket), TimeUnit.MILLISECONDS)) return null
-        return try {
-            if (!current(ticket)) {
-                null
-            } else {
-                val result = block(ticket)
-                if (current(ticket)) {
-                    result
-                } else {
-                    (result as? Bitmap)?.recycle()
+        return if (!gate.tryAcquire(remaining(ticket), TimeUnit.MILLISECONDS)) {
+            null
+        } else {
+            try {
+                if (!current(ticket)) {
                     null
+                } else {
+                    val result = block(ticket)
+                    if (current(ticket)) {
+                        result
+                    } else {
+                        (result as? Bitmap)?.recycle()
+                        null
+                    }
                 }
+            } finally {
+                gate.release()
             }
-        } finally {
-            gate.release()
         }
     }
 

@@ -33,8 +33,13 @@ Binder, missing death and malformed replies stop the campaign as unqualified.
 The fixture treats disconnect, unbind, a retirement request and elapsed time as
 unresolved lifetime observations.
 
-Probe cases retain the existing8-second host deadline and6-second watchdog.
-Waveform cases use the existing40-second ceiling. These containment bounds remain separate from measured performance budgets.
+Probe requests retain the existing 8-second deadline and 6-second watchdog.
+Waveform requests retain their 40-second ceiling. After a timely reply, the fixture
+allows a separate 2-second grace period for the exact Binder-death witness. Missing
+or late replies remain unqualified. Missing death keeps the worker generation held.
+The result records operation and retirement durations separately; total elapsed time
+includes cleanup and output validation. These finite bounds remain separate from
+measured performance budgets and production defaults.
 Descendant lifetime remains outside the endpoint death proof. Pixel values stay
 untrusted; the copied Bitmap supplies bounded private storage with authenticity
 and atomicity outside its guarantees.

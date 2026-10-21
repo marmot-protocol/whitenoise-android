@@ -183,18 +183,16 @@ class MediaBindingRecoveryTest {
                 }
             }
         // Hold the real old-source close at its existing executor boundary, without a production hook.
-        val session = field(transport, "session")
-        val sources = field(session, "sources")
-        for (name in listOf("sourceTimer", "sourceWatchdog\$delegate")) {
-            sources.javaClass
-                .getDeclaredField(name)
-                .apply { isAccessible = true }
-                .set(sources, lazyOf(scheduler))
-        }
         val reset = Thread { transport.activateSession() }
-        reset.start()
         var call: Call? = null
         try {
+            val session = field(transport, "session")
+            val sources = field(session, "sources")
+            sources.javaClass
+                .getDeclaredField("sourceTimer")
+                .apply { isAccessible = true }
+                .set(sources, lazyOf(scheduler))
+            reset.start()
             assertTrue(closing.await(2, TimeUnit.SECONDS))
             call = start(transport, 1)
             val successor = context.next()
@@ -233,6 +231,12 @@ class MediaBindingRecoveryTest {
         source.writeBytes(byteArrayOf(1))
         val provider = HeldSourceProvider(source)
         val authority = "dev.ipf.whitenoise.test.held-session-source"
+        provider.attachInfo(
+            context,
+            android.content.pm
+                .ProviderInfo()
+                .also { it.authority = authority },
+        )
         ShadowContentResolver.registerProviderInternal(authority, provider)
         val transport = IsolatedMediaTransport(context)
         val outcome = AtomicReference<Result<android.graphics.Bitmap?>>()
@@ -244,7 +248,10 @@ class MediaBindingRecoveryTest {
         var next: Call? = null
         old.start()
         try {
-            assertTrue(provider.entered.await(2, TimeUnit.SECONDS))
+            assertTrue(
+                "Provider entry failed: ${outcome.get()?.exceptionOrNull()?.javaClass?.simpleName}",
+                provider.entered.await(2, TimeUnit.SECONDS),
+            )
             transport.activateSession()
             provider.release.countDown()
             old.join(2_000)
@@ -339,7 +346,7 @@ class MediaBindingRecoveryTest {
             assertNull(transport.decode(byteArrayOf(1), 1, false, MediaDecodePolicy.DECODE))
             val refused = context.next()
             assertEquals(0, refused.remote.requests)
-            assertTrue(context.unbound.isEmpty())
+            assertEquals(listOf(refused.connection), context.unbound)
             context.acceptBind = true
             next = start(transport, 2)
             val current = context.next()
@@ -348,6 +355,9 @@ class MediaBindingRecoveryTest {
             assertEquals(1, current.remote.requests)
             current.remote.die()
             next.join()
+            transport.close()
+            assertEquals(1, context.unbound.count { it === refused.connection })
+            assertEquals(1, context.unbound.count { it === current.connection })
         } finally {
             next?.interruptAndJoin()
             context.dieAll()

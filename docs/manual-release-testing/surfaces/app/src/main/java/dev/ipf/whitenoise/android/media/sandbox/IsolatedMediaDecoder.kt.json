@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedMediaDecoder.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Account reset retains the still-image process owner and revokes the old session",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedMediaDecoder.kt",
+        "anchor": "fun resetForAccount()",
+        "test_ids": [
+          "MED-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

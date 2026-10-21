@@ -31,6 +31,10 @@ internal class MediaAvCapabilityBinding(
     private var selected: AvCapabilityWorker? = null
     private var closed = false
 
+    private companion object {
+        const val DEATH_GRACE_MS = 2_000L
+    }
+
     fun run(
         file: File,
         request: Bundle,
@@ -60,11 +64,15 @@ internal class MediaAvCapabilityBinding(
                 val capacity = checkNotNull(MediaDecodePolicy.outputCapacity(128))
                 SharedMemory.create("av-capability", capacity).use { output ->
                     exchange(worker, input, output, request)
+                    check(worker.remaining() > 0) { "Reply deadline; lifetime held" }
+                    val operationElapsed = SystemClock.elapsedRealtime() - started
+                    val retirementStarted = SystemClock.elapsedRealtime()
                     retire(worker)
-                    check(worker.dead.await(worker.remaining(), TimeUnit.MILLISECONDS)) { "Exact Binder death missing" }
+                    check(worker.dead.await(DEATH_GRACE_MS, TimeUnit.MILLISECONDS)) { "Exact Binder death missing" }
+                    val retirementElapsed = SystemClock.elapsedRealtime() - retirementStarted
                     checkNotNull(worker.result).let { result ->
                         AvCapabilityEvidence.validate(result, output)
-                        return AvCapabilityEvidence.row(worker.id, result, started)
+                        return AvCapabilityEvidence.row(worker.id, result, started, operationElapsed, retirementElapsed)
                     }
                 }
             }
@@ -148,7 +156,7 @@ internal class MediaAvCapabilityBinding(
         worker: AvCapabilityWorker,
         connection: ServiceConnection,
     ) {
-        if (worker.bound) context.unbindService(connection)
+        runCatching { context.unbindService(connection) }
         worker.remote?.let { runCatching { it.unlinkToDeath(worker.death, 0) } }
         val terminal =
             synchronized(lock) {
@@ -275,6 +283,8 @@ private object AvCapabilityEvidence {
         id: Int,
         result: Bundle,
         started: Long,
+        operationElapsed: Long,
+        retirementElapsed: Long,
     ): JSONObject =
         JSONObject()
             .put("request", id)
@@ -282,6 +292,8 @@ private object AvCapabilityEvidence {
             .put("success", result.getBoolean("success"))
             .put("death_observed_before_output_read", true)
             .put("elapsed_ms", SystemClock.elapsedRealtime() - started)
+            .put("operation_elapsed_ms", operationElapsed)
+            .put("retirement_elapsed_ms", retirementElapsed)
             .put("pixels", result.getBoolean("pixels"))
             .put("duration_ms", result.getLong("duration"))
             .put("waveform_bars", result.getFloatArray("waveform")?.size ?: 0)
