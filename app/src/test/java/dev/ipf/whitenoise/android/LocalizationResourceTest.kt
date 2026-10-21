@@ -781,7 +781,8 @@ class LocalizationResourceTest {
                 "任何變更之前請求我的核准",
             )
         if (
-            prerequisiteStart < 0 || phoneCheck <= prerequisiteStart ||
+            prerequisiteStart < 0 ||
+            phoneCheck <= prerequisiteStart ||
             prerequisiteApprovalPatterns.none { prompt.substring(prerequisiteStart, phoneCheck).contains(it) }
         ) {
             violations += "missing approval before prerequisite host changes"
