@@ -18,6 +18,10 @@ name: Android Instrumented Tests
 on:
   workflow_dispatch:
     inputs:
+      attachment_diagnostic:
+        description: 'Diagnostic branch only: first receive and controller-resume probes with redacted ADB binding evidence'
+        type: boolean
+        default: false
       mdk_qualification:
         description: Populated current-master runtime upgrade, cold restart and both recovery modes
         required: false
@@ -265,7 +269,7 @@ jobs:
       matrix:
         # Zapstore carries the self-updater/installer paths the APK probes
         # exercise; Play runs on master pushes and manual dispatches.
-        distribution: ${{ fromJSON(github.event_name == 'pull_request' && '["Zapstore"]' || '["Play", "Zapstore"]') }}
+        distribution: ${{ fromJSON((github.event_name == 'pull_request' || inputs.attachment_diagnostic) && '["Zapstore"]' || '["Play", "Zapstore"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -273,6 +277,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Verify redacted binding diagnostics
+        if: inputs.attachment_diagnostic
+        run: python3 -m unittest discover -s tools/attachment-fixture -p test_device_runner.py
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -288,19 +295,19 @@ jobs:
           script: |
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume-changed
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-unknown-length
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-lock
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-automatic-resume
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-media
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-tile-transfer
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background-receipt
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk-recreation
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-forward
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume-changed
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-unknown-length
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-lock
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-automatic-resume
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-media
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-tile-transfer
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background-receipt
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk-recreation
+            [ "${{ inputs.attachment_diagnostic }}" = true ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-forward
       - name: Preserve redacted ledger and measurements on success or failure
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -312,7 +319,7 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification
+    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.attachment_diagnostic
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60

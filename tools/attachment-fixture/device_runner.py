@@ -39,13 +39,20 @@ def failure_diagnostics(error, stage, adb, serial, physical):
                            if isinstance(value, str))
     statuses = (("INSTRUMENTATION_RESULT: shortMsg=Process crashed.", "process-crashed"),
                 ("Unable to find instrumentation info", "missing-instrumentation"),
-                ("error: device offline", "device-offline"),
+                ("device offline", "device-offline"),
                 (f"error: device '{serial}' not found", "device-missing"),
                 ("error: no devices/emulators found", "device-missing"),
                 ("error: closed", "transport-closed"), ("error: protocol fault", "transport-protocol-fault"),
                 ("INSTRUMENTATION_ABORTED", "instrumentation-aborted"),
                 ("INSTRUMENTATION_FAILED", "instrumentation-failed"))
     details["subprocess_status"] = next((status for marker, status in statuses if marker in transcript), "unknown")
+    if stage == "reverse-binding":
+        if "cannot rebind existing socket" in transcript:
+            details["subprocess_status"] = "reverse-already-bound"
+        elif "cannot bind listener" in transcript:
+            details["subprocess_status"] = (
+                "reverse-address-in-use" if "Address already in use" in transcript else
+                "reverse-permission-denied" if "Permission denied" in transcript else "reverse-bind-failed")
     if stage not in ("instrumentation", "restart-instrumentation") or physical:
         return details
     try:
@@ -183,7 +190,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             threads.append(thread)
             started_services.append(service)
         stage = "reverse-binding"
-        for port in (server.server_port, relay.port):
+        for role, port in (("blob", server.server_port), ("relay", relay.port)):
+            report["reverse_binding"] = {"role": role, "owned_success_count": len(forwards)}
             # --no-rebind fails instead of overwriting an existing reverse owned by another task.
             adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{port}")
             forwards.append(port)

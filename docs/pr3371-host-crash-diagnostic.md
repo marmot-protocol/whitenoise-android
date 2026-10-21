@@ -39,3 +39,8 @@ Relevant primary documentation: [GDB attach](https://sourceware.org/gdb/current/
 [signal delivery](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Signaling.html).
 After a targeted repair, the exact signed APK still needs a full upgrade and cold
 restart without a debugger before physical follow-up or review readiness.
+
+The separate `attachment_diagnostic` dispatch runs only the unchanged first two
+attachment scenarios after hosted failure-contract tests. It classifies reverse
+binding failures with fixed categories and binding roles, retaining no raw ADB
+errors or ports. This partial campaign cannot replace complete attachment CI.
