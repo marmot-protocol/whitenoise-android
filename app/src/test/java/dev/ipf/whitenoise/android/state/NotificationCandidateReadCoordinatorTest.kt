@@ -61,11 +61,13 @@ class NotificationCandidateReadCoordinatorTest {
             try {
                 repeat(4) { index ->
                     val key = NotificationCandidateReadKey("account", "chat$index", "message", 1, 1)
-                    assertNull(coordinator.read(key, 100) {
-                        entered.countDown()
-                        check(release.await(10, TimeUnit.SECONDS))
-                        NotificationCandidateState.Unread
-                    })
+                    assertNull(
+                        coordinator.read(key, 100) {
+                            entered.countDown()
+                            check(release.await(10, TimeUnit.SECONDS))
+                            NotificationCandidateState.Unread
+                        },
+                    )
                 }
                 assertTrue(entered.await(1, TimeUnit.SECONDS))
                 val fifth = NotificationCandidateReadKey("account", "fifth", "message", 1, 1)
