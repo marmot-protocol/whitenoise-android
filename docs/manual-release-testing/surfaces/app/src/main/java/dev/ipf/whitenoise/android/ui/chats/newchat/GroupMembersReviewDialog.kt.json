@@ -67,9 +67,9 @@
         ]
       },
       {
-        "surface": "R.plurals.group_review_add_members",
+        "surface": "R.string.group_review_add_member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "anchor": "R.plurals.group_review_add_members",
+        "anchor": "R.string.group_review_add_member",
         "test_ids": [
           "GRP-030",
           "GRP-034"
@@ -79,6 +79,15 @@
         "surface": "R.string.group_review_invitation_visibility",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
         "anchor": "R.string.group_review_invitation_visibility",
+        "test_ids": [
+          "GRP-030",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "R.string.group_action_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "R.string.group_action_add_members",
         "test_ids": [
           "GRP-030",
           "GRP-034"

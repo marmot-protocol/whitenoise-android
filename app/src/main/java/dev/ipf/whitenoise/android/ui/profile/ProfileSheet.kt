@@ -64,7 +64,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -114,6 +113,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
+import dev.ipf.whitenoise.android.ui.chats.newchat.groupReviewAddMembersLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.chats.newchat.withDmCreationOwner
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
@@ -1512,7 +1512,7 @@ internal fun ProfileAddToGroupsContent(
             groups = reviewGroups,
             members = listOf(target),
             busy = busy,
-            confirmLabel = pluralStringResource(R.plurals.group_review_add_members, 1),
+            confirmLabel = stringResource(groupReviewAddMembersLabel(1)),
             onConfirm = {
                 confirmSelection = null
                 onAdd(targets)

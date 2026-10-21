@@ -2333,8 +2333,6 @@
     <plurals name="group_action_groups_count">
         <item quantity="other">%1$d 个群组</item>
     </plurals>
-    <plurals name="group_review_add_members">
-        <item quantity="other">添加成员</item>
-    </plurals>
+    <string name="group_review_add_member">添加成员</string>
     <string name="group_review_invitation_visibility">所有成员可见。</string>
 </resources>

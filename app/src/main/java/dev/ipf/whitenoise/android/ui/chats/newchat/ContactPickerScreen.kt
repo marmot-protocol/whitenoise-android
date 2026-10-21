@@ -136,7 +136,7 @@ internal fun ContactPickerScreen(
                 reviewingSelection = false
                 onConfirm()
             },
-            confirmLabel = pluralStringResource(R.plurals.group_review_add_members, selected.size),
+            confirmLabel = stringResource(groupReviewAddMembersLabel(selected.size)),
             initialAdminIds = initialAdminIds,
             onInitialAdminChange = onInitialAdminChange,
         )

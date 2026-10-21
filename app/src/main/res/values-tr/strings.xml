@@ -2366,9 +2366,6 @@
         <item quantity="one">%1$d grup</item>
         <item quantity="other">%1$d grup</item>
     </plurals>
-    <plurals name="group_review_add_members">
-        <item quantity="one">Üye ekle</item>
-        <item quantity="other">Üye ekle</item>
-    </plurals>
+    <string name="group_review_add_member">Üye ekle</string>
     <string name="group_review_invitation_visibility">Tüm üyeler görebilir.</string>
 </resources>

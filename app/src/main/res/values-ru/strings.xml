@@ -2442,11 +2442,6 @@
         <item quantity="many">%1$d групп</item>
         <item quantity="other">%1$d группы</item>
     </plurals>
-    <plurals name="group_review_add_members">
-        <item quantity="one">Добавить участника</item>
-        <item quantity="few">Добавить участников</item>
-        <item quantity="many">Добавить участников</item>
-        <item quantity="other">Добавить участников</item>
-    </plurals>
+    <string name="group_review_add_member">Добавить участника</string>
     <string name="group_review_invitation_visibility">Видно всем участникам.</string>
 </resources>

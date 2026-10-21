@@ -2368,9 +2368,6 @@
         <item quantity="one">%1$d grupo</item>
         <item quantity="other">%1$d grupos</item>
     </plurals>
-    <plurals name="group_review_add_members">
-        <item quantity="one">Añadir miembro</item>
-        <item quantity="other">Añadir miembros</item>
-    </plurals>
+    <string name="group_review_add_member">Añadir miembro</string>
     <string name="group_review_invitation_visibility">Visible para todos los miembros.</string>
 </resources>

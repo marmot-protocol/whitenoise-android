@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,7 +65,7 @@ internal fun GroupMembersReviewDialog(
     confirmLabel: String,
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
-    title: String = pluralStringResource(R.plurals.group_review_add_members, members.size),
+    title: String = stringResource(groupReviewAddMembersLabel(members.size)),
     description: String? = stringResource(R.string.group_review_invitation_visibility),
     invitation: Boolean = true,
     dismissEnabled: Boolean = !busy,
@@ -166,6 +165,12 @@ internal fun GroupMembersReviewDialog(
             }
         },
     )
+}
+
+/** The action is singular only for one selected person, independent of locale plural categories. */
+internal fun groupReviewAddMembersLabel(memberCount: Int): Int {
+    if (memberCount == 1) return R.string.group_review_add_member
+    return R.string.group_action_add_members
 }
 
 /** Keep the captured actor at the top end and reflow a title that cannot share its line. */

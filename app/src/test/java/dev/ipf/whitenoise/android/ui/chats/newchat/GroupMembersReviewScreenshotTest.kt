@@ -2,11 +2,9 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.Bitmap
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
@@ -14,7 +12,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -29,7 +26,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
@@ -608,123 +604,14 @@ class GroupMembersReviewScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
     ) {
-        val state =
-            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
-                .withGroupReviewActorNpub()
-        val id = "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
-        val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
-        val pictureUrl = "https://example.com/alice-review.png"
-        val memberImage = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).apply { eraseColor(0xff008080.toInt()) }
-        val groupImage = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).apply { eraseColor(0xff1565c0.toInt()) }
-        AvatarImageLoader.putCached(pictureUrl, memberImage.asImageBitmap())
-        val member =
-            RecipientSearch.Candidate(
-                id,
-                "Private Alice",
-                npub,
-                searchProfile =
-                    UserProfileMetadataFfi(
-                        if (rtl) "Alice Public with a long profile name" else "alice",
-                        "Alice Public",
-                        null,
-                        pictureUrl,
-                        null,
-                        null,
-                        null,
-                    ),
-            )
-        val selected = mutableStateListOf(member)
         var submits = 0
-        val admins = mutableStateListOf<String>()
-        rule.setContent {
-            CompositionLocalProvider(
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-            ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
-                    ContactPickerScreen(
-                        appState = state,
-                        title = "Choose people",
-                        selected = selected,
-                        onBack = {},
-                        onConfirm = { submits += 1 },
-                        confirmLabel = "Add member",
-                        reviewGroup = MemberReviewGroup("garden", "Garden club", image = groupImage.asImageBitmap()),
-                        initialAdminIds = admins.toSet(),
-                        onInitialAdminChange = { person, admin ->
-                            if (admin) admins.add(person.accountIdHex) else admins.remove(person.accountIdHex)
-                        },
-                    )
-                }
-            }
-        }
-        rule.onNodeWithContentDescription("Review selected members").performClick()
-        rule.onNode(isDialog()).assertExists()
-        rule.onNodeWithTag("group.action.acting_account").assertExists()
-        assertPublicReviewIdentity(npub, rtl)
-        rule.onAllNodesWithText("Remove member").assertCountEquals(0)
-        rule.onAllNodesWithText("Public key").assertCountEquals(0)
-        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
-        if (!rtl) {
-            val bounds = rule.onNodeWithTag("group.members.review.dialog").fetchSemanticsNode().boundsInRoot
-            assertTrue("Single-member review should leave comfortable room on a 780dp screen", bounds.height <= 460f)
-            rule.onAllNodesWithText("Add member").assertCountEquals(2)
-        }
-        val actorCopy = rule.onNodeWithContentDescription("Acting account, $GROUP_REVIEW_ACTOR_NPUB")
-        val actorBounds = actorCopy.fetchSemanticsNode().boundsInRoot
-        assertTrue(actorBounds.height >= 48f && actorBounds.width >= 48f)
-        actorCopy.performClick()
-        val clipboard =
-            ApplicationProvider
-                .getApplicationContext<Context>()
-                .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        assertEquals(
-            GROUP_REVIEW_ACTOR_NPUB,
-            clipboard.primaryClip!!
-                .getItemAt(0)
-                .text
-                .toString(),
-        )
-        val memberCopy = rule.onNodeWithContentDescription("Member, $npub")
-        memberCopy.performScrollTo()
-        val memberBounds = memberCopy.fetchSemanticsNode().boundsInRoot
-        assertTrue(memberBounds.height >= 48f && memberBounds.width >= 48f)
-        memberCopy.performClick()
-        assertEquals(
-            npub,
-            clipboard.primaryClip!!
-                .getItemAt(0)
-                .text
-                .toString(),
-        )
+        rule.showGroupMembersReview(dark, amoled, rtl) { submits += 1 }
+        rule.assertGroupMembersReview(rtl)
         rule
             .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_$name.png")
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed().performClick()
         assertEquals(1, submits)
-    }
-
-    /** Verifies public identity, privacy and logical column order before the golden is captured. */
-    private fun assertPublicReviewIdentity(
-        npub: String,
-        rtl: Boolean,
-    ) {
-        rule.onNodeWithText("Garden club").assertIsDisplayed()
-        rule
-            .onNodeWithText(if (rtl) "Alice Public with a long profile name" else "alice")
-            .performScrollTo()
-            .assertIsDisplayed()
-        rule
-            .onNodeWithText(
-                dev.ipf.whitenoise.android.core.IdentityFormatter
-                    .short(npub, prefix = 10, suffix = 8),
-            ).performScrollTo()
-            .assertIsDisplayed()
-        rule
-            .onNode(hasText("Private Alice") and hasAnyAncestor(hasTestTag("group.members.review.member")))
-            .assertDoesNotExist()
-        val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
-        val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
-        assertTrue(if (rtl) person.bottom <= group.top else person.center.x < group.center.x)
     }
 }
 
