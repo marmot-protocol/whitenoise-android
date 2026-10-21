@@ -97,6 +97,7 @@ internal fun ReplyPreviewCard(
     contentColor: Color? = null,
     accentColor: Color? = null,
     secondaryColor: Color? = null,
+    warningColor: Color? = null,
     receivedEmoji: ReceivedEmoji = ReceivedEmoji.None,
     appState: WhiteNoiseAppState? = null,
 ) {
@@ -234,7 +235,7 @@ internal fun ReplyPreviewCard(
                         Text(
                             text = it,
                             style = MaterialTheme.typography.labelSmall,
-                            color = resolvedContentColor.copy(alpha = 0.75f),
+                            color = warningColor ?: resolvedContentColor.copy(alpha = 0.75f),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )

@@ -65,7 +65,10 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import dev.ipf.whitenoise.android.state.BubbleSide
+import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -177,6 +180,78 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         // capture can fail in Skia's PNG stream encoder on Linux even after all layout assertions pass.
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
     }
+
+    /** Real text, captioned-file and standalone-file replies keep their respective Light surfaces. */
+    @Test
+    fun customReplySurfacesLight() = captureCustomReplySurfaces("light", AppThemeMode.Light)
+
+    /** The same production branches preserve readable custom roles in Dark. */
+    @Test
+    fun customReplySurfacesDark() = captureCustomReplySurfaces("dark", AppThemeMode.Dark)
+
+    /** AMOLED keeps black interiors and its existing standalone and in-bubble outlines. */
+    @Test
+    fun customReplySurfacesAmoled() = captureCustomReplySurfaces("amoled", AppThemeMode.Amoled)
+
+    /** Runs the actual dispatcher with account defaults and a winning per-chat received color. */
+    private fun captureCustomReplySurfaces(
+        name: String,
+        mode: AppThemeMode,
+    ) {
+        appState.updateThemeMode(mode)
+        val theme = BubbleTheme.resolve(mode, mode != AppThemeMode.Light)
+        appState.updateGlobalBubbleColor(theme, BubbleSide.Mine, 0xFFFFFFFFL)
+        appState.updateGlobalBubbleColor(theme, BubbleSide.Other, 0xFF040404L)
+        appState.updateChatBubbleColor(GROUP_ID, BubbleSide.Other, 0xFF999999L)
+        val rows = customReplyRows()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = mode != AppThemeMode.Light, amoled = mode == AppThemeMode.Amoled) {
+                Column(
+                    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(12.dp),
+                ) {
+                    rows.forEach { FileMessage(it) }
+                }
+            }
+        }
+        rows.filter { it.record.direction == "sent" && requireNotNull(it.projected).media.isNotEmpty() }
+            .forEach(::cacheCanonicalOwnFiles)
+        composeRule.onAllNodesWithText("Parent message").assertCountEquals(rows.size)
+        composeRule.onNodeWithText("Custom sent text").assertExists()
+        composeRule.onNodeWithText("Custom received text").assertExists()
+        composeRule.onNodeWithText("Custom sent caption").assertExists()
+        composeRule.onNodeWithText("Custom received caption").assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_custom_reply_surfaces_$name.png")
+    }
+
+    /** Builds independent sent/received rows for the three real reply-placement branches. */
+    private fun customReplyRows(): List<TimelineMessage> =
+        listOf(false, true).flatMap { mine ->
+            val direction = if (mine) "sent" else "received"
+            val index = if (mine) 210 else 200
+            listOf(
+                fileTimelineMessage(
+                    index = index,
+                    fileName = "",
+                    mine = mine,
+                    caption = "Custom $direction text",
+                    hasReply = true,
+                    attachments = emptyList(),
+                ),
+                fileTimelineMessage(
+                    index = index + 1,
+                    fileName = "$direction-caption.pdf",
+                    mine = mine,
+                    caption = "Custom $direction caption",
+                    hasReply = true,
+                ),
+                fileTimelineMessage(
+                    index = index + 2,
+                    fileName = "$direction-standalone.pdf",
+                    mine = mine,
+                    hasReply = true,
+                ),
+            )
+        }
 
     /** Proves the received-file card stays hidden until first-frame cache resolution completes. */
     @Test

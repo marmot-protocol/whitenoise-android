@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,7 +38,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageReplyQuoteColo
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -50,12 +50,12 @@ import java.io.File
 /** Real bubble/card surfaces pin quote separation independently of message direction and quoted author. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h2400dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h4000dp-mdpi")
 class ReplyQuoteContrastScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Default, white, black, boundary-grey and saturated custom fills in Light. */
+    /** Default, extreme, near-black, boundary-grey and saturated custom fills in Light. */
     @Test
     fun replyQuotesLight() = captureMatrix("light")
 
@@ -79,23 +79,34 @@ class ReplyQuoteContrastScreenshotTest {
             for (green in 0..255 step 51) {
                 for (blue in 0..255 step 51) {
                     val argb = 0xFF000000L or (red.toLong() shl 16) or (green.toLong() shl 8) or blue.toLong()
-                    val content = colorFromArgb(requireNotNull(readableTextArgb(argb)))
-                    val colors =
-                        messageReplyQuoteColors(true, false, colorFromArgb(argb), content, colorScheme)
-                    assertNotEquals(argb, opaqueArgb(colors.container))
-                    assertTrue(contrastRatio(opaqueArgb(content), opaqueArgb(colors.container)) >= WCAG_AA_NORMAL_TEXT_CONTRAST)
-                    assertTrue(
-                        contrastRatio(
-                            opaqueArgb(colors.secondary.compositeOver(colors.container)),
-                            opaqueArgb(colors.container),
-                        ) >= WCAG_AA_NORMAL_TEXT_CONTRAST,
-                    )
+                    assertReplyContrast(argb, colorScheme)
                 }
             }
         }
     }
 
-    /** Both real text/caption/file call sites consume the shared policy, excluding standalone media. */
+    /** Verifies separation and final body/warning ink, including the review's boundary-grey regression. */
+    private fun assertReplyContrast(
+        argb: Long,
+        colorScheme: ColorScheme,
+    ) {
+        val content = colorFromArgb(requireNotNull(readableTextArgb(argb)))
+        val colors = messageReplyQuoteColors(true, false, colorFromArgb(argb), content, colorScheme)
+        assertTrue(contrastRatio(argb, opaqueArgb(colors.container)) >= MIN_INSET_CONTRAST)
+        assertTrue(
+            contrastRatio(opaqueArgb(content), opaqueArgb(colors.container)) >= WCAG_AA_NORMAL_TEXT_CONTRAST,
+        )
+        listOf(colors.secondary, requireNotNull(colors.warning)).forEach { text ->
+            assertTrue(
+                contrastRatio(
+                    opaqueArgb(text.compositeOver(colors.container)),
+                    opaqueArgb(colors.container),
+                ) >= WCAG_AA_NORMAL_TEXT_CONTRAST,
+            )
+        }
+    }
+
+    /** Normal text and focused text previews consume the same roles; media retains its standalone surface. */
     @Test
     fun productionQuotesUseTheSharedPolicyAtBothRenderingBoundaries() {
         val body =
@@ -110,6 +121,8 @@ class ReplyQuoteContrastScreenshotTest {
         assertEquals(2, Regex("containerColor = replyFillColor\\.").findAll(body).count())
         assertTrue(body.contains("containerColor = replyFillColor.takeIf { insideBubble }"))
         assertTrue(body.contains("containerColor = replyFillColor.takeUnless { hasMedia }"))
+        assertTrue(body.contains("warningColor = replyQuoteColors.warning.takeIf { insideBubble }"))
+        assertTrue(body.contains("warningColor = replyQuoteColors.warning.takeUnless { hasMedia }"))
     }
 
     /** Captures actual production frames and cards, then samples their painted parent and child fills. */
@@ -128,9 +141,14 @@ class ReplyQuoteContrastScreenshotTest {
             }
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
-                CompositionLocalProvider(LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
                     Surface(color = MaterialTheme.colorScheme.background) {
-                        Column(Modifier.padding(12.dp).testTag(ROOT), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(
+                            Modifier.padding(12.dp).testTag(ROOT),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
                             cases.withIndex().chunked(2).forEach { row ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     row.forEach { (index, case) -> QuoteBubble(case, index, amoled) }
@@ -142,19 +160,23 @@ class ReplyQuoteContrastScreenshotTest {
             }
         }
         composeRule.onNodeWithTag(ROOT).captureRoboImage("src/test/snapshots/reply_quote_contrast_$name.png")
-        if (!amoled) {
-            cases.forEachIndexed { index, case ->
-                if (case.color != null) {
-                    val parent = composeRule.onNodeWithTag("frame-$index").captureToImage().toPixelMap()
-                    val child = composeRule.onNodeWithTag("quote-$index").captureToImage().toPixelMap()
-                    val parentFill = opaqueArgb(parent[parent.width / 2, 4])
-                    val quoteFill = opaqueArgb(child[child.width - 5, child.height / 2])
-                    assertEquals(case.color, parentFill)
-                    assertNotEquals(parentFill, quoteFill)
-                    assertTrue(
-                        contrastRatio(requireNotNull(readableTextArgb(case.color)), quoteFill) >= WCAG_AA_NORMAL_TEXT_CONTRAST,
-                    )
-                }
+        if (!amoled) assertPaintedQuoteFills(cases)
+    }
+
+    /** Samples production paint rather than accepting merely different policy color values. */
+    private fun assertPaintedQuoteFills(cases: List<QuoteCase>) {
+        cases.forEachIndexed { index, case ->
+            if (case.color != null) {
+                val parent = composeRule.onNodeWithTag("frame-$index").captureToImage().toPixelMap()
+                val child = composeRule.onNodeWithTag("quote-$index").captureToImage().toPixelMap()
+                val parentFill = opaqueArgb(parent[parent.width / 2, 4])
+                val quoteFill = opaqueArgb(child[child.width - 5, child.height / 2])
+                assertEquals(case.color, parentFill)
+                assertTrue(contrastRatio(parentFill, quoteFill) >= MIN_INSET_CONTRAST)
+                assertTrue(
+                    contrastRatio(requireNotNull(readableTextArgb(case.color)), quoteFill) >=
+                        WCAG_AA_NORMAL_TEXT_CONTRAST,
+                )
             }
         }
     }
@@ -190,6 +212,7 @@ class ReplyQuoteContrastScreenshotTest {
                         senderTitle = "Alice",
                         isOwn = case.own,
                         body = "Quoted text",
+                        warning = "Delivery not confirmed".takeIf { case.color == 0xFF999999L },
                         mediaKind = ReplyMediaKind.None,
                         onClick = null,
                         onDismiss = null,
@@ -197,6 +220,7 @@ class ReplyQuoteContrastScreenshotTest {
                         contentColor = content,
                         accentColor = content,
                         secondaryColor = colors.secondary,
+                        warningColor = colors.warning,
                     )
                 }
                 Text(if (case.mine) "Sent reply" else "Received reply", color = content)
@@ -215,6 +239,19 @@ class ReplyQuoteContrastScreenshotTest {
 
     private companion object {
         const val ROOT = "reply-quote-contrast"
-        val PALETTE = listOf(null, 0xFFFFFFFFL, 0xFF000000L, 0xFF777777L, 0xFFB91C1CL, 0xFF15803DL)
+        const val MIN_INSET_CONTRAST = 1.2
+        val PALETTE =
+            listOf(
+                null,
+                0xFFFFFFFFL,
+                0xFF000000L,
+                0xFF040404L,
+                0xFF0A0A0AL,
+                0xFF121212L,
+                0xFF777777L,
+                0xFF999999L,
+                0xFFB91C1CL,
+                0xFF15803DL,
+            )
     }
 }

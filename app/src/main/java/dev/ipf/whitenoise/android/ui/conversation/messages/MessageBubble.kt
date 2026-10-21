@@ -2276,6 +2276,7 @@ internal fun MessageBubble(
                             contentColor = bubbleContentColor.takeIf { insideBubble },
                             accentColor = replyAccentArgb?.let(::colorFromArgb) ?: pairedReplyAccent,
                             secondaryColor = replySecondaryColor.takeIf { insideBubble },
+                            warningColor = replyQuoteColors.warning.takeIf { insideBubble },
                         )
                     }
                 }
@@ -2929,6 +2930,7 @@ internal fun MessageBubble(
                                                     )?.let(::colorFromArgb)
                                                         ?: bubbleContentColor.takeUnless { hasMedia },
                                                 secondaryColor = replySecondaryColor.takeUnless { hasMedia },
+                                                warningColor = replyQuoteColors.warning.takeUnless { hasMedia },
                                             )
                                         }
                                     },
