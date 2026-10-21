@@ -1776,8 +1776,8 @@
     <string name="developer_tools_already_enabled">Gli strumenti sviluppatore sono già attivi</string>
     <string name="appearance_outline_colors_fixed">AMOLED usa il bianco fisso per i pulsanti di azione. I contorni dei fumetti si possono personalizzare in Colori fumetti.</string>
     <string name="appearance_theme">Tema</string>
-    <string name="appearance_theme_help">L\'impostazione di sistema segue il dispositivo. Chiaro e Scuro mantengono l\'aspetto selezionato. AMOLED usa uno sfondo nero con contorni bianchi.</string>
-    <string name="appearance_amoled_detail">Nero puro con contorni bianchi netti.</string>
+    <string name="appearance_theme_help">L\'impostazione di sistema segue il dispositivo. Chiaro e Scuro mantengono l\'aspetto selezionato. AMOLED mantiene sfondi neri, contorni dei messaggi personalizzabili e pulsanti di azione bianchi.</string>
+    <string name="appearance_amoled_detail">Sfondi neri con contorni dei messaggi personalizzabili.</string>
     <string name="appearance_font_size_help">La dimensione del testo si aggiunge all\'impostazione della dimensione dei caratteri del dispositivo.</string>
     <string name="appearance_enter_help">Maiusc+Invio inserisce sempre una nuova riga su una tastiera fisica.</string>
     <string name="appearance_font_system">Sistema</string>

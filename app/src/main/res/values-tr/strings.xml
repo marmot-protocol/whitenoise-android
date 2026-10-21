@@ -1774,8 +1774,8 @@
     <string name="developer_tools_already_enabled">Geliştirici araçları zaten açık</string>
     <string name="appearance_outline_colors_fixed">AMOLED, eylem düğmeleri için sabit beyaz kullanır. Mesaj balonu dış çizgileri Balon renkleri bölümünden özelleştirilebilir.</string>
     <string name="appearance_theme">Tema</string>
-    <string name="appearance_theme_help">Sistem varsayılanı cihazınızı takip eder. Açık ve Koyu, seçilen görünümü korur. AMOLED, beyaz çizgili siyah bir arka plan kullanır.</string>
-    <string name="appearance_amoled_detail">Keskin beyaz çizgilerle saf siyah.</string>
+    <string name="appearance_theme_help">Sistem varsayılanı cihazınızı takip eder. Açık ve Koyu, seçilen görünümü korur. AMOLED; siyah arka planları, özelleştirilebilir mesaj kenarlıklarını ve beyaz işlem düğmelerini korur.</string>
+    <string name="appearance_amoled_detail">Özelleştirilebilir mesaj kenarlıklarıyla siyah arka planlar.</string>
     <string name="appearance_font_size_help">Metin boyutu, cihazınızın yazı tipi boyutu ayarına eklenir.</string>
     <string name="appearance_enter_help">Shift+Enter, donanım klavyesine her zaman yeni bir satır ekler.</string>
     <string name="appearance_font_system">Sistem</string>

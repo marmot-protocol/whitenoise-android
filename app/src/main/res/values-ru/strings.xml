@@ -1838,8 +1838,8 @@
     <string name="developer_tools_already_enabled">Инструменты разработчика уже включены</string>
     <string name="appearance_outline_colors_fixed">В теме AMOLED кнопки действий всегда белые. Цвета контуров сообщений можно настроить в разделе «Цвета сообщений».</string>
     <string name="appearance_theme">Тема</string>
-    <string name="appearance_theme_help">Системные настройки по умолчанию соответствуют вашему устройству. Светлый и Темный сохраняют выбранный вид. AMOLED использует черный фон с белыми контурами.</string>
-    <string name="appearance_amoled_detail">Чистый чёрный фон с чёткими белыми контурами.</string>
+    <string name="appearance_theme_help">Системный режим следует настройкам устройства. Светлый и тёмный режимы сохраняют выбранный вид. AMOLED сохраняет чёрный фон, настраиваемые контуры сообщений и белые кнопки действий.</string>
+    <string name="appearance_amoled_detail">Чёрный фон с настраиваемыми контурами сообщений.</string>
     <string name="appearance_font_size_help">Размер текста добавляется к настройке размера шрифта вашего устройства.</string>
     <string name="appearance_enter_help">Shift+Enter всегда вставляет новую строку на аппаратной клавиатуре.</string>
     <string name="appearance_font_system">Системный</string>

@@ -92,21 +92,21 @@ class AppearanceScreenBehaviorTest {
         }
     }
 
-    /** AMOLED fixes the palette: both colour editor rows leave the list instead of sitting disabled. */
+    /** AMOLED retains global bubble customization while keeping action buttons fixed white. */
     @Test
-    fun amoledHidesTheColourEditorRows() {
+    fun amoledKeepsBubbleColorsEnabledAndHidesOnlyActionColor() {
         composeRule.onNodeWithTag("appearance.colors.group").assertExists()
         composeRule.onNodeWithText("AMOLED").performClick()
         composeRule.runOnIdle { assertEquals(AppThemeMode.Amoled, appState.themeMode) }
-        composeRule.onNodeWithTag("appearance.colors.group").assertDoesNotExist()
+        composeRule.onNodeWithTag("appearance.colors.group").assertExists()
         composeRule.onNodeWithText("Action color").assertDoesNotExist()
-        composeRule.onNodeWithText("Chat bubble colors").assertDoesNotExist()
+        composeRule.onNodeWithText("Chat bubble colors").assertIsEnabled().performClick()
         composeRule
             .onNodeWithText("AMOLED uses fixed white action and bubble colors. Switch themes to customize colors.")
             .assertDoesNotExist()
         composeRule.runOnIdle {
             assertEquals(0, actionColorCount)
-            assertEquals(0, bubbleColorsCount)
+            assertEquals(1, bubbleColorsCount)
         }
         composeRule.onNodeWithText("Light").performClick()
         composeRule.onNodeWithText("Action color").assertIsEnabled()

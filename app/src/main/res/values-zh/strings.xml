@@ -1747,8 +1747,8 @@
     <string name="developer_tools_already_enabled">开发者工具已开启</string>
     <string name="appearance_outline_colors_fixed">AMOLED 操作按钮使用固定白色。消息气泡轮廓可在“气泡颜色”中自定义。</string>
     <string name="appearance_theme">主题</string>
-    <string name="appearance_theme_help">系统默认跟踪您的设备 。 光和暗保持选定的外观.AMOLED使用带有白色轮廓的黑色背景。</string>
-    <string name="appearance_amoled_detail">纯黑背景，搭配清晰的白色轮廓。</string>
+    <string name="appearance_theme_help">系统默认跟随设备设置。浅色和深色模式保持所选外观。AMOLED 保持纯黑背景、可自定义的消息气泡轮廓和白色操作按钮。</string>
+    <string name="appearance_amoled_detail">纯黑背景，搭配可自定义的消息气泡轮廓。</string>
     <string name="appearance_font_size_help">文本大小添加到设备字体大小设置中。</string>
     <string name="appearance_enter_help">Shift+Enter 总是在硬件键盘上插入新行.</string>
     <string name="appearance_font_system">系统</string>

@@ -1776,8 +1776,8 @@
     <string name="developer_tools_already_enabled">Les outils de développement sont déjà activés</string>
     <string name="appearance_outline_colors_fixed">AMOLED utilise du blanc fixe pour les boutons d’action. Les contours des bulles sont personnalisables dans Couleurs des bulles.</string>
     <string name="appearance_theme">Thème</string>
-    <string name="appearance_theme_help">Par défaut, le système suit votre appareil. Clair et Sombre conservent l\'apparence choisie. AMOLED utilise un fond noir avec des contours blancs.</string>
-    <string name="appearance_amoled_detail">Noir pur avec des contours blancs nets.</string>
+    <string name="appearance_theme_help">Le mode système suit votre appareil. Clair et Sombre conservent l\'apparence choisie. AMOLED conserve des fonds noirs, des contours de bulles personnalisables et des boutons d\'action blancs.</string>
+    <string name="appearance_amoled_detail">Fonds noirs avec des contours de bulles personnalisables.</string>
     <string name="appearance_font_size_help">La taille du texte s\'ajoute au réglage de taille de police de votre appareil.</string>
     <string name="appearance_enter_help">Maj+Entrée insère toujours une nouvelle ligne sur un clavier physique.</string>
     <string name="appearance_font_system">Système</string>
