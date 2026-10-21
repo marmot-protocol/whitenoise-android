@@ -165,6 +165,8 @@ def entry_identity(snapshot):
 def generation_for(snapshot, identity):
     """Read a PR's recovery generation without borrowing another PR's grant."""
     if 'generations' in snapshot:
+        if 'generation' in snapshot:
+            raise Held('generations-held')
         generations = snapshot['generations']
         if (not isinstance(generations, dict) or any(
                 not isinstance(number, str) or not 1 <= len(number) <= 10
@@ -178,16 +180,7 @@ def generation_for(snapshot, identity):
     if type(generation) is not int or generation < 0:
         raise Held('generation-held')
     if generation > 0:
-        identities = {(entry['number'], entry['pull_request_id']) for entry in snapshot['entries']}
-        identities.add((identity.number, identity.pull_request_id))
-        candidate = snapshot.get('candidate')
-        if candidate is not None:
-            if (not isinstance(candidate, dict) or type(candidate.get('number')) is not int
-                    or not isinstance(candidate.get('pull_request_id'), str)):
-                raise Held('generation-map-required')
-            identities.add((candidate['number'], candidate['pull_request_id']))
-        if len(identities) != 1:
-            raise Held('generation-map-required')
+        raise Held('generation-map-required')
     return generation
 
 
@@ -251,16 +244,18 @@ def plan(snapshot, candidate, verify_source, verify_integration, *, target_numbe
 
 
 def validate_journal(journal):
-    if (not isinstance(journal, dict) or journal.get('schema') != POLICY_VERSION
+    if (not isinstance(journal, dict) or type(journal.get('schema')) is not int
+            or journal.get('schema') != POLICY_VERSION
             or not isinstance(journal.get('effects'), dict)):
         raise Held('invalid-journal')
     for key, record in journal['effects'].items():
         if (not isinstance(record, dict) or not isinstance(record.get('payload'), dict)
+                or not isinstance(record.get('state'), str)
                 or record.get('state') not in
                 {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed',
                  'not-sent', 'not-sent-exhausted'}
                 or digest(record.get('payload')) != key
-                or record.get('payload', {}).get('repo') != REPO):
+                or record['payload'].get('repo') != REPO):
             raise Held('invalid-journal-record')
         attempts = record.get('not_sent_attempts', 0)
         if type(attempts) is not int or attempts < 0:
@@ -283,10 +278,18 @@ def validate_journal(journal):
         if record.get('state')=='retired-closed' and (not DIGEST.fullmatch(str(record.get('terminal_proof_sha256',''))) or not isinstance(record.get('retired_by'),dict) or record.get('terminal_unmerged') is not True):
             raise Held('retired-terminal-proof-required')
         payload = record['payload']
-        identity = Identity(**payload['identity'])
-        rebuilt = Effect(payload['kind'], identity, payload['proof_sha256'], payload['generation'])
-        if rebuilt.payload() != payload:
+        if (type(payload.get('schema')) is not int or payload.get('schema') != POLICY_VERSION
+                or set(payload) != {'schema', 'repo', 'kind', 'identity', 'proof_sha256', 'generation'}
+                or not isinstance(payload.get('identity'), dict)
+                or set(payload['identity']) != set(Identity.__dataclass_fields__)):
             raise Held('invalid-journal-payload')
+        try:
+            identity = Identity(**payload['identity'])
+            rebuilt = Effect(payload['kind'], identity, payload['proof_sha256'], payload['generation'])
+            if rebuilt.payload() != payload:
+                raise Held('invalid-journal-payload')
+        except (TypeError, ValueError, KeyError) as exc:
+            raise Held('invalid-journal-payload') from exc
     return journal
 
 
@@ -395,13 +398,15 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
         if (target_number is None and candidate is not None and effect is not None
                 and effect.kind == 'authorize-integration'
                 and effect.identity.number != candidate.number
-                and journal['effects'].get(effect.key(), {}).get('state') == 'confirmed'):
-            return plan(snapshot, candidate, verify_source, verify_integration,
-                        target_number=candidate.number)
-        return effect
+                and (journal['effects'].get(effect.key(), {}).get('state') == 'confirmed'
+                     or previous_result(journal['effects'].get(effect.key()))
+                     in {'known-refusal-held', 'not-sent-exhausted-held'})):
+            return (plan(snapshot, candidate, verify_source, verify_integration,
+                         target_number=candidate.number), effect)
+        return effect, None
 
     first = observe()
-    effect = choose(first)
+    effect, front = choose(first)
     held = refused_selection_result(journal, effect)
     if held:
         return held
@@ -419,9 +424,8 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
     # A second full fresh read and proof verification must agree. Unknown reads
     # raise before intent persistence; no mutation is attempted on uncertainty.
     second = observe()
-    current = choose(second)
-    if (current != effect or ('rules_sha256' in first, first.get('rules_sha256'))
-            != ('rules_sha256' in second, second.get('rules_sha256'))
+    current, current_front = choose(second)
+    if (current != effect or current_front != front or first.get('rules_sha256') != second.get('rules_sha256')
             or not lease_held()):
         return 'identity-changed'
     return execute(journal, effect, write, readback, persist)

@@ -8,18 +8,6 @@ from scripts import whitenoise_android_serial_queue as q
 
 
 class QueueTest(unittest.TestCase):
-    def test_journal_rejects_non_mapping_payload_and_record(self):
-        for payload in (None, 7, 'payload', [], True):
-            with self.subTest(payload=payload):
-                record = {'state': 'confirmed', 'payload': payload}
-                journal = {'schema': 1, 'effects': {q.digest(payload): record}}
-                with self.assertRaisesRegex(q.Held, 'invalid-journal-record'):
-                    q.validate_journal(journal)
-        for record in (None, 7, 'record', [], True):
-            with self.subTest(record=record):
-                with self.assertRaisesRegex(q.Held, 'invalid-journal-record'):
-                    q.validate_journal({'schema': 1, 'effects': {'a' * 64: record}})
-
     def setUp(self):
         self.identity = q.Identity(10, 'PR_node', 'a' * 40, 'b' * 40)
         self.journal = {'schema': 1, 'effects': {}}
@@ -60,6 +48,99 @@ class QueueTest(unittest.TestCase):
             'jump': False, 'number': 10,
             'pull_request_id': 'PR_node', 'source': 'a' * 40,
             'integration': head, 'entry_id': 'ENTRY_node'}])
+
+    def test_journal_rejects_non_mapping_payload_and_record(self):
+        for payload in (None, 7, 'payload', [], True):
+            with self.subTest(payload=payload):
+                record = {'state': 'confirmed', 'payload': payload}
+                journal = {'schema': 1, 'effects': {q.digest(payload): record}}
+                with self.assertRaisesRegex(q.Held, 'invalid-journal-record'):
+                    q.validate_journal(journal)
+        for record in (None, 7, 'record', [], True):
+            with self.subTest(record=record):
+                with self.assertRaisesRegex(q.Held, 'invalid-journal-record'):
+                    q.validate_journal({'schema': 1, 'effects': {'a' * 64: record}})
+
+    def test_boolean_journal_schema_holds(self):
+        self.journal['schema'] = True
+        with self.assertRaisesRegex(q.Held, 'invalid-journal'):
+            self.tick()
+        self.assertFalse(self.writes)
+
+    def test_non_string_record_state_holds(self):
+        payload = q.Effect('authorize-source', self.identity, 'c' * 64).payload()
+        for state in ([], {}, None, True, 7):
+            with self.subTest(state=state):
+                self.journal = {'schema': 1, 'effects': {q.digest(payload):
+                    {'payload': payload, 'state': state}}}
+                with self.assertRaisesRegex(q.Held, 'invalid-journal-record'):
+                    self.tick()
+        self.assertFalse(self.writes)
+
+    def test_malformed_mapping_payload_holds_before_any_write(self):
+        valid = q.Effect('authorize-source', self.identity, 'c' * 64).payload()
+        payloads = [{'repo': q.REPO}, dict(valid, identity=[]),
+                    dict(valid, identity=dict(valid['identity'], unexpected=1)),
+                    dict(valid, identity=dict(valid['identity'], source=None)),
+                    dict(valid, proof_sha256=[]), dict(valid, generation=True),
+                    dict(valid, kind=[]), dict(valid, schema=True),
+                    dict(valid, identity=dict(valid['identity'], base=[])),
+                    dict(valid, identity=dict(valid['identity'], integration=[]))]
+        for payload in payloads:
+            with self.subTest(payload=payload):
+                self.journal = {'schema': 1, 'effects': {q.digest(payload):
+                    {'state': 'confirmed', 'payload': payload}}}
+                with self.assertRaisesRegex(q.Held, 'invalid-journal-payload'):
+                    self.tick()
+        self.assertFalse(self.writes)
+
+    def test_map_and_scalar_input_is_ambiguous(self):
+        self.snapshot.update(generations={'10': 1}, generation=0)
+        with self.assertRaisesRegex(q.Held, 'generations-held'):
+            self.tick()
+        self.assertFalse(self.writes)
+
+    def test_held_front_proof_drift_blocks_peer_before_write(self):
+        self.queued()
+        front = q.entry_identity(self.snapshot)
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        for proof in ('d' * 64, 'e' * 64):
+            effect = q.Effect('authorize-integration', front, proof)
+            self.journal['effects'][effect.key()] = {'payload': effect.payload(), 'state': 'refused'}
+        proofs = iter(('d' * 64, 'e' * 64))
+        self.assertEqual(self.tick(candidate=other, verify_integration=lambda *_: next(proofs)),
+                         'identity-changed')
+        self.assertFalse(self.writes)
+
+    def test_unknown_front_never_falls_through_to_peer(self):
+        self.queued()
+        front = q.entry_identity(self.snapshot)
+        effect = q.Effect('authorize-integration', front, 'e' * 64)
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.journal['effects'][effect.key()] = {'payload': effect.payload(), 'state': 'unknown'}
+        self.assertEqual(self.tick(candidate=other, readback=lambda *_: False), 'unknown-held')
+        self.assertFalse(self.writes)
+
+    def test_default_held_front_admits_peer_without_replaying_front(self):
+        self.queued()
+        front = q.entry_identity(self.snapshot)
+        effect = q.Effect('authorize-integration', front, 'e' * 64)
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.integration = lambda *_: 'e' * 64
+        for state in ('refused', 'not-sent-exhausted'):
+            with self.subTest(state=state):
+                record = {'payload': effect.payload(), 'state': state}
+                if state == 'not-sent-exhausted':
+                    record.update(not_sent_attempts=3, response_sha256='d' * 64)
+                self.journal = {'schema': 1, 'effects': {effect.key(): record}}
+                original = copy.deepcopy(record)
+                self.writes.clear()
+                self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
+                self.assertEqual(self.writes[-1][0].identity, other)
+                self.assertEqual(self.journal['effects'][effect.key()], original)
 
     def test_default_mapped_front_precedes_absent_or_different_candidate(self):
         self.queued()
@@ -181,7 +262,7 @@ class QueueTest(unittest.TestCase):
                 self.assertEqual(self.tick(target_number=10), 'authorize-source-confirmed')
                 for key, record in original['effects'].items():
                     self.assertEqual(self.journal['effects'][key], record)
-                self.snapshot.update(generation=0, candidate=asdict(other))
+                self.snapshot.update(candidate=asdict(other))
                 expected = 'known-refusal-held' if state == 'refused' else 'not-sent-exhausted-held'
                 self.assertEqual(self.tick(candidate=other, target_number=11), expected)
                 self.assertEqual(self.journal['effects'][effects[1].key()],
@@ -219,17 +300,17 @@ class QueueTest(unittest.TestCase):
         self.assertFalse(self.journal['effects'])
 
 
-    def test_legacy_positive_scalar_preserves_exact_key_and_budget(self):
+    def test_positive_scalar_requires_map_even_for_singleton_refusal(self):
+        other = q.Identity(11, 'PR_11', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        effect = q.Effect('authorize-source', other, 'c' * 64, 0)
+        self.journal['effects'][effect.key()] = {'payload': effect.payload(), 'state': 'refused'}
+        original = copy.deepcopy(self.journal)
         self.snapshot['generation'] = 1
-        self.snapshot.pop('rules_sha256')
-        effect = q.Effect('authorize-source', self.identity, 'c' * 64, 1)
-        self.journal['effects'][effect.key()] = {'payload': effect.payload(),
-            'state': 'not-sent', 'not_sent_attempts': 2, 'not_sent_budget': 3,
-            'response_sha256': 'e' * 64, 'retry_after': 0}
-        self.assertEqual(self.tick(write=lambda *_: (_ for _ in ()).throw(q.NotSent('f' * 64))),
-                         'not-sent-exhausted-held')
-        self.assertEqual(list(self.journal['effects']), [effect.key()])
-        self.assertEqual(self.journal['effects'][effect.key()]['not_sent_attempts'], 3)
+        with self.assertRaisesRegex(q.Held, 'generation-map-required'):
+            self.tick(candidate=other)
+        self.assertEqual(self.journal, original)
+        self.assertFalse(self.writes)
 
     def test_legacy_positive_scalar_with_multiple_prs_requires_map(self):
         self.queued()
@@ -239,6 +320,7 @@ class QueueTest(unittest.TestCase):
             self.tick(candidate=other,
                       verify_integration=lambda *_: self.fail('ambiguous legacy grant'))
         self.assertFalse(self.writes)
+        self.snapshot.pop('generation')
         self.snapshot.update(generations={'11': 1})
         self.assertEqual(self.tick(candidate=other, verify_integration=lambda *_: 'e' * 64),
                          'authorize-integration-confirmed')
@@ -547,7 +629,7 @@ class QueueTest(unittest.TestCase):
     def test_owner_generation_recovery_retains_exhaustion_and_revalidates(self):
         self.exhaust_never_sent_budget()
         old_key = next(iter(self.journal['effects']))
-        self.snapshot['generation'] = 1
+        self.snapshot['generations'] = {str(self.snapshot['candidate']['number']): 1}
         with self.assertRaises(q.Held):
             self.tick(verify_source=lambda *_: None)
         self.assertFalse(self.writes)
@@ -560,7 +642,7 @@ class QueueTest(unittest.TestCase):
 
     def test_generation_change_does_not_release_unknown_sent_effect(self):
         self.assertEqual(self.tick(readback=lambda *_: False), 'unknown-held')
-        self.snapshot['generation'] = 1
+        self.snapshot['generations'] = {str(self.snapshot['candidate']['number']): 1}
         self.assertEqual(self.tick(readback=lambda *_: False), 'unknown-held')
         self.assertEqual(len(self.writes), 1)
 
@@ -569,7 +651,7 @@ class QueueTest(unittest.TestCase):
         old = copy.deepcopy(self.journal)
         other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
         self.snapshot['candidate'] = asdict(other)
-        self.snapshot['generation'] = 1
+        self.snapshot['generations'] = {str(self.snapshot['candidate']['number']): 1}
         self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
         effect = q.Effect('enqueue', other, 'c' * 64, 1)
         self.assertEqual(q.execute(self.journal, effect, self.write,
@@ -577,29 +659,29 @@ class QueueTest(unittest.TestCase):
         for key, record in old['effects'].items():
             self.assertEqual(self.journal['effects'][key], record)
         self.snapshot['candidate'] = asdict(self.identity)
-        self.snapshot['generation'] = 0
+        self.snapshot['generations'] = {}
         self.assertEqual(self.tick(), 'not-sent-exhausted-held')
 
     def test_confirmed_explicit_recovery_releases_historical_exhaustion_hold(self):
         self.exhaust_never_sent_budget()
         old_key = next(iter(self.journal['effects']))
-        self.snapshot['generation'] = 1
+        self.snapshot['generations'] = {str(self.snapshot['candidate']['number']): 1}
         self.assertEqual(self.tick(), 'authorize-source-confirmed')
         other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
         self.snapshot['candidate'] = asdict(other)
-        self.snapshot['generation'] = 0
+        self.snapshot['generations'] = {}
         self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
         self.assertEqual(self.journal['effects'][old_key]['state'], 'not-sent-exhausted')
         self.assertEqual(len(self.writes), 2)
 
     def test_never_sent_recovery_keeps_own_history_and_allows_other_pr(self):
         self.exhaust_never_sent_budget()
-        self.snapshot['generation'] = 1
+        self.snapshot['generations'] = {str(self.snapshot['candidate']['number']): 1}
         self.assertEqual(self.tick(write=lambda *_: (_ for _ in ()).throw(q.NotSent('e' * 64))),
                          'not-sent-backoff')
         other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
         self.snapshot['candidate'] = asdict(other)
-        self.snapshot['generation'] = 0
+        self.snapshot['generations'] = {}
         self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
         self.assertEqual(len(self.writes), 1)
 
@@ -801,7 +883,7 @@ class QueueTest(unittest.TestCase):
         self.snapshot['source_authorization'] = {'effect_key':first.key(),
             'source':self.identity.source,'creator_id':q.ACTOR_ID,'state':'success'}
         self.tick()
-        self.snapshot['generation'] = 1
+        self.snapshot['generations'] = {str(self.snapshot['candidate']['number']): 1}
         self.assertEqual(self.tick(),'authorize-source-confirmed')
         new = self.writes[-1][0]
         self.assertNotEqual(first.key(),new.key())
@@ -890,7 +972,7 @@ class QueueTest(unittest.TestCase):
         self.assertEqual(q.execute(self.journal, blocked, self.write,
                                   self.readback, self.save), 'known-refusal-held')
         self.snapshot['candidate'] = asdict(self.identity)
-        self.snapshot['generation'] = 1
+        self.snapshot['generations'] = {str(self.snapshot['candidate']['number']): 1}
         self.assertEqual(self.tick(), 'authorize-source-confirmed')
         for key, record in prior['effects'].items():
             self.assertEqual(self.journal['effects'][key], record)
