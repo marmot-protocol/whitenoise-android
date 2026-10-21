@@ -526,13 +526,33 @@ class EmulatorProcessEvidenceTest(unittest.TestCase):
                 if expected == 0:
                     (reports / 'driver-finished.json').write_text('{}\n')
                 self.assertEqual(observer.observe(command, reports), expected)
-                result = json.loads((reports / 'emulator-process.json').read_text())
+                records = list(reports.glob('emulator-process-*.json'))
+                self.assertEqual(len(records), 1)
+                result = json.loads(records[0].read_text())
                 self.assertEqual(result['signal'], signum)
                 self.assertEqual(result['returncode'], -signal.SIGTERM if signum else expected)
                 self.assertEqual(result['driver_finished_before_exit'], expected == 0)
                 self.assertGreater(result['pid'], 0)
                 self.assertNotIn('command', result)
                 self.assertNotIn('argv', result)
+
+    def test_later_helper_cannot_overwrite_primary_process_evidence(self):
+        """A successful teardown helper cannot erase the primary launch's nonzero terminal status."""
+        with tempfile.TemporaryDirectory() as directory:
+            reports = Path(directory)
+            primary = [sys.executable, '-c', 'raise SystemExit(17)', '-avd', 'private-fixture-label']
+            self.assertEqual(observer.observe(primary, reports), 17)
+            primary_path = next(reports.glob('emulator-process-*.json'))
+            primary_record = primary_path.read_bytes()
+            self.assertEqual(observer.observe([sys.executable, '-c', 'pass'], reports), 0)
+            self.assertEqual(primary_path.read_bytes(), primary_record)
+            records = [json.loads(path.read_text()) for path in reports.glob('emulator-process-*.json')]
+            self.assertEqual(len(records), 2)
+            self.assertEqual({item['returncode'] for item in records}, {0, 17})
+            self.assertTrue(next(item for item in records if item['returncode'] == 17)['avd_launch'])
+            self.assertFalse(next(item for item in records if item['returncode'] == 0)['avd_launch'])
+            self.assertNotIn('private-fixture-label', primary_record.decode())
+            self.assertEqual(list(reports.glob('*.tmp')), [])
 
     def test_sdk_hook_preserves_arguments_and_refuses_double_install(self):
         """A fixture launcher in a path with spaces receives arguments verbatim and remains byte-identical."""
@@ -544,20 +564,57 @@ class EmulatorProcessEvidenceTest(unittest.TestCase):
             original = '#!' + sys.executable + '\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n'
             launcher.write_text(original)
             launcher.chmod(0o755)
-            (sdk / 'source.properties').write_text('Pkg.Revision=37.2.12\nPrivate.Value=not-retained\n')
+            (sdk / 'source.properties').write_text('Pkg.Revision=37.1.11\nPrivate.Value=not-retained\n')
             with patch.dict(observer.os.environ, {'GITHUB_ACTIONS': 'true', 'RUNNER_OS': 'Linux',
                                                  'ANDROID_HOME': str(sdk.parent),
+                                                 'PREVIEW_EMULATOR_REVISION': '37.1.11',
                                                  'PREVIEW_EMULATOR_OPTIONS': '-no-window -gpu swiftshader'}), \
                     patch.object(observer, 'REPORTS', root / 'reports'):
+                with patch.dict(observer.os.environ, {'PREVIEW_EMULATOR_REVISION': '37.2.12'}):
+                    with self.assertRaisesRegex(RuntimeError, 'pinned comparison version'):
+                        observer.install()
+                self.assertEqual(launcher.read_text(), original)
+                self.assertFalse((sdk / 'emulator.observed-original').exists())
                 observer.install()
                 self.assertEqual((sdk / 'emulator.observed-original').read_text(), original)
                 arguments = ['--avd', 'fixture with spaces', 'literal;value', '$not-expanded']
                 output = subprocess.check_output([str(launcher), *arguments], text=True, timeout=15)
                 self.assertEqual(json.loads(output), arguments)
-                self.assertEqual((root / 'reports/emulator-version.txt').read_text(), '37.2.12\n')
+                self.assertEqual((root / 'reports/emulator-version.txt').read_text(), '37.1.11\n')
                 self.assertNotIn('Private.Value', (root / 'reports/emulator-version.txt').read_text())
                 with self.assertRaisesRegex(RuntimeError, 'unmodified'):
                     observer.install()
+
+    def test_driver_rechecks_revision_and_observer_before_device_operations(self):
+        """A failed prelaunch hook cannot let the action qualify an unpinned or unobserved emulator."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sdk = root / 'sdk/emulator'
+            sdk.mkdir(parents=True)
+            reports = root / 'reports'
+            reports.mkdir()
+            properties = sdk / 'source.properties'
+            properties.write_text('Pkg.Revision=37.2.12\n')
+            with patch.dict(observer.os.environ, {'GITHUB_ACTIONS': 'true', 'RUNNER_OS': 'Linux',
+                                                 'ANDROID_HOME': str(sdk.parent),
+                                                 'PREVIEW_EMULATOR_REVISION': '37.1.11'}), \
+                    patch.object(observer, 'REPORTS', reports), \
+                    patch.object(observer.subprocess, 'call', return_value=17) as qualification:
+                with self.assertRaisesRegex(RuntimeError, 'pinned comparison version'):
+                    observer.driver()
+                properties.write_text('Pkg.Revision=37.1.11\n')
+                with self.assertRaisesRegex(RuntimeError, 'observer installation required'):
+                    observer.driver()
+                (sdk / 'emulator.observed-original').write_text('fixture')
+                (reports / 'emulator-version.txt').write_text('37.2.12\n')
+                with self.assertRaisesRegex(RuntimeError, 'observer installation required'):
+                    observer.driver()
+                qualification.assert_not_called()
+                self.assertFalse((reports / 'driver-finished.json').exists())
+                (reports / 'emulator-version.txt').write_text('37.1.11\n')
+                self.assertEqual(observer.driver(), 17)
+                qualification.assert_called_once()
+                self.assertEqual(json.loads((reports / 'driver-finished.json').read_text())['returncode'], 17)
 
     def test_personal_machine_cannot_install_observer(self):
         """SDK changes fail before reading paths when the hosted Linux identity is absent."""

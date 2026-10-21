@@ -45,14 +45,22 @@ def disable_core_dumps():
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 
+def write_record(path, facts):
+    """Publish a complete process record atomically, including when artifact collection overlaps teardown."""
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(facts, indent=2) + '\n')
+    temporary.replace(path)
+
+
 def observe(command, reports, executable=None):
     """Wait for the real launcher, retain its signal/status and forward failure without restarting it."""
     reports.mkdir(parents=True, exist_ok=True)
-    facts = {'started_at': timestamp(), 'oom_before': oom_counters()}
+    facts = {'started_at': timestamp(), 'oom_before': oom_counters(),
+             'avd_launch': any(arg in {'-avd', '--avd'} or arg.startswith('@') for arg in command[1:])}
     child = subprocess.Popen(command, executable=executable, preexec_fn=disable_core_dumps)
     facts['pid'] = child.pid
-    report = reports / 'emulator-process.json'
-    report.write_text(json.dumps(facts, indent=2) + '\n')
+    report = reports / f'emulator-process-{child.pid}.json'
+    write_record(report, facts)
     previous = {signum: signal.getsignal(signum) for signum in (signal.SIGINT, signal.SIGTERM)}
 
     def terminate(signum, frame):
@@ -71,8 +79,20 @@ def observe(command, reports, executable=None):
                   'max_rss_kib': resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
                   'oom_after': oom_counters(),
                   'driver_finished_before_exit': (reports / 'driver-finished.json').exists()})
-    report.write_text(json.dumps(facts, indent=2) + '\n')
+    write_record(report, facts)
     return result if result >= 0 else 128 - result
+
+
+def emulator_revision():
+    """Reject a missing or unexpected SDK revision before launcher changes or qualification operations."""
+    sdk = Path(os.environ['ANDROID_HOME']).resolve() / 'emulator'
+    revision = re.findall(r'^Pkg\.Revision\s*=\s*([0-9.]+)\s*$',
+                          (sdk / 'source.properties').read_text(), re.M)
+    if len(revision) != 1:
+        raise RuntimeError('SDK emulator revision unavailable')
+    if revision[0] != os.environ.get('PREVIEW_EMULATOR_REVISION'):
+        raise RuntimeError('SDK emulator revision does not match the pinned comparison version')
+    return revision[0]
 
 
 def install():
@@ -83,12 +103,9 @@ def install():
     original = sdk / 'emulator.observed-original'
     if launcher.is_symlink() or not launcher.is_file() or original.exists() or original.is_symlink():
         raise RuntimeError('Expected one unmodified SDK emulator launcher')
-    revision = re.findall(r'^Pkg\.Revision\s*=\s*([0-9.]+)\s*$',
-                          (sdk / 'source.properties').read_text(), re.M)
-    if len(revision) != 1:
-        raise RuntimeError('SDK emulator revision unavailable')
+    revision = emulator_revision()
     REPORTS.mkdir(parents=True, exist_ok=True)
-    (REPORTS / 'emulator-version.txt').write_text(revision[0] + '\n')
+    (REPORTS / 'emulator-version.txt').write_text(revision + '\n')
     (REPORTS / 'emulator-options.txt').write_text(os.environ['PREVIEW_EMULATOR_OPTIONS'] + '\n')
     mode = launcher.stat().st_mode
     launcher.rename(original)
@@ -102,8 +119,12 @@ def install():
 
 
 def driver():
-    """Run the unchanged qualification driver and mark completion before normal action teardown."""
+    """Recheck the pinned revision before qualification because the action continues after hook failures."""
     hosted_linux()
+    revision = emulator_revision()
+    original = Path(os.environ['ANDROID_HOME']).resolve() / 'emulator/emulator.observed-original'
+    if not original.is_file() or (REPORTS / 'emulator-version.txt').read_text().strip() != revision:
+        raise RuntimeError('Verified emulator observer installation required before qualification')
     result = subprocess.call([sys.executable, str(Path(__file__).with_name('qualify_signed_preview.py'))])
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / 'driver-finished.json').write_text(json.dumps(

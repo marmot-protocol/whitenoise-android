@@ -218,7 +218,34 @@ status or signal, timestamps, peak child RSS and available cgroup OOM counters,
 and distinguishes exit before driver completion from normal action teardown.
 Kernel core dumps are disabled; raw crash databases and memory are never uploaded.
 The observer never restarts a dead emulator or changes a qualification assertion.
-The renderer, image and resource allocation stay fixed while this diagnosis runs.
+Two subsequent attempts at `e8fd6dd` recorded host QEMU `SIGSEGV` before driver
+completion, at the old baseline composer and before candidate installation.
+Their cgroup OOM counters stayed zero. Neither completed a qualification phase;
+the underlying crashing function is still unknown. The same baseline, driver and
+renderer had passed at `9b47cf9`, so another unchanged retry is not the next step.
+
+The signed-preview lane now makes one controlled version comparison with
+**37.1.11 stable**, the nearest prior stable release in
+[Android's release notes](https://developer.android.com/studio/releases/emulator).
+The [official archive](https://developer.android.com/studio/emulator_archive)
+identifies Linux build `15917651`, with published ZIP SHA-256
+`95771e0ae431897b2a4bd2d97fa095f29a8b0624a7b216baf529f9306161c266`.
+The pinned action's `emulator-build` input selects that build; the prelaunch hook
+fails before modifying the launcher unless installed `Pkg.Revision` is exactly
+`37.1.11`. Because the action continues after a failed prelaunch hook, the driver
+independently rechecks that revision and the observer installation before any
+qualification or device operation. The action does not verify the archive checksum, so the published digest
+is provenance, not a claimed local checksum verification. API 34, the system-image
+selection, ARM64 bridge, SwiftShader options, 4 GiB guest RAM and all application
+assertions remain unchanged. This is an infrastructure comparison, not a known
+emulator fix or passing qualification evidence.
+
+Each launcher invocation now retains an atomic `emulator-process-<pid>.json`,
+including whether it launched an AVD. A later teardown helper cannot overwrite
+the primary process's exit evidence. Regression coverage preserves the first
+failed child's record across a successful helper and rejects a version mismatch
+before changing SDK files or running qualification. Raw arguments, memory and
+crash databases remain excluded.
 
 ## Retention
 
