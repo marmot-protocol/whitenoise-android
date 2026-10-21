@@ -30,6 +30,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -103,7 +104,6 @@ class NostrEventReaderTest {
             WhiteNoiseTheme {
                 NostrEventReaderScreen(
                     card = noteCard(),
-                    authoredReference = AUTHORED_REFERENCE,
                     document = readerDocument(),
                     parsing = false,
                     authorDisplayName = { "Alex Morgan" },
@@ -118,7 +118,8 @@ class NostrEventReaderTest {
 
         composeRule.onNodeWithText(string(R.string.nostr_event_type_note)).assertIsDisplayed()
         composeRule.onNodeWithText("Alex Morgan ·", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithTag(NOSTR_EVENT_READER_REFERENCE_TAG).assertIsDisplayed()
+        // The reader stands for its event, so the encoded reference is not printed (#3317).
+        composeRule.onNodeWithText("nevent1", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("The complete first paragraph is visible.").assertIsDisplayed()
         composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(hasText(LONG_MIDDLE))
         composeRule.onNodeWithText(LONG_MIDDLE).fetchSemanticsNode()
@@ -151,6 +152,49 @@ class NostrEventReaderTest {
         assertEquals(1, copies)
         assertEquals(1, externalOpens)
         assertEquals(1, dismissals)
+    }
+
+    /**
+     * An article reader shows one date, its publication time in the reader's own time zone, never the event time
+     * beside it, and never prints its raw address, while Copy reference stays available (#3317).
+     */
+    @Test
+    fun articleReaderShowsOnePublicationDateAndNoRawAddress() {
+        var copies = 0
+        val zone = TimeZone.getDefault()
+        // Fourteen hours ahead of UTC, so the local publication date is a day after the UTC one.
+        TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati"))
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    NostrEventReaderScreen(
+                        card =
+                            noteCard().copy(
+                                kind = NostrEventCardKind.Article,
+                                eventKind = 30_023,
+                                title = "An article",
+                                publishedAt = PUBLISHED_AT,
+                            ),
+                        document = readerDocument(),
+                        parsing = false,
+                        authorDisplayName = { "Alex Morgan" },
+                        mentionDisplayName = { null },
+                        onNostrProfileTap = {},
+                        onCopyReference = { copies++ },
+                        onOpenExternal = {},
+                        onDismiss = {},
+                    )
+                }
+            }
+
+            composeRule.onNodeWithText("Alex Morgan · Sep 14, 2020").assertIsDisplayed()
+            composeRule.onNodeWithText("2025", substring = true).assertDoesNotExist()
+            composeRule.onNodeWithText("naddr1", substring = true).assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(string(R.string.nostr_event_copy)).performClick()
+            assertEquals(1, copies)
+        } finally {
+            TimeZone.setDefault(zone)
+        }
     }
 
     @Test
@@ -341,6 +385,9 @@ class NostrEventReaderTest {
 
     private companion object {
         const val AUTHORED_REFERENCE = "nevent1qqs8f4r0originalreference6da8fv0"
+
+        // 2020-09-13T23:00:00Z, which is already 2020-09-14 in Kiritimati.
+        const val PUBLISHED_AT = 1_600_038_000L
         const val NESTED_NOTE = "note1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsn9e8p"
         val LONG_MIDDLE = "Long middle context ".repeat(80)
     }

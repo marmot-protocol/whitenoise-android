@@ -1,8 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal fun String.asDurationLabel(): String? {
@@ -22,17 +19,6 @@ internal fun String.asByteCountLabel(): String? {
         else -> "$bytes B"
     }
 }
-
-internal fun String.asEpochLabel(): String? =
-    toLongOrNull()
-        ?.takeIf { it > 0 }
-        ?.let { seconds ->
-            runCatching {
-                DateTimeFormatter.ISO_LOCAL_DATE.format(
-                    Instant.ofEpochSecond(seconds).atZone(ZoneOffset.UTC),
-                )
-            }.getOrNull()
-        }
 
 private const val SECONDS_PER_MINUTE = 60L
 private const val BYTES_PER_KIBIBYTE = 1_024L

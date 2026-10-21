@@ -425,7 +425,7 @@ internal object PlatformInterruptedAttachmentProbe {
     }
 
     /** Match the actual generated WorkSpec in the own-app scheduler; do not guess an ID or stop other jobs. */
-    private fun findScheduledWork(
+    internal fun findScheduledWork(
         context: Context,
         workId: String,
     ): Pair<String?, Int> {

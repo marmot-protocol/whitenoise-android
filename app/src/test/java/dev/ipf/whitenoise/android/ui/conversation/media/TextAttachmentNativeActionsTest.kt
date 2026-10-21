@@ -70,6 +70,71 @@ class TextAttachmentNativeActionsTest {
             assertEquals(2, calls)
         }
 
+    /** Repeated Share taps while one is prepared open a single share sheet, and the reader can show it is busy. */
+    @Test
+    fun shareIsSingleFlightAndExposesItsBusyState() =
+        runTest {
+            val staged = CompletableDeferred<Unit>()
+            var shares = 0
+            val actions =
+                TextAttachmentNativeActions(
+                    sourceIsCurrent = { true },
+                    shareSource = {
+                        shares += 1
+                        staged.await()
+                    },
+                ) {}
+
+            val share = launch { actions.share() }
+            runCurrent()
+            assertTrue(actions.sharing)
+            actions.share()
+            assertEquals(1, shares)
+
+            staged.complete(Unit)
+            share.join()
+            assertFalse(actions.sharing)
+            actions.share()
+            assertEquals(2, shares)
+        }
+
+    /** A reader whose source is gone shares nothing. */
+    @Test
+    fun aReleasedReaderSharesNothing() =
+        runTest {
+            var shares = 0
+            val actions = TextAttachmentNativeActions({ true }, shareSource = { shares += 1 }) {}
+
+            actions.release()
+            actions.share()
+
+            assertEquals(0, shares)
+            assertFalse(actions.sharing)
+        }
+
+    /** A share abandoned while it is prepared, as when the reader closes, cancels quietly and never sticks busy. */
+    @Test
+    fun aCancelledShareDoesNotStickTheBusyState() =
+        runTest {
+            var shares = 0
+            val actions =
+                TextAttachmentNativeActions(
+                    sourceIsCurrent = { true },
+                    shareSource = {
+                        shares += 1
+                        if (shares == 1) throw CancellationException("reader closed")
+                    },
+                ) {}
+
+            val first = launch { actions.share() }
+            first.join()
+
+            assertTrue(first.isCancelled)
+            assertFalse(actions.sharing)
+            actions.share()
+            assertEquals(2, shares)
+        }
+
     /** Selection speaks only its real visible text while the unselected path retains native Markdown projection. */
     @Test
     fun selectedSpeechNeverIncludesUnselectedDocumentText() {

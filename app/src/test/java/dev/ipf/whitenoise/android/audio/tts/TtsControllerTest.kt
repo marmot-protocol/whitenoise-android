@@ -16,6 +16,87 @@ import kotlin.concurrent.thread
 
 @Suppress("LargeClass") // Controller lifecycle, focus, and seek cases share one fake engine/focus harness.
 class TtsControllerTest {
+    /** Chronologically newer retained rows must never override the fresh request's authoritative roster. */
+    @Test
+    fun olderHistoryAndRenderedSeekUseTheFreshRosterInBothDirections() {
+        for ((previous, resolved) in listOf(2 to 3, 3 to 2)) {
+            for (renderedSeek in listOf(false, true)) {
+                val engine = FakeTtsSpeechEngine()
+                val controller = controllerWithTestClock()
+                controller.attachEngine(engine)
+                val retained =
+                    TtsSpeakableEntry(
+                        "alice",
+                        "Alice",
+                        "Retained.",
+                        messageIdHex = "new",
+                        timelineAt = 2uL,
+                        conversationMemberCount = previous,
+                    )
+                val incoming =
+                    retained.copy(
+                        text = "Older.",
+                        messageIdHex = "old",
+                        timelineAt = 1uL,
+                        conversationMemberCount = resolved,
+                    )
+                assertTrue(controller.speak(listOf(retained), Locale.US))
+                engine.start(0)
+                val first = engine.spoken.size
+                val installed =
+                    if (renderedSeek) {
+                        controller.installSeekTarget(
+                            incoming,
+                            0,
+                            controller.state.value.sessionId,
+                            incoming.projectionId,
+                        )
+                    } else {
+                        controller.extendReadAloudWindow(
+                            TtsHistoryDirection.Older,
+                            listOf(incoming),
+                            "old",
+                            TtsWindowSentenceTarget.First,
+                        )
+                    }
+                assertTrue(installed)
+                assertEquals(listOf("old", "new"), controller.queuedMessageIds())
+                assertEquals(if (resolved == 2) "Older." else "Alice: Older.", engine.spoken[first].text)
+                controller.stop()
+            }
+        }
+    }
+
+    /** Actual engine starts, rather than queued utterances, own two-member navigation context. */
+    @Test
+    fun twoMemberNavigationReceivesTheStartedSpeakerFromTheEngineAdapter() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controllerWithTestClock()
+        controller.attachEngine(engine)
+        val entries =
+            listOf(
+                TtsSpeakableEntry("alice", "Alice", "First.", messageIdHex = "a1", conversationMemberCount = 2),
+                TtsSpeakableEntry("alice", "Alice", "Second.", messageIdHex = "a2", conversationMemberCount = 2),
+                TtsSpeakableEntry("bob", "Bob", "Reply.", messageIdHex = "b1", conversationMemberCount = 2),
+            )
+        assertTrue(controller.speak(entries, Locale.US))
+        assertEquals(listOf("First.", "Second.", "Bob: Reply."), engine.spoken.map { it.text })
+        engine.start(0)
+        var first = engine.spoken.size
+        controller.skipNextMessage()
+        assertEquals("Second.", engine.spoken[first].text)
+        engine.start(first)
+        first = engine.spoken.size
+        controller.skipNextMessage()
+        assertEquals("Bob: Reply.", engine.spoken[first].text)
+        engine.start(first)
+        controller.pause()
+        first = engine.spoken.size
+        controller.resume()
+        assertEquals("Reply.", engine.spoken[first].text)
+        controller.stop()
+    }
+
     /** A document replaces message playback; blank or unavailable starts preserve the current queue. */
     @Test
     fun attachmentStartReplacesTheQueueAndRejectsBlankOrUnavailableSpeech() {
@@ -940,6 +1021,19 @@ class TtsControllerTest {
         assertFalse(controller.appendSpeech(TtsSpeakableEntry("", "", "Orphan."), Locale.US))
         assertTrue(engine.spoken.isEmpty())
     }
+
+    /** Keeps real start callbacks deterministic without Android's platform clock or a background ticker. */
+    private fun controllerWithTestClock(): TtsController =
+        TtsController(
+            audioFocus = FakeTtsAudioFocus(),
+            maxChunkLength = 4_000,
+            wordTicker =
+                TtsEstimatedWordTicker(
+                    dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
+                    clock = { 0L },
+                ),
+            clock = { 0L },
+        )
 
     private fun controller(focus: FakeTtsAudioFocus): TtsController =
         TtsController(

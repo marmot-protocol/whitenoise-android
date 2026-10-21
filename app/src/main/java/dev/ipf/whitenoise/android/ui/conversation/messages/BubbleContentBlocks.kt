@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsMentionPresentation
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.messageContainsOnlyNostrEventReferences
 import dev.ipf.whitenoise.android.core.nostrEventReferences
+import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -78,6 +79,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.RemoteGiphyMediaBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberPendingUploadProgress
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoicePresentationOwner
+import dev.ipf.whitenoise.android.ui.conversation.nostr.MAX_CARDS_PER_MESSAGE
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCards
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationMessageBubble
@@ -594,11 +596,23 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     emptyList()
                 }
             }
+        // The cards represent these events, so the prose leaves out references
+        // that only repeat them, and a body of nothing else is hidden (#3317).
+        // References past the card cap are not represented and stay visible.
+        val representedEventIds =
+            remember(eventReferences) {
+                eventReferences.take(MAX_CARDS_PER_MESSAGE).mapTo(HashSet()) { it.reference.stableId }
+            }
+        val bodyOnlyRepeatsCards =
+            remember(markdownDocument, representedEventIds) {
+                markdownDocument?.onlyRepeatsRepresentedEvents(representedEventIds) == true
+            }
         val showMessageTextBody =
-            !messageContainsOnlyNostrEventReferences(
-                message = bodyText,
-                references = eventReferences,
-            )
+            !bodyOnlyRepeatsCards &&
+                !messageContainsOnlyNostrEventReferences(
+                    message = bodyText,
+                    references = eventReferences,
+                )
         val density = LocalDensity.current
         val lineHeightPx =
             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
@@ -724,6 +738,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                             ttsReadAloudHighlightStyle = highlightStyle,
                             ttsSentenceLayoutReporter = presentedTtsSentenceLayoutReporter,
                             searchHighlight = searchHighlight,
+                            hiddenEventIds = representedEventIds,
                         )
                     }
                 }
