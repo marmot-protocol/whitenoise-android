@@ -99,18 +99,21 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
 
     /** Light replies use the global received fill when the conversation has no override. */
     @Test
-    fun globalReceivedReplySurfacesLight() =
+    fun globalReceivedReplySurfacesLight() {
         captureCustomReplySurfaces("global_received_light", AppThemeMode.Light, useChatReceivedColor = false)
+    }
 
     /** Dark replies resolve the global near-black received fill through the production dispatcher. */
     @Test
-    fun globalReceivedReplySurfacesDark() =
+    fun globalReceivedReplySurfacesDark() {
         captureCustomReplySurfaces("global_received_dark", AppThemeMode.Dark, useChatReceivedColor = false)
+    }
 
     /** AMOLED resolves the global received outline while retaining its black reply interiors. */
     @Test
-    fun globalReceivedReplySurfacesAmoled() =
+    fun globalReceivedReplySurfacesAmoled() {
         captureCustomReplySurfaces("global_received_amoled", AppThemeMode.Amoled, useChatReceivedColor = false)
+    }
 
     /** Runs the actual dispatcher with global colors and an optional winning per-chat received override. */
     private fun captureCustomReplySurfaces(
