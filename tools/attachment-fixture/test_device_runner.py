@@ -229,7 +229,7 @@ class RunnerContractTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 device_runner.run("adb", "emulator-5554", Path(root) / "server", output)
             report = json.loads(output.read_text())
-            self.assertEqual({"role": "relay", "owned_success_count": 1}, report["reverse_binding"])
+            self.assertEqual({"role": "relay", "owned_success_count_before_attempt": 1}, report["reverse_binding"])
             self.assertEqual("reverse-address-in-use", report["failure_diagnostics"]["subprocess_status"])
             self.assertEqual(bindings[:1], removed)
             self.assertFalse(report["qualified"])

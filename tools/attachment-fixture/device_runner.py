@@ -191,7 +191,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             started_services.append(service)
         stage = "reverse-binding"
         for role, port in (("blob", server.server_port), ("relay", relay.port)):
-            report["reverse_binding"] = {"role": role, "owned_success_count": len(forwards)}
+            report["reverse_binding"] = {"role": role, "owned_success_count_before_attempt": len(forwards)}
             # --no-rebind fails instead of overwriting an existing reverse owned by another task.
             adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{port}")
             forwards.append(port)
