@@ -73,7 +73,8 @@ def prepare():
     candidate_url = 'https://github.com/marmot-protocol/whitenoise-android/releases/download/android-pr-previews/whitenoise-pr-3371-isolated.apk'
     download(candidate_url, PAIR / 'candidate.apk')
     baseline = verify_apk(PAIR / 'baseline.apk', pin['source'], pin['native_sha256'], pin['signer_sha256'])
-    candidate = verify_apk(PAIR / 'candidate.apk', os.environ['GITHUB_SHA'], NATIVE, pin['signer_sha256'])
+    candidate_source = os.environ.get('PREVIEW_DIAGNOSTIC_SOURCE', os.environ['GITHUB_SHA'])
+    candidate = verify_apk(PAIR / 'candidate.apk', candidate_source, NATIVE, pin['signer_sha256'])
     unsigned = Path('build/mdk-preview-unsigned')
     provenance = dict(line.split('=', 1) for line in (unsigned / 'provenance.env').read_text().splitlines())
     build = json.loads(Path('build/mdk-preview-build-run.json').read_text())
@@ -81,7 +82,7 @@ def prepare():
             build['path'] != '.github/workflows/android-pr-apk.yml' or
             str(build['run_number']) != provenance.get('run_number')):
         raise RuntimeError('Preview build did not use the successful trusted default-branch dispatch')
-    if (len(provenance) != 4 or provenance.get('head_sha') != os.environ['GITHUB_SHA'] or
+    if (len(provenance) != 4 or provenance.get('head_sha') != candidate_source or
             provenance.get('channel') != 'isolated' or provenance.get('pr_number') != '3371'):
         raise RuntimeError('Unsigned build provenance is not the exact candidate')
     apks = list(unsigned.glob('*.apk'))
@@ -97,6 +98,8 @@ def prepare():
             if original.read(name) != signed.read(name):
                 raise RuntimeError('Signed preview application bytes differ from the exact-head build')
     facts = {'baseline': baseline, 'candidate': candidate, 'build_provenance': provenance, 'phases': {}}
+    if os.environ.get('PREVIEW_DIAGNOSTIC_SOURCE'):
+        facts.update({'diagnostic_only': True, 'workflow_source': os.environ['GITHUB_SHA']})
     (REPORTS / 'apk-provenance.json').write_text(json.dumps(facts, indent=2) + '\n')
     return facts
 

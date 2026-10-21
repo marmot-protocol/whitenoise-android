@@ -125,7 +125,20 @@ def driver():
     original = Path(os.environ['ANDROID_HOME']).resolve() / 'emulator/emulator.observed-original'
     if not original.is_file() or (REPORTS / 'emulator-version.txt').read_text().strip() != revision:
         raise RuntimeError('Verified emulator observer installation required before qualification')
-    result = subprocess.call([sys.executable, str(Path(__file__).with_name('qualify_signed_preview.py'))])
+    debugger = None
+    if os.environ.get('PREVIEW_DIAGNOSTIC_SOURCE'):
+        if os.environ.get('PREVIEW_EMULATOR_STACK_TRACE') != 'true':
+            raise RuntimeError('Separate candidate source is allowed only for host crash diagnosis')
+        if __package__:
+            from .preview_emulator_stack import attach_emulator, stop_debugger
+        else:
+            from preview_emulator_stack import attach_emulator, stop_debugger
+        debugger = attach_emulator(REPORTS)
+    try:
+        result = subprocess.call([sys.executable, str(Path(__file__).with_name('qualify_signed_preview.py'))])
+    finally:
+        if debugger is not None:
+            stop_debugger(debugger)
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / 'driver-finished.json').write_text(json.dumps(
         {'finished_at': timestamp(), 'returncode': result}) + '\n')
