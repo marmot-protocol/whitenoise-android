@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Looper
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
@@ -13,6 +15,7 @@ import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.notifications.ConversationCardBarrier
 import dev.ipf.whitenoise.android.notifications.ConversationCardOp
 import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
@@ -33,6 +36,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -145,6 +149,118 @@ class NotificationReactionRemovalRaceTest {
             } finally {
                 probe.release.countDown()
                 fixture.close()
+            }
+        }
+
+    /** A removal's quote-free retry cannot obtain a fresh dismissal lifetime and resurrect a dismissed card. */
+    @Test
+    fun quoteFreeRetryDoesNotOutliveItsOriginalDismissalLifetime() =
+        runBlocking {
+            val fixture = fixture(CountDownLatch(0))
+            val probe = ReactionWriteProbe(lateCorrection = false)
+            try {
+                fixture.bootstrap()
+                ConversationCardPostSynchronizer.testHook = probe
+                fixture.emitUpdate(reaction(fixture.update))
+                awaitLatch(probe.queued)
+                fixture.appState.recordNotificationContentRemoval(
+                    RemovedNotificationMessage(ACCOUNT, "other-chat", TARGET),
+                )
+                ConversationCardPostSynchronizer.markDismissed(reactionKey.tag, reactionKey.id)
+                probe.release.countDown()
+                fixture.awaitUpdateConsumed()
+                val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(500)
+                while (System.nanoTime() < until) {
+                    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                    delay(1L)
+                }
+                assertTrue(activeReactionText().isEmpty())
+                assertEquals(0, probe.writes.get())
+            } finally {
+                probe.release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** Picture-only enrichment may not clone a live quote after its original removal fence becomes stale. */
+    @Test
+    fun aRemovalAtTheAvatarWriteNeverRepublishesTheLiveQuote() =
+        runBlocking {
+            val release = CountDownLatch(1)
+            val fetchStarted = CountDownLatch(1)
+            val reached = CountDownLatch(1)
+            val removed = AtomicBoolean(false)
+            val copiedQuoteWrites = AtomicInteger()
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP,
+                    messageIdHex = TARGET,
+                    isDm = true,
+                    emitStartupNotification = false,
+                    senderPictureUrl = "https://example.com/quoted-avatar.png",
+                    localDisplayName = "Alice",
+                    profileImageDownload = { _, _ ->
+                        fetchStarted.countDown()
+                        check(release.await(10, TimeUnit.SECONDS))
+                        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+                        bitmap.eraseColor(Color.MAGENTA)
+                        ByteArrayOutputStream().use { out ->
+                            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out))
+                            out.toByteArray()
+                        }
+                    },
+                )
+            try {
+                AvatarImageLoader.clear()
+                fixture.bootstrap()
+                fixture.emitUpdate(reaction(fixture.update))
+                awaitReactionText(SECRET)
+                awaitLatch(fetchStarted)
+                ConversationCardPostSynchronizer.testHook =
+                    avatarRemovalProbe(fixture, removed, reached, copiedQuoteWrites)
+                release.countDown()
+                awaitLatch(reached)
+                val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(500)
+                while (System.nanoTime() < until) {
+                    shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                    delay(1L)
+                }
+                assertEquals("inspect writes while the old live card still exists", 0, copiedQuoteWrites.get())
+                assertTrue("no cancellation hides a stale rewrite", activeReactionText().any { SECRET in it })
+            } finally {
+                release.countDown()
+                fixture.close()
+                AvatarImageLoader.clear()
+                AvatarImageLoader.resetProfileImageFetcherForTests()
+            }
+        }
+
+    /** Commits only the removal mark at the actual final platform boundary, then audits every later write. */
+    private fun avatarRemovalProbe(
+        fixture: NotificationBootstrapTestFixture,
+        removed: AtomicBoolean,
+        reached: CountDownLatch,
+        quotedWrites: AtomicInteger,
+    ): ConversationCardTestHook =
+        object : ConversationCardTestHook {
+            /** Marks before the last permission callback and counts any actual stale payload written afterwards. */
+            override fun onBarrier(
+                op: ConversationCardOp,
+                barrier: ConversationCardBarrier,
+                notificationTag: String,
+                notificationId: Int,
+            ) {
+                if (notificationTag != reactionKey.tag || notificationId != reactionKey.id) return
+                if (barrier == ConversationCardBarrier.BEFORE_PLATFORM_WRITE && removed.compareAndSet(false, true)) {
+                    fixture.appState.recordNotificationContentRemoval(
+                        RemovedNotificationMessage(ACCOUNT, GROUP, TARGET),
+                    )
+                    reached.countDown()
+                }
+                if (barrier == ConversationCardBarrier.AFTER_WRITE && removed.get()) {
+                    if (activeReactionText().any { SECRET in it }) quotedWrites.incrementAndGet()
+                }
             }
         }
 

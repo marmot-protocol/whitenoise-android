@@ -99,7 +99,7 @@ class NotificationFirstPostContentWiringTest {
         val pictureRefresh = source.functionBody("refreshLateNotificationIdentity")
         assertTrue(
             "the late-picture refresh keeps the late-correction fences",
-            "isNotificationEnrichmentAllowed(candidate, firstPost)" in pictureRefresh &&
+            "isNotificationEnrichmentAllowed(update, firstPost)" in pictureRefresh &&
                 "refreshLateIdentityImage(" in pictureRefresh,
         )
         val schedule = source.functionBody("scheduleNotificationEnrichment")

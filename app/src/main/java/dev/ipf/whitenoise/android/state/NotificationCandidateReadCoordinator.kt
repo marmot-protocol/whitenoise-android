@@ -45,8 +45,10 @@ internal class NotificationCandidateReadCoordinator(
         block: suspend () -> NotificationCandidateState,
     ): Deferred<NotificationCandidateState>? {
         val conversation = key.accountRef to key.groupIdHex.lowercase()
-        pending[conversation]?.let { existing -> return existing.result.takeIf { existing.key == key } }
-        if (pending.size >= MAX_PENDING_READS) return null
+        val existing = pending[conversation]
+        if (existing != null || pending.size >= MAX_PENDING_READS) {
+            return existing?.result?.takeIf { existing.key == key }
+        }
         val result = scope.async(dispatcher, start = CoroutineStart.LAZY) { block() }
         val admitted = PendingRead(key, result)
         pending[conversation] = admitted

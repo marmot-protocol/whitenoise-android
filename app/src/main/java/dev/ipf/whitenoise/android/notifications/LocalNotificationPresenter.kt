@@ -800,6 +800,19 @@ class LocalNotificationPresenter(
         return true
     }
 
+    /** Retains one dismissal lifetime across a caller's quote-only retry without replacing inner show ownership. */
+    internal suspend fun withShowLifetime(
+        update: NotificationUpdateFfi,
+        post: suspend (isNotDismissed: () -> Boolean) -> Boolean,
+    ): Boolean {
+        val key = LocalNotificationFormatter.notificationDismissalKey(update)
+        return ConversationCardPostSynchronizer.withRegisteredShow(
+            key.tag,
+            key.id,
+            ConversationCardScope(update.accountRef, update.groupIdHex),
+        ) { token -> post { ConversationCardPostSynchronizer.isShowNotDismissed(token) } }
+    }
+
     /**
      * Formats and publishes one notification under the caller's live eligibility gate.
      * Matching-message replacements also require newest-show ownership, and every

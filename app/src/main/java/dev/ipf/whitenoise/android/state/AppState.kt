@@ -12799,8 +12799,10 @@ class WhiteNoiseAppState private constructor(
         }
         var posted = false
         try {
-            posted = withVerifiedReactionQuote(update, firstPost) { candidate ->
-                if (!isNotificationEnrichmentAllowed(candidate, firstPost)) return@withVerifiedReactionQuote false
+            posted = withVerifiedReactionQuote(update, firstPost) { candidate, isNotDismissed ->
+                if (!isNotDismissed() || !isNotificationEnrichmentAllowed(candidate, firstPost)) {
+                    return@withVerifiedReactionQuote false
+                }
                 localNotificationPresenter.show(
                     update = candidate,
                     conversationTitleOverride = content.conversationTitle,
@@ -12816,7 +12818,7 @@ class WhiteNoiseAppState private constructor(
                     replaceCurrentMessage = true,
                     shortNpub = ::shortNpub,
                     isPostStillAllowed = {
-                        isNotificationEnrichmentAllowed(candidate, firstPost)
+                        isNotDismissed() && isNotificationEnrichmentAllowed(candidate, firstPost)
                     },
                 )
             }
@@ -12968,28 +12970,16 @@ class WhiteNoiseAppState private constructor(
         firstPost: NotificationFirstPost,
         late: LateNotificationIdentity,
     ) {
-        withVerifiedReactionQuote(update, firstPost) { candidate ->
-            if (!isNotificationEnrichmentAllowed(candidate, firstPost)) return@withVerifiedReactionQuote false
-            val content =
-                if (candidate == update) {
-                    late.content
-                } else {
-                    LocalNotificationFormatter.content(
-                        update = candidate,
-                        context = appContext,
-                        senderNameOverride = late.content.senderName,
-                        conversationTitleOverride = late.content.conversationTitle,
-                        shortNpub = ::cachedShortNpubOrUnknown,
-                    ) ?: return@withVerifiedReactionQuote false
-                }
-            localNotificationPresenter.refreshLateIdentityImage(
-                update = candidate,
-                content = content,
-                pictures = late.sources,
-                directShareEligible = candidate.accountRef == activeAccountRef,
-                isRefreshCurrent = { isNotificationEnrichmentAllowed(candidate, firstPost) },
-            )
-        }
+        // Avatar rewrites preserve live card text. Never replace its quote fence with an unquoted candidate:
+        // that would permit the presenter's copy of a still-quoted live card to re-publish a removed excerpt.
+        if (!isNotificationEnrichmentAllowed(update, firstPost)) return
+        localNotificationPresenter.refreshLateIdentityImage(
+            update = update,
+            content = late.content,
+            pictures = late.sources,
+            directShareEligible = update.accountRef == activeAccountRef,
+            isRefreshCurrent = { isNotificationEnrichmentAllowed(update, firstPost) },
+        )
     }
 
     /** Posts either the resolved first-draw value or the existing safe fallback. */
@@ -13044,7 +13034,7 @@ class WhiteNoiseAppState private constructor(
         redactContent: Boolean,
         onNotificationWritten: () -> Unit,
     ): Boolean =
-        withVerifiedReactionQuote(update, firstPost) { candidate ->
+        withVerifiedReactionQuote(update, firstPost) { candidate, isNotDismissed ->
             localNotificationPresenter.show(
                 update = candidate,
                 conversationTitleOverride = firstPost.content?.conversationTitle,
@@ -13060,7 +13050,7 @@ class WhiteNoiseAppState private constructor(
                 shortNpub = ::cachedShortNpubOrUnknown,
                 onNotificationWritten = onNotificationWritten,
                 isPostStillAllowed = {
-                    isQueuedReactionQuoteCurrent(candidate, firstPost) &&
+                    isNotDismissed() && isQueuedReactionQuoteCurrent(candidate, firstPost) &&
                         isNotificationGenerationPostAllowed(
                             update = candidate,
                             postEpoch = firstPost.epoch,
@@ -13464,13 +13454,15 @@ class WhiteNoiseAppState private constructor(
     private suspend fun withVerifiedReactionQuote(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
-        post: suspend (NotificationUpdateFfi) -> Boolean,
-    ): Boolean {
-        val current = withoutStaleQueuedReactionQuote(update, firstPost)
-        if (post(current)) return true
-        val unquoted = withoutStaleQueuedReactionQuote(current, firstPost)
-        return unquoted != current && post(unquoted)
-    }
+        post: suspend (NotificationUpdateFfi, () -> Boolean) -> Boolean,
+    ): Boolean =
+        localNotificationPresenter.withShowLifetime(update) { isNotDismissed ->
+            val current = withoutStaleQueuedReactionQuote(update, firstPost)
+            if (!isNotDismissed()) return@withShowLifetime false
+            if (post(current, isNotDismissed)) return@withShowLifetime true
+            val unquoted = withoutStaleQueuedReactionQuote(current, firstPost)
+            unquoted != current && isNotDismissed() && post(unquoted, isNotDismissed)
+        }
 
     /** Exercises the exact typed-update production path from JVM or instrumentation acceptance tests. */
     internal suspend fun processNotificationUpdateForTest(update: NotificationUpdateFfi) {
