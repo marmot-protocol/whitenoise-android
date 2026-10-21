@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/res/values-ru/strings.xml",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Claude Code first-installation prompt, approval boundaries and phone setup guidance",
+        "source": "app/src/main/res/values-ru/strings.xml",
+        "anchor": "name=\"agent_connector_claude_prompt\"",
+        "test_ids": [
+          "SET-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
