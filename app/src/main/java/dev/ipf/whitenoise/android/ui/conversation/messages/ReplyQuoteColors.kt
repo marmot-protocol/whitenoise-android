@@ -11,8 +11,10 @@ private const val REPLY_QUOTE_FILL_ALPHA = 0.16f
 private const val REPLY_QUOTE_SECONDARY_ALPHA = 0.78f
 private const val REPLY_QUOTE_WARNING_ALPHA = 0.75f
 private const val REPLY_QUOTE_STRONG_TINT_ALPHA = 0.32f
+
 // Decorative inset separation; text independently retains the existing WCAG AA contrast floor.
 private const val MIN_REPLY_INSET_CONTRAST = 1.2
+
 private const val UNSIGNED_ARGB_MASK = 0xFFFFFFFFL
 
 /** Container and readable text roles shared by the message reply-card boundaries. */
