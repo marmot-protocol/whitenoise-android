@@ -8,7 +8,8 @@ import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.parseMarkdownOrEmptyDocument
 
 /** Builds the single active message projection consumed by every TTS entry point. */
-@Suppress("ReturnCount", "LongParameterList") // Explicit rendering and conversation inputs share this one speech projection.
+// Explicit rendering and conversation inputs share this one speech projection.
+@Suppress("ReturnCount", "LongParameterList")
 internal suspend fun projectTtsSpeakableEntry(
     message: AppMessageRecordFfi,
     editedText: String?,

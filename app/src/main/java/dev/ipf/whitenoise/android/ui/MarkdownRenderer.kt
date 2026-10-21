@@ -1926,8 +1926,8 @@ internal fun rememberMarkdownPreviewText(
  * - The result is capped at [maxLength]; the walk stops early once the budget
  *   is spent so a huge message never builds a giant string for a one-line row.
  *
- * [applyProfileDirection] is disabled for fragments assembled into a focused
- * preview; that caller styles the complete text to avoid extra paragraph boundaries.
+ * [applyProfileDirection] is disabled for fragments assembled into chat rows or focused previews;
+ * those callers style the complete text to avoid extra paragraph boundaries.
  */
 internal fun markdownDocumentToPreviewAnnotatedString(
     document: MarkdownDocumentFfi,
