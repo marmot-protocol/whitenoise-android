@@ -70,6 +70,20 @@ func (relay *offlineSignerRelay) rememberResponse(response nostr.Event) {
 	relay.responses = append(relay.responses, response)
 }
 
+// diagnostics reports only bounded counters, never signer identities or event contents.
+func (relay *offlineSignerRelay) diagnostics() string {
+	if !relay.mu.TryLock() {
+		return "relay_counters=busy"
+	}
+	defer relay.mu.Unlock()
+	return fmt.Sprintf("relay_requests=%d relay_forbidden=%d relay_subscribers=%d relay_responses=%d", relay.requests, relay.forbidden, len(relay.peers), len(relay.responses))
+}
+
+// publishFailure preserves the command error and exposes only bounded diagnostic state.
+func (relay *offlineSignerRelay) publishFailure(ctx context.Context, err error, started, publishStarted time.Time, stderr string) error {
+	return fmt.Errorf("offline ZSP failed: %w; phase=publish elapsed=%s total_elapsed=%s context=%v %s\n%s", err, time.Since(publishStarted), time.Since(started), ctx.Err(), relay.diagnostics(), stderr)
+}
+
 // ServeHTTP serializes request handling and reply replay across connection orderings.
 func (relay *offlineSignerRelay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, nil)
@@ -156,13 +170,14 @@ func rehearse() error {
 	if len(os.Args) != 3 {
 		return fmt.Errorf("usage: rehearse-zsp.go PINNED_ZSP DISPOSABLE_APK")
 	}
+	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	binary, _ := filepath.Abs(os.Args[1])
 	apk, _ := filepath.Abs(os.Args[2])
 	version, err := exec.CommandContext(ctx, binary, "--version").Output()
 	if err != nil || !strings.Contains("\n"+string(version), "\nv0.4.17\n") {
-		return fmt.Errorf("expected pinned v0.4.17: %q (%v)", version, err)
+		return fmt.Errorf("expected pinned v0.4.17: %q (%v); phase=version elapsed=%s context=%v", version, err, time.Since(started), ctx.Err())
 	}
 	signerKey, clientKey := nostr.GeneratePrivateKey(), nostr.GeneratePrivateKey()
 	signerPub, _ := nostr.GetPublicKey(signerKey)
@@ -217,8 +232,9 @@ func rehearse() error {
 	cmd.Env = append(cmd.Env, "SIGN_WITH=bunker://"+signerPub+"?relay=ws://"+listener.Addr().String())
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	publishStarted := time.Now()
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("offline ZSP failed: %w\n%s", err, stderr.String())
+		return relay.publishFailure(ctx, err, started, publishStarted, stderr.String())
 	}
 	kinds := map[int]int{}
 	for _, line := range bytes.Split(bytes.TrimSpace(stdout.Bytes()), []byte("\n")) {
