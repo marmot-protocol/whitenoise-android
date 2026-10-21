@@ -253,19 +253,43 @@ class PreviewUi:
             time.sleep(2)
         raise RuntimeError(f'{phase}: retained demo history and composer did not become usable')
 
+    def focused_composer_node(self):
+        """Locate the focused field over the empty composer's placeholder, including Compose's scroll semantics."""
+        for placeholder in self.matches('Message'):
+            container = self.parents.get(placeholder)
+            if container is None:
+                continue
+            controls = {node.get('content-desc') for node in container.iter('node')}
+            if not {'Add attachment', 'Dictate text'} <= controls:
+                continue
+            label_bounds = list(map(int, re.findall(r'\d+', placeholder.get('bounds', ''))))
+            if len(label_bounds) != 4:
+                continue
+            for node in container.iter('node'):
+                if (node.get('class') not in {'android.widget.EditText', 'android.widget.ScrollView'} or
+                        node.get('focused') != 'true' or node.get('package') != APP or not self.enabled(node)):
+                    continue
+                bounds = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
+                if (len(bounds) == 4 and bounds[0] <= label_bounds[0] < label_bounds[2] <= bounds[2] and
+                        bounds[1] <= label_bounds[1] < label_bounds[3] <= bounds[3]):
+                    return node
+        return None
+
     def focus_composer(self, phase):
-        """Exercise the empty compact composer without sending or deleting any fixture data."""
+        """Require actual composer focus and a shown IME without sending or deleting fixture data."""
         self.click('Message')
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             self.snapshot()
-            focused = any(node.get('class') == 'android.widget.EditText' and node.get('focused') == 'true'
-                          for node in self.nodes)
+            focused = self.focused_composer_node()
             keyboard = adb('shell', 'dumpsys', 'input_method')
-            if focused and re.search(r'\bmInputShown=true\b', keyboard):
-                (REPORTS / f'{phase}-composer.xml').write_text(self.xml)
-                (REPORTS / f'{phase}-composer.json').write_text(
-                    json.dumps({'focused_editable': True, 'keyboard_shown': True}) + '\n')
+            shown = bool(re.search(r'\bmInputShown=true\b', keyboard))
+            observation = {'focused_composer': focused is not None, 'keyboard_shown': shown,
+                           'focus_class': focused.get('class') if focused is not None else None}
+            (REPORTS / f'{phase}-composer.xml').write_text(self.xml)
+            (REPORTS / f'{phase}-composer.json').write_text(json.dumps(observation) + '\n')
+            if focused is not None and shown:
+                (REPORTS / f'{phase}-composer.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
                 adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
                 return
             time.sleep(1)

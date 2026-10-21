@@ -271,23 +271,27 @@ class MarmotUpgradeFixtureTest {
             val sent = runtime.sendMediaReference(account, group, reference, "Promoted baseline pending upload")
             value.put("pendingMessage", sent.messageIds.single())
             receipt.writeText(value.toString())
+            reportUpgradePending(runtime, value, "send-returned", sent)
         }
         val message = value.getString("pendingMessage")
         try {
             withTimeout(30_000L) {
                 val target = awaitTarget(runtime, account, group, message)
+                reportUpgradePending(runtime, value, "history-found")
                 while (true) {
                     val assets = runtime.attachmentLocalAssets(account, group, listOf(target))
                     val reference = assets.single().reference
                     if (reference != null) {
                         val bytes = runtime.readAttachmentAsset(account, reference, 0uL, PENDING_SIZE.toUInt()).bytes
                         assertArrayEquals(payload(1), bytes)
+                        reportUpgradePending(runtime, value, "retained-plaintext-passed")
                         break
                     }
                     delay(100L)
                 }
             }
         } finally {
+            reportUpgradePending(runtime, value, "read-finished")
             verifyUpgradeStorage(runtime, "pending-read-observation", beforeStart = true)
         }
     }

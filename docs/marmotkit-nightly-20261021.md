@@ -149,7 +149,13 @@ must fail with errno 28, and native state must pause with the legacy body retain
 The fixture then removes only its filler, unmounts that disposable volume, and
 lets MDK recover. Corrupted and removed synthetic receiver files must never return
 unauthenticated plaintext; explicit native acquisition must restore exact bytes.
-These remain proposed assertions until a linked hosted run passes.
+Pending-upload observations retain native send disposition, confirmation/history
+presence and local-reference availability separately; a returned message ID alone
+does not prove publication. A promotion failure keeps the campaign failed but
+allows the independent receiver-file recovery checks after a qualified cold
+restart. No re-send, replacement download or persistence repair satisfies the
+pending-upload assertion. These remain proposed assertions until a linked hosted
+run passes.
 
 The trusted baseline was obtained from the genuine temporary PR3371 head whose
 application/build tree is master `b3b66afefb7459e9ae9206c85c3a85627345cf2c`.
@@ -161,7 +167,11 @@ exact-head unsigned build, requires ARM64 support from the hosted emulator image
 and creates synthetic history through ordinary release UI. The driver verifies
 Settings arrival instead of treating an avatar tap as navigation success; it
 preserves the original profile and restores the account-row viewport before
-reading only its public key. It disables emulator
+reading only its public key. Composer checks identify the focused field within
+the attachment/dictation control group and over its empty placeholder: Compose
+exposes this scrolling `BasicTextField` as `ScrollView`, not `EditText`. A shown
+keyboard remains separately required, and focus/IME observations are retained
+even on failure. It disables emulator
 networking and verifies that no default network remains before the in-place
 candidate upgrade, again before cold restart, and after the retained identity
 check. Relay recovery cannot substitute for retained local history. Neither a

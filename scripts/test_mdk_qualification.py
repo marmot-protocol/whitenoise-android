@@ -2,11 +2,12 @@
 
 from pathlib import Path
 import tempfile
+import json
 import unittest
 import queue
 import subprocess
 import zipfile
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from scripts import run_mdk_qualification as campaign
 from scripts import run_mdk_faults as faults
@@ -28,6 +29,34 @@ class QualificationEvidenceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', return_value=output):
                 campaign.instrument('fixture', campaign.UPGRADE, expected)
+
+    def test_pending_upload_failure_stays_failed_while_original_media_recovery_runs(self):
+        """Independent receiver-file checks must not hide a failed sender promotion or require it to pass."""
+        facts = {'phases': {'cold_restart': 'passed'}}
+        blob = Mock()
+
+        def fixture_instrument(name, *args):
+            """Fail only promotion, preserving the already-verified original media for separate recovery."""
+            if name == 'pending-promotion':
+                raise RuntimeError('pending upload unavailable')
+
+        with patch.object(campaign, 'stop'), patch.object(campaign, 'instrument', side_effect=fixture_instrument) as run:
+            campaign.post_upgrade_campaigns((), blob, facts)
+        self.assertEqual([call.args[0] for call in run.call_args_list],
+                         ['pending-promotion', 'media-corrupt', 'media-lost'])
+        self.assertIn('pending_promotion_campaign', facts['phases'])
+        self.assertNotIn('pending_promotion', facts['phases'])
+        self.assertNotIn('promoted_cold_restart', facts['phases'])
+        self.assertEqual(facts['phases']['media_corrupt_recovery'], 'passed')
+        self.assertEqual(facts['phases']['media_lost_recovery'], 'passed')
+        blob.acquisition_unavailable.clear.assert_called_once_with()
+
+    def test_post_upgrade_campaigns_reject_an_unqualified_cold_fixture(self):
+        """A missing cold-restart pass forbids both promotion and destructive disposable-file checks."""
+        with patch.object(campaign, 'instrument') as run:
+            with self.assertRaisesRegex(RuntimeError, 'require the retained cold-restart'):
+                campaign.post_upgrade_campaigns((), Mock(), {'phases': {}})
+            run.assert_not_called()
 
     def test_pass_requires_each_named_case(self):
         self.invoke(transcript([('retained', 0)]), {'retained'})
@@ -280,6 +309,63 @@ class QualificationUiTest(unittest.TestCase):
                         patch.object(ui, 'open_completed_demo') as reopen, patch.object(ui, 'focus_composer'):
                     ui.retained_chat('baseline')
                     reopen.assert_called_once_with()
+
+    def composer_window(self, field_class='android.widget.ScrollView', focused='true',
+                        bounds='[30,315][290,363]', package=preview.APP, enabled='true'):
+        """Mirror the observed empty BasicTextField: scroll semantics and a separate overlaid placeholder."""
+        return (f'<hierarchy><node enabled="{enabled}">'
+                f'<node class="{field_class}" focused="{focused}" package="{package}" '
+                f'enabled="true" bounds="{bounds}"/>'
+                '<node text="Message" enabled="true" bounds="[30,327][99,351]"/>'
+                '<node content-desc="Add attachment" enabled="true"/>'
+                '<node content-desc="Dictate text" enabled="true"/></node></hierarchy>')
+
+    def test_composer_focus_accepts_observed_scroll_semantics_but_not_unrelated_focus(self):
+        """A focused view qualifies only inside the composer, over its placeholder and in the app package."""
+        cases = [({}, True), ({'field_class': 'android.widget.EditText'}, True),
+                 ({'field_class': 'android.widget.TextView'}, False), ({'focused': 'false'}, False),
+                 ({'bounds': '[30,20][290,68]'}, False), ({'package': 'another.app'}, False),
+                 ({'enabled': 'false'}, False)]
+        for changes, expected in cases:
+            with self.subTest(changes=changes), patch.object(preview, 'adb', return_value=self.composer_window(**changes)):
+                ui = preview.PreviewUi()
+                ui.snapshot()
+                self.assertEqual(ui.focused_composer_node() is not None, expected)
+        unrelated = (f'<hierarchy><node class="android.widget.ScrollView" focused="true" package="{preview.APP}" '
+                     'bounds="[30,315][290,363]"/><node><node text="Message" enabled="true" '
+                     'bounds="[30,327][99,351]"/></node></hierarchy>')
+        with patch.object(preview, 'adb', return_value=unrelated):
+            ui = preview.PreviewUi()
+            ui.snapshot()
+            self.assertIsNone(ui.focused_composer_node())
+
+    def test_composer_focus_still_requires_a_shown_keyboard_and_retains_failure_observation(self):
+        """The corrected Compose selector must not turn focus without an IME into a passing observation."""
+        for shown in (False, True):
+            def fixture_adb(*args, **kwargs):
+                """Expose real composer geometry independently of the keyboard-visible state."""
+                if args[:2] == ('shell', 'cat'):
+                    return self.composer_window()
+                if args == ('shell', 'dumpsys', 'input_method'):
+                    return 'mInputShown=' + str(shown).lower()
+                return b'image' if kwargs.get('binary') else ''
+
+            with self.subTest(shown=shown), tempfile.TemporaryDirectory() as directory:
+                with patch.object(preview, 'REPORTS', Path(directory)), \
+                        patch.object(preview, 'adb', side_effect=fixture_adb) as command, \
+                        patch.object(preview.time, 'monotonic', side_effect=[0, 0, 31]), patch.object(preview.time, 'sleep'):
+                    ui = preview.PreviewUi()
+                    with patch.object(ui, 'click'):
+                        if shown:
+                            ui.focus_composer('baseline')
+                            command.assert_any_call('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+                        else:
+                            with self.assertRaisesRegex(RuntimeError, 'did not accept focus'):
+                                ui.focus_composer('baseline')
+                    observation = json.loads((Path(directory) / 'baseline-composer.json').read_text())
+                    self.assertTrue(observation['focused_composer'])
+                    self.assertEqual(observation['keyboard_shown'], shown)
+                    self.assertEqual((Path(directory) / 'baseline-composer.png').exists(), shown)
 
     def test_settings_requires_arrival_after_a_lost_signup_navigation_tap(self):
         """A visible original avatar and a dispatched tap do not prove that Settings opened."""

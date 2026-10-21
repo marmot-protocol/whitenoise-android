@@ -168,6 +168,33 @@ def usable_chat(name):
     raise RuntimeError(f'{name}: retained conversation did not become usable')
 
 
+def post_upgrade_campaigns(ports, blob, facts):
+    """Keep pending-upload failure separate from recovery of the already-qualified original receiver file."""
+    if facts['phases'].get('cold_restart') != 'passed':
+        raise RuntimeError('Post-upgrade campaigns require the retained cold-restart fixture')
+    try:
+        stop()
+        instrument('pending-promotion', UPGRADE, {'retainedAccountHistoryAndMedia'},
+                   (*ports, '-e', 'qualificationPhase', 'promote'))
+        facts['phases']['pending_promotion'] = 'passed'
+        stop()
+        instrument('promoted-cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
+                   (*ports, '-e', 'qualificationPhase', 'promoted-cold'))
+        facts['phases']['promoted_cold_restart'] = 'passed'
+    except (RuntimeError, subprocess.SubprocessError) as error:
+        facts['phases']['pending_promotion_campaign'] = type(error).__name__ + ': ' + str(error)
+    # This is the receiver's original 16 MiB file. Pending-upload promotion concerns the sender's separate body.
+    try:
+        blob.acquisition_unavailable.clear()
+        for damage in ('corrupt', 'lost'):
+            stop()
+            instrument('media-' + damage, UPGRADE, {'retainedAccountHistoryAndMedia'},
+                       (*ports, '-e', 'qualificationPhase', damage))
+            facts['phases']['media_' + damage + '_recovery'] = 'passed'
+    except (RuntimeError, subprocess.SubprocessError) as error:
+        facts['phases']['media_recovery_campaign'] = type(error).__name__ + ': ' + str(error)
+
+
 def main():
     """Keep upgrade phases dependent, but finish both independent recovery modes even if migration fails."""
     if os.environ.get('GITHUB_ACTIONS') != 'true' or adb('shell', 'getprop', 'ro.kernel.qemu').strip() != '1':
@@ -222,26 +249,9 @@ def main():
             facts['phases']['cold_restart'] = 'passed'
         except (RuntimeError, subprocess.SubprocessError) as error:
             facts['phases']['upgrade_campaign'] = type(error).__name__ + ': ' + str(error)
-        # Keep core upgrade/cold evidence even if the separate pending upload qualification fails.
+        # Keep independent receiver recovery evidence even if pending-upload promotion fails.
         if facts['phases'].get('cold_restart') == 'passed':
-            try:
-                stop()
-                instrument('pending-promotion', UPGRADE, {'retainedAccountHistoryAndMedia'},
-                           (*ports, '-e', 'qualificationPhase', 'promote'))
-                facts['phases']['pending_promotion'] = 'passed'
-                stop()
-                instrument('promoted-cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
-                           (*ports, '-e', 'qualificationPhase', 'promoted-cold'))
-                facts['phases']['promoted_cold_restart'] = 'passed'
-                # Only the known synthetic blob service may satisfy explicit recovery of deliberately damaged files.
-                blob.acquisition_unavailable.clear()
-                for damage in ('corrupt', 'lost'):
-                    stop()
-                    instrument('media-' + damage, UPGRADE, {'retainedAccountHistoryAndMedia'},
-                               (*ports, '-e', 'qualificationPhase', damage))
-                    facts['phases']['media_' + damage + '_recovery'] = 'passed'
-            except (RuntimeError, subprocess.SubprocessError) as error:
-                facts['phases']['pending_promotion_campaign'] = type(error).__name__ + ': ' + str(error)
+            post_upgrade_campaigns(ports, blob, facts)
         # Separate generated roots in the maintained recovery fixture do not depend on upgrade success.
         try:
             install('candidate')
