@@ -115,7 +115,10 @@ class DeletedNotificationContentCoverageTest {
             }.toList()
 
     /** Requires the fence inside the presenter's chosen callback, rather than another value in the call. */
-    private fun hasFinalWriteFence(arguments: String, callback: String): Boolean {
+    private fun hasFinalWriteFence(
+        arguments: String,
+        callback: String,
+    ): Boolean {
         val opening =
             Regex("""\b${Regex.escape(callback)}\s*=\s*\{""").find(arguments)?.range?.last ?: return false
         val body = arguments.substring(opening, matchingClose(arguments, opening, '{', '}') + 1)
