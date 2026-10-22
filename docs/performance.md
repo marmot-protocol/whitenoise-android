@@ -104,6 +104,18 @@ errors. Turn the switch off and repeat an action to confirm no new lines appear.
 White Noise controls future emission only; retention of lines already written to
 Logcat is controlled by Android/GrapheneOS.
 
+### Notification candidate admission
+
+`op=notification_post phase=notification_candidate_gate layer=android` measures
+the complete read-state gate, including bounded admission and awaiting its native
+read. It does not measure when an abandoned synchronous binding actually finishes.
+Only gates taking at least 100 ms emit this phase. Fast reads and fail-fast
+rejections do not consume the shared 256-event session budget, leaving room for
+`push_recovery` evidence during catch-up. Slow gates still share that finite cap.
+The phase contains no account, conversation, message identity or content. An absent
+phase can mean a below-threshold gate or inactive diagnostics; it does not prove
+that no candidate was checked.
+
 ### Send and attachment diagnosis
 
 `op=text_send` and `op=media_send` follow one process-local operation from the
