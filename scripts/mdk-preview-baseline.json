@@ -1,0 +1,11 @@
+{
+  "source": "132792bf8043bd2de8dd142f6844a1fd91b18096",
+  "master_source": "b3b66afefb7459e9ae9206c85c3a85627345cf2c",
+  "mdk_source": "88d1683e13a1dd60ba102d06c7b5a8acb3635590",
+  "apk_sha256": "179dd58e86ea0050dc947304633067ccf92b4ae48ea1baed21b51bfcabc7a375",
+  "native_sha256": "08cd3dc8142b9946c1d30965bfc39fd4c09977ea30bf21f7f5f13c889f6d76c7",
+  "signer_sha256": "d2d18141eb7113e67714735bdccfba21ee211082a318dba52ac3fef3b6a796a5",
+  "builder_run": 39555728064,
+  "publisher_run": 39556881642,
+  "url": "https://github.com/marmot-protocol/whitenoise-android/releases/download/android-pr-previews/whitenoise-pr-3371-baseline-132792bf8-179dd58e86ea.apk"
+}

@@ -24,6 +24,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.R
@@ -298,7 +299,10 @@ class InvitationAccountSwitchDeviceTest {
             .newWithConfiguration(
                 root.path,
                 listOf(relay),
-                MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+                MarmotOptions(
+                    relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                    deployment = marmotDeploymentWhiteNoise(),
+                ),
             ).also { it.start() }
 
     /** Drains all fixture jobs before native storage is released. */

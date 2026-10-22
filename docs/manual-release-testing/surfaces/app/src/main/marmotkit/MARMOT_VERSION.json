@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "MarmotKit snapshot 88d1683e immutable SDK pin: in-place upgrade from formal 0.13.0 with retained accounts, history, drafts and attachment bytes, replay and epoch-gap recovery fixes, typed recipient lookup failures, group-change admission, storage-parked attachments, responsive startup, signer/recovery compatibility and exact build provenance; mandatory pre-handoff populated current-runtime upgrade and independent cold-restart smokes",
+        "surface": "Testing-only MarmotKit nightly 20261021 from 8c214fee: verified immutable bytes, explicit White Noise deployment and retained keychain namespace, account migration 0113 and background legacy-body migration with native database compaction, retained-data upgrade and cold restart, attachment storage refusal and retry, existing invitation and recovery qualification; 30-day artifact retention and no downgrade",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
-        "anchor": "artifact-id=snapshot-88d1683e13a1dd60ba102d06c7b5a8acb3635590",
+        "anchor": "artifact-id=0.14.0-nightly.20261021",
         "test_ids": [
           "INT-010",
           "INT-003",

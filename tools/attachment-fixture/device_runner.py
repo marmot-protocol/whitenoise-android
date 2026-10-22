@@ -104,7 +104,7 @@ def failure_diagnostics(error, stage, adb, serial, physical):
                            if isinstance(value, str))
     statuses = (("INSTRUMENTATION_RESULT: shortMsg=Process crashed.", "process-crashed"),
                 ("Unable to find instrumentation info", "missing-instrumentation"),
-                ("error: device offline", "device-offline"),
+                ("device offline", "device-offline"),
                 (f"error: device '{serial}' not found", "device-missing"),
                 ("error: no devices/emulators found", "device-missing"),
                 ("error: closed", "transport-closed"), ("error: protocol fault", "transport-protocol-fault"),
@@ -119,6 +119,13 @@ def failure_diagnostics(error, stage, adb, serial, physical):
                 ("Unknown option", "invalid-command-option"), ("Bad component name", "invalid-component"),
                 ("am: inaccessible or not found", "activity-command-missing"))
     details["subprocess_status"] = next((status for marker, status in statuses if marker in transcript), "unknown")
+    if stage == "reverse-binding":
+        if "cannot rebind existing socket" in transcript:
+            details["subprocess_status"] = "reverse-already-bound"
+        elif "cannot bind listener" in transcript:
+            details["subprocess_status"] = (
+                "reverse-address-in-use" if "Address already in use" in transcript else
+                "reverse-permission-denied" if "Permission denied" in transcript else "reverse-bind-failed")
     details["command_exception_class"] = next((name for name in DIAGNOSTIC_EXCEPTIONS if name in transcript), "unknown")
     if stage not in ("instrumentation", "restart-instrumentation") or physical:
         return details
@@ -256,7 +263,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             started_services.append(service)
         stage = "reverse-binding"
         report["reverse_admission"] = []
-        for port in (server.server_port, relay.port):
+        for role, port in (("blob", server.server_port), ("relay", relay.port)):
+            report["reverse_binding"] = {"role": role, "owned_success_count_before_attempt": len(device_ports)}
             # Host allocation says nothing about device availability; keep the two namespaces separate.
             admission = {}
             report["reverse_admission"].append(admission)

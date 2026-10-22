@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.core.MarmotClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -35,7 +36,7 @@ class EditedChatPreviewFfiIntegrationTest {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "edit-preview-ffi-${UUID.randomUUID()}").apply { mkdirs() }
-            val native = Marmot(root.absolutePath, MarmotClient.bootstrapRelays)
+            val native = Marmot(root.absolutePath, MarmotClient.bootstrapRelays, marmotDeploymentWhiteNoise())
             var chats: ChatsController? = null
             var nativeClosed = false
             var phase = "start"
@@ -135,7 +136,7 @@ class EditedChatPreviewFfiIntegrationTest {
                     phase = "cold snapshot"
                     native.shutdownAndClose()
                     nativeClosed = true
-                    Marmot(root.absolutePath, emptyList()).use { reopened ->
+                    Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise()).use { reopened ->
                         val cold = reopened.chatList(account.label, true).single { it.groupIdHex == group }
                         assertEquals(EDITED, cold.lastMessage?.plaintext)
                         assertEquals(before.activitySortAt, cold.activitySortAt)
