@@ -125,17 +125,20 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
+import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
@@ -391,6 +394,8 @@ internal fun ComposerPill(
     onAccessoryHeightChanged: (Dp) -> Unit = {},
     onAutomaticTextMeasured: (Int, Boolean) -> Unit = { _, _ -> },
     scrollOwnerKey: Any? = null,
+    // Replaced edit sessions must retire pending trusted-system Paste callbacks too.
+    pasteTargetKey: Any? = null,
     // Compact-height viewports cannot afford the expanded control layout, whose
     // fixed header and action-row overhead consumes the whole compact composer
     // ceiling and squeezes the editor viewport to zero, so they pin the inline
@@ -601,23 +606,32 @@ internal fun ComposerPill(
                 else -> ComposerResizeStripHeight
             },
         )
-    val pasteFromClipboard: () -> Unit = {
-        val pastedText = clipboardManager?.primaryClipPlainText(context)
-        if (!pastedText.isNullOrEmpty()) {
-            val value = latestTextFieldValue
-            val start = value.selection.min.coerceIn(0, value.text.length)
-            val end = value.selection.max.coerceIn(start, value.text.length)
-            val updated = value.text.replaceRange(start, end, pastedText)
-            latestOnValueChange(
-                value.copy(
-                    text = updated,
-                    selection = TextRange(start + pastedText.length),
-                    composition = null,
-                ),
-            )
+    val tryPasteFromClipboard: () -> Boolean = {
+        try {
+            clipboardManager.withPrimaryClipForPaste { clip ->
+                // Text only; image receive-content and attachment import keep their own routes.
+                val pastedText =
+                    if (clip.description.hasMimeType("text/*")) clip.plainText(context) else null
+                if (!pastedText.isNullOrEmpty()) {
+                    val value = latestTextFieldValue
+                    val start = value.selection.min.coerceIn(0, value.text.length)
+                    val end = value.selection.max.coerceIn(start, value.text.length)
+                    latestOnValueChange(
+                        value.copy(
+                            text = value.text.replaceRange(start, end, pastedText),
+                            selection = TextRange(start + pastedText.length),
+                            composition = null,
+                        ),
+                    )
+                }
+                textToolbar.hide()
+            }
+        } catch (_: SecurityException) {
+            // A text URI can also require a platform grant during coercion.
+            false
         }
-        textToolbar.hide()
     }
+    val pasteFromClipboard: () -> Unit = { tryPasteFromClipboard() }
     val caretFollowSuspended =
         readingScrollAnchor?.matches(textFieldValue) == true
     SideEffect {
@@ -665,7 +679,8 @@ internal fun ComposerPill(
     val draftStartOffscreen by remember(composerScrollState) {
         derivedStateOf { composerScrollState.value > 0 }
     }
-    val leadingControlsWidth = if (hasAttachmentAction) 80.dp else 40.dp
+    val leadingControlsWidth = (if (hasAttachmentAction) 80.dp else 40.dp) + 48.dp
+    val compactEditorStartInset = (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
             (if (trailingAction != null) 40.dp else 0.dp)
@@ -734,7 +749,7 @@ internal fun ComposerPill(
                 }
             val compactWidthPx =
                 with(density) {
-                    (measurementWidth - (CompactEditorStartInset + compactMeasurementTrailingReserve))
+                    (measurementWidth - (compactEditorStartInset + compactMeasurementTrailingReserve))
                         .coerceAtLeast(1.dp)
                         .roundToPx()
                 }
@@ -1193,7 +1208,7 @@ internal fun ComposerPill(
                                     }.deferredPadding(
                                         start = {
                                             interpolateDp(
-                                                if (hasAttachmentAction) CompactEditorStartInset else 40.dp,
+                                                compactEditorStartInset,
                                                 EditingEditorStartInset,
                                                 editingProgress.value,
                                             )
@@ -1461,6 +1476,8 @@ internal fun ComposerPill(
                             if (textFieldValue.text.isEmpty()) {
                                 Text(
                                     stringResource(R.string.message),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1533,6 +1550,20 @@ internal fun ComposerPill(
                                             )
                                         }
                                         attachmentMenu?.invoke(attachmentAnchorBounds)
+                                    }
+                                }
+                                key(scrollOwnerKey, pasteTargetKey, inputContentVisible, inputFocusEnabled) {
+                                    SystemPasteIconButton(
+                                        onPaste = tryPasteFromClipboard,
+                                        enabled = inputContentVisible && inputFocusEnabled,
+                                        modifier = Modifier.size(48.dp).testTag("composer.paste"),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_content_paste),
+                                            contentDescription = stringResource(R.string.paste),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
+                                        )
                                     }
                                 }
                                 TextEntryEmojiAction(

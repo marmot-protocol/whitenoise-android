@@ -45,12 +45,25 @@ class FontSizeDialogScreenshotTest {
                 LocalDensity provides Density(density.density, systemScale),
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = theme != BubbleTheme.Light, amoled = theme == BubbleTheme.Amoled, fontScale = scale.factor) {
-                    FontSizeDialog(selected = scale, onSelect = {}, onDismiss = {}, theme = theme, mineArgb = null, otherArgb = null)
+                WhiteNoiseTheme(
+                    darkTheme = theme != BubbleTheme.Light,
+                    amoled = theme == BubbleTheme.Amoled,
+                    fontScale = scale.factor,
+                ) {
+                    FontSizeDialog(
+                        selected = scale,
+                        onSelect = {},
+                        onDismiss = {},
+                        theme = theme,
+                        mineArgb = null,
+                        otherArgb = null,
+                    )
                 }
             }
         }
         composeRule.onNodeWithTag("font_size.preview").assertExists()
-        composeRule.onNodeWithTag("font_size.dialog").captureRoboImage("src/test/snapshots/font_size_${scale.name}_${theme.name}.png")
+        composeRule
+            .onNodeWithTag("font_size.dialog")
+            .captureRoboImage("src/test/snapshots/font_size_${scale.name}_${theme.name}.png")
     }
 }

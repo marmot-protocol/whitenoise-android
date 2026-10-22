@@ -4580,7 +4580,10 @@ internal fun ConversationScreen(
                                         onBeforeBodyCollapse = {
                                             // Explicit collapse supersedes any deferred viewport correction.
                                             scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                                            scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), nearBottom = false)
+                                            scrollCoordinator.onUserGestureSettled(
+                                                currentScrollAnchor(),
+                                                nearBottom = false,
+                                            )
                                             currentTimelineListIndex(item.record.messageIdHex)?.let { index ->
                                                 // Preserve a visible top edge; a deep offset into a tall body
                                                 // must not survive after that content has been clipped away.
@@ -4589,15 +4592,21 @@ internal fun ConversationScreen(
                                                         it.index == index
                                                     }
                                                 val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
-                                                scrollCoordinator.settleReadingAt(
+                                                val anchor =
                                                     ConversationScrollAnchor(
                                                         messageId = item.record.messageIdHex,
                                                         itemId = item.presentationId,
                                                         listIndex = index,
                                                         pixelOffset = offset,
-                                                    ),
-                                                )
-                                                listState.requestScrollToItem(index, offset)
+                                                    )
+                                                scrollCoordinator.settleReadingAt(anchor)
+                                                val bookmark = scrollCoordinator.bookmark(anchor)
+                                                scope.launch {
+                                                    scrollCoordinator.restoreBookmark(
+                                                        bookmark,
+                                                        resolveAnchorIndex = ::resolveScrollAnchorIndex,
+                                                    )
+                                                }
                                             }
                                         },
                                         collapseLongMessages = collapseLongMessages,

@@ -61,27 +61,6 @@ class MessageActionMenuLayoutTest {
         assertEquals(listOf("showLess"), callbacks)
     }
 
-    /** Collapse is opt-in and remains beside the other reading actions without removing Copy or Reply. */
-    @Test
-    fun showLessIsPresentOnlyForAnEligibleExpandedBody() {
-        fun actions(eligible: Boolean) =
-            messageActionKinds(
-                canReply = true,
-                canEdit = false,
-                canSelect = false,
-                canSelectText = false,
-                canCopyText = true,
-                canSpeak = false,
-                canForward = false,
-                canSave = false,
-                canShowLess = eligible,
-            )
-        assertTrue(MessageActionKind.ShowLess !in actions(false))
-        assertTrue(MessageActionKind.ShowLess in actions(true))
-        assertTrue(MessageActionKind.CopyText in actions(true))
-        assertTrue(MessageActionKind.Reply in actions(true))
-    }
-
     /** The model emits the prototype's action order, not the capability-argument order. */
     @Test
     fun actionModelPreservesCapabilityOrder() {

@@ -8200,7 +8200,9 @@ class WhiteNoiseAppState private constructor(
                 } else {
                     // SharedPreferences changes its memory map even when the disk commit fails.
                     withContext(Dispatchers.IO) {
-                        runCatching { preferences.edit().putString(FONT_SCALE_KEY, durableFontScale.preferenceValue).commit() }
+                        runCatching {
+                            preferences.edit().putString(FONT_SCALE_KEY, durableFontScale.preferenceValue).commit()
+                        }
                     }
                     if (revision == fontScaleSaveRevision) fontScale = durableFontScale
                     presentTransient(R.string.font_size_save_failed)

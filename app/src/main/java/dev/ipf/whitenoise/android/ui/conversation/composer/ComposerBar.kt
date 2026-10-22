@@ -1536,6 +1536,7 @@ internal fun ComposerBar(
                             }
                         },
                         scrollOwnerKey = Triple(draftKey, draftAccountRef, draftGroupIdHex),
+                        pasteTargetKey = editingMessageId,
                         multilineControlsSuppressed = compactControlLayout,
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,

@@ -57,34 +57,24 @@ internal fun messageActionKinds(
     canInfo: Boolean = true,
     canReport: Boolean = false,
 ): List<MessageActionKind> =
-    buildList {
-        // Keep on screen leads, so in a two-column grid it always lands in the first row where it
-        // can be found without reading the whole menu.
-        if (canKeepOnScreen) add(MessageActionKind.KeepOnScreen)
-        if (canShowLess) add(MessageActionKind.ShowLess)
-        if (canEdit) add(MessageActionKind.Edit)
-        if (canSelectText) add(MessageActionKind.SelectText)
-        if (canReply) add(MessageActionKind.Reply)
-        if (canForward) add(MessageActionKind.Forward)
-        if (canShare) add(MessageActionKind.Share)
-        if (canSave) add(MessageActionKind.Save)
-        if (canCopyText) add(MessageActionKind.CopyText)
-        if (canTranslate) add(MessageActionKind.Translate)
-        if (canSpeak) add(MessageActionKind.Speak)
-        if (canSpeak && canSpeakCodeLiterally) add(MessageActionKind.SpeakCodeLiterally)
-        if (canSelect) add(MessageActionKind.Select)
-        addAll(trailingMessageActionKinds(canInfo, canReport))
-    }
-
-/** The closing actions: Info, then Report, which sits beside delete because both hand the message to someone else. */
-private fun trailingMessageActionKinds(
-    canInfo: Boolean,
-    canReport: Boolean,
-): List<MessageActionKind> =
-    buildList {
-        if (canInfo) add(MessageActionKind.Info)
-        if (canReport) add(MessageActionKind.Report)
-    }
+    // Keep on screen leads so it remains in the first row of a two-column menu.
+    listOf(
+        MessageActionKind.KeepOnScreen to canKeepOnScreen,
+        MessageActionKind.ShowLess to canShowLess,
+        MessageActionKind.Edit to canEdit,
+        MessageActionKind.SelectText to canSelectText,
+        MessageActionKind.Reply to canReply,
+        MessageActionKind.Forward to canForward,
+        MessageActionKind.Share to canShare,
+        MessageActionKind.Save to canSave,
+        MessageActionKind.CopyText to canCopyText,
+        MessageActionKind.Translate to canTranslate,
+        MessageActionKind.Speak to canSpeak,
+        MessageActionKind.SpeakCodeLiterally to (canSpeak && canSpeakCodeLiterally),
+        MessageActionKind.Select to canSelect,
+        MessageActionKind.Info to canInfo,
+        MessageActionKind.Report to canReport,
+    ).filter { (_, enabled) -> enabled }.map { (kind, _) -> kind }
 
 internal fun messageActionColumnCount(
     availableWidth: Dp,

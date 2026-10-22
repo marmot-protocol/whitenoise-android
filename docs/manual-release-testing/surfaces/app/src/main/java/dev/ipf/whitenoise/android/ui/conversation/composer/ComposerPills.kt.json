@@ -56,6 +56,14 @@
           "CON-013",
           "CON-021"
         ]
+      },
+      {
+        "surface": "Persistent composer Paste control",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "SystemPasteIconButton(",
+        "test_ids": [
+          "CON-013"
+        ]
       }
     ],
     "source_coverage": [
@@ -155,6 +163,16 @@
         "anchor": ".deferredPadding(",
         "test_ids": [
           "CON-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "action:paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "CON-013"
         ]
       }
     ]

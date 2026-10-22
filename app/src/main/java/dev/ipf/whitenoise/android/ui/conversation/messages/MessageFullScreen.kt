@@ -263,7 +263,6 @@ internal fun MessageFullScreenBody(
     onNostrProfileTap: ((String) -> Unit)?,
     onCopyMarkdownLink: (String) -> Unit,
     selectionController: ReaderTextSelectionController? = null,
-    onShowLess: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val selectionKey = remember(body, markdownDocument) { Any() }

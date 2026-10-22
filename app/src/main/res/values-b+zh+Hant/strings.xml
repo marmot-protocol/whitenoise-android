@@ -2252,7 +2252,7 @@
     <string name="profile_notifications_mute">將此人的通知靜音</string>
     <string name="profile_notifications_system">聲音和系統行為</string>
     <string name="profile_notifications_android_vibration">由 Android 設定</string>
-    <string name="profile_notification_scope_detail">適用於此帳號所有對話中此人傳送的訊息。訊息接收和未讀數量不變。</string>
+    <string name="profile_notification_scope_detail">自訂 Android 設定適用於此帳號所有對話中歸屬於此人的訊息、邀請和群組角色變更。靜音僅適用於訊息。訊息傳遞和未讀計數維持不變。</string>
     <string name="profile_notification_precedence">先套用聊天靜音和僅提及規則，再套用此人的靜音或自訂 Android 設定。使用預設設定會恢復聊天和全域設定。現有通知保留原來的管道。</string>
     <string name="profile_notification_channel_name">%1$s · 所有聊天中的訊息</string>
     <string name="destination_filter_all">所有聊天</string>
@@ -2348,4 +2348,10 @@
     <string name="search_message_content_failed">無法搜尋訊息內容。</string>
     <string name="document_save_interrupted">身分驗證中斷了此次儲存。請再次選擇「儲存」以選擇目的地。</string>
     <string name="avatar_preparation_interrupted">圖片更新已中斷。請先檢查目前的圖片，再重新選擇。</string>
+    <string name="show_less">收起</string>
+    <string name="font_size_preview">訊息預覽</string>
+    <string name="font_size_sample_received">我們在車站見面吧。下午你還方便嗎？</string>
+    <string name="font_size_sample_quote">下午在車站</string>
+    <string name="font_size_sample_sent">好，到時見！我到了就傳訊息給你。</string>
+    <string name="font_size_save_failed">無法儲存文字大小。已保留先前儲存的大小。</string>
 </resources>
