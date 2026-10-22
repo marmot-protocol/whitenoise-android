@@ -167,7 +167,9 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
             app.readCachedPublicEventCards(accounts.second.label, fixture.cardReferences),
         )
         val snapshots = NostrEventCardSnapshots()
-        snapshots.warm(fixture.records(), parseMarkdown = { app.parseMarkdownOrEmpty(it) }) { references ->
+        // The warm reads cards from parsed records, as the page's Markdown hydration produces them.
+        val hydrated = fixture.records().map { it.withMarkdownTokens(app.parseMarkdownOrEmpty(it.plaintext)) }
+        snapshots.warm(hydrated) { references ->
             app.readCachedPublicEventCards(owner, references)
         }
         val authorThrottle = PublicEventAuthorRefreshThrottle()

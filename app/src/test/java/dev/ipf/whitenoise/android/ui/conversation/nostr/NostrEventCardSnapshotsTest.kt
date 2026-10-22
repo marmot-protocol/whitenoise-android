@@ -35,11 +35,13 @@ class NostrEventCardSnapshotsTest {
             val batches = mutableListOf<List<String>>()
             val snapshots = NostrEventCardSnapshots()
 
-            snapshots.warm(records, parseMarkdown = { error("tokens are present") }) { references ->
-                batches += references
-                references.map { loaded(it) }
-            }
+            val read =
+                snapshots.warm(records) { references ->
+                    batches += references
+                    references.map { loaded(it) }
+                }
 
+            assertEquals(20, read)
             assertEquals(listOf(16, 4), batches.map { it.size })
             assertEquals(noteBech32(eventId(19)), batches.first().first())
             records.indices.forEach { index ->
@@ -48,34 +50,33 @@ class NostrEventCardSnapshotsTest {
             }
         }
 
-    /** A message whose Markdown is not hydrated yet is parsed for its references, and deleted rows are skipped. */
+    /** Only parsed messages name cards, so an unhydrated message is left to hydration, and deleted rows are skipped. */
     @Test
-    fun warmParsesUnhydratedMessagesAndSkipsDeletedOnes() =
+    fun warmReadsOnlyParsedMessagesAndSkipsDeletedOnes() =
         runTest {
             val visible = noteBech32(eventId(1))
-            val deleted = noteBech32(eventId(2))
+            val unhydrated = noteBech32(eventId(2))
+            val deleted = noteBech32(eventId(3))
             val records =
                 listOf(
-                    eventCardTimelineRecord("visible", "nostr:$visible"),
-                    eventCardTimelineRecord("deleted", "nostr:$deleted", deleted = true),
+                    eventCardTimelineRecord("visible", "nostr:$visible", contentTokens = eventCardDocument(visible)),
+                    eventCardTimelineRecord("unhydrated", "nostr:$unhydrated"),
+                    eventCardTimelineRecord(
+                        "deleted",
+                        "nostr:$deleted",
+                        contentTokens = eventCardDocument(deleted),
+                        deleted = true,
+                    ),
                     eventCardTimelineRecord("plain", "no card here"),
                 )
-            val parsed = mutableListOf<String>()
             val read = mutableListOf<String>()
             val snapshots = NostrEventCardSnapshots()
 
-            snapshots.warm(
-                records,
-                parseMarkdown = { text ->
-                    parsed += text
-                    eventCardDocument(visible)
-                },
-            ) { references ->
+            snapshots.warm(records) { references ->
                 read += references
                 references.map { loaded(it) }
             }
 
-            assertEquals(listOf("nostr:$visible"), parsed)
             assertEquals(listOf(visible), read)
         }
 
@@ -97,7 +98,7 @@ class NostrEventCardSnapshotsTest {
                     contentTokens = eventCardDocument(known, missing, failed),
                 )
 
-            snapshots.warm(listOf(record), parseMarkdown = { error("unused") }) { references ->
+            snapshots.warm(listOf(record)) { references ->
                 references.map { reference ->
                     when (reference) {
                         failed -> NostrEventCardState.Failed

@@ -6692,8 +6692,8 @@ class ConversationController(
     private val initialPresentationWarmCoordinator =
         ConversationInitialPresentationWarmCoordinator(
             scope = controllerScope,
-            budgetMillis = INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS,
-            warm = { work -> warmInitialPresentation(work) },
+            warmProfiles = { senders -> appState.warmProfilePresentationsBlocking(senders) },
+            warmEventCards = { work -> warmInitialEventCards(work) },
             onReady = { hasPreparedInitialPresentation = true },
         )
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -12760,10 +12760,16 @@ class ConversationController(
         val preparingInitialPresentation = !hasPreparedInitialPresentation
         hasPublishedAuthoritativeTimeline = true
         initialTimelineSeedActive = false
-        publishTimelinePageBeforeMarkdownHydration(appliedRecords)
+        // While the first page is prepared, its card warm owns the cache read and reuses this hydration's parse.
+        val hydratedRecords =
+            publishTimelinePageBeforeMarkdownHydration(
+                appliedRecords,
+                warmEventCards = !preparingInitialPresentation,
+            )
         clearRecoveredOlderPageFailure(priorOldestId)
         scheduleProfilePresentationWarm(
             records = appliedRecords,
+            hydratedRecords = hydratedRecords,
             markInitialPresentationReady = preparingInitialPresentation,
         )
         windowPresentationTiming.timelinePublished()
@@ -12783,6 +12789,7 @@ class ConversationController(
      */
     private fun scheduleProfilePresentationWarm(
         records: List<TimelineMessageRecordFfi>,
+        hydratedRecords: Deferred<List<TimelineMessageRecordFfi>>?,
         markInitialPresentationReady: Boolean,
     ) {
         if (!markInitialPresentationReady) return
@@ -12790,15 +12797,35 @@ class ConversationController(
             InitialPresentationWarmWork(
                 senders = initialPresentationProfileSenders(records),
                 eventCardRecords = records.filter(::mayRenderNostrEventCard),
+                hydratedRecords = hydratedRecords,
             ),
         )
     }
 
-    /** Warms sender profiles and cached event cards side by side, so neither waits for the other. */
-    private suspend fun warmInitialPresentation(work: InitialPresentationWarmWork) {
-        coroutineScope {
-            launch { warmEventCardSnapshots(work.eventCardRecords) }
-            appState.warmProfilePresentationsBlocking(work.senders)
+    /**
+     * Holds the first page for its cached event cards (#2238) and records how long the read took, so a device run
+     * can measure the cold encrypted-cache open. The line carries only a duration and a reference count.
+     */
+    private suspend fun warmInitialEventCards(work: InitialPresentationWarmWork) {
+        val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_OPEN)
+        val startedAt = SystemClock.elapsedRealtime()
+        var references: Int? = null
+        try {
+            references =
+                warmInitialEventCardSnapshots(work, eventCardSnapshots) { batch ->
+                    appState.readCachedPublicEventCards(conversationAccountRef, batch)
+                }
+        } finally {
+            val durationMs = SystemClock.elapsedRealtime() - startedAt
+            PerformanceDiagnostics.record(
+                trace,
+                PerformancePhase.EVENT_CARD_CACHE_WARM,
+                elapsedMs = durationMs,
+                durationMs = durationMs,
+                result = if (references == null) PerformanceResult.DROPPED else PerformanceResult.SUCCESS,
+                layer = PerformanceLayer.STORAGE,
+                count = references,
+            )
         }
     }
 
@@ -12809,30 +12836,40 @@ class ConversationController(
     private suspend fun warmEventCardSnapshots(records: List<TimelineMessageRecordFfi>) {
         if (records.isEmpty()) return
         runCatchingCancellable {
-            eventCardSnapshots.warm(records, appState::parseMarkdownOrEmpty) { references ->
+            eventCardSnapshots.warm(records) { references ->
                 appState.readCachedPublicEventCards(conversationAccountRef, references)
             }
         }
     }
 
-    private fun publishTimelinePageBeforeMarkdownHydration(records: List<TimelineMessageRecordFfi>) {
-        val scope = conversationScope
-        if (scope == null) {
-            publishTimelineFromIndexes()
-            return
-        }
-        publishTimelineBeforeMarkdownHydration(
-            scope = scope,
-            records = records,
-            publish = ::publishTimelineFromIndexes,
-            // Cards appear once their message's Markdown does, so their cached state is read before it applies.
-            hydrate = { pending ->
-                hydrateTimelineMarkdown(pending).also { hydrated ->
-                    warmEventCardSnapshots(hydrated.filter(::mayRenderNostrEventCard))
-                }
-            },
-            applyHydrated = ::applyHydratedTimelineMarkdown,
-        )
+    /**
+     * Publishes [records], then hydrates their Markdown, and returns that hydration's parsed records when one runs.
+     * With [warmEventCards], cards are read from MDK's cache before the hydrated rows apply. Otherwise the caller's
+     * initial warm reads them from the returned records, so the same messages are never parsed twice.
+     */
+    private fun publishTimelinePageBeforeMarkdownHydration(
+        records: List<TimelineMessageRecordFfi>,
+        warmEventCards: Boolean,
+    ): Deferred<List<TimelineMessageRecordFfi>>? {
+        val scope = conversationScope ?: return null.also { publishTimelineFromIndexes() }
+        val hydratedRecords = CompletableDeferred<List<TimelineMessageRecordFfi>>()
+        val hydration =
+            publishTimelineBeforeMarkdownHydration(
+                scope = scope,
+                records = records,
+                publish = ::publishTimelineFromIndexes,
+                // Cards appear once their message's Markdown does, so their cached state is read before it applies.
+                hydrate = { pending ->
+                    hydrateTimelineMarkdown(pending).also { hydrated ->
+                        hydratedRecords.complete(hydrated)
+                        if (warmEventCards) warmEventCardSnapshots(hydrated.filter(::mayRenderNostrEventCard))
+                    }
+                },
+                applyHydrated = ::applyHydratedTimelineMarkdown,
+            )
+        // A cancelled or failed hydration still releases the warm waiting on it, with nothing parsed.
+        hydration?.invokeOnCompletion { hydratedRecords.complete(emptyList()) }
+        return hydratedRecords.takeIf { hydration != null }
     }
 
     /** Applies live timeline changes and invalidates suspended whole-window refreshes. */

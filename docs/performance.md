@@ -48,6 +48,18 @@ complete either timing. Request/row keys remain in controller-local memory;
 only closed categories, opaque diagnostic counters and timing values are emitted
 through the existing opt-in bounded session. Projection traces are capped at 32.
 
+### First-page event cards
+
+`op=chat_open phase=event_card_cache_warm layer=storage` times the cache-only
+read that restores a conversation's previously resolved public event cards
+before its first page is shown (#2238). It is emitted only for a first page
+whose messages name `note`, `nevent` or `naddr` references. `duration_ms` covers
+the wait for that page's Markdown hydration plus the batched MDK cache read, and
+`count` is the number of references read. `result=dropped` means the read did
+not settle, either because a newer page superseded it or because it exceeded the
+one-second route budget and the cards resolved themselves after the route opened.
+A cold-start value near the budget is the encrypted-cache open, not the network.
+
 ### Conversation history pages
 
 `op=chat_history_page` covers one page of history in either direction: older,

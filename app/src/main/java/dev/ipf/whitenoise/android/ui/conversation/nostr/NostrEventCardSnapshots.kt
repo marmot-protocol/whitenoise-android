@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
-import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import dev.ipf.whitenoise.android.core.nostrEventReferences
@@ -36,16 +35,16 @@ internal class NostrEventCardSnapshots(
     }
 
     /**
-     * Reads MDK's cached projection for the cards [records] will show and keeps every hit. References already known
-     * are skipped, and a reference a resolver settled while the read ran keeps the resolver's newer state.
+     * Reads MDK's cached projection for the cards [records] will show, keeps every hit and returns how many
+     * references it read. References already known are skipped, and a reference a resolver settled while the read
+     * ran keeps the resolver's newer state. Only parsed records name cards, so the warm never parses Markdown itself.
      */
     suspend fun warm(
         records: List<TimelineMessageRecordFfi>,
-        parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
         readCached: NostrEventCacheRead,
-    ) {
+    ): Int {
         val missing =
-            nostrEventCardWarmOccurrences(records, parseMarkdown)
+            nostrEventCardWarmOccurrences(records)
                 .filter { synchronized(entries) { it.reference.stableId !in entries } }
         missing.chunked(NOSTR_EVENT_CACHE_BATCH).forEach { batch ->
             val states = readCached(batch.map(NostrEventReferenceOccurrence::authoredReference))
@@ -57,6 +56,7 @@ internal class NostrEventCardSnapshots(
                 }
             }
         }
+        return missing.size
     }
 
     /** Drops the least recently used entries beyond [capacity]. */
@@ -80,25 +80,24 @@ private fun NostrEventCardState.isSettled(): Boolean =
 
 /**
  * The card references [records] will render, newest message first, at most [MAX_CARDS_PER_MESSAGE] per message and
- * [maxReferences] overall. Only messages whose text names a bech32 event entity are considered. A message whose
- * Markdown has not been hydrated yet is parsed here, the same way hydration will parse it.
+ * [maxReferences] overall. Only messages whose text names a bech32 event entity are considered, and only through
+ * their parsed content — a message whose Markdown is not hydrated yet names nothing here, so the hydration parse is
+ * the only one.
  */
-internal suspend fun nostrEventCardWarmOccurrences(
+internal fun nostrEventCardWarmOccurrences(
     records: List<TimelineMessageRecordFfi>,
-    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     maxReferences: Int = MAX_WARM_REFERENCES,
 ): List<NostrEventReferenceOccurrence> {
     val occurrences = LinkedHashMap<String, NostrEventReferenceOccurrence>()
     val candidates =
         records
-            .filter(::mayRenderNostrEventCard)
+            .filter { mayRenderNostrEventCard(it) && it.contentTokens.blocks.isNotEmpty() }
             .sortedWith(
                 compareByDescending<TimelineMessageRecordFfi> { it.timelineAt }.thenByDescending { it.messageIdHex },
             )
     for (record in candidates) {
         if (occurrences.size >= maxReferences) break
-        val document = record.contentTokens.takeIf { it.blocks.isNotEmpty() } ?: parseMarkdown(record.plaintext)
-        nostrEventReferences(document).take(MAX_CARDS_PER_MESSAGE).forEach { occurrence ->
+        nostrEventReferences(record.contentTokens).take(MAX_CARDS_PER_MESSAGE).forEach { occurrence ->
             if (occurrences.size < maxReferences) occurrences.putIfAbsent(occurrence.reference.stableId, occurrence)
         }
     }

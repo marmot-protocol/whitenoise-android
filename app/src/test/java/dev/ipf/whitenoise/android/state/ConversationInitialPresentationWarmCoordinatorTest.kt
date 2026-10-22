@@ -3,9 +3,13 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.ui.conversation.nostr.eventCardTimelineRecord
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -21,11 +25,10 @@ class ConversationInitialPresentationWarmCoordinatorTest {
             val secondWarm = CompletableDeferred<Unit>()
             var readyCount = 0
             val coordinator =
-                ConversationInitialPresentationWarmCoordinator(
-                    scope = this,
-                    budgetMillis = 10_000L,
-                    warm = { work ->
-                        when (work.senders.single()) {
+                coordinator(
+                    profileBudgetMillis = 10_000L,
+                    warmProfiles = { senders ->
+                        when (senders.single()) {
                             "first" -> firstWarm.await()
                             "second" -> secondWarm.await()
                         }
@@ -45,18 +48,12 @@ class ConversationInitialPresentationWarmCoordinatorTest {
             assertEquals(1, readyCount)
         }
 
-    /** A slow local read releases navigation exactly at the budget. */
+    /** A slow local profile read on a page without cards releases navigation exactly at the profile budget. */
     @Test
     fun warmBudgetReleasesNavigationWhenLocalProfileReadsAreSlow() =
         runTest {
             var readyCount = 0
-            val coordinator =
-                ConversationInitialPresentationWarmCoordinator(
-                    scope = this,
-                    budgetMillis = 100L,
-                    warm = { awaitCancellation() },
-                    onReady = { readyCount += 1 },
-                )
+            val coordinator = coordinator(warmProfiles = { awaitCancellation() }, onReady = { readyCount += 1 })
 
             coordinator.prepare(InitialPresentationWarmWork(listOf("slow")))
             runCurrent()
@@ -74,13 +71,7 @@ class ConversationInitialPresentationWarmCoordinatorTest {
     fun supersededWarmCannotRestartTheTotalNavigationBudget() =
         runTest {
             var readyCount = 0
-            val coordinator =
-                ConversationInitialPresentationWarmCoordinator(
-                    scope = this,
-                    budgetMillis = 100L,
-                    warm = { awaitCancellation() },
-                    onReady = { readyCount += 1 },
-                )
+            val coordinator = coordinator(warmProfiles = { awaitCancellation() }, onReady = { readyCount += 1 })
 
             coordinator.prepare(InitialPresentationWarmWork(listOf("first")))
             runCurrent()
@@ -101,10 +92,8 @@ class ConversationInitialPresentationWarmCoordinatorTest {
             var warmed: InitialPresentationWarmWork? = null
             var readyCount = 0
             val coordinator =
-                ConversationInitialPresentationWarmCoordinator(
-                    scope = this,
-                    budgetMillis = 10_000L,
-                    warm = { work ->
+                coordinator(
+                    warmEventCards = { work ->
                         warmed = work
                         cardWarm.await()
                     },
@@ -122,6 +111,70 @@ class ConversationInitialPresentationWarmCoordinatorTest {
             assertEquals(1, readyCount)
         }
 
+    /** The profile budget expiring never cancels a card warm, which keeps the route until it settles. */
+    @Test
+    fun profileBudgetExpiryDoesNotCancelTheCardWarm() =
+        runTest {
+            var cardWarmFinishedAt: Long? = null
+            var readyAt: Long? = null
+            val coordinator =
+                coordinator(
+                    warmProfiles = { awaitCancellation() },
+                    warmEventCards = {
+                        delay(SLOW_CARD_READ_MILLIS)
+                        cardWarmFinishedAt = currentTime
+                    },
+                    onReady = { readyAt = currentTime },
+                )
+
+            coordinator.prepare(InitialPresentationWarmWork(listOf("sender"), eventCardRecords = listOf(cardRecord())))
+            advanceTimeBy(INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS + 1L)
+            runCurrent()
+            assertEquals(null, readyAt)
+            advanceTimeBy(SLOW_CARD_READ_MILLIS)
+            runCurrent()
+
+            assertEquals(SLOW_CARD_READ_MILLIS, cardWarmFinishedAt)
+            assertEquals(SLOW_CARD_READ_MILLIS, readyAt)
+        }
+
+    /** A card warm that never settles still opens the route, exactly at the card budget. */
+    @Test
+    fun cardBudgetBoundsANeverSettlingCardWarm() =
+        runTest {
+            var readyAt: Long? = null
+            val coordinator =
+                coordinator(warmEventCards = { awaitCancellation() }, onReady = { readyAt = currentTime })
+
+            coordinator.prepare(InitialPresentationWarmWork(emptyList(), eventCardRecords = listOf(cardRecord())))
+            advanceTimeBy(INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS - 1L)
+            runCurrent()
+            assertEquals(null, readyAt)
+            advanceTimeBy(1L)
+            runCurrent()
+
+            assertEquals(INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS, readyAt)
+        }
+
+    /** A coordinator over [this] test scope with the production budgets unless a test overrides them. */
+    private fun TestScope.coordinator(
+        warmProfiles: suspend (List<String>) -> Unit = {},
+        warmEventCards: suspend (InitialPresentationWarmWork) -> Unit = {},
+        onReady: () -> Unit,
+        profileBudgetMillis: Long = INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS,
+    ) = ConversationInitialPresentationWarmCoordinator(
+        scope = this as CoroutineScope,
+        warmProfiles = warmProfiles,
+        warmEventCards = warmEventCards,
+        onReady = onReady,
+        profileBudgetMillis = profileBudgetMillis,
+    )
+
     /** A timeline record whose text names an event card. */
     private fun cardRecord(): TimelineMessageRecordFfi = eventCardTimelineRecord("m", "nostr:note1example")
+
+    private companion object {
+        /** Slower than the profile budget, within the card budget. */
+        const val SLOW_CARD_READ_MILLIS = 400L
+    }
 }
