@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
@@ -76,6 +78,60 @@ class AccountWideForwardTargetsTest {
                 }
             assertEquals(listOf(RETAINED, BEYOND), result.map { it.id })
             assertSame(retained, result.first())
+        }
+
+    @Test
+    fun localRemovalWithholdsOldExtrasButPreservesRetainedRowsAndRollback() =
+        runBlocking {
+            val controller =
+                controllerWithAccountWideRead { _, _ -> listOf(presentedRow(RETAINED), presentedRow(BEYOND)) }
+            try {
+                controller.applyChatListRow(chatRow(RETAINED))
+                val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+                // Content-only updates do not invalidate the full read or evict its useful extras.
+                controller.applyChatListRow(chatRow(RETAINED).copy(manuallyMarkedUnread = true))
+                assertTrue(snapshot.hasCurrentMembership)
+                assertEquals(listOf(BEYOND), snapshot.items().map { it.id })
+
+                controller.applyChatListSubscriptionUpdate(
+                    ACCOUNT_REF,
+                    ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, RETAINED),
+                )
+                assertFalse(snapshot.hasCurrentMembership)
+                assertTrue(snapshot.items().isEmpty())
+                val surviving = chatListItemFromProjection(chatRow(BEYOND))
+                assertEquals(listOf(surviving), snapshot.chatListItems(listOf(surviving)))
+                // A restored row is live again; an obsolete snapshot still cannot republish extras.
+                controller.applyChatListRow(chatRow(RETAINED))
+                val restored = chatListItemFromProjection(chatRow(RETAINED))
+                assertEquals(listOf(restored), snapshot.chatListItems(listOf(restored)))
+                assertTrue(requireNotNull(controller.loadAccountWideForwardTargets()).hasCurrentMembership)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun membershipChangeDuringNativeReadCannotPublishItsOldRows() =
+        runBlocking {
+            lateinit var controller: ChatsController
+            controller =
+                controllerWithAccountWideRead { _, _ ->
+                    controller.applyChatListSubscriptionUpdate(
+                        ACCOUNT_REF,
+                        ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, RETAINED),
+                    )
+                    listOf(presentedRow(RETAINED), presentedRow(BEYOND))
+                }
+            try {
+                controller.applyChatListRow(chatRow(RETAINED))
+                val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+                assertFalse(snapshot.hasCurrentMembership)
+                assertTrue(snapshot.items().isEmpty())
+                assertTrue(snapshot.chatListItems(emptyList()).isEmpty())
+            } finally {
+                controller.onCleared()
+            }
         }
 
     /** A read that outlives its account binding is rejected instead of being offered under the next account. */

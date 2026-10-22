@@ -4349,9 +4349,11 @@ class ChatsController private constructor(
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
             if (!optimistic) finishRemovedChatRowClientState(removedRow.groupIdHex)
-            noteMaterializedGroupMembershipChanged()
-            scheduleRecompute()
         }
+        // Off-window rows can still belong to a mounted full-list read. Every removal invalidates
+        // those extras and schedules its replacement, even when this bounded window held no row.
+        noteMaterializedGroupMembershipChanged()
+        scheduleRecompute()
     }
 
     private fun finishRemovedChatRowClientState(groupIdHex: String) {
@@ -4378,6 +4380,16 @@ class ChatsController private constructor(
         }
         noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
+    }
+
+    /** Full native reads wait for admitted local removals and reject a superseding runtime. */
+    internal suspend fun readAfterRemovals(read: suspend () -> List<PresentedChatRowFfi>?): List<PresentedChatRowFfi>? {
+        val runtime = appState.runtimeGeneration
+        val rows =
+            appState.localGroupDeleteCleanupMutex.withLock {
+                if (appState.runtimeGeneration != runtime) null else read()
+            }
+        return rows.takeIf { appState.runtimeGeneration == runtime }
     }
 
     private fun noteMaterializedGroupMembershipChanged() {
@@ -4910,8 +4922,7 @@ class ChatsController private constructor(
                 chatListDepartureIsCurrent(account, epoch, runtime) && appState.retainedAccountReactivationRef == null
             }
             if (!isCurrent()) return@let false
-            val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-            removeChatRow(groupIdHex, optimistic = true)
+            var removedSnapshot: RemovedChatRowSnapshot? = null
             var nativeCommitted = false
             val wipe =
                 runCatching {
@@ -4919,6 +4930,10 @@ class ChatsController private constructor(
                         LocalGroupRemovalRequest(account, groupIdHex, forgetProtocol),
                         isCurrent,
                         observer.readinessBudget,
+                        onAdmitted = {
+                            removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
+                            removeChatRow(groupIdHex, optimistic = true)
+                        },
                     ) {
                         nativeCommitted = true
                         if (isCurrent()) observer.onNativeCommitted()

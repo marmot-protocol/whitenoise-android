@@ -22,6 +22,8 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
@@ -289,6 +291,118 @@ class ChatsScreenFolderSelectionRecompositionTest {
                 replacement.complete(emptyList())
                 controller.onCleared()
             }
+        }
+    }
+
+    @Test fun localRemovalNeverReappearsDuringDelayedOrFailedUnreadRefresh() {
+        val appState = testAppState()
+        val replacement = CompletableDeferred<List<dev.ipf.marmotkit.PresentedChatRowFfi>>()
+        val deleted = "d1".repeat(32)
+        val surviving = "d2".repeat(32)
+        val native =
+            listOf(deleted, surviving).map { id ->
+                presentedRow(id).let { it.copy(row = it.row.copy(manuallyMarkedUnread = true)) }
+            }
+        var reads = 0
+        appState.liveSubscriptionOverrides.chatList =
+            ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> error("not used") },
+                openChats = { _, _ -> error("not used") },
+                presentedChatList = { _, _ ->
+                    reads++
+                    if (reads == 1) native else replacement.await()
+                },
+            )
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        try {
+            native.forEach { controller.applyChatListRow(it.row) }
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            composeRule.setContent {
+                WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
+            }
+            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.waitUntil { reads == 1 }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chat.row.$deleted").assertExists()
+            composeRule.onNodeWithTag("chat.row.$surviving").assertExists()
+            composeRule.runOnIdle {
+                controller.applyChatListSubscriptionUpdate(
+                    ACCOUNT_REF,
+                    ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, deleted),
+                )
+                assertFalse(controller.containsGroup(deleted))
+            }
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            composeRule.waitUntil { reads >= 2 }
+            composeRule.onNodeWithTag("chat.row.$deleted").assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.row.$surviving").assertExists()
+            composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
+            composeRule.runOnIdle { replacement.completeExceptionally(IllegalStateException("read failed")) }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chat.row.$deleted").assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.row.$surviving").assertExists()
+            composeRule.onNodeWithText(context.getString(R.string.pull_unread_retry)).assertExists()
+        } finally {
+            composeRule.runOnIdle {
+                replacement.complete(emptyList())
+                controller.onCleared()
+            }
+        }
+    }
+
+    @Test fun openingSearchRestoresAllChatsInTheSelectedFolder() {
+        val appState = testAppState()
+        val unread = "d1".repeat(32)
+        val read = "d2".repeat(32)
+        val outside = "d3".repeat(32)
+        val native =
+            listOf(unread, read, outside).map { id ->
+                presentedRow(id).let { it.copy(row = it.row.copy(manuallyMarkedUnread = id == unread)) }
+            }
+        appState.liveSubscriptionOverrides.chatList =
+            ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> error("not used") },
+                openChats = { _, _ -> error("not used") },
+                presentedChatList = { _, _ -> native },
+            )
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        try {
+            native.forEach { controller.applyChatListRow(it.row) }
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            val folder = appState.chatFolderPreferences.createFolder(ACCOUNT_REF, "Work")!!
+            listOf(unread, read).forEach {
+                appState.chatFolderPreferences.setChatInFolder(ACCOUNT_REF, folder.id, it, true)
+            }
+            var search by mutableStateOf(GlobalSearchState())
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    ChatsScreen(
+                        appState,
+                        controller,
+                        {},
+                        { _, _, _, _ -> },
+                        selectedFolderId = folder.id,
+                        globalSearchState = search,
+                        onGlobalSearchStateChange = { transform -> search = transform(search) },
+                    )
+                }
+            }
+            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chat.row.$unread").assertExists()
+            composeRule.onNodeWithTag("chat.row.$read").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.chat_list_search_open)).performClick()
+            composeRule.onNodeWithTag("chats.searchField").assertExists()
+            composeRule.onNodeWithTag("chat.row.$read").assertExists()
+            composeRule.onNodeWithTag("chat.row.$outside").assertDoesNotExist()
+            composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+            composeRule.onNodeWithTag("chats.searchField").assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.row.$unread").assertExists()
+            composeRule.onNodeWithTag("chat.row.$read").assertExists()
+            composeRule.onNodeWithTag("chat.row.$outside").assertDoesNotExist()
+            composeRule.onNodeWithText(context.getString(R.string.pull_unread_show_all)).assertDoesNotExist()
+        } finally {
+            composeRule.runOnIdle { controller.onCleared() }
         }
     }
 

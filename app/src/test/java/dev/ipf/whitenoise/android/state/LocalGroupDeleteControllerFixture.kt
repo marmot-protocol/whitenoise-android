@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.startCoroutine
 
 internal const val LOCAL_DELETE_ACCOUNT = "local-delete-account"
 internal val LOCAL_DELETE_ACCOUNT_ID = "a1".repeat(32)
@@ -41,10 +42,13 @@ internal fun TestScope.localGroupDeleteFixture(
     controllers: MutableList<ChatsController>,
     failing: String? = null,
     onRowRead: () -> Unit = {},
+    beforeDelete: suspend () -> Unit = {},
+    configureState: (WhiteNoiseAppState, AtomicBoolean) -> Unit = { _, _ -> },
 ): LocalGroupDeleteFixture {
     val calls = ConcurrentLinkedQueue<String>()
     val failureMethod = AtomicReference(failing)
-    val native = localDeleteNative(calls, AtomicBoolean(true), failureMethod, onRowRead)
+    val present = AtomicBoolean(true)
+    val native = localDeleteNative(calls, present, failureMethod, onRowRead, beforeDelete)
     val context = ApplicationProvider.getApplicationContext<Context>()
     val fixtureAccount = AccountSummaryFfi(LOCAL_DELETE_ACCOUNT, LOCAL_DELETE_ACCOUNT_ID, true, false, false, true)
     val state =
@@ -58,6 +62,7 @@ internal fun TestScope.localGroupDeleteFixture(
             // Share the virtual readiness deadline's clock instead of racing real IO dispatch.
             marmotIoDispatcher = StandardTestDispatcher(testScheduler),
         )
+    configureState(state, present)
     val controller = ChatsController(state, LOCAL_DELETE_ACCOUNT) { _, _ -> emptyList() }
     controllers += controller
     controller.setChatListVisible(false)
@@ -82,6 +87,7 @@ private fun localDeleteNative(
     present: AtomicBoolean,
     failing: AtomicReference<String?>,
     onRowRead: () -> Unit,
+    beforeDelete: suspend () -> Unit,
 ): MarmotInterface =
     Proxy.newProxyInstance(
         MarmotInterface::class.java.classLoader,
@@ -106,8 +112,14 @@ private fun localDeleteNative(
             "listMedia" -> emptyList<Any>()
             "catchUpAccounts" -> Unit
             "deleteGroupLocal", "forgetGroupLocal" -> {
-                present.set(false)
-                true
+                val operation: suspend () -> Boolean = {
+                    beforeDelete()
+                    present.set(false)
+                    true
+                }
+                @Suppress("UNCHECKED_CAST")
+                operation.startCoroutine(arguments!!.last() as Continuation<Boolean>)
+                COROUTINE_SUSPENDED
             }
             "selectedMessageDraft", "clearMessageDraftIfRevision" ->
                 SelectedMessageDraftFfi(draftRevisionStub(), null)

@@ -42,11 +42,21 @@ internal suspend fun ChatsController.readAccountWideForwardTargets(): AccountWid
     val read = liveSubscriptions.presentedChatList
     if (account == null || read == null) return AccountWideRead.Unavailable
     val epoch = bindEpoch
-    val result = runCatchingCancellable { read(account, true) }
+    val membershipRevision = materializedGroupsRevision
+    val result =
+        runCatchingCancellable {
+            readAfterRemovals {
+                if (!isActiveBindEpoch(epoch) || accountRef != account) null else read(account, true)
+            }
+        }
     return when {
         !isActiveBindEpoch(epoch) || accountRef != account -> AccountWideRead.Unavailable
         result.isFailure -> AccountWideRead.Failed
-        else -> AccountWideRead.Loaded(AccountWideForwardTargets(this, epoch, result.getOrThrow()))
+        result.getOrThrow() == null -> AccountWideRead.Unavailable
+        else ->
+            AccountWideRead.Loaded(
+                AccountWideForwardTargets(this, epoch, checkNotNull(result.getOrThrow()), membershipRevision),
+            )
     }
 }
 
@@ -59,13 +69,18 @@ internal class AccountWideForwardTargets(
     private val controller: ChatsController,
     private val epoch: Long,
     private val presented: List<PresentedChatRowFfi>,
+    private val membershipRevision: Long,
 ) {
     /** A successful read stops proving completeness when its controller is rebound or cleared. */
     val isCurrent: Boolean get() = controller.isActiveBindEpoch(epoch)
 
+    /** A window membership change invalidates old extras, including locally deleted conversations. */
+    val hasCurrentMembership: Boolean
+        get() = isCurrent && controller.materializedGroupsRevision == membershipRevision
+
     /** Rejects expired bindings and prefers the current retained window over the account-wide snapshot. */
     fun items(): List<ChatListItem> {
-        if (!isCurrent) return emptyList()
+        if (!hasCurrentMembership) return emptyList()
         val accountId = controller.boundAccountIdHex()
         return presented
             .filterNot { controller.containsGroup(it.row.groupIdHex) }
@@ -79,6 +94,9 @@ internal class AccountWideForwardTargets(
         draftedAtSeconds: (ChatListItem) -> ULong? = { null },
     ): List<ChatListItem> {
         if (!isCurrent) return emptyList()
+        // Keep the live window useful while a replacement read is pending or has failed. An old
+        // off-window row cannot distinguish window eviction from deletion, so withhold all extras.
+        if (!hasCurrentMembership) return sortChatListItems(retained, draftedAtSeconds)
         val retainedIds = retained.mapTo(hashSetOf()) { it.foldedId }
         val accountId = controller.boundAccountIdHex()
         return sortChatListItems(

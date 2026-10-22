@@ -266,7 +266,7 @@ internal fun ChatsScreen(
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
     // The complete native snapshot exists only while this temporary view is open.
     var unreadPullProgress by remember { mutableFloatStateOf(0f) }
-    var unreadOnly by remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId) {
+    var unreadOnly by remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
         mutableStateOf(false)
     }
     var unreadSnapshot by remember(controller, selectedFolderId) { mutableStateOf<AccountWideForwardTargets?>(null) }
@@ -275,7 +275,14 @@ internal fun ChatsScreen(
     var unreadLoadedRevision by remember(controller, selectedFolderId) { mutableLongStateOf(-1L) }
     var unreadLoadedFolderState by remember(controller, selectedFolderId) { mutableStateOf(folderStoreState) }
     val unreadRevision = controller.forwardTargetsRevision
-    LaunchedEffect(controller, unreadOnly, unreadRevision, unreadRetry, folderStoreState) {
+    LaunchedEffect(
+        controller,
+        unreadOnly,
+        unreadRevision,
+        controller.materializedGroupsRevision,
+        unreadRetry,
+        folderStoreState,
+    ) {
         if (!unreadOnly) unreadSnapshot = null
         unreadReadFailed = false
         if (unreadOnly) {
@@ -310,7 +317,9 @@ internal fun ChatsScreen(
     }
     val currentUnreadSnapshot =
         unreadSnapshot?.takeIf {
-            unreadLoadedRevision == unreadRevision && unreadLoadedFolderState == folderStoreState && it.isCurrent
+            unreadLoadedRevision == unreadRevision &&
+                unreadLoadedFolderState == folderStoreState &&
+                it.hasCurrentMembership
         }
     // A row revision invalidates completeness, while the same scope may keep useful rows during refresh.
     val displayUnreadSnapshot = unreadSnapshot?.takeIf { unreadLoadedFolderState == folderStoreState && it.isCurrent }
@@ -321,6 +330,7 @@ internal fun ChatsScreen(
             controller.items,
             controller.archivedItems,
             unreadRevision,
+            controller.materializedGroupsRevision,
         ) {
             if (unreadOnly) {
                 displayUnreadSnapshot?.chatListItems(controller.items + controller.archivedItems) { item ->
