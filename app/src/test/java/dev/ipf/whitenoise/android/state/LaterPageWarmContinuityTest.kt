@@ -8,6 +8,8 @@ import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.E
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.LOADED
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.NOTE
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.READ_BLOCK_SECONDS
+import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.SECOND_EVENT_ID
+import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.SECOND_NOTE
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.describe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -138,6 +140,51 @@ class LaterPageWarmContinuityTest {
                 assertTrue("the send vanished in $order", PENDING_ID in order || ECHO_ID in order)
             }
             assertEquals(listOf(NEW_A_ID, FAR_CARD_ID, ECHO_ID), timelineMessageIds(fixture.controller))
+        } finally {
+            read.countDown()
+            fixture.close()
+        }
+    }
+
+    /**
+     * A newer window is installed while an older page's cards are read, carrying a second previously resolved card the
+     * older page did not have. The newer window is what gets committed, so its card is read too within the same budget,
+     * and both cards first compose Loaded.
+     */
+    @Test
+    fun newerWindowInstalledDuringTheReadHasItsCardsReadToo() {
+        val read = CountDownLatch(1)
+        val newest = timelineRecord(NEW_A_ID, 3uL, plaintext = "plain newest")
+        val olderCard = timelineRecord(FAR_CARD_ID, 1uL, plaintext = "nostr:$NOTE")
+        val newerCard = timelineRecord(TARGET_ID, 2uL, plaintext = "nostr:$SECOND_NOTE")
+        val fixture =
+            EventCardConversationFixture(
+                composeRule = composeRule,
+                snapshotPage = timelinePage(newest).copy(hasMoreBefore = true),
+                backwardsPage = timelinePage(olderCard, newest),
+                cacheRead = { read.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) },
+            )
+        try {
+            fixture.compose()
+            fixture.awaitIdleCondition { fixture.controller.hasPreparedInitialPresentation }
+            var advanced: Boolean? = null
+            navigationScope.launch { advanced = fixture.controller.loadOlderTimelinePage() }
+            fixture.awaitIdleCondition { fixture.cacheReads.get() >= 1 }
+            fixture.timelineScript.installedWindow =
+                InstalledConversationWindow(
+                    page = timelinePage(olderCard, newerCard, newest),
+                    frame = MarmotWindowTestFakes.conversationFrame("Timeline group"),
+                )
+
+            read.countDown()
+            fixture.awaitIdleCondition { advanced != null && fixture.composed.size >= 2 }
+
+            assertEquals(listOf(FAR_CARD_ID, TARGET_ID, NEW_A_ID), timelineMessageIds(fixture.controller))
+            assertEquals(
+                "no card composes Loading first",
+                setOf("$LOADED $EVENT_ID", "$LOADED $SECOND_EVENT_ID"),
+                fixture.composed.map(::describe).toSet(),
+            )
         } finally {
             read.countDown()
             fixture.close()

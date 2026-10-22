@@ -34,7 +34,9 @@ import org.json.JSONObject
 import org.robolectric.Shadows.shadowOf
 import java.lang.reflect.Proxy
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -130,6 +132,21 @@ internal class EventCardConversationFixture(
         composeRule.waitForIdle()
     }
 
+    /**
+     * Occupies every thread of the shared binding IO pool with bulk work that runs until [release] opens, as page
+     * hydration, prefetch and window commands can while the reader scrolls.
+     */
+    fun occupyBindingThreads(release: CountDownLatch) {
+        val started = CountDownLatch(NATIVE_THREADS)
+        repeat(NATIVE_THREADS) {
+            nativeExecutor.execute {
+                started.countDown()
+                release.await(BULK_WORK_SECONDS, TimeUnit.SECONDS)
+            }
+        }
+        check(started.await(BULK_WORK_SECONDS, TimeUnit.SECONDS)) { "bulk work never started" }
+    }
+
     /** Releases the controller, its scripted window and its native threads. */
     fun close() {
         controller.onCleared()
@@ -163,6 +180,10 @@ internal class EventCardConversationFixture(
     companion object {
         val EVENT_ID = "a".repeat(64)
         val NOTE = noteBech32(EVENT_ID)
+
+        /** A second previously resolved card, for a window that names one the first read did not. */
+        val SECOND_EVENT_ID = "b".repeat(64)
+        val SECOND_NOTE = noteBech32(SECOND_EVENT_ID)
         const val CACHED_CONTENT = "Seen before"
         const val LOADING = "Loading"
         const val LOADED = "Loaded"
@@ -172,6 +193,7 @@ internal class EventCardConversationFixture(
         const val READ_BLOCK_SECONDS = 10L
         private const val WAIT_MILLIS = 10_000L
         private const val NATIVE_THREADS = 4
+        private const val BULK_WORK_SECONDS = 120L
 
         /** The card a recorded state draws, by its visible text. */
         fun describe(state: NostrEventCardState): String =
@@ -182,7 +204,12 @@ internal class EventCardConversationFixture(
             }
 
         /** MDK's parse of [text]: the card reference when it names the note, otherwise nothing structured. */
-        private fun parsedNote(text: String) = if (NOTE in text) eventCardDocument(NOTE) else EMPTY_MARKDOWN_DOCUMENT
+        private fun parsedNote(text: String) =
+            when {
+                NOTE in text -> eventCardDocument(NOTE)
+                SECOND_NOTE in text -> eventCardDocument(SECOND_NOTE)
+                else -> EMPTY_MARKDOWN_DOCUMENT
+            }
 
         /** MDK's cached projection of the card, present and verified. */
         private fun cachedCardPreview(reference: String) =
@@ -191,7 +218,7 @@ internal class EventCardConversationFixture(
                 state = PublicEventPreviewStateFfi.PRESENT,
                 eventJson =
                     JSONObject()
-                        .put("id", EVENT_ID)
+                        .put("id", if (reference == SECOND_NOTE) SECOND_EVENT_ID else EVENT_ID)
                         .put("pubkey", "c".repeat(64))
                         .put("created_at", 1)
                         .put("kind", 1)

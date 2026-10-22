@@ -151,6 +151,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
@@ -12900,63 +12901,126 @@ class ConversationController(
     }
 
     /**
-     * Reads the cached event cards of [page]'s rows that are not on screen yet and may render one, before the page is
-     * applied (#2238), and returns [page] with those rows' Markdown parsed, so the commit installs that one parse and
-     * every card first composes complete. The first page has its own hold and is returned as is, and so is a page with
-     * no such row, at no cost.
+     * Reads the cached event cards of the rows that will be applied and are not on screen yet, before they are (#2238),
+     * and returns the window to apply with those rows' Markdown parsed, so the commit installs that one parse and every
+     * card first composes complete. The window is the subscription's newest installed one, else [page], since that is
+     * what [applyTimelinePage] commits. A newer window installed while the read runs has its new card rows read too,
+     * within what is left of the same budget. The first page has its own hold and is returned as is, and so is a
+     * window with no such row, at no cost.
      *
      * The parse and the cache read ride the binding IO hop, so the caller only suspends. Past
-     * [LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS], or when the read fails, the page is returned with whatever was parsed
-     * and its cards resolve themselves as before. Callers run this before their `TIMELINE_APPLY` timing starts.
+     * [LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS] in all, or when a read fails, the window is returned with whatever
+     * was parsed and its other cards resolve themselves as before. Callers run this before their `TIMELINE_APPLY`
+     * timing starts.
      */
     internal suspend fun warmLaterPageEventCards(page: TimelinePageFfi): TimelinePageFfi {
-        val candidates =
-            withContext(Dispatchers.Main.immediate) {
+        val scope = conversationScope ?: return page
+        val startedAt = SystemClock.elapsedRealtime()
+        val read = HashSet<String>()
+        val parsed = mutableListOf<TimelineMessageRecordFfi>()
+        var target = page
+        var reading = true
+        while (reading) {
+            val (window, candidates) = laterPageCardCandidates(page, read)
+            target = window
+            val remaining = LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS - (SystemClock.elapsedRealtime() - startedAt)
+            candidates.mapTo(read, TimelineMessageRecordFfi::messageIdHex)
+            val warmed =
+                candidates
+                    .takeIf { it.isNotEmpty() && remaining > 0L }
+                    ?.let { readLaterPageEventCards(scope, it, remaining) }
+            // Read again only when this read settled: a newer window may have been installed meanwhile.
+            reading = warmed != null
+            warmed?.let(parsed::addAll)
+        }
+        return if (read.isEmpty()) page else target.withParsedRecords(parsed)
+    }
+
+    /**
+     * The window [applyTimelinePage] would commit now — the newest installed one, else [page] — with its rows that may
+     * render a card, are not on screen and are not among [read]. None before the first page is prepared.
+     */
+    private suspend fun laterPageCardCandidates(
+        page: TimelinePageFfi,
+        read: Set<String>,
+    ): Pair<TimelinePageFfi, List<TimelineMessageRecordFfi>> =
+        withContext(Dispatchers.Main.immediate) {
+            val window = timelineSubscription?.latestInstalledWindow()?.page ?: page
+            val candidates =
                 if (!hasPreparedInitialPresentation) {
                     emptyList()
                 } else {
-                    page.messages.filter { mayRenderNostrEventCard(it) && it.messageIdHex !in timelineRecords }
+                    window.messages.filter { record ->
+                        val id = record.messageIdHex
+                        mayRenderNostrEventCard(record) && id !in timelineRecords && id !in read
+                    }
                 }
-            }
-        val scope = conversationScope
-        if (candidates.isEmpty() || scope == null) return page
+            window to candidates
+        }
+
+    /**
+     * Parses [candidates] once and reads their cached cards in its own job on the event-card read lane, so the whole
+     * read takes one main-thread turn to resume, never queues behind bulk binding work, and [budgetMillis] can give up
+     * on a binding call that never returns instead of waiting it out. Returns the parsed rows, or null past the budget
+     * or on failure. Each read is recorded once it ends, past the budget too, with how long its binding work took.
+     */
+    private suspend fun readLaterPageEventCards(
+        scope: CoroutineScope,
+        candidates: List<TimelineMessageRecordFfi>,
+        budgetMillis: Long,
+    ): List<TimelineMessageRecordFfi>? {
         val startedAt = SystemClock.elapsedRealtime()
-        // Its own job, so the budget can give up on a binding call that never returns instead of waiting it out.
+        val laneMillis = AtomicLong(-1L)
+        val accountRef = conversationAccountRef
         val warm =
             scope.async {
                 // Never fails the session's scope: a failed parse or read only leaves the cards to resolve themselves.
                 runCatchingCancellable {
-                    hydrateTimelineMarkdown(candidates).also { parsed ->
+                    onEventCardReadLane {
+                        val laneStartedAt = SystemClock.elapsedRealtime()
+                        val parsed =
+                            candidates.map { record ->
+                                val document = appState.parseMarkdownOrEmpty(record.plaintext)
+                                if (document.blocks.isEmpty()) record else record.withMarkdownTokens(document)
+                            }
                         eventCardSnapshots.warm(parsed) { references ->
-                            appState.readCachedPublicEventCards(conversationAccountRef, references)
+                            appState.readCachedPublicEventCards(accountRef, references)
                         }
+                        laneMillis.set(SystemClock.elapsedRealtime() - laneStartedAt)
+                        parsed
                     }
                 }.getOrNull()
             }
-        var parsed: List<TimelineMessageRecordFfi>? = null
-        try {
-            parsed = withTimeoutOrNull(LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS) { warm.await() }
-        } finally {
-            if (!warm.isCompleted) warm.cancel()
-            recordLaterPageEventCardWarm(SystemClock.elapsedRealtime() - startedAt, candidates.size, parsed != null)
+        val parsed = withTimeoutOrNull(budgetMillis) { warm.await() }
+        if (parsed != null) {
+            recordLaterPageEventCardWarm(startedAt, laneMillis.get(), candidates.size, settled = true)
+        } else {
+            warm.cancel()
+            // The lane's binding call cannot be interrupted, so its time is recorded when it does return.
+            warm.invokeOnCompletion {
+                recordLaterPageEventCardWarm(startedAt, laneMillis.get(), candidates.size, settled = false)
+            }
         }
-        return parsed?.let(page::withParsedRecords) ?: page
+        return parsed
     }
 
     /**
-     * Records one later-page card read as `op=chat_history_page phase=event_card_page_warm`: its duration, the number
-     * of rows it covered and whether it settled within the budget, never an id, text or reference.
+     * Records one later-page card read as `op=chat_history_page phase=event_card_page_warm layer=storage`:
+     * `elapsed_ms` from the read's start to its end as seen by the caller, `duration_ms` the binding work on the card
+     * lane (parse and cache reads, or 0 if it never ran), the rows it covered, and whether it settled within the
+     * budget. Their difference is time spent waiting for a thread or the main thread. Never an id, text or reference.
      */
     private fun recordLaterPageEventCardWarm(
-        durationMs: Long,
+        startedAt: Long,
+        laneMillis: Long,
         rows: Int,
         settled: Boolean,
     ) {
         PerformanceDiagnostics.record(
             PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE),
             PerformancePhase.EVENT_CARD_PAGE_WARM,
-            elapsedMs = durationMs.coerceAtLeast(0L),
-            durationMs = durationMs.coerceAtLeast(0L),
+            elapsedMs = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
+            durationMs = laneMillis.coerceAtLeast(0L),
             result = if (settled) PerformanceResult.SUCCESS else PerformanceResult.DROPPED,
             layer = PerformanceLayer.STORAGE,
             count = rows,

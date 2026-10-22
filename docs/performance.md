@@ -72,19 +72,30 @@ publishes once with those cards complete. Nothing is hidden or held: until the
 read settles the transcript simply shows what it showed before, so a far jump
 keeps the previous messages rather than a blank list, and an optimistic send
 stays on screen. The rows' Markdown is parsed once, for both the card read and
-the commit. A page without such rows is applied at once, as before.
+the commit. The rows read are those of the window that will be committed: the
+subscription's newest installed window, and if a newer one is installed while
+the read runs, its new card rows are read too, within what is left of the same
+budget. A page without such rows is applied at once, as before.
 
 `op=chat_history_page phase=event_card_page_warm layer=storage` records one
-such read: `duration_ms` covers the parse and the batched MDK cache read,
-`count` is the number of rows read for, and `result=dropped` means the read did
-not settle within the one-second card budget, or failed, after which the page
-was applied anyway and each card resolved itself. The read runs before the
-`TIMELINE_APPLY` host timing starts, so that timing stays the apply alone, and
-outside the paging lock, except for a visible-row report and the anchor before
-an older page, which already run under it: their read happens only when the
-re-centred window brings card rows not on screen, typically 23 to 36 ms on a
-Pixel 9a and at most the budget. Live windows arriving meanwhile queue behind
-the one being read, as they queue behind any apply.
+such read. `duration_ms` is the binding work alone: the parse and the batched
+MDK cache reads, run back to back on a dedicated card-read lane of two IO
+threads, so they never queue behind bulk binding work (page hydration,
+prefetch, window commands) on the shared IO pool, and never return to the main
+thread between steps. `elapsed_ms` runs from the read's start until the caller
+has its result, so `elapsed_ms - duration_ms` is time spent waiting for a lane
+thread and for the main thread to resume the page. `count` is the number of
+rows read for. `result=dropped` means the read did not settle within the
+one-second card budget, or failed, after which the page was applied anyway and
+each card resolved itself; a dropped read is still recorded once its binding
+call returns, so its `duration_ms` shows how long the binding work really took.
+The read runs before the `TIMELINE_APPLY` host timing starts, so that timing
+stays the apply alone, and outside the paging lock, except for a visible-row
+report and the anchor before an older page, which already run under it: their
+read happens only when the re-centred window brings card rows not on screen,
+typically 23 to 36 ms on a Pixel 9a and at most the budget. Live windows
+arriving meanwhile queue behind the one being read, as they queue behind any
+apply.
 
 ### Conversation history pages
 

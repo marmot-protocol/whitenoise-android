@@ -190,6 +190,31 @@ class LaterPageEventCardFirstFrameTest {
         }
     }
 
+    /**
+     * While every thread of the shared binding IO pool is busy with bulk work, an older page's card is still read on
+     * the card lane well within the budget, so the page is applied with its card composed Loaded on its first frame.
+     */
+    @Test
+    fun olderPageCardIsReadWhileBindingThreadsAreBusy() {
+        val bulkWork = CountDownLatch(1)
+        val fixture = pagedConversation(cacheRead = {})
+        try {
+            fixture.compose()
+            fixture.awaitIdleCondition { fixture.controller.hasPreparedInitialPresentation }
+            fixture.occupyBindingThreads(bulkWork)
+            var advanced: Boolean? = null
+            pagingScope.launch { advanced = fixture.controller.loadOlderTimelinePage() }
+
+            fixture.awaitIdleCondition { advanced != null && fixture.composed.isNotEmpty() }
+
+            assertEquals(true, advanced)
+            assertEquals(listOf("$LOADED $EVENT_ID"), fixture.composed.map(::describe).distinct())
+        } finally {
+            bulkWork.countDown()
+            fixture.close()
+        }
+    }
+
     /** An older page that names no card publishes every row at once and never reads the card cache. */
     @Test
     fun olderPageWithoutCardsPublishesAtOnce() {
