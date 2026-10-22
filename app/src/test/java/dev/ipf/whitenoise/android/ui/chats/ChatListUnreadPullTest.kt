@@ -46,23 +46,47 @@ class ChatListUnreadPullTest {
 
     @Test fun pullBeginningAwayFromTopCannotArmWhenTopIsReached() {
         var atTop = false
+        val sampledTopStates = mutableListOf<Boolean>()
         var activations = 0
         rule.setContent {
             Box(
                 Modifier
                     .size(300.dp)
                     .testTag("list")
-                    .chatListUnreadPull(true, { atTop }, 72f) { activations++ },
+                    .chatListUnreadPull(true, {
+                        sampledTopStates += atTop
+                        atTop
+                    }, 72f) { activations++ },
             )
         }
+        // performTouchInput queues its events until the block returns. Flush the initial down
+        // before changing the viewport, so the recognizer really observes a gesture below the top.
         rule.onNodeWithTag("list").performTouchInput {
             down(Offset(100f, 20f))
             moveTo(Offset(100f, 50f))
+        }
+        rule.runOnIdle {
+            assertEquals(listOf(false), sampledTopStates)
             atTop = true
+        }
+        rule.onNodeWithTag("list").performTouchInput {
             moveTo(Offset(100f, 180f))
             up()
         }
-        assertEquals(0, activations)
+        rule.runOnIdle {
+            assertEquals(0, activations)
+            assertEquals(listOf(false), sampledTopStates)
+        }
+        // A fresh gesture may use the new viewport, but the preceding held gesture could not rearm.
+        rule.onNodeWithTag("list").performTouchInput {
+            down(Offset(100f, 20f))
+            moveTo(Offset(100f, 180f))
+            up()
+        }
+        rule.runOnIdle {
+            assertEquals(listOf(false, true), sampledTopStates)
+            assertEquals(1, activations)
+        }
     }
 
     @Test fun topPullWorksWithRealScrollableList() {

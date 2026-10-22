@@ -1,3 +1,6 @@
+// Animation source ownership and its Compose renderers form one bounded presentation unit.
+@file:Suppress("MatchingDeclarationName")
+
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Box
@@ -37,6 +40,7 @@ internal val groupAvatarAnimationPermits = Semaphore(MAX_PLAYING_GROUP_AVATARS)
  * The permit covers the original-byte read and the complete mounted animation, not just decoding.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun AnimatedGroupAvatarOverlay(
     animation: GroupAvatarAnimation,
     modifier: Modifier = Modifier,
@@ -50,6 +54,7 @@ internal fun AnimatedGroupAvatarOverlay(
 }
 
 @Composable
+@Suppress("FunctionNaming")
 private fun GroupAvatarPlayback(
     animation: GroupAvatarAnimation,
     modifier: Modifier,

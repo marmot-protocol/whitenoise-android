@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Trascina verso il basso per mostrare le conversazioni non lette</string>
+    <string name="pull_unread_only">Solo non lette</string>
+    <string name="pull_unread_show_all">Mostra tutte</string>
+    <string name="pull_unread_retry">Riprova a caricare le conversazioni non lette</string>
+    <string name="pull_unread_load_failed">Impossibile caricare le conversazioni non lette. Riprova.</string>
+    <string name="pull_unread_hint">Trascina per mostrare le conversazioni non lette</string>
+    <string name="pull_unread_release">Rilascia per mostrare le conversazioni non lette</string>
+</resources>

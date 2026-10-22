@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Okunmamış sohbetleri göstermek için aşağı çek</string>
+    <string name="pull_unread_only">Yalnızca okunmamış</string>
+    <string name="pull_unread_show_all">Tümünü göster</string>
+    <string name="pull_unread_retry">Okunmamış sohbetleri yüklemeyi yeniden dene</string>
+    <string name="pull_unread_load_failed">Okunmamış sohbetler yüklenemedi. Yeniden deneyin.</string>
+    <string name="pull_unread_hint">Okunmamış sohbetleri göstermek için çek</string>
+    <string name="pull_unread_release">Okunmamış sohbetleri göstermek için bırak</string>
+</resources>

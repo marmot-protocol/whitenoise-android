@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
+import dev.ipf.whitenoise.android.ui.common.durableGroupAvatarPresentation
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupAvatarPresentation
@@ -323,6 +324,49 @@ class GroupAvatarLocalAssetScreenshotTest {
         assertEquals(0, fixture.reads.get())
         assertEquals(0, fixture.requests.get())
         assertEquals(0, fixture.legacyDownloads.get())
+    }
+
+    /** Thumbnail playback reuses the first-frame source and rejects an old owner after cache replacement. */
+    @Test
+    fun warmGroupGifUsesRetainedSourceWithoutAnotherNativeRead() =
+        kotlinx.coroutines.runBlocking {
+            val fixture = AvatarLocalFixture()
+            val selected = asset()
+            val cacheKey = checkNotNull(selected.cacheKey(ACCOUNT_REF))
+            val image = checkNotNull(AvatarImageLoader.decodeAndCache(cacheKey, solidPng(), AvatarImageLoader.currentCacheLifetime()))
+            val gif =
+                dev.ipf.whitenoise.android.core
+                    .twoFrameGif()
+            AvatarImageLoader.putCachedAnimated(cacheKey, image, gif)
+            val presentation = fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, personPicture = false)
+            val animation = checkNotNull(presentation.groupAnimation)
+            repeat(3) { assertSame(gif, animation.readBytes()) }
+            assertEquals(0, fixture.reads.get())
+
+            AvatarImageLoader.clearStoredAvatars()
+            AvatarImageLoader.putCachedAnimated(cacheKey, image, gif)
+            assertNull(animation.readBytes())
+            val current = fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, personPicture = false)
+            assertSame(gif, checkNotNull(current.groupAnimation).readBytes())
+            assertEquals(0, fixture.reads.get())
+        }
+
+    /** Cached encoded bytes alone cannot authorize playback without a live native runtime owner. */
+    @Test
+    fun cachedGroupGifRequiresNativeRuntimeOwnership() {
+        val fixture = AvatarLocalFixture(withRuntime = false)
+        val selected = asset()
+        val cacheKey = checkNotNull(selected.cacheKey(ACCOUNT_REF))
+        val image = checkNotNull(AvatarImageLoader.decodeAndCache(cacheKey, solidPng(), AvatarImageLoader.currentCacheLifetime()))
+        AvatarImageLoader.putCachedAnimated(
+            cacheKey,
+            image,
+            dev.ipf.whitenoise.android.core
+                .twoFrameGif(),
+        )
+        val presentation = fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, personPicture = false)
+        assertNull(presentation.groupAnimation)
+        assertEquals(0, fixture.reads.get())
     }
 
     /** Cold local decoding never withholds navigation; warm-cache first frames remain synchronous. */

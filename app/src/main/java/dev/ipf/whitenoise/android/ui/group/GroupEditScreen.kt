@@ -353,7 +353,8 @@ internal fun GroupEditScreen(
             imagePickerScope.launch {
                 val gif = ProfilePictureDraftProcessor.isGifSource(context.contentResolver, uri)
                 val current = appState.activeAccountRef == imageAccount && appState.runtimeGeneration == imageRuntime
-                if (generation != imagePickGeneration || !current || imageSaving || controller.mutationInFlight) {
+                val mutationInFlight = imageSaving || controller.mutationInFlight
+                if (generation != imagePickGeneration || !current || mutationInFlight) {
                     return@launch
                 }
                 if (gif) {

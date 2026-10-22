@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 internal const val SETTINGS_ROUTE_MOTION_MILLIS = 200
+private const val SETTINGS_ROUTE_FADE_RANGE = 0.15f
 
 /** Navigation hierarchy supplies direction; peer destinations use the forward treatment. */
 internal fun settingsRouteDirection(
@@ -84,7 +85,7 @@ internal fun <T> SettingsRouteMotion(
             Modifier.fillMaxSize().graphicsLayer {
                 val remaining = if (motion) 1f - progress.value else 0f
                 translationX = direction * travel * remaining
-                alpha = 1f - 0.15f * remaining
+                alpha = 1f - SETTINGS_ROUTE_FADE_RANGE * remaining
             },
         ) {
             content(target)

@@ -41,17 +41,16 @@ internal fun Modifier.chatListUnreadPull(
                         // An untouched hold belongs to the row's context-menu/range-selection gesture.
                         // Claim only a pull that crossed touch slop before long press could take ownership.
                         val heldMillis = change.uptimeMillis - first.uptimeMillis
-                        if (!claimed && heldMillis >= viewConfiguration.longPressTimeoutMillis) {
+                        if (unclaimedUnreadPullExpired(claimed, heldMillis, viewConfiguration.longPressTimeoutMillis)) {
                             rejected = true
                         }
                         if (change.pressed) {
                             val delta = change.positionChange()
                             distance += delta.y
                             horizontal += delta.x
-                            if (abs(horizontal) > viewConfiguration.touchSlop && abs(horizontal) > abs(distance)) {
+                            if (unreadPullDirectionRejected(horizontal, distance, viewConfiguration.touchSlop)) {
                                 rejected = true
                             }
-                            if (distance < -viewConfiguration.touchSlop) rejected = true
                             if (!rejected && distance > viewConfiguration.touchSlop) {
                                 claimed = true
                                 change.consume()
@@ -67,3 +66,17 @@ internal fun Modifier.chatListUnreadPull(
             }
         }
     }
+
+/** Once row long press owns an untouched hold, later range movement cannot claim an unread pull. */
+private fun unclaimedUnreadPullExpired(
+    claimed: Boolean,
+    heldMillis: Long,
+    longPressTimeoutMillis: Long,
+): Boolean = !claimed && heldMillis >= longPressTimeoutMillis
+
+/** Horizontal actions and upward reversals retain their existing ownership of the pointer stream. */
+private fun unreadPullDirectionRejected(
+    horizontal: Float,
+    distance: Float,
+    touchSlop: Float,
+): Boolean = (abs(horizontal) > touchSlop && abs(horizontal) > abs(distance)) || distance < -touchSlop

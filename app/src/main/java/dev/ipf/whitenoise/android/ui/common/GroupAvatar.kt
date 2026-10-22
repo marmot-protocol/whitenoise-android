@@ -72,28 +72,12 @@ internal fun rememberGroupAvatarPresentation(
         val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
         val seededImage = ownedSeed?.durableImageFor(durableKey)
         // Missing/invalidated assets must not revive a legacy bitmap or launch a second acquisition.
-        return GroupAvatarPresentation(
-            image = durableImage ?: seededImage,
-            pictureUrl = null,
-            animationKey = durableKey.takeIf { durableAvatarIsPersonPicture },
-            readOriginalBytes = appState.retainedAvatarBytesReader(durableAvatar, accountRef),
-            groupAnimation =
-                if (groupOwnsPicture && durableKey != null) {
-                    appState
-                        .retainedAvatarBytesReader(
-                            durableAvatar,
-                            accountRef,
-                            maxBytes = GROUP_AVATAR_MAX_PAYLOAD_BYTES.toULong(),
-                        )?.let { reader ->
-                            GroupAvatarAnimation(
-                                "${appState.runtimeGeneration}|${AvatarImageLoader.currentCacheLifetime()}|" +
-                                    "${group.groupIdHex}|$durableKey",
-                                reader,
-                            )
-                        }
-                } else {
-                    null
-                },
+        return appState.durableGroupAvatarPresentation(
+            group,
+            durableAvatar,
+            accountRef,
+            durableImage ?: seededImage,
+            durableAvatarIsPersonPicture,
         )
     }
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
@@ -107,17 +91,7 @@ internal fun rememberGroupAvatarPresentation(
             ) { AvatarImageLoader.load(checkNotNull(legacyUrl)) }
             image
         }
-    val seededImage =
-        ownedSeed
-            ?.takeIf {
-                when (it.source) {
-                    ChatListAvatarSource.DURABLE -> false
-                    ChatListAvatarSource.LEGACY_URL -> it.key == legacyUrl
-                    ChatListAvatarSource.ENCRYPTED_GROUP -> legacyUrl == null && it.key == encryptedKey
-                    ChatListAvatarSource.FALLBACK_URL ->
-                        legacyUrl == null && encryptedImage == null && it.key == ownedFallback
-                }
-            }?.image
+    val seededImage = ownedSeed?.legacyImageFor(legacyUrl, encryptedKey, encryptedImage, ownedFallback)
     val originalReader = rememberLegacyGroupAvatarBytes(appState, group, accountRef, legacyUrl, encryptedKey)
     return GroupAvatarPresentation(
         image = seededImage ?: remoteImage ?: encryptedImage,
@@ -186,34 +160,6 @@ private fun rememberLegacyGroupAvatarBytes(
             null
         }
     }
-
-/**
- * A bounded-list miss proves neither selection nor deletion. Read MDK's current snapshot in that case,
- * and verify it again after the byte read so account/source changes never publish stale animation.
- */
-@Suppress("LongParameterList")
-internal suspend fun readLegacyGroupAvatarBytes(
-    expected: AppGroupRecordFfi,
-    accountRef: String,
-    ownerIsCurrent: () -> Boolean,
-    currentGroup: () -> AppGroupRecordFfi?,
-    readSnapshotGroup: suspend () -> AppGroupRecordFfi?,
-    readBytes: suspend () -> ByteArray?,
-): ByteArray? {
-    suspend fun sourceIsCurrent(): Boolean {
-        if (!ownerIsCurrent()) return false
-        val current = currentGroup() ?: readSnapshotGroup()
-        return ownerIsCurrent() &&
-            current != null &&
-            current.groupIdHex.equals(expected.groupIdHex, ignoreCase = true) &&
-            ProfileSanitizer.protocolImageUrl(current.avatarUrl) ==
-            ProfileSanitizer.protocolImageUrl(expected.avatarUrl) &&
-            encryptedGroupAvatarCacheKey(accountRef, current) == encryptedGroupAvatarCacheKey(accountRef, expected)
-    }
-    if (!sourceIsCurrent()) return null
-    val bytes = readBytes() ?: return null
-    return bytes.takeIf { it.size <= GROUP_AVATAR_MAX_PAYLOAD_BYTES && sourceIsCurrent() }
-}
 
 /** A private picture can be displayed only for its own known, signed-in local account. */
 private fun WhiteNoiseAppState.ownsPrivateAvatarSource(

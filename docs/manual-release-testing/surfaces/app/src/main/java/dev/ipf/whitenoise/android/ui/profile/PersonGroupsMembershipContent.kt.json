@@ -10,6 +10,22 @@
         "test_ids": [
           "ACC-022"
         ]
+      },
+      {
+        "surface": "MembershipControllersEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "fun MembershipControllersEffect(",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "MembershipRemovalConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "fun MembershipRemovalConfirmation(",
+        "test_ids": [
+          "ACC-022"
+        ]
       }
     ],
     "source_coverage": [

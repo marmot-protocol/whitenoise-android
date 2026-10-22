@@ -11895,12 +11895,8 @@ class ConversationController(
                 try {
                     val outcome =
                         appState.withGroupCommitLock(account, group.groupIdHex) {
-                            if (refreshAuthorityBeforeCommit) {
-                                val epoch = mutationPresentation.groupAuthorityEpoch
-                                refreshManagementState()
-                                if (mutationPresentation.groupAuthorityEpoch == epoch || !ownsRemovalPresentation()) {
-                                    return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
-                                }
+                            if (!refreshRemovalAuthority(refreshAuthorityBeforeCommit, ::ownsRemovalPresentation)) {
+                                return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             }
                             authoritativeAdministrationTarget(target)
                                 ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
@@ -11947,6 +11943,17 @@ class ConversationController(
                 }
             }
         }
+
+    /** Called inside the existing commit lock; a failed read never reuses the previous permission frontier. */
+    private suspend fun refreshRemovalAuthority(
+        refresh: Boolean,
+        ownsPresentation: () -> Boolean,
+    ): Boolean {
+        if (!refresh) return true
+        val epoch = mutationPresentation.groupAuthorityEpoch
+        refreshManagementState()
+        return mutationPresentation.groupAuthorityEpoch != epoch && ownsPresentation()
+    }
 
     /** Promotes or demotes [member], asking first if MDK holds the change back. True once committed. */
     suspend fun setMemberAdmin(

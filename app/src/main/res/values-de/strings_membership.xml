@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_group_remove_person">%1$s aus %2$s entfernen</string>
+    <string name="shared_group_remove_confirmation">%1$s (%2$s) aus %3$s entfernen?\nGruppe: %4$s\nAusführendes Konto: %5$s (%6$s).\n\nDer Zugriff dieser Person auf die Gruppe wird entzogen.</string>
+</resources>

@@ -4373,14 +4373,12 @@ class WhiteNoiseAppState private constructor(
                 initialGroup = item.group,
                 accountRefOverride = account,
             )
-        try {
-            controller.refreshManagementState()
-            if (activeAccountRef == account && controller.managementState != null) return controller
-            controller.onCleared()
-            return null
-        } catch (failure: Throwable) {
-            controller.onCleared()
-            throw failure
+        var retained = false
+        return try {
+            runCatchingCancellable { controller.refreshManagementState() }.getOrThrow()
+            controller.takeIf { activeAccountRef == account && it.managementState != null }?.also { retained = true }
+        } finally {
+            if (!retained) controller.onCleared()
         }
     }
 

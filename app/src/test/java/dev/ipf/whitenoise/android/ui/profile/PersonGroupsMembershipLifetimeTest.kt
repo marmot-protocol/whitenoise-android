@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.profile
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
@@ -47,7 +49,7 @@ class PersonGroupsMembershipLifetimeTest {
                 }
             }
         }
-        val oldAdd = rule.onNodeWithTag("groups_in_common.add").captureClickCallbackForReplay()
+        val oldAdd = addButton().captureClickCallbackForReplay()
         rule.runOnIdle { mounted.value = false }
         rule.waitForIdle()
         rule.runOnIdle { mounted.value = true }
@@ -56,7 +58,14 @@ class PersonGroupsMembershipLifetimeTest {
             oldAdd()
             assertEquals(0, adds)
         }
-        rule.onNodeWithTag("groups_in_common.add").performClick()
+        addButton().performClick()
         rule.runOnIdle { assertEquals(1, adds) }
     }
+
+    /** The tag belongs to SettingsBottomAction; capture the actual nested production button's callback. */
+    private fun addButton() =
+        rule.onNode(
+            hasClickAction() and hasAnyAncestor(hasTestTag("groups_in_common.add")),
+            useUnmergedTree = true,
+        )
 }

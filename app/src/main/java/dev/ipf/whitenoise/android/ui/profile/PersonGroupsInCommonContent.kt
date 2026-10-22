@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -39,6 +40,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Group
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -135,7 +137,14 @@ internal fun PersonGroupsInCommonContent(
                                                         contentDescription = removeLabel(group),
                                                     )
                                                 }
-                                                DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+                                                val menuScrollState = rememberScrollState()
+                                                DropdownMenu(
+                                                    expanded,
+                                                    onDismissRequest = { expanded = false },
+                                                    scrollState = menuScrollState,
+                                                    modifier =
+                                                        Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+                                                ) {
                                                     DropdownMenuItem(
                                                         text = { Text(removeLabel(group)) },
                                                         onClick = {
