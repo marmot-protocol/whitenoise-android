@@ -140,7 +140,7 @@ class VoicePlaybackControllerFocusTest {
 
         player.seekedToMs = null
         setPlaybackState(VoicePlaybackController.state.value.copy(positionMs = 123, durationMs = 0))
-        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertFalse(VoicePlaybackController.seekSessionBy(42, 10_000))
         assertEquals(null, player.seekedToMs)
         assertEquals(123, VoicePlaybackController.state.value.positionMs)
     }

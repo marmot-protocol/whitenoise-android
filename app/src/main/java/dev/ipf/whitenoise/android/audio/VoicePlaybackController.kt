@@ -536,7 +536,7 @@ object VoicePlaybackController {
 
     /**
      * Moves the displayed session's playhead by [deltaMs], clamped to the clip, keeping its play or pause intent. A
-     * stale strip whose session was replaced cannot seek the newer clip.
+     * stale strip whose session was replaced cannot seek the newer clip. False when nothing was seeked.
      */
     fun seekSessionBy(
         sessionId: Long,
@@ -547,8 +547,7 @@ object VoicePlaybackController {
         val key = currentKey
         if (active == null || key == null) return false
         val position = runCatching { active.currentPosition }.getOrDefault(current.positionMs)
-        seekTo(key, position + deltaMs)
-        return true
+        return seekTo(key, position + deltaMs)
     }
 
     /** Advances the shared voice speed only while [sessionId] is still the displayed session; null when stale. */
@@ -641,13 +640,13 @@ object VoicePlaybackController {
         }
     }
 
-    /** Seek the active player to [positionMs] (clamped to duration). */
+    /** Seek the active player to [positionMs] (clamped to duration); false when nothing was seeked. */
     fun seekTo(
         key: String,
         positionMs: Int,
-    ) {
+    ): Boolean {
         nextPlaybackGeneration()
-        val mp = player?.takeIf { currentKey == key } ?: return
+        val mp = player?.takeIf { currentKey == key } ?: return false
         // Read mp.duration once, inside a guard: if the player has been driven
         // into the Error state but not yet nulled (OnError/OnCompletion post
         // releasePlayerInternal() to Main, leaving a window where player != null
@@ -658,10 +657,13 @@ object VoicePlaybackController {
         // rather than restarting the clip from zero.
         val duration =
             runCatching { mp.duration }.getOrNull()?.takeIf { it > 0 } ?: _state.value.durationMs
-        if (duration <= 0) return
-        val clamped = positionMs.coerceIn(0, duration)
-        runCatching { mp.seekTo(clamped) }
-        _state.value = _state.value.copy(positionMs = clamped, durationMs = duration)
+        val seekable = duration > 0
+        if (seekable) {
+            val clamped = positionMs.coerceIn(0, duration)
+            runCatching { mp.seekTo(clamped) }
+            _state.value = _state.value.copy(positionMs = clamped, durationMs = duration)
+        }
+        return seekable
     }
 
     /** Stop and release the active player. */
