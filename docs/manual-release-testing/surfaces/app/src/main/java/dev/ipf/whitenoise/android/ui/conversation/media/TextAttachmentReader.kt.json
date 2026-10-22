@@ -4,7 +4,7 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Attachment toolbar document-top playback",
+        "surface": "Attachment toolbar read-aloud from the top or the selection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.read_aloud",
         "test_ids": [
@@ -111,7 +111,7 @@
         ]
       },
       {
-        "surface": "Text reader Share menu item: R.string.share",
+        "surface": "Text reader top-bar Share icon: R.string.share",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.share",
         "test_ids": [

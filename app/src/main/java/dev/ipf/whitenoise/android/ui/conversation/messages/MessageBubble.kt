@@ -1461,15 +1461,24 @@ internal fun MessageBubble(
     }
 
     /**
-     * Double-tapping your own editable text opens it for editing (#3388). While this conversation's read-aloud session
-     * is active the same gesture keeps seeking there, and other messages seek or start read-aloud as before.
+     * Whether a press lands on this bubble's rendered text rather than a link, the row's empty width or its
+     * chrome, so a double tap there may edit without stealing a link's own activation.
+     */
+    fun ordinaryTextHitAt(pressInWindow: Offset): Boolean =
+        !markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow) &&
+            renderedTextHitAtWindowPosition(textLayouts.selectableTextLayouts.snapshot(), pressInWindow) != null
+
+    /**
+     * Double-tapping the ordinary text of your own editable message opens it for editing (#3388). While this
+     * conversation's read-aloud session is active the same gesture keeps seeking there, and other messages seek or
+     * start read-aloud as before.
      */
     val messageTextDoubleTap: (Offset) -> Unit = { position ->
-        if (canEditMessage && !ownsActiveReadAloud()) {
-            beginEdit()
-        } else {
-            val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
-            if (pressInWindow != null) seekSpeakAloudAt(pressInWindow)
+        val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
+        when {
+            pressInWindow == null -> Unit
+            canEditMessage && !ownsActiveReadAloud() -> if (ordinaryTextHitAt(pressInWindow)) beginEdit()
+            else -> seekSpeakAloudAt(pressInWindow)
         }
     }
 

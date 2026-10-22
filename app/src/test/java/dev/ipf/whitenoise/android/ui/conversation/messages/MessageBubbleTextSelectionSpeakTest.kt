@@ -342,6 +342,87 @@ class MessageBubbleTextSelectionSpeakTest {
         assertFalse(appState.ownsTtsAutoReadSession(GROUP_ID))
     }
 
+    /** With speech unavailable, double-tapping your own text still opens it for editing. */
+    @Test
+    fun doubleTapOwnMessageTextEditsWithoutAUsableSpeechEngine() {
+        val appState = appStateWithTts(usableTts = false)
+        val item = ownTimelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        renderSingleBubble(item, controller, appState)
+
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+
+        assertEquals(item.record.messageIdHex, controller.editingMessageId)
+    }
+
+    /** A link in your own message keeps its own activation; double-tapping it never opens the editor. */
+    @Test
+    fun doubleTapOnALinkInYourOwnMessageDoesNotEdit() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = ownCopy(timelineMessageWithAutolink())
+        val controller = conversationController(appState)
+        renderSingleBubble(item, controller, appState)
+
+        doubleTapOnMessageText("https://example.com")
+        composeRule.waitForIdle()
+
+        assertEquals(null, controller.editingMessageId)
+        assertTrue(engine.spoken.isEmpty())
+    }
+
+    /** Double-tapping the empty width beside your own bubble is not a text gesture and never edits. */
+    @Test
+    fun doubleTapBesideYourOwnBubbleDoesNotEdit() {
+        val appState = appStateWithTts()
+        val item = ownTimelineMessage("Short note.")
+        val controller = conversationController(appState)
+        renderSingleBubble(item, controller, appState)
+
+        doubleTapAt(Offset(4f, messageTextPositionOnHost("Short note").y))
+        composeRule.waitForIdle()
+
+        assertEquals(null, controller.editingMessageId)
+    }
+
+    /** Text selection mode and read-only chats keep their restrictions: double-tapping your own text never edits. */
+    @Test
+    fun doubleTapOwnMessageTextDoesNotEditInTextSelectionOrReadOnlyChats() {
+        val appState = appStateWithTts()
+        val item = ownTimelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        var textSelectionMode by mutableStateOf(true)
+        var readOnly by mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        textSelectionMode = textSelectionMode,
+                        onTextSelectionModeChange = { textSelectionMode = it },
+                        readOnly = readOnly,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+        assertEquals(null, controller.editingMessageId)
+
+        composeRule.runOnIdle {
+            textSelectionMode = false
+            readOnly = true
+        }
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+        assertEquals(null, controller.editingMessageId)
+    }
+
     /** While this conversation is being read aloud, double-tapping your own text seeks there and does not edit. */
     @Test
     fun doubleTapOwnMessageTextSeeksWhileReadAloudOwnsTheConversation() {
@@ -1121,8 +1202,11 @@ class MessageBubbleTextSelectionSpeakTest {
         }
     }
 
-    private fun doubleTapOnMessageText(substring: String) {
-        val pressOnHost = messageTextPositionOnHost(substring)
+    /** Double-taps the first character run matching [substring] in the rendered message text. */
+    private fun doubleTapOnMessageText(substring: String) = doubleTapAt(messageTextPositionOnHost(substring))
+
+    /** Performs two taps at one host position, spaced inside the platform double-tap window. */
+    private fun doubleTapAt(pressOnHost: Offset) {
         composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
             down(pressOnHost)
             up()
@@ -1198,6 +1282,7 @@ class MessageBubbleTextSelectionSpeakTest {
         onTextSelectionModeChange: (Boolean) -> Unit,
         isActionMenuOpen: Boolean = false,
         onActionMenuOpenChange: (Boolean) -> Unit = {},
+        readOnly: Boolean = false,
     ) {
         val composerTextState = ComposerTextState(TextFieldValue(""))
         val ttsState by appState.ttsController.state.collectAsState()
@@ -1235,6 +1320,7 @@ class MessageBubbleTextSelectionSpeakTest {
                 mentionPickerEnabled = false,
                 ttsHighlightPassage = timelineRowTtsHighlightPassage(item.record.messageIdHex, ttsState),
                 ttsReadAloudProgress = timelineRowTtsReadAloudProgress(item.record.messageIdHex, ttsState),
+                readOnly = readOnly,
             )
         }
     }
@@ -1248,7 +1334,11 @@ class MessageBubbleTextSelectionSpeakTest {
         }
     }
 
-    private fun appStateWithTts(engine: FakeSessionEngine = FakeSessionEngine()): WhiteNoiseAppState {
+    /** App state with one signed-in account, a healthy conversation feed and, unless disabled, usable speech. */
+    private fun appStateWithTts(
+        engine: FakeSessionEngine = FakeSessionEngine(),
+        usableTts: Boolean = true,
+    ): WhiteNoiseAppState {
         val appState =
             WhiteNoiseAppState(
                 context = context,
@@ -1273,7 +1363,7 @@ class MessageBubbleTextSelectionSpeakTest {
                 timelineScripts = listOf(ScriptedConversationTimelineSubscription(snapshotPage = null)),
                 group = group(),
             ).subscriptions
-        appState.forceUsableTtsResolutionForTests()
+        if (usableTts) appState.forceUsableTtsResolutionForTests()
         appState.ttsController.attachEngine(engine)
         return appState
     }
@@ -1333,13 +1423,14 @@ class MessageBubbleTextSelectionSpeakTest {
     }
 
     /** The same fixture message, sent by this account so it is eligible for editing. */
-    private fun ownTimelineMessage(body: String): TimelineMessage {
-        val item = timelineMessage(body)
-        return item.copy(
+    private fun ownTimelineMessage(body: String): TimelineMessage = ownCopy(timelineMessage(body))
+
+    /** Re-addresses a fixture message as sent by this account. */
+    private fun ownCopy(item: TimelineMessage): TimelineMessage =
+        item.copy(
             record = item.record.copy(direction = "sent", sender = ACCOUNT_ID),
             status = MessageStatus.Sent,
         )
-    }
 
     /** Mounts one production bubble in the tagged host used by the gesture helpers. */
     private fun renderSingleBubble(

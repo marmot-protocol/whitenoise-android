@@ -647,21 +647,21 @@ object VoicePlaybackController {
         positionMs: Int,
     ) {
         nextPlaybackGeneration()
-        val mp = player ?: return
-        if (currentKey != key) return
+        val mp = player?.takeIf { currentKey == key } ?: return
         // Read mp.duration once, inside a guard: if the player has been driven
         // into the Error state but not yet nulled (OnError/OnCompletion post
         // releasePlayerInternal() to Main, leaving a window where player != null
         // and the player is in Error), getDuration() throws IllegalStateException.
-        // Fall back to the last known duration so a seek can never crash the UI.
-        val duration = runCatching { mp.duration }.getOrDefault(_state.value.durationMs)
-        val clamped = positionMs.coerceIn(0, duration.coerceAtLeast(0))
+        // Fall back to the last known duration so a seek can never crash the UI,
+        // and likewise when a ready codec reports a non-positive duration. With
+        // no known length there is no bound to clamp to, so the seek is skipped
+        // rather than restarting the clip from zero.
+        val duration =
+            runCatching { mp.duration }.getOrNull()?.takeIf { it > 0 } ?: _state.value.durationMs
+        if (duration <= 0) return
+        val clamped = positionMs.coerceIn(0, duration)
         runCatching { mp.seekTo(clamped) }
-        _state.value =
-            _state.value.copy(
-                positionMs = clamped,
-                durationMs = if (duration > 0) duration else _state.value.durationMs,
-            )
+        _state.value = _state.value.copy(positionMs = clamped, durationMs = duration)
     }
 
     /** Stop and release the active player. */

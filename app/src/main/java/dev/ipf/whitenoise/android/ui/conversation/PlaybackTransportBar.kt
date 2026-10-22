@@ -98,8 +98,8 @@ internal fun VoiceTransportBarContent(
     state: VoicePlaybackController.PlaybackState,
     onPlayingChange: (Boolean) -> Unit,
     onStop: () -> Unit,
-    onSeekBy: (Int) -> Unit = {},
-    onCycleSpeed: () -> Unit = {},
+    onSeekBy: (Int) -> Unit,
+    onCycleSpeed: () -> Unit,
     onBodyClick: (() -> Unit)? = null,
 ) {
     Surface(

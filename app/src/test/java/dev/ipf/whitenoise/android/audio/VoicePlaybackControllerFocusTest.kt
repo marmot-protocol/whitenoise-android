@@ -126,6 +126,25 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(0, player.startCount)
     }
 
+    /** A codec reporting no duration falls back to the known clip length, and with none known the seek is skipped. */
+    @Test fun shellSeekUsesTheKnownLengthWhenTheCodecReportsNone() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        player.durationMs = 0
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 900))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertEquals(900, player.seekedToMs)
+        assertEquals(900, VoicePlaybackController.state.value.durationMs)
+
+        player.seekedToMs = null
+        setPlaybackState(VoicePlaybackController.state.value.copy(positionMs = 123, durationMs = 0))
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertEquals(null, player.seekedToMs)
+        assertEquals(123, VoicePlaybackController.state.value.positionMs)
+    }
+
     /** A stale banner cannot seek or change the speed of the session that replaced it. */
     @Test fun replacedShellSessionRejectsSeekAndSpeed() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
@@ -141,7 +160,6 @@ class VoicePlaybackControllerFocusTest {
 
         assertEquals(1.5f, VoicePlaybackController.cycleSessionSpeed(43))
         assertEquals(1.5f, VoicePlaybackController.state.value.speed)
-        setControllerField("currentSpeed", 1f)
     }
 
     /** Equal attachment keys under another account must prepare new bytes instead of resuming the old player. */
@@ -192,6 +210,7 @@ class VoicePlaybackControllerFocusTest {
     @After
     fun tearDown() {
         VoicePlaybackController.stop()
+        setControllerField("currentSpeed", 1f)
         setAudioFocusOwnerField("audioManager", null)
         setAudioFocusOwnerField("focusRequest", null)
         setAudioFocusOwnerField("currentOwner", null)
