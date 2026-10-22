@@ -176,7 +176,8 @@ class NotificationMessageRouteExactReadNavigationTest {
         try {
             awaitBoundChatList(holder, appState)
             composeRule.runOnIdle { inbound.value = messageTarget() }
-            check(firstReadStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) { "the first read never ran" }
+            awaitCondition("the first read never ran") { firstReadStarted.count == 0L }
+            assertTrue("the held read must not consume its tap", handled.isEmpty())
             composeRule.runOnIdle {
                 holdReads.set(false)
                 inbound.value = messageTarget().copy(messageIdHex = NEWEST_ID)
