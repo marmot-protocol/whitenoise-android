@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
 import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,6 +35,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -56,6 +58,9 @@ import java.util.concurrent.atomic.AtomicInteger
 @Config(sdk = [34])
 @Suppress("LargeClass") // Every scenario drives the same process-wide listener, presenter and card fixture.
 class NotificationContentRetractionTest {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     private val context: Application = RuntimeEnvironment.getApplication()
     private val cardKey = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT_REF, GROUP_ID)
 
@@ -508,7 +513,10 @@ class NotificationContentRetractionTest {
                 )
             try {
                 fixture.bootstrap()
-                PushTokenStore.create(context).recordPendingPushWakeCatchUp()
+                assertTrue(
+                    "the encrypted wake marker must be admitted",
+                    PushTokenStore.create(context).recordPendingPushWakeCatchUp(),
+                )
                 fixture.runWithMainLooperPumping { fixture.appState.runPushWakeRecoveryAttempt() }
                 fixture.awaitUpdateConsumed()
                 repeat(2) { fixture.emitUpdate(fixture.update) }
