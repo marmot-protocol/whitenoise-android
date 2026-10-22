@@ -170,6 +170,120 @@ class GroupConversationSnapshotApplicationTest {
             }
         }
 
+    @Test
+    fun profileRemovalRechecksRevokedAuthorityInsideTheCommitLock() =
+        runTest {
+            var calls = 0
+            val initial = snapshot("Before", admin = true)
+            val peer =
+                initial.details.members.single().copy(
+                    memberIdHex = "cc".repeat(32),
+                    account = null,
+                    local = false,
+                    isAdmin = false,
+                    isSelf = false,
+                )
+            initial.details.members = initial.details.members + peer
+            initial.details.mlsState.memberCount = 2u
+            val revoked = snapshot("Revoked", admin = false)
+            revoked.details.members = revoked.details.members + peer
+            revoked.details.mlsState.memberCount = 2u
+            val controller = controller { if (calls++ == 0) initial else revoked }
+            try {
+                controller.refreshManagementState()
+                org.junit.Assert.assertTrue(controller.isSelfAdmin)
+                org.junit.Assert.assertFalse(
+                    controller.removeMember(
+                        controller.members.single { it.memberIdHex == peer.memberIdHex },
+                        refreshAuthorityBeforeCommit = true,
+                    ),
+                )
+                assertEquals(2, calls)
+                org.junit.Assert.assertFalse(controller.isSelfAdmin)
+                org.junit.Assert.assertNotNull(controller.lastMutationError)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun failedAuthoritativeRefreshCannotReuseEarlierRemovalPermission() =
+        runTest {
+            var calls = 0
+            val initial = snapshot("Before", admin = true)
+            val peer =
+                initial.details.members.single().copy(
+                    memberIdHex = "cc".repeat(32),
+                    account = null,
+                    local = false,
+                    isAdmin = false,
+                    isSelf = false,
+                )
+            initial.details.members = initial.details.members + peer
+            initial.details.mlsState.memberCount = 2u
+            val controller =
+                controller {
+                    if (calls++ == 0) initial else throw IllegalStateException("network unavailable")
+                }
+            try {
+                controller.refreshManagementState()
+                org.junit.Assert.assertFalse(
+                    controller.removeMember(
+                        controller.members.single { it.memberIdHex == peer.memberIdHex },
+                        refreshAuthorityBeforeCommit = true,
+                    ),
+                )
+                assertEquals(2, calls)
+                org.junit.Assert.assertNotNull(controller.lastMutationError)
+                assertTrue(controller.members.any { it.memberIdHex == peer.memberIdHex })
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun retiredProfileRemovalCannotPresentAStaleRosterFailureToTheNewRuntime() =
+        runTest {
+            var calls = 0
+            val initial = snapshot("Before", admin = true)
+            val peer =
+                initial.details.members.single().copy(
+                    memberIdHex = "cc".repeat(32),
+                    account = null,
+                    local = false,
+                    isAdmin = false,
+                    isSelf = false,
+                )
+            initial.details.members = initial.details.members + peer
+            initial.details.mlsState.memberCount = 2u
+            lateinit var controller: ConversationController
+            controller =
+                controller {
+                    if (calls++ > 0) {
+                        val field = WhiteNoiseAppState::class.java.getDeclaredField("runtimeGeneration\$delegate")
+                        field.isAccessible = true
+                        val generation = field.get(controller.appState) as androidx.compose.runtime.MutableIntState
+                        generation.intValue++
+                    }
+                    initial
+                }
+            try {
+                controller.refreshManagementState()
+                val previousToast = controller.appState.toast
+                org.junit.Assert.assertFalse(
+                    controller.removeMember(
+                        controller.members.single { it.memberIdHex == peer.memberIdHex },
+                        refreshAuthorityBeforeCommit = true,
+                    ),
+                )
+                assertEquals(2, calls)
+                assertEquals(previousToast, controller.appState.toast)
+                assertNull(controller.lastMutationError)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     private fun controller(
         initialGroup: AppGroupRecordFfi = conversationTimelineTestGroup(),
         read: suspend () -> GroupConversationSnapshotFfi,

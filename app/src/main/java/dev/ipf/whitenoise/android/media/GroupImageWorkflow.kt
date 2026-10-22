@@ -132,6 +132,30 @@ internal object GroupImageDraftProcessor {
     private const val READ_TIMEOUT_MS = 10_000
     private const val ACCEPT_HEADER = "image/avif,image/webp,image/apng,image/png,image/jpeg,image/gif,*/*;q=0.8"
 
+    /** Group picks retain sanitized GIF frames; other identity surfaces keep their own policy. */
+    suspend fun fromGroupRemoteUrl(rawUrl: String): ImageUploadDraft =
+        withContext(Dispatchers.IO) {
+            val (url, source) = fetchRemoteImage(rawUrl)
+            fromGroupBytes(source, url)
+        }
+
+    internal fun fromGroupBytes(
+        source: ByteArray,
+        sourceUrl: String?,
+    ): ImageUploadDraft =
+        if (isGif(source)) {
+            validateGroupGif(ProfilePictureDraftProcessor.animatedGifDraft(source, sourceUrl))
+        } else {
+            fromBytes(source, sourceUrl)
+        }
+
+    private fun validateGroupGif(draft: ImageUploadDraft): ImageUploadDraft {
+        if (admitAnimationSource(draft.plaintext) !is AnimationSourceAdmission.Admitted) {
+            throw ImageUploadPreparationException.UnsupportedImage
+        }
+        return draft
+    }
+
     /** Fetches [rawUrl] within the bounded, SSRF-hardened policy and prepares it as a JPEG draft. */
     suspend fun fromRemoteUrl(rawUrl: String): ImageUploadDraft =
         withContext(Dispatchers.IO) {
@@ -187,7 +211,9 @@ internal object GroupImageDraftProcessor {
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ): ImageUploadDraft =
         withContext(ioDispatcher) {
-            if (isGroupSvgDocument(contentResolver, uri)) {
+            if (ProfilePictureDraftProcessor.isGifSource(contentResolver, uri)) {
+                validateGroupGif(ProfilePictureDraftProcessor.fromContentUri(contentResolver, uri))
+            } else if (isGroupSvgDocument(contentResolver, uri)) {
                 fromBytes(readGroupIdentityImageSource(contentResolver, uri), sourceUrl = null)
             } else {
                 fromContentUri(contentResolver, uri)

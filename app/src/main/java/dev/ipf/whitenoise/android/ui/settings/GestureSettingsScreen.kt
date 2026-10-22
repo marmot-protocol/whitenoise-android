@@ -34,6 +34,7 @@ internal fun GestureSettingsScreen(
         appState.swipePreferences::set,
         appState.swipePreferences::reset,
         onBack,
+        appState.swipePreferences::setPullUnread,
     )
 }
 
@@ -45,6 +46,7 @@ internal fun GestureSettingsContent(
     onChange: (SwipeBinding, SwipeAction) -> Unit,
     onReset: () -> Unit,
     onBack: () -> Unit,
+    onPullUnreadChange: (Boolean) -> Unit = {},
 ) {
     var picker by rememberSaveable { mutableStateOf<SwipeBinding?>(null) }
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -79,6 +81,19 @@ internal fun GestureSettingsContent(
                                 onClick = { picker = binding },
                             )
                         }
+                    }
+                }
+            }
+            item {
+                SettingsGroup {
+                    row("pull_unread") { context ->
+                        SettingsSwitch(
+                            context,
+                            stringResource(R.string.pull_unread_setting),
+                            state.pullUnread,
+                            onPullUnreadChange,
+                            modifier = Modifier.testTag("gestures.pull_unread"),
+                        )
                     }
                 }
             }

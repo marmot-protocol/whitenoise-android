@@ -73,6 +73,33 @@ internal class AccountWideForwardTargets(
             .filter { isEligibleForwardTarget(it, accountId) }
     }
 
+    /** Complete transient list projection; retained native rows override this one-shot read. */
+    fun chatListItems(retained: List<ChatListItem>): List<ChatListItem> {
+        if (!isCurrent) return emptyList()
+        val retainedIds = retained.mapTo(hashSetOf()) { it.foldedId }
+        val accountId = controller.boundAccountIdHex()
+        return sortChatListItems(
+            retained +
+                presented
+                    .filterNot { it.row.groupIdHex.lowercase(Locale.ROOT) in retainedIds }
+                    .map { controller.projectPresentedRow(it, accountId) },
+        )
+    }
+
+    /**
+     * Hydrates every requested row for the temporary full chat list, including retained rows whose
+     * roster is still missing. A live fetch already in progress remains unresolved until it publishes;
+     * callers must not treat that row as a complete participant-folder nonmatch.
+     */
+    suspend fun resolveChatListMembers(groupIds: Set<String>): Set<String> {
+        if (!isCurrent) return emptySet()
+        val requested = presented.filter { it.row.groupIdHex in groupIds }
+        controller.resolveForwardTargetMembers(requested)
+        return requested.mapNotNullTo(linkedSetOf()) { row ->
+            row.row.groupIdHex.takeIf { isCurrent && !controller.hasMemberSnapshot(it) }
+        }
+    }
+
     /** Resolves only missing rosters requested from this exact account-owned presented snapshot. */
     suspend fun resolveMembers(groupIds: Set<String>) {
         resolveMembersBeyondWindow(groupIds)

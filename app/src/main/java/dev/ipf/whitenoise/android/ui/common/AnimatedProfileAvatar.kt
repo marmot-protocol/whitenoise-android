@@ -133,6 +133,8 @@ internal fun AnimatedProfileAvatarLayer(
     modifier: Modifier = Modifier,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     explicitViewer: Boolean = false,
+    groupThumbnail: Boolean = false,
+    onDecodeUnavailable: () -> Unit = {},
     decode: suspend (ByteArray, Int) -> Drawable? = ::decodeAnimatedProfileAvatar,
 ) {
     // Not keyed on the source: the visibility node only reports changes, so a reset here would leave a
@@ -142,12 +144,18 @@ internal fun AnimatedProfileAvatarLayer(
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
         .collectAsState()
     val foreground = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
-    val animate = explicitViewer && shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
+    val animate =
+        (explicitViewer || groupThumbnail) && shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
     val drawable by produceState<Drawable?>(null, source, maxEdgePx, animate) {
         value = null
         if (animate) {
-            val produced = decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))
+            val produced =
+                dev.ipf.whitenoise.android.state
+                    .runCatchingCancellable {
+                        decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))
+                    }.getOrNull()
             value = produced
+            if (produced == null) onDecodeUnavailable()
             awaitDispose { (produced as? java.io.Closeable)?.close() }
         }
     }

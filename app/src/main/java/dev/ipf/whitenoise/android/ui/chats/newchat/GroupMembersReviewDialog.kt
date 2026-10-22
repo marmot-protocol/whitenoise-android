@@ -50,6 +50,7 @@ internal data class MemberReviewGroup(
     val name: String,
     val pictureUrl: String? = null,
     val image: ImageBitmap? = null,
+    val groupAnimation: dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation? = null,
 )
 
 /** Shows the destination opposite each public member identity; actions stay outside the scrolling body. */

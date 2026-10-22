@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +43,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
+import dev.ipf.whitenoise.android.media.ProfilePictureDraftProcessor
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -72,6 +74,7 @@ import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /**
  * The URL a Blossom upload may be published under. Throws rather than fall
@@ -342,13 +345,32 @@ internal fun GroupEditScreen(
 
         var photoMenuOpen by remember { mutableStateOf(false) }
         var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+        val imagePickerScope = rememberCoroutineScope()
+        var imagePickGeneration by remember { mutableStateOf(0) }
+
+        fun pickGroupImage(uri: Uri) {
+            val generation = ++imagePickGeneration
+            imagePickerScope.launch {
+                val gif = ProfilePictureDraftProcessor.isGifSource(context.contentResolver, uri)
+                val current = appState.activeAccountRef == imageAccount && appState.runtimeGeneration == imageRuntime
+                if (generation != imagePickGeneration || !current || imageSaving || controller.mutationInFlight) {
+                    return@launch
+                }
+                if (gif) {
+                    uploadPublicAvatar { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, uri) }
+                } else {
+                    pendingCropUri = uri
+                }
+            }
+        }
+
         val photoPicker =
             rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-                if (uri != null) pendingCropUri = uri
+                if (uri != null) pickGroupImage(uri)
             }
         val filePicker =
             rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                if (uri != null) pendingCropUri = uri
+                if (uri != null) pickGroupImage(uri)
             }
         IdentityImageCropFlow(
             uri = pendingCropUri,
@@ -422,6 +444,7 @@ internal fun GroupEditScreen(
                             size = GroupEditAvatarSize,
                             pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
                             picture = encryptedGroupAvatar,
+                            groupAnimation = groupAvatar.groupAnimation,
                         )
                     }
                     if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -532,7 +555,7 @@ internal fun GroupEditScreen(
                 onPickPhoto = { uri ->
                     if (imageSaving || controller.mutationInFlight) return@ImageSearchSheet
                     imageFailureScope.clear()
-                    pendingCropUri = uri
+                    pickGroupImage(uri)
                 },
                 onPickEmoji = {
                     imageFailureScope.clear()

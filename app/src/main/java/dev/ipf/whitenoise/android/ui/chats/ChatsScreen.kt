@@ -40,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +49,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
@@ -87,9 +89,13 @@ import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
+import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
+import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
@@ -101,7 +107,9 @@ import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
 import dev.ipf.whitenoise.android.state.localDeleteBatchRetryNotice
 import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
+import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.recordProductObservation
+import dev.ipf.whitenoise.android.state.references
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
@@ -256,8 +264,67 @@ internal fun ChatsScreen(
     // filters exactly as before.
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
+    // The complete native snapshot exists only while this temporary view is open.
+    var unreadPullProgress by remember { mutableFloatStateOf(0f) }
+    var unreadOnly by remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId) {
+        mutableStateOf(false)
+    }
+    var unreadSnapshot by remember(controller, selectedFolderId) { mutableStateOf<AccountWideForwardTargets?>(null) }
+    var unreadReadFailed by remember(controller, selectedFolderId) { mutableStateOf(false) }
+    var unreadRetry by remember(controller, selectedFolderId) { mutableIntStateOf(0) }
+    var unreadLoadedRevision by remember(controller, selectedFolderId) { mutableLongStateOf(-1L) }
+    var unreadLoadedFolderState by remember(controller, selectedFolderId) { mutableStateOf(folderStoreState) }
+    val unreadRevision = controller.forwardTargetsRevision
+    LaunchedEffect(controller, unreadOnly, unreadRevision, unreadRetry, folderStoreState) {
+        unreadSnapshot = null
+        unreadReadFailed = false
+        if (unreadOnly) {
+            when (val read = controller.readAccountWideForwardTargets()) {
+                is AccountWideRead.Loaded -> {
+                    val rule =
+                        appState.activeAccountRef?.let { account ->
+                            selectedFolderId?.let { appState.chatFolderPreferences.folderRule(account, it) }
+                        }
+                    val needsMembers =
+                        rule?.includeMemberPubkeys?.isNotEmpty() == true ||
+                            rule
+                                ?.smartFilter
+                                ?.let(SmartFolderCodec::decode)
+                                ?.references(FolderField.PARTICIPANTS) == true
+                    val ids =
+                        read.snapshot
+                            .chatListItems(controller.items + controller.archivedItems)
+                            .mapTo(mutableSetOf()) { it.group.groupIdHex }
+                    val unresolved = if (needsMembers) read.snapshot.resolveChatListMembers(ids) else emptySet()
+                    if (unresolved.isNotEmpty()) {
+                        unreadReadFailed = true
+                    } else {
+                        unreadSnapshot = read.snapshot
+                        unreadLoadedRevision = unreadRevision
+                        unreadLoadedFolderState = folderStoreState
+                    }
+                }
+                AccountWideRead.Failed, AccountWideRead.Unavailable -> unreadReadFailed = true
+            }
+        }
+    }
+    val currentUnreadSnapshot =
+        unreadSnapshot?.takeIf {
+            unreadLoadedRevision == unreadRevision && unreadLoadedFolderState == folderStoreState && it.isCurrent
+        }
+    val completeUnreadItems =
+        if (unreadOnly) currentUnreadSnapshot?.chatListItems(controller.items + controller.archivedItems) else null
+    val folderActiveItems = completeUnreadItems?.filterNot { it.group.archived } ?: controller.items
+    val folderArchivedItems = completeUnreadItems?.filter { it.group.archived } ?: controller.archivedItems
     val searchFolderContext =
-        rememberSearchFolderContext(appState, controller, groupTitleCopy, accountRef = appState.activeAccountRef)
+        rememberSearchFolderContext(
+            appState,
+            controller,
+            groupTitleCopy,
+            accountRef = appState.activeAccountRef,
+            activeItems = folderActiveItems,
+            archivedItems = folderArchivedItems,
+        )
     val accountFolders = searchFolderContext.folders
     val selectedFolder = accountFolders.firstOrNull { it.id == selectedFolderId }
     val selectedFolderRule =
@@ -364,8 +431,8 @@ internal fun ChatsScreen(
 
     // Advanced folders combine loaded windows; legacy folders retain their archive-side selection.
     val sourceList =
-        remember(controller.items, controller.archivedItems, selectedFolderRule) {
-            chatFolderSource(selectedFolderRule, controller.items, controller.archivedItems)
+        remember(folderActiveItems, folderArchivedItems, selectedFolderRule) {
+            chatFolderSource(selectedFolderRule, folderActiveItems, folderArchivedItems)
         }
     LaunchedEffect(controller, controller.recoveryProjectionGeneration, sourceList) {
         val generation = controller.recoveryProjectionGeneration
@@ -651,8 +718,22 @@ internal fun ChatsScreen(
             }
         }
     val visibleItems =
-        remember(searchSections, selectedFolder, searchActive, appState.profileRevisionForCompose) {
-            val rows = searchSections.orderedItems()
+        remember(
+            searchSections,
+            selectedFolder,
+            searchActive,
+            unreadOnly,
+            appState.activeAccountRef,
+            appState.profileRevisionForCompose,
+        ) {
+            val rows =
+                searchSections.orderedItems().let { rows ->
+                    if (unreadOnly) {
+                        rows.filter { it.effectiveHasUnread(appState.activeAccount?.accountIdHex) }
+                    } else {
+                        rows
+                    }
+                }
             if (searchActive) {
                 rows
             } else {
@@ -1052,7 +1133,7 @@ internal fun ChatsScreen(
     ) {
         if (advancedFolder) controller.returnSmartFolderWindowsToTop()
     }
-    val hasEarlierChats = !advancedFolder && controller.hasEarlierChats(chatListWindowView)
+    val hasEarlierChats = !unreadOnly && !advancedFolder && controller.hasEarlierChats(chatListWindowView)
     LaunchedEffect(chatListState, controller, chatListWindowView, hasEarlierChats) {
         snapshotFlow { chatListState.firstVisibleItemIndex }
             .distinctUntilChanged()
@@ -1092,14 +1173,14 @@ internal fun ChatsScreen(
                 }
             }
     }
-    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder) {
-        if (advancedFolder) return@LaunchedEffect
+    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder, unreadOnly) {
+        if (advancedFolder || unreadOnly) return@LaunchedEffect
         collectChatListForwardPaging(listState = chatListState) {
             controller.loadMoreChats(chatListWindowView)
         }
     }
-    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder) {
-        if (advancedFolder) return@LaunchedEffect
+    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder, unreadOnly) {
+        if (advancedFolder || unreadOnly) return@LaunchedEffect
         collectChatListVisibleAnchor(
             listState = chatListState,
             searchActive = { currentSearchActive },
@@ -1805,6 +1886,37 @@ internal fun ChatsScreen(
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
         ) {
+            if (!searchOpen && !selectionMode) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    if (unreadPullProgress > 0f) {
+                        Text(
+                            stringResource(
+                                if (unreadPullProgress >= 1f) {
+                                    R.string.pull_unread_release
+                                } else {
+                                    R.string.pull_unread_hint
+                                },
+                            ),
+                            Modifier.padding(start = 16.dp),
+                        )
+                    } else if (unreadOnly) {
+                        Text(stringResource(R.string.pull_unread_only), Modifier.padding(start = 16.dp))
+                    }
+                    TextButton(
+                        onClick = { unreadOnly = !unreadOnly },
+                        modifier = Modifier.testTag("chats.unread_filter"),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (unreadOnly) R.string.pull_unread_show_all else R.string.pull_unread_only,
+                            ),
+                        )
+                    }
+                    if (unreadReadFailed && unreadOnly) {
+                        TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
+                    }
+                }
+            }
             // Chats reset and folder management remain available with an empty list.
             // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
             // The prototype swaps the whole top column for the search bar and its mode chips, so the
@@ -1906,6 +2018,12 @@ internal fun ChatsScreen(
                                 searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
                                     .rememberLazyGridState(),
                         )
+                    unreadOnly && unreadReadFailed ->
+                        Column(Modifier.fillMaxSize().padding(16.dp)) {
+                            Text(stringResource(R.string.pull_unread_load_failed))
+                            TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
+                        }
+                    unreadOnly && currentUnreadSnapshot == null -> LoadingScreen()
                     controller.isLoading && sourceList.isEmpty() -> {
                         val slowCopy = stringResource(R.string.chat_list_startup_slow)
                         LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })
@@ -1975,7 +2093,30 @@ internal fun ChatsScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxSize()
-                                        .trackWhiteNoiseHeader(chatListState)
+                                        .chatListUnreadPull(
+                                            enabled =
+                                                appState.swipePreferences.state.pullUnread &&
+                                                    !unreadOnly &&
+                                                    !searchOpen &&
+                                                    !selectionMode &&
+                                                    actionSheetChatId == null &&
+                                                    !actionMenuOwner.pointerHeld,
+                                            atTop = {
+                                                !hasEarlierChats &&
+                                                    !chatListState.isScrollInProgress &&
+                                                    chatListState.firstVisibleItemIndex == 0 &&
+                                                    chatListState.firstVisibleItemScrollOffset == 0
+                                            },
+                                            thresholdPx = with(LocalDensity.current) { 72.dp.toPx() },
+                                            scopeKey =
+                                                Triple(
+                                                    appState.activeAccountRef,
+                                                    appState.runtimeGeneration,
+                                                    selectedFolderId,
+                                                ),
+                                            onProgress = { unreadPullProgress = it },
+                                            onActivate = { unreadOnly = true },
+                                        ).trackWhiteNoiseHeader(chatListState)
                                         .clipToBounds()
                                         .chatListEdgeFade(chatListState)
                                         .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
@@ -2194,6 +2335,7 @@ internal fun ChatsScreen(
                             chatListItemDisplayTitle(item, appState, groupTitleCopy),
                             avatar.pictureUrl,
                             avatar.image,
+                            groupAnimation = avatar.groupAnimation,
                         ),
                         actionLabel = stringResource(R.string.delete_from_device),
                     )

@@ -32,6 +32,14 @@ internal class ProfileAccountWideGroupsHolder(
     private val scope: CoroutineScope,
     private val rowsRevision: () -> Long = { appState.chatRowsRevision() },
 ) {
+    private val accountAtOpen = appState.activeAccountRef
+    private val runtimeAtOpen = appState.runtimeGeneration
+
+    private fun ownsCurrentAccount(): Boolean {
+        val sameRuntime = appState.runtimeGeneration == runtimeAtOpen
+        return sameRuntime && appState.activeAccountRef == accountAtOpen
+    }
+
     /** The latest snapshot and failures, replaced rather than mutated so Compose observes every change. */
     var value by mutableStateOf(ProfileAccountWideGroups())
         private set
@@ -44,7 +52,7 @@ internal class ProfileAccountWideGroupsHolder(
 
     /** The lookups to serve now: the latest snapshot if it matches the current chat rows, else none. */
     fun current(): ProfileAccountWideGroups =
-        if (loadedRevision == rowsRevision()) {
+        if (ownsCurrentAccount() && loadedRevision == rowsRevision()) {
             value
         } else {
             ProfileAccountWideGroups()
@@ -56,10 +64,11 @@ internal class ProfileAccountWideGroupsHolder(
      * read that could not run leaves them on the retained rows alone.
      */
     suspend fun load() {
+        if (!ownsCurrentAccount()) return
         val token = ++latestRead
         val revision = rowsRevision()
         val read = appState.readAccountWideForwardTargets()
-        if (token == latestRead && revision == rowsRevision()) {
+        if (ownsCurrentAccount() && token == latestRead && revision == rowsRevision()) {
             value =
                 ProfileAccountWideGroups(
                     snapshot = (read as? AccountWideRead.Loaded)?.snapshot,
@@ -67,6 +76,13 @@ internal class ProfileAccountWideGroupsHolder(
                 )
             loadedRevision = revision
         }
+    }
+
+    /** Re-read native account-wide rows after a committed membership change, even for a resolved roster. */
+    suspend fun refreshAfterMembershipChange() {
+        if (!ownsCurrentAccount()) return
+        loadedRevision = null
+        load()
     }
 
     /**
@@ -78,6 +94,7 @@ internal class ProfileAccountWideGroupsHolder(
         groupIds: Set<String>,
         retry: Boolean = false,
     ) {
+        if (!ownsCurrentAccount()) return
         appState.requestProfileGroupMembers(groupIds, retry)
         val snapshot = value.snapshot
         if (snapshot == null) {
@@ -106,7 +123,8 @@ internal fun rememberProfileAccountWideGroups(
 ): ProfileAccountWideGroupsHolder {
     val scope = rememberCoroutineScope()
     val accountRef = appState.activeAccountRef
-    val holder = remember(appState, accountRef) { ProfileAccountWideGroupsHolder(appState, scope) }
+    val holder =
+        remember(appState, accountRef, appState.runtimeGeneration) { ProfileAccountWideGroupsHolder(appState, scope) }
     val rowsRevision = appState.chatRowsRevision()
     LaunchedEffect(holder, enabled, rowsRevision) {
         if (enabled) holder.load()

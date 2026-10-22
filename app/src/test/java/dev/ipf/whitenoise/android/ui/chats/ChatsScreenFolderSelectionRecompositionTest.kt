@@ -25,13 +25,17 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentedRow
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Before
@@ -183,6 +187,48 @@ class ChatsScreenFolderSelectionRecompositionTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).performClick()
         composeRule.onNodeWithText("Pending consent").assertDoesNotExist()
         controller.onCleared()
+    }
+
+    @Test fun editingFolderRuleReloadsUnreadBeforeClaimingCompleteness() {
+        val appState = testAppState()
+        val reread = CompletableDeferred<List<dev.ipf.marmotkit.PresentedChatRowFfi>>()
+        var reads = 0
+        val native = presentedRow("d1".repeat(32)).let { it.copy(row = it.row.copy(manuallyMarkedUnread = true)) }
+        appState.liveSubscriptionOverrides.chatList =
+            ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> error("not used") },
+                openChats = { _, _ -> error("not used") },
+                presentedChatList = { _, _ ->
+                    reads++
+                    if (reads == 1) listOf(native) else reread.await()
+                },
+            )
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        val folder = appState.chatFolderPreferences.createFolder(ACCOUNT_REF, "Work")!!
+        appState.chatFolderPreferences.setFolderRule(
+            ACCOUNT_REF,
+            folder.id,
+            ChatFolderRule(includeAll = true, includeMuted = true),
+        )
+        setControllerItems(controller, listOf(chatItem(native.row.groupIdHex)))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatsScreen(appState, controller, {}, { _, _, _, _ -> }, selectedFolderId = folder.id)
+            }
+        }
+        composeRule.onNodeWithTag("chats.unread_filter").performClick()
+        composeRule.waitUntil { reads == 1 }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            appState.chatFolderPreferences.setFolderRule(
+                ACCOUNT_REF,
+                folder.id,
+                ChatFolderRule(includeMemberPubkeys = setOf("a1".repeat(32)), includeMuted = true),
+            )
+        }
+        composeRule.waitUntil { reads == 2 }
+        composeRule.onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG).assertExists()
+        composeRule.runOnIdle { reread.complete(emptyList()) }
     }
 
     private fun testAppState(): WhiteNoiseAppState =

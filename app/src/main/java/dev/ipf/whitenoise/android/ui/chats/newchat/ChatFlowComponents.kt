@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.Group
@@ -141,6 +142,7 @@ internal fun ContactRow(
     onSubtitleClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     titleMaxLines: Int = 1,
+    groupAnimation: GroupAvatarAnimation? = null,
     secondaryContent: (@Composable () -> Unit)? = null,
 ) {
     val copyLabel = stringResource(R.string.copy)
@@ -186,6 +188,7 @@ internal fun ContactRow(
                 pictureUrl = avatarUrl?.takeIf { avatarImage == null },
                 picture = avatarImage,
                 animationKey = avatarAnimationKey,
+                groupAnimation = groupAnimation,
             )
             if (isFollowed) {
                 FollowedPersonBadge(modifier = Modifier.align(Alignment.BottomEnd))

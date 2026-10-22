@@ -4359,6 +4359,31 @@ class WhiteNoiseAppState private constructor(
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex, accountWide)
             ?: ProfileGroupPickerState.empty()
 
+    /** A non-started administration controller uses the existing authoritative mutation contract.
+     * It owns no timeline subscriptions; accepted mutations are retained by launchMutation.
+     */
+    internal suspend fun profileMembershipController(
+        account: String,
+        item: ChatListItem,
+    ): ConversationController? {
+        if (activeAccountRef != account || item.isDm()) return null
+        val controller =
+            ConversationController(
+                appState = this,
+                initialGroup = item.group,
+                accountRefOverride = account,
+            )
+        try {
+            controller.refreshManagementState()
+            if (activeAccountRef == account && controller.managementState != null) return controller
+            controller.onCleared()
+            return null
+        } catch (failure: Throwable) {
+            controller.onCleared()
+            throw failure
+        }
+    }
+
     /** Makes [targetRef] an admin of [groupIdHex], asking first if MDK holds the change back. True once committed. */
     suspend fun promoteProfileInGroup(
         targetRef: String,
@@ -11833,13 +11858,21 @@ class WhiteNoiseAppState private constructor(
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
+        pendingProfileGroupsInCommon = false
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
         pendingProfileNpub = link.npub
         return true
     }
 
-    fun presentProfile(npub: String) {
+    internal var pendingProfileGroupsInCommon by mutableStateOf(false)
+        private set
+
+    fun presentProfile(
+        npub: String,
+        groupsInCommon: Boolean = false,
+    ) {
+        pendingProfileGroupsInCommon = groupsInCommon
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
         pendingProfileNpub = npub
@@ -11849,6 +11882,7 @@ class WhiteNoiseAppState private constructor(
         npub: String,
         profile: UserProfileMetadataFfi?,
     ) {
+        pendingProfileGroupsInCommon = false
         pendingProfileMetadata = profile
         pendingProfileFromDiscovery = true
         pendingProfileNpub = npub
@@ -11951,6 +11985,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun clearPresentedProfile() {
+        pendingProfileGroupsInCommon = false
         pendingProfileNpub = null
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false

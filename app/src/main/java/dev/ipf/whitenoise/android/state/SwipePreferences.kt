@@ -17,6 +17,7 @@ internal data class SwipePreferenceState(
     val messageRight: SwipeAction = SwipeAction.Default,
     val chatLeft: SwipeAction = SwipeAction.Off,
     val chatRight: SwipeAction = SwipeAction.Off,
+    val pullUnread: Boolean = true,
 ) {
     /** Returns the stored choice, before resolving the mirrored default. */
     fun choice(binding: SwipeBinding): SwipeAction =
@@ -56,9 +57,19 @@ internal class SwipePreferences(
         state = read()
     }
 
+    fun setPullUnread(enabled: Boolean) {
+        preferences.edit().putBoolean("pull_unread", enabled).apply()
+        state = read()
+    }
+
     /** Removes only these four UI settings and restores upgrade-compatible behavior. */
     fun reset() {
-        preferences.edit().also { edit -> SwipeBinding.entries.forEach { edit.remove(key(it)) } }.apply()
+        preferences
+            .edit()
+            .also { edit ->
+                SwipeBinding.entries.forEach { edit.remove(key(it)) }
+                edit.remove("pull_unread")
+            }.apply()
         state = SwipePreferenceState()
     }
 
@@ -74,6 +85,7 @@ internal class SwipePreferences(
             value(SwipeBinding.MessageRight),
             value(SwipeBinding.ChatLeft),
             value(SwipeBinding.ChatRight),
+            runCatching { preferences.getBoolean("pull_unread", true) }.getOrDefault(true),
         )
     }
 

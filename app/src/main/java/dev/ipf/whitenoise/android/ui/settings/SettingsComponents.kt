@@ -159,6 +159,7 @@ internal fun SettingsLink(
     enabled: Boolean = true,
     busy: Boolean = false,
     destructive: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
     leading: (@Composable () -> Unit)? = null,
 ) {
     val editable = enabled && !busy
@@ -174,11 +175,12 @@ internal fun SettingsLink(
         enabled = editable,
         leadingContent = leading,
         supportingContent = summary?.let { { SettingsRowSupportingText(it, editable) } },
-        trailingContent = {
-            SettingsRowTrailing(busy) {
-                Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null)
-            }
-        },
+        trailingContent =
+            trailing ?: {
+                SettingsRowTrailing(busy) {
+                    Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null)
+                }
+            },
         colors = settingsRowColors(context),
         content = { SettingsRowTitle(title, editable, destructive) },
     )

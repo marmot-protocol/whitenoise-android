@@ -402,36 +402,43 @@ internal fun SettingsScreen(
 
     var openProfilePictureActions by
         rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
-    if (detail == null) {
-        SettingsHomeScreen(
-            appState = appState,
-            onBackToChats = onBackToChats,
-            onOpenDetail = {
-                if (it == SettingsDetail.Profile) openProfilePictureActions = false
-                onDetailChange(it)
-            },
-            onOpenProfilePictureActions = {
-                openProfilePictureActions = true
-                onDetailChange(SettingsDetail.Profile)
-            },
-            viewport = homeViewport,
-            onViewportChange = onHomeViewportChange,
-        )
-        return
+    SettingsRouteMotion(
+        target = detail,
+        depth = settingsDetailDepth(detail),
+        ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+        contentVisible = !appState.appLockScreenVisible,
+    ) { route ->
+        if (route == null) {
+            SettingsHomeScreen(
+                appState = appState,
+                onBackToChats = onBackToChats,
+                onOpenDetail = {
+                    if (it == SettingsDetail.Profile) openProfilePictureActions = false
+                    onDetailChange(it)
+                },
+                onOpenProfilePictureActions = {
+                    openProfilePictureActions = true
+                    onDetailChange(SettingsDetail.Profile)
+                },
+                viewport = homeViewport,
+                onViewportChange = onHomeViewportChange,
+            )
+        } else {
+            SettingsDetailRoute(
+                appState = appState,
+                detail = route,
+                onOpenSupportChat = onOpenSupportChat,
+                onOpenDiagnostics = onOpenDiagnostics,
+                onDetailChange = onDetailChange,
+                openProfilePictureActionsOnEntry = openProfilePictureActions,
+                onProfilePictureActionsOpened = { openProfilePictureActions = false },
+                onProfileBack = {
+                    openProfilePictureActions = false
+                    onDetailChange(null)
+                },
+            )
+        }
     }
-    SettingsDetailRoute(
-        appState = appState,
-        detail = detail,
-        onOpenSupportChat = onOpenSupportChat,
-        onOpenDiagnostics = onOpenDiagnostics,
-        onDetailChange = onDetailChange,
-        openProfilePictureActionsOnEntry = openProfilePictureActions,
-        onProfilePictureActionsOpened = { openProfilePictureActions = false },
-        onProfileBack = {
-            openProfilePictureActions = false
-            onDetailChange(null)
-        },
-    )
 }
 
 /** Every Settings detail destination and the parent each one returns to. */

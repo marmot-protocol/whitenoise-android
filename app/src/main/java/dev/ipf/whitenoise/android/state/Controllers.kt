@@ -3720,7 +3720,7 @@ class ChatsController private constructor(
     ) {
         if (accountRef == null) return
         val rowKey = chatRowKey(record.groupIdHex)
-        if (groupRecordsById[record.groupIdHex] == null && !chatRowsByGroup.containsKey(rowKey)) return
+        val retained = groupRecordsById[record.groupIdHex] != null || chatRowsByGroup.containsKey(rowKey)
         if (members != null) {
             memberCacheLifetime.advance()
             presentationMembersByGroup = presentationMembersByGroup - record.groupIdHex
@@ -3743,6 +3743,12 @@ class ChatsController private constructor(
             memberCacheByGroup = updated.memberCacheByGroup
             removedGroupIds = updated.removedGroupIds
             memberSnapshotsRevision += 1L
+        }
+        // Off-window profile management uses the same authoritative roster cache. Updating it must
+        // not insert a chat into the retained native window or create a second group projection.
+        if (!retained) {
+            if (members != null) scheduleRecompute()
+            return
         }
         // chatListItemFromProjection reads row.archived / row.pendingConfirmation
         // (not just the group record), so patch both the chat row and the group
@@ -11870,10 +11876,18 @@ class ConversationController(
     }
 
     /** Removes [member] from the group, asking first if MDK holds the change back. True once they are gone. */
-    suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
+    suspend fun removeMember(
+        member: AppGroupMemberRecordFfi,
+        refreshAuthorityBeforeCommit: Boolean = false,
+    ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
+            val runtimeAtAdmission = appState.runtimeGeneration
+
+            fun ownsRemovalPresentation(): Boolean =
+                !refreshAuthorityBeforeCommit ||
+                    (appState.activeAccountRef == account && appState.runtimeGeneration == runtimeAtAdmission)
             // remove_members signs a roster update for a Nostr pubkey, so use the
             // stable member id. memberRef may be a local account label.
             val target = member.memberIdHex
@@ -11881,6 +11895,13 @@ class ConversationController(
                 try {
                     val outcome =
                         appState.withGroupCommitLock(account, group.groupIdHex) {
+                            if (refreshAuthorityBeforeCommit) {
+                                val epoch = mutationPresentation.groupAuthorityEpoch
+                                refreshManagementState()
+                                if (mutationPresentation.groupAuthorityEpoch == epoch || !ownsRemovalPresentation()) {
+                                    return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
+                                }
+                            }
                             authoritativeAdministrationTarget(target)
                                 ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             val result =
@@ -11898,10 +11919,10 @@ class ConversationController(
                             GroupAdministrationCommitOutcome.COMMITTED
                         }
                     if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
-                        presentRosterChanged(R.string.toast_couldnt_remove_member)
+                        if (ownsRemovalPresentation()) presentRosterChanged(R.string.toast_couldnt_remove_member)
                         return@track false
                     }
-                    presentConversationTransient(R.string.toast_member_removed)
+                    if (ownsRemovalPresentation()) presentConversationTransient(R.string.toast_member_removed)
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
@@ -11911,10 +11932,16 @@ class ConversationController(
                     // whether this specific target remains in the local roster.
                     refreshMembers()
                     if (members.none { it.memberIdHex.equals(target, ignoreCase = true) }) {
-                        presentConversationTransient(R.string.toast_member_removed)
+                        if (ownsRemovalPresentation()) presentConversationTransient(R.string.toast_member_removed)
                         true
                     } else {
-                        recordMutationFailure(R.string.toast_couldnt_remove_member, "GROUP_REMOVE_MEMBER", throwable)
+                        if (ownsRemovalPresentation()) {
+                            recordMutationFailure(
+                                R.string.toast_couldnt_remove_member,
+                                "GROUP_REMOVE_MEMBER",
+                                throwable,
+                            )
+                        }
                         false
                     }
                 }

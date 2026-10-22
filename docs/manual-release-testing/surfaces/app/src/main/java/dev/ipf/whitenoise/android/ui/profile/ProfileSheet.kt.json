@@ -90,7 +90,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileSheet(",
         "test_ids": [
-          "PRO-001"
+          "PRO-001",
+          "ACC-022"
         ]
       },
       {

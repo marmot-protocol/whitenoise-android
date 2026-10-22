@@ -117,7 +117,14 @@ internal fun GroupReviewDestinationIdentity(
     actionLabel: String? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Avatar(group.name, group.id, 48.dp, pictureUrl = group.pictureUrl, picture = group.image)
+        Avatar(
+            group.name,
+            group.id,
+            48.dp,
+            pictureUrl = group.pictureUrl,
+            picture = group.image,
+            groupAnimation = group.groupAnimation,
+        )
         EmojiLabel(group.name, style = MaterialTheme.typography.titleSmall)
         actionLabel?.let { Text(it) }
     }

@@ -8,7 +8,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Dp
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.whitenoise.android.core.AvatarByteFetchResult
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.GROUP_AVATAR_MAX_PAYLOAD_BYTES
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
@@ -74,6 +76,24 @@ internal fun rememberGroupAvatarPresentation(
             image = durableImage ?: seededImage,
             pictureUrl = null,
             animationKey = durableKey.takeIf { durableAvatarIsPersonPicture },
+            readOriginalBytes = appState.retainedAvatarBytesReader(durableAvatar, accountRef),
+            groupAnimation =
+                if (groupOwnsPicture && durableKey != null) {
+                    appState
+                        .retainedAvatarBytesReader(
+                            durableAvatar,
+                            accountRef,
+                            maxBytes = GROUP_AVATAR_MAX_PAYLOAD_BYTES.toULong(),
+                        )?.let { reader ->
+                            GroupAvatarAnimation(
+                                "${appState.runtimeGeneration}|${AvatarImageLoader.currentCacheLifetime()}|" +
+                                    "${group.groupIdHex}|$durableKey",
+                                reader,
+                            )
+                        }
+                } else {
+                    null
+                },
         )
     }
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
@@ -98,10 +118,101 @@ internal fun rememberGroupAvatarPresentation(
                         legacyUrl == null && encryptedImage == null && it.key == ownedFallback
                 }
             }?.image
+    val originalReader = rememberLegacyGroupAvatarBytes(appState, group, accountRef, legacyUrl, encryptedKey)
     return GroupAvatarPresentation(
         image = seededImage ?: remoteImage ?: encryptedImage,
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
+        readOriginalBytes = originalReader,
+        groupAnimation =
+            originalReader?.takeIf { groupOwnsPicture }?.let { reader ->
+                GroupAvatarAnimation(
+                    "${appState.runtimeGeneration}|${AvatarImageLoader.currentCacheLifetime()}|" +
+                        "$accountRef|${group.groupIdHex}|${legacyUrl ?: encryptedKey}",
+                    reader,
+                )
+            },
     )
+}
+
+/** A legacy viewer/thumbnail reads only the still-selected image of a current authoritative row. */
+@Composable
+private fun rememberLegacyGroupAvatarBytes(
+    appState: WhiteNoiseAppState,
+    group: AppGroupRecordFfi,
+    accountRef: String?,
+    legacyUrl: String?,
+    encryptedKey: String?,
+): (suspend () -> ByteArray?)? =
+    remember(
+        appState,
+        appState.runtimeGeneration,
+        AvatarImageLoader.currentCacheLifetime(),
+        accountRef,
+        group.groupIdHex,
+        legacyUrl,
+        encryptedKey,
+    ) {
+        val runtime = appState.runtimeGeneration
+        val lifetime = AvatarImageLoader.currentCacheLifetime()
+        val ownsSource = {
+            appState.activeAccountRef == accountRef &&
+                appState.runtimeGeneration == runtime &&
+                AvatarImageLoader.currentCacheLifetime() == lifetime
+        }
+        if (accountRef != null && (legacyUrl != null || encryptedKey != null)) {
+            suspend {
+                readLegacyGroupAvatarBytes(
+                    expected = group,
+                    accountRef = accountRef,
+                    ownerIsCurrent = ownsSource,
+                    currentGroup = { appState.currentGroupAvatarItem(accountRef, group.groupIdHex)?.group },
+                    readSnapshotGroup = {
+                        appState.marmotIo { groupConversationSnapshot(accountRef, group.groupIdHex).details.group }
+                    },
+                    readBytes = {
+                        if (legacyUrl != null) {
+                            AvatarImageLoader.peekAnimatedSource(legacyUrl)
+                                ?: (
+                                    AvatarImageLoader.fetchBytes(legacyUrl, GROUP_AVATAR_MAX_PAYLOAD_BYTES)
+                                        as? AvatarByteFetchResult.Success
+                                )?.bytes
+                        } else {
+                            appState.marmotIo { downloadGroupBlossomImage(accountRef, group.groupIdHex) }
+                        }
+                    },
+                )
+            }
+        } else {
+            null
+        }
+    }
+
+/**
+ * A bounded-list miss proves neither selection nor deletion. Read MDK's current snapshot in that case,
+ * and verify it again after the byte read so account/source changes never publish stale animation.
+ */
+@Suppress("LongParameterList")
+internal suspend fun readLegacyGroupAvatarBytes(
+    expected: AppGroupRecordFfi,
+    accountRef: String,
+    ownerIsCurrent: () -> Boolean,
+    currentGroup: () -> AppGroupRecordFfi?,
+    readSnapshotGroup: suspend () -> AppGroupRecordFfi?,
+    readBytes: suspend () -> ByteArray?,
+): ByteArray? {
+    suspend fun sourceIsCurrent(): Boolean {
+        if (!ownerIsCurrent()) return false
+        val current = currentGroup() ?: readSnapshotGroup()
+        return ownerIsCurrent() &&
+            current != null &&
+            current.groupIdHex.equals(expected.groupIdHex, ignoreCase = true) &&
+            ProfileSanitizer.protocolImageUrl(current.avatarUrl) ==
+            ProfileSanitizer.protocolImageUrl(expected.avatarUrl) &&
+            encryptedGroupAvatarCacheKey(accountRef, current) == encryptedGroupAvatarCacheKey(accountRef, expected)
+    }
+    if (!sourceIsCurrent()) return null
+    val bytes = readBytes() ?: return null
+    return bytes.takeIf { it.size <= GROUP_AVATAR_MAX_PAYLOAD_BYTES && sourceIsCurrent() }
 }
 
 /** A private picture can be displayed only for its own known, signed-in local account. */
@@ -189,7 +300,7 @@ internal fun rememberConversationGroupAvatar(
         )
     return presentation.copy(
         readOriginalBytes =
-            originalBytes.takeUnless {
+            (originalBytes ?: presentation.readOriginalBytes).takeUnless {
                 dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
                     .isPrivate(presentation.pictureUrl)
             },
@@ -289,5 +400,6 @@ internal fun GroupAvatar(
         pictureUrl = presentation.pictureUrl?.takeIf { presentation.image == null },
         picture = presentation.image,
         animationKey = presentation.animationKey,
+        groupAnimation = presentation.groupAnimation,
     )
 }

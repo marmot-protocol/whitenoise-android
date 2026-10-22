@@ -4,10 +4,16 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -60,6 +66,46 @@ class PersonProfileScreenshotTest {
 
     /** Confirmed empty groups offers the explicit existing Add action. */
     @Test fun emptyGroups() = groups("groups_empty", false, emptyList())
+
+    @Test fun membershipActionsLight() = membershipActions("light")
+
+    @Test fun membershipActionsDark() = membershipActions("dark", dark = true)
+
+    @Test fun membershipActionsAmoled() = membershipActions("amoled", dark = true, amoled = true)
+
+    @Test fun membershipActionsLargeRtl() = membershipActions("large_rtl", rtl = true)
+
+    @OptIn(ExperimentalRoborazziApi::class)
+    private fun membershipActions(
+        name: String,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
+                    PersonGroupsInCommonContent(
+                        rows = listOf(PersonSharedGroupRow("friends", "Friends", 4)),
+                        unresolved = false,
+                        onBack = {},
+                        onOpen = {},
+                        onAdd = {},
+                        onRetry = {},
+                        removeLabel = { "Remove River from ${it.title}" },
+                        onRemove = {},
+                        canRemove = { true },
+                    )
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_group_membership_$name.png")
+        composeRule.onNodeWithTag("groups_in_common.menu.friends").performClick()
+        composeRule.onNodeWithText("Remove River from Friends").assertIsDisplayed()
+        captureScreenRoboImage("src/test/snapshots/shared_group_membership_${name}_menu.png")
+    }
 
     /** Private local editor is scrollable and uses the shared field styling. */
     @Test fun privateDetails() {

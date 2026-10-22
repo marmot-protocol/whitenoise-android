@@ -51,6 +51,7 @@ internal fun Avatar(
     pictureUrl: String? = null,
     picture: ImageBitmap? = null,
     animationKey: String? = null,
+    groupAnimation: GroupAvatarAnimation? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -98,6 +99,10 @@ internal fun Avatar(
                 } else {
                     animationKey
                 }
+            if (groupAnimation != null) {
+                val maxEdgePx = with(LocalDensity.current) { size.roundToPx() }
+                AnimatedGroupAvatarOverlay(groupAnimation, Modifier.fillMaxSize(), maxEdgePx)
+            }
             if (animatedKey != null) {
                 val maxEdgePx = with(LocalDensity.current) { size.roundToPx() }
                 AnimatedProfileAvatarOverlay(animatedKey, image, Modifier.fillMaxSize(), maxEdgePx)

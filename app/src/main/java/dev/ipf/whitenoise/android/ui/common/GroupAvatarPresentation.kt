@@ -12,4 +12,5 @@ internal data class GroupAvatarPresentation(
     val pictureUrl: String?,
     val readOriginalBytes: (suspend () -> ByteArray?)? = null,
     val animationKey: String? = null,
+    val groupAnimation: GroupAvatarAnimation? = null,
 )
