@@ -141,6 +141,17 @@ class MarmotUpgradeFixtureTest {
         while (runtime.attachmentLocalAssets(receiver.label, group, listOf(target)).single().reference == null) {
             delay(100L)
         }
+        val initial =
+            JSONObject()
+                .put("accounts", JSONArray(runtime.listAccounts().map { it.accountIdHex }.sorted()))
+                .put("sender", sender.label)
+                .put("receiver", receiver.label)
+                .put("group", group)
+                .put("seedPid", Process.myPid())
+                .put("originalMessage", requireNotNull(upload.sent).messageIds.single())
+        receipt.writeText(initial.toString())
+        // Avatar metadata advances the group epoch; finish it before preparing epoch-bound unsent media.
+        if (fileStoreBaseline()) seedUpgradeAvatar(runtime, receipt)
         // Keep an uploaded-but-unsent outgoing record across 0113 as well as the published attachment.
         val pending =
             runtime.uploadMedia(
@@ -155,16 +166,9 @@ class MarmotUpgradeFixtureTest {
             )
         val reference = pending.attachments.single().reference
         val value =
-            JSONObject()
-                .put("accounts", JSONArray(runtime.listAccounts().map { it.accountIdHex }.sorted()))
-                .put("sender", sender.label)
-                .put("receiver", receiver.label)
-                .put("group", group)
-                .put("seedPid", Process.myPid())
-                .put("originalMessage", requireNotNull(upload.sent).messageIds.single())
+            JSONObject(receipt.readText())
                 .put("pendingReference", reference.upgradeReceipt())
         receipt.writeText(value.toString())
-        if (fileStoreBaseline()) seedUpgradeAvatar(runtime, receipt)
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
     }
