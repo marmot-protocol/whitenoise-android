@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactShare.kt",
+  "legacy_sha256": "7b4a3a01074c355f262999e9ef71af16038d1815819e8d842ac5492210268cd3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "attachedVCardContact",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactShare.kt",
+        "anchor": "fun attachedVCardContact(",
+        "test_ids": [
+          "MED-029"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "External operation ownership through authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactShare.kt",
+        "anchor": "SharedContactSaver",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

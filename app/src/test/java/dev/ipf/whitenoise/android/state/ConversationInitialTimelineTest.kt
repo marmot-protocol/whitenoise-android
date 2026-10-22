@@ -29,6 +29,7 @@ class ConversationInitialTimelineTest {
         assertEquals(MessageStatus.Received, timeline.single().status)
     }
 
+    /** A preview that cannot paint as a complete, final row, including one naming an event card, seeds nothing. */
     @Test
     fun incompleteOrDerivedPreviewNeverSeedsAProtocolRow() {
         val rejected =
@@ -41,6 +42,8 @@ class ConversationInitialTimelineTest {
                 preview(attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 1u),
                 preview(contentTokens = markdown(truncated = true)),
                 preview(deliveryState = ChatListMessageDeliveryStateFfi.FAILED),
+                // A seeded event card would paint as Loading before the first page can warm it (#2238).
+                preview(plaintext = "look nostr:note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv"),
             )
 
         rejected.forEach { candidate ->

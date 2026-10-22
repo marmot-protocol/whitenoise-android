@@ -905,6 +905,14 @@
         "test_ids": [
           "CHL-007"
         ]
+      },
+      {
+        "surface": "A first page naming event cards stays unpublished until their cached state is read, on every open path",
+        "anchor": "private fun releaseInitialPageEventCardHold(",
+        "test_ids": [
+          "STB-002"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"
       }
     ]
   },

@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.animation.ValueAnimator
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.updateTransition
@@ -96,7 +97,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
@@ -187,11 +187,25 @@ internal fun conversationRouteForwardDirection(layoutDirection: LayoutDirection)
         Rtl -> -1
     }
 
+/**
+ * One staged share's post-account-switch chat open, bound to the share request that produced it.
+ * [stagedAtElapsedMillis] is [SystemClock.elapsedRealtime] at staging, so a token restored long after
+ * the share (or across a reboot) is discarded instead of reopening a chat out of context.
+ */
 internal data class PendingStagedShareOpen(
+    val requestId: String,
     val accountRef: String,
     val groupIdHex: String,
     val otherChatCount: Int,
-)
+    val stagedAtElapsedMillis: Long = SystemClock.elapsedRealtime(),
+) {
+    /** True while the account-switch handoff is still recent enough to follow the user's share. */
+    fun isFresh(nowElapsedMillis: Long = SystemClock.elapsedRealtime()): Boolean =
+        nowElapsedMillis - stagedAtElapsedMillis in 0L..STAGED_SHARE_OPEN_MAX_AGE_MILLIS
+}
+
+/** Covers a slow account switch and chat-list load, but not a later unrelated app return. */
+internal const val STAGED_SHARE_OPEN_MAX_AGE_MILLIS = 5L * 60L * 1_000L
 
 internal sealed interface ProfileForegroundRoute {
     data object None : ProfileForegroundRoute
@@ -654,7 +668,7 @@ internal fun MainShell(
     val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
     val currentShareRequestId by rememberUpdatedState(visibleShareRequest?.requestId ?: inboundShareRequest?.requestId)
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
-    var pendingStagedShareOpen by remember { mutableStateOf<PendingStagedShareOpen?>(null) }
+    var pendingStagedShareOpen by shellStateHolder::pendingStagedShareOpen
     val clearSharePickerRequest: () -> Unit = {
         val request = visibleShareRequest ?: inboundShareRequest
         val requestId = request?.requestId ?: shellStateHolder.pendingShareRequestId
@@ -856,7 +870,8 @@ internal fun MainShell(
         }
     }
 
-    val openAfterStagedShare: (String, List<String>) -> Unit = openStagedShare@{ accountRef, groupIds ->
+    // The first argument is the staged share's request id, which binds a deferred cross-account open.
+    val openAfterStagedShare: (String, String, List<String>) -> Unit = openStagedShare@{ share, accountRef, groupIds ->
         if (groupIds.isEmpty()) return@openStagedShare
         val otherCount = groupIds.size - 1
         if (accountRef == appState.activeAccountRef) {
@@ -873,6 +888,7 @@ internal fun MainShell(
         } else {
             val pending =
                 PendingStagedShareOpen(
+                    requestId = share,
                     accountRef = accountRef,
                     groupIdHex = groupIds.first(),
                     otherChatCount = otherCount,
@@ -906,7 +922,7 @@ internal fun MainShell(
                 appState.present(R.string.toast_notification_account_unavailable)
                 return@stageShare false
             }
-            openAfterStagedShare(accountRef, groupIds)
+            openAfterStagedShare(request.requestId, accountRef, groupIds)
             true
         }
 
@@ -921,6 +937,11 @@ internal fun MainShell(
         chatsController.archivedItems,
     ) {
         val pending = pendingStagedShareOpen ?: return@LaunchedEffect
+        if (!pending.isFresh()) {
+            // A handoff that outlived its share must not open a chat the user has long left.
+            pendingStagedShareOpen = null
+            return@LaunchedEffect
+        }
         if (appState.accounts.none { it.label == pending.accountRef && it.isSignedInSigningAccount() }) {
             pendingStagedShareOpen = null
             appState.present(R.string.toast_notification_account_unavailable)
@@ -1025,7 +1046,7 @@ internal fun MainShell(
                 }
             if (stagingResult.getOrDefault(false)) {
                 clearSharePickerRequest()
-                openAfterStagedShare(accountRef, listOf(directGroupId))
+                openAfterStagedShare(request.requestId, accountRef, listOf(directGroupId))
             } else {
                 if (shellStateHolder.promoteInboundShareRequest(request, persisted)) onShareRequestHandled(request)
                 val message =
@@ -1647,21 +1668,26 @@ internal fun MainShell(
         if (!controller.group.groupIdHex.equals(request.item.group.groupIdHex, ignoreCase = true)) {
             return@LaunchedEffect
         }
-        withTimeoutOrNull(CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS) {
-            snapshotFlow {
-                preparedConversationCanOpen(
-                    hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
-                    hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
-                    hasLoadError = controller.error != null,
-                    terminalConversationUnavailable = controller.terminalConversationUnavailable,
-                )
-            }.filter { it }
-                .first()
-        }
+        awaitPreparedConversationOpen(
+            awaitReady = {
+                snapshotFlow {
+                    preparedConversationCanOpen(
+                        hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
+                        hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
+                        hasLoadError = controller.error != null,
+                        terminalConversationUnavailable = controller.terminalConversationUnavailable,
+                    )
+                }.filter { it }
+                    .first()
+            },
+            holdingForEventCards = { controller.isHoldingInitialPageForEventCards },
+        )
         // A normal cached open reaches the ready state before this deadline and
-        // keeps its spinner-free transition. A stuck local read must not make a
-        // tap look ignored indefinitely; after the bound, the destination owns
-        // the existing loading/error surfaces while the same controller continues.
+        // keeps its spinner-free transition. A first page held for its event
+        // cards may extend the wait by the card budget, never more. A stuck local
+        // read must not make a tap look ignored indefinitely; after the bound,
+        // the destination owns the existing loading/error surfaces while the
+        // same controller continues.
         selectedChatOpenContext = ConversationOpenContext(focusMessageId = request.focusMessageId)
         selectedChatJustCreated = request.justCreated
         selectedChatOpenedAsDmHint = request.justCreated

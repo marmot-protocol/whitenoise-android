@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -453,7 +454,7 @@ internal fun ProfileImageActions(
 ) {
     var expanded by remember(owner) { mutableStateOf(false) }
     var entryExpansionConsumed by remember(owner, target) { mutableStateOf(false) }
-    var pickerOwner by remember(owner) { mutableStateOf<String?>(null) }
+    var pickerOwner by rememberSaveable(owner, target.name) { mutableStateOf<String?>(null) }
     var launchFailed by remember(owner) { mutableStateOf(false) }
     val photos =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->

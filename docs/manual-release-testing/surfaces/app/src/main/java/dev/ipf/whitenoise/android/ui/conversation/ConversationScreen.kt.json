@@ -211,6 +211,30 @@
         "test_ids": [
           "MED-013"
         ]
+      },
+      {
+        "surface": "External operation ownership through authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "rememberConversationCameraCapture(",
+        "test_ids": [
+          "STB-001"
+        ]
+      },
+      {
+        "surface": "Authentication-return feedback: R.string.contact_read_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.contact_read_failed",
+        "test_ids": [
+          "STB-001"
+        ]
+      },
+      {
+        "surface": "Authentication-return feedback: R.string.toast_couldnt_decode_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.toast_couldnt_decode_image",
+        "test_ids": [
+          "STB-001"
+        ]
       }
     ]
   },

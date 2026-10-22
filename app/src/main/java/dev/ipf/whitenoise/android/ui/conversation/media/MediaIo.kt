@@ -914,7 +914,7 @@ internal fun fileProviderUri(
  * stale-age basis at app start instead.
  */
 internal fun clearMediaTempFiles(context: android.content.Context) {
-    runCatching { java.io.File(context.cacheDir, "camera").deleteRecursively() }
+    runCatching { AttachmentPlaintextCache.clearUnheldFiles(java.io.File(context.cacheDir, "camera")) }
     runCatching { java.io.File(context.cacheDir, MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
 }
 

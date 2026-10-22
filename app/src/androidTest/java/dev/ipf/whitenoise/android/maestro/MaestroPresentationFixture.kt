@@ -46,6 +46,14 @@ internal class MaestroPresentationFixture(
     lateinit var imageUri: Uri
         private set
     private var imageFile: File? = null
+    var emojiDirectory: File? = null
+        private set
+    val emojiBytes: ByteArray
+        get() =
+            java.io.ByteArrayOutputStream().use {
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                it.toByteArray()
+            }
     private var clipboard: MaestroPresentationClipboard? = null
     private var translationAcquisition: JSONObject? = null
     var nativeController: ConversationController? = null
@@ -95,6 +103,12 @@ internal class MaestroPresentationFixture(
             imageFile = file
             file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
             imageUri = Uri.fromFile(file)
+        }
+        if (scenario.startsWith("extra-modal-emoji-wrapper-")) {
+            emojiDirectory =
+                java.nio.file.Files
+                    .createTempDirectory(activity.cacheDir.toPath(), "maestro-emoji-")
+                    .toFile()
         }
         activity.setContent {
             WhiteNoiseTheme {
@@ -202,6 +216,7 @@ internal class MaestroPresentationFixture(
     override fun close() {
         nativeController?.onCleared()
         if (scenario == "surface-animated-avatar") AvatarImageLoader.clear()
+        emojiDirectory?.let { check(it.deleteRecursively() && !it.exists()) { "Emoji fixture cleanup failed" } }
         bitmap.recycle()
         imageFile?.let { check(!it.exists() || it.delete()) { "Generated preview file cleanup failed" } }
     }

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.whitenoise.android.ui.conversation.nostr.mayNameNostrEventCard
 
 /**
  * Builds the short-lived timeline shown while the authoritative MDK page opens.
@@ -10,8 +11,10 @@ import dev.ipf.marmotkit.ChatListMessagePreviewFfi
  * The chat-list projection deliberately carries less data than a timeline row.
  * Only an undeleted, complete plain-text kind-9 preview can therefore be
  * reconstructed without inventing tags or rendering a derived protocol event as
- * a chat bubble. Full optimistic rows are already conversation-scoped UI state
- * and take precedence when the chat-list preview points at the same message.
+ * a chat bubble. A preview that names an event card is left out too, because its
+ * card could not be warmed before this seed paints (#2238). Full optimistic rows
+ * are already conversation-scoped UI state and take precedence when the
+ * chat-list preview points at the same message.
  */
 internal fun initialConversationTimeline(
     preview: ChatListMessagePreviewFfi?,
@@ -40,6 +43,8 @@ private fun ChatListMessagePreviewFfi.isRenderableInitialSeed(groupIdHex: String
         !deleted &&
         kind == CHAT_MESSAGE_KIND &&
         plaintext.isNotBlank() &&
+        // A seeded card would start as Loading before the first page warms it, so such a preview waits for the page.
+        !mayNameNostrEventCard(plaintext) &&
         attachmentKind == null &&
         attachmentCount == 0u &&
         !contentTokens.truncated

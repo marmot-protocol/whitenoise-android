@@ -111,6 +111,40 @@ class AuditUploadConsentTest {
             }
         }
 
+    /** A declined acknowledgement stays declined across an update or restart, with no renewal sheet (#2820). */
+    @Test
+    fun declinedAcknowledgementSurvivesUpdateWithoutRenewal() =
+        runTest {
+            preferences.edit().clear().commit()
+            AuditUploadConsent(preferences).choose(false)
+            val receipt = preferences.all.toMap()
+            repeat(2) {
+                val native = Native(enabled = false)
+                val updated = AuditUploadConsent(preferences)
+                updated.prepare(native.runtime)
+                assertFalse(updated.granted)
+                assertFalse(updated.requiresChoice)
+                assertFalse(native.enabled)
+                assertFalse(native.mutations.contains("allow-upload"))
+                assertEquals(receipt, preferences.all)
+            }
+        }
+
+    /** A failed recorder read after an update neither clears a valid acknowledgement nor asks again. */
+    @Test
+    fun failedRecorderReadAfterUpdateKeepsTheAcknowledgement() =
+        runTest {
+            preferences.edit().clear().commit()
+            AuditUploadConsent(preferences).choose(true)
+            val receipt = preferences.all.toMap()
+            val native = Native(enabled = true, failSettingsRead = true)
+            val updated = AuditUploadConsent(preferences)
+            updated.prepare(native.runtime)
+            assertTrue(updated.granted)
+            assertFalse(updated.requiresChoice)
+            assertEquals(receipt, preferences.all)
+        }
+
     /** Native rejection leaves a consented recorder local and cannot assert upload readiness. */
     @Test
     fun rejectedV5UploadDoesNotBlockStartupOrStopLocalRecording() =

@@ -933,7 +933,7 @@ private fun FileLibraryTab(
     appState: WhiteNoiseAppState,
     onJumpToMessage: (String) -> Unit,
 ) {
-    val documentSaveFallback = rememberDocumentSaveFallback()
+    val documentSaveFallback = rememberDocumentSaveFallback(appState, controller.group.groupIdHex)
     MonthSectionedColumn(
         sections = tiles.fileSections,
         listState = listState,

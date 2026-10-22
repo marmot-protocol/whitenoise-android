@@ -314,8 +314,10 @@ object ConversationNotificationChannels {
             lightColor = source.lightColor
             setAllowBubbles(source.canBubble())
             if (vibrationPattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
-                enableVibration(parent.shouldVibrate())
+                // Pattern first: `setVibrationPattern(null)` also turns vibration off, which would drop
+                // a parent that vibrates with the system default waveform (#1717).
                 this.vibrationPattern = parent.vibrationPattern
+                enableVibration(parent.shouldVibrate())
             } else {
                 applyConversationVibration(this, vibrationPattern)
             }

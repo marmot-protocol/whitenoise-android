@@ -2380,4 +2380,6 @@
     <string name="search_scope_selected_chats">Chats seleccionados</string>
     <string name="search_message_content_loading">Buscando en el contenido de los mensajes…</string>
     <string name="search_message_content_failed">No se pudo buscar en el contenido de los mensajes.</string>
+    <string name="document_save_interrupted">La autenticación interrumpió el guardado. Elige Guardar de nuevo para seleccionar un destino.</string>
+    <string name="avatar_preparation_interrupted">Se interrumpió la actualización de la imagen. Revisa la imagen actual antes de seleccionarla de nuevo.</string>
 </resources>

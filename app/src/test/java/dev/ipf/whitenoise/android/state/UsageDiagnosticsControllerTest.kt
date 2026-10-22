@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsPromptState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -17,11 +18,19 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** Behavioral receipt projection tests; the fake controls persistence failure and exporter capability. */
+/**
+ * Behavioral receipt projection tests; the fake controls persistence failure and exporter capability.
+ * Robolectric supplies `android.util.Log` for the controller's debug receipt line.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class UsageDiagnosticsControllerTest {
     /** A replacement Android projection reads the native decision without creating another grant. */
     @Test
@@ -243,6 +252,78 @@ class UsageDiagnosticsControllerTest {
             assertFalse(state.busy)
         }
 
+    /**
+     * An ordinary update or process restart keeps a saved choice (#2820): an unchanged granted or declined
+     * receipt opens no startup sheet, and only MDK's own renewal verdict asks again.
+     */
+    @Test
+    fun updateWithUnchangedReceiptOpensNoStartupSheetAndKeepsTheChoice() =
+        runBlocking {
+            for (enabled in listOf(true, false)) {
+                val native = NativeReceipt()
+                assertTrue(UsageDiagnosticsController().choose(native.engine, enabled))
+                val updated = UsageDiagnosticsController()
+                updated.refresh(native.engine)
+                assertEquals(enabled, updated.granted)
+                assertFalse("a declined user is never opted in by an update", !enabled && updated.selected)
+                assertEquals(StartupDiagnosticsPromptState.CLOSED, startupPrompt(updated))
+                assertEquals(1, native.writes)
+
+                native.decision = UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED
+                val renewed = UsageDiagnosticsController()
+                renewed.refresh(native.engine)
+                assertFalse(renewed.granted)
+                assertEquals(StartupDiagnosticsPromptState.CHOICE, startupPrompt(renewed))
+            }
+        }
+
+    /** A failed receipt read after an update is a visible retry, never a granted or settled receipt. */
+    @Test
+    fun failedReadAfterUpdateStaysRetryableUntilTheReceiptLoads() =
+        runBlocking {
+            val native = NativeReceipt()
+            assertTrue(UsageDiagnosticsController().choose(native.engine, true))
+            native.fail = true
+            val updated = UsageDiagnosticsController()
+            updated.refresh(native.engine)
+            assertTrue(updated.failed)
+            assertFalse(updated.granted)
+            assertNull(updated.observations.ticket())
+            val prompt = startupPrompt(updated)
+            assertEquals(StartupDiagnosticsPromptState.READ_ERROR, prompt)
+            native.fail = false
+            updated.retry(native.engine)
+            assertTrue(updated.granted)
+            assertEquals(
+                StartupDiagnosticsPromptState.CLOSED,
+                prompt.refreshed(decisionLoaded = true, choiceRequired = updated.requiresChoice, readFailed = false),
+            )
+        }
+
+    /** The upgrade-repro debug line carries the decision and short revision hashes, and nothing else. */
+    @Test
+    fun receiptLogCarriesOnlyDecisionAndShortRevisions() =
+        runBlocking {
+            val native = NativeReceipt()
+            native.registryRevision = "0123456789abcdef".repeat(4)
+            val state = UsageDiagnosticsController()
+            state.refresh(native.engine)
+            assertEquals(
+                "usage_diagnostics_receipt op=read result=ok decision=ACCEPTANCE_REQUIRED " +
+                    "policy=policy registry=0123456789ab exporter=READY",
+                usageDiagnosticsReceiptLog(write = false, snapshot = state.snapshot),
+            )
+            assertEquals("usage_diagnostics_receipt op=write result=failed", usageDiagnosticsReceiptLog(true, null))
+        }
+
+    /** Replays the production startup prompt decision for one freshly loaded receipt projection. */
+    private fun startupPrompt(state: UsageDiagnosticsController) =
+        StartupDiagnosticsPromptState.AWAITING_RECEIPT.refreshed(
+            decisionLoaded = state.snapshot != null || state.failed,
+            choiceRequired = state.requiresChoice,
+            readFailed = state.failed,
+        )
+
     /** Tiny native boundary with independently controllable settings and delivery capability. */
     private class NativeReceipt {
         var writes = 0
@@ -250,7 +331,8 @@ class UsageDiagnosticsControllerTest {
         var configured = true
         var beforeWrite: () -> Unit = {}
         var beforeRead: () -> Unit = {}
-        private var decision = UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED
+        var decision = UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED
+        var registryRevision = "registry"
         val engine =
             Proxy.newProxyInstance(
                 MarmotInterface::class.java.classLoader,
@@ -294,6 +376,6 @@ class UsageDiagnosticsControllerTest {
             } as MarmotInterface
 
         /** Returns a native-shaped receipt without exposing test identity or content. */
-        private fun settings() = UsageDiagnosticsSettingsFfi(decision, "policy", "registry", 0L, false)
+        private fun settings() = UsageDiagnosticsSettingsFfi(decision, "policy", registryRevision, 0L, false)
     }
 }

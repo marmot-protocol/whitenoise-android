@@ -2378,4 +2378,6 @@
     <string name="search_scope_selected_chats">Seçilen sohbetler</string>
     <string name="search_message_content_loading">Mesaj içeriği aranıyor…</string>
     <string name="search_message_content_failed">Mesaj içeriğinde arama yapılamadı.</string>
+    <string name="document_save_interrupted">Kimlik doğrulama bu kaydetme işlemini kesintiye uğrattı. Hedef seçmek için tekrar Kaydet’i seçin.</string>
+    <string name="avatar_preparation_interrupted">Görüntü güncellemesi kesintiye uğradı. Tekrar seçmeden önce mevcut görüntüyü kontrol edin.</string>
 </resources>

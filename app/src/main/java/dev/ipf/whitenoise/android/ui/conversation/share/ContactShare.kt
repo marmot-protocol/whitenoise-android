@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.ContactsContract
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
+import androidx.compose.runtime.saveable.listSaver
 import dev.ipf.whitenoise.android.state.PendingAttachment
 
 private const val TAG = "WNContactShare"
@@ -35,6 +36,19 @@ internal data class SharedContact(
 
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: phone ?: email ?: ""
 }
+
+/** Retains only the one explicitly selected contact across app-lock disposal. */
+internal val SharedContactSaver =
+    listSaver<SharedContact?, String>(
+        save = { contact ->
+            contact?.let { listOf(it.name.orEmpty(), it.phone.orEmpty(), it.email.orEmpty()) }.orEmpty()
+        },
+        restore = { fields ->
+            fields.takeIf { it.size == 3 }?.let {
+                SharedContact(it[0].ifEmpty { null }, it[1].ifEmpty { null }, it[2].ifEmpty { null })
+            }
+        },
+    )
 
 /** Human-readable body carried as the message caption (also the text fallback). */
 internal fun formatContactShareText(contact: SharedContact): String = listOfNotNull(contact.name, contact.phone, contact.email).joinToString("\n")
