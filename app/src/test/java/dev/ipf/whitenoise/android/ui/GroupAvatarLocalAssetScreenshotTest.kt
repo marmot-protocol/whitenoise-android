@@ -808,7 +808,9 @@ class CachedGroupAvatarSourceTest {
                     .twoFrameGif()
             AvatarImageLoader.putCachedAnimated(url, image, gif)
             val retired =
-                fixture.state.legacyGroupAnimationReader(ACCOUNT_REF, url) { error("URL reader must remain cache-only") }
+                fixture.state.legacyGroupAnimationReader(ACCOUNT_REF, url) {
+                    error("URL reader must remain cache-only")
+                }
             var encryptedReads = 0
             val encrypted =
                 fixture.state.legacyGroupAnimationReader(ACCOUNT_REF, null) {

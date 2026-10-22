@@ -1936,7 +1936,9 @@ internal fun ChatsScreen(
                             ),
                         )
                     }
-                    if (unreadOnly && currentUnreadSnapshot == null && !unreadReadFailed && displayUnreadSnapshot != null) {
+                    val unreadRefreshPending = unreadOnly && currentUnreadSnapshot == null
+                    val retainedUnreadVisible = !unreadReadFailed && displayUnreadSnapshot != null
+                    if (unreadRefreshPending && retainedUnreadVisible) {
                         CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
                     }
                     if (unreadReadFailed && unreadOnly) {

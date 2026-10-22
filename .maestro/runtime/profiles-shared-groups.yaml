@@ -19,6 +19,29 @@ name: profiles-shared-groups
       text: "Groups in Common"
     direction: DOWN
 - tapOn: "Groups in Common"
+- assertVisible:
+    id: groups_in_common.list
+- assertVisible: "Maestro group"
+- assertVisible:
+    id: 'groups_in_common\.menu\..+'
+    enabled: true
+- tapOn:
+    id: 'groups_in_common\.menu\..+'
+- assertVisible:
+    text: Remove Maestro Bob from Maestro group
+- tapOn:
+    text: Remove Maestro Bob from Maestro group
+- assertVisible:
+    id: confirmation.confirm
+    enabled: true
+- assertVisible:
+    text: '(?s)Remove Maestro Bob \(npub1[a-z0-9]+\) from Maestro group\?\nGroup: [0-9a-fA-F]+\nActing as: [^\n]+ \(npub1[a-z0-9]+\)\.\n\nTheir access to this group will be removed\.'
+- tapOn:
+    id: confirmation.cancel
+- assertNotVisible:
+    id: confirmation.confirm
+- assertVisible:
+    id: groups_in_common.list
 - assertVisible: "Maestro group"
 - back
 - assertVisible: "User Profile"

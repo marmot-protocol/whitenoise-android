@@ -38,12 +38,15 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLooper
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -247,24 +250,46 @@ class ChatsScreenFolderSelectionRecompositionTest {
                 },
             )
         val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
-        val retained = chatItem(id).let { it.copy(projection = checkNotNull(it.projection).copy(manuallyMarkedUnread = true)) }
-        setControllerItems(controller, listOf(retained))
-        composeRule.setContent {
-            WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
+        try {
+            val retained =
+                chatItem(id).let {
+                    it.copy(projection = checkNotNull(it.projection).copy(manuallyMarkedUnread = true))
+                }
+            setControllerItems(controller, listOf(retained))
+            composeRule.setContent {
+                WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
+            }
+            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.waitUntil { reads == 1 }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chat.row.$id").assertExists()
+            val revisionBeforeUpdate =
+                composeRule.runOnIdle {
+                    assertEquals(ACCOUNT_REF, controller.accountRef)
+                    val revision = controller.forwardTargetsRevision
+                    controller.applyChatListRow(native.row.copy(activitySortAt = 10uL))
+                    assertTrue(controller.containsGroup(id))
+                    revision
+                }
+            // The real row-update API coalesces recompute on Android Main after 16ms; Compose's
+            // frame clock does not advance Robolectric's delayed Android-looper work.
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            composeRule.runOnIdle { assertTrue(controller.forwardTargetsRevision > revisionBeforeUpdate) }
+            composeRule.waitUntil { reads >= 2 }
+            composeRule.onNodeWithTag("chat.row.$id").assertExists()
+            composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
+            composeRule
+                .onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG)
+                .assertDoesNotExist()
+            composeRule.runOnIdle { replacement.complete(listOf(native)) }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+        } finally {
+            composeRule.runOnIdle {
+                replacement.complete(emptyList())
+                controller.onCleared()
+            }
         }
-        composeRule.onNodeWithTag("chats.unread_filter").performClick()
-        composeRule.waitUntil { reads == 1 }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("chat.row.$id").assertExists()
-        composeRule.runOnIdle { controller.applyChatListRow(native.row.copy(activitySortAt = 10uL)) }
-        composeRule.waitUntil { reads >= 2 }
-        composeRule.onNodeWithTag("chat.row.$id").assertExists()
-        composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
-        composeRule.onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
-        composeRule.runOnIdle { replacement.complete(listOf(native)) }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
-        controller.onCleared()
     }
 
     private fun testAppState(): WhiteNoiseAppState =
