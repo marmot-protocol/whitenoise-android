@@ -159,18 +159,24 @@ class QualificationEvidenceTest(unittest.TestCase):
                 self.assertIn('transport timeout', evidence)
                 self.assertEqual(len(list(Path(directory).glob('*-command-error.txt'))), 4)
 
-    def test_recovery_allows_only_the_two_documented_upstream_ignores(self):
-        """A changed recovery skip set needs explicit review rather than silently passing the campaign."""
-        passed = [(name, 0) for name in campaign.RECOVERY_CASES]
-        for skipped in (campaign.IGNORED, set(), campaign.IGNORED | {'unexpected'}):
-            output = transcript(passed + [(name, -3) for name in skipped])
-            with tempfile.TemporaryDirectory() as directory:
-                with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign, 'adb', return_value=output):
-                    if skipped == campaign.IGNORED:
-                        campaign.instrument('recovery', campaign.RECOVERY, campaign.RECOVERY_CASES)
-                    else:
-                        with self.assertRaises(RuntimeError):
-                            campaign.instrument('recovery', campaign.RECOVERY, campaign.RECOVERY_CASES)
+    def test_recovery_requires_both_formerly_ignored_cases(self):
+        """The adopted replay fixes must execute; ignored, missing and failed cases are all blocking."""
+        cases = campaign.RECOVERY_CASES
+        for changed in ('oneSenderBeyondTheReorderToleranceRecoversEveryMessage',
+                        'offlineReplayAfterTheLookbackRecoversEveryMessage'):
+            self.assertIn(changed, cases)
+            for terminal in (0, -3, -2, None):
+                rows = [(name, 0) for name in cases - {changed}]
+                if terminal is not None:
+                    rows.append((changed, terminal))
+                with tempfile.TemporaryDirectory() as directory:
+                    with patch.object(campaign, 'REPORTS', Path(directory)), \
+                            patch.object(campaign, 'adb', return_value=transcript(rows)):
+                        if terminal == 0:
+                            campaign.instrument('recovery', campaign.RECOVERY, cases)
+                        else:
+                            with self.assertRaises(RuntimeError):
+                                campaign.instrument('recovery', campaign.RECOVERY, cases)
 
     def test_component_disable_requires_the_reported_state(self):
         """A zero-exit pm command reporting DEFAULT cannot satisfy the background isolation precondition."""

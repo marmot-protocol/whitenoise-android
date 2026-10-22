@@ -108,6 +108,10 @@ internal fun recordUpgradeDatabase(
         0,
         Bundle().apply { putString("qualification_database", report.toString()) },
     )
+    if (fileStoreBaseline()) {
+        check(walBytes == 0L) { "Closed native runtime retained an untruncated WAL" }
+        return
+    }
     if (phase == "seed") {
         check(bytes >= 32L * 1024L * 1024L) { "Baseline did not persist the large legacy fixture" }
         value.put("baselineDatabaseBytes", bytes)

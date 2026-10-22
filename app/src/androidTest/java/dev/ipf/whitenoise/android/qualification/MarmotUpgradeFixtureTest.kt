@@ -71,6 +71,7 @@ class MarmotUpgradeFixtureTest {
                     runtime.start()
                     if (phase == "seed") {
                         seed(runtime, relay, requireNotNull(arguments.getString("blobPort")), receipt)
+                        if (fileStoreBaseline()) verifyUpgradeStorage(runtime, phase, beforeStart = false)
                     } else if (phase in setOf("corrupt", "lost")) {
                         recoverDamagedMedia(runtime, root, receipt)
                     } else {
@@ -92,7 +93,7 @@ class MarmotUpgradeFixtureTest {
                         } else if (phase == "promoted-cold") {
                             verifyPendingUpload(runtime, receipt, phase)
                         }
-                        if (phase == "upgrade") {
+                        if (phase == "upgrade" && !fileStoreBaseline()) {
                             awaitUpgradeCompaction(root, receipt)
                             verifyUpgradeStorage(
                                 runtime,
@@ -163,6 +164,7 @@ class MarmotUpgradeFixtureTest {
                 .put("originalMessage", requireNotNull(upload.sent).messageIds.single())
                 .put("pendingReference", reference.upgradeReceipt())
         receipt.writeText(value.toString())
+        if (fileStoreBaseline()) seedUpgradeAvatar(runtime, "http://127.0.0.1:$blobPort", receipt)
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
     }
@@ -180,6 +182,7 @@ class MarmotUpgradeFixtureTest {
         if (phase == "promoted-cold") assertNotEquals(value.getInt("promotePid"), Process.myPid())
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
+        if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
         value.put("${phase}Pid", Process.myPid())
         receipt.writeText(value.toString())
     }

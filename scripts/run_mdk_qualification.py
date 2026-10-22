@@ -21,12 +21,13 @@ UPGRADE = 'dev.ipf.whitenoise.android.qualification.MarmotUpgradeFixtureTest'
 RECOVERY = 'dev.ipf.whitenoise.android.state.MarmotKitRecoveryQualificationTest'
 RECOVERY_CASES = {
     'offlineReplayBeyondTheRelayClampRecoversEveryMessage',
+    'oneSenderBeyondTheReorderToleranceRecoversEveryMessage',
+    'offlineReplayAfterTheLookbackRecoversEveryMessage',
+    'healthyAccountReceivesAfterLocalDeletionAndRestart',
     'epochGapIsRecoveredFromTheNewestEventsWhenComparisonFails',
     'catchingUpRefusalIsAcknowledgedForOneChange',
     'retryAfterAnIncompleteLookupCreatesExactlyOneGroup',
 }
-IGNORED = {'oneSenderBeyondTheReorderToleranceRecoversEveryMessage',
-           'offlineReplayAfterTheLookbackRecoversEveryMessage'}
 REPORTS = Path('build/mdk-qualification')
 
 
@@ -93,8 +94,7 @@ def instrument(name, test_class, expected, extra=()):
     unexpected = {case: code for case, code in statuses.items() if code not in (0, -3)}
     fact = {'passed': sorted(passed), 'skipped': sorted(skipped), 'failed': unexpected}
     (REPORTS / f'{name}.json').write_text(json.dumps(fact, indent=2) + '\n')
-    expected_skipped = IGNORED if test_class == RECOVERY else set()
-    if passed != expected or unexpected or skipped != expected_skipped:
+    if passed != expected or unexpected or skipped:
         raise RuntimeError(f'{name}: required cases did not all pass; see retained transcript')
     if 'INSTRUMENTATION_CODE: -1' not in output:
         raise RuntimeError(f'{name}: runner did not finish successfully')
@@ -240,7 +240,8 @@ def main():
              'api': adb('shell', 'getprop', 'ro.build.version.sdk').strip(),
              'abi': adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
              'package': APP, 'exact_signed_preview_qualified': False, 'phases': {}}
-    ports = ('-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port))
+    ports = ('-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port),
+             '-e', 'fileStoreBaseline', 'true')
     started_servers = []
     try:
         try:
@@ -262,11 +263,9 @@ def main():
             facts['phases']['baseline'] = 'passed'
             blob.acquisition_unavailable.set()
             install('candidate')
-            from run_mdk_faults import run_faults
-            run_faults(adb, instrument, stop, ports, REPORTS, RUNNER, UPGRADE)
-            verify_fixture_transports((relay, blob), 'after-native-faults')
-            facts['phases']['kernel_enospc'] = 'passed'
-            facts['phases']['pre_delete_crash'] = 'passed'
+            # Current master already uses retained attachment files. The byte-pinned 0113 fault hooks
+            # belong to the older SQL-body upgrade; they cannot run against this different library.
+            verify_fixture_transports((relay, blob), 'before-upgrade')
             instrument('upgrade-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'upgrade'))
             stop()
@@ -307,7 +306,7 @@ def main():
                 server.shutdown()
             server.server_close()
     required = {'baseline', 'upgrade', 'cold_restart', 'pending_promotion', 'promoted_cold_restart',
-                'recovery_refuse', 'recovery_ignore', 'kernel_enospc', 'pre_delete_crash',
+                'recovery_refuse', 'recovery_ignore',
                 'media_corrupt_recovery', 'media_lost_recovery'}
     if set(facts['phases']) != required or any(value != 'passed' for value in facts['phases'].values()):
         raise SystemExit('Qualification failed; retained reports distinguish failed and unexecuted phases')
