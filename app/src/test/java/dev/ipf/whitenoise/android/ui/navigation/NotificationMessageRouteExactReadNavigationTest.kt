@@ -150,7 +150,7 @@ class NotificationMessageRouteExactReadNavigationTest {
                 },
             )
         val holder = MainShellStateHolder(appState, SavedStateHandle())
-        val inbound = mutableStateOf<NotificationTarget?>(messageTarget())
+        val inbound = mutableStateOf<NotificationTarget?>(null)
         val requestId = mutableLongStateOf(REQUEST_ID)
         val handled = CopyOnWriteArrayList<Pair<Long, String?>>()
         appState.setAppInForeground(true)
@@ -169,13 +169,17 @@ class NotificationMessageRouteExactReadNavigationTest {
             }
         }
         try {
+            awaitBoundChatList(holder, appState)
+            composeRule.runOnIdle { inbound.value = messageTarget() }
             check(firstReadStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) { "the first read never ran" }
             composeRule.runOnIdle {
                 holdReads.set(false)
                 inbound.value = messageTarget().copy(messageIdHex = NEWEST_ID)
                 requestId.longValue = REQUEST_ID + 1L
             }
-            awaitCondition("the newer tap was never consumed") { handled.isNotEmpty() }
+            awaitCondition("the newer tap was never consumed") {
+                handled.any { it.first == REQUEST_ID + 1L && it.second == NEWEST_ID }
+            }
             val openedContext = holder.selectedChatOpenContext.value
 
             releaseRetiredReads.countDown()
@@ -192,6 +196,17 @@ class NotificationMessageRouteExactReadNavigationTest {
         } finally {
             releaseRetiredReads.countDown()
             composeRule.runOnIdle { holder.release() }
+        }
+    }
+
+    /** Finishes the broad-list binding before arming the exact-read race under the documented ready-list state. */
+    private fun awaitBoundChatList(
+        holder: MainShellStateHolder,
+        appState: WhiteNoiseAppState,
+    ) {
+        val chats = composeRule.runOnIdle { holder.chatsController(ACCOUNT_REF, appState.runtimeGeneration) }
+        awaitCondition("the initial chat list never finished binding") {
+            chats.boundAccountRef == ACCOUNT_REF && chats.hasLoadedLocalSnapshot && !chats.isLoading
         }
     }
 

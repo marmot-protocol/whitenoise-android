@@ -19,6 +19,32 @@ class PerformanceDiagnosticSchemaTest {
         assertEquals(null, available.begin(PerformanceOperation.APP_START))
     }
 
+    /** Notification gates emit a closed Android phase without serializing candidate identity or text. */
+    @Test
+    fun notificationCandidateGateUsesThePrivacyReviewedEmitter() {
+        val lines = mutableListOf<String>()
+        val emitter = emitter(lines = lines)
+        emitter.start()
+        val trace = assertNotNullTrace(emitter.begin(PerformanceOperation.NOTIFICATION_POST))
+        emitter.record(
+            trace = trace,
+            phase = PerformancePhase.NOTIFICATION_CANDIDATE_GATE,
+            elapsedMs = 200L,
+            durationMs = 200L,
+            result = PerformanceResult.SUCCESS,
+            layer = PerformanceLayer.ANDROID,
+        )
+        val line = lines.single()
+        assertTrue(line.contains("op=notification_post"))
+        assertTrue(line.contains("phase=notification_candidate_gate"))
+        assertTrue(line.contains("layer=android"))
+        assertEquals(
+            "schema=2 app_rev=app1234 mdk_rev=mdk5678 session=p#1 op=notification_post " +
+                "phase=notification_candidate_gate elapsed_ms=200 duration_ms=200 result=success layer=android",
+            line,
+        )
+    }
+
     @Test
     fun schemaUsesOnlyClosedEnumsAndBoundedNumbers() {
         val lines = mutableListOf<String>()
@@ -147,6 +173,7 @@ class PerformanceDiagnosticSchemaTest {
         assertEquals(
             setOf(
                 "push_recovery",
+                "notification_post",
                 "app_start",
                 "chat_open",
                 "chat_list_refresh",

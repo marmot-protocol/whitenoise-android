@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.notifications.ConversationCardBarrier
 import dev.ipf.whitenoise.android.notifications.ConversationCardOp
 import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
@@ -20,13 +21,18 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +41,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -742,11 +749,137 @@ class NotificationContentRetractionTest {
                     }
                 }
                 val card =
-                    manager().activeNotifications.first { it.tag == reactionKey.tag && it.id == reactionKey.id }
+                    manager()
+                        .activeNotifications
+                        .first { it.tag == reactionKey.tag && it.id == reactionKey.id }
                 assertTrue(card.notification.extras.toString().contains("valid new quote"))
             } finally {
                 fixture.close()
                 assertTrue(MessageHidePreferences.writeHiddenMessageIdsByKey(preferences, key, previous))
+            }
+        }
+
+    /** A second same-chat message waits for a healthy 200 ms enrichment read and reaches the actual tray. */
+    @Test
+    fun aSecondMessagePostsWhileTheFirstEnrichmentReadIsInFlight() =
+        runBlocking {
+            val enrichmentEntered = CountDownLatch(1)
+            val releaseEnrichment = CountDownLatch(1)
+            val secondPrepared = CountDownLatch(1)
+            val outcomes = CopyOnWriteArrayList<String>()
+            val fixture = delayedEnrichmentFixture(enrichmentEntered, releaseEnrichment, secondPrepared, outcomes)
+            var releaseJob: Job? = null
+            try {
+                fixture.bootstrap()
+                fixture.emitUpdate(fixture.update)
+                fixture.awaitNotificationPosted()
+                awaitLatch(enrichmentEntered)
+                releaseJob =
+                    launch(Dispatchers.IO) {
+                        check(secondPrepared.await(5, TimeUnit.SECONDS))
+                        delay(200)
+                        releaseEnrichment.countDown()
+                    }
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = NEWER_ID,
+                        notificationKey = "startup:account-a:$NEWER_ID",
+                        previewText = "Second message during enrichment",
+                    ),
+                )
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (outcomes.size < 2) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                assertEquals("healthy busy admission must remain eligible", "unread", outcomes[1])
+                awaitCardMessageId(NEWER_ID)
+                releaseJob.join()
+            } finally {
+                secondPrepared.countDown()
+                releaseEnrichment.countDown()
+                releaseJob?.cancelAndJoin()
+                fixture.close()
+            }
+        }
+
+    /** The listener's first row read posts, its enrichment read pauses, and the second first-post read waits. */
+    private fun delayedEnrichmentFixture(
+        entered: CountDownLatch,
+        release: CountDownLatch,
+        secondPrepared: CountDownLatch,
+        outcomes: MutableList<String>,
+    ): NotificationBootstrapTestFixture {
+        val reads = AtomicInteger()
+        val prepared = AtomicInteger()
+        return NotificationBootstrapTestFixture(
+            context = context,
+            groupIdHex = GROUP_ID,
+            messageIdHex = MESSAGE_ID,
+            emitStartupNotification = false,
+            onChatListRow = { _, _ ->
+                if (reads.incrementAndGet() == 2) {
+                    entered.countDown()
+                    check(release.await(5, TimeUnit.SECONDS))
+                }
+                null
+            },
+            notificationFirstPostTimingObserver = { event ->
+                val secondContent =
+                    event.stage == NotificationFirstPostTimingStage.ContentComplete && prepared.incrementAndGet() == 2
+                if (secondContent) secondPrepared.countDown()
+                if (event.stage == NotificationFirstPostTimingStage.CandidateGateComplete) outcomes += event.outcome
+            },
+        )
+    }
+
+    /** A tag match alone could be the first card; require the actual newer message stamped in the platform payload. */
+    private suspend fun awaitCardMessageId(messageId: String) {
+        withTimeout(AWAIT_TIMEOUT_MS) {
+            while (
+                manager().activeNotifications.none {
+                    it.tag == cardKey.tag &&
+                        it.id == cardKey.id &&
+                        it.notification.extras.getString(
+                            LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
+                        ) == messageId
+                }
+            ) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Ordinary relay posts reach WNPerf even with no timing observer or push-recovery trace installed. */
+    @Test
+    fun aNotificationCandidateGateEmitsRealPrivacySafePerformanceEvidence() =
+        runBlocking {
+            PerformanceDiagnostics.stop()
+            assumeTrue(PerformanceDiagnostics.start().available)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    previewText = "Private notification candidate",
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+                val line =
+                    PerformanceDiagnostics.exportLines().single {
+                        "op=notification_post phase=notification_candidate_gate" in it
+                    }
+                assertTrue(line.contains("result=success layer=android"))
+                assertFalse(line.contains(ACCOUNT_REF))
+                assertFalse(line.contains(GROUP_ID))
+                assertFalse(line.contains(MESSAGE_ID))
+                assertFalse(line.contains("Private notification candidate"))
+            } finally {
+                fixture.close()
+                PerformanceDiagnostics.stop()
             }
         }
 

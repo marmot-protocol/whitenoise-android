@@ -12997,7 +12997,7 @@ class WhiteNoiseAppState private constructor(
         }
         val gateStartedAt = SystemClock.elapsedRealtime()
         val candidateState =
-            if (firstPost.shouldPost) notificationCandidateGate(update, "post") else NotificationCandidateState.Unknown
+            if (firstPost.shouldPost) measureNotificationCandidateGate(update) else NotificationCandidateState.Unknown
         recordNotificationFirstPostTiming(
             stage = NotificationFirstPostTimingStage.CandidateGateComplete,
             receivedAtElapsedMs = receivedAtElapsedMs,
@@ -13028,6 +13028,28 @@ class WhiteNoiseAppState private constructor(
         rememberPostedGroupInvite(update, firstPost, posted, postedRedacted)
         PushWakeDiagnostics.event(if (posted) PushWakeEvent.Posted else PushWakeEvent.Suppressed)
         return posted
+    }
+
+    /** Emits the actual admission/read wait through opt-in WNPerf, without account or message identifiers. */
+    private suspend fun measureNotificationCandidateGate(update: NotificationUpdateFfi): NotificationCandidateState {
+        val trace = PerformanceDiagnostics.begin(PerformanceOperation.NOTIFICATION_POST)
+        val startedAt = SystemClock.elapsedRealtime()
+        val state = notificationCandidateGate(update, "post")
+        val elapsed = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)
+        PerformanceDiagnostics.record(
+            trace = trace,
+            phase = PerformancePhase.NOTIFICATION_CANDIDATE_GATE,
+            elapsedMs = elapsed,
+            durationMs = elapsed,
+            result =
+                when (state) {
+                    NotificationCandidateState.Unread -> PerformanceResult.SUCCESS
+                    NotificationCandidateState.Read, NotificationCandidateState.Removed -> PerformanceResult.DROPPED
+                    NotificationCandidateState.Unknown -> PerformanceResult.FAILURE
+                },
+            layer = PerformanceLayer.ANDROID,
+        )
+        return state
     }
 
     /** Executes the resolved or fallback first write under the captured fences. */
@@ -13424,8 +13446,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Drops an opaque quote after a removal observed in this process (#3323). Persisted hides alone do not
-     * permanently suppress all later quotes. Verifying a new target after restart/eviction awaits MDK #2366.
+     * Drops every later opaque reaction quote in this chat for this process lifetime after an observed removal
+     * (#3323). Persisted hides alone do not extend that suppression after restart. A new target cannot be verified
+     * after restart/eviction until MDK #2366 supplies its identity; the reaction itself still posts.
      */
     private fun withoutUnverifiableReactionQuote(update: NotificationUpdateFfi): NotificationUpdateFfi {
         val removed = notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)
