@@ -145,6 +145,31 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(123, VoicePlaybackController.state.value.positionMs)
     }
 
+    /** Quick repeated taps build on the seek still in flight instead of re-reading the stale playhead. */
+    @Test fun shellSeeksAccumulateWhileTheCodecIsStillSeeking() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 100))
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 100))
+
+        assertEquals(player.positionMs + 200, player.seekedToMs)
+        assertEquals(player.positionMs + 200, VoicePlaybackController.state.value.positionMs)
+    }
+
+    /** A seek the codec rejects reports failure and leaves the published playhead where it was. */
+    @Test fun rejectedShellSeekReportsFailureAndKeepsThePlayhead() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer(failSeek = true)
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
+
+        assertFalse(VoicePlaybackController.seekSessionBy(42, 100))
+        assertEquals(player.positionMs, VoicePlaybackController.state.value.positionMs)
+    }
+
     /** A stale banner cannot seek or change the speed of the session that replaced it. */
     @Test fun replacedShellSessionRejectsSeekAndSpeed() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
@@ -629,6 +654,7 @@ class VoicePlaybackControllerFocusTest {
         private val failVolumeChange: Boolean = false,
         private val failVolumeRestore: Boolean = false,
         private val failPlayingQuery: Boolean = false,
+        private val failSeek: Boolean = false,
     ) : MediaPlayer() {
         var playing = true
         var released = false
@@ -662,8 +688,9 @@ class VoicePlaybackControllerFocusTest {
 
         var seekedToMs: Int? = null
 
-        /** Records the clamped target the controller hands to the codec. */
+        /** Records the clamped target the controller hands to the codec, or rejects it like an invalid player. */
         override fun seekTo(msec: Int) {
+            if (failSeek) throw IllegalStateException("seekTo failed")
             seekedToMs = msec
         }
 

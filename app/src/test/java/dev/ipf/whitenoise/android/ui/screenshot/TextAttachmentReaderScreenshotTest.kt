@@ -169,6 +169,7 @@ class TextAttachmentReaderScreenshotTest {
             .captureRoboImage("src/test/snapshots/text_attachment_reader_plain_large_rtl.png")
     }
 
+    /** At the narrowest width and large RTL text, every toolbar action and the full file name stay reachable. */
     @Test
     @Config(sdk = [36], qualifiers = "w240dp-h640dp-mdpi")
     fun longUnbrokenFilenameStaysAccessibleAtNarrowLargeRtl() {
@@ -187,6 +188,14 @@ class TextAttachmentReaderScreenshotTest {
             onCopy = { copied = it },
         )
 
+        listOf(R.string.back, R.string.read_aloud, R.string.copy_text, R.string.share, R.string.more_options)
+            .forEach { label ->
+                composeRule
+                    .onNodeWithContentDescription(string(label))
+                    .assertIsDisplayed()
+                    .assertIsEnabled()
+                    .assertHasClickAction()
+            }
         composeRule
             .onNodeWithTag(TEXT_ATTACHMENT_READER_FILENAME_TAG)
             .assertTextEquals(longFilenameCandidate.displayName)

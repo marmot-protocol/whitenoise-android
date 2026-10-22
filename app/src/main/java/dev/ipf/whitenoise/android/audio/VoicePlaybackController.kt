@@ -108,6 +108,11 @@ object VoicePlaybackController {
     private var currentOwnerKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
+
+    // MediaPlayer seeks complete asynchronously, so currentPosition can still
+    // report the old playhead. Relative banner seeks build on the last
+    // requested target until this player confirms it.
+    private var pendingSeek: PendingSeek? = null
     private val playbackRequests = StalenessGuard()
 
     // play() suspends while MediaPlayer prepares on IO; serialize callers so
@@ -326,6 +331,9 @@ object VoicePlaybackController {
                     callback.callback(completed)
                 }
             }
+        }
+        mp.setOnSeekCompleteListener { p ->
+            scope.launch { if (pendingSeek?.player === p) pendingSeek = null }
         }
         mp.setOnErrorListener { p, what, extra ->
             scope.launch {
@@ -546,7 +554,9 @@ object VoicePlaybackController {
         val active = player?.takeIf { sessionId == current.sessionId && current.ready }
         val key = currentKey
         if (active == null || key == null) return false
-        val position = runCatching { active.currentPosition }.getOrDefault(current.positionMs)
+        val position =
+            pendingSeek?.takeIf { it.player === active }?.targetMs
+                ?: runCatching { active.currentPosition }.getOrDefault(current.positionMs)
         return seekTo(key, position + deltaMs)
     }
 
@@ -657,13 +667,14 @@ object VoicePlaybackController {
         // rather than restarting the clip from zero.
         val duration =
             runCatching { mp.duration }.getOrNull()?.takeIf { it > 0 } ?: _state.value.durationMs
-        val seekable = duration > 0
-        if (seekable) {
-            val clamped = positionMs.coerceIn(0, duration)
-            runCatching { mp.seekTo(clamped) }
+        // A player in an invalid state rejects the seek; only an accepted seek moves the published playhead.
+        val clamped = positionMs.coerceIn(0, duration.coerceAtLeast(0))
+        val seeked = duration > 0 && runCatching { mp.seekTo(clamped) }.isSuccess
+        if (seeked) {
+            pendingSeek = PendingSeek(mp, clamped)
             _state.value = _state.value.copy(positionMs = clamped, durationMs = duration)
         }
-        return seekable
+        return seeked
     }
 
     /** Stop and release the active player. */
@@ -684,6 +695,7 @@ object VoicePlaybackController {
             runCatching { mp.release() }
         }
         player = null
+        pendingSeek = null
         currentKey = null
         currentOwnerKey = null
         abandonFocus()
@@ -709,6 +721,12 @@ object VoicePlaybackController {
                 }
             }
     }
+
+    /** The target of a seek [player] accepted but has not yet reported complete. */
+    private class PendingSeek(
+        val player: MediaPlayer,
+        val targetMs: Int,
+    )
 
     private fun stopTicker() {
         tickerJob?.cancel()

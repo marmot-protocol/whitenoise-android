@@ -1466,7 +1466,11 @@ internal fun MessageBubble(
      */
     fun ordinaryTextHitAt(pressInWindow: Offset): Boolean =
         !markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow) &&
-            renderedTextHitAtWindowPosition(textLayouts.selectableTextLayouts.snapshot(), pressInWindow) != null
+            renderedTextHitAtWindowPosition(
+                textLayouts.selectableTextLayouts.snapshot(),
+                pressInWindow,
+                requireTextLineHit = true,
+            ) != null
 
     /**
      * Double-tapping the ordinary text of your own editable message opens it for editing (#3388). While this
