@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.PublicEventPreviewStateFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.marmotkit.verifyPublicNostrEventJson
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
@@ -213,7 +214,11 @@ class NostrEventPreviewProcessRecreationFfiIntegrationTest {
     }
 
     /** Loopback relays are allowed only in this fixture's native configuration. */
-    private fun loopbackOptions() = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
+    private fun loopbackOptions() =
+        MarmotOptions(
+            deployment = marmotDeploymentWhiteNoise(),
+            relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+        )
 
     /** The signed fixture events and the authored references a conversation would contain. */
     private class PreviewFixture {
