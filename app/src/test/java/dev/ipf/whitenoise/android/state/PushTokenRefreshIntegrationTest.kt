@@ -365,6 +365,12 @@ class PushTokenRefreshIntegrationTest {
                         release.complete(Unit)
                         first.join()
                         latest?.join()
+                        if (retirement == "rotation") {
+                            val store = PushTokenStore.create(context)
+                            kotlinx.coroutines.withTimeout(5_000L) {
+                                while (store.nativePushRegistrationSyncPending()) kotlinx.coroutines.yield()
+                            }
+                        }
                     }
                     if (retirement == "rotation") {
                         assertEquals(listOf("latest-callback"), fixture.upsertedPushTokens.toList())
@@ -559,7 +565,7 @@ class PushTokenRefreshIntegrationTest {
             .apply { isAccessible = true }
             .get(fixture.appState) as kotlinx.coroutines.sync.Mutex
 
-    /** Captures the actual callback child so assertions wait for its complete production path. */
+    /** Observes a new notification child; callers must separately await durable registration state. */
     private fun queueRotation(
         fixture: NotificationBootstrapTestFixture,
         token: String,
