@@ -113,9 +113,13 @@ internal class NotificationCandidateReadCoordinator(
     )
 
     private sealed interface ReadAdmission {
-        data class Granted(val read: PendingRead) : ReadAdmission
+        data class Granted(
+            val read: PendingRead,
+        ) : ReadAdmission
 
-        data class Busy(val version: Long) : ReadAdmission
+        data class Busy(
+            val version: Long,
+        ) : ReadAdmission
 
         data object Rejected : ReadAdmission
     }
