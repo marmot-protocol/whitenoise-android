@@ -9,7 +9,7 @@ import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import java.io.File
 
-/** Only the fixture permits loopback; the baseline adapter omits the not-yet-existing deployment argument. */
+/** Both published generations use the same deployment; only this isolated fixture permits loopback services. */
 internal fun upgradeFixtureRuntime(
     context: Context,
     root: File,

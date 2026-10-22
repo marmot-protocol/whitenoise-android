@@ -72,6 +72,13 @@ class DiagnosticFormatterTest {
         }
     }
 
+    /** A native follow-list limit is neither a transient connectivity problem nor an unexpected exception. */
+    @Test
+    fun followListLimitRemainsDistinctFromUnavailableLookup() {
+        assertEquals("FOLLOW_LIST_TOO_LARGE", DiagnosticFormatter.errorCode(MarmotKitException.FollowListTooLarge()))
+        assertEquals("CONNECTIVITY", DiagnosticFormatter.errorCode(MarmotKitException.FollowListUnavailable()))
+    }
+
     /** Caller-selected details retain precedence over the automatic contention subtype. */
     @Test
     fun explicitTechnicalDetailTakesPrecedenceOverContention() {
