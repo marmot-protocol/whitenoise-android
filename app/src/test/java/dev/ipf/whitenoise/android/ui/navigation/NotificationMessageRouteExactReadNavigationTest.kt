@@ -242,7 +242,9 @@ class NotificationMessageRouteExactReadNavigationTest {
     }
 
     /** Test-local context follows Compose effects into IO without adding a production routing hook. */
-    private class MainLooperEffectJobs : AbstractCoroutineContextElement(Key), ThreadContextElement<Job?> {
+    private class MainLooperEffectJobs :
+        AbstractCoroutineContextElement(Key),
+        ThreadContextElement<Job?> {
         private val current = ThreadLocal<Job?>()
         private val mainJobs = ConcurrentHashMap.newKeySet<Job>()
 
@@ -267,7 +269,9 @@ class NotificationMessageRouteExactReadNavigationTest {
         @OptIn(ExperimentalCoroutinesApi::class)
         fun currentMainOwner(): Job {
             var job = checkNotNull(current.get()) { "the binding did not inherit its Compose effect context" }
-            while (job !in mainJobs) job = checkNotNull(job.parent) { "the read has no captured Main effect owner" }
+            while (job !in mainJobs) {
+                job = checkNotNull(job.parent) { "the read has no captured Main effect owner" }
+            }
             return job
         }
 

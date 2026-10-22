@@ -87,21 +87,22 @@ class NotificationReadReconciliationCoordinatorTest {
     fun cancellingTheReceiptScopeRetiresItsWorkers() =
         runTest {
             val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+            val receiptJob = scope.coroutineContext.job
             val release = CompletableDeferred<Unit>()
             val coordinator = NotificationReadReconciliationCoordinator(scope, 1_000) { _, _ -> release.await() }
             try {
                 coordinator.request("account", "first")
                 coordinator.request("account", "second")
                 runCurrent()
-                val workers = scope.coroutineContext.job.children.toList()
+                val workers = receiptJob.children.toList()
                 assertEquals(2, workers.size)
                 scope.cancel()
                 runCurrent()
                 assertTrue(workers.all { it.isCompleted && it.isCancelled })
-                assertTrue(scope.coroutineContext.job.children.none())
+                assertTrue(receiptJob.children.none())
                 coordinator.request("account", "first")
                 runCurrent()
-                assertTrue("a stopped listener cannot leave a live worker", scope.coroutineContext.job.children.none())
+                assertTrue("a stopped listener cannot leave a live worker", receiptJob.children.none())
             } finally {
                 scope.cancel()
             }
