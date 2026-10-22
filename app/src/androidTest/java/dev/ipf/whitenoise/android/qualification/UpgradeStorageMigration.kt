@@ -70,11 +70,11 @@ internal suspend fun verifyUpgradeStorage(
     pendingLegacyBytes: ULong = 0uL,
     readWhilePaused: suspend () -> Unit = {},
 ) {
-    if (fileStoreBaseline()) {
-        verifyFileStoreUpgrade(runtime, phase, beforeStart)
+    val fileBaseline = fileStoreBaseline()
+    if (fileBaseline || phase == "seed") {
+        if (fileBaseline) verifyFileStoreUpgrade(runtime, phase, beforeStart)
         return
     }
-    if (phase == "seed") return
     val accounts = runtime.listAccounts().map { it.label }
     if (phase == "upgrade" && beforeStart) {
         initialLegacyBytes = accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes }

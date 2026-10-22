@@ -33,7 +33,10 @@ internal fun damageUpgradeMedia(
     }
 }
 
-/** Identifies only the disposable receiver's native body files; account labels and paths stay off reports. */
+/**
+ * Selects the fixture's 16 MiB attachment, excluding the small avatar cache bodies sharing the native media store.
+ * The encrypted, uncompressed file has bounded framing overhead; uniqueness still fails closed before damage.
+ */
 private fun upgradeReceiverMediaBodies(
     root: File,
     receipt: File,
@@ -42,7 +45,12 @@ private fun upgradeReceiverMediaBodies(
     check(context.packageName == "dev.ipf.whitenoise.android.mdkqualification")
     val receiver = JSONObject(receipt.readText()).getString("receiver")
     val account = root.walkTopDown().single { it.isDirectory && it.name == receiver }
-    return File(account, "media").walkTopDown().filter { it.isFile && it.name.matches(Regex("[0-9a-f]{32}")) }.toList()
+    return File(account, "media")
+        .walkTopDown()
+        .filter {
+            it.isFile && it.name.matches(Regex("[0-9a-f]{32}")) &&
+                it.length() in (16L * 1024L * 1024L) until (17L * 1024L * 1024L)
+        }.toList()
 }
 
 /** Lets MDK unlink a replaced corrupt orphan before the next fault selects the sole recovered receiver body. */

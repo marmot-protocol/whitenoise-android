@@ -265,6 +265,7 @@ class MarmotUpgradeFixtureTest {
         awaitUpgradeMediaCleanup(root, receipt)
         verifyRetained(runtime, value)
         verifyHistory(runtime, value)
+        if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
     }
 
     /** Promotes the baseline upload without uploading it again, then verifies its distinct retained plaintext. */

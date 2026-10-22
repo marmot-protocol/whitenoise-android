@@ -63,7 +63,8 @@ private suspend fun awaitUpgradeAvatar(
                     row?.destroy()
                 }
             if (asset?.availability == AvatarAvailabilityFfi.READY && asset.reference != null) {
-                val payload = runtime.readAvatarAssets(owner, listOf(checkNotNull(asset.reference)), 1_048_576uL).single()
+                val payload =
+                    runtime.readAvatarAssets(owner, listOf(checkNotNull(asset.reference)), 1_048_576uL).single()
                 check(!payload.deferred && payload.bytes.isNotEmpty())
                 retained =
                     JSONObject()
