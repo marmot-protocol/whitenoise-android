@@ -20,6 +20,17 @@ internal data class NostrEventReferenceOccurrence(
 internal fun nostrEventReferences(document: MarkdownDocumentFfi): List<NostrEventReferenceOccurrence> = NostrEventReferenceCollector().collect(document)
 
 /**
+ * A cheap text check for the forms [nostrEventReferences] turns into cards, so a message without one skips the parse
+ * and cache read a card needs: a `nostr:note1…`, `nostr:nevent1…` or `nostr:naddr1…` URI, which MDK's Markdown parser
+ * recognizes only lowercase and between word boundaries, or an HTTP(S) link carrying such a NIP-19 segment. A bare
+ * `note1…` token, a word such as "footnote1" and a scheme-less `njump.me/note1…` never render a card, so they do not
+ * match. It may still match text whose bech32 does not decode, or a `nostr:` URI inside a code span.
+ */
+internal fun mayNameNostrEventCardReference(text: String): Boolean =
+    EVENT_ENTITY_PREFIX.containsMatchIn(text) &&
+        (NOSTR_EVENT_URI.containsMatchIn(text) || HTTP_EVENT_LINK.containsMatchIn(text))
+
+/**
  * True only when every non-whitespace token in the authored message is one of
  * the event pointers represented by a card. Embedded references remain in the
  * Markdown body so hiding the duplicate preview never removes surrounding
@@ -158,6 +169,19 @@ private const val MAX_MARKDOWN_DESTINATION_LENGTH = 8_192
 private const val MAX_EVENT_REFERENCES_PER_MESSAGE = 3
 private val WHITESPACE = Regex("\\s+")
 private const val NIP19_BODY_CHARS = "ac-hj-np-z02-9"
+private const val NIP19_EVENT_HRP = "(?:note|nevent|naddr)1"
+private val EVENT_ENTITY_PREFIX = Regex("(?i)$NIP19_EVENT_HRP")
+
+/** MDK's `nostr:` URI shape: lowercase, at least six data characters, not fused to a word, digit, `_` or `/`. */
+private val NOSTR_EVENT_URI =
+    Regex("(?<![A-Za-z0-9_/])nostr:$NIP19_EVENT_HRP[$NIP19_BODY_CHARS]{6,}(?![A-Za-z0-9_/])")
+
+/** An HTTP(S) URL whose unbroken text carries the segment [NostrEventReferenceCollector] reads a card from. */
+private val HTTP_EVENT_LINK =
+    Regex(
+        "(?i)https?://\\S*?(?<![$NIP19_BODY_CHARS])$NIP19_EVENT_HRP" +
+            "[$NIP19_BODY_CHARS]+(?![$NIP19_BODY_CHARS])",
+    )
 private val NIP19_EVENT_SEGMENT =
     Regex(
         "(?i)(?<![$NIP19_BODY_CHARS])(?:note|nevent|naddr)1" +

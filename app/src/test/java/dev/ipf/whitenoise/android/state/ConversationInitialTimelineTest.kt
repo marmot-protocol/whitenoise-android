@@ -58,6 +58,22 @@ class ConversationInitialTimelineTest {
         )
     }
 
+    /** Prose that only looks like an event reference renders no card, so it still seeds the opening row. */
+    @Test
+    fun cardLookalikePreviewStillSeeds() {
+        listOf(
+            "see footnote1 below",
+            "bare note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv",
+            "njump.me/note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv",
+        ).forEach { plaintext ->
+            assertEquals(
+                "lookalike must seed: $plaintext",
+                1,
+                initialConversationTimeline(preview(plaintext = plaintext), GROUP_ID, false, emptyList()).size,
+            )
+        }
+    }
+
     @Test
     fun pendingPlainTextPreviewSeedsTruthfulOutgoingRow() {
         val timeline =

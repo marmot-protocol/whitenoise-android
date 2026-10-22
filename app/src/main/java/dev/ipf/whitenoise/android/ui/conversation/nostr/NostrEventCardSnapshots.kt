@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
+import dev.ipf.whitenoise.android.core.mayNameNostrEventCardReference
 import dev.ipf.whitenoise.android.core.nostrEventReferences
 
 /**
@@ -104,15 +105,16 @@ internal fun nostrEventCardWarmOccurrences(
     return occurrences.values.toList()
 }
 
-/** A cheap text check: a card needs a bech32 `note`, `nevent` or `naddr` entity somewhere in the message. */
+/** A cheap text check: an undeleted message may show a card only when [mayNameNostrEventCard] holds for it. */
 internal fun mayRenderNostrEventCard(record: TimelineMessageRecordFfi): Boolean =
     !record.deleted &&
         mayNameNostrEventCard(record.plaintext)
 
-/** True when [text] contains a bech32 `note`, `nevent` or `naddr` entity, so a message with it may show a card. */
-internal fun mayNameNostrEventCard(text: String): Boolean = EVENT_ENTITY_PREFIX.containsMatchIn(text)
-
-private val EVENT_ENTITY_PREFIX = Regex("(?i)(note1|nevent1|naddr1)")
+/**
+ * True when [text] carries a form that renders an event card — a `nostr:` event URI or an HTTP(S) link with a NIP-19
+ * event segment — so every card hold and the chat-list seed apply the same check.
+ */
+internal fun mayNameNostrEventCard(text: String): Boolean = mayNameNostrEventCardReference(text)
 
 /** Two cached reads of [NOSTR_EVENT_CACHE_BATCH] cover the cards of a typical first page. */
 private const val MAX_WARM_REFERENCES = 32
