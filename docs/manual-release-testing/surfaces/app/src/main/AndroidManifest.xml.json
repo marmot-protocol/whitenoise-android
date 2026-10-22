@@ -351,6 +351,16 @@
           "TTS-001"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "main native heap memory-tagging application policy",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android:memtagMode",
+        "test_ids": [
+          "SYS-013"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []
