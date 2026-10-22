@@ -170,8 +170,14 @@ internal object MediaWorkerBaseline {
         corpus: List<ByteArray>,
         elapsed: Long,
         includeNegativeProbes: Boolean,
-    ): JSONObject =
-        JSONObject()
+    ): JSONObject {
+        val applicationFlags =
+            InstrumentationRegistry
+                .getInstrumentation()
+                .targetContext
+                .applicationInfo
+                .flags
+        return JSONObject()
             .put("kind", "header")
             .put("schema", 1)
             .put("corpus", "synthetic-gradient-256-and-svg-v1")
@@ -182,17 +188,14 @@ internal object MediaWorkerBaseline {
             .put("flavor", dev.ipf.whitenoise.android.BuildConfig.FLAVOR)
             .put("build_type", dev.ipf.whitenoise.android.BuildConfig.BUILD_TYPE)
             .put("build_config_debug", dev.ipf.whitenoise.android.BuildConfig.DEBUG)
-            .put(
-                "application_debuggable",
-                InstrumentationRegistry.getInstrumentation().targetContext.applicationInfo.flags and
-                    ApplicationInfo.FLAG_DEBUGGABLE != 0,
-            )
+            .put("application_debuggable", applicationFlags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
             .put("includes_negative_probes", includeNegativeProbes)
             .put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
             .put("build_fingerprint", Build.FINGERPRINT)
             .put("corpus_prepare_ns", elapsed)
             .put("caller_resources", resources())
             .put("security_qualification", false)
+    }
 
     private fun summary(
         completed: Int,
