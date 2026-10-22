@@ -10,6 +10,7 @@ internal enum class MessageAlertChannelKind(
 ) {
     PARENT("parent"),
     CONVERSATION_CHILD("conversation_child"),
+    PROFILE_CHILD("profile_child"),
     EXISTING_CARD("existing_card"),
 }
 
@@ -61,6 +62,7 @@ internal fun messageAlertChannelKind(
     when {
         existingCardChannel != null && existingCardChannel == channelId -> MessageAlertChannelKind.EXISTING_CARD
         channelId == route.id -> MessageAlertChannelKind.PARENT
+        channelId.startsWith(ProfileNotificationChannels.PREFIX) -> MessageAlertChannelKind.PROFILE_CHILD
         else -> MessageAlertChannelKind.CONVERSATION_CHILD
     }
 

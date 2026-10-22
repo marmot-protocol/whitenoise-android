@@ -73,6 +73,39 @@ class MessageAlertPathTest {
             assertEquals(NotificationChannelSpec.MENTIONS.id, mention.channelId)
         }
 
+    /** Explicit per-person channels retain their actual routing role in content-free diagnostic evidence. */
+    @Test
+    fun aCustomizedProfileChannelIsIdentifiedByItsActualPostedRoute() =
+        runBlocking {
+            presenter.ensureChannels()
+            val update = dmUpdate("profile-1")
+            val author = update.sender.accountIdHex
+            val pattern = ConversationVibrationPattern.SYSTEM_DEFAULT
+            val channelId =
+                ProfileNotificationChannels(context).customize(update.accountRef, author, "Alice", pattern, pattern)
+            assertTrue(
+                ProfileNotificationOverridePreferences(context).set(
+                    update.accountRef,
+                    author,
+                    ProfileNotificationOverride(ProfileNotificationMode.CUSTOM, pattern),
+                ),
+            )
+            val card = post(update)
+            assertEquals(channelId, card.channelId)
+            val diagnostic =
+                messageAlertDiagnostic(
+                    context,
+                    NotificationChannelSpec.DIRECT_MESSAGES,
+                    card.channelId,
+                    existingCardChannel = null,
+                    silentWrite = false,
+                )
+            assertEquals(MessageAlertChannelKind.PROFILE_CHILD, diagnostic.channelKind)
+            assertTrue(diagnostic.line().contains("channel=profile_child"))
+            assertFalse(diagnostic.line().contains(channelId))
+            assertNoAppOwnedAlert(card)
+        }
+
     /** No message card carries an app-owned sound, vibration or default alert — the channel is the only path. */
     @Test
     fun noMessageCardCarriesAnAppOwnedAlert() =
