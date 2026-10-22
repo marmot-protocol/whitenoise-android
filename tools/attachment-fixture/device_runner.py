@@ -35,12 +35,15 @@ def adb_command(adb, serial, *args, timeout=180):
     return subprocess.run([adb, "-s", serial, *args], check=True, capture_output=True, text=True, timeout=timeout).stdout
 
 
-def bind_reverse_port(adb, serial, host_port, receipt=None):
-    """Reserve one of four explicit device ports; advance only on confirmed address-in-use failures."""
+def bind_reverse_port(adb, serial, host_port, receipt=None, reserved=()):
+    """Reserve one of four explicit device ports outside [reserved]; advance only on confirmed address-in-use failures.
+
+    [reserved] holds device ports this run already owns, so a second mapping can never draw the first one's port.
+    """
     if receipt is None:
         receipt = {}
     receipt.update(attempts=0, occupied_ports=0, status="failed")
-    candidates = random.SystemRandom().sample(range(32768, 61000), 4)
+    candidates = random.SystemRandom().sample([port for port in range(32768, 61000) if port not in reserved], 4)
     for index, port in enumerate(candidates):
         receipt["attempts"] += 1
         try:
@@ -106,13 +109,15 @@ def failure_diagnostics(error, stage, adb, serial, physical):
                 ("error: no devices/emulators found", "device-missing"),
                 ("error: closed", "transport-closed"), ("error: protocol fault", "transport-protocol-fault"),
                 ("cannot bind listener", "listener-bind-failed"), ("error: listener", "listener-error"),
+                # A failing test's stack trace can name any exception, so the instrumentation verdict wins over the
+                # generic activity-manager markers below.
+                ("INSTRUMENTATION_ABORTED", "instrumentation-aborted"),
+                ("INSTRUMENTATION_FAILED", "instrumentation-failed"),
                 ("Can't find service: activity", "activity-service-missing"),
                 ("Failure calling service activity", "activity-service-failed"),
                 ("java.lang.SecurityException", "security-exception"), ("Permission Denial", "permission-denied"),
                 ("Unknown option", "invalid-command-option"), ("Bad component name", "invalid-component"),
-                ("am: inaccessible or not found", "activity-command-missing"),
-                ("INSTRUMENTATION_ABORTED", "instrumentation-aborted"),
-                ("INSTRUMENTATION_FAILED", "instrumentation-failed"))
+                ("am: inaccessible or not found", "activity-command-missing"))
     details["subprocess_status"] = next((status for marker, status in statuses if marker in transcript), "unknown")
     if stage == "reverse-binding":
         if "cannot rebind existing socket" in transcript:
@@ -263,7 +268,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             # Host allocation says nothing about device availability; keep the two namespaces separate.
             admission = {}
             report["reverse_admission"].append(admission)
-            device_ports.append(bind_reverse_port(adb, serial, port, admission))
+            device_ports.append(bind_reverse_port(adb, serial, port, admission, reserved=device_ports))
         blob_port, relay_port = device_ports
         server.set_upload_port(blob_port)
         report["reverse_bindings_before_instrumentation"] = reverse_mapping_diagnostics(

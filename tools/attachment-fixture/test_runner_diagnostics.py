@@ -66,6 +66,9 @@ class RunnerDiagnosticsTest(unittest.TestCase):
             ("androidx.test.internal.runner.listener.RunListener PRIVATE\nINSTRUMENTATION_ABORTED",
              "instrumentation-aborted", "unknown"),
             ("cannot bind PRIVATE\nINSTRUMENTATION_FAILED", "instrumentation-failed", "unknown"),
+            ("java.lang.SecurityException: Permission Denial PRIVATE\n\tat PRIVATE\nINSTRUMENTATION_FAILED",
+             "instrumentation-failed", "java.lang.SecurityException"),
+            ("Bad component name PRIVATE\nINSTRUMENTATION_ABORTED", "instrumentation-aborted", "unknown"),
             ("PRIVATE", "unknown", "unknown"),
         ):
             with self.subTest(status=status), patch.object(device_runner.subprocess, "run") as capture:
