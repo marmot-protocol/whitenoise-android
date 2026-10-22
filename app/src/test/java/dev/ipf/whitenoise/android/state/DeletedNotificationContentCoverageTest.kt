@@ -19,10 +19,12 @@ class DeletedNotificationContentCoverageTest {
         val shows = callArguments(source, "localNotificationPresenter.show(")
         val refreshes = callArguments(source, "localNotificationPresenter.refreshLateIdentityImage(")
         assertTrue("expected the initial, redacted and enrichment writes", shows.size >= 3)
-        (shows + refreshes).forEach { arguments ->
+        assertTrue("expected a late picture write", refreshes.isNotEmpty())
+        val writes = shows.map { it to "isPostStillAllowed" } + refreshes.map { it to "isRefreshCurrent" }
+        writes.forEach { (arguments, callback) ->
             assertTrue(
-                "every card write must recheck the content fence at its final write: $arguments",
-                "isNotificationGenerationPostAllowed(" in arguments || "isNotificationEnrichmentAllowed(" in arguments,
+                "every card write must recheck the content fence in $callback: $arguments",
+                hasFinalWriteFence(arguments, callback),
             )
         }
         assertTrue(
@@ -35,6 +37,22 @@ class DeletedNotificationContentCoverageTest {
             "notificationContentInvalidations.hasRemovalInConversation(" in
                 functionBody(source, "isNotificationGenerationPostAllowed"),
         )
+    }
+
+    /** Guard names in unrelated values cannot hide a missing or unfenced final-write callback. */
+    @Test
+    fun onlyTheFinalWriteCallbackCanSatisfyTheFenceGate() {
+        val callbacks =
+            listOf(
+                "isPostStillAllowed" to "isNotificationGenerationPostAllowed",
+                "isRefreshCurrent" to "isNotificationEnrichmentAllowed",
+            )
+        callbacks.forEach { (callback, guard) ->
+            val unrelated = "previewTextOverride = $guard(update)"
+            assertFalse(hasFinalWriteFence("($unrelated, $callback = { true })", callback))
+            assertFalse(hasFinalWriteFence("($unrelated)", callback))
+            assertTrue(hasFinalWriteFence("($callback = { $guard(update) })", callback))
+        }
     }
 
     /** Every new history entry is stamped with its message id, and carried entries keep theirs. */
@@ -95,6 +113,15 @@ class DeletedNotificationContentCoverageTest {
                 val open = match.range.last
                 source.substring(open, matchingClose(source, open, '(', ')') + 1)
             }.toList()
+
+    /** Requires the fence inside the presenter's chosen callback, rather than another value in the call. */
+    private fun hasFinalWriteFence(arguments: String, callback: String): Boolean {
+        val opening =
+            Regex("""\b${Regex.escape(callback)}\s*=\s*\{""").find(arguments)?.range?.last ?: return false
+        val body = arguments.substring(opening, matchingClose(arguments, opening, '{', '}') + 1)
+        return "isNotificationEnrichmentAllowed(" in body ||
+            (callback == "isPostStillAllowed" && "isNotificationGenerationPostAllowed(" in body)
+    }
 
     /** The body of the named function in [source]. */
     private fun functionBody(
