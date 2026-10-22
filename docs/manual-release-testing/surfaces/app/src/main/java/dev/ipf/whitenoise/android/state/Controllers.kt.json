@@ -897,6 +897,14 @@
         "test_ids": [
           "MSG-007"
         ]
+      },
+      {
+        "surface": "Archive native commit adapter retains account binding and group lock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun applyArchiveMutation(",
+        "test_ids": [
+          "CHL-007"
+        ]
       }
     ]
   },
