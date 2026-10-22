@@ -8,16 +8,60 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalView
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.WarmResumeConversationPhase
+import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.withTimeoutOrNull
 
+/** Freshness may yield only to an admitted, unlocked frame belonging to the same live controller. */
+internal fun canPresentRetainedConversationFrame(
+    anchored: Boolean,
+    ownsCurrentPresentation: Boolean,
+    appReady: Boolean,
+    lockVisible: Boolean,
+): Boolean = anchored && ownsCurrentPresentation && appReady && !lockVisible
+
+/** Distinguishes the lifecycle's one requested focus edge from foreground user focus intent. */
+internal class ConversationForegroundFocusIntent {
+    private var expectedAutomaticFocus: Boolean? = null
+
+    fun pause() {
+        expectedAutomaticFocus = null
+    }
+
+    fun resume(
+        restoreFocus: Boolean,
+        clearFocus: Boolean,
+    ) {
+        expectedAutomaticFocus =
+            when {
+                restoreFocus -> true
+                clearFocus -> false
+                else -> null
+            }
+    }
+
+    fun supersedesRestore(
+        focused: Boolean,
+        resumed: Boolean,
+    ): Boolean {
+        if (!resumed) return false
+        val expected = expectedAutomaticFocus
+        expectedAutomaticFocus = null
+        return focused != expected
+    }
+}
+
 private typealias ForegroundSettlePredicate = (ConversationForegroundSettleState) -> Boolean
 
 /** A retired or superseded receipt cannot count as a commit; the shared presentation deadline owns fallback. */
 internal suspend fun awaitCommittedConversationTimeline(receipt: Deferred<Boolean>?) {
-    if (receipt?.await() == false) awaitCancellation()
+    if (receipt?.await() == false) {
+        WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.LocalHandoffSuperseded)
+        awaitCancellation()
+    }
 }
 
 /** Layout and IME animation state required before the foreground frame can be exposed. */

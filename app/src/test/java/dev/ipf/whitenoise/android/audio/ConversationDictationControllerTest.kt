@@ -685,6 +685,330 @@ class ConversationDictationControllerTest {
             assertEquals("New draft recognized words", f.drafts.getValue(key()).text)
         }
 
+    /** Explicit choices replace each other while the same recognition tail is pending. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun latestExplicitModeOwnsPendingRecognition() =
+        runTest {
+            for (sendLast in listOf(false, true)) {
+                val sent = mutableListOf<String>()
+                val f =
+                    fixture(
+                        draft = TextFieldValue("Draft", TextRange(5)),
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = { request ->
+                            request.beginDispatch().also { if (it) sent += request.payload }
+                        },
+                    )
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                f.controller.send()
+                assertTrue(f.controller.completionActionsEnabled)
+                f.controller.paste()
+                if (sendLast) f.controller.send()
+                f.platform.listener.onResult("tail")
+                advanceUntilIdle()
+                assertEquals(if (sendLast) listOf("Draft tail") else emptyList<String>(), sent)
+                assertEquals(if (sendLast) "" else "Draft tail", f.drafts.getValue(key()).text)
+            }
+        }
+
+    /** A replaced explicit Send's asynchronous answer cannot reject an accepted Paste. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun explicitPasteRetiresExplicitSendValidation() =
+        runTest {
+            val validation = CompletableDeferred<ConversationDictationTargetValidation>()
+            var sends = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    targetValidator = { _, _ -> validation.await() },
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            runCurrent()
+            f.controller.send()
+            f.platform.listener.onResult("tail")
+            runCurrent()
+            f.controller.paste()
+            assertEquals("Draft tail", f.drafts.getValue(key()).text)
+            validation.complete(ConversationDictationTargetValidation.DefinitelyRemoved)
+            advanceUntilIdle()
+            assertEquals(0, sends)
+            assertEquals("Draft tail", f.drafts.getValue(key()).text)
+        }
+
+    /** Repeated taps on the selected Send spinner reuse its held membership probe. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun repeatedSendReusesPendingValidation() =
+        runTest {
+            val validation = CompletableDeferred<ConversationDictationTargetValidation>()
+            var checks = 0
+            var sends = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    targetValidator = { _, _ ->
+                        checks++
+                        validation.await()
+                    },
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        request.beginDispatch().also { if (it) sends++ }
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            runCurrent()
+            f.controller.send()
+            f.platform.listener.onResult("tail")
+            runCurrent()
+            repeat(20) { f.controller.send() }
+            runCurrent()
+            assertEquals(1, checks)
+            validation.complete(ConversationDictationTargetValidation.Available)
+            advanceUntilIdle()
+            assertEquals(1, sends)
+        }
+
+    /** The production app-lock write fence defers recovery and unlock writes it exactly once. */
+    @Test
+    fun focusInterruptionDefersDraftWriteUntilAppUnlock() {
+        for (pendingAudio in listOf(false, true)) {
+            var locked = false
+            var evaluatingUnlock = false
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    appLocked = { locked },
+                    appUnlockEvaluationPending = { evaluatingUnlock },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.platform.listener.onResult("accepted")
+            f.scheduler.runDelay(500L)
+            f.platform.pendingCallerAudio = pendingAudio
+            locked = true
+            f.controller.interruptForAudioFocusLoss()
+            assertEquals("Draft", f.drafts.getValue(key()).text)
+            assertEquals(0, f.writes)
+            assertTrue(f.controller.hasUnrecoveredTranscript)
+            if (pendingAudio) assertTrue(f.platform.pendingCallerAudio)
+            f.controller.onAppForegrounded()
+            assertEquals(0, f.writes)
+            locked = false
+            evaluatingUnlock = true
+            f.controller.onAppForegrounded()
+            assertEquals(0, f.writes)
+            evaluatingUnlock = false
+            f.controller.onAppForegrounded()
+            assertEquals("Draft accepted", f.drafts.getValue(key()).text)
+            assertEquals(1, f.writes)
+            f.controller.onAppForegrounded()
+            assertEquals(1, f.writes)
+            if (pendingAudio) assertTrue(f.platform.pendingCallerAudio)
+        }
+    }
+
+    /** Lock defers restoration of an admitted but rejected send without replaying transport. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun appLockDefersRejectedSendRestorationWithoutSendingAgain() =
+        runTest {
+            var locked = false
+            var sends = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    appLocked = { locked },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sends++
+                        assertTrue(request.beginDispatch())
+                        locked = true
+                        request.onDispatchRejectedBeforeTransport()
+                        request.onDispatchRejectedBeforeTransport()
+                        false
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.platform.listener.onResult("tail")
+            advanceUntilIdle()
+            assertEquals("", f.drafts.getValue(key()).text)
+            assertEquals(1, sends)
+            locked = false
+            f.controller.onAppForegrounded()
+            assertEquals("Draft tail", f.drafts.getValue(key()).text)
+            f.controller.onAppForegrounded()
+            assertEquals(1, sends)
+        }
+
+    /** Deferring restoration never overwrites an editor revision created after the admitted clear. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun appLockDeferredRejectedSendPreservesNewerEditorRevision() =
+        runTest {
+            var locked = false
+            var sends = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    appLocked = { locked },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sends++
+                        assertTrue(request.beginDispatch())
+                        locked = true
+                        request.onDispatchRejectedBeforeTransport()
+                        request.onDispatchRejectedBeforeTransport()
+                        false
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.platform.listener.onResult("tail")
+            advanceUntilIdle()
+            f.edit(key(), TextFieldValue("New edit", TextRange(8)))
+            locked = false
+            f.controller.onAppForegrounded()
+            assertEquals("New edit Draft tail", f.drafts.getValue(key()).text)
+            f.controller.onAppForegrounded()
+            assertEquals("New edit Draft tail", f.drafts.getValue(key()).text)
+            assertEquals(1, sends)
+        }
+
+    /** Focus loss and surrender use the controller's preserving path, never its Cancel action. */
+    @Test
+    fun focusInterruptionPreservesAcceptedTextAndRejectsLateCallbacks() {
+        for (surrender in listOf(false, true)) {
+            var sends = 0
+            var captureClosures = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    onAfterAudioCapture = { captureClosures++ },
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
+                )
+            var onChange: (Int) -> Unit = {}
+            var onSurrender: () -> Unit = {}
+            val lease =
+                ConversationDictationAudioFocusLease(
+                    requestFocus = { change, surrenderCallback ->
+                        onChange = change
+                        onSurrender = surrenderCallback
+                        true
+                    },
+                    abandonFocus = {},
+                    postToMain = { it() },
+                    endCapture = f.controller::interruptForAudioFocusLoss,
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.platform.listener.onResult("accepted")
+            f.scheduler.runDelay(500L)
+            val playback =
+                dev.ipf.whitenoise.android.state.ConversationDictationPlaybackHandoff(
+                    ttsState = {
+                        dev.ipf.whitenoise.android.audio.tts.TtsState
+                            .Idle()
+                    },
+                    ttsGeneration = { 0L },
+                    pauseTts = {},
+                    resumeTts = {},
+                    pauseVoice = { null },
+                    resumeVoice = { false },
+                )
+            val handoff =
+                dev.ipf.whitenoise.android.state
+                    .ConversationDictationMediaHandoff(playback, lease)
+            handoff.beforeRecognition(requireNotNull(f.controller.state.target).copy(pauseOtherAudio = true))
+            val capture = f.platform.session
+            val closuresBeforeInterruption = captureClosures
+            if (surrender) onSurrender() else onChange(android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+            assertTrue(capture.destroyed)
+            assertTrue(captureClosures > closuresBeforeInterruption)
+            assertTrue(capture.cancelled)
+            assertFalse(f.controller.ownsMicrophone)
+            assertEquals("Draft accepted", f.drafts.getValue(key()).text)
+            assertEquals(0, sends)
+            onChange(android.media.AudioManager.AUDIOFOCUS_LOSS)
+            assertEquals("Draft accepted", f.drafts.getValue(key()).text)
+            handoff.afterAudioCapture()
+        }
+    }
+
+    /** An involuntary interruption retires an already pending Send validation. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun focusInterruptionDuringSendValidationNeverSends() =
+        runTest {
+            val validation = CompletableDeferred<ConversationDictationTargetValidation>()
+            var sends = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    targetValidator = { _, _ -> validation.await() },
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            runCurrent()
+            f.controller.send()
+            f.platform.listener.onResult("tail")
+            runCurrent()
+            f.controller.interruptForAudioFocusLoss()
+            assertEquals("Draft tail", f.drafts.getValue(key()).text)
+            validation.complete(ConversationDictationTargetValidation.Available)
+            advanceUntilIdle()
+            assertEquals(0, sends)
+            assertEquals("Draft tail", f.drafts.getValue(key()).text)
+        }
+
+    /** An unavailable original target cannot receive interruption text through another owner. */
+    @Test
+    fun focusInterruptionRespectsUnavailableOriginalTargetAndConcurrentDraft() {
+        for (available in listOf(false, true)) {
+            var targetAvailable = true
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetAvailable = { targetAvailable },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.platform.listener.onResult("accepted")
+            f.scheduler.runDelay(500L)
+            f.edit(key(), TextFieldValue("New draft", TextRange(9)))
+            targetAvailable = available
+            f.controller.interruptForAudioFocusLoss()
+            assertEquals(if (available) "New draft accepted" else "New draft", f.drafts.getValue(key()).text)
+        }
+    }
+
+    /** Unrecognized captured audio is recovery work even when accepted text is empty. */
+    @Test
+    fun focusInterruptionRetainsAudioWithoutAcceptedTranscript() {
+        val f = fixture(draft = TextFieldValue("Draft"))
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.platform.pendingCallerAudio = true
+        f.controller.interruptForAudioFocusLoss()
+        assertTrue(f.platform.pendingCallerAudio)
+        assertEquals("Draft", f.drafts.getValue(key()).text)
+        // Recovery may be parked once capture closes; neither state is destructive Cancel.
+        assertTrue(
+            f.controller.state is ConversationDictationState.Failed ||
+                f.controller.hasParkedComposerAudio(ACCOUNT, GROUP),
+        )
+    }
+
     /** A button press while the automatic endpoint drains its tail owns delivery, not the default. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -8511,6 +8835,8 @@ class ConversationDictationControllerTest {
         onSendBlocked: () -> Unit = {},
         onDraftRead: () -> Unit = {},
         allowDraftWrite: () -> Boolean = { true },
+        appLocked: () -> Boolean = { false },
+        appUnlockEvaluationPending: () -> Boolean = { false },
     ): Fixture {
         val scheduler = FakeTimeoutScheduler()
         val drafts = mutableMapOf(key() to draft)
@@ -8527,15 +8853,20 @@ class ConversationDictationControllerTest {
                     )
                 },
                 writeDraft = { account, group, expectedRevision, value ->
-                    val target = account to group
-                    if (!allowDraftWrite() || (revisions[target] ?: 0L) != expectedRevision) {
-                        null
-                    } else {
-                        drafts[target] = value
-                        revisions[target] = expectedRevision + 1L
-                        writes += 1
-                        onDraftWritten(value)
-                        expectedRevision + 1L
+                    dev.ipf.whitenoise.android.state.writeConversationDictationDraftWhenUnlocked(
+                        appLocked(),
+                        appUnlockEvaluationPending(),
+                    ) {
+                        val target = account to group
+                        if (!allowDraftWrite() || (revisions[target] ?: 0L) != expectedRevision) {
+                            null
+                        } else {
+                            drafts[target] = value
+                            revisions[target] = expectedRevision + 1L
+                            writes += 1
+                            onDraftWritten(value)
+                            expectedRevision + 1L
+                        }
                     }
                 },
                 targetAvailable = { _, _ -> targetAvailable() },

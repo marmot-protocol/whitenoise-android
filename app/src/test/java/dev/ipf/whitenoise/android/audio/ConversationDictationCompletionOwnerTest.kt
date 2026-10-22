@@ -11,6 +11,20 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ConversationDictationCompletionOwnerTest {
+    /** Every explicit choice stays editable until the synchronous policy claim. */
+    @Test
+    fun latestExplicitChoiceWinsUntilCommitted() {
+        val intent = ConversationDictationCompletionIntent()
+        org.junit.Assert.assertTrue(intent.choose(ConversationDictationDeliveryMode.SendOnFinish))
+        org.junit.Assert.assertTrue(intent.choose(ConversationDictationDeliveryMode.PasteIntoDraft))
+        org.junit.Assert.assertFalse(intent.choose(ConversationDictationDeliveryMode.SendOnFinish, automatic = true))
+        assertEquals(ConversationDictationDeliveryMode.PasteIntoDraft, intent.mode)
+        org.junit.Assert.assertTrue(intent.choose(ConversationDictationDeliveryMode.SendOnFinish))
+        intent.commit()
+        org.junit.Assert.assertFalse(intent.choose(ConversationDictationDeliveryMode.PasteIntoDraft))
+        assertEquals(ConversationDictationDeliveryMode.SendOnFinish, intent.mode)
+    }
+
     /** A thrown draft write is not a CAS conflict and must not trigger repeated writes or append fallback. */
     @Test
     fun pasteRetainsAfterOneThrowingWrite() {

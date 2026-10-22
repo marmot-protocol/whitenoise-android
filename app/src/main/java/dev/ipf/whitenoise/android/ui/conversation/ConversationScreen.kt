@@ -1892,6 +1892,10 @@ internal fun ConversationScreen(
                 .PrivateShareFiles(context)
         }
     val exitConversation = {
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+            dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.NavigationRequested,
+        )
         val exitingUris = (pendingMediaSlots.map { it.uri } + pendingDocumentUris).filter(importedShareFiles::owns)
         pendingMediaSlots = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
         pendingDocumentUris = pendingDocumentUris.filterNot(importedShareFiles::owns)
@@ -2921,6 +2925,10 @@ internal fun ConversationScreen(
             onStateChange = ::updateConversationSearch,
         )
         BackHandler(enabled = !conversationSearchState.filterSheetOpen) {
+            scrollCoordinator.cancelForegroundRestoreForUserIntent()
+            dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+                dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.InputReceived,
+            )
             when (
                 conversationBackAction(
                     textSelectionActive = textSelectionMessageId != null,
@@ -3741,6 +3749,21 @@ internal fun ConversationScreen(
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
             externalRevision = composerShareRevision to composerDictationRevision,
         )
+    LaunchedEffect(controller, composerTextState) {
+        var previous = composerTextState.valueState.value
+        snapshotFlow { composerTextState.valueState.value }.collect { current ->
+            if (current != previous) {
+                scrollCoordinator.cancelForegroundRestoreForUserIntent()
+                dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+                    dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.InputReceived,
+                )
+                previous = current
+            }
+        }
+    }
+    LaunchedEffect(controller, controller.editingMessageId, controller.replyingTo, navigationState.searchOpen) {
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+    }
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the

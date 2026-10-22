@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -17,6 +18,38 @@ import java.util.concurrent.CancellationException
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Scroll state-machine invariants share one command/writer harness.
 class ConversationScrollCoordinatorTest {
+    @Test
+    fun typingIntentCancelsAnAlreadyStartedForegroundCorrection() =
+        runTest {
+            val writer = BlockingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val geometry = ConversationForegroundGeometry(720, 0, 96)
+            val token =
+                coordinator.beginForegroundRestore(
+                    ConversationForegroundSnapshot(
+                        coordinator.bookmark(anchor(messageId = "retained", listIndex = 4)),
+                        geometry,
+                    ),
+                )
+            coordinator.releaseForegroundRestoreGate(token)
+            val correction =
+                async {
+                    coordinator.completeForegroundRestore(
+                        token,
+                        geometry.copy(viewportHeightPx = 500),
+                        resolveAnchorIndex = { 4 },
+                        resolveTailIndex = { 9 },
+                    )
+                }
+            runCurrent()
+            assertTrue(writer.writeStarted.isCompleted)
+            coordinator.cancelForegroundRestoreForUserIntent()
+            runCurrent()
+            assertFalse(correction.await())
+            assertFalse(coordinator.foregroundRestorePending)
+            assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+        }
+
     @Test
     fun unchangedForegroundGeometryPerformsNoScrollWrite() =
         runTest {
@@ -147,6 +180,7 @@ class ConversationScrollCoordinatorTest {
             coordinator.releaseForegroundRestoreGate(token)
 
             assertFalse(coordinator.foregroundRestoreInProgress)
+            assertTrue(coordinator.foregroundRestorePending)
             val restored =
                 coordinator.completeForegroundRestore(
                     token = token,
@@ -1869,7 +1903,7 @@ class ConversationScrollCoordinatorTest {
         assertTrue(effects.contains("scrollCoordinator.completeForegroundRestore("))
         assertTrue(screen.contains("ConversationViewportRestorationEffects("))
         assertTrue(screen.contains("ConversationViewportStructureEffect("))
-        assertTrue(owner.contains("coordinator.foregroundRestoreInProgress"))
+        assertTrue(owner.contains("coordinator.foregroundRestorePending"))
         assertTrue(effects.contains("ConversationForegroundDrawGateEffect"))
         assertTrue(effects.contains("foregroundPreDrawSignals"))
         assertTrue(effects.contains("awaitConversationForegroundPresentation("))

@@ -211,6 +211,14 @@
         "test_ids": [
           "MED-013"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Typing and navigation retire deferred geometry",
+        "anchor": "snapshotFlow { composerTextState.valueState.value }",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

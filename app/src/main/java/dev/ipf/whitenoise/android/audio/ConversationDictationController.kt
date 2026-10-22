@@ -94,6 +94,7 @@ internal enum class ConversationDictationFailure {
     MicrophoneMuted,
     MicrophoneInUse,
     AudioFocusUnavailable,
+    Interrupted,
     NoSpeech,
     NoMatch,
     Network,
@@ -1338,6 +1339,11 @@ internal class ConversationDictationController internal constructor(
         val current = state
         val action = deliveryMode?.name ?: "Done"
         val source = if (automatic) "automatic" else "explicit"
+        val previousMode = requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
+        val nextMode = deliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
+        val replacingValidation =
+            previousMode != nextMode &&
+                current.sessionId?.let(completion.validation::validationInProgress) == true
         if (!inActiveRecognitionState ||
             !completion.intent.choose(deliveryMode, automatic)
         ) {
@@ -1346,15 +1352,14 @@ internal class ConversationDictationController internal constructor(
             )
             return
         }
+        // A result for the old choice must not deliver or reject the replacement choice.
+        if (replacingValidation) completion.validation.reset()
         conversationDictationDiagnostic("event=completion_action action=$action source=$source accepted=true")
         // Capture is already sealed by the silence endpoint; only the delivery choice changes.
         if (finishRequested) {
-            if (deliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft &&
-                completion.transcript.isNotBlank() &&
-                completion.validation.validatingSessionId == current.sessionId
-            ) {
-                // Paste is a local draft action; a pending Send membership probe must
-                // not delay it or later turn an accepted Paste into a validation failure.
+            if (replacingValidation && completion.transcript.isNotBlank()) {
+                // Re-evaluate the latest policy against the same completed transcript.
+                // Paste remains local; a replacement Send gets a fresh validation token.
                 validateAndDeliverTranscript(
                     requireNotNull(current.sessionId),
                     requireNotNull(current.target),
@@ -1513,6 +1518,17 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Idle
     }
 
+    /** Involuntary focus loss preserves input; an earlier Send choice is never submitted. */
+    fun interruptForAudioFocusLoss() {
+        if (!inActiveRecognitionState || deliveryInProgress || completion.intent.committed) return
+        completion.validation.reset()
+        completion.dispatch.cancelBeforeTransport()
+        completion.intent.reset()
+        completion.intent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
+        unresolvedRecognitionFailure = ConversationDictationFailure.Interrupted
+        abortSessionPreservingTranscript("audio_focus_lost")
+    }
+
     /** Handles involuntary teardown without routing already recognized text through cancellation. */
     private fun abortSessionPreservingTranscript(reason: String) {
         conversationDictationDiagnostic(
@@ -1527,7 +1543,17 @@ internal class ConversationDictationController internal constructor(
         val sessionId = current.sessionId
         val target = current.target
         val transcript = accumulatedTranscript.trim().ifBlank { completion.transcript.trim() }
-        if (transcript.isNotBlank() && sessionId != null && target != null) {
+        if (sessionId != null &&
+            target != null &&
+            runCatching(platform::callerAudioHasPending).getOrDefault(true)
+        ) {
+            failWithRetainedCallerAudio(
+                sessionId,
+                target,
+                unresolvedRecognitionFailure ?: ConversationDictationFailure.Unknown,
+                recognizedTranscript = transcript.ifBlank { null },
+            )
+        } else if (transcript.isNotBlank() && sessionId != null && target != null) {
             if (completion.dispatch.dispatchedSessionId == sessionId) {
                 retainUndeliveredTranscript(sessionId, target, transcript)
             } else {

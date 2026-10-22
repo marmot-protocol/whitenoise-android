@@ -20,10 +20,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.state.WarmResumeConversationPhase
+import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -65,7 +69,7 @@ internal fun ConversationImeReanchorEffect(
             imeTransitionBookmark.value = null
             return@LaunchedEffect
         }
-        if (scrollCoordinator.foregroundRestoreInProgress) return@LaunchedEffect
+        if (scrollCoordinator.foregroundRestorePending) return@LaunchedEffect
         val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
         if (!initialTimelineAnchored || suppressForCustomInputSwap) return@LaunchedEffect
         awaitImeInsetAtTarget(
@@ -128,6 +132,17 @@ internal fun ConversationForegroundRestoreEffects(
     val foregroundPreDrawSignals = remember(controller) { Channel<Unit>(capacity = Channel.CONFLATED) }
     var foregroundRestoreToken by remember(controller) { mutableStateOf<ConversationForegroundRestoreToken?>(null) }
     val resumeScrollRestoreCoordinator = remember(controller) { ResumeScrollRestoreCoordinator() }
+    val foregroundFocusIntent = remember(controller) { ConversationForegroundFocusIntent() }
+    LaunchedEffect(controller, composerFocused) {
+        if (
+            foregroundFocusIntent.supersedesRestore(
+                focused = composerFocused,
+                resumed = lifecycleOwner?.lifecycle?.currentState == Lifecycle.State.RESUMED,
+            )
+        ) {
+            scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        }
+    }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val rootView = LocalView.current
@@ -179,6 +194,7 @@ internal fun ConversationForegroundRestoreEffects(
         searchOpen = searchOpen,
         hasActiveEditOrReplySession = hasActiveEditOrReplySession,
         onPause = {
+            foregroundFocusIntent.pause()
             resumeScrollRestoreCoordinator.cancel()
             foregroundRestoreToken =
                 if (currentInitialTimelineAnchored) {
@@ -195,10 +211,30 @@ internal fun ConversationForegroundRestoreEffects(
                 }
         },
         onResume = { restoreFocus, clearFocus ->
+            foregroundFocusIntent.resume(restoreFocus, clearFocus)
             scope.launch { controller.retryInviteAcceptanceAuthority() }
             foregroundPreDrawSignals.tryReceive()
             val restoreToken = foregroundRestoreToken
             foregroundRestoreToken = null
+            WarmResumeTrace.conversationPhase(
+                WarmResumeConversationPhase.Resume,
+                imeRequested = restoreToken?.expectedImeVisible == true || restoreFocus,
+                imeObserved = currentForegroundGeometryProvider().imeBottomPx > 0,
+            )
+            val retainedPresentationSafe =
+                canPresentRetainedConversationFrame(
+                    anchored = currentInitialTimelineAnchored,
+                    ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation,
+                    appReady = controller.appState.phase == AppPhase.Ready,
+                    lockVisible = controller.appState.appLockScreenVisible,
+                )
+            if (restoreToken != null && retainedPresentationSafe) {
+                scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
+                WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.RetainedFrameReleased)
+                requestConversationForegroundFrame(rootView)
+            } else {
+                scrollCoordinator.cancelForegroundRestore()
+            }
             val pendingLocalTimeline = controller.pendingTimelineAtForeground()
             resumeScrollRestoreCoordinator.launchResumeWork(scope) {
                 when {
@@ -211,7 +247,7 @@ internal fun ConversationForegroundRestoreEffects(
                         keyboardController?.hide()
                     }
                 }
-                if (currentInitialTimelineAnchored && restoreToken != null) {
+                if (retainedPresentationSafe && restoreToken != null) {
                     var releaseFrameRequested = false
                     val resumedPresentation =
                         awaitConversationForegroundPresentation(
@@ -222,6 +258,7 @@ internal fun ConversationForegroundRestoreEffects(
                             awaitLocalTimeline = {
                                 if (pendingLocalTimeline != null) {
                                     awaitCommittedConversationTimeline(pendingLocalTimeline)
+                                    WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.LocalHandoffCommitted)
                                     // Discard a pre-draw from the old composition while local apply was held.
                                     // The next signal measures the post-handoff transcript/chrome together.
                                     foregroundPreDrawSignals.tryReceive()

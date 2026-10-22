@@ -189,3 +189,5 @@
 # Group action review: exact captured bulk targets and successor identity.
 *.ChatDepartureReviewScreenshotTest.bulkDepartureNamesEachCapturedGroupAndActor
 *.ChatDepartureReviewScreenshotTest.successorReviewLargeRtlKeepsActorGroupAndCombinedAction
+*.ConversationDictationPersistentControlTest.processingChoiceCanSwitchWithSelectedAccessibleState
+*.ConversationDictationPersistentControlTest.processingChoiceLightLargeRtlKeepsBothChoicesUsable

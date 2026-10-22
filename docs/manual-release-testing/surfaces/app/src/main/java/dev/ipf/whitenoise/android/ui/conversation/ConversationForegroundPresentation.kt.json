@@ -28,6 +28,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "surface": "Retained frame privacy and owner admission",
+        "anchor": "canPresentRetainedConversationFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

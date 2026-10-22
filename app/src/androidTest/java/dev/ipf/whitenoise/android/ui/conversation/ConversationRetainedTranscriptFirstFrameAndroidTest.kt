@@ -8,12 +8,15 @@ import android.util.Log
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -38,6 +41,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -116,28 +120,51 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             fixture.recording.set(true)
             val resumedAt = SystemClock.uptimeMillis()
             composeRule.runOnUiThread { owner.moveTo(Lifecycle.State.RESUMED) }
-            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.firstBlockedAt != null }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            assertFalse("retained A is live while the newer handoff is held", fixture.hasB)
             composeRule.runOnUiThread {
-                assertTrue("supersede before fallback", SystemClock.uptimeMillis() - fixture.lastResumeAt < 1_500L)
                 assertTrue(fixture.controller.pendingTimelineAtForeground()?.isCompleted == false)
-                assertTrue(fixture.draws.isEmpty())
-                assertTrue(fixture.gateReleasedAt == null)
                 owner.moveTo(Lifecycle.State.CREATED)
+                fixture.draws.clear() // The second foreground epoch owns its own first-live-frame evidence.
                 owner.moveTo(Lifecycle.State.RESUMED)
             }
-            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.firstBlockedAt != null }
-            assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
             fixture.dispatcher.release()
-            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+                fixture.draws.any { ConversationTimelineTestIds.MESSAGE_B in it.messageIds }
+            }
             assertSame(retainedActivity, composeRule.activity)
             assertEquals(Lifecycle.State.RESUMED, retainedActivity.lifecycle.currentState)
-            assertResumedTranscript(fixture, null, resumedAt, false)
+            assertResumedTranscript(fixture, null, resumedAt, false, allowRetainedPendingFrame = true)
             composeRule.onNode(hasSetTextAction()).performTextInput(" editable")
         } catch (failure: Throwable) {
             bodyFailure = failure
             throw failure
         } finally {
             closeFirstDrawFixture(fixture, retainedActivity, bodyFailure)
+        }
+    }
+
+    /** Actual Back routing must draw its result before the deliberately held local handoff completes. */
+    @Test
+    fun retainedConversationBackDrawsWhileLocalPreparationIsStillHeld() {
+        val fixture = mountFixture(controlledOwner = true)
+        val owner = checkNotNull(fixture.owner)
+        try {
+            composeRule.runOnUiThread { owner.moveTo(Lifecycle.State.CREATED) }
+            fixture.dispatcher.hold.set(true)
+            fixture.first.emitWindow(fixture.pageWithB)
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.dispatcher.hasPending }
+            fixture.recording.set(true)
+            composeRule.runOnUiThread { owner.moveTo(Lifecycle.State.RESUMED) }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            assertFalse(fixture.hasB)
+            composeRule.runOnUiThread { retainedActivity.onBackPressedDispatcher.onBackPressed() }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.navigationDrawObserved.get() }
+            assertTrue("navigation is visibly live before the held handoff", fixture.dispatcher.hold.get())
+            assertTrue(fixture.dispatcher.hasPending)
+            assertFalse(fixture.hasB)
+        } finally {
+            fixture.close()
         }
     }
 
@@ -216,6 +243,12 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             composeRule.runOnUiThread {
                 val route = replacementRoute(kind)
                 publishFixtureOwner(fixture.appState, route.accountRef, kind == RouteReplacement.Runtime)
+                if (kind != RouteReplacement.Chat) {
+                    assertFalse(
+                        "old account/runtime cannot admit an early retained frame",
+                        fixture.controller.ownsRetainedForegroundPresentation,
+                    )
+                }
                 next = RetainedFixture(false, false, route, fixture.appState)
                 fixture.ownedReplacement = next
             }
@@ -349,11 +382,13 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             fixture.recording.set(true)
             val resumedAt = SystemClock.uptimeMillis()
             resumeForFirstDraw(fixture, boundary)
-            stallWatchdog.phase("await first live draw")
-            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            stallWatchdog.phase("await eventual current transcript draw")
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+                fixture.draws.any { ConversationTimelineTestIds.MESSAGE_B in it.messageIds }
+            }
             stallWatchdog.phase("post-draw activity lookup")
             assertSame(original, composeRule.activity)
-            assertResumedTranscript(fixture, olderAnchor, resumedAt, denyIme)
+            assertResumedTranscript(fixture, olderAnchor, resumedAt, denyIme, boundary == UpdateBoundary.Queued)
             stallWatchdog.phase("post-draw editor input")
             composeRule.onNode(hasSetTextAction()).performTextInput(" editable")
         } catch (failure: Throwable) {
@@ -404,12 +439,18 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         stallWatchdog.phase("resume task")
         resumeRetainedActivity()
         if (boundary != UpdateBoundary.Queued) return
-        stallWatchdog.phase("await blocked pre-draw")
-        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.preDraws.get() > checkpoint }
-        assertTrue("known local preparation must still hold the first draw", fixture.draws.isEmpty())
-        assertTrue("queued preparation produced a blocked pre-draw", fixture.firstBlockedAt != null)
+        stallWatchdog.phase("await live retained pre-draw")
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+            fixture.preDraws.get() > checkpoint && fixture.draws.isNotEmpty()
+        }
+        assertFalse("held local preparation must remain pending", fixture.hasB)
+        assertTrue(ConversationTimelineTestIds.MESSAGE_A in fixture.draws.first().messageIds)
+        assertFalse(ConversationTimelineTestIds.MESSAGE_B in fixture.draws.first().messageIds)
         stallWatchdog.phase("release queued preparation")
         fixture.dispatcher.release()
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+            fixture.draws.any { ConversationTimelineTestIds.MESSAGE_B in it.messageIds }
+        }
     }
 
     /** Requires the exact saved older anchor to have been painted before backgrounding. */
@@ -462,8 +503,14 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         olderAnchor: Map.Entry<Any, Int>?,
         resumedAt: Long,
         denyIme: Boolean,
+        allowRetainedPendingFrame: Boolean = false,
     ) {
-        val drawn = fixture.draws.first()
+        val drawn =
+            if (allowRetainedPendingFrame) {
+                fixture.draws.first { ConversationTimelineTestIds.MESSAGE_B in it.messageIds }
+            } else {
+                fixture.draws.first()
+            }
         val newestKey = "msg:${ConversationTimelineTestIds.MESSAGE_B}"
         assertTrue(ConversationTimelineTestIds.MESSAGE_B in drawn.messageIds)
         assertSame(fixture.controller, drawn.controller)
@@ -484,7 +531,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         assertFalse("independent roster work stays held", fixture.rosterReply.isCompleted)
         assertEquals(fixture.expectedOpenCount, fixture.scripts.timelineSubscriptionOpenCount)
         assertTrue(fixture.firstDrawAt >= resumedAt)
-        assertTrue(fixture.applicationTimes.last() <= fixture.firstDrawAt)
+        assertTrue(fixture.applicationTimes.last() <= drawn.rootDrawAtUptimeMs)
         assertTrue(fixture.lastResumeAt >= resumedAt)
         assertTrue(fixture.firstDrawAt >= fixture.lastResumeAt)
         val gateHeldMs =
@@ -545,11 +592,22 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                             appState = active.appState,
                             chat = active.chat,
                             controller = active.controller,
-                            onBack = {},
+                            onBack = {
+                                active.mounted = false
+                                active.navigatedAway = true
+                            },
                             restoredScrollSnapshot = active.readingSnapshot,
                         )
                     }
                 }
+            } else if (active.navigatedAway) {
+                BasicText(
+                    "Fixture chat list",
+                    Modifier.drawWithContent {
+                        drawContent()
+                        active.navigationDrawObserved.set(true)
+                    },
+                )
             }
         }
         stallWatchdog.phase("await initial transcript draw")
@@ -678,6 +736,11 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         val appState =
             (appStateOverride ?: createFixtureAppState(includeSecondAccount)).also {
                 it.liveSubscriptionOverrides.conversation = scripts.subscriptions
+                // The direct-screen fixture owns a ready synthetic account, bypassing only bootstrap setup.
+                WhiteNoiseAppState::class.java
+                    .getDeclaredMethod("setPhase", AppPhase::class.java)
+                    .apply { isAccessible = true }
+                    .invoke(it, AppPhase.Ready)
             }
         val rosterReply = CompletableDeferred<dev.ipf.marmotkit.GroupRosterFfi>()
         val dispatcher = HeldPreparationDispatcher()
@@ -714,6 +777,8 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         var owner: ControlledConversationOwner? = null
         var composition: AbstractComposeView? = null
         var mounted by mutableStateOf(true)
+        var navigatedAway by mutableStateOf(false)
+        val navigationDrawObserved = AtomicBoolean()
         var paintStaleControl by mutableStateOf(false)
         var staleRows: List<TimelineMessage> = emptyList()
         val preDraws = AtomicInteger()
@@ -744,8 +809,9 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             if (frame.controller !== controller) return
             if (!recording.get()) lastDraw = frame
             initialDrawObserved.set(true)
-            if (recording.get() && draws.isEmpty()) {
-                firstDrawAt = frame.rootDrawAtUptimeMs
+            if (recording.get()) {
+                // Keep the first-frame oracle immutable while observing eventual local convergence.
+                if (draws.isEmpty()) firstDrawAt = frame.rootDrawAtUptimeMs
                 draws.add(frame)
             }
         }

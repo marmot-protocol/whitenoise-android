@@ -14,13 +14,17 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -28,6 +32,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
@@ -51,6 +56,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w320dp-h640dp-mdpi")
@@ -100,8 +106,9 @@ class ConversationDictationPersistentControlTest {
 
         composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         composeRule
-            .onNodeWithTag(DICTATION_PROGRESS_TAG)
+            .onNodeWithContentDescription("Send")
             .assertIsDisplayed()
+            .assertHasClickAction()
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.ProgressBarRangeInfo,
@@ -122,11 +129,69 @@ class ConversationDictationPersistentControlTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Processing)
         composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         val send = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
-        val progress = composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
+        val progress =
+            composeRule
+                .onNodeWithTag(DICTATION_PROGRESS_TAG, useUnmergedTree = true)
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
         assertTrue(progress.left >= send.left && progress.right <= send.right)
         assertTrue(progress.top >= send.top && progress.bottom <= send.bottom)
         composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
+    }
+
+    /** Pending processing advertises its selected action while both choices stay usable. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun processingChoiceCanSwitchWithSelectedAccessibleState() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture, darkTheme = true, amoled = true)
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.onNodeWithContentDescription("Paste").assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Send")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Send")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_send_editable.png")
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithContentDescription("Send").assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Paste")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Paste")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_paste_editable.png")
+    }
+
+    /** Pending processing advertises its selected action while both choices stay usable. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun processingChoiceLightLargeRtlKeepsBothChoicesUsable() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture, fontScale = 2f, rtl = true, darkTheme = false)
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.onNodeWithContentDescription("Paste").assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Send")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Send")
+        composeRule
+            .onRoot()
+            .captureRoboImage("src/test/snapshots/dictation_processing_send_editable_light_large_rtl.png")
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithContentDescription("Send").assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Paste")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Paste")
+        composeRule
+            .onRoot()
+            .captureRoboImage("src/test/snapshots/dictation_processing_paste_editable_light_large_rtl.png")
     }
 
     /** A draft conflict is resolved automatically and never exposes a second edit action. */
@@ -549,11 +614,31 @@ class ConversationDictationPersistentControlTest {
             assertEquals("Edited saved text", fixture.draft.text)
         }
 
+    /** Each completion choice is one labelled 48dp action; progress belongs to that action. */
+    private fun assertProcessingActionsAccessible(selectedLabel: String) {
+        listOf("Send", "Paste").forEach { label ->
+            composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
+            val action = composeRule.onNodeWithContentDescription(label)
+            action.assertIsEnabled().assertHasClickAction()
+            val bounds = action.getUnclippedBoundsInRoot()
+            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.bottom - bounds.top >= 48.dp)
+        }
+        composeRule.onNodeWithContentDescription(selectedLabel).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.ProgressBarRangeInfo,
+                ProgressBarRangeInfo.Indeterminate,
+            ),
+        )
+    }
+
     private fun render(
         fixture: Fixture,
         fontScale: Float = 1f,
         rtl: Boolean = false,
         displayedState: ConversationDictationState? = null,
+        darkTheme: Boolean? = null,
+        amoled: Boolean = false,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -561,7 +646,10 @@ class ConversationDictationPersistentControlTest {
                 LocalDensity provides Density(density.density, fontScale),
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme {
+                WhiteNoiseTheme(
+                    darkTheme = darkTheme ?: androidx.compose.foundation.isSystemInDarkTheme(),
+                    amoled = amoled,
+                ) {
                     Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
                         ConversationDictationPersistentControl(
                             state = displayedState ?: fixture.controller.state,

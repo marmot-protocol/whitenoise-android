@@ -1697,7 +1697,9 @@ class WhiteNoiseAppState private constructor(
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
     private val conversationDictationMediaHandoff by lazy {
-        createConversationDictationMediaHandoff(ttsController, appContext) { conversationDictation.cancel() }
+        createConversationDictationMediaHandoff(ttsController, appContext) {
+            conversationDictation.interruptForAudioFocusLoss()
+        }
     }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
@@ -2990,7 +2992,10 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Long? = composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+    ): Long? =
+        writeConversationDictationDraftWhenUnlocked(appLockScreenVisible, appUnlockEvaluationPending) {
+            composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+        }
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {
@@ -7917,6 +7922,7 @@ class WhiteNoiseAppState private constructor(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
+        if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
         resumePendingInviteNotificationIdentityRefreshes()
         resumePushWakeEpisodeFromLifecycle()
         if (dismissRetainedVisibleConversation) {
@@ -7979,6 +7985,7 @@ class WhiteNoiseAppState private constructor(
                 requestAppUnlock()
             } else {
                 appLockScreenVisible = false
+                if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
                 resumePendingInviteNotificationIdentityRefreshes()
             }
         }

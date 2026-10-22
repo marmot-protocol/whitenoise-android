@@ -17,6 +17,15 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationForegroundPresentationTest {
+    @Test
+    fun retainedFrameRequiresCurrentOwnerReadyUnlockedAndAnchoredContent() {
+        assertTrue(canPresentRetainedConversationFrame(true, true, true, false))
+        assertFalse(canPresentRetainedConversationFrame(false, true, true, false))
+        assertFalse(canPresentRetainedConversationFrame(true, false, true, false))
+        assertFalse(canPresentRetainedConversationFrame(true, true, false, false))
+        assertFalse(canPresentRetainedConversationFrame(true, true, true, true))
+    }
+
     /** A consumed local publication still waits for its actual layout, even without an outstanding receipt. */
     @Test
     fun consumedTimelineWaitsForMatchingMeasuredPublication() =

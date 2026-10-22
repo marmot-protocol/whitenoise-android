@@ -268,7 +268,7 @@ internal class ConversationScrollCoordinator(
     private var activeCommand: Job? = null
     private var userGestureInProgress = false
     private val foregroundRestoreLifetime = StalenessGuard()
-    private var foregroundSnapshot: ConversationForegroundSnapshot? = null
+    private var foregroundSnapshot by mutableStateOf<ConversationForegroundSnapshot?>(null)
 
     var mode by mutableStateOf(settledMode)
         private set
@@ -391,8 +391,20 @@ internal class ConversationScrollCoordinator(
         foregroundRestoreInProgress = false
     }
 
+    /** Typing/focus/navigation also retire an already-started deferred lifecycle writer. */
+    fun cancelForegroundRestoreForUserIntent() {
+        if (!foregroundRestorePending) return
+        cancelForegroundRestore()
+        invalidateActiveCommand()
+        mode = settledMode
+    }
+
+    /** Whether an anchor correction still owns its captured snapshot after live drawing resumes. */
+    internal val foregroundRestorePending: Boolean
+        get() = foregroundSnapshot != null
+
     /**
-     * Opens the draw gate after the bounded settle deadline while keeping the
+     * Opens the freshness draw gate while keeping the
      * captured snapshot, so the next settled geometry can still apply the one
      * deferred correction. User intent, navigation, and disposal discard the
      * retained snapshot through the existing cancellation paths.
@@ -491,7 +503,7 @@ internal class ConversationScrollCoordinator(
 
     /** Reapplies the current history bookmark only while no newer gesture or command owns it. */
     suspend fun reanchorReadingHistory(resolveAnchorIndex: (ConversationScrollAnchor) -> Int?): Boolean {
-        if (foregroundRestoreInProgress) return false
+        if (foregroundRestorePending) return false
         val anchor = readingAnchor
         val canRestore =
             !userGestureInProgress &&
@@ -679,7 +691,7 @@ internal class ConversationScrollCoordinator(
         operation: suspend ConversationScrollCommandScope.() -> Unit,
     ): Boolean {
         if (reason.supersedesUnreadJump) onExplicitNavigation()
-        if (foregroundRestoreInProgress && reason.defersDuringForegroundRestore) return false
+        if (foregroundRestorePending && reason.defersDuringForegroundRestore) return false
         return runCommand(
             transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
             resultingMode = resultingMode ?: settledMode,
