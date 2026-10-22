@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 
 /**
@@ -51,9 +52,11 @@ internal fun searchableTimelineRecord(record: TimelineMessageRecordFfi): ChatLis
 internal fun messageSearchSnippet(
     match: ChatListMessageSearch.SearchableRecord,
     needle: String,
+    copy: MessageTextCopy = MessageTextCopy.Default,
 ): SnippetHighlight? =
     if (needle.isEmpty()) {
         ChatListMessageSearch.buildFilteredSnippet(match.plaintext, match.mediaLabels)
+            ?: if (ChatListMessageSearch.isEligibleMatch(match, needle)) SnippetHighlight(copy.message, 0, 0) else null
     } else {
         ChatListMessageSearch.buildSnippet(match.plaintext, needle)
     }
