@@ -107,6 +107,43 @@ class VoicePlaybackControllerFocusTest {
         assertNull(VoicePlaybackController.state.value.source)
     }
 
+    /** Banner seeks move the retained player by the requested step, clamp to the clip and keep a pause paused. */
+    @Test fun shellSeekClampsToTheClipAndPreservesPause() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
+        assertTrue(VoicePlaybackController.setSessionPlaying(42, false))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertEquals(player.durationMs, player.seekedToMs)
+        assertEquals(player.durationMs, VoicePlaybackController.state.value.positionMs)
+        assertTrue(VoicePlaybackController.seekSessionBy(42, -10_000))
+        assertEquals(0, player.seekedToMs)
+        assertEquals(0, VoicePlaybackController.state.value.positionMs)
+        assertFalse(player.playing)
+        assertFalse(VoicePlaybackController.state.value.isPlaying)
+        assertEquals(0, player.startCount)
+    }
+
+    /** A stale banner cannot seek or change the speed of the session that replaced it. */
+    @Test fun replacedShellSessionRejectsSeekAndSpeed() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setControllerField("currentSpeed", 1f)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 43, ready = true, speed = 1f))
+
+        assertFalse(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertNull(VoicePlaybackController.cycleSessionSpeed(42))
+        assertNull(player.seekedToMs)
+        assertEquals(1f, VoicePlaybackController.state.value.speed)
+
+        assertEquals(1.5f, VoicePlaybackController.cycleSessionSpeed(43))
+        assertEquals(1.5f, VoicePlaybackController.state.value.speed)
+        setControllerField("currentSpeed", 1f)
+    }
+
     /** Equal attachment keys under another account must prepare new bytes instead of resuming the old player. */
     @Test fun sameKeyDifferentAccountDoesNotResumeCapturedAudio() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
@@ -603,6 +640,13 @@ class VoicePlaybackControllerFocusTest {
         }
 
         override fun getCurrentPosition(): Int = positionMs
+
+        var seekedToMs: Int? = null
+
+        /** Records the clamped target the controller hands to the codec. */
+        override fun seekTo(msec: Int) {
+            seekedToMs = msec
+        }
 
         /** Models codecs that discover duration late or reject a metadata query without losing the player. */
         override fun getDuration(): Int {

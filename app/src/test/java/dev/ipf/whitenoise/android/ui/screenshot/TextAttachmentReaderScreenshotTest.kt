@@ -209,7 +209,7 @@ class TextAttachmentReaderScreenshotTest {
         assertEquals(longFilenameCandidate.displayName, copied)
     }
 
-    /** Ready actions are accessible and do not offer editing. */
+    /** Ready actions sit in the top bar, stay accessible, do not offer editing and leave no bottom button row. */
     @Test
     fun readyActionsAreAccessibleAndDoNotOfferEditing() {
         var dismissed = 0
@@ -231,7 +231,11 @@ class TextAttachmentReaderScreenshotTest {
 
         composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsEnabled().performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.speak_aloud)).assertIsEnabled().performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.read_aloud)).assertIsEnabled().performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.share)).assertIsEnabled().performClick()
+        composeRule.onNodeWithText(string(R.string.copy_text)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.speak_aloud)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.speak_aloud)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.text_attachment_reader_title)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
         composeRule.onNodeWithText(string(R.string.text_attachment_open_external)).performClick()
@@ -242,13 +246,12 @@ class TextAttachmentReaderScreenshotTest {
         assertEquals(1, dismissed)
         assertEquals(markdownPreview().text, copied)
         assertEquals(1, spoken)
+        assertEquals(1, shared)
         assertEquals(1, opened)
         composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.onNodeWithText(string(R.string.share)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.save)).assertIsEnabled().performClick()
         assertEquals(1, saved)
-        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
-        composeRule.onNodeWithText(string(R.string.share)).assertIsEnabled().performClick()
-        assertEquals(1, shared)
         composeRule.onNodeWithText(string(R.string.edit)).assertDoesNotExist()
     }
 
@@ -263,14 +266,16 @@ class TextAttachmentReaderScreenshotTest {
             shareBusy = true,
         )
 
+        composeRule.onNodeWithContentDescription(string(R.string.share)).assertIsNotEnabled().performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsEnabled()
+        composeRule.onNodeWithContentDescription(string(R.string.read_aloud)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
-        composeRule.onNodeWithText(string(R.string.share)).assertIsNotEnabled().performClick()
         composeRule.onNodeWithText(string(R.string.save)).assertIsEnabled()
         composeRule.onNodeWithText(string(R.string.text_attachment_open_external)).assertIsEnabled()
         assertEquals(0, shared)
     }
 
-    /** The overflow menu offers Save, Share and Open in another app (#3331). */
+    /** The overflow menu keeps Save and Open in another app once Share moved to the top bar (#3385). */
     @Test
     fun overflowMenuLight() {
         render(candidate = markdownCandidate, state = TextAttachmentReaderState.Ready(markdownPreview()))
@@ -366,7 +371,7 @@ class TextAttachmentReaderScreenshotTest {
         )
 
         composeRule.onNodeWithText(fullSource).performTouchInput { longClick() }
-        composeRule.onNodeWithContentDescription(string(R.string.speak_aloud)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.read_aloud)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
 
         assertTrue(copied.isNotBlank())
@@ -455,23 +460,42 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithText(destination).assertIsDisplayed()
     }
 
-    /** Actual native metadata and Stop reading chrome stay reachable at the real theme-owned large font. */
+    /** Actual native metadata and the top-bar actions stay reachable at the real theme-owned large font. */
     @Test
-    fun loadedByteCountAndCurrentSpeechToggleRemainVisible() {
-        var toggled = 0
+    fun loadedByteCountAndTopActionsRemainVisible() {
+        var read = 0
         val preview = TextAttachmentPreview(plainCandidate, "Selected reader text", byteCount = 1_024L)
         render(
             candidate = plainCandidate,
             state = TextAttachmentReaderState.Ready(preview),
             darkTheme = true,
             fontScale = 1.6f,
-            isReading = true,
-            onReadAloud = { toggled += 1 },
+            onReadAloud = { read += 1 },
         )
         composeRule.onNodeWithText(context.getString(R.string.bytes_count, 1_024L)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.tts_bar_stop)).assertIsEnabled().performClick()
-        assertEquals(1, toggled)
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithContentDescription(string(R.string.share)).assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithContentDescription(string(R.string.read_aloud)).assertIsEnabled().performClick()
+        assertEquals(1, read)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/text_reader_native_actions_dark_large.png")
+    }
+
+    /** An empty attachment offers neither Copy nor read-aloud, while Share still sends the original file. */
+    @Test
+    fun emptyContentDisablesCopyAndReadAloud() {
+        var copied = 0
+        var read = 0
+        render(
+            candidate = plainCandidate,
+            state = TextAttachmentReaderState.Ready(TextAttachmentPreview(plainCandidate, "")),
+            onCopy = { copied += 1 },
+            onReadAloud = { read += 1 },
+        )
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsNotEnabled().performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.read_aloud)).assertIsNotEnabled().performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.share)).assertIsEnabled()
+        assertEquals(0, copied)
+        assertEquals(0, read)
     }
 
     /** Composes the surface under test with the given fixture. */
@@ -490,7 +514,6 @@ class TextAttachmentReaderScreenshotTest {
         onSave: () -> Unit = {},
         onShare: () -> Unit = {},
         shareBusy: Boolean = false,
-        isReading: Boolean = false,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -511,7 +534,6 @@ class TextAttachmentReaderScreenshotTest {
                             onSave = onSave,
                             onShare = onShare,
                             shareBusy = shareBusy,
-                            isReading = isReading,
                         )
                     }
                 }

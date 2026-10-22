@@ -318,10 +318,56 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.waitForIdle()
 
         assertFalse(actionMenuOpen)
+        assertEquals(null, controller.editingMessageId)
         assertEquals(originalSessionId, appState.ttsController.state.value.sessionId)
         assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
         assertEquals(submissionsBeforeSeek + 1, engine.spoken.size)
         assertEquals("Second sentence.", engine.spoken.last().text)
+    }
+
+    /** Double-tapping your own text while read-aloud is idle opens it for editing instead of starting speech. */
+    @Test
+    fun doubleTapOwnMessageTextOpensEditWhileReadAloudIsIdle() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = ownTimelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        renderSingleBubble(item, controller, appState)
+
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+
+        assertEquals(item.record.messageIdHex, controller.editingMessageId)
+        assertTrue(engine.spoken.isEmpty())
+        assertFalse(appState.ownsTtsAutoReadSession(GROUP_ID))
+    }
+
+    /** While this conversation is being read aloud, double-tapping your own text seeks there and does not edit. */
+    @Test
+    fun doubleTapOwnMessageTextSeeksWhileReadAloudOwnsTheConversation() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = ownTimelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        val started =
+            runBlocking {
+                appState.speakAloudAutoRead(
+                    GROUP_ID,
+                    listOf(projectedTtsEntry(item)),
+                    Locale.US,
+                    backgroundPreparation = true,
+                )
+            }
+        assertTrue(started)
+        val originalSessionId = appState.ttsController.state.value.sessionId
+        renderSingleBubble(item, controller, appState)
+
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+
+        assertEquals(null, controller.editingMessageId)
+        assertEquals(originalSessionId, appState.ttsController.state.value.sessionId)
+        assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
     }
 
     /** Double tap seeks inside active truncated message projection. */
@@ -1284,6 +1330,37 @@ class MessageBubbleTextSelectionSpeakTest {
                 ),
             status = MessageStatus.Received,
         )
+    }
+
+    /** The same fixture message, sent by this account so it is eligible for editing. */
+    private fun ownTimelineMessage(body: String): TimelineMessage {
+        val item = timelineMessage(body)
+        return item.copy(
+            record = item.record.copy(direction = "sent", sender = ACCOUNT_ID),
+            status = MessageStatus.Sent,
+        )
+    }
+
+    /** Mounts one production bubble in the tagged host used by the gesture helpers. */
+    private fun renderSingleBubble(
+        item: TimelineMessage,
+        controller: ConversationController,
+        appState: WhiteNoiseAppState,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        textSelectionMode = false,
+                        onTextSelectionModeChange = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
     }
 
     private fun timelineMessageWithAutolink(): TimelineMessage {

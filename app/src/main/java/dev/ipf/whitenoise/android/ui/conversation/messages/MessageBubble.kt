@@ -1273,16 +1273,20 @@ internal fun MessageBubble(
         if (accepted) ttsLinkTapCoordinator.cancelPendingActivation()
     }
 
+    /** Whether this conversation's read-aloud session is speaking, paused or preparing right now. */
+    fun ownsActiveReadAloud(): Boolean {
+        val activeState = appState.ttsController.state.value
+        val active =
+            activeState is TtsState.Speaking || activeState is TtsState.Paused || activeState is TtsState.Preparing
+        return active && appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
+    }
+
     /** Seeks owned read-aloud to the double-tapped sentence, or starts reading there unless the tap hit a link. */
     @Suppress("ComplexCondition", "ReturnCount")
     fun seekSpeakAloudAt(pressInWindow: Offset) {
         if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
         val layouts = textLayouts.selectableTextLayouts.snapshot()
-        val activeState = appState.ttsController.state.value
-        val ownsActiveSession =
-            (activeState is TtsState.Speaking || activeState is TtsState.Paused || activeState is TtsState.Preparing) &&
-                appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
-        if (ownsActiveSession) {
+        if (ownsActiveReadAloud()) {
             val hit = renderedTextHitAtWindowPosition(layouts, pressInWindow)
             val sentenceIndex =
                 hit?.let {
@@ -1445,10 +1449,28 @@ internal fun MessageBubble(
                     )
             )
 
-    /** Maps a double tap on the message text to window space and seeks or starts read-aloud there. */
+    val canEditMessage =
+        !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted
+
+    /** Opens this message in the edit composer; reply and edit modes are mutually exclusive in the composer banner. */
+    fun beginEdit() {
+        if (deleted || actionsReadOnly) return
+        onActionMenuOpenChange(false)
+        controller.replyingTo = null
+        controller.beginMessageEdit(record.messageIdHex)
+    }
+
+    /**
+     * Double-tapping your own editable text opens it for editing (#3388). While this conversation's read-aloud session
+     * is active the same gesture keeps seeking there, and other messages seek or start read-aloud as before.
+     */
     val messageTextDoubleTap: (Offset) -> Unit = { position ->
-        val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
-        if (pressInWindow != null) seekSpeakAloudAt(pressInWindow)
+        if (canEditMessage && !ownsActiveReadAloud()) {
+            beginEdit()
+        } else {
+            val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
+            if (pressInWindow != null) seekSpeakAloudAt(pressInWindow)
+        }
     }
 
     // Resolved when the gesture fires rather than on every recomposition: the
@@ -1709,7 +1731,8 @@ internal fun MessageBubble(
                         ),
                     ).then(
                         Modifier.observeMessageTextDoubleTap(
-                            enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
+                            enabled =
+                                !deleted && !selectionMode && !textSelectionMode && (canSpeakAloud || canEditMessage),
                             allowConsumedTapAt = { position ->
                                 pressState.rowCoordinates[0]
                                     ?.localToWindow(position)
@@ -2640,8 +2663,7 @@ internal fun MessageBubble(
                     canReply = !deleted && !actionsReadOnly,
                     canReact = !deleted && !actionsReadOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
-                    canEdit =
-                        !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                    canEdit = canEditMessage,
                     canForward = !deleted && !actionsReadOnly && forwardPayload != null,
                     forwardBlockedReason =
                         if (!isPollRecord && !deleted && !actionsReadOnly) {
@@ -2703,16 +2725,7 @@ internal fun MessageBubble(
                         }
                     },
                     onReply = ::beginReply,
-                    onEdit = {
-                        if (!deleted && !actionsReadOnly) {
-                            onActionMenuOpenChange(false)
-                            // Cancel any reply-in-progress: reply and
-                            // edit modes are mutually exclusive in the
-                            // composer banner.
-                            controller.replyingTo = null
-                            controller.beginMessageEdit(record.messageIdHex)
-                        }
-                    },
+                    onEdit = ::beginEdit,
                     onCopyText = ::copyMessageText,
                     onSpeak = {
                         speakFromHere()

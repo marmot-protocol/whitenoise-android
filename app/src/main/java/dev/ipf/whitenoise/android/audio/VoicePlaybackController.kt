@@ -534,6 +534,30 @@ object VoicePlaybackController {
         if (_state.value.sessionId == sessionId) stop()
     }
 
+    /**
+     * Moves the displayed session's playhead by [deltaMs], clamped to the clip, keeping its play or pause intent. A
+     * stale strip whose session was replaced cannot seek the newer clip.
+     */
+    fun seekSessionBy(
+        sessionId: Long,
+        deltaMs: Int,
+    ): Boolean {
+        val current = _state.value
+        val active = player?.takeIf { sessionId == current.sessionId && current.ready }
+        val key = currentKey
+        if (active == null || key == null) return false
+        val position = runCatching { active.currentPosition }.getOrDefault(current.positionMs)
+        seekTo(key, position + deltaMs)
+        return true
+    }
+
+    /** Advances the shared voice speed only while [sessionId] is still the displayed session; null when stale. */
+    fun cycleSessionSpeed(sessionId: Long): Float? {
+        val current = _state.value
+        if (sessionId != current.sessionId || !current.ready || player == null) return null
+        return cycleSpeed()
+    }
+
     /** Pause the active player (no-op if nothing is active). */
     fun pause() {
         nextPlaybackGeneration()
