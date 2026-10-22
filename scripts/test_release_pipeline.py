@@ -658,16 +658,20 @@ def check_policy(manifests):
 
 
 class MemoryTaggingPolicyTest(unittest.TestCase):
+    """Guard source-level tagging policy; runtime qualification remains separate."""
     def manifests(self):
+        """Load each shipped source-set manifest for policy validation."""
         return {
             path.parent.name: ET.parse(path).getroot()
             for path in (ROOT / "app/src").glob("*/AndroidManifest.xml")
         }
 
     def test_shipped_source_manifests_preserve_application_inheritance(self):
+        """Check release and debug policy across all shipped source sets."""
         check_policy(self.manifests())
 
     def test_missing_or_weaker_application_policy_is_rejected(self):
+        """Reject absent, disabled or incorrectly selected application modes."""
         for source_set in ("main", "debug"):
             for mode in (None, "off", "default", "sync" if source_set == "main" else "async"):
                 with self.subTest(source_set=source_set, mode=mode):
@@ -681,12 +685,14 @@ class MemoryTaggingPolicyTest(unittest.TestCase):
                         check_policy(manifests)
 
     def test_debug_requires_explicit_merger_replacement(self):
+        """Require debug to replace the inherited release mode explicitly."""
         manifests = self.manifests()
         manifests["debug"].find("application").set(TOOLS + "replace", "android:name")
         with self.assertRaisesRegex(AssertionError, "must replace"):
             check_policy(manifests)
 
     def test_missing_manifest_is_not_an_inheritance_pass(self):
+        """Treat missing required source manifests as incomplete evidence."""
         for source_set in ("main", "debug"):
             with self.subTest(source_set=source_set):
                 manifests = self.manifests()
@@ -695,6 +701,7 @@ class MemoryTaggingPolicyTest(unittest.TestCase):
                     check_policy(manifests)
 
     def test_flavor_and_process_overrides_are_rejected(self):
+        """Reject flavor and process overrides of the inherited application policy."""
         for source_set, tag in (("zapstore", "application"), ("main", "process")):
             with self.subTest(source_set=source_set, tag=tag):
                 manifests = self.manifests()
@@ -707,6 +714,7 @@ class MemoryTaggingPolicyTest(unittest.TestCase):
                     check_policy(manifests)
 
     def test_merger_markers_cannot_discard_inherited_policy(self):
+        """Reject merger directives that erase the inherited tagging policy."""
         for marker, value in (("node", "replace"), ("node", "remove"), ("remove", "android:memtagMode")):
             with self.subTest(marker=marker, value=value):
                 manifests = self.manifests()
