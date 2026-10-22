@@ -43,20 +43,23 @@ internal suspend fun WhiteNoiseAppState.refreshPublicEventCard(
 /**
  * Refreshes the card author's kind-0 profile at most once per [PublicEventAuthorRefreshThrottle] interval, then
  * returns the card with MDK's cached author metadata. A cached card already carries that metadata, so this only
- * updates the header in place when the profile itself changed.
+ * updates the header in place when the profile itself changed. A failed refresh, offline for example, does not use
+ * up the interval, so the next card for that author tries again.
  */
 internal suspend fun WhiteNoiseAppState.refreshPublicEventCardAuthor(
     loaded: Loaded,
     throttle: PublicEventAuthorRefreshThrottle = PublicEventAuthorRefreshThrottle.shared,
 ): Loaded {
     val pubkey = loaded.card.authorPubkeyHex
-    if (!throttle.tryAcquire(pubkey)) return loaded
-    val relays = publicEventCardRelays()
-    val author =
-        marmotIo {
-            refreshProfile(pubkey, relays)
-            userProfile(pubkey)?.toEventAuthorMetadata()
-        }
+    val refreshed =
+        throttle.refreshing(pubkey) {
+            val relays = publicEventCardRelays()
+            marmotIo {
+                refreshProfile(pubkey, relays)
+                userProfile(pubkey)?.toEventAuthorMetadata()
+            }
+        } ?: return loaded
+    val author = refreshed.value
     return if (author == null || author == loaded.card.authorMetadata) {
         loaded
     } else {
@@ -137,8 +140,36 @@ internal class PublicEventAuthorRefreshThrottle(
 ) {
     private val lastRefresh = LinkedHashMap<String, Long>(16, 0.75f, true)
 
+    /**
+     * Runs [refresh] when [pubkey] has not been refreshed within the interval, and returns its result, or null when
+     * throttled. The slot is held while [refresh] runs, so concurrent cards share one refresh, and is kept only when
+     * it succeeds. A failure or cancellation releases it before rethrowing.
+     */
+    suspend fun <T> refreshing(
+        pubkey: String,
+        refresh: suspend () -> T,
+    ): Refreshed<T>? {
+        if (!tryAcquire(pubkey)) return null
+        var succeeded = false
+        try {
+            return Refreshed(refresh()).also { succeeded = true }
+        } finally {
+            if (!succeeded) release(pubkey)
+        }
+    }
+
+    /** One completed refresh's result, distinguishing a null result from a throttled call. */
+    data class Refreshed<T>(
+        val value: T,
+    )
+
+    /** Forgets [pubkey]'s attempt, so the next card for it may refresh again. */
+    private fun release(pubkey: String) {
+        synchronized(lastRefresh) { lastRefresh.remove(pubkey.lowercase(Locale.ROOT)) }
+    }
+
     /** True, and records the attempt, when [pubkey] has not been refreshed within the interval. */
-    fun tryAcquire(pubkey: String): Boolean {
+    private fun tryAcquire(pubkey: String): Boolean {
         val key = pubkey.lowercase(Locale.ROOT)
         val now = nanoTime()
         return synchronized(lastRefresh) {
