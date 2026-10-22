@@ -40,6 +40,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -866,7 +867,7 @@ class NotificationContentRetractionTest {
                     messageIdHex = MESSAGE_ID,
                     previewText = "Private notification candidate",
                     onChatListRow = { _, _ ->
-                        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofMillis(150L))
+                        ShadowSystemClock.advanceBy(Duration.ofMillis(150L))
                         null
                     },
                 )

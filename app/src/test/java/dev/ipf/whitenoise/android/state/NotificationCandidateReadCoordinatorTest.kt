@@ -214,7 +214,9 @@ class NotificationCandidateReadCoordinatorTest {
                     },
                 )
                 assertTrue(entered.await(1, TimeUnit.SECONDS))
-                val binding = scope.coroutineContext.job.children.single()
+                val binding =
+                    scope.coroutineContext.job.children
+                        .single()
                 val nextKey = key.copy(messageIdHex = "second")
                 val second =
                     async(start = CoroutineStart.UNDISPATCHED) {
