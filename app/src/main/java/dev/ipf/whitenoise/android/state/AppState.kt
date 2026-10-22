@@ -12597,12 +12597,10 @@ class WhiteNoiseAppState private constructor(
      * Requests cleanup for each shown conversation on stream open (#3323, #2065). Opens and read-state events
      * share the receipt loop's workers, so reconnecting never cancels or duplicates an unfinished native read.
      */
-    private suspend fun requestActiveNotificationCardReconciliation(
-        readReconciliations: NotificationReadReconciliationCoordinator,
-    ) {
+    private suspend fun requestActiveCardReconciliation(coordinator: NotificationReadReconciliationCoordinator) {
         val cards = withContext(Dispatchers.Default) { localNotificationPresenter.activeConversationCards() }
         cards.map { it.accountRef to it.groupIdHex.lowercase() }.distinct().forEach { (account, group) ->
-            readReconciliations.request(account, group)
+            coordinator.request(account, group)
         }
     }
 
@@ -13249,7 +13247,7 @@ class WhiteNoiseAppState private constructor(
                 try {
                     // Each open requests cleanup for cards left while the process or stream was down. It shares
                     // read-state workers: a newer open marks a blocked pass dirty and retains its latest follow-up.
-                    runCatchingCancellable { requestActiveNotificationCardReconciliation(readReconciliations) }
+                    runCatchingCancellable { requestActiveCardReconciliation(readReconciliations) }
                         .onFailure { appStateDebug(it) { "notification reconcile failed" } }
                     runCatchingCancellable {
                         var event = subscription.next()
