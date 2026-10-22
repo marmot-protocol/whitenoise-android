@@ -39,11 +39,12 @@ internal class NotificationCandidateReadCoordinator(
         return withTimeoutOrNull(timeoutMillis) { result.await() }
     }
 
-    /** Shares only an identical candidate; completion owns removal even when all awaiters have left. */
+    /** Shares only unfinished identical reads; completion publication can precede its cleanup callback. */
     private fun admit(
         key: NotificationCandidateReadKey,
         block: suspend () -> NotificationCandidateState,
     ): Deferred<NotificationCandidateState>? {
+        pending.entries.removeAll { it.value.result.isCompleted }
         val conversation = key.accountRef to key.groupIdHex.lowercase()
         val existing = pending[conversation]
         if (existing != null || pending.size >= MAX_PENDING_READS) {

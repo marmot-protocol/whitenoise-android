@@ -36,6 +36,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
@@ -50,6 +51,7 @@ class NotificationReactionRemovalRaceTest {
     private val context: Application = RuntimeEnvironment.getApplication()
     private val manager: NotificationManager = context.getSystemService(NotificationManager::class.java)
     private val reactionKey = LocalNotificationFormatter.reactionDismissalKey(ACCOUNT, GROUP)
+    private val messageKey = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT, GROUP)
 
     /** Grants posting and starts each production-path race with an empty tray. */
     @Before
@@ -184,9 +186,10 @@ class NotificationReactionRemovalRaceTest {
             }
         }
 
-    /** Picture-only enrichment may not clone a live quote after its original removal fence becomes stale. */
+    /** A removed message cannot be republished by its otherwise-reachable late avatar rewrite. */
     @Test
-    fun aRemovalAtTheAvatarWriteNeverRepublishesTheLiveQuote() =
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aRemovalAtTheAvatarWriteNeverRepublishesTheMessage() =
         runBlocking {
             val release = CountDownLatch(1)
             val fetchStarted = CountDownLatch(1)
@@ -199,6 +202,7 @@ class NotificationReactionRemovalRaceTest {
                     groupIdHex = GROUP,
                     messageIdHex = TARGET,
                     isDm = true,
+                    previewText = SECRET,
                     emitStartupNotification = false,
                     senderPictureUrl = "https://example.com/quoted-avatar.png",
                     localDisplayName = "Alice",
@@ -216,10 +220,9 @@ class NotificationReactionRemovalRaceTest {
             try {
                 AvatarImageLoader.clear()
                 fixture.bootstrap()
-                fixture.emitUpdate(reaction(fixture.update))
-                awaitReactionText(SECRET)
+                fixture.emitUpdate(fixture.update)
                 awaitLatch(fetchStarted)
-                assertTrue("the actual recorder saw the initial quoted card", recordedReactionHasQuote())
+                assertTrue("the actual recorder saw the initial message card", recordedMessageHasText())
                 ConversationCardPostSynchronizer.testHook =
                     avatarRemovalProbe(fixture, removed, reached, writesAtRemoval)
                 release.countDown()
@@ -231,12 +234,12 @@ class NotificationReactionRemovalRaceTest {
                     delay(1L)
                 }
                 val writtenAfterRemoval = ReactionWriteRecordingNotificationManager.writes.drop(writesAtRemoval.get())
-                val quotedWrites =
-                    writtenAfterRemoval.filter { it.tag == reactionKey.tag && it.id == reactionKey.id }.filter {
+                val staleWrites =
+                    writtenAfterRemoval.filter { it.tag == messageKey.tag && it.id == messageKey.id }.filter {
                         allText(it.notification.extras).any { text -> SECRET in text }
                     }
-                assertTrue("actual platform writes must never restore the quote", quotedWrites.isEmpty())
-                assertTrue("no cancellation hides a stale rewrite", activeReactionText().any { SECRET in it })
+                assertTrue("actual platform writes must never restore the removed message", staleWrites.isEmpty())
+                assertTrue("no cancellation hides a stale rewrite", activeMessageText().any { SECRET in it })
             } finally {
                 release.countDown()
                 fixture.close()
@@ -246,13 +249,23 @@ class NotificationReactionRemovalRaceTest {
         }
 
     /** Positive control proving the recorder intercepted the known initial payload before the race starts. */
-    private fun recordedReactionHasQuote(): Boolean {
+    private fun recordedMessageHasText(): Boolean {
         val recorded = ReactionWriteRecordingNotificationManager.writes
         return recorded.any {
-            it.tag == reactionKey.tag && it.id == reactionKey.id &&
+            it.tag == messageKey.tag &&
+                it.id == messageKey.id &&
                 allText(it.notification.extras).any { text -> SECRET in text }
         }
     }
+
+    /** Reads the actual live message card so cancellation cannot hide a stale avatar rewrite. */
+    private fun activeMessageText(): List<String> =
+        manager.activeNotifications
+            .firstOrNull { it.tag == messageKey.tag && it.id == messageKey.id }
+            ?.notification
+            ?.extras
+            ?.let(::allText)
+            .orEmpty()
 
     /** Captures the platform-write index and removal mark at the last permission boundary. */
     private fun avatarRemovalProbe(
@@ -269,7 +282,7 @@ class NotificationReactionRemovalRaceTest {
                 notificationTag: String,
                 notificationId: Int,
             ) {
-                if (notificationTag != reactionKey.tag || notificationId != reactionKey.id) return
+                if (notificationTag != messageKey.tag || notificationId != messageKey.id) return
                 if (barrier == ConversationCardBarrier.BEFORE_PLATFORM_WRITE && removed.compareAndSet(false, true)) {
                     writesAtRemoval.set(ReactionWriteRecordingNotificationManager.writes.size)
                     fixture.appState.recordNotificationContentRemoval(

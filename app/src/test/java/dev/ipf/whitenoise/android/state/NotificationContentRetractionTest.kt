@@ -741,7 +741,8 @@ class NotificationContentRetractionTest {
                         delay(1L)
                     }
                 }
-                val card = manager().activeNotifications.first { it.tag == reactionKey.tag && it.id == reactionKey.id }
+                val card =
+                    manager().activeNotifications.first { it.tag == reactionKey.tag && it.id == reactionKey.id }
                 assertTrue(card.notification.extras.toString().contains("valid new quote"))
             } finally {
                 fixture.close()

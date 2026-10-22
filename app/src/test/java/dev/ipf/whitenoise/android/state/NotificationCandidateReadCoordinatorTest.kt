@@ -15,6 +15,35 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Real blocking reads must outlive the caller's bounded await without multiplying native work. */
 class NotificationCandidateReadCoordinatorTest {
+    /** A later phase must observe current state rather than reuse a completed first-post decision. */
+    @Test
+    fun aCompletedCandidateIsReadAgain() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val coordinator = NotificationCandidateReadCoordinator(scope, Dispatchers.IO)
+            val calls = AtomicInteger()
+            val key = NotificationCandidateReadKey("account", "chat", "message", 1, 1)
+            try {
+                assertEquals(
+                    NotificationCandidateState.Unread,
+                    coordinator.read(key, 1_000) {
+                        calls.incrementAndGet()
+                        NotificationCandidateState.Unread
+                    },
+                )
+                assertEquals(
+                    NotificationCandidateState.Read,
+                    coordinator.read(key, 1_000) {
+                        calls.incrementAndGet()
+                        NotificationCandidateState.Read
+                    },
+                )
+                assertEquals(2, calls.get())
+            } finally {
+                scope.cancel()
+            }
+        }
+
     /** A timed-out retry joins the same binding, while another conversation has independent admission. */
     @Test
     fun aBlockedReadIsBoundedAndDoesNotOccupyAnotherConversation() =
