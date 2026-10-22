@@ -9,6 +9,9 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 
+private const val CHAT_PREVIEW_STREAM_START_KIND = 1200uL
+private const val CHAT_PREVIEW_EDIT_KIND = 1009uL
+
 /** Raw presentation inputs; no row, profile, media reference or selected draft. */
 internal data class ChatListPreviewInput(
     val plaintext: String,
@@ -35,8 +38,8 @@ internal fun projectedChatListPreviewText(
     return when {
         preview.deleted -> copy.deleted
         MessageProjector.isPollKind(preview.kind) -> copy.poll
-        preview.kind == 1200uL -> preview.plaintext.ifBlank { copy.agentStreamStarted }
-        preview.kind == 1009uL -> latestFallback(empty)
+        preview.kind == CHAT_PREVIEW_STREAM_START_KIND -> preview.plaintext.ifBlank { copy.agentStreamStarted }
+        preview.kind == CHAT_PREVIEW_EDIT_KIND -> latestFallback(empty)
         MessageProjector.isGroupSystemKind(preview.kind) ->
             GroupSystemEvents.previewText(
                 plaintext = preview.plaintext,

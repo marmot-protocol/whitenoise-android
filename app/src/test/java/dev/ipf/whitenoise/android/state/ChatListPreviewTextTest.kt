@@ -73,7 +73,8 @@ class ChatListPreviewTextTest {
             ),
         )
         assertNull(ChatListMessageSearch.buildFilteredSnippet(record.plaintext, emptyList()))
-        assertEquals(MessageTextCopy.Default.message, messageSearchSnippet(record, "")?.text)
+        val localized = MessageTextCopy.Default.copy(message = "Nachricht")
+        assertEquals("Nachricht", messageSearchSnippet(record, "", localized)?.text)
         assertFalse(ChatListMessageSearch.isEligibleMatch(record, "needle"))
         assertNull(messageSearchSnippet(record, "needle"))
     }

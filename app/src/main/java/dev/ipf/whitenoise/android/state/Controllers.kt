@@ -4407,11 +4407,11 @@ class ChatsController private constructor(
         chats: List<ChatListItem>,
         rawQuery: String,
         constraints: MessageSearchConstraints? = null,
+        copy: MessageTextCopy = MessageTextCopy.Default,
     ): Map<String, MessageBodyMatch> {
         val account = accountRef ?: return emptyMap()
         val needle = rawQuery.trim()
         if (needle.isEmpty() && constraints == null) return emptyMap()
-        val ciNeedle = needle.lowercase()
         return appState.measureHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEARCH) {
             withContext(Dispatchers.IO) {
                 val semaphore = Semaphore(SEARCH_FANOUT)
@@ -4420,7 +4420,7 @@ class ChatsController private constructor(
                         chats.map { item ->
                             async {
                                 semaphore.withPermit {
-                                    searchOneChat(account, item.group.groupIdHex, needle, ciNeedle, constraints)
+                                    searchOneChat(account, item.group.groupIdHex, needle, constraints, copy)
                                 }
                             }
                         }
@@ -4438,9 +4438,10 @@ class ChatsController private constructor(
         account: String,
         groupIdHex: String,
         needle: String,
-        ciNeedle: String,
         constraints: MessageSearchConstraints?,
+        copy: MessageTextCopy,
     ): MessageBodyMatch? {
+        val ciNeedle = needle.lowercase()
         // The FFI `search` field narrows to rows whose text matches the needle,
         // but it can't filter by kind/deleted — that gating happens client-side
         // via [ChatListMessageSearch.isSearchableBody]. So a single small page
@@ -4497,7 +4498,7 @@ class ChatsController private constructor(
                     constraints,
                 )
             if (match != null) {
-                val snippet = messageSearchSnippet(match, needle) ?: return null
+                val snippet = messageSearchSnippet(match, needle, copy) ?: return null
                 return MessageBodyMatch(
                     groupIdHex = groupIdHex,
                     messageIdHex = match.messageIdHex,
