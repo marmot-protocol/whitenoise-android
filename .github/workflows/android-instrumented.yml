@@ -462,11 +462,17 @@ jobs:
         shell: bash
         env:
           RETAIN_FAILED_MEDIA: ${{ job.status != 'success' }}
+          RETAIN_STARTUP_TRACE: ${{ inputs.media_startup_trace }}
         run: |
           if [[ "$RETAIN_FAILED_MEDIA" == 'true' ]]; then
             shopt -s nullglob
-            app_apks=(app/build/outputs/apk/devZapstore/debug/*-universal-debug.apk)
-            test_apks=(app/build/outputs/apk/androidTest/devZapstore/debug/*.apk)
+            if [[ "$RETAIN_STARTUP_TRACE" == 'true' ]]; then
+              app_apks=(app/build/outputs/apk/devZapstore/benchmarkRelease/*-universal-*.apk)
+              test_apks=(app/build/outputs/apk/androidTest/devZapstore/benchmarkRelease/*.apk)
+            else
+              app_apks=(app/build/outputs/apk/devZapstore/debug/*-universal-debug.apk)
+              test_apks=(app/build/outputs/apk/androidTest/devZapstore/debug/*.apk)
+            fi
             if [[ ${#app_apks[@]} != 1 || ${#test_apks[@]} != 1 ]]; then
               echo "Focused failure capture requires exactly one built app and test APK" >&2
               exit 1
@@ -483,6 +489,7 @@ jobs:
           path: |
             app/build/outputs/apk/**/*.apk
             app/build/outputs/apk/source-revision.txt
+            app/build/outputs/mapping/devZapstoreBenchmarkRelease*/mapping.txt
             scripts/outbound-share-fixture/build/fixture.apk
             scripts/outbound-share-fixture/build/control.apk
           if-no-files-found: error

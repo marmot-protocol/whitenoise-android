@@ -216,6 +216,13 @@ def run():
         if original_error is not None:
             state['run_exception'] = {'error_class': type(original_error).__name__, 'error': str(original_error)}
         try:
+            # Keep runner discovery diagnostics inside this hosted synthetic lane.
+            adb(['logcat', '-d', '-v', 'threadtime', 'AndroidJUnitRunner:I',
+                 'TestRunner:I', 'AndroidRuntime:E', '*:S'], 'runner-logcat', 10)
+        except Exception as error:
+            # Diagnostic retention must never prevent trace cleanup.
+            state['runner_diagnostic_error'] = type(error).__name__
+        try:
             issues = finish(state)
         except Exception as error:
             # A receipt write failure must not mask an existing test failure or cancellation.

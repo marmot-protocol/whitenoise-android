@@ -40,6 +40,15 @@ gradle.projectsEvaluated {
     def selected = gradle.rootProject.findProject(':app')
     def execution = selected.objects.newInstance(StartupTraceExecution)
     def workspace = gradle.rootProject.projectDir
+    selected.tasks.named('compileDevZapstoreBenchmarkReleaseAndroidTestKotlin').configure {
+        doFirst {
+            def report = new File(workspace, 'app/build/reports/media-startup-trace/compiled-test-inputs.json')
+            report.parentFile.mkdirs()
+            def sources = inputs.files.files.findAll { it.isFile() && (it.name.endsWith('.kt') || it.name.endsWith('.java')) }
+                .collect { workspace.toPath().relativize(it.toPath()).toString() }.sort()
+            report.text = groovy.json.JsonOutput.toJson([task: path, sources: sources]) + '\n'
+        }
+    }
     selected.tasks.named('connectedDevZapstoreBenchmarkReleaseAndroidTest').configure {
         doFirst {
             execution.execOperations.exec { spec ->
