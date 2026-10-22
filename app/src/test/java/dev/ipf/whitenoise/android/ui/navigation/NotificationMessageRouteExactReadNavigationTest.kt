@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -21,13 +22,17 @@ import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
+import dev.ipf.whitenoise.android.state.ChatsSubscriptionHandle
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.FfiChatListWindowHandle
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notifiedMessagePreview
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -182,11 +187,7 @@ class NotificationMessageRouteExactReadNavigationTest {
             }
             val openedContext = holder.selectedChatOpenContext.value
 
-            releaseRetiredReads.countDown()
-            repeat(SETTLE_POLLS) {
-                composeRule.waitForIdle()
-                Thread.sleep(POLL_MILLIS)
-            }
+            settleReleasedReads(releaseRetiredReads)
 
             assertEquals(listOf((REQUEST_ID + 1L) to NEWEST_ID), handled.toList())
             assertEquals(openedContext, holder.selectedChatOpenContext.value)
@@ -196,6 +197,15 @@ class NotificationMessageRouteExactReadNavigationTest {
         } finally {
             releaseRetiredReads.countDown()
             composeRule.runOnIdle { holder.release() }
+        }
+    }
+
+    /** Lets every released retired read resume before asserting that its stale continuation changed nothing. */
+    private fun settleReleasedReads(release: CountDownLatch) {
+        release.countDown()
+        repeat(SETTLE_POLLS) {
+            composeRule.waitForIdle()
+            Thread.sleep(POLL_MILLIS)
         }
     }
 
@@ -340,11 +350,35 @@ class NotificationMessageRouteExactReadNavigationTest {
                 ),
             activeAccountRef = ACCOUNT_REF,
         ).also { state ->
+            state.liveSubscriptionOverrides.chatList = quietEmptyChatList()
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
                 .apply { isAccessible = true }
                 .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
         }
+
+    /** Keeps the broad projection ready and empty without an absent native subscription causing rebinding. */
+    private fun quietEmptyChatList() =
+        ChatListLiveSubscriptions(
+            openChatListWindow = { _, view ->
+                FfiChatListWindowHandle(
+                    MarmotWindowTestFakes.chatListWindow(view, emptyList(), next = { awaitCancellation() }),
+                )
+            },
+            openChats = { _, _ -> NoGroupRecords },
+        )
+
+    /** The account has no broad-list groups; notification routing must use the exact read instead. */
+    private object NoGroupRecords : ChatsSubscriptionHandle {
+        /** The complete initial group snapshot is empty. */
+        override fun snapshot(): List<AppGroupRecordFfi> = emptyList()
+
+        /** A quiet live stream stays open until its owning bind is cancelled. */
+        override suspend fun next(): AppGroupRecordFfi? = awaitCancellation()
+
+        /** The fixture owns no native handle. */
+        override fun close() = Unit
+    }
 
     /** The row the exact read returns when the conversation is in fact still there. */
     private fun chatListRow() =
