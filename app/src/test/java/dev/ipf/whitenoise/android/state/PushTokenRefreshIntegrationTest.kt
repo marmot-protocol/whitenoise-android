@@ -365,12 +365,7 @@ class PushTokenRefreshIntegrationTest {
                         release.complete(Unit)
                         first.join()
                         latest?.join()
-                        if (retirement == "rotation") {
-                            val store = PushTokenStore.create(context)
-                            kotlinx.coroutines.withTimeout(5_000L) {
-                                while (store.nativePushRegistrationSyncPending()) kotlinx.coroutines.yield()
-                            }
-                        }
+                        if (latest != null) awaitRegistrationSettled()
                     }
                     if (retirement == "rotation") {
                         assertEquals(listOf("latest-callback"), fixture.upsertedPushTokens.toList())
@@ -564,6 +559,16 @@ class PushTokenRefreshIntegrationTest {
             .getDeclaredField("notificationDeliveryModeMutex")
             .apply { isAccessible = true }
             .get(fixture.appState) as kotlinx.coroutines.sync.Mutex
+
+    /**
+     * Waits for the durable registration marker to clear — the rotation child snapshot can be another notification
+     * job, so joining it alone does not prove registration finished.
+     */
+    private suspend fun awaitRegistrationSettled() {
+        kotlinx.coroutines.withTimeout(5_000L) {
+            while (PushTokenStore.create(context).nativePushRegistrationSyncPending()) kotlinx.coroutines.yield()
+        }
+    }
 
     /** Observes a new notification child; callers must separately await durable registration state. */
     private fun queueRotation(
