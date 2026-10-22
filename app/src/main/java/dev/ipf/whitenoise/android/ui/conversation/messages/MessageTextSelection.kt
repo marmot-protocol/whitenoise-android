@@ -145,6 +145,8 @@ internal fun nearestNonWhitespaceOffset(
  * Maps a window-space press to a word in SelectionState's global text space.
  * The geometric ordering intentionally mirrors Compose SelectionRegistrarImpl:
  * side-by-side Text nodes sort by x, other nodes by y.
+ * Gutter presses clamp to the leaf's clipped window bounds before converting into
+ * source coordinates, so horizontally scrolled text cannot seed an off-screen word.
  */
 internal fun textSelectionSeedRange(
     layouts: Collection<SelectableTextLayout>,
@@ -177,7 +179,7 @@ internal fun textSelectionSeedRange(
         if (pressInWindow == null) {
             0
         } else {
-            val local = target.coordinates.windowToLocal(pressInWindow)
+            val local = target.coordinates.visibleLocalPosition(pressInWindow)
             target.layoutResult.getOffsetForPosition(
                 Offset(
                     x =
@@ -206,6 +208,17 @@ internal fun textSelectionSeedRange(
     return TextRange(
         start = precedingLength + localRange.start,
         end = precedingLength + localRange.end,
+    )
+}
+
+/** Converts a gutter press through the clipped viewport before mapping it to the scrolled text leaf. */
+private fun LayoutCoordinates.visibleLocalPosition(pressInWindow: Offset): Offset {
+    val visible = boundsInWindow()
+    return windowToLocal(
+        Offset(
+            pressInWindow.x.coerceIn(visible.left, visible.right),
+            pressInWindow.y.coerceIn(visible.top, visible.bottom),
+        ),
     )
 }
 

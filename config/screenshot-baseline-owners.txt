@@ -9,6 +9,10 @@
 
 *ScreenshotTest
 
+*.MessageBubbleTextSelectionSpeakTest.codePathNativeSelectionKeepsScrolledFilename
+*.MessageBubbleTextSelectionSpeakTest.swipeOnFittingCodeBlockBeginsReply
+*.MessageBubbleTextSelectionSpeakTest.swipeOnFittingMathBlockBeginsReply
+
 *.StartupReadyRecoveryRouteTest.rootRendersRecoveryWithoutRemountingTheBindOrRestoringProtectedContent
 
 *.AutoDownloadBacklogControlTest
