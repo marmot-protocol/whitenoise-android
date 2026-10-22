@@ -106,7 +106,6 @@ class MarkdownCodePathLayoutCoverageTest {
                             byteArrayOf(),
                         ),
                     mentionDisplayName = null,
-                    isGroupMember = null,
                     onNostrProfileTap = null,
                     onCopyMarkdownLink = {},
                     modifier = Modifier.width(240.dp),
