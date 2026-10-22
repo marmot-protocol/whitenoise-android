@@ -107,7 +107,10 @@ internal fun nostrEventCardWarmOccurrences(
 /** A cheap text check: a card needs a bech32 `note`, `nevent` or `naddr` entity somewhere in the message. */
 internal fun mayRenderNostrEventCard(record: TimelineMessageRecordFfi): Boolean =
     !record.deleted &&
-        EVENT_ENTITY_PREFIX.containsMatchIn(record.plaintext)
+        mayNameNostrEventCard(record.plaintext)
+
+/** True when [text] contains a bech32 `note`, `nevent` or `naddr` entity, so a message with it may show a card. */
+internal fun mayNameNostrEventCard(text: String): Boolean = EVENT_ENTITY_PREFIX.containsMatchIn(text)
 
 private val EVENT_ENTITY_PREFIX = Regex("(?i)(note1|nevent1|naddr1)")
 

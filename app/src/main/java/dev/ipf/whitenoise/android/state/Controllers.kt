@@ -6630,6 +6630,15 @@ class ConversationController(
     var hasPreparedInitialPresentation by mutableStateOf(false)
         private set
 
+    /**
+     * True while the first authoritative page names event cards and is held unpublished until their cached state has
+     * been read, or the card budget ran out (#2238). Every path that shows the conversation then composes those rows
+     * only with their cards complete, and the chat-list open may wait the card budget instead of its usual bound.
+     * Changes made meanwhile, a send included, publish with the page, at most the card budget after it arrived.
+     */
+    var isHoldingInitialPageForEventCards by mutableStateOf(false)
+        private set
+
     /** The engine proved this conversation is no longer available to the account. */
     var terminalConversationUnavailable by mutableStateOf(false)
         private set
@@ -6694,7 +6703,11 @@ class ConversationController(
             scope = controllerScope,
             warmProfiles = { senders -> appState.warmProfilePresentationsBlocking(senders) },
             warmEventCards = { work -> warmInitialEventCards(work) },
-            onReady = { hasPreparedInitialPresentation = true },
+            onReady = {
+                // Rows and the readiness flag change together, so the opened route never sees a held page.
+                releaseInitialPageEventCardHold()
+                hasPreparedInitialPresentation = true
+            },
         )
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val attachmentPresentation =
@@ -7034,6 +7047,8 @@ class ConversationController(
 
     private fun discardInitialTimelineSeedForFailure(preserveOptimisticMessages: Boolean) {
         if (!shouldDiscardInitialTimelineSeedForFailure(hasPublishedAuthoritativeTimeline)) return
+        // A failure resolves the first presentation, so a page held for its cards must not stay hidden.
+        isHoldingInitialPageForEventCards = false
         initialTimelineSeedActive = false
         if (preserveOptimisticMessages) {
             publishTimelineFromIndexes()
@@ -7049,7 +7064,9 @@ class ConversationController(
         hasPreparedInitialPresentation = true
     }
 
+    /** Publishes an empty first page, which names no card, so any earlier card hold ends with it. */
     private fun publishAuthoritativeEmptyInitialTimeline() {
+        isHoldingInitialPageForEventCards = false
         hasPublishedAuthoritativeTimeline = true
         hasPreparedInitialPresentation = true
         initialTimelineSeedActive = false
@@ -12758,8 +12775,7 @@ class ConversationController(
         // update paths do — so publish directly. A second full rebuild here
         // re-projected every held record on each page load. See #74.
         val preparingInitialPresentation = !hasPreparedInitialPresentation
-        hasPublishedAuthoritativeTimeline = true
-        initialTimelineSeedActive = false
+        markPagePublishedUnlessHeldForEventCards(preparingInitialPresentation, appliedRecords)
         // While the first page is prepared, its card warm owns the cache read and reuses this hydration's parse.
         val hydratedRecords =
             publishTimelinePageBeforeMarkdownHydration(
@@ -12772,7 +12788,7 @@ class ConversationController(
             hydratedRecords = hydratedRecords,
             markInitialPresentationReady = preparingInitialPresentation,
         )
-        windowPresentationTiming.timelinePublished()
+        recordPagePublicationUnlessHeld()
         val streamIdsToLaunch = windowStreamIdsToLaunch(streamIds, removedStreamIds::contains)
         onWindowApplyMeasured(
             preparation.performanceSample(prepared, commitPlan.projectIds.size, commitStartedAt, windowApplyNanoTime()),
@@ -12782,10 +12798,11 @@ class ConversationController(
     }
 
     /**
-     * Publish protocol rows immediately, then warm existing local profile
-     * presentation state. MainShell keeps a prepared chat-list tap on its source
-     * page until this initial warm completes, preventing sender metadata from
-     * remeasuring bubbles during the route transition.
+     * Warms existing local profile presentation state and, for a page that names
+     * them, cached event cards. MainShell keeps a prepared chat-list tap on its
+     * source page until this initial warm completes, preventing sender metadata
+     * from remeasuring bubbles during the route transition. A page with cards is
+     * also held unpublished until then, so no open path shows a card unwarmed.
      */
     private fun scheduleProfilePresentationWarm(
         records: List<TimelineMessageRecordFfi>,
@@ -12800,6 +12817,41 @@ class ConversationController(
                 hydratedRecords = hydratedRecords,
             ),
         )
+    }
+
+    /**
+     * Marks an applied page published, unless it is a first page that names event cards (#2238). That page, and any
+     * page replacing it before readiness, stays held until its cached cards are read, so no row composes unwarmed.
+     */
+    private fun markPagePublishedUnlessHeldForEventCards(
+        preparingInitialPresentation: Boolean,
+        records: List<TimelineMessageRecordFfi>,
+    ) {
+        isHoldingInitialPageForEventCards =
+            preparingInitialPresentation &&
+            (isHoldingInitialPageForEventCards || records.any(::mayRenderNostrEventCard))
+        if (isHoldingInitialPageForEventCards) return
+        hasPublishedAuthoritativeTimeline = true
+        initialTimelineSeedActive = false
+    }
+
+    /** Times the page's publication now, or, for a page held for its event cards, when the hold releases it. */
+    private fun recordPagePublicationUnlessHeld() {
+        if (!isHoldingInitialPageForEventCards) windowPresentationTiming.timelinePublished()
+    }
+
+    /**
+     * Publishes the first page held for its event cards, together with the flags that say it is published. Called
+     * once the card warm settled or its budget ran out, so a held row composes with its snapshot in place, or, past
+     * the budget, as an ordinary unwarmed card.
+     */
+    private fun releaseInitialPageEventCardHold() {
+        if (!isHoldingInitialPageForEventCards) return
+        isHoldingInitialPageForEventCards = false
+        hasPublishedAuthoritativeTimeline = true
+        initialTimelineSeedActive = false
+        publishTimelineFromIndexes()
+        windowPresentationTiming.timelinePublished()
     }
 
     /**
@@ -12845,7 +12897,8 @@ class ConversationController(
     /**
      * Publishes [records], then hydrates their Markdown, and returns that hydration's parsed records when one runs.
      * With [warmEventCards], cards are read from MDK's cache before the hydrated rows apply. Otherwise the caller's
-     * initial warm reads them from the returned records, so the same messages are never parsed twice.
+     * initial warm reads them from the returned records, so the same messages are never parsed twice. The returned
+     * records complete only after they applied, so a first page held for its cards is released with them in place.
      */
     private fun publishTimelinePageBeforeMarkdownHydration(
         records: List<TimelineMessageRecordFfi>,
@@ -12861,11 +12914,13 @@ class ConversationController(
                 // Cards appear once their message's Markdown does, so their cached state is read before it applies.
                 hydrate = { pending ->
                     hydrateTimelineMarkdown(pending).also { hydrated ->
-                        hydratedRecords.complete(hydrated)
                         if (warmEventCards) warmEventCardSnapshots(hydrated.filter(::mayRenderNostrEventCard))
                     }
                 },
-                applyHydrated = ::applyHydratedTimelineMarkdown,
+                applyHydrated = { hydrated ->
+                    applyHydratedTimelineMarkdown(hydrated)
+                    hydratedRecords.complete(hydrated)
+                },
             )
         // A cancelled or failed hydration still releases the warm waiting on it, with nothing parsed.
         hydration?.invokeOnCompletion { hydratedRecords.complete(emptyList()) }
@@ -13859,6 +13914,8 @@ class ConversationController(
 
     /** Publishes the indexed window after row-owned expiry and visibility filters. */
     private fun publishTimelineFromIndexesInternal() {
+        // A first page held for its event cards is published whole by its release, with every change made meanwhile.
+        if (isHoldingInitialPageForEventCards) return
         // Preserve the handoff snapshot for one complete frame. Any projection
         // or optimistic mutation arriving during that frame is already reflected
         // in the indexes and is folded into the scheduled settlement publish.

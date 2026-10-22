@@ -55,10 +55,15 @@ read that restores a conversation's previously resolved public event cards
 before its first page is shown (#2238). It is emitted only for a first page
 whose messages name `note`, `nevent` or `naddr` references. `duration_ms` covers
 the wait for that page's Markdown hydration plus the batched MDK cache read, and
-`count` is the number of references read. `result=dropped` means the read did
-not settle, either because a newer page superseded it or because it exceeded the
-one-second route budget and the cards resolved themselves after the route opened.
-A cold-start value near the budget is the encrypted-cache open, not the network.
+`count` is the number of references read. While it runs, the page stays
+unpublished, so every open path (chat list, notification, share or a restored
+chat) first composes those rows with their cards complete, and a chat-list tap
+waits up to the card budget beyond its usual 300 ms. Pages without card
+references publish at once and keep the 300 ms open bound. `result=dropped`
+means the read did not settle, either because a newer page superseded it or
+because it exceeded the one-second card budget, after which the page published
+and each card resolved itself. A cold-start value near the budget is the
+encrypted-cache open, not the network.
 
 ### Conversation history pages
 

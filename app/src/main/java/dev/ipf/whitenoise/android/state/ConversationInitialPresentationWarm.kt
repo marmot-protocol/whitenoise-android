@@ -57,9 +57,10 @@ internal data class InitialPresentationWarmWork(
  * Sender profiles and event cards warm side by side under separate budgets, both measured from the first page and
  * never restarted by a later one. Profiles keep the short [profileBudgetMillis]: an unwarmed name only fills in late.
  * A page that names event cards also waits for their cache read, up to [eventCardBudgetMillis], because an unwarmed
- * card would start as Loading and then grow under the reader (#2238). Expiring the profile budget never cancels the
- * card warm. A newer authoritative page supersedes the older jobs, so stale work can never release navigation for
- * content that is no longer current.
+ * card would start as Loading and then grow under the reader (#2238). The controller keeps such a page unpublished
+ * until [onReady], so its rows compose with their cards in place whichever path opened the conversation. Expiring the
+ * profile budget never cancels the card warm. A newer authoritative page supersedes the older jobs, so stale work
+ * can never release navigation for content that is no longer current.
  */
 internal class ConversationInitialPresentationWarmCoordinator(
     private val scope: CoroutineScope,
@@ -180,13 +181,14 @@ internal suspend fun warmInitialEventCardSnapshots(
 internal const val INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS = 100L
 
 /**
- * How long a first page that names event cards may hold its route for their cached state.
+ * How long a first page that names event cards may stay unpublished for their cached state, and how much longer
+ * than usual a chat-list tap may wait for it.
  *
  * The read is cache-only and never touches the network. Its one slow case is the first native read after a cold
  * start, which opens the account's encrypted cache and waits for the page's Markdown hydration. That can take several
  * hundred milliseconds on a cold device, far beyond the profile budget, while a warm reopen settles in a few. One
  * second covers the cold case and keeps the worst tap-to-route delay at the point where a tap still reads as
- * answered. Past it the route opens anyway and each card resolves itself.
+ * answered. Past it the page publishes anyway and each card resolves itself.
  */
 internal const val INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS = 1_000L
 private const val INITIAL_PRESENTATION_PROFILE_LIMIT = 12
