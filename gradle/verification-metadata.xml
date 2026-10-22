@@ -2762,6 +2762,17 @@
             <sha256 value="8fffc4b79bf43dd72203e2b3619086eb2668f01d5d704080d3c7e99d19bf42a0" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.tracing" name="tracing-android" version="2.0.4">
+         <artifact name="tracing-android-2.0.4.module">
+            <sha256 value="86781f3e24bc991acab8287bdf978aedd04138312a20d4c87294607e9b806463" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="tracing-android-2.0.4.pom">
+            <sha256 value="465cae6e89c4b01d858339c4e4824cba3e522fb3bf8bfd1ff931a31408198a59" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="tracing.aar">
+            <sha256 value="a2ab05ec17ea88cbaf02b50a97f0146d87fa78821638063fb2de913585277d52" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.tracing" name="tracing-desktop" version="2.0.3">
          <artifact name="tracing-desktop-2.0.3.jar">
             <sha256 value="06a950da1802cb02c1ff0619c100f291bc040a7c4c02abb138279aefad15fb1d" origin="Independent official supplier audit" />
@@ -2771,6 +2782,17 @@
          </artifact>
          <artifact name="tracing-desktop-2.0.3.pom">
             <sha256 value="c3e5b210bf90881d3db8630de4dce8099577fc21bcb41ba10f47f4c9e186165b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.tracing" name="tracing-desktop" version="2.0.4">
+         <artifact name="tracing-desktop-2.0.4.jar">
+            <sha256 value="50b1f32c5fe02f377319e0cc05451957dddd557c0bd0b5de40b85b411f9ba80c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="tracing-desktop-2.0.4.module">
+            <sha256 value="a179062167c3e66f19553d6818a3aa970d3d256071477517623039116c0840ae" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="tracing-desktop-2.0.4.pom">
+            <sha256 value="b93eda2470fe5e342fa46017ed8099ca91ef6ed294bc86873cfa7d554446c8f0" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.tracing" name="tracing-ktx" version="1.0.0">
@@ -2809,6 +2831,17 @@
          </artifact>
          <artifact name="tracing-ktx-2.0.3.pom">
             <sha256 value="21be31f9ac728d6560bcfc9e8ede4d3958ebe13e2221ca375895fcbd0d9346cd" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.tracing" name="tracing-ktx" version="2.0.4">
+         <artifact name="tracing-ktx-2.0.4.aar">
+            <sha256 value="412390fd809e94ca366e13ed104fd2407bd27fcc0721a75cad3e08327f4065da" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="tracing-ktx-2.0.4.module">
+            <sha256 value="7c9a3cedf8df53ada9dfe9c51c41f97d0e89131f58f1dedcc0d32f5508e3bd44" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="tracing-ktx-2.0.4.pom">
+            <sha256 value="4015e450749842912ec963aa65a44b67d851d4d8fa518b6c03d93c6cba02d39f" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.tracing" name="tracing-perfetto-binary" version="1.0.1">
@@ -2869,6 +2902,14 @@
          </artifact>
          <artifact name="tracing-2.0.3.pom">
             <sha256 value="78e75c608c9be7112e4ea09850041da25e291cc546e0b1b0a600623c33498bd7" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.tracing" name="tracing" version="2.0.4">
+         <artifact name="tracing-2.0.4.module">
+            <sha256 value="d4be31cb120be18f1245fe5211d75abc7d061a68aa2f5e97a6041c5f2979714f" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="tracing-2.0.4.pom">
+            <sha256 value="0777d1f863e566f6c0cc9009f90b8db5bb298030f0d89885246220cbb71c05d7" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.vectordrawable" name="vectordrawable-animated" version="1.1.0">
