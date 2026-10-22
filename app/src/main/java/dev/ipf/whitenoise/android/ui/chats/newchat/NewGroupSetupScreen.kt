@@ -21,6 +21,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
+import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
@@ -71,8 +74,10 @@ private suspend fun createOrRecoverNewGroup(
     onStage: (NewGroupCreateStage?) -> Unit,
     onCreateError: (Throwable) -> Unit,
     owner: GroupCreationSession,
+    diagnostic: DmCreationAttempt,
 ): String? =
     runCatchingCancellable {
+        diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
         onStage(NewGroupCreateStage.Creating)
         if (owner.isCurrent()) {
             appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_START)
@@ -84,20 +89,25 @@ private suspend fun createOrRecoverNewGroup(
                     createGroupWithOptions(account, name, members, options)
                 }
             }.also {
+                diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                 if (owner.isCurrent()) {
                     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
                 }
             }
-    }.getOrElse {
-        createdGroupIdAfterProjectionUnavailable(it)?.also {
+    }.getOrElse { failure ->
+        createdGroupIdAfterProjectionUnavailable(failure)?.also {
+            diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
+            diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
+            diagnostic.failed(DmCreationPhase.PROJECTION, failure)
             if (owner.isCurrent()) {
                 appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
             }
         } ?: run {
+            diagnostic.failed(DmCreationPhase.CREATE, failure)
             if (owner.isCurrent()) {
                 appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
             }
-            onCreateError(it)
+            onCreateError(failure)
             null
         }
     }
@@ -147,6 +157,7 @@ private suspend fun runNewGroupCreateMutation(
     onAuthoritativeReadFailed: (Throwable) -> Unit,
     owner: GroupCreationSession,
 ) {
+    val diagnostic = owner.diagnostics.nextAttempt()
     try {
         runGroupCreationStages(
             owner = owner,
@@ -158,6 +169,7 @@ private suspend fun runNewGroupCreateMutation(
                     onStage,
                     onCreateError,
                     owner,
+                    diagnostic,
                 )
             },
             openCurrentChat = { groupIdHex ->
@@ -173,10 +185,12 @@ private suspend fun runNewGroupCreateMutation(
                     onRetryGroupIdCleared = onRetryGroupIdCleared,
                     onAuthoritativeReadFailed = onAuthoritativeReadFailed,
                     owner = owner,
+                    diagnostic = diagnostic,
                 )
             },
         )
     } catch (cancelled: CancellationException) {
+        diagnostic.failed(DmCreationPhase.OWNER, cancelled)
         if (owner.isCurrent()) appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
         throw cancelled
     }
@@ -193,18 +207,22 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     onRetryGroupIdCleared: () -> Unit,
     onAuthoritativeReadFailed: (Throwable) -> Unit,
     owner: GroupCreationSession,
+    diagnostic: DmCreationAttempt,
 ) {
+    diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
     runCatchingCancellable {
         val item =
             owner.currentValue {
                 loadCreatedGroupForOwner(appState, accountRef, groupIdHex, owner)
             }
+        diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
         onRetryGroupIdCleared()
         if (showCreatedToast) {
             appState.presentConversationTransient(accountRef, groupIdHex, R.string.toast_chat_created)
         }
         onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
+        diagnostic.failed(DmCreationPhase.PROJECTION, it)
         if (owner.isCurrent()) appState.abandonGroupCreateTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
         onAuthoritativeReadFailed(it)
     }

@@ -24,6 +24,21 @@ import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AmberSignInBoundaryTest {
+    /** A newer accepted selection during the signer UI retires the original Amber action before native I/O. */
+    @Test
+    fun newerSelectionDuringSignerWaitPreventsNativeAmberWork() =
+        runBlocking {
+            val fixture = fixture(legacyFallback = false)
+            fixture.state.amberPublicKeyRequest = {
+                runBlocking { fixture.state.accountSession.publishCreatedIdentity("replacement") {} }
+                ACCOUNT_ID
+            }
+            val result = runCatching { fixture.state.loginWithAmber() }
+            assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+            assertTrue(fixture.calls.isEmpty())
+            assertNull(fixture.state.amberSignInStage)
+        }
+
     /** A staged duplicate keeps the imported nsec account and its data in place. */
     @Test
     fun stagedDuplicatePreservesExistingAccount() = assertDuplicateBoundary(legacyFallback = false)

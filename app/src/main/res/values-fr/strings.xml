@@ -2332,6 +2332,9 @@
     <string name="chat_departure_confirm">Vérifiez les %1$d discussions sélectionnées. Les groupes rejoints seront quittés et supprimés de cet appareil ; les discussions directes sont supprimées localement. Les autres membres gardent leurs copies. Les transferts administratifs seront confirmés avant la suppression.</string>
     <string name="chat_departure_result">%1$d terminées · %2$d inachevées · %3$d ignorées. Réessayer vérifie les appartenances et reprend uniquement les étapes inachevées.</string>
     <string name="chat_departure_admin_granted">Le transfert des droits a réussi. La sortie du groupe reste inachevée.</string>
+    <string name="notification_push_storage_unavailable">Impossible de lire les paramètres push enregistrés. Ils ont été conservés et l’inscription push est suspendue. Réessayez lorsque l’appareil est déverrouillé.</string>
+    <string name="notification_push_import_pending">Certains anciens paramètres push n’ont pas pu être récupérés. Ils ont été conservés et l’inscription push est suspendue. Réessayez pour les vérifier à nouveau.</string>
+    <string name="notification_push_cleanup_unknown">Un ancien nettoyage push ne peut pas être confirmé. L’inscription push est suspendue. Réessayer vérifie à nouveau l’état enregistré, sans l’effacer ni le réinitialiser.</string>
     <string name="reaction_details_loading">Chargement des réactions…</string>
     <string name="reaction_details_load_failed">Impossible de charger les réactions.</string>
     <string name="group_create_remove_and_continue">Retirer cette personne et continuer</string>

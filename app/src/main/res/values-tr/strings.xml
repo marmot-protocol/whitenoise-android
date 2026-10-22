@@ -2330,6 +2330,9 @@
     <string name="chat_departure_confirm">Seçilen %1$d sohbeti gözden geçirin. Katıldığınız gruplardan çıkılacak ve bu cihazdan silinecek; doğrudan sohbetler yerel olarak silinir. Diğer üyeler kopyalarını korur. Gerekli yönetici devirleri silme başlamadan önce onaylanır.</string>
     <string name="chat_departure_result">%1$d tamamlandı · %2$d bitmedi · %3$d atlandı. Yeniden deneme üyeliği kontrol eder ve yalnızca bitmemiş işlemleri sürdürür.</string>
     <string name="chat_departure_admin_granted">Yönetici devri başarılı. Gruptan ayrılma henüz tamamlanmadı.</string>
+    <string name="notification_push_storage_unavailable">Kayıtlı anlık bildirim ayarları okunamadı. Ayarlar korundu ve anlık bildirim kaydı duraklatıldı. Cihazın kilidi açıldığında yeniden deneyin.</string>
+    <string name="notification_push_import_pending">Önceki anlık bildirim ayarlarından bazıları kurtarılamadı. Ayarlar korundu ve anlık bildirim kaydı duraklatıldı. Tekrar kontrol etmek için yeniden deneyin.</string>
+    <string name="notification_push_cleanup_unknown">Önceki bir anlık bildirim temizliği doğrulanamıyor. Anlık bildirim kaydı duraklatıldı. Yeniden denemek, kayıtlı durumu silmeden veya sıfırlamadan tekrar kontrol eder.</string>
     <string name="reaction_details_loading">Tepkiler yükleniyor…</string>
     <string name="reaction_details_load_failed">Tepkiler yüklenemedi.</string>
     <string name="group_create_remove_and_continue">Bu kişiyi kaldır ve devam et</string>

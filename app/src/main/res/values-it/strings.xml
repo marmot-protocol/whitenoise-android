@@ -2332,6 +2332,9 @@
     <string name="chat_departure_confirm">Rivedi %1$d chat selezionate. I gruppi verranno abbandonati ed eliminati da questo dispositivo; le chat dirette vengono eliminate localmente. Gli altri membri conservano le loro copie. I passaggi di amministrazione saranno confermati prima di eliminare.</string>
     <string name="chat_departure_result">%1$d completate · %2$d incomplete · %3$d saltate. Riprova verifica le appartenenze e continua solo le operazioni incomplete.</string>
     <string name="chat_departure_admin_granted">Il trasferimento dei diritti è riuscito. L’uscita dal gruppo non è ancora completata.</string>
+    <string name="notification_push_storage_unavailable">Impossibile leggere le impostazioni push salvate. Sono state conservate e la registrazione push è in pausa. Riprova quando il dispositivo è sbloccato.</string>
+    <string name="notification_push_import_pending">Impossibile recuperare alcune impostazioni push precedenti. Sono state conservate e la registrazione push è in pausa. Riprova per verificarle di nuovo.</string>
+    <string name="notification_push_cleanup_unknown">Impossibile confermare una precedente pulizia push. La registrazione push è in pausa. Un nuovo tentativo verifica lo stato salvato, senza cancellarlo o reimpostarlo.</string>
     <string name="reaction_details_loading">Caricamento delle reazioni…</string>
     <string name="reaction_details_load_failed">Impossibile caricare le reazioni.</string>
     <string name="group_create_remove_and_continue">Rimuovi questa persona e continua</string>

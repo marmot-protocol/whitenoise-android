@@ -9,6 +9,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,6 +23,178 @@ import kotlin.coroutines.ContinuationInterceptor
 /** Exercises the extracted production boundary with suspended platform/native adapters, without booting MDK. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppAccountSessionCoordinatorTest {
+    /** Automatic succession cannot invalidate an explicit handoff that already won its atomic intent boundary. */
+    @Test
+    fun conditionalSuccessorReservationPreservesNewerExplicitIntent() {
+        val handoff = AccountSwitchLocalSnapshotHandoff()
+        val logout = handoff.beginRequest()
+        val explicit = handoff.beginRequest("explicit")
+        assertNull(handoff.beginRequestIfCurrent(logout, "automatic"))
+        assertTrue(handoff.isCurrent(explicit))
+        assertEquals(explicit, handoff.captureForAccount("explicit"))
+        assertNull(handoff.captureForAccount("automatic"))
+        val accepted = handoff.beginRequestIfCurrent(explicit, "accepted")
+        assertEquals(explicit + 1, accepted)
+        assertEquals(accepted, handoff.captureForAccount("accepted"))
+    }
+
+    /** A queued activation cannot enter native preparation while logout owns the actual coordinator lifetime. */
+    @Test
+    fun lifetimeOwnerFencesNativePreparationAndCancelledWaitHasNoEffects() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val acquired = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val logout =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.withLifetime {
+                        acquired.complete(Unit)
+                        release.await()
+                    }
+                }
+            acquired.await()
+            val queued =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("cancelled"))
+                }
+            assertTrue(host.events.isEmpty())
+            queued.cancelAndJoin()
+            release.complete(Unit)
+            logout.await()
+            assertTrue(host.events.isEmpty())
+            assertEquals("original", host.activeAccount)
+        }
+
+    /** An explicit queued selection wins automatic succession before the automatic path can call native prepare. */
+    @Test
+    fun queuedExplicitSelectionSupersedesAutomaticSignOutSuccessor() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val release = CompletableDeferred<Unit>()
+            val entered = CompletableDeferred<Long>()
+            val logout =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.withLifetime {
+                        entered.complete(owner.retireSelectionsForSignOut())
+                        release.await()
+                    }
+                }
+            val generation = entered.await()
+            val explicit =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("explicit"))
+                }
+            release.complete(Unit)
+            logout.await()
+            assertNotNull(explicit.await())
+            val before = host.events.toList()
+            assertNull(
+                owner.activateAfterSignOutIfCurrent(generation, AccountSessionActivationRequest("automatic")) { true },
+            )
+            assertEquals(before, host.events)
+            assertEquals("explicit", host.activeAccount)
+        }
+
+    /** Routing can drain a setup child outside lifetime without giving an older user action a fresh generation. */
+    @Test
+    fun delayedRoutingCannotOvertakeNewerActivationOrNativePrepare() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val release = CompletableDeferred<Unit>()
+            val earlier =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("earlier"), beforePrepare = {
+                        release.await()
+                        true
+                    })
+                }
+            assertNotNull(owner.activate(AccountSessionActivationRequest("newer")))
+            release.complete(Unit)
+            assertNull(earlier.await())
+            assertEquals("newer", host.activeAccount)
+            assertFalse(host.events.contains("prepare:earlier"))
+        }
+
+    /** The actual setup controller joins a command whose cancellation finally needs the production lifetime. */
+    @Test
+    fun setupControllerCancellationCleanupFinishesBeforeActivationTakesLifetime() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val entered = CompletableDeferred<Unit>()
+            val base =
+                dev.ipf.whitenoise.android.ui.onboarding.setup
+                    .FakeSetupClient()
+            val client =
+                object : dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupClient by base {
+                    override suspend fun execute(
+                        request: dev.ipf.whitenoise.android.ui.onboarding.setup.SetupRequest,
+                    ): dev.ipf.marmotkit.OnboardingSnapshotFfi? {
+                        try {
+                            entered.complete(Unit)
+                            kotlinx.coroutines.awaitCancellation()
+                        } finally {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                                owner.withLifetime { host.events += "setup-cleaned" }
+                            }
+                        }
+                    }
+                }
+            val controller =
+                dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupController(
+                    dev.ipf.whitenoise.android.ui.onboarding.setup.SETUP_TEST_ACCOUNT,
+                    client,
+                    backgroundScope,
+                    { true },
+                    {},
+                    {},
+                )
+            controller.reconnect()
+            runCurrent()
+            controller.submit(
+                dev.ipf.whitenoise.android.ui.onboarding.setup.SetupRequest(
+                    3uL,
+                    dev.ipf.marmotkit.OnboardingStepFfi.PROFILE,
+                    dev.ipf.marmotkit.OnboardingActionFfi.CONTINUE_WITHOUT,
+                ),
+            )
+            runCurrent()
+            entered.await()
+            assertNotNull(
+                owner.activate(AccountSessionActivationRequest("next"), beforePrepare = {
+                    controller.close()
+                    true
+                }),
+            )
+            assertTrue(host.events.indexOf("setup-cleaned") < host.events.indexOf("prepare:next"))
+        }
+
+    /** A late pending route for the same account may not clear a newer accepted selection. */
+    @Test
+    fun oldSameAccountRoutingCannotClearNewerSameRefPublication() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val release = CompletableDeferred<Unit>()
+            val earlier =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("original"), beforePrepare = { generation ->
+                        release.await()
+                        owner.withLifetime {
+                            if (owner.handoff.isCurrent(generation)) host.activeAccount = null
+                        }
+                        false
+                    })
+                }
+            assertNotNull(owner.activate(AccountSessionActivationRequest("original")))
+            release.complete(Unit)
+            assertNull(earlier.await())
+            assertEquals("original", host.activeAccount)
+        }
+
     /** Local-ready and frame acknowledgement precede the existing profile/privacy/notification/service sequence. */
     @Test
     fun publishesBeforeFrameWaitAndRefreshesOnlyAfterAcknowledgement() =
@@ -56,7 +229,7 @@ class AppAccountSessionCoordinatorTest {
             )
         }
 
-    /** A newer selection can finish while an older native preload is suspended; the old result cannot publish. */
+    /** A newer queued selection invalidates old preparation, then enters native work after lifetime release. */
     @Test
     fun supersededPreparationCannotClearOrPublishOverNewAccount() =
         runTest {
@@ -68,9 +241,14 @@ class AppAccountSessionCoordinatorTest {
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.activate(AccountSessionActivationRequest("old-request"))
                 }
-            assertNotNull(owner.activate(AccountSessionActivationRequest("new-request")))
+            val newer =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("new-request"))
+                }
+            assertFalse(newer.isCompleted)
             release.complete(Unit)
             assertNull(old.await())
+            assertNotNull(newer.await())
             assertEquals("new-request", host.activeAccount)
             assertEquals(listOf("publish:new-request"), host.events.filter { it.startsWith("publish:") })
         }
@@ -88,9 +266,14 @@ class AppAccountSessionCoordinatorTest {
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.activate(AccountSessionActivationRequest("old-request"))
                 }
-            assertNotNull(owner.activate(AccountSessionActivationRequest("new-request")))
+            val newer =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("new-request"))
+                }
+            assertFalse(newer.isCompleted)
             release.complete(Unit)
             assertNull(old.await())
+            assertNotNull(newer.await())
             assertEquals("new-request", host.activeAccount)
             assertEquals(1, host.events.count { it.startsWith("publish:") })
         }
@@ -273,9 +456,13 @@ class AppAccountSessionCoordinatorTest {
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.activate(AccountSessionActivationRequest("old-request"))
                 }
-            owner.publishCreatedIdentity("created") { host.activeAccount = "created" }
+            val publication =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.publishCreatedIdentity("created") { host.activeAccount = "created" }
+                }
             release.complete(Unit)
             assertNull(selection.await())
+            publication.await()
             assertEquals("created", host.activeAccount)
             assertFalse(host.events.any { it.startsWith("publish:") })
         }
@@ -292,9 +479,13 @@ class AppAccountSessionCoordinatorTest {
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.activate(AccountSessionActivationRequest("old-request"))
                 }
-            owner.publishSignedOutIdentity { host.activeAccount = null }
+            val publication =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.publishSignedOutIdentity { host.activeAccount = null }
+                }
             release.complete(Unit)
             assertNull(selection.await())
+            publication.await()
             assertNull(host.activeAccount)
             assertEquals(listOf("prepare:old-request"), host.events)
         }

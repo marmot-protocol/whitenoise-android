@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
+import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -22,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -38,6 +40,9 @@ import java.util.concurrent.atomic.AtomicInteger
 @Config(sdk = [36])
 @Suppress("LargeClass") // One fixture-backed suite covers the complete two-transport settlement state machine.
 class NotificationDeliveryModeRecoveryTest {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     private val context: Context
         get() = RuntimeEnvironment.getApplication().applicationContext
 
@@ -51,6 +56,120 @@ class NotificationDeliveryModeRecoveryTest {
     fun stopTestService() {
         NotificationStreamForegroundService.stop(context)
     }
+
+    /** A no-account bootstrap suspended in its real readiness read cannot clear a newer accepted owner. */
+    @Test
+    fun delayedNoAccountBootstrapPreservesNewerOwner() =
+        runBlocking {
+            val reading = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val once = AtomicBoolean(false)
+            val created = account("new-owner")
+            val nativeAccounts = mutableListOf<AccountSummaryFfi>()
+            lateinit var fixture: NotificationBootstrapTestFixture
+            fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    accounts = nativeAccounts,
+                    onCreateIdentity = { created.also { nativeAccounts += it } },
+                    onUsageDiagnosticsRead = {
+                        if (fixture.runtimeStartCalls.get() > 0 && once.compareAndSet(false, true)) {
+                            reading.countDown()
+                            check(release.await(5, TimeUnit.SECONDS))
+                        }
+                    },
+                )
+            val bootstrap = async { fixture.bootstrap() }
+            try {
+                withTimeout(5_000) { while (reading.count > 0) yield() }
+                // Identity publication clears main-confined caches, so it runs on the main looper like the UI caller.
+                fixture.runOnMainLooperPumping { fixture.appState.createIdentity() }
+                release.countDown()
+                bootstrap.await()
+                assertEquals("new-owner", fixture.appState.activeAccountRef)
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+            } finally {
+                release.countDown()
+                bootstrap.cancelAndJoin()
+                fixture.close()
+            }
+        }
+
+    /** Explicit enabling cannot use an in-memory clear whose durable commit failed. */
+    @Test
+    fun explicitEnableRequiresDurableDisableMarkerClear() = assertFailedDisableClearBlocksPositiveWriter(fcm = false)
+
+    /** FCM cutover observes the same failed-clear fence before positive native settings or registration. */
+    @Test
+    fun fcmEnableRequiresDurableDisableMarkerClear() = assertFailedDisableClearBlocksPositiveWriter(fcm = true)
+
+    private fun assertFailedDisableClearBlocksPositiveWriter(fcm: Boolean) =
+        runBlocking {
+            val positive = AtomicInteger(0)
+            val fixture =
+                fixture(
+                    platform = RecordingNativePushFallbackPlatform(context),
+                    nativeEnabled = false,
+                    fcmAvailable = true,
+                    onSetNative = { account, enabled ->
+                        if (enabled) positive.incrementAndGet()
+                        settings(account, nativeEnabled = enabled)
+                    },
+                )
+            try {
+                fixture.bootstrap()
+                val backing = context.getSharedPreferences("failed-disable-clear-$fcm", Context.MODE_PRIVATE)
+                backing.edit().clear().commit()
+                val seed = PushTokenStore(backing)
+                assertTrue(seed.recordPendingDisable(ACCOUNT_A))
+                assertTrue(seed.recordPendingDisable(ACCOUNT_B))
+                val failClear = AtomicBoolean(true)
+                val store =
+                    PushTokenStore(
+                        object : android.content.SharedPreferences by backing {
+                            override fun edit(): android.content.SharedPreferences.Editor {
+                                val editor = backing.edit()
+                                var clearsA = false
+                                return object : android.content.SharedPreferences.Editor by editor {
+                                    override fun putStringSet(
+                                        key: String?,
+                                        values: MutableSet<String>?,
+                                    ): android.content.SharedPreferences.Editor =
+                                        apply {
+                                            if (key == dev.ipf.whitenoise.android.notifications.KEY_PENDING_DISABLES) {
+                                                clearsA = values?.contains(ACCOUNT_A) == false
+                                            }
+                                            editor.putStringSet(key, values)
+                                        }
+
+                                    override fun commit(): Boolean {
+                                        val committed = editor.commit()
+                                        return if (clearsA && failClear.compareAndSet(true, false)) false else committed
+                                    }
+                                }
+                            }
+                        },
+                    )
+                fixture.replacePushTokenStore(store)
+                positive.set(0)
+                fixture.upsertedPushRegistrations.clear()
+                val enabled =
+                    fixture.runWithMainLooperPumping {
+                        if (fcm) {
+                            fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Fcm)
+                        } else {
+                            fixture.appState.setNativePushEnabled(true)
+                        }
+                    }
+                assertFalse(enabled)
+                assertEquals(0, positive.get())
+                assertTrue(fixture.upsertedPushRegistrations.isEmpty())
+                assertFalse(fixture.notificationSettings(ACCOUNT_A).nativePushEnabled)
+                assertEquals(setOf(ACCOUNT_A, ACCOUNT_B), store.pendingDisables())
+            } finally {
+                fixture.close()
+            }
+        }
 
     /** A rejected service request restores both durable and projected persistent state. */
     @Test
@@ -1102,12 +1221,14 @@ class NotificationDeliveryModeRecoveryTest {
                         check(releasePersist.await(10, TimeUnit.SECONDS))
                     },
                 )
+            var sdkToken = "old-token"
             val fixture =
                 fixture(
                     platform = platform,
                     nativeEnabled = true,
                     accounts = listOf(account(ACCOUNT_A), account(ACCOUNT_B)),
                     fcmAvailable = true,
+                    fcmTokenReader = { sdkToken },
                 )
             val store = PushTokenStore.create(context)
             try {
@@ -1124,6 +1245,7 @@ class NotificationDeliveryModeRecoveryTest {
                 val local = async { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local) }
                 withTimeout(2_000L) { while (persistStarted.count > 0L) yield() }
                 fixture.runWithMainLooperPumping {
+                    sdkToken = "rotated-token"
                     fixture.appState.onPushTokenRotated("rotated-token")
                     withTimeout(2_000L) { while (!store.nativePushRegistrationSyncPending()) yield() }
                 }
@@ -1288,6 +1410,7 @@ class NotificationDeliveryModeRecoveryTest {
         accounts: List<AccountSummaryFfi> = listOf(account(ACCOUNT_A)),
         onUpsert: (String) -> Unit = {},
         fcmAvailable: Boolean = false,
+        fcmTokenReader: suspend () -> String? = { "test-token" },
         onSetNative: ((String, Boolean) -> NotificationSettingsFfi)? = null,
         onClear: ((String) -> PushRegistrationShareOutcomeFfi)? = null,
         onNotificationSettings: ((String) -> NotificationSettingsFfi)? = null,
@@ -1301,6 +1424,7 @@ class NotificationDeliveryModeRecoveryTest {
         onClearPushRegistration = onClear,
         onNotificationSettings = onNotificationSettings,
         pushServerConfigProvider = { CONFIG },
+        fcmTokenReader = fcmTokenReader,
         nativePushCapabilityResolver = {
             if (fcmAvailable) NativePushCapability.Available else NativePushCapability.MissingPushServerConfiguration
         },

@@ -477,7 +477,12 @@ class NotificationStreamForegroundService : Service() {
         // start never disables the user's Keep Connected preference.
         fun syncNativePushRegistration(context: Context): Boolean {
             val appContext = context.applicationContext
-            PushTokenStore.create(appContext).recordPendingNativePushRegistrationSync()
+            try {
+                PushTokenStore.create(appContext).recordPendingNativePushRegistrationSync()
+            } catch (_: PushTokenStorageException) {
+                android.util.Log.w("PushTokenStorage", "native_sync_nudge_unavailable")
+                return false
+            }
             return startForegroundServiceSafely(appContext) { ctx ->
                 Intent(ctx, NotificationStreamForegroundService::class.java)
                     .setAction(ACTION_SYNC_NATIVE_PUSH_REGISTRATION)

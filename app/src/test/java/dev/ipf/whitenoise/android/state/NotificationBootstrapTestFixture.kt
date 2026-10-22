@@ -133,6 +133,8 @@ internal class NotificationBootstrapTestFixture(
     private val onOnboardingSnapshot: (() -> OnboardingSnapshotFfi?)? = null,
     private val onAuditLogSettings: (() -> Unit)? = null,
     private val onPrivacyRuntimeConfig: (() -> Unit)? = null,
+    private val onUsageDiagnosticsRead: (() -> Unit)? = null,
+    private val onCreateIdentity: (() -> AccountSummaryFfi)? = null,
     private val onUserProfile: ((accountIdHex: String) -> UserProfileMetadataFfi?)? = null,
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     // Separate activation's presented-row boundary from concurrent raw unread folds.
@@ -154,6 +156,7 @@ internal class NotificationBootstrapTestFixture(
     private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+    fcmTokenReader: suspend () -> String? = { null },
     nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
         NativePushCapability.MissingPushServerConfiguration
     },
@@ -329,6 +332,7 @@ internal class NotificationBootstrapTestFixture(
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments?.first()
                 "usageDiagnosticsSettings" -> {
+                    onUsageDiagnosticsRead?.invoke()
                     emitAtFirstPostStartFfiBoundary()
                     UsageDiagnosticsSettingsFfi(
                         decision = UsageDiagnosticsDecisionFfi.DECLINED,
@@ -491,6 +495,7 @@ internal class NotificationBootstrapTestFixture(
                     npubCalls.incrementAndGet()
                     "npub1coldidentityfallback"
                 }
+                "createIdentity" -> checkNotNull(onCreateIdentity) { "Unexpected identity creation" }.invoke()
                 "listAccounts" -> accounts.toList()
                 "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                 "setAttachmentDownloadPolicy" -> Unit
@@ -644,6 +649,7 @@ internal class NotificationBootstrapTestFixture(
             bootstrapActionableTimeoutMillis = { bootstrapActionableTimeoutMillis },
             nativePushFallbackPlatform = nativePushFallbackPlatform,
             pushServerConfigProvider = pushServerConfigProvider,
+            fcmTokenReader = fcmTokenReader,
             nativePushCapabilityResolver = nativePushCapabilityResolver,
             notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         )

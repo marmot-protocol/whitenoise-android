@@ -16,9 +16,10 @@ class AmberLoginReconciliationCoverageTest {
         val end = source.indexOf("private suspend fun reregisterExternalSigners()", start)
         val body = source.substring(start, end)
         val begin = body.indexOf("beginExternalSignerOnboarding(")
-        val mount = body.indexOf("accountSetup.open(snapshot)", begin)
+        val mount = body.indexOf("accountSetup.open(snapshot, runtime, epoch)", begin)
         val exit = body.indexOf("return", mount)
-        val legacy = body.indexOf("loginExternalSigner(", exit)
+        // Legacy login and its signer reconciliation live in the fallback the interactive path returns before.
+        val legacy = body.indexOf("loginAmberFallback(", exit)
         assertTrue("interactive setup must be attempted first", begin >= 0 && mount > begin)
         assertTrue("accepted setup must return before legacy login", exit > mount && legacy > exit)
         assertTrue(
@@ -35,10 +36,13 @@ class AmberLoginReconciliationCoverageTest {
         val nextFunction = source.indexOf("private suspend fun reregisterExternalSigners()", loginStart)
         require(loginStart >= 0 && nextFunction > loginStart) { "Missing Amber login function" }
         val body = source.substring(loginStart, nextFunction)
+        val fallback = source.functionBody("loginAmberFallback")
 
-        val loginIndex = body.indexOf("loginExternalSigner(")
-        val reconcileIndex = body.indexOf("registerExternalSigner(", loginIndex + 1)
-        val importedActivation = body.indexOf("activateImportedIdentity(summary)", reconcileIndex + 1)
+        val loginIndex = fallback.indexOf("loginExternalSigner(")
+        val reconcileIndex = fallback.indexOf("registerExternalSigner(", loginIndex + 1)
+        val fallbackCall = body.indexOf("loginAmberFallback(runtime, pubkeyHex")
+        val importedActivation =
+            body.indexOf("activateImportedIdentity(summary, runtime, epoch, selection)", fallbackCall + 1)
         val imported = source.functionBody("activateImportedIdentity")
         val refreshIndex = imported.indexOf("refreshAccounts()")
         val activateIndex = imported.indexOf("activateAccountSession(", refreshIndex + 1)
@@ -46,7 +50,7 @@ class AmberLoginReconciliationCoverageTest {
         assertTrue("Amber login must create the external-signer account", loginIndex >= 0)
         assertTrue(
             "the stable signer must be re-registered after login and before account refresh",
-            reconcileIndex > loginIndex && importedActivation > reconcileIndex,
+            reconcileIndex > loginIndex && fallbackCall >= 0 && importedActivation > fallbackCall,
         )
         assertTrue(
             "the reconciled account must not become active before refresh completes",
@@ -56,7 +60,7 @@ class AmberLoginReconciliationCoverageTest {
             "the reconciliation must target the new account with its canonical signer key",
             Regex(
                 """registerExternalSigner\s*\(\s*summary\.label\s*,\s*amberSigner\.buildSigner\(pubkeyHex\)""",
-            ).containsMatchIn(body),
+            ).containsMatchIn(fallback),
         )
     }
 
@@ -69,7 +73,7 @@ class AmberLoginReconciliationCoverageTest {
         require(start >= 0 && end > start) { "Missing nsec setup boundary" }
         val body = source.substring(start, end)
         val production = body.substring(body.indexOf("return try {"))
-        assertTrue(production.contains("accountSetup.begin(nsec)"))
+        assertTrue(production.contains("accountSetup.begin(nsec, ownsOrigin)"))
         val caughtTypes =
             Regex("catch\\s*\\([^:]+:\\s*([^)]*)\\)")
                 .findAll(production)

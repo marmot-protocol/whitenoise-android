@@ -11,7 +11,9 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.SignOutOutcomeFfi
+import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -37,6 +39,9 @@ import kotlin.coroutines.resume
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class SettingsSignOutOperationTest {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -154,17 +159,6 @@ class SettingsSignOutOperationTest {
         return fixture
     }
 
-    /** Account metadata is enough for the native retained-session path; no broad teardown fixture is necessary. */
-    private fun account() =
-        AccountSummaryFfi(
-            label = ACCOUNT_REF,
-            accountIdHex = "b".repeat(64),
-            localSigning = true,
-            externalSigning = false,
-            signedOut = false,
-            running = true,
-        )
-
     private data class Fixture(
         val state: WhiteNoiseAppState,
         val native: SuspendedSignOut,
@@ -181,7 +175,11 @@ class SettingsSignOutOperationTest {
                 arrayOf(MarmotInterface::class.java),
             ) { proxy, method, arguments ->
                 when (method.name) {
+                    // Admitted sign-out confirms native push is off before the native logout.
+                    "setNativePushEnabled" -> confirmNativePushDisabled(arguments)
                     "signOut" -> suspendSignOut(arguments)
+                    // Unfinished local cleanup re-reads the native account to decide whether it stayed signed in.
+                    "listAccounts" -> listOf(account())
                     "toString" -> "SuspendedSignOutTestProxy"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === arguments?.firstOrNull()
@@ -191,6 +189,13 @@ class SettingsSignOutOperationTest {
                     }
                 }
             } as MarmotInterface
+
+        /** Returns MDK's committed native-push-off receipt for the signing-out account. */
+        private fun confirmNativePushDisabled(arguments: Array<out Any?>?): NotificationSettingsFfi {
+            val args = requireNotNull(arguments)
+            check(args[0] == ACCOUNT_REF && args[1] == false)
+            return NotificationSettingsFfi(ACCOUNT_REF, "b".repeat(64), true, nativePushEnabled = false)
+        }
 
         /** Records the exact cleanup preference and fails immediately if a concurrent call reaches native code. */
         private fun suspendSignOut(arguments: Array<out Any?>?): Any {
@@ -218,5 +223,16 @@ class SettingsSignOutOperationTest {
     private companion object {
         const val ACCOUNT_REF = "sign-out-operation-test"
         const val TIMEOUT_MILLIS = 5_000L
+
+        /** Account metadata is enough for the native retained-session path; no broad teardown fixture is necessary. */
+        fun account() =
+            AccountSummaryFfi(
+                label = ACCOUNT_REF,
+                accountIdHex = "b".repeat(64),
+                localSigning = true,
+                externalSigning = false,
+                signedOut = false,
+                running = true,
+            )
     }
 }

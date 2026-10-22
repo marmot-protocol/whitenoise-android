@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.io.File
@@ -35,6 +36,12 @@ internal object LegacySecurePreferences {
         val prefs = opener(context, fileName)
         return prefs.all.mapNotNull { (key, value) -> stringOf(value)?.let { key to it } }.toMap()
     }
+
+    /** Opens an existing typed compatibility source without creating an empty encrypted store. */
+    internal fun openForImport(
+        context: Context,
+        fileName: String,
+    ): SharedPreferences? = if (exists(context, fileName)) openLegacyEncryptedPreferences(context, fileName) else null
 
     private fun openLegacyEncryptedPreferences(
         context: Context,

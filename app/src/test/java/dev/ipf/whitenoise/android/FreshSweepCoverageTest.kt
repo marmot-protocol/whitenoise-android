@@ -156,7 +156,26 @@ class FreshSweepCoverageTest {
         assertTrue(chatListLeave.contains("withContext(NonCancellable)"))
         assertTrue(conversationLeave.contains("withContext(NonCancellable)"))
         assertTrue(accept.indexOf("acceptGroupInvite") < accept.indexOf("refreshMembers()"))
-        assertTrue(invite.indexOf("try {") < invite.indexOf("val adminTargets"))
+        val resolver =
+            source.section("private suspend fun resolveCanonicalInviteRefs", "private fun presentAdminCommitOutcome")
+        val guardedResolution = resolver.indexOf("try {")
+        assertTrue(guardedResolution >= 0)
+        assertTrue(guardedResolution < resolver.indexOf("canonicalGroupInviteRefs("))
+        assertTrue(resolver.contains("catch (throwable: Throwable)"))
+        assertTrue(resolver.contains("diagnostic?.failed(DmCreationPhase.RECIPIENTS, throwable)"))
+        assertTrue(resolver.contains("throwable.rethrowIfCancellation()"))
+        assertTrue(resolver.contains("recordMutationFailure("))
+        assertTrue(
+            invite.contains(
+                "resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: " + "return@withMutationLockResult false",
+            ),
+        )
+        assertTrue(invite.contains("resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false"))
+        val adminResolution = invite.indexOf("resolveCanonicalInviteRefs(initialAdminRefs, diagnostic)")
+        val recipientSuccess = "DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS"
+        val acceptedRecipients = invite.indexOf(recipientSuccess, adminResolution)
+        assertTrue(adminResolution >= 0)
+        assertTrue(acceptedRecipients > adminResolution)
     }
 
     /** Successful acceptance still settles UI state before best-effort warmup, with account fencing. */

@@ -20,6 +20,20 @@ class PushTokenStoreTest {
         assertEquals(2, preferences.commitCalls)
     }
 
+    /** Failed removal acknowledgement must be retried even when the old obligation disappeared from memory. */
+    @Test
+    fun pendingDisableClearRecommitsAfterFailedDiskAcknowledgement() {
+        val preferences = FakeSharedPreferences(ArrayDeque(listOf(true, true, false, true, true)))
+        val store = PushTokenStore(preferences)
+        assertTrue(store.recordPendingDisable("account-a"))
+        assertTrue(store.recordPendingDisable("account-b"))
+        assertFalse(store.clearPendingDisable("account-a"))
+        assertEquals(setOf("account-a", "account-b"), store.pendingDisables())
+        assertTrue(store.clearPendingDisable("account-a"))
+        assertEquals(5, preferences.commitCalls)
+        assertEquals(setOf("account-b"), store.pendingDisables())
+    }
+
     /** A new generation and its eligible exhausted-budget reset must share one commit. */
     @Test
     fun wakeRecordAndEpisodeAdmissionCommitAtomically() {
@@ -217,12 +231,9 @@ class PushTokenStoreTest {
     @Test
     fun legacyPushWakeBooleanActsAsAnObservedGeneration() {
         val legacy = FakeSharedPreferences()
-        val secure = FakeSharedPreferences()
         legacy.edit().putBoolean("pending_push_wake_catch_up", true).commit()
 
-        migrateLegacyPushTokenPreferences(legacy, secure)
-
-        val store = PushTokenStore(secure)
+        val store = PushTokenStore(legacy)
         val legacyGeneration = store.pendingPushWakeCatchUpGeneration()
         assertTrue(legacyGeneration > 0L)
         store.recordPendingPushWakeCatchUp()
@@ -371,52 +382,6 @@ class PushTokenStoreTest {
         store.recordPendingDisable("npub-b")
         assertEquals(setOf("npub-a"), store.pendingClears())
         assertEquals(setOf("npub-b"), store.pendingDisables())
-    }
-
-    @Test
-    fun migrationCopiesLegacyPlaintextPrefsToSecureStoreThenClearsLegacy() {
-        val legacy = FakeSharedPreferences()
-        val secure = FakeSharedPreferences()
-        PushTokenStore(legacy).apply {
-            setToken("fcm-legacy")
-            recordPendingNativePushRegistrationSync()
-            recordPendingPushWakeCatchUp()
-            recordPendingClear("npub-clear")
-            recordPendingDisable("npub-disable")
-        }
-
-        migrateLegacyPushTokenPreferences(legacy, secure)
-
-        PushTokenStore(secure).apply {
-            assertEquals("fcm-legacy", lastToken())
-            assertEquals(true, nativePushRegistrationSyncPending())
-            assertEquals(true, pushWakeCatchUpPending())
-            assertEquals(setOf("npub-clear"), pendingClears())
-            assertEquals(setOf("npub-disable"), pendingDisables())
-        }
-        assertTrue("legacy plaintext prefs should be wiped after durable migration", legacy.all.isEmpty())
-    }
-
-    @Test
-    fun migrationDoesNotOverwriteExistingSecureValues() {
-        val legacy = FakeSharedPreferences()
-        val secure = FakeSharedPreferences()
-        PushTokenStore(legacy).apply {
-            setToken("fcm-legacy")
-            recordPendingClear("legacy-clear")
-        }
-        PushTokenStore(secure).apply {
-            setToken("fcm-secure")
-            recordPendingClear("secure-clear")
-        }
-
-        migrateLegacyPushTokenPreferences(legacy, secure)
-
-        PushTokenStore(secure).apply {
-            assertEquals("fcm-secure", lastToken())
-            assertEquals(setOf("secure-clear"), pendingClears())
-        }
-        assertFalse("legacy should be cleared even when secure values win", legacy.contains("fcm_token"))
     }
 
     // #167 regression: onNewToken runs on a Firebase background thread, so the

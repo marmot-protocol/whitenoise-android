@@ -2507,6 +2507,9 @@
     <string name="group_create_unattributed_failure">We could not identify an affected person. Retry or edit your members.</string>
     <string name="media_reply_draft_conflict">Your draft changed. Keep this reply and try again, or cancel the reply before sending.</string>
     <string name="share_connect_save_to_gallery">Save to Gallery</string>
+    <string name="notification_push_storage_unavailable">Saved push settings could not be read. They have been kept, and push registration is paused. Retry when the device is unlocked.</string>
+    <string name="notification_push_import_pending">Some earlier push settings could not be recovered. They have been kept, and push registration is paused. Retry to check them again.</string>
+    <string name="notification_push_cleanup_unknown">An earlier push cleanup cannot be confirmed. Push registration is paused. Retry checks saved state again; it does not erase or reset it.</string>
     <string name="media_storage_blocked_short">Not enough storage</string>
     <string name="media_storage_blocked">Not enough storage. Free up space, then tap to retry.</string>
     <string name="error_obsolete_key_package">This person needs to update White Noise before they can be added. Ask them to update and open it, then retry.</string>

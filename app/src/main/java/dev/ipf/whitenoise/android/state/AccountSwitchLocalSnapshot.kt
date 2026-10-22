@@ -305,6 +305,16 @@ internal class AccountSwitchLocalSnapshotHandoff {
             requestedAccountRef = accountRef
         }
 
+    /** Reserves automatic succession only if the original logout intent still owns this exact generation. */
+    fun beginRequestIfCurrent(
+        expected: Long,
+        accountRef: String,
+    ): Long? =
+        requests.advanceIfCurrent(expected) {
+            pending = null
+            requestedAccountRef = accountRef
+        }
+
     /**
      * Captures a destructive-operation fence only when no different account is
      * already being activated ahead of the still-published active label.

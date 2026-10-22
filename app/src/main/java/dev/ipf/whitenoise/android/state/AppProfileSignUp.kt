@@ -17,13 +17,48 @@ import kotlinx.coroutines.launch
  */
 internal class AppProfileSignUp(
     private val appState: WhiteNoiseAppState,
-    private val activateCreatedIdentity: (AccountSummaryFfi) -> Unit,
+    private val activateCreatedIdentity: suspend (AccountSummaryFfi, () -> Boolean) -> Unit,
     private val configurePrivacyRuntime: suspend () -> Unit,
     private val warmProfile: (String) -> Unit,
     private val markReady: () -> Unit,
 ) {
     private val directIdentityQualification = IdentityPolicyQualification()
     private val profileIdentityCoordinator = SignUpIdentityCoordinator()
+
+    private data class CreatingRuntime(
+        val native: dev.ipf.marmotkit.MarmotInterface,
+        val epoch: Int,
+    )
+
+    private val creatingRuntimes = java.util.IdentityHashMap<AccountSummaryFfi, CreatingRuntime>()
+
+    private fun ownsCreatingRuntime(summary: AccountSummaryFfi): Boolean {
+        val owner = creatingRuntimes[summary] ?: return false
+        return appState.runtimeGeneration == owner.epoch && appState.marmot() === owner.native
+    }
+
+    private suspend fun createOwnedIdentity(expectedOwner: SignUpOwner): AccountSummaryFfi {
+        val owner = CreatingRuntime(appState.marmot(), appState.runtimeGeneration)
+        return appState.withCurrentAccountLifetime {
+            val runtimeCurrent = appState.runtimeGeneration == owner.epoch && appState.marmot() === owner.native
+            if (!runtimeCurrent) throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
+            if (expectedOwner.runtime != owner.epoch ||
+                expectedOwner.accountRef != appState.activeAccountRef ||
+                !appState.accountSession.handoff.isCurrent(expectedOwner.selection)
+            ) {
+                throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
+            }
+            appState.marmotIo { createIdentityWithBootstrapRelays() }.also { creatingRuntimes[it] = owner }
+        }
+    }
+
+    private suspend fun qualifyOwnedIdentity(summary: AccountSummaryFfi) =
+        appState.withAccountLifetime {
+            if (!ownsCreatingRuntime(summary)) {
+                throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
+            }
+            appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
+        }
 
     /** Accepted native receipt survives recreation; only this adapter can replace it. */
     var pending by mutableStateOf<SignUpController?>(null)
@@ -40,12 +75,18 @@ internal class AppProfileSignUp(
         pending =
             SignUpController(
                 scope = appState.mutationsScope,
-                currentOwner = { SignUpOwner(appState.runtimeGeneration, appState.activeAccountRef) },
+                currentOwner = {
+                    SignUpOwner(
+                        appState.runtimeGeneration,
+                        appState.activeAccountRef,
+                        appState.accountSession.handoff.capture(),
+                    )
+                },
                 ownerAvailable = ::ownerAvailable,
                 create = { owner ->
                     profileIdentityCoordinator.createOrReuse(owner) {
                         runCatchingCancellable {
-                            appState.marmotIo { createIdentityWithBootstrapRelays() }
+                            createOwnedIdentity(owner)
                         }.onFailure {
                             appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
                         }.getOrThrow()
@@ -54,7 +95,7 @@ internal class AppProfileSignUp(
                 hasPendingIdentityReceipt = profileIdentityCoordinator::hasPendingReceipt,
                 qualify = { account ->
                     runCatchingCancellable {
-                        appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label)) }
+                        qualifyOwnedIdentity(account)
                     }.onFailure {
                         appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
                     }.getOrThrow()
@@ -81,15 +122,22 @@ internal class AppProfileSignUp(
     /** Creates a policy-qualified identity for the legacy no-profile action without duplicating a retained receipt. */
     @Suppress("TooGenericExceptionCaught")
     suspend fun createIdentityWithoutProfile() {
+        val requestedSelection = appState.accountSession.handoff.capture()
+        val requestedOwner = SignUpOwner(appState.runtimeGeneration, appState.activeAccountRef, requestedSelection)
         val startedAt = SystemClock.elapsedRealtime()
         try {
             val summary =
                 directIdentityQualification.createQualifyAndAccept(
-                    create = { appState.marmotIo { createIdentityWithBootstrapRelays() } },
+                    create = { createOwnedIdentity(requestedOwner) },
                     qualify = { account ->
-                        appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(account.label)) }
+                        qualifyOwnedIdentity(account)
                     },
-                    accept = activateCreatedIdentity,
+                    accept = { summary ->
+                        if (!appState.accountSession.handoff.isCurrent(requestedSelection)) {
+                            throw kotlinx.coroutines.CancellationException("Identity creation superseded")
+                        }
+                        activateCreatedIdentity(summary) { ownsCreatingRuntime(summary) }
+                    },
                 )
             markReady()
             appState.presentTransient(R.string.toast_identity_created)
@@ -115,9 +163,10 @@ internal class AppProfileSignUp(
         profileIdentityCoordinator.reconcile(summary) { creationOwner ->
             val ownsSource =
                 appState.runtimeGeneration == creationOwner.runtime &&
-                    appState.activeAccountRef == creationOwner.accountRef
-            if (ownsSource && ownerAvailable()) {
-                activateCreatedIdentity(summary)
+                    appState.activeAccountRef == creationOwner.accountRef &&
+                    appState.accountSession.handoff.isCurrent(creationOwner.selection)
+            if (ownsSource && ownsCreatingRuntime(summary) && ownerAvailable()) {
+                activateCreatedIdentity(summary) { ownsCreatingRuntime(summary) }
                 SignUpIdentityReconciliation(receiptHandled = true, activated = true)
             } else {
                 appState.refreshAccounts()
