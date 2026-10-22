@@ -2454,4 +2454,7 @@
     <string name="search_scope_selected_chats">Выбранные чаты</string>
     <string name="search_message_content_loading">Поиск по содержимому сообщений…</string>
     <string name="search_message_content_failed">Не удалось выполнить поиск по содержимому сообщений.</string>
+    <string name="document_save_interrupted">Аутентификация прервала сохранение. Нажмите «Сохранить» ещё раз, чтобы выбрать место назначения.</string>
+    <string name="avatar_preparation_interrupted">Обновление изображения прервано. Проверьте текущее изображение, прежде чем выбирать его снова.</string>
+    <string name="dictation_interrupted">Диктовка прервана. Перед отправкой проверьте восстановленный текст и оставшиеся аудиозаписи.</string>
 </resources>

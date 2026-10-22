@@ -177,14 +177,12 @@ class NostrReferencePresentationCoverageTest {
         assertEquals(listOf("BubbleContentBlocks.kt"), hidingCallers)
     }
 
-    /** A real resolver that loads [NOTE]'s event from one relay with its signature accepted. */
+    /** A real resolver that loads [NOTE]'s event from MDK's cached projection. */
     private fun loadedResolver() =
         NostrEventCardResolver(
             parentScope = scope,
-            relayProvider = { listOf("wss://relay.example") },
-            fetchEvents = { _, _ -> listOf(EVENT) },
-            verifyEvent = { true },
-            verificationDispatcher = Dispatchers.Unconfined,
+            readCached = { references -> references.map { NostrEventCardState.Loaded(EVENT.toCardModel()) } },
+            refresh = { NostrEventCardState.Loaded(EVENT.toCardModel()) },
         )
 
     /** The plain text on the system clipboard. */

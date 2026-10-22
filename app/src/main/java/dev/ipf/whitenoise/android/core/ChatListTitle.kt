@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -47,19 +48,86 @@ internal fun chatListItemTitle(
     memberTitle: (String) -> String,
     copy: GroupTitleCopy,
 ): String =
+    renderChatTitle(
+        ChatSelectionTitleInput(
+            groupIdHex = item.group.groupIdHex,
+            groupName = item.group.name,
+            projectedTitle = item.projectedTitle,
+            selectedTitle = item.selectedPresentation?.title,
+            presentationPeerIdHex = item.presentationOtherMemberAccount,
+            presentationMemberCount = item.presentationMemberCount,
+            pendingConfirmation = item.group.pendingConfirmation,
+            welcomerIdHex = item.group.welcomerAccountIdHex,
+            conversationKind = item.projection?.conversationKind,
+            activeAccountIsSoleMember = item.presentationActiveAccountIsSoleMember,
+        ),
+        contactNickname,
+        memberTitle,
+        copy,
+        namedTitle = { item.sanitizedNamedTitle },
+    )
+
+/** Only the primitive title facts shared by a row and a complete selection. */
+internal data class ChatSelectionTitleInput(
+    val groupIdHex: String,
+    val groupName: String,
+    val projectedTitle: String?,
+    val selectedTitle: PresentationTextFfi?,
+    val presentationPeerIdHex: String?,
+    val presentationMemberCount: Int,
+    val pendingConfirmation: Boolean,
+    val welcomerIdHex: String?,
+    val conversationKind: ChatConversationKindFfi?,
+    val activeAccountIsSoleMember: Boolean,
+) {
+    override fun toString(): String = "ChatSelectionTitleInput(redacted)"
+}
+
+/** Pure rendering; selection callers supply frozen map lookups, never acquisition callbacks. */
+internal fun chatSelectionTitle(
+    input: ChatSelectionTitleInput,
+    contactNickname: (String) -> String?,
+    memberTitle: (String) -> String,
+    copy: GroupTitleCopy,
+): String =
+    renderChatTitle(input, contactNickname, memberTitle, copy) {
+        input.groupName.takeIf { it.isNotBlank() }?.let { raw ->
+            input.projectedTitle?.let(ProfileSanitizer::displayName) ?: ProfileSanitizer.displayName(raw)
+        }
+    }
+
+/** Keeps the row's memoized fallback lazy even when selected titles are present. */
+private fun renderChatTitle(
+    input: ChatSelectionTitleInput,
+    contactNickname: (String) -> String?,
+    memberTitle: (String) -> String,
+    copy: GroupTitleCopy,
+    namedTitle: () -> String?,
+): String =
     conversationHeaderTitle(
-        dmPeerAccountIdHex = item.presentationOtherMemberAccount.takeIf { item.isDm() },
+        dmPeerAccountIdHex =
+            input.presentationPeerIdHex.takeIf {
+                GroupProjector.isDm(input.conversationKind, input.presentationMemberCount, input.groupName)
+            },
         contactNickname = contactNickname,
-        preparedTitle = selectedChatPresentationTitle(item.selectedPresentation, copy) ?: item.sanitizedNamedTitle,
+        preparedTitle = selectedChatPresentationTextTitle(input.selectedTitle, copy) ?: namedTitle(),
     ) {
         GroupProjector.displayTitle(
-            group = item.group,
-            otherMemberAccount = item.presentationOtherMemberAccount,
-            memberCount = item.presentationMemberCount,
+            name = input.groupName,
+            pendingInviteAccount =
+                if (input.pendingConfirmation) {
+                    input.welcomerIdHex?.takeIf { it.isNotBlank() }
+                        ?: input.presentationPeerIdHex?.takeIf { it.isNotBlank() }
+                } else {
+                    null
+                },
+            groupIdHex = input.groupIdHex,
+            otherMemberAccount = input.presentationPeerIdHex,
+            memberCount = input.presentationMemberCount,
             memberTitle = memberTitle,
             copy = copy,
-            conversationKind = item.projection?.conversationKind,
-            soleSelfMember = item.presentationActiveAccountIsSoleMember,
+            conversationKind = input.conversationKind,
+            soleSelfMember = input.activeAccountIsSoleMember,
         )
     }
 
@@ -67,8 +135,14 @@ internal fun chatListItemTitle(
 internal fun selectedChatPresentationTitle(
     presentation: ConversationPresentationFfi?,
     copy: GroupTitleCopy,
+): String? = selectedChatPresentationTextTitle(presentation?.title, copy)
+
+/** Reuses the selected title enum without allocating a complete presentation record. */
+internal fun selectedChatPresentationTextTitle(
+    title: PresentationTextFfi?,
+    copy: GroupTitleCopy,
 ): String? =
-    when (val selected = presentation?.title) {
+    when (val selected = title) {
         is PresentationTextFfi.Literal -> ProfileSanitizer.displayName(selected.text)
         is PresentationTextFfi.UnnamedGroup -> copy.unnamedGroupTitle
         PresentationTextFfi.UnavailableConversation -> copy.unavailableConversationTitle

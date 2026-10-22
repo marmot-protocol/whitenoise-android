@@ -4,6 +4,41 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ProfileImageDraftsTest {
+    /** A native cache miss keeps the original baselines until an authoritative refresh arrives. */
+    @Test
+    fun unavailableNativeCachePreservesOriginalBaselinesUntilAuthoritativeRefresh() {
+        val untouched = ProfileImageDrafts("old-picture", "old-banner")
+        val cacheMiss = untouched.rebased(null, null)
+        assertEquals(untouched, cacheMiss)
+        assertEquals(
+            ProfileImageDrafts("new-picture", "new-banner"),
+            cacheMiss.rebased("new-picture", "new-banner"),
+        )
+    }
+
+    /** A cache miss cannot turn an explicit image removal back into an untouched field. */
+    @Test
+    fun unavailableCacheDoesNotConvertAnExplicitRemovalIntoAnUntouchedField() {
+        val removed = ProfileImageDrafts("old-picture", "old-banner").without(ProfileImageTarget.Picture)
+        val refreshed = removed.rebased(null, null).rebased("new-picture", "")
+        assertEquals("", refreshed.picture)
+        assertEquals("new-picture", refreshed.baselinePicture)
+        assertEquals("", refreshed.banner)
+    }
+
+    /** A restored uploaded picture stays an edit when untouched fields merge a native refresh. */
+    @Test
+    fun restoredUploadedPictureRemainsAnEditAgainstTheNativeRefreshBaseline() {
+        val native = ProfileEditDraft(picture = "https://example.com/previous.jpg")
+        val restored = native.copy(picture = "https://example.com/uploaded.jpg")
+        val refreshed = native.copy(about = "Refreshed native biography")
+
+        val merged = restored.mergeUntouchedFields(loadStartedWith = native, refreshed = refreshed)
+
+        assertEquals(restored.picture, merged.picture)
+        assertEquals(refreshed.about, merged.about)
+    }
+
     @Test
     fun bannerUploadUpdatesOnlyTheBannerDraft() {
         val drafts =
@@ -52,7 +87,7 @@ class ProfileImageDraftsTest {
             )
 
         assertEquals(
-            ProfileImageDrafts(picture = "https://example.com/picture.jpg"),
+            drafts.copy(banner = ""),
             drafts.without(ProfileImageTarget.Banner),
         )
     }

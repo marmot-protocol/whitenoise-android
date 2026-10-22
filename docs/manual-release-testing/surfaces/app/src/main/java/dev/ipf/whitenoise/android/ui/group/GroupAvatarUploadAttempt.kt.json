@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAvatarUploadAttempt.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Group avatar upload safety failures preserve the saved avatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAvatarUploadAttempt.kt",
+        "anchor": "internal class GroupAvatarUploadFailure(",
+        "test_ids": [
+          "STB-003"
+        ]
+      },
+      {
+        "surface": "Group avatar preparation failure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAvatarUploadAttempt.kt",
+        "anchor": "R.string.toast_couldnt_prepare_image",
+        "test_ids": [
+          "STB-003"
+        ]
+      },
+      {
+        "surface": "Group avatar upload or publication failure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAvatarUploadAttempt.kt",
+        "anchor": "R.string.toast_couldnt_upload_group_image",
+        "test_ids": [
+          "STB-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

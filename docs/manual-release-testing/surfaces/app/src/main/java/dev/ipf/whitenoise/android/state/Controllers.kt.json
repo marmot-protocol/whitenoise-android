@@ -907,6 +907,14 @@
         ]
       },
       {
+        "surface": "A first page naming event cards stays unpublished until their cached state is read, on every open path",
+        "anchor": "private fun releaseInitialPageEventCardHold(",
+        "test_ids": [
+          "STB-002"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"
+      },
+      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "surface": "Same account/runtime retained controller admission",
         "anchor": "val ownsRetainedForegroundPresentation: Boolean",

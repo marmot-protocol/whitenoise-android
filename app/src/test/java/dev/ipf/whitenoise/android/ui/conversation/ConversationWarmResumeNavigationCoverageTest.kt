@@ -31,6 +31,11 @@ class ConversationWarmResumeNavigationCoverageTest {
         }
         assertTrue(coordinator.foregroundRestorePending)
         focus.resume(restoreFocus = true, clearFocus = false)
+        // The pause callback can arrive after ON_RESUME and before requestFocus takes effect.
+        if (focus.supersedesRestore(focused = false, resumed = true)) {
+            coordinator.cancelForegroundRestoreForUserIntent()
+        }
+        assertTrue(coordinator.foregroundRestorePending)
         assertFalse(focus.supersedesRestore(focused = true, resumed = true))
         assertTrue(coordinator.foregroundRestorePending)
         if (focus.supersedesRestore(focused = false, resumed = true)) {
@@ -43,8 +48,23 @@ class ConversationWarmResumeNavigationCoverageTest {
     fun automaticClearFocusIsNotNewUserIntentButNextForegroundFocusIs() {
         val focus = ConversationForegroundFocusIntent()
         focus.resume(restoreFocus = false, clearFocus = true)
+        assertFalse(focus.supersedesRestore(focused = true, resumed = true))
         assertFalse(focus.supersedesRestore(focused = false, resumed = true))
         assertTrue(focus.supersedesRestore(focused = true, resumed = true))
+    }
+
+    @Test
+    fun pauseRetiresAutomaticFocusAndNewOwnerCannotInheritIt() {
+        val focus = ConversationForegroundFocusIntent()
+        focus.resume(restoreFocus = true, clearFocus = false)
+        focus.pause()
+        assertFalse(focus.supersedesRestore(focused = false, resumed = false))
+        focus.resume(restoreFocus = false, clearFocus = true)
+        assertFalse(focus.supersedesRestore(focused = true, resumed = true))
+        assertFalse(focus.supersedesRestore(focused = false, resumed = true))
+        assertTrue(focus.supersedesRestore(focused = true, resumed = true))
+        val replacement = ConversationForegroundFocusIntent()
+        assertTrue(replacement.supersedesRestore(focused = false, resumed = true))
     }
 
     @Test

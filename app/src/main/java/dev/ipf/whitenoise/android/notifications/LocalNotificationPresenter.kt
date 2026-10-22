@@ -809,6 +809,17 @@ class LocalNotificationPresenter(
                         }.getOrNull()?.let { importance ->
                             importance in NotificationManager.IMPORTANCE_NONE..NotificationManager.IMPORTANCE_LOW
                         } == true
+                    val silentChild = silentPost || quietChannel || decision.importance == ChannelImportance.LOW
+                    // #1717 evidence: the OS channel, never the app, plays this alert. Debug builds only.
+                    notificationDebug {
+                        messageAlertDiagnostic(
+                            context,
+                            NotificationChannelSpec.forUpdate(update),
+                            channelId,
+                            existingCardChannel,
+                            silentChild,
+                        ).line()
+                    }
                     val builder =
                         NotificationCompat
                             .Builder(context, channelId)
@@ -826,7 +837,7 @@ class LocalNotificationPresenter(
                                         notificationContent.notificationId,
                                         rewriteGeneration ?: showToken.notificationGeneration.id,
                                     ),
-                                    silent = silentPost || quietChannel || decision.importance == ChannelImportance.LOW,
+                                    silent = silentChild,
                                 )
                             }.setSmallIcon(R.drawable.ic_stat_whitenoise)
                             .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))

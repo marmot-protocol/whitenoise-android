@@ -121,6 +121,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             val resumedAt = SystemClock.uptimeMillis()
             composeRule.runOnUiThread { owner.moveTo(Lifecycle.State.RESUMED) }
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            assertTrue(ConversationTimelineTestIds.MESSAGE_A in fixture.draws.first().messageIds)
             assertFalse("retained A is live while the newer handoff is held", fixture.hasB)
             composeRule.runOnUiThread {
                 assertTrue(fixture.controller.pendingTimelineAtForeground()?.isCompleted == false)

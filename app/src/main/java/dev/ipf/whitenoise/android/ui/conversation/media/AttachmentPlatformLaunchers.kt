@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -185,42 +184,6 @@ internal fun androidPackageInstallPermissionIntent(context: Context): Intent =
         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
         Uri.parse("package:${context.packageName}"),
     )
-
-/**
- * Last-resort destination picker for general documents when MediaStore cannot
- * publish into Downloads. Cancellation is propagated without an error toast.
- */
-@Composable
-internal fun rememberDocumentSaveFallback(): DocumentSaveFallback {
-    val context = LocalContext.current
-    val launchCreateDocument = rememberStartActivityForResult { result -> result }
-    return remember(context, launchCreateDocument) {
-        { source, fileName, mediaType ->
-            AttachmentPlaintextCache.protectPublicationFile(source)
-            try {
-                val result = launchCreateDocument(createDocumentIntent(fileName, mediaType))
-                val destination =
-                    result.data?.data?.takeIf { result.resultCode == Activity.RESULT_OK }
-                        ?: throw DocumentDestinationCancelledException()
-                withContext(Dispatchers.IO) {
-                    copyDocumentToDestination(context, source, destination)
-                }
-            } finally {
-                AttachmentPlaintextCache.unprotectPublicationFile(source)
-            }
-        }
-    }
-}
-
-internal fun createDocumentIntent(
-    fileName: String,
-    mediaType: String,
-): Intent =
-    Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-        addCategory(Intent.CATEGORY_OPENABLE)
-        type = normalizeDocumentMime(mediaType)
-        putExtra(Intent.EXTRA_TITLE, safeDocumentDisplayName(fileName))
-    }
 
 internal suspend fun saveDocumentWithFallback(
     context: Context,

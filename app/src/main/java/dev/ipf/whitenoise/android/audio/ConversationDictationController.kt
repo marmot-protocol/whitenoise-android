@@ -1557,25 +1557,24 @@ internal class ConversationDictationController internal constructor(
             if (completion.dispatch.dispatchedSessionId == sessionId) {
                 retainUndeliveredTranscript(sessionId, target, transcript)
             } else {
-                val incomplete =
-                    generation.session != null ||
-                        unresolvedRecognitionFailure != null ||
-                        runCatching(platform::callerAudioHasPending).getOrDefault(true)
                 preserveTranscriptInLatestDraft(
                     sessionId,
                     target,
                     transcript,
-                    failureCause =
-                        if (incomplete) {
-                            unresolvedRecognitionFailure ?: ConversationDictationFailure.Unknown
-                        } else {
-                            null
-                        },
+                    failureCause = interruptedTranscriptFailure(),
                 )
             }
         } else {
             cancelSession()
         }
+    }
+
+    private fun interruptedTranscriptFailure(): ConversationDictationFailure? {
+        val incomplete =
+            generation.session != null ||
+                unresolvedRecognitionFailure != null ||
+                runCatching(platform::callerAudioHasPending).getOrDefault(true)
+        return if (incomplete) unresolvedRecognitionFailure ?: ConversationDictationFailure.Unknown else null
     }
 
     /** Claims the queued provider-Activity request exactly once before Android launches it. */

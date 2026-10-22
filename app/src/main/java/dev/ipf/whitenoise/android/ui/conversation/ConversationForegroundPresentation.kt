@@ -49,8 +49,14 @@ internal class ConversationForegroundFocusIntent {
     ): Boolean {
         if (!resumed) return false
         val expected = expectedAutomaticFocus
-        expectedAutomaticFocus = null
-        return focused != expected
+        if (expected != null) {
+            // Pause can report its old focus after ON_RESUME but before the requested edge.
+            // Keep that edge armed until it is observed; Back/typing/navigation retire their
+            // restore tokens directly, independently of these automatic focus callbacks.
+            if (focused == expected) expectedAutomaticFocus = null
+            return false
+        }
+        return true
     }
 }
 

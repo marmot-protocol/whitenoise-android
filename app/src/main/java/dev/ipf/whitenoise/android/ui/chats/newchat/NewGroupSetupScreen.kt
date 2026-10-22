@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
+import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
@@ -329,6 +330,15 @@ private fun NewGroupSetupAccountScreen(
     var showImagePicker by remember { mutableStateOf(false) }
     var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
+    val cropRecovery =
+        rememberAvatarPreparationRecovery(
+            origin = "$runtime:$accountRef:new-group-avatar",
+            isCurrent = owner::isCurrent,
+            onInterrupted = {
+                draft.imageNeedsReselection = true
+                appState.present(R.string.avatar_preparation_interrupted)
+            },
+        )
     var imageDraft by draft::imageDraft
     var imagePreparing by remember { mutableStateOf(false) }
     var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -437,8 +447,12 @@ private fun NewGroupSetupAccountScreen(
 
     /** Prepares a picked image into the staged draft, dropping stale generations. */
     @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
-    fun prepareImage(load: suspend () -> ImageUploadDraft) {
+    fun prepareImage(
+        acceptedCrop: Boolean = false,
+        load: suspend () -> ImageUploadDraft,
+    ) {
         if (!detailsEditableNow()) return
+        if (acceptedCrop) cropRecovery.accepted()
         val generation = ++imageGeneration
         val failureAttempt = imageFailureScope.begin()
         imageError = false
@@ -448,6 +462,7 @@ private fun NewGroupSetupAccountScreen(
                 val prepared = owner.currentValue(load)
                 if (generation != imageGeneration) return@launchMutation
                 imageDraft = prepared
+                if (acceptedCrop) cropRecovery.settled()
                 draft.imageNeedsReselection = false
                 showImagePicker = false
             } catch (cancelled: CancellationException) {
@@ -460,6 +475,7 @@ private fun NewGroupSetupAccountScreen(
                 if (!stillCurrent) {
                     return@launchMutation
                 }
+                if (acceptedCrop) cropRecovery.settled()
                 imageError = true
                 appState.presentFailure(
                     R.string.toast_couldnt_prepare_image,
@@ -478,6 +494,7 @@ private fun NewGroupSetupAccountScreen(
     // through to the Activity while the create is mid-flight.
     BackHandler {
         if (!busy && owner.isCurrent()) {
+            cropRecovery.settled()
             owner.dispose()
             onBack()
         }
@@ -527,6 +544,7 @@ private fun NewGroupSetupAccountScreen(
             NewGroupSetupActions(
                 back = {
                     if (!busy && owner.isCurrent()) {
+                        cropRecovery.settled()
                         owner.dispose()
                         onBack()
                     }
@@ -671,7 +689,7 @@ private fun NewGroupSetupAccountScreen(
         },
         onCropped = { bytes, crop ->
             pendingCropUri = null
-            prepareImage { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+            prepareImage(acceptedCrop = true) { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
         },
     )
 

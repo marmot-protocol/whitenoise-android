@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
+  "legacy_sha256": "80b63ca7a385419ff64c3905ab6b409bed363cdd3aee8f9a58ac93bfccb0f3c4",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Cached event cards start complete from the conversation snapshot and never return to Loading on refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
+        "anchor": "val seeded = snapshots[reference.stableId]",
+        "test_ids": [
+          "STB-002"
+        ]
+      },
+      {
+        "surface": "Account-scoped native cached public event card resolution and refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardResolver.kt",
+        "anchor": "internal class NostrEventCardResolver(",
+        "test_ids": [
+          "STB-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

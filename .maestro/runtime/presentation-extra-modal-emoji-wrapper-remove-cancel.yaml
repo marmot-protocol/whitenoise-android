@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-emoji-wrapper-remove-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: "Remove :fixture:[?]"
+- assertVisible:
+    text: Cancel
+- assertVisible:
+    text: Remove
+    enabled: true
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

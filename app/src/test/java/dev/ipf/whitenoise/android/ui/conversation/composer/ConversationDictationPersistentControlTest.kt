@@ -613,141 +613,142 @@ class ConversationDictationPersistentControlTest {
             assertEquals(1, sends)
             assertEquals("Edited saved text", fixture.draft.text)
         }
+}
 
-    /** Each completion choice is one labelled 48dp action; progress belongs to that action. */
-    private fun assertProcessingActionsAccessible(selectedLabel: String) {
-        listOf("Send", "Paste").forEach { label ->
-            composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
-            val action = composeRule.onNodeWithContentDescription(label)
-            action.assertIsEnabled().assertHasClickAction()
-            val bounds = action.getUnclippedBoundsInRoot()
-            assertTrue(bounds.right - bounds.left >= 48.dp)
-            assertTrue(bounds.bottom - bounds.top >= 48.dp)
-        }
-        composeRule.onNodeWithContentDescription(selectedLabel).assert(
-            SemanticsMatcher.expectValue(
-                SemanticsProperties.ProgressBarRangeInfo,
-                ProgressBarRangeInfo.Indeterminate,
-            ),
-        )
+/** Each completion choice is one labelled 48dp action; progress belongs to that action. */
+private fun ConversationDictationPersistentControlTest.assertProcessingActionsAccessible(selectedLabel: String) {
+    listOf("Send", "Paste").forEach { label ->
+        composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
+        val action = composeRule.onNodeWithContentDescription(label)
+        action.assertIsEnabled().assertHasClickAction()
+        val bounds = action.getUnclippedBoundsInRoot()
+        assertTrue(bounds.right - bounds.left >= 48.dp)
+        assertTrue(bounds.bottom - bounds.top >= 48.dp)
     }
+    composeRule.onNodeWithContentDescription(selectedLabel).assert(
+        SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo.Indeterminate,
+        ),
+    )
+}
 
-    private fun render(
-        fixture: Fixture,
-        fontScale: Float = 1f,
-        rtl: Boolean = false,
-        displayedState: ConversationDictationState? = null,
-        darkTheme: Boolean? = null,
-        amoled: Boolean = false,
-    ) {
-        composeRule.setContent {
-            val density = LocalDensity.current
-            CompositionLocalProvider(
-                LocalDensity provides Density(density.density, fontScale),
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+private fun ConversationDictationPersistentControlTest.render(
+    fixture: Fixture,
+    fontScale: Float = 1f,
+    rtl: Boolean = false,
+    displayedState: ConversationDictationState? = null,
+    darkTheme: Boolean? = null,
+    amoled: Boolean = false,
+) {
+    composeRule.setContent {
+        val density = LocalDensity.current
+        CompositionLocalProvider(
+            LocalDensity provides Density(density.density, fontScale),
+            LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+        ) {
+            WhiteNoiseTheme(
+                darkTheme = darkTheme ?: androidx.compose.foundation.isSystemInDarkTheme(),
+                amoled = amoled,
             ) {
-                WhiteNoiseTheme(
-                    darkTheme = darkTheme ?: androidx.compose.foundation.isSystemInDarkTheme(),
-                    amoled = amoled,
-                ) {
-                    Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
-                        ConversationDictationPersistentControl(
-                            state = displayedState ?: fixture.controller.state,
-                            controller = fixture.controller,
-                        )
-                    }
+                Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
+                    ConversationDictationPersistentControl(
+                        state = displayedState ?: fixture.controller.state,
+                        controller = fixture.controller,
+                    )
                 }
             }
         }
     }
+}
 
-    private fun fixture(
-        initial: TextFieldValue,
-        deferActivityReadiness: Boolean = false,
-        deliveryScope: CoroutineScope? = null,
-        send: suspend (ConversationDictationSendRequest) -> Boolean = { false },
-        onDraftRead: () -> Unit = {},
-    ): Fixture {
-        val platform = FakePlatform(deferActivityReadiness)
-        var draft = initial
-        var revision = 0L
-        val controller =
-            ConversationDictationController(
-                platform = platform,
-                readDraft = { _, _ ->
-                    onDraftRead()
-                    ConversationDictationDraftSnapshot(draft, revision)
-                },
-                writeDraft = { _, _, expected, value ->
-                    if (expected != revision) {
-                        null
-                    } else {
-                        draft = value
-                        revision += 1L
-                        revision
-                    }
-                },
-                disclosureAccepted = { true },
-                markDisclosureAccepted = {},
-                targetValidationScope = deliveryScope,
-                sendTranscriptIfOriginUnchanged = send,
-                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
-            )
-        return Fixture(
-            controller = controller,
+private fun fixture(
+    initial: TextFieldValue,
+    deferActivityReadiness: Boolean = false,
+    deliveryScope: CoroutineScope? = null,
+    send: suspend (ConversationDictationSendRequest) -> Boolean = { false },
+    onDraftRead: () -> Unit = {},
+): Fixture {
+    val platform = FakePlatform(deferActivityReadiness)
+    var draft = initial
+    var revision = 0L
+    val controller =
+        ConversationDictationController(
             platform = platform,
-            readDraft = { draft },
-            editDraft = { value ->
-                draft = value
-                revision += 1L
+            readDraft = { _, _ ->
+                onDraftRead()
+                ConversationDictationDraftSnapshot(draft, revision)
             },
+            writeDraft = { _, _, expected, value ->
+                if (expected != revision) {
+                    null
+                } else {
+                    draft = value
+                    revision += 1L
+                    revision
+                }
+            },
+            disclosureAccepted = { true },
+            markDisclosureAccepted = {},
+            targetValidationScope = deliveryScope,
+            sendTranscriptIfOriginUnchanged = send,
+            scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
         )
+    return Fixture(
+        controller = controller,
+        platform = platform,
+        readDraft = { draft },
+        editDraft = { value ->
+            draft = value
+            revision += 1L
+        },
+    )
+}
+
+private data class Fixture(
+    val controller: ConversationDictationController,
+    val platform: FakePlatform,
+    private val readDraft: () -> TextFieldValue,
+    private val editDraft: (TextFieldValue) -> Unit,
+) {
+    val draft: TextFieldValue
+        get() = readDraft()
+
+    fun edit(value: TextFieldValue) = editDraft(value)
+}
+
+@Suppress("MaxLineLength")
+private class FakePlatform(
+    private val deferActivityReadiness: Boolean,
+) : ConversationDictationPlatform {
+    lateinit var listener: ConversationDictationRecognitionListener
+
+    override fun hasRecordAudioPermission() = true
+
+    override fun recognitionAvailable() = true
+
+    override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
+        if (!deferActivityReadiness) callback(true)
+        return ConversationDictationTimeoutHandle {}
     }
 
-    private data class Fixture(
-        val controller: ConversationDictationController,
-        val platform: FakePlatform,
-        private val readDraft: () -> TextFieldValue,
-        private val editDraft: (TextFieldValue) -> Unit,
-    ) {
-        val draft: TextFieldValue
-            get() = readDraft()
+    override fun createSession(
+        // Keep provider completion controllable through the original callback receiver.
+        listener: ConversationDictationRecognitionListener,
+    ): ConversationDictationRecognitionSession {
+        this.listener = listener
+        return object : ConversationDictationRecognitionSession {
+            override fun start() = Unit
 
-        fun edit(value: TextFieldValue) = editDraft(value)
-    }
+            override fun stop() = Unit
 
-    @Suppress("MaxLineLength")
-    private class FakePlatform(
-        private val deferActivityReadiness: Boolean,
-    ) : ConversationDictationPlatform {
-        lateinit var listener: ConversationDictationRecognitionListener
+            override fun cancel() = Unit
 
-        override fun hasRecordAudioPermission() = true
-
-        override fun recognitionAvailable() = true
-
-        override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
-            if (!deferActivityReadiness) callback(true)
-            return ConversationDictationTimeoutHandle {}
+            override fun destroy() = Unit
         }
-
-        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
-            this.listener = listener
-            return object : ConversationDictationRecognitionSession {
-                override fun start() = Unit
-
-                override fun stop() = Unit
-
-                override fun cancel() = Unit
-
-                override fun destroy() = Unit
-            }
-        }
-    }
-
-    private companion object {
-        const val ACCOUNT = "account"
-        const val GROUP = "group"
-        const val ROOT_TAG = "dictation-strip-test-root"
     }
 }
+
+private const val ACCOUNT = "account"
+private const val GROUP = "group"
+private const val ROOT_TAG = "dictation-strip-test-root"

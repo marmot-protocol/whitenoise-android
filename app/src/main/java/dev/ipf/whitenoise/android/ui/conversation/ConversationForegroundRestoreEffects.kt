@@ -15,11 +15,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -237,16 +239,13 @@ internal fun ConversationForegroundRestoreEffects(
             }
             val pendingLocalTimeline = controller.pendingTimelineAtForeground()
             resumeScrollRestoreCoordinator.launchResumeWork(scope) {
-                when {
-                    restoreFocus -> {
-                        runCatching { composerFocus.requestFocus() }
-                        keyboardController?.show()
-                    }
-                    clearFocus -> {
-                        focusManager.clearFocus(force = true)
-                        keyboardController?.hide()
-                    }
-                }
+                restoreConversationComposerFocus(
+                    restoreFocus,
+                    clearFocus,
+                    composerFocus,
+                    keyboardController,
+                    focusManager,
+                )
                 if (retainedPresentationSafe && restoreToken != null) {
                     var releaseFrameRequested = false
                     val resumedPresentation =
@@ -325,4 +324,23 @@ internal fun ConversationController.conversationTimelineStructure(): Conversatio
             },
         groupRecoveryCount = if (conversationGroupRecoveryRowVisible()) 1 else 0,
     )
+}
+
+private fun restoreConversationComposerFocus(
+    restoreFocus: Boolean,
+    clearFocus: Boolean,
+    composerFocus: FocusRequester,
+    keyboardController: SoftwareKeyboardController?,
+    focusManager: FocusManager,
+) {
+    when {
+        restoreFocus -> {
+            runCatching { composerFocus.requestFocus() }
+            keyboardController?.show()
+        }
+        clearFocus -> {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
+    }
 }

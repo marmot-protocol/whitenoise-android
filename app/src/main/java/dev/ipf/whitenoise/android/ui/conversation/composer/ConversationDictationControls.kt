@@ -226,7 +226,6 @@ private fun ConversationDictationActiveActions(
     controller: ConversationDictationController,
     actionColors: AccountActionColors,
 ) {
-    val pasteLabel = stringResource(R.string.paste)
     val sendLabel = stringResource(R.string.send)
     if (controller.captureInProgress) {
         ConversationDictationListeningIndicator()
@@ -238,31 +237,7 @@ private fun ConversationDictationActiveActions(
     ) {
         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
     }
-    IconButton(
-        onClick = controller::paste,
-        enabled = controller.completionActionsEnabled,
-        modifier =
-            Modifier.size(48.dp).semantics {
-                contentDescription = pasteLabel
-                selected = controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
-                if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
-                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
-                }
-            },
-    ) {
-        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
-            CircularProgressIndicator(
-                modifier =
-                    Modifier
-                        .size(22.dp)
-                        .testTag(DICTATION_PROGRESS_TAG)
-                        .clearAndSetSemantics {},
-                strokeWidth = 2.dp,
-            )
-        } else {
-            Icon(Icons.Default.ContentPaste, contentDescription = null)
-        }
-    }
+    ConversationDictationPasteAction(controller)
     if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
         IconButton(
             onClick = controller::send,
@@ -297,6 +272,36 @@ private fun ConversationDictationActiveActions(
             // commands are the whole control, and each keeps a 48dp target.
             width = 48.dp,
         )
+    }
+}
+
+@Composable
+private fun ConversationDictationPasteAction(controller: ConversationDictationController) {
+    val pasteLabel = stringResource(R.string.paste)
+    IconButton(
+        onClick = controller::paste,
+        enabled = controller.completionActionsEnabled,
+        modifier =
+            Modifier.size(48.dp).semantics {
+                contentDescription = pasteLabel
+                selected = controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
+                if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                }
+            },
+    ) {
+        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+            CircularProgressIndicator(
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .testTag(DICTATION_PROGRESS_TAG)
+                        .clearAndSetSemantics {},
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(Icons.Default.ContentPaste, contentDescription = null)
+        }
     }
 }
 

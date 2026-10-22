@@ -1687,6 +1687,7 @@
     <string name="shared_media_save">Save</string>
     <string name="shared_media_share">Share</string>
     <string name="shared_media_saved">Saved</string>
+    <string name="document_save_interrupted">Authentication interrupted this save. Choose Save again to select a destination.</string>
     <string name="shared_media_save_failed">Couldn\'t save file</string>
     <string name="shared_media_voice_failed">Couldn\'t play voice message</string>
     <string name="disappearing_messages">Disappearing messages</string>
@@ -2546,4 +2547,5 @@
     <string name="search_scope_selected_chats">Selected chats</string>
     <string name="search_message_content_loading">Searching message content…</string>
     <string name="search_message_content_failed">Couldn’t search message content.</string>
+    <string name="avatar_preparation_interrupted">The image update was interrupted. Check the current image before selecting it again.</string>
 </resources>

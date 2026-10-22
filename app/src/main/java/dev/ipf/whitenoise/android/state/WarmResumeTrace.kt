@@ -145,16 +145,6 @@ internal object WarmResumeTrace {
         )
     }
 
-    private fun marker(
-        activityToken: Int,
-        event: String,
-        fields: String = "",
-    ) {
-        if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
-        val suffix = fields.takeIf(String::isNotEmpty)?.let { " $it" }.orEmpty()
-        Log.i(TAG, "activity=$activityToken event=$event$suffix")
-    }
-
     @Synchronized
     private fun completeTrace(
         activityToken: Int,
@@ -170,7 +160,6 @@ internal object WarmResumeTrace {
         val foregroundEpoch: Int,
     )
 
-    private const val TAG = "WNWarmResume"
     private const val TRACE_SECTION = "WhiteNoise.warmResume.firstUsefulFrame"
     private const val MAX_RECORDED_SURFACE_FRAMES = 64
 }
@@ -202,3 +191,15 @@ internal enum class WarmResumeConversationPhase {
     NavigationRequested,
     RootDraw,
 }
+
+private fun marker(
+    activityToken: Int,
+    event: String,
+    fields: String = "",
+) {
+    if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
+    val suffix = fields.takeIf(String::isNotEmpty)?.let { " $it" }.orEmpty()
+    Log.i(TAG, "activity=$activityToken event=$event$suffix")
+}
+
+private const val TAG = "WNWarmResume"

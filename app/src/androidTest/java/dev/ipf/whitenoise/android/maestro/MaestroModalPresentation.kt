@@ -9,20 +9,26 @@ import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.ui.CustomEmoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
+import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.qr.ScannerErrorDialog
 import dev.ipf.whitenoise.android.ui.settings.AuditLogExportConsentDialog
 import dev.ipf.whitenoise.android.ui.settings.AuditLogExportDestinationDialog
+import dev.ipf.whitenoise.android.ui.settings.ConfirmEmojiRemoval
 import dev.ipf.whitenoise.android.ui.settings.CustomEmojiNameDialog
 import dev.ipf.whitenoise.android.ui.settings.EncryptedBackupResultDialog
+import dev.ipf.whitenoise.android.ui.settings.StagedEmoji
+import dev.ipf.whitenoise.android.ui.settings.StagedEmojiDialog
 import dev.ipf.whitenoise.android.ui.share.ShareImportStatus
 
-/** Existing dialog controls consume bounded state; no camera, key export, emoji save or diagnostic upload runs. */
+/** Production dialogs consume bounded state; emoji saves use only a cleaned, task-owned local store. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun MaestroModalPresentation(fixture: MaestroPresentationFixture) {
     when {
         fixture.scenario.startsWith("extra-modal-backup-") -> BackupPresentation(fixture)
+        fixture.scenario.startsWith("extra-modal-emoji-wrapper-") -> EmojiWrapperPresentation(fixture)
         fixture.scenario.startsWith("extra-modal-emoji-") -> EmojiNamePresentation(fixture)
         fixture.scenario.startsWith("extra-modal-scanner-") ->
             ScannerErrorDialog(
@@ -105,6 +111,52 @@ private fun ShareFailurePresentation(fixture: MaestroPresentationFixture) {
         LaunchedEffect(allowed) {
             check(content && allowed) { "Import errors must be acknowledged before showing share content" }
             fixture.finish("continue-handoff")
+        }
+    }
+}
+
+/** Presents the custom emoji naming or removal dialog over a fixture store for Maestro capture. */
+@Composable
+@Suppress("FunctionNaming")
+private fun EmojiWrapperPresentation(fixture: MaestroPresentationFixture) {
+    val directory = checkNotNull(fixture.emojiDirectory)
+    val store = remember(fixture) { CustomEmojiStore(directory) }
+    val bytes = remember(fixture) { fixture.emojiBytes }
+    val removal = fixture.scenario.contains("remove")
+    if (removal) {
+        val file = remember(fixture) { java.io.File(directory, "fixture.png").apply { writeBytes(bytes) } }
+        val emoji = remember(fixture) { CustomEmoji(":fixture:", file, fixture.image) }
+        ConfirmEmojiRemoval(
+            emoji = emoji,
+            onDismiss = {
+                check(file.readBytes().contentEquals(bytes))
+                fixture.finish("cancel-retained")
+            },
+            onConfirm = {
+                check(file.delete() && !file.exists())
+                fixture.finish("remove-dispatched")
+            },
+        )
+    } else {
+        val pending = remember(fixture) { StagedEmoji(bytes, fixture.image, "fixture", "fixture-owner") }
+        var cleared by remember { mutableStateOf(false) }
+        val save = fixture.scenario.endsWith("save")
+        StagedEmojiDialog(fixture.appState, store, pending.takeUnless { cleared }) {
+            check(!cleared)
+            cleared = true
+            if (!save) {
+                check(directory.listFiles().orEmpty().isEmpty())
+                fixture.finish("dismiss-no-save")
+            }
+        }
+        val saved = store.emoji[":fixture:"]
+        LaunchedEffect(saved) {
+            if (saved != null) {
+                check(save && cleared && saved.shortcode == ":fixture:")
+                check(saved.file.readBytes().contentEquals(bytes))
+                check(store.emoji.entries.size == 1)
+                fixture.finish("save-persisted")
+            }
         }
     }
 }

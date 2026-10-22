@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaRow
 @Suppress("FunctionNaming")
 internal fun MaestroLibraryPresentation(fixture: MaestroPresentationFixture) {
     val message = checkNotNull(checkNotNull(fixture.nativeChat).latest)
+    val controller = checkNotNull(fixture.nativeController)
     FileLibraryRow(
         row =
             SharedMediaRow(
@@ -34,8 +35,8 @@ internal fun MaestroLibraryPresentation(fixture: MaestroPresentationFixture) {
                 recordedAt = 1_800_000_000u,
                 sender = checkNotNull(fixture.appState.activeAccount).accountIdHex,
             ),
-        controller = checkNotNull(fixture.nativeController),
+        controller = controller,
         appState = fixture.appState,
-        documentSaveFallback = rememberDocumentSaveFallback(),
+        documentSaveFallback = rememberDocumentSaveFallback(fixture.appState, controller.group.groupIdHex),
     )
 }

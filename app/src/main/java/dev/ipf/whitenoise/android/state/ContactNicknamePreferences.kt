@@ -39,36 +39,77 @@ internal object ContactNicknamePreferences {
         accountRef: String?,
         contactPubkeyHex: String,
         nickname: String?,
-    ): Boolean {
-        val key = preferenceKey(accountRef, contactPubkeyHex) ?: return false
-        val normalized = ProfileSanitizer.displayName(nickname)
-        val current = readNickname(preferences, accountRef, contactPubkeyHex)
-        if (current == normalized && (normalized != null || !preferences.contains(key))) return false
-        val edit = preferences.edit()
-        if (normalized == null) {
-            edit.remove(key)
-        } else {
-            edit.putString(key, normalized)
+    ): Boolean =
+        synchronized(ContactPictureStore.lock) {
+            val key = preferenceKey(accountRef, contactPubkeyHex) ?: return@synchronized false
+            val normalized = ProfileSanitizer.displayName(nickname)
+            val current = readNickname(preferences, accountRef, contactPubkeyHex)
+            if (current == normalized && (normalized != null || !preferences.contains(key))) return@synchronized false
+            val edit = preferences.edit()
+            if (normalized == null) {
+                edit.remove(key)
+            } else {
+                edit.putString(key, normalized)
+            }
+            edit.apply()
+            true
         }
-        edit.apply()
-        return true
-    }
 
     /** Commits deletion of the exact account prefix on disk; similar account labels retain their private records. */
     fun clearAllForAccount(
         preferences: SharedPreferences,
         accountRef: String?,
-    ): Boolean {
-        val account = normalizedAccountRef(accountRef) ?: return false
-        val prefix = accountKeyPrefix(account)
-        val keys = preferences.all.keys.filter { it.startsWith(prefix) }
-        if (keys.isEmpty()) return false
-        val edit = preferences.edit()
-        keys.forEach { edit.remove(it) }
-        // commit(), not apply(): a wipe must not leave contact data on disk if
-        // the process dies before an async write lands. Callers hop to IO.
-        return edit.commit()
+    ): Boolean =
+        synchronized(ContactPictureStore.lock) {
+            val account = normalizedAccountRef(accountRef) ?: return@synchronized false
+            val prefix = accountKeyPrefix(account)
+            val keys = preferences.all.keys.filter { it.startsWith(prefix) }
+            if (keys.isEmpty()) return@synchronized false
+            val edit = preferences.edit()
+            keys.forEach { edit.remove(it) }
+            // commit(), not apply(): a wipe must not leave contact data on disk if
+            // the process dies before an async write lands. Callers hop to IO.
+            edit.commit()
+        }
+
+    /** Immutable private values from one account; never a protocol or profile cache. */
+    class Snapshot internal constructor(
+        internal val accountRef: String,
+        val nicknames: Map<String, String>,
+    ) {
+        override fun toString(): String = "NicknameSnapshot(size=${nicknames.size})"
     }
+
+    /** Reads only canonical keys written by this store, under the editor/teardown lock. */
+    fun snapshotForAccount(
+        preferences: SharedPreferences,
+        accountRef: String?,
+    ): Snapshot? =
+        synchronized(ContactPictureStore.lock) {
+            val account = normalizedAccountRef(accountRef) ?: return@synchronized null
+            val prefix = accountKeyPrefix(account)
+            val values = linkedMapOf<String, String>()
+            preferences.all.keys.forEach { key ->
+                if (key.startsWith(prefix)) {
+                    val contact = key.removePrefix(prefix)
+                    if (normalizedContactPubkey(contact) == contact) {
+                        ProfileSanitizer.displayName(preferences.getString(key, null))?.let { values[contact] = it }
+                    }
+                }
+            }
+            Snapshot(account, java.util.Collections.unmodifiableMap(values))
+        }
+
+    /** Compares exact values, including IO commits that precede Compose revision notifications. */
+    fun isSnapshotCurrent(
+        preferences: SharedPreferences,
+        accountRef: String?,
+        snapshot: Snapshot,
+    ): Boolean =
+        synchronized(ContactPictureStore.lock) {
+            val current = snapshotForAccount(preferences, accountRef) ?: return@synchronized false
+            current.accountRef == snapshot.accountRef && current.nicknames == snapshot.nicknames
+        }
 
     /** Trims local account labels without changing their case-sensitive storage identity. */
     private fun normalizedAccountRef(accountRef: String?): String? =

@@ -150,6 +150,14 @@
           "NTF-035",
           "NTF-036"
         ]
+      },
+      {
+        "surface": "external media continuity and per-channel alert policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun show(",
+        "test_ids": [
+          "STB-005"
+        ]
       }
     ]
   },

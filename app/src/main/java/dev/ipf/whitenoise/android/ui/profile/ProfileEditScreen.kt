@@ -31,11 +31,13 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,6 +78,7 @@ import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
+import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -101,7 +104,21 @@ internal fun profileImageFailureOperation(
 internal data class ProfileImageDrafts(
     val picture: String = "",
     val banner: String = "",
+    val baselinePicture: String = picture,
+    val baselineBanner: String = banner,
 ) {
+    /** Rebase only untouched fields; uploaded URLs/removals remain transient authored edits. */
+    fun rebased(
+        nativePicture: String?,
+        nativeBanner: String?,
+    ): ProfileImageDrafts =
+        copy(
+            picture = if (picture == baselinePicture) nativePicture ?: picture else picture,
+            banner = if (banner == baselineBanner) nativeBanner ?: banner else banner,
+            baselinePicture = nativePicture ?: baselinePicture,
+            baselineBanner = nativeBanner ?: baselineBanner,
+        )
+
     fun without(target: ProfileImageTarget): ProfileImageDrafts =
         when (target) {
             ProfileImageTarget.Picture -> copy(picture = "")
@@ -120,6 +137,53 @@ internal data class ProfileImageDrafts(
             ProfileImageTarget.Banner -> copy(banner = uploadedUrl)
         }
     }
+}
+
+/** Saves transient image edits and their original baselines; native publication stays explicit. */
+internal val ProfileImageDraftsSaver =
+    listSaver<ProfileImageDrafts, String>(
+        save = { listOf(it.picture, it.banner, it.baselinePicture, it.baselineBanner) },
+        restore = { ProfileImageDrafts(it[0], it[1], it[2], it[3]) },
+    )
+
+/**
+ * A remounted editor presents its saved authored edits rebased onto the current native image baseline.
+ *
+ * The rebase is derived on every read rather than written back during composition, so composing never mutates the
+ * state it reads. Rebasing is idempotent, so a caller that writes a presented value back stores the same drafts.
+ */
+@Composable
+internal fun rememberProfileImageDrafts(
+    accountId: String?,
+    nativePicture: String?,
+    nativeBanner: String?,
+): MutableState<ProfileImageDrafts> {
+    val saved =
+        rememberSaveable(accountId, stateSaver = ProfileImageDraftsSaver) {
+            mutableStateOf(ProfileImageDrafts(nativePicture.orEmpty(), nativeBanner.orEmpty()))
+        }
+    return remember(saved, nativePicture, nativeBanner) {
+        RebasedProfileImageDrafts(saved, nativePicture, nativeBanner)
+    }
+}
+
+/** Reads [saved] rebased onto the native images, and writes straight through to it. */
+private class RebasedProfileImageDrafts(
+    private val saved: MutableState<ProfileImageDrafts>,
+    private val nativePicture: String?,
+    private val nativeBanner: String?,
+) : MutableState<ProfileImageDrafts> {
+    override var value: ProfileImageDrafts
+        get() = saved.value.rebased(nativePicture, nativeBanner)
+        set(drafts) {
+            saved.value = drafts
+        }
+
+    /** The presented drafts, for destructuring. */
+    override fun component1(): ProfileImageDrafts = value
+
+    /** A setter that writes through to the saved drafts, for destructuring. */
+    override fun component2(): (ProfileImageDrafts) -> Unit = { value = it }
 }
 
 internal const val PROFILE_BANNER_CONTROL_TAG = "profile_banner_control"
@@ -504,7 +568,7 @@ internal fun ProfileEditScreen(
     val displayName = fields.name.text.toString()
     val about = fields.about.text.toString()
     var baselineDraft by remember(appState, activeAccountId) { mutableStateOf(initialDraft) }
-    var isEditing by remember(appState, activeAccountId) { mutableStateOf(openPictureActionsOnEntry) }
+    var isEditing by rememberSaveable(activeAccountId) { mutableStateOf(openPictureActionsOnEntry) }
     var editRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
     var acceptedSaveRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
     val readiness =
@@ -515,10 +579,7 @@ internal fun ProfileEditScreen(
             cachedProfile,
             loadProfile,
         )
-    var imageDrafts by
-        remember(appState, activeAccountId) {
-            mutableStateOf(ProfileImageDrafts(picture = initialDraft.picture, banner = initialDraft.banner))
-        }
+    var imageDrafts by rememberProfileImageDrafts(activeAccountId, cachedDraft?.picture, cachedDraft?.banner)
     val picture = imageDrafts.picture
     val banner = imageDrafts.banner
     val nip05 = fields.address.text.toString()
@@ -545,6 +606,20 @@ internal fun ProfileEditScreen(
     var fullPictureOpen by remember(activeAccountId) { mutableStateOf(false) }
     var pendingAvatarCropUri by rememberSaveable(activeAccountId) { mutableStateOf<android.net.Uri?>(null) }
     var fullBannerOpen by remember(activeAccountId) { mutableStateOf(false) }
+    val imageAccountRef = appState.activeAccountRef
+    val imageRuntime = appState.runtimeGeneration
+    val cropRecovery =
+        rememberAvatarPreparationRecovery(
+            origin = "$imageRuntime:$activeAccountId:profile-picture",
+            isCurrent = {
+                imageAccountRef != null &&
+                    appState.activeAccountRef == imageAccountRef &&
+                    appState.runtimeGeneration == imageRuntime &&
+                    !appState.signOutInProgress &&
+                    !appState.wipeInProgress
+            },
+            onInterrupted = { appState.present(R.string.avatar_preparation_interrupted) },
+        )
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(picture)
@@ -589,6 +664,7 @@ internal fun ProfileEditScreen(
 
     /** Restores the draft to the baseline profile. */
     fun resetDraft() {
+        cropRecovery.settled()
         saveFailed = false
         fields.restore(baselineDraft)
         imageDrafts = ProfileImageDrafts(baselineDraft.picture, baselineDraft.banner)
@@ -676,6 +752,7 @@ internal fun ProfileEditScreen(
                     if (saveState.completeSave(accountId, metadata, succeeded)) {
                         acceptedSaveRevision++
                         baselineDraft = profileEditDraft(metadata)
+                        imageDrafts = imageDrafts.rebased(baselineDraft.picture, baselineDraft.banner)
                         if (submittedRevision == editRevision) isEditing = false
                         if (!isEditing) resetDraft()
                     }
@@ -690,6 +767,7 @@ internal fun ProfileEditScreen(
     @Suppress("LongMethod", "TooGenericExceptionCaught") // Preparation and upload have different failure types.
     fun uploadProfileDraft(
         target: ProfileImageTarget,
+        acceptedCrop: Boolean = false,
         prepare: suspend () -> dev.ipf.whitenoise.android.media.ImageUploadDraft,
     ) {
         val accountRef = appState.activeAccountRef ?: return
@@ -699,6 +777,7 @@ internal fun ProfileEditScreen(
                 ProfileImageTarget.Banner -> bannerUploading
             }
         if (alreadyUploading || busy || !isEditing) return
+        if (acceptedCrop) cropRecovery.accepted()
         val capturedRevision = editRevision
         when (target) {
             ProfileImageTarget.Picture -> pictureUploading = true
@@ -723,7 +802,10 @@ internal fun ProfileEditScreen(
                         ProfileSanitizer.androidOwnedHttpsImageUrl(uploaded)
                             ?: throw IllegalStateException("profile image upload returned an unsafe URL")
                     val activeAccountRef = appState.activeAccountRef
-                    if (capturedRevision != editRevision || !isEditing) return@launch
+                    val staleCrop = acceptedCrop && appState.runtimeGeneration != imageRuntime
+                    if (capturedRevision != editRevision || !isEditing || staleCrop) {
+                        return@launch
+                    }
                     imageDrafts =
                         imageDrafts.withUploadedImage(
                             target = target,
@@ -732,6 +814,7 @@ internal fun ProfileEditScreen(
                             activeAccountRef = activeAccountRef,
                         )
                     if (activeAccountRef != accountRef) return@launch
+                    if (acceptedCrop) cropRecovery.settled()
                     when (target) {
                         ProfileImageTarget.Picture -> showPictureSheet = false
                         ProfileImageTarget.Banner -> showBannerSheet = false
@@ -739,6 +822,15 @@ internal fun ProfileEditScreen(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
+                    if (acceptedCrop) {
+                        val currentOwner =
+                            appState.activeAccountRef == accountRef &&
+                                appState.runtimeGeneration == imageRuntime
+                        if (capturedRevision != editRevision || !isEditing || !currentOwner) {
+                            return@launch
+                        }
+                        cropRecovery.settled()
+                    }
                     appState.presentFailure(
                         titleRes =
                             if (prepared) {
@@ -824,7 +916,7 @@ internal fun ProfileEditScreen(
             }
             baselineDraft = refreshed
             fields.restore(merged)
-            imageDrafts = ProfileImageDrafts(picture = merged.picture, banner = merged.banner)
+            imageDrafts = imageDrafts.rebased(refreshed.picture, refreshed.banner)
             profileContentReady = true
             if (profile == null) hostAttempt.unavailable() else hostAttempt.success()
         } catch (cancelled: CancellationException) {
@@ -905,7 +997,7 @@ internal fun ProfileEditScreen(
         },
         onCropped = { bytes, crop ->
             pendingAvatarCropUri = null
-            uploadProfileDraft(ProfileImageTarget.Picture) {
+            uploadProfileDraft(ProfileImageTarget.Picture, acceptedCrop = true) {
                 renderIdentityImageDraft(bytes, crop, MediaQuality.Standard)
             }
         },

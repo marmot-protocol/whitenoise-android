@@ -121,6 +121,7 @@ internal class UsageDiagnosticsController {
                 if (runtime !== engine || revision != capturedRevision) return@withLock false
                 snapshot = result.getOrNull()
                 failed = result.isFailure
+                appStateDebug { usageDiagnosticsReceiptLog(write, snapshot) }
                 if (result.isSuccess) pendingChoice = null
                 val ready = granted && snapshot?.status?.productAnalytics == DiagnosticsExporterStatusFfi.READY
                 if (choice != null || observations.ticket() == null || !ready) observations.reset(ready && foreground)
@@ -166,3 +167,28 @@ internal class UsageDiagnosticsController {
     private fun foregroundActivity(): ProductAnalyticsActivityFfi =
         if (foreground) ProductAnalyticsActivityFfi.FOREGROUND else ProductAnalyticsActivityFfi.BACKGROUND
 }
+
+/** Hex digits of a receipt revision a debug log may carry, enough to tell two revisions apart. */
+private const val RECEIPT_REVISION_LOG_PREFIX = 12
+
+/**
+ * One debug line per completed receipt read or write, for reproducing an upgrade re-prompt (#2820).
+ *
+ * It carries only MDK's decision and revision hashes — no account, device or install identifier. The
+ * registry revision is MDK's stored receipt value, so comparing the line before and after an update
+ * shows whether a prompt followed a changed receipt or an unchanged receipt MDK no longer accepts.
+ */
+internal fun usageDiagnosticsReceiptLog(
+    write: Boolean,
+    snapshot: UsageDiagnosticsSnapshot?,
+): String {
+    val operation = if (write) "write" else "read"
+    val settings = snapshot?.settings ?: return "usage_diagnostics_receipt op=$operation result=failed"
+    return "usage_diagnostics_receipt op=$operation result=ok decision=${settings.decision} " +
+        "policy=${settings.policyRevision.take(POLICY_REVISION_LOG_LIMIT)} " +
+        "registry=${settings.registryRevision.take(RECEIPT_REVISION_LOG_PREFIX)} " +
+        "exporter=${snapshot.status.productAnalytics}"
+}
+
+/** Longest policy label a debug log carries; MDK's labels are short constants such as `usage-diagnostics-v1`. */
+private const val POLICY_REVISION_LOG_LIMIT = 40

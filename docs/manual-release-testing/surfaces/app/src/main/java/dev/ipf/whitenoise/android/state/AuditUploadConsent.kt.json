@@ -10,6 +10,14 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "audit disclosure choices retained across update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditUploadConsent.kt",
+        "anchor": "fun choose(",
+        "test_ids": [
+          "STB-004"
+        ]
       }
     ]
   },

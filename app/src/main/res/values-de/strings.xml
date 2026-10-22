@@ -2397,4 +2397,7 @@
     <string name="search_scope_selected_chats">Ausgewählte Chats</string>
     <string name="search_message_content_loading">Nachrichteninhalte werden durchsucht…</string>
     <string name="search_message_content_failed">Nachrichteninhalte konnten nicht durchsucht werden.</string>
+    <string name="document_save_interrupted">Die Authentifizierung hat diesen Speichervorgang unterbrochen. Wähle erneut „Speichern“, um einen Zielort auszuwählen.</string>
+    <string name="avatar_preparation_interrupted">Die Bildänderung wurde unterbrochen. Prüfe das aktuelle Bild, bevor du es erneut auswählst.</string>
+    <string name="dictation_interrupted">Diktat unterbrochen. Prüfe den wiederhergestellten Text und alle verbleibenden Audioaufnahmen vor dem Senden.</string>
 </resources>
