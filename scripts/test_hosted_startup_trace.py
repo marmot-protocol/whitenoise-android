@@ -360,5 +360,37 @@ class HostedStartupTraceTests(unittest.TestCase):
                 self.assertEqual('TRACE_SELECTED' in r.stdout,expected==0)
 
 
+    def test_opt_in_minified_trace_compiles_only_existing_healthy_fixture_closure(self):
+        init = (ROOT/'scripts/hosted-startup-trace.init.gradle').read_text()
+        block = init.split('def traceSources = [', 1)[1].split(']', 1)[0]
+        selected = re.findall(r"'(dev/[^']+\.kt)'", block)
+        expected = [
+            'dev/ipf/whitenoise/android/ManualDeviceFixture.kt',
+            'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerHealthyBaselineDeviceTest.kt',
+            'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerBaseline.kt',
+            'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerBaselineBinding.kt',
+        ]
+        self.assertEqual(selected, expected)
+        self.assertIn("def instrumented = android.sourceSets.getByName('androidTest')", init)
+        self.assertIn('instrumented.java.setIncludes(traceSources)', init)
+        self.assertIn('instrumented.kotlin.setIncludes(traceSources)', init)
+        # All paths exist; selecting the CLI class does not select debug-only
+        # instrumentation sources or put their services in the minified app.
+        root = ROOT/'app/src/androidTest/java'
+        for relative in selected:
+            text = (root/relative).read_text()
+            self.assertNotRegex(text, r'AvProbe|AV_READY|NotificationTiming|NotificationCatchUp')
+        self.assertIn('MediaWorkerBaseline.runHealthy()', (root/expected[1]).read_text())
+        self.assertIn('private const val CASES = 100', (root/expected[2]).read_text())
+        self.assertIn('includeNegativeProbes = false', (root/expected[2]).read_text())
+        self.assertIn('IsolatedMediaTransport(binding', (root/expected[2]).read_text())
+        # Normal validation jobs do not load the opt-in trace source scope.
+        # The existing benchmark dependency capture intentionally loads it.
+        workflow = (ROOT/'.github/workflows/android-ci.yml').read_text()
+        self.assertEqual(workflow.count('hosted-startup-trace.init.gradle'), 1)
+        self.assertNotIn('hosted-startup-trace.init.gradle', workflow.split('  compile-tests:', 1)[1])
+        self.assertIn('inputs.capture_benchmark_dependency_inputs', workflow)
+
+
 if __name__ == '__main__':
     unittest.main()

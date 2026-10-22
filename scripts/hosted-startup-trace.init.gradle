@@ -13,6 +13,18 @@ gradle.beforeProject { project ->
         project.pluginManager.withPlugin('com.android.application') {
             project.extensions.getByName('androidComponents').finalizeDsl { android ->
                 android.testBuildType = 'benchmarkRelease'
+                // This opt-in APK runs only the existing healthy timing fixture.
+                // Debug-only capability and notification fixtures remain in the
+                // normal debug test suite, never in the minified app under test.
+                def traceSources = [
+                    'dev/ipf/whitenoise/android/ManualDeviceFixture.kt',
+                    'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerHealthyBaselineDeviceTest.kt',
+                    'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerBaseline.kt',
+                    'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerBaselineBinding.kt',
+                ]
+                def instrumented = android.sourceSets.getByName('androidTest')
+                instrumented.java.setIncludes(traceSources)
+                instrumented.kotlin.setIncludes(traceSources)
                 def benchmark = android.buildTypes.getByName('benchmarkRelease')
                 if (benchmark.debuggable || !benchmark.minifyEnabled || !benchmark.shrinkResources) {
                     throw new GradleException(
