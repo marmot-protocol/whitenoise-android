@@ -158,6 +158,44 @@ def start_fixture_services(servers, started_servers):
     verify_fixture_transports(servers, 'initial')
 
 
+def fixture_package_uid():
+    """Resolve only the isolated primary-user package, never a prefix-matching test or personal app."""
+    output = adb('shell', 'cmd', 'package', 'list', 'packages', '-U', '--user', '0', APP)
+    matches = re.findall(r'^package:' + re.escape(APP) + r' uid:(\d+)$', output, re.MULTILINE)
+    if len(matches) != 1 or not 10000 <= int(matches[0]) < 20000:
+        raise RuntimeError('Isolated fixture application UID unavailable')
+    return matches[0]
+
+
+def fixture_network_rules(uid):
+    """Keep reverse-mapped loopback services reachable while forbidding all public IPv4 and IPv6 traffic."""
+    return [(binary, ('OUTPUT', '-m', 'owner', '--uid-owner', uid, '!', '-d', loopback, '-j', 'REJECT'))
+            for binary, loopback in (('iptables', '127.0.0.0/8'), ('ip6tables', '::1/128'))]
+
+
+def verify_fixture_network_isolation(uid):
+    """Fail closed if the in-place update changed UID or either kernel egress rule is missing."""
+    if fixture_package_uid() != uid:
+        raise RuntimeError('Fixture UID changed after network isolation')
+    for binary, rule in fixture_network_rules(uid):
+        adb('shell', binary, '-C', *rule)
+
+
+def isolate_fixture_public_network():
+    """After baseline avatar seeding, deny refetch for this disposable emulator app without changing native policy."""
+    if os.environ.get('GITHUB_ACTIONS') != 'true' or adb('shell', 'getprop', 'ro.kernel.qemu').strip() != '1':
+        raise RuntimeError('Hosted disposable emulator required for network isolation')
+    if adb('shell', 'am', 'get-current-user').strip() != '0' or adb('shell', 'id', '-u').strip() != '0':
+        raise RuntimeError('Rooted primary-user fixture required for network isolation')
+    uid = fixture_package_uid()
+    for binary, rule in fixture_network_rules(uid):
+        adb('shell', binary, '-I', *rule)
+    verify_fixture_network_isolation(uid)
+    evidence = {'uid': uid, 'ipv4': 'deny except 127.0.0.0/8', 'ipv6': 'deny except ::1/128'}
+    (REPORTS / 'public-network-isolation.json').write_text(json.dumps(evidence, indent=2) + '\n')
+    return uid
+
+
 def usable_chat(name):
     """Observe production MainActivity after real bootstrap, then open retained synthetic conversation history."""
     print(f'{name}: opening retained conversation through MainActivity', flush=True)
@@ -263,6 +301,9 @@ def main():
             facts['phases']['baseline'] = 'passed'
             blob.acquisition_unavailable.set()
             install('candidate')
+            # MDK correctly requires public HTTPS for avatars. Block this app's public egress after seeding
+            # so neither native instrumentation nor normal MainActivity can hide migration loss with a refetch.
+            isolated_uid = isolate_fixture_public_network()
             # Current master already uses retained attachment files. The byte-pinned 0113 fault hooks
             # belong to the older SQL-body upgrade; they cannot run against this different library.
             verify_fixture_transports((relay, blob), 'before-upgrade')
@@ -276,6 +317,7 @@ def main():
             stop()
             instrument('cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'cold'))
+            verify_fixture_network_isolation(isolated_uid)
             facts['phases']['cold_restart'] = 'passed'
         except (RuntimeError, subprocess.SubprocessError) as error:
             facts['phases']['upgrade_campaign'] = type(error).__name__ + ': ' + str(error)

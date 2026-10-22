@@ -75,6 +75,11 @@ with acquisition disabled, and normal MainActivity must open usable retained
 chats. Separate phases promote the pending upload, restart again and recover
 corrupt/lost disposable media. Both recovery modes then require all seven named
 cases, including the formerly ignored single-sender and long-offline replays.
+Avatar seeding uses an immutable public HTTPS image with a checked SHA-256,
+respecting MDK's URL validation. Before the first candidate launch, the runner
+blocks public IPv4 and IPv6 egress for only the disposable app's UID, while
+retaining loopback access to its relay/blob fixtures. It verifies those rules
+before upgrade and after cold reads so avatar refetch cannot hide migration loss.
 The Android healthy-receive test covers local deletion and restart; MDK's
 exact-source composed tests separately cover hydration quarantine and
 send-before-drain ordering. Keep those evidence boundaries explicit.

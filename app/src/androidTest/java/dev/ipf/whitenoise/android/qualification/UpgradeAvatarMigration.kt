@@ -1,28 +1,28 @@
 package dev.ipf.whitenoise.android.qualification
 
-import android.graphics.Bitmap
-import android.graphics.Color
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.Marmot
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
 
-/** Seeds a native-owned avatar cache on October 21 so migration 0114 must preserve real cached image bytes. */
+private const val FIXTURE_AVATAR_URL =
+    "https://raw.githubusercontent.com/marmot-protocol/whitenoise-android/" +
+        "512dcf241e155ff71d6751b0d06d9cb8b9830cd4/app/src/main/res/mipmap-mdpi/ic_launcher.png"
+private const val FIXTURE_AVATAR_SHA256 = "a447905dfc5868e09924d9539d05832bdf058863a144a73476f67741b315d6a6"
+
+/** Seeds a pinned public HTTPS image through MDK; the runner blocks public egress before any upgrade reads. */
 internal suspend fun seedUpgradeAvatar(
     runtime: Marmot,
-    blobServer: String,
     receipt: File,
 ) {
     val value = JSONObject(receipt.readText())
     val account = value.getString("sender")
     val group = value.getString("group")
-    val url = runtime.uploadProfileImage(account, upgradeAvatarPng(), "image/png", blobServer)
-    runtime.updateGroupAvatarUrl(account, group, url, null, null)
+    runtime.updateGroupAvatarUrl(account, group, FIXTURE_AVATAR_URL, null, null)
     val avatars = JSONArray()
     for (owner in listOf(account, value.getString("receiver"))) {
         avatars.put(awaitUpgradeAvatar(runtime, owner, group))
@@ -30,20 +30,6 @@ internal suspend fun seedUpgradeAvatar(
     value.put("avatars", avatars)
     receipt.writeText(value.toString())
     verifyUpgradeAvatar(runtime, value)
-}
-
-/** Produces a small valid synthetic image without depending on external assets or image generators. */
-private fun upgradeAvatarPng(): ByteArray {
-    val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
-    return try {
-        bitmap.eraseColor(Color.MAGENTA)
-        ByteArrayOutputStream().use {
-            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-            it.toByteArray()
-        }
-    } finally {
-        bitmap.recycle()
-    }
 }
 
 /** Uses MDK's projected target and acquisition, retaining only its opaque reference and observed payload digest. */
@@ -66,6 +52,7 @@ private suspend fun awaitUpgradeAvatar(
                 val payload =
                     runtime.readAvatarAssets(owner, listOf(checkNotNull(asset.reference)), 1_048_576uL).single()
                 check(!payload.deferred && payload.bytes.isNotEmpty())
+                check(avatarDigest(payload.bytes) == FIXTURE_AVATAR_SHA256) { "Unexpected pinned avatar content" }
                 retained =
                     JSONObject()
                         .put("account", owner)
@@ -100,7 +87,7 @@ internal suspend fun verifyUpgradeAvatar(
     }
 }
 
-/** Compares only generated image content; account identifiers and native descriptors stay in the private receipt. */
+/** Compares only image content; account identifiers and native descriptors stay in the private receipt. */
 private fun avatarDigest(bytes: ByteArray): String =
     MessageDigest
         .getInstance("SHA-256")

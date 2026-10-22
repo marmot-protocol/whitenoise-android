@@ -111,6 +111,17 @@ Required candidate evidence:
 - Packaged native smoke, production/staging release-runtime verification and
   arm64 reproduction under current hosted CI policy; exact-head review and gates.
 
+The baseline avatar is the 2,898-byte launcher PNG from Android commit
+`512dcf241e155ff71d6751b0d06d9cb8b9830cd4`, fetched through MDK over public HTTPS.
+Its required SHA-256 is
+`a447905dfc5868e09924d9539d05832bdf058863a144a73476f67741b315d6a6`.
+After seeding, UID-scoped IPv4/IPv6 rules deny public egress for the disposable
+app before any candidate reads. Loopback relay/blob access remains available;
+the blob fixture separately refuses retained attachment acquisition until the
+explicit recovery phases. Verified firewall rules and original image digests
+prevent a network refetch from concealing lost avatar cache data. This changes
+only the hosted fixture; it does not relax MDK's HTTPS or destination policy.
+
 [Full MDK CI at the exact source](https://github.com/marmot-protocol/mdk/actions/runs/39685697283)
 already passed the composed #2318 regressions:
 `quarantined_group_does_not_block_account_receives` (shard 5),

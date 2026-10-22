@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Testing-only MarmotKit nightly 20261022 from 77f22e35: verified immutable bytes, migrations 0114 avatar files and 0115 replay admission, populated current-master upgrade and cold restart, retained attachments/avatars/pending upload, all seven recovery cases with no skips and upstream quarantine isolation evidence; 30-day retention and no downgrade",
+        "surface": "Testing-only MarmotKit nightly 20261022 from 77f22e35: verified immutable artifact bytes; adoption requires hosted qualification of migrations 0114 avatar files and 0115 replay admission, populated current-master upgrade and cold restart, retained attachments/avatars/pending upload and all seven recovery cases with no skips; exact-head results are recorded separately from upstream quarantine isolation evidence; 30-day retention and no downgrade",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "artifact-id=0.14.0-nightly.20261022",
         "test_ids": [

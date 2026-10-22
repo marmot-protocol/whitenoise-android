@@ -85,6 +85,54 @@ class QualificationEvidenceTest(unittest.TestCase):
                 thread.assert_not_called()
                 self.assertEqual(started_servers, [])
 
+    def test_public_network_isolation_targets_only_the_fixture_uid_and_both_address_families(self):
+        """A successful isolation records verified IPv4/IPv6 rules while keeping loopback fixtures reachable."""
+        def device(*args):
+            """Return a primary-user fixture and a similarly named test package with a different UID."""
+            if args == ('shell', 'getprop', 'ro.kernel.qemu'):
+                return '1\n'
+            if args in (('shell', 'am', 'get-current-user'), ('shell', 'id', '-u')):
+                return '0\n'
+            if args[:4] == ('shell', 'cmd', 'package', 'list'):
+                return f'package:{campaign.APP}.test uid:10124\npackage:{campaign.APP} uid:10123\n'
+            return ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(campaign.os.environ, {'GITHUB_ACTIONS': 'true'}), \
+                    patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=device) as commands:
+                self.assertEqual(campaign.isolate_fixture_public_network(), '10123')
+            rules = [call.args for call in commands.call_args_list
+                     if len(call.args) > 1 and call.args[1] in ('iptables', 'ip6tables')]
+            self.assertEqual(len(rules), 4)
+            for binary, loopback in (('iptables', '127.0.0.0/8'), ('ip6tables', '::1/128')):
+                for operation in ('-I', '-C'):
+                    self.assertIn(('shell', binary, operation, 'OUTPUT', '-m', 'owner', '--uid-owner',
+                                   '10123', '!', '-d', loopback, '-j', 'REJECT'), rules)
+            self.assertEqual(json.loads((Path(directory) / 'public-network-isolation.json').read_text())['uid'],
+                             '10123')
+
+    def test_public_network_isolation_rejects_missing_uid_and_incomplete_firewall(self):
+        """A prefix match, physical target or failed IPv6 rule cannot be reported as protected retained reads."""
+        for output in (f'package:{campaign.APP}.test uid:10124\n', f'package:{campaign.APP} uid:1000\n'):
+            with patch.object(campaign, 'adb', return_value=output):
+                with self.assertRaisesRegex(RuntimeError, 'UID unavailable'):
+                    campaign.fixture_package_uid()
+        with patch.dict(campaign.os.environ, {'GITHUB_ACTIONS': 'true'}), \
+                patch.object(campaign, 'adb', return_value='0\n') as commands:
+            with self.assertRaisesRegex(RuntimeError, 'Hosted disposable emulator required'):
+                campaign.isolate_fixture_public_network()
+            self.assertEqual(commands.call_count, 1)
+        failure = subprocess.CalledProcessError(1, ['ip6tables'])
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(campaign.os.environ, {'GITHUB_ACTIONS': 'true'}), \
+                    patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'fixture_package_uid', return_value='10123'), \
+                    patch.object(campaign, 'adb', side_effect=['1', '0', '0', '', failure]):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    campaign.isolate_fixture_public_network()
+            self.assertFalse((Path(directory) / 'public-network-isolation.json').exists())
+
     def test_pending_upload_failure_stays_failed_while_original_media_recovery_runs(self):
         """Independent receiver-file checks must not hide a failed sender promotion or require it to pass."""
         facts = {'phases': {'cold_restart': 'passed'}}

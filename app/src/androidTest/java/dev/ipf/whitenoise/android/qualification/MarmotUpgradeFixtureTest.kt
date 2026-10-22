@@ -164,7 +164,7 @@ class MarmotUpgradeFixtureTest {
                 .put("originalMessage", requireNotNull(upload.sent).messageIds.single())
                 .put("pendingReference", reference.upgradeReceipt())
         receipt.writeText(value.toString())
-        if (fileStoreBaseline()) seedUpgradeAvatar(runtime, "http://127.0.0.1:$blobPort", receipt)
+        if (fileStoreBaseline()) seedUpgradeAvatar(runtime, receipt)
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
     }
