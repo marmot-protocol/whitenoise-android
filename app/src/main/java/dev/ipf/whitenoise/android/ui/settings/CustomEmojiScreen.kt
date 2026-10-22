@@ -288,32 +288,30 @@ private fun PrepareSelectedEmoji(
         fun failSelection(message: Int) {
             failCurrentEmojiSelection(appState, selectionAccount to selectionRuntime, uri, message, onFailed)
         }
-        run {
-            val resolver = context.contentResolver
-            val (read, name) =
-                withContext(Dispatchers.IO) {
-                    readBoundedDocument(CustomEmojiStore.MAX_BYTES) { resolver.openInputStream(uri) } to
-                        queryDisplayName(resolver, uri).orEmpty()
-                }
-            if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) {
-                return@LaunchedEffect
+        val resolver = context.contentResolver
+        val (read, name) =
+            withContext(Dispatchers.IO) {
+                readBoundedDocument(CustomEmojiStore.MAX_BYTES) { resolver.openInputStream(uri) } to
+                    queryDisplayName(resolver, uri).orEmpty()
             }
-            val bytes =
-                when (read) {
-                    is BoundedDocumentRead.Success -> read.bytes
-                    BoundedDocumentRead.TooLarge -> return@LaunchedEffect failSelection(R.string.custom_emoji_too_large)
-                    BoundedDocumentRead.Empty,
-                    BoundedDocumentRead.Unreadable,
-                    -> return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
-                }
-            val preview =
-                withContext(Dispatchers.Default) { decodeEmojiImage(bytes) }
-                    ?: return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
-            if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) {
-                return@LaunchedEffect
-            }
-            onStaged(StagedEmoji(bytes, preview, emojiCodeForFileName(name), selectionIdentity))
+        if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) {
+            return@LaunchedEffect
         }
+        val bytes =
+            when (read) {
+                is BoundedDocumentRead.Success -> read.bytes
+                BoundedDocumentRead.TooLarge -> return@LaunchedEffect failSelection(R.string.custom_emoji_too_large)
+                BoundedDocumentRead.Empty,
+                BoundedDocumentRead.Unreadable,
+                -> return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
+            }
+        val preview =
+            withContext(Dispatchers.Default) { decodeEmojiImage(bytes) }
+                ?: return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
+        if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) {
+            return@LaunchedEffect
+        }
+        onStaged(StagedEmoji(bytes, preview, emojiCodeForFileName(name), selectionIdentity))
     }
 }
 
