@@ -8,7 +8,12 @@ pluginManagement {
             }
         }
         mavenCentral()
-        gradlePluginPortal()
+        gradlePluginPortal {
+            content {
+                // The portal marker differs from the reviewed Maven Central POM.
+                excludeModule("dev.detekt", "dev.detekt.gradle.plugin")
+            }
+        }
     }
 }
 plugins {
