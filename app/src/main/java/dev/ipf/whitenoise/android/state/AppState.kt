@@ -13227,6 +13227,14 @@ class WhiteNoiseAppState private constructor(
         var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
         var preopened = initial
         var openReconciliation: Job? = null
+        val readReconciliations =
+            NotificationReadReconciliationCoordinator(
+                scope = this,
+                followUpMillis = NOTIFICATION_READ_RECONCILE_FOLLOW_UP_MILLIS,
+            ) { account, group ->
+                runCatchingCancellable { reconcileConversationNotificationCards(account, group, marmot) }
+                    .onFailure { appStateDebug(it) { "notification read reconcile failed" } }
+            }
         while (isActive) {
             val subscription =
                 preopened?.also { preopened = null } ?: runCatchingCancellable { marmot.subscribeEvents() }
@@ -13251,7 +13259,7 @@ class WhiteNoiseAppState private constructor(
                         var event = subscription.next()
                         while (event != null) {
                             backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                            handleNotificationContentEvent(event, marmot)
+                            handleNotificationContentEvent(event, readReconciliations)
                             val received = (event as? MarmotEventFfi.MessageReceived)?.received
                             // Only the cheap kind and sender check runs here; the suppression reads run with the
                             // lookup, as a child of this loop, so they never delay the next event.
@@ -13278,13 +13286,13 @@ class WhiteNoiseAppState private constructor(
     /**
      * Applies [event]'s notification consequences without delaying the receipt loop that delivered it (#3323,
      * #2065). A removal is fenced at once, so no queued post or correction can restore it, and its cards are
-     * rewritten in a supervised child. A read-state change reconciles that conversation's cards in a child too, and
-     * once more shortly after, so a card the platform had not listed yet when the read landed is also corrected.
-     * Children serialize per conversation and their failures are logged, never cancelling the loop.
+     * rewritten in a supervised child. Read-state changes share one worker per conversation, including a delayed
+     * follow-up after its latest request so a card not yet listed by the platform is also corrected. An in-flight
+     * native read finishes before a dirty worker reads again. Failures are logged without cancelling the loop.
      */
     private fun CoroutineScope.handleNotificationContentEvent(
         event: MarmotEventFfi,
-        marmot: MarmotInterface,
+        readReconciliations: NotificationReadReconciliationCoordinator,
     ) {
         removedNotificationMessages(event).forEach { message ->
             recordNotificationContentRemoval(message)
@@ -13294,13 +13302,7 @@ class WhiteNoiseAppState private constructor(
             }
         }
         readStateChangedConversation(event)?.let { (accountRef, groupIdHex) ->
-            launch {
-                runCatchingCancellable {
-                    reconcileConversationNotificationCards(accountRef, groupIdHex, marmot)
-                    delay(NOTIFICATION_READ_RECONCILE_FOLLOW_UP_MILLIS)
-                    reconcileConversationNotificationCards(accountRef, groupIdHex, marmot)
-                }.onFailure { appStateDebug(it) { "notification read reconcile failed" } }
-            }
+            readReconciliations.request(accountRef, groupIdHex)
         }
     }
 

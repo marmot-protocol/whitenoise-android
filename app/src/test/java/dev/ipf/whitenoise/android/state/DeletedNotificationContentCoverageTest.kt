@@ -56,12 +56,18 @@ class DeletedNotificationContentCoverageTest {
     @Test
     fun everyRemovalSourceReachesTheRetraction() {
         val source = source("state/AppState.kt")
-        assertTrue("handleNotificationContentEvent(event, marmot)" in functionBody(source, "runMutedChatReceiptLoop"))
+        val receiptLoop = functionBody(source, "runMutedChatReceiptLoop")
+        assertTrue("handleNotificationContentEvent(event, readReconciliations)" in receiptLoop)
+        assertTrue("NotificationReadReconciliationCoordinator(" in receiptLoop)
+        assertTrue("scope = this" in receiptLoop)
+        assertTrue("followUpMillis = NOTIFICATION_READ_RECONCILE_FOLLOW_UP_MILLIS" in receiptLoop)
+        assertTrue("reconcileConversationNotificationCards(account, group, marmot)" in receiptLoop)
         assertTrue("reconcileActiveNotificationCards(marmot)" in functionBody(source, "runMutedChatReceiptLoop"))
         assertTrue("retractNotificationContent(" in functionBody(source, "hideMessageForMe"))
         val eventBody = functionBody(source, "handleNotificationContentEvent")
         assertTrue("removedNotificationMessages(event)" in eventBody)
         assertTrue("readStateChangedConversation(event)" in eventBody)
+        assertTrue("readReconciliations.request(accountRef, groupIdHex)" in eventBody)
     }
 
     /** The source file under the app's main package. */

@@ -7,6 +7,8 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Bundle
 import android.os.Parcelable
+import android.os.Process
+import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
@@ -129,6 +131,38 @@ class NotificationDeletedContentTest {
         val card = requireNotNull(card(ACCOUNT))
         assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         assertTrue("artwork cleanup must run after the rewrite", reconciliations.get() > before)
+    }
+
+    /** A silent partial rewrite remains eligible for a captured cleanup even before the platform lists it. */
+    @Test
+    fun aSilentRewritePreservesTheCapturedDismissalBoundary() {
+        post(message("old-id", "older secret text"))
+        post(message("new-id", "newer valid text"))
+        val key = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT, GROUP)
+        val live = manager.activeNotifications.single { it.tag == key.tag && it.id == key.id }
+        val original =
+            StatusBarNotification(
+                context.packageName,
+                context.packageName,
+                key.id,
+                key.tag,
+                1_000,
+                0,
+                0,
+                live.notification,
+                Process.myUserHandle(),
+                1_000L,
+            )
+        val rewriter = LocalNotificationPresenter(context, activeNotificationsProvider = { arrayOf(original) })
+        val cleanup =
+            LocalNotificationPresenter(context, nowMillis = { 2_000L }, activeNotificationsProvider = { emptyArray() })
+        val request = requireNotNull(cleanup.captureConversationDismissal(ACCOUNT, GROUP))
+
+        assertTrue(rewriter.reconcileConversationContent(ACCOUNT, GROUP, false) { id, _ -> id != "old-id" })
+        assertEquals(listOf("newer valid text"), messageTexts(requireNotNull(card(ACCOUNT))))
+        assertTrue(runBlocking { cleanup.dismissConversationMessages(request) })
+
+        assertNull("a rewrite is not a newer message beyond the captured cutoff", card(ACCOUNT))
     }
 
     /** A card whose only entry is deleted is cancelled, as is a long first message shown as expandable text. */

@@ -83,24 +83,26 @@ internal class NotificationCandidateReadCoordinator(
         if (pending.entries.removeAll { it.value.result.isCompleted }) admissionVersion.value += 1L
         val conversation = key.accountRef to key.groupIdHex.lowercase()
         val existing = pending[conversation]
-        if (existing?.key == key) return ReadAdmission.Granted(existing)
-        if (existing?.abandoned == true) return ReadAdmission.Rejected
-        if (pending.size >= MAX_PENDING_READS && pending.values.all { it.abandoned }) return ReadAdmission.Rejected
-        if (existing != null || pending.size >= MAX_PENDING_READS) {
-            return ReadAdmission.Busy(admissionVersion.value)
-        }
-        val result = scope.async(dispatcher, start = CoroutineStart.LAZY) { block() }
-        val admitted = PendingRead(key, result)
-        pending[conversation] = admitted
-        result.invokeOnCompletion {
-            synchronized(lock) {
-                if (pending[conversation] === admitted) {
-                    pending.remove(conversation)
-                    admissionVersion.value += 1L
+        return when {
+            existing?.key == key -> ReadAdmission.Granted(existing)
+            existing?.abandoned == true -> ReadAdmission.Rejected
+            pending.size >= MAX_PENDING_READS && pending.values.all { it.abandoned } -> ReadAdmission.Rejected
+            existing != null || pending.size >= MAX_PENDING_READS -> ReadAdmission.Busy(admissionVersion.value)
+            else -> {
+                val result = scope.async(dispatcher, start = CoroutineStart.LAZY) { block() }
+                val admitted = PendingRead(key, result)
+                pending[conversation] = admitted
+                result.invokeOnCompletion {
+                    synchronized(lock) {
+                        if (pending[conversation] === admitted) {
+                            pending.remove(conversation)
+                            admissionVersion.value += 1L
+                        }
+                    }
                 }
+                ReadAdmission.Granted(admitted)
             }
         }
-        return ReadAdmission.Granted(admitted)
     }
 
     private data class PendingRead(

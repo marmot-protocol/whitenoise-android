@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
+import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notifiedMessagePreview
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,11 +48,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 /**
  * A bound, finished chat list that does not carry the tapped conversation is not proof the
@@ -61,8 +68,10 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class NotificationMessageRouteExactReadNavigationTest {
+    private val effectJobs = MainLooperEffectJobs()
+
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createComposeRule(effectContext = effectJobs)
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
@@ -139,20 +148,11 @@ class NotificationMessageRouteExactReadNavigationTest {
      */
     @Test
     fun aHeldExactReadReleasedAfterANewerTapNeitherConsumesNorReopensIt() {
-        val firstReadStarted = CountDownLatch(1)
-        val releaseRetiredReads = CountDownLatch(1)
-        // Chat-list updates can re-run the older request's pass, so every read it starts is held, not just the first.
-        val holdReads = AtomicBoolean(true)
+        val held = HeldRouteReads(effectJobs)
         val exactReads = AtomicInteger(0)
         val appState =
             appState(
-                fakeMarmot(RowAnswer.FOUND, exactReads) {
-                    if (holdReads.get()) {
-                        firstReadStarted.countDown()
-                        val released = releaseRetiredReads.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
-                        check(released) { "the retired reads were never released" }
-                    }
-                },
+                fakeMarmot(RowAnswer.FOUND, exactReads, beforeRead = held::awaitRelease),
             )
         val holder = MainShellStateHolder(appState, SavedStateHandle())
         val inbound = mutableStateOf<NotificationTarget?>(null)
@@ -176,10 +176,10 @@ class NotificationMessageRouteExactReadNavigationTest {
         try {
             awaitBoundChatList(holder, appState)
             composeRule.runOnIdle { inbound.value = messageTarget() }
-            awaitCondition("the first read never ran") { firstReadStarted.count == 0L }
+            awaitCondition("the first read never ran") { held.started.count == 0L }
             assertTrue("the held read must not consume its tap", handled.isEmpty())
             composeRule.runOnIdle {
-                holdReads.set(false)
+                held.stopHolding()
                 inbound.value = messageTarget().copy(messageIdHex = NEWEST_ID)
                 requestId.longValue = REQUEST_ID + 1L
             }
@@ -188,7 +188,7 @@ class NotificationMessageRouteExactReadNavigationTest {
             }
             val openedContext = holder.selectedChatOpenContext.value
 
-            settleReleasedReads(releaseRetiredReads)
+            settleReleasedReads(held)
 
             assertEquals(listOf((REQUEST_ID + 1L) to NEWEST_ID), handled.toList())
             assertEquals(openedContext, holder.selectedChatOpenContext.value)
@@ -196,18 +196,82 @@ class NotificationMessageRouteExactReadNavigationTest {
             assertEquals(NEWEST_ID, openedContext.notificationTarget?.messageIdHex)
             assertNull("a retired read must not present anything", appState.toast)
         } finally {
-            releaseRetiredReads.countDown()
+            held.release.countDown()
             composeRule.runOnIdle { holder.release() }
         }
     }
 
-    /** Lets every released retired read resume before asserting that its stale continuation changed nothing. */
-    private fun settleReleasedReads(release: CountDownLatch) {
-        release.countDown()
-        repeat(SETTLE_POLLS) {
-            composeRule.waitForIdle()
-            Thread.sleep(POLL_MILLIS)
+    /** Waits for every retired routing owner and its native children before checking the newer route's state. */
+    private fun settleReleasedReads(held: HeldRouteReads) {
+        held.release.countDown()
+        awaitCondition("the retired routing jobs never completed") { held.completed() }
+        composeRule.waitForIdle()
+    }
+
+    /** Captures every held read's route owner atomically with deciding whether that read must wait. */
+    private class HeldRouteReads(
+        private val effectJobs: MainLooperEffectJobs,
+    ) {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        private val lock = Any()
+        private var holding = true
+        private val jobs = mutableListOf<Job>()
+
+        /** Holds each accepted read until release, preserving its actual routing job for a completion barrier. */
+        fun awaitRelease() {
+            val held =
+                synchronized(lock) {
+                    holding.also { if (it) jobs += effectJobs.currentMainOwner() }
+                }
+            if (held) {
+                started.countDown()
+                check(release.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                    "retired reads were never released"
+                }
+            }
         }
+
+        /** Prevents subsequent reads from joining the held set before a newer tap is submitted. */
+        fun stopHolding() {
+            synchronized(lock) { holding = false }
+        }
+
+        /** A completed route owner has also finished its blocking IO child and any stale continuation. */
+        fun completed(): Boolean = synchronized(lock) { jobs.isNotEmpty() && jobs.all { it.isCompleted } }
+    }
+
+    /** Test-local context follows Compose effects into IO without adding a production routing hook. */
+    private class MainLooperEffectJobs : AbstractCoroutineContextElement(Key), ThreadContextElement<Job?> {
+        private val current = ThreadLocal<Job?>()
+        private val mainJobs = ConcurrentHashMap.newKeySet<Job>()
+
+        /** Remembers jobs executing on Main before their IO children run the fake binding. */
+        override fun updateThreadContext(context: CoroutineContext): Job? {
+            val previous = current.get()
+            val job = context[Job]
+            current.set(job)
+            if (job != null && Looper.myLooper() == Looper.getMainLooper()) mainJobs += job
+            return previous
+        }
+
+        /** Restores the prior coroutine when a dispatcher leaves this thread. */
+        override fun restoreThreadContext(
+            context: CoroutineContext,
+            oldState: Job?,
+        ) {
+            current.set(oldState)
+        }
+
+        /** Finds the nearest captured Main ancestor, the effect that owns this particular native read. */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        fun currentMainOwner(): Job {
+            var job = checkNotNull(current.get()) { "the binding did not inherit its Compose effect context" }
+            while (job !in mainJobs) job = checkNotNull(job.parent) { "the read has no captured Main effect owner" }
+            return job
+        }
+
+        private companion object Key : CoroutineContext.Key<MainLooperEffectJobs>
     }
 
     /** Finishes the broad-list binding before arming the exact-read race under the documented ready-list state. */
@@ -435,7 +499,6 @@ class NotificationMessageRouteExactReadNavigationTest {
         const val REQUEST_ID = 41L
         const val ROUTE_TIMEOUT_MILLIS = 10_000L
         const val POLL_MILLIS = 20L
-        const val SETTLE_POLLS = 25
         val ACCOUNT_ID = "aa".repeat(32)
         val GROUP_ID = "bb".repeat(32)
         val MESSAGE_ID = NotificationScenario.NOTIFIED_ID

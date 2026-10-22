@@ -447,9 +447,10 @@ class LocalNotificationPresenter(
             val manager =
                 context.getSystemService(NotificationManager::class.java)
                     ?: return@withLock CardContentOutcome.FAILED
-            val live =
-                activeNotification(manager, key.tag, key.id)?.notification
+            val liveCard =
+                activeNotification(manager, key.tag, key.id)
                     ?: return@withLock CardContentOutcome.ABSENT
+            val live = liveCard.notification
             val entries = retainedEntryGroups(live)
             val kept = entries.filter { isEntryValid(entryMessageId(it), it.first().timestamp) }
             try {
@@ -460,7 +461,7 @@ class LocalNotificationPresenter(
                         cancelNotification(compat, key.tag, key.id)
                         CardContentOutcome.CANCELLED
                     }
-                    else -> rewriteWithEntries(compat, key, live, kept)
+                    else -> rewriteWithEntries(compat, key, live, kept, recordedAtMs = dismissalTime(liveCard))
                 }
             } catch (exception: RuntimeException) {
                 notificationDebug { "reconcile card failed type=${exception.javaClass.simpleName}" }
@@ -504,13 +505,15 @@ class LocalNotificationPresenter(
      * Silently rewrites a live conversation card with only [kept] entries, so no removed entry's text, quote or
      * artwork survives anywhere in the payload. The newest kept entry becomes the card's stamped message; the
      * generation is unchanged, so the write lands only while that same card is still live. Copied actions are
-     * removed when their newest-message target no longer matches the retained card.
+     * removed when their newest-message target no longer matches the retained card. [recordedAtMs] preserves the
+     * live card's dismissal age, so a cleanup captured before this silent rewrite can still remove it.
      */
     private fun rewriteWithEntries(
         compat: NotificationManagerCompat,
         key: NotificationDismissalKey,
         live: Notification,
         kept: List<List<NotificationCompat.MessagingStyle.Message>>,
+        recordedAtMs: Long,
     ): CardContentOutcome {
         val previous = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live)
         val messages = kept.flatten()
@@ -542,7 +545,8 @@ class LocalNotificationPresenter(
                         )
                     },
                 ).build()
-        val result = postNotificationSafely(compat, key.tag, key.id, rewritten, mustBeLive = true)
+        val result =
+            postNotificationSafely(compat, key.tag, key.id, rewritten, recordedAtMs = recordedAtMs, mustBeLive = true)
         val written = result == NotificationCardWriteResult.WRITTEN
         return if (written) CardContentOutcome.REBUILT else CardContentOutcome.FAILED
     }

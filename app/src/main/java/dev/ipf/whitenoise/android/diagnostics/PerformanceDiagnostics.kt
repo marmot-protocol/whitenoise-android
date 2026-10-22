@@ -8,6 +8,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
 private const val ROUTINE_SPAN_THRESHOLD_MS = 5L
+private const val NOTIFICATION_CANDIDATE_GATE_THRESHOLD_MS = 100L
 
 /** Restricts compile-time source revisions to a short non-user-controlled token. */
 private fun sanitizePerformanceRevision(value: String): String =
@@ -98,7 +99,7 @@ internal enum class PerformancePhase(
     CONNECTIVITY_WAKE_READY("connectivity_wake_ready"),
     NOTIFICATION_RECEIVER_READY("notification_receiver_ready"),
     NOTIFICATION_RECEIVER_RETRY("notification_receiver_retry"),
-    NOTIFICATION_CANDIDATE_GATE("notification_candidate_gate", 100L),
+    NOTIFICATION_CANDIDATE_GATE("notification_candidate_gate", NOTIFICATION_CANDIDATE_GATE_THRESHOLD_MS),
     ACCOUNT_CATCH_UP_START("account_catch_up_start"),
     ACCOUNT_SUBSCRIPTION_ACTIVATED("account_subscription_activated"),
     CURRENT_REPLAY_COMPLETE("current_replay_complete"),
