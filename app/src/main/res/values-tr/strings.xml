@@ -2372,4 +2372,10 @@
     </plurals>
     <string name="group_review_add_member">Üye ekle</string>
     <string name="group_review_invitation_visibility">Tüm üyeler görebilir.</string>
+    <string name="search_scope_this_chat">Bu sohbet · %1$s</string>
+    <string name="search_scope_all_chats">Tüm sohbetler</string>
+    <string name="search_scope_other_chats">Diğer sohbetlerde ara</string>
+    <string name="search_scope_selected_chats">Seçilen sohbetler</string>
+    <string name="search_message_content_loading">Mesaj içeriği aranıyor…</string>
+    <string name="search_message_content_failed">Mesaj içeriğinde arama yapılamadı.</string>
 </resources>

@@ -2340,4 +2340,10 @@
     </plurals>
     <string name="group_review_add_member">新增成員</string>
     <string name="group_review_invitation_visibility">所有成員皆可見。</string>
+    <string name="search_scope_this_chat">此聊天 · %1$s</string>
+    <string name="search_scope_all_chats">所有聊天</string>
+    <string name="search_scope_other_chats">搜尋其他聊天</string>
+    <string name="search_scope_selected_chats">已選聊天</string>
+    <string name="search_message_content_loading">正在搜尋訊息內容…</string>
+    <string name="search_message_content_failed">無法搜尋訊息內容。</string>
 </resources>

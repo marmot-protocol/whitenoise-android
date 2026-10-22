@@ -1,0 +1,46 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalSearchBodyStage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
+        "anchor": "fun GlobalSearchBodyStage(",
+        "test_ids": [
+          "FIND-003",
+          "FIND-013",
+          "FIND-015"
+        ]
+      },
+      {
+        "surface": "Search viewport restoration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
+        "anchor": "fun rememberSearchBodyAnchorRestoration(",
+        "test_ids": [
+          "FIND-015"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Body search pending status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
+        "anchor": "R.string.search_message_content_loading",
+        "test_ids": [
+          "FIND-003",
+          "FIND-015"
+        ]
+      },
+      {
+        "surface": "Body search failure preserves local names and offers retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
+        "anchor": "R.string.search_message_content_failed",
+        "test_ids": [
+          "FIND-003",
+          "FIND-015"
+        ]
+      }
+    ]
+  }
+}

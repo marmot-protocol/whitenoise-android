@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -11,11 +14,14 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
+import dev.ipf.whitenoise.android.ui.conversation.clearConversationSearchFilters
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -345,5 +351,117 @@ class GlobalSearchFilterInteractionTest {
         composeRule
             .onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
             .assertContentDescriptionEquals(context.getString(R.string.chat_list_search_clear_all_filters))
+    }
+
+    /** The local menu offers message filters while conflicting restored chips remain recoverable. */
+    @Test
+    fun conversationMenuOffersOnlyMessageFilters() {
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterMenu(
+                    expanded = true,
+                    state = GlobalSearchState(isOpen = true),
+                    onDismiss = {},
+                    onCategory = {},
+                    onClearAll = {},
+                    conversationScope = true,
+                )
+            }
+        }
+        listOf(GlobalSearchFilterCategory.Sender, GlobalSearchFilterCategory.Date, GlobalSearchFilterCategory.Content)
+            .forEach { composeRule.onNodeWithTag(globalSearchFilterMenuItemTag(it)).assertExists() }
+        listOf(GlobalSearchFilterCategory.Chat, GlobalSearchFilterCategory.ChatType, GlobalSearchFilterCategory.Folder)
+            .forEach { composeRule.onNodeWithTag(globalSearchFilterMenuItemTag(it)).assertDoesNotExist() }
+    }
+
+    /** The origin is labelled and cannot be accidentally removed; broadening has its own action. */
+    @Test
+    fun conversationScopeIsVisibleAndBroadeningIsExplicit() {
+        val chat = GlobalSearchChatFilter("origin", "Community")
+        var broadened = false
+        var removed = ""
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterControlsRow(
+                    state = GlobalSearchState(isOpen = true, chatFilters = setOf(chat)),
+                    onRemoveFilter = { removed = it },
+                    onClearAll = {},
+                    conversationScope = chat,
+                    onSearchOtherChats = { broadened = true },
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag("search-scope-label")
+            .assertTextEquals(context.getString(R.string.search_scope_this_chat, "Community"))
+        composeRule.onNodeWithTag(globalSearchFilterChipTag(chat.chipId)).assertDoesNotExist()
+        assertFalse(broadened)
+        assertEquals("", removed)
+        composeRule.onNodeWithTag("search-other-chats").performClick()
+        assertTrue(broadened)
+    }
+
+    /** Retained chat chips cannot expose a no-op action; a removable date filter can still be cleared. */
+    @Test
+    fun conversationChatChipsOfferClearAllOnlyWhenNonScopeFiltersCanChange() {
+        val origin = GlobalSearchChatFilter("origin", "Community")
+        val other = GlobalSearchChatFilter("other", "Another chat")
+        val selectedChats = setOf(origin, other)
+        val state = mutableStateOf(GlobalSearchState(isOpen = true, chatFilters = selectedChats))
+        composeRule.setContent {
+            Surface {
+                GlobalSearchFilterControlsRow(
+                    state = state.value,
+                    conversationScope = origin,
+                    onRemoveFilter = {},
+                    onClearAll = { state.value = clearConversationSearchFilters(state.value) },
+                )
+            }
+        }
+        composeRule.onNodeWithTag(globalSearchFilterChipTag(other.chipId)).assertExists()
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).assertDoesNotExist()
+        composeRule.runOnIdle {
+            state.value = state.value.copy(dateFilterSelection = GlobalSearchDateFilterSelection.Today)
+        }
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).performClick()
+        composeRule.runOnIdle {
+            assertEquals(selectedChats, state.value.chatFilters)
+            assertEquals(GlobalSearchDateFilterSelection.AnyTime, state.value.dateFilterSelection)
+        }
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(globalSearchFilterChipTag(other.chipId)).assertExists()
+    }
+
+    /** Narrow large-font scope/action controls use full-width rows without losing the explicit action. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
+    fun narrowLargeRtlScopeStacksTheExplicitBroadeningActionBelowTheLabel() {
+        val chat = GlobalSearchChatFilter("origin", "Community")
+        var broadened = false
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, 2f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+            ) {
+                WhiteNoiseTheme {
+                    Surface {
+                        GlobalSearchFilterControlsRow(
+                            state = GlobalSearchState(isOpen = true, chatFilters = setOf(chat)),
+                            onRemoveFilter = {},
+                            onClearAll = {},
+                            conversationScope = chat,
+                            onSearchOtherChats = { broadened = true },
+                        )
+                    }
+                }
+            }
+        }
+        val label = composeRule.onNodeWithTag("search-scope-label").fetchSemanticsNode().boundsInRoot
+        val action = composeRule.onNodeWithTag("search-other-chats").fetchSemanticsNode().boundsInRoot
+        assertTrue("explicit action must be below the full-width scope label", action.top >= label.bottom)
+        assertTrue("action retains the label's available width", action.width >= label.width)
+        composeRule.onNodeWithTag("search-other-chats").performClick()
+        assertTrue(broadened)
     }
 }

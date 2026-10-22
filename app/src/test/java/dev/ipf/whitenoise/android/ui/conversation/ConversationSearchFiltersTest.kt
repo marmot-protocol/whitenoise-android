@@ -5,8 +5,10 @@ import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchChatFilter
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchChatType
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterCategory
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchStateSaver
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -80,5 +82,63 @@ class ConversationSearchFiltersTest {
         assertEquals(ConversationSearchScanStatus.COMPLETE, conversationSearchScanStatus("", emptyList(), false, true))
         assertEquals(ConversationSearchScanStatus.FAILED, conversationSearchScanStatus("", null, true, true))
         assertEquals(ConversationSearchScanStatus.IDLE, conversationSearchScanStatus("", null, false))
+    }
+
+    /** Clearing message filters never removes the named chat or changes query/account ownership. */
+    @Test
+    fun clearKeepsConversationScopeAndQuery() {
+        val state =
+            conversationSearchPreset("account", 3, "chat", "Community").copy(
+                query = "needle",
+                senderFilters = setOf(GlobalSearchSenderFilter("author", "Alice")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Last7Days,
+                contentFilterSelection = GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.LINKS)),
+            )
+        val cleared = clearConversationSearchFilters(state)
+        assertEquals(state.chatFilters, cleared.chatFilters)
+        assertEquals(state.accountScopeToken, cleared.accountScopeToken)
+        assertEquals(state.query, cleared.query)
+        assertTrue(keepsConversationSearchNavigator(cleared, "chat"))
+        assertFalse(cleared.messageFiltersActive)
+    }
+
+    /** Explicit broadening preserves message intent and removes only cross-chat restrictions. */
+    @Test
+    fun explicitBroadeningKeepsCompatibleFiltersAndAccountOwner() {
+        val state =
+            conversationSearchPreset("account", 3, "chat", "Community").copy(
+                query = "needle",
+                folderFilters = setOf("folder"),
+                chatTypeFilters = setOf(GlobalSearchChatType.DIRECT),
+                senderFilters = setOf(GlobalSearchSenderFilter("author", "Alice")),
+                dateFilterSelection = GlobalSearchDateFilterSelection.Last7Days,
+                contentFilterSelection = GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.LINKS)),
+            )
+        val broader = broadenConversationSearch(state)
+        assertEquals(state.query, broader.query)
+        assertEquals(state.senderFilters, broader.senderFilters)
+        assertEquals(state.dateFilterSelection, broader.dateFilterSelection)
+        assertEquals(state.contentFilterSelection, broader.contentFilterSelection)
+        assertEquals(state.accountScopeToken, broader.accountScopeToken)
+        assertTrue(broader.folderFilters.isEmpty())
+        assertTrue(broader.chatTypeFilters.isEmpty())
+        assertTrue(broader.chatFilters.isEmpty())
+        assertFalse(keepsConversationSearchNavigator(broader, "chat"))
+    }
+
+    /** The canonical saver retains contradictory selections; restoration cannot manufacture results. */
+    @Test
+    fun restoredContradictionsRemainInTheCanonicalRequest() {
+        val state =
+            conversationSearchPreset("account", 3, "group", "Community").copy(
+                chatTypeFilters = setOf(GlobalSearchChatType.DIRECT),
+                folderFilters = setOf("different-folder"),
+            )
+        val saved = with(GlobalSearchStateSaver) { requireNotNull(SaverScope { true }.save(state)) }
+        assertEquals(state, GlobalSearchStateSaver.restore(saved))
+        val cleared = clearConversationSearchFilters(state)
+        assertEquals(state.chatFilters, cleared.chatFilters)
+        assertTrue(cleared.chatTypeFilters.isEmpty())
+        assertTrue(cleared.folderFilters.isEmpty())
     }
 }

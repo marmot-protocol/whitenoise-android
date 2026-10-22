@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterOptions
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterScope
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFolderOption
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.SearchFolderContext
 import dev.ipf.whitenoise.android.ui.chats.applyGlobalSearchChatScope
 import dev.ipf.whitenoise.android.ui.chats.chatFolderDisplayName
@@ -100,3 +101,16 @@ internal fun rememberConversationSearchControls(
         scoped.any { canonicalChatListGroupId(it.id) == canonicalChatListGroupId(chat.id) },
     )
 }
+
+/** Clear is a filter operation; the conversation's explicit scope remains selected. */
+internal fun clearConversationSearchFilters(state: GlobalSearchState): GlobalSearchState =
+    GlobalSearchTransitions.clearAllFilters(state).copy(chatFilters = state.chatFilters)
+
+/** Only this explicit action changes the conversation search to account-wide local search. */
+internal fun broadenConversationSearch(state: GlobalSearchState): GlobalSearchState =
+    state.copy(
+        openFilterCategory = null,
+        folderFilters = emptySet(),
+        chatTypeFilters = emptySet(),
+        chatFilters = emptySet(),
+    )
