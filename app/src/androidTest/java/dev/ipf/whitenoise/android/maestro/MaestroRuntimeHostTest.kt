@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
@@ -141,7 +142,10 @@ class MaestroRuntimeHostTest {
                 Marmot.newWithConfiguration(
                     root.absolutePath,
                     relays,
-                    MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+                    MarmotOptions(
+                        relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                        deployment = marmotDeploymentWhiteNoise(),
+                    ),
                 )
             var state: WhiteNoiseAppState? = null
             var activity: MaestroActivityOwner? = null
@@ -199,7 +203,10 @@ class MaestroRuntimeHostTest {
                         Marmot.newWithConfiguration(
                             root.absolutePath,
                             relays,
-                            MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+                            MarmotOptions(
+                                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                                deployment = marmotDeploymentWhiteNoise(),
+                            ),
                         )
                     peerLabel = accounts[1].label
                     groupId = group

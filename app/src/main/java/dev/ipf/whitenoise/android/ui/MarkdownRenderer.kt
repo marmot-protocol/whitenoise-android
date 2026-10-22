@@ -4,8 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,17 +37,24 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -54,6 +63,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextLinkStyles
@@ -64,10 +74,12 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
@@ -77,12 +89,12 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
-import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSearchHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighlight
@@ -115,29 +127,16 @@ import java.util.Locale
  *   fetches would bypass the encrypted-media pipeline, so we don't.
  * - Math (inline + block): monospace literal, no typesetting.
  *
- * Nostr entities are first-class. The "@" prefix is reserved for a real
- * group-member mention: a `NostrMention` whose resolved account is a current
- * member of the active group (per [isGroupMember]) renders as "@DisplayName"
- * (bold, tinted). A pasted npub/nprofile of a NON-member still resolves and
- * shows its display name via [mentionDisplayName], but WITHOUT the "@" — it
- * reads as an inline profile link, not a mention, so "@" keeps meaning
- * "addressing a member of this group" (#1017). An unresolved entity falls back
- * to its shortened bech32 in the code style. npub/nprofile entities route taps
- * to [onNostrProfileTap] (an in-app profile presentation — identity taps are
- * never handed to external apps via ACTION_VIEW) in every case;
- * note/nevent/naddr/nrelay stay styled but inert.
+ * Parsed npub/nprofile entities share a resolved username label and route taps to [onNostrProfileTap].
+ * Names and bounded identity fallbacks have the same appearance across DM/group, encoding and roster
+ * membership. Native mention eligibility and the receiver's self-mention treatment are separate.
+ * Other Nostr HRPs retain their existing inert rendering.
  */
 @Composable
 internal fun MarkdownMessageBody(
     document: MarkdownDocumentFfi,
     modifier: Modifier = Modifier,
     mentionDisplayName: ((String) -> String?)? = null,
-    // Whether a mention entity's bech32 resolves to a current member of the
-    // active group. Only a member gets the "@" mention treatment; a resolved
-    // non-member keeps its name but drops the "@" (#1017). Null (no roster
-    // available) treats every resolved mention as a member — the pre-#1017
-    // behavior — so DM/preview callers without a roster are unchanged.
-    isGroupMember: ((String) -> Boolean)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
     useDecorativeBackgrounds: Boolean = true,
     // Reports the layout of the final rendered text line so a caller can place
@@ -201,11 +200,10 @@ internal fun MarkdownMessageBody(
             }
         }
     val bodyContext =
-        remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds, hiddenEventIds) {
+        remember(linkListener, mentionDisplayName, useDecorativeBackgrounds, hiddenEventIds) {
             MarkdownBodyContext(
                 linkListener,
                 mentionDisplayName,
-                isGroupMember,
                 useDecorativeBackgrounds,
                 hiddenEventIds,
             )
@@ -290,7 +288,6 @@ internal const val MARKDOWN_MAX_EXTRA_BLANK_LINES = 6
 private data class MarkdownBodyContext(
     val linkListener: LinkInteractionListener,
     val mentionDisplayName: ((String) -> String?)?,
-    val isGroupMember: ((String) -> Boolean)?,
     val useDecorativeBackgrounds: Boolean,
     val hiddenEventIds: Set<String> = emptySet(),
 )
@@ -862,6 +859,13 @@ internal fun markdownHeadingTextStyle(
         else -> typography.bodyMedium
     }.copy(fontWeight = FontWeight.SemiBold)
 
+/**
+ * Keeps code/math source in LTR order within a bounded viewport, including in RTL conversations.
+ * Fitting source leaves horizontal drags to the bubble's swipe action. Overflowing source owns
+ * horizontal drags in either direction, including at its edges, so panning never unexpectedly replies.
+ * Fades indicate only the edges with more source to read; source text and selection remain unchanged.
+ * Saved offsets belong to this source and leaf: replacement resets them, while unchanged content stays restorable.
+ */
 @Composable
 private fun MarkdownCodeBlockView(
     content: String,
@@ -872,20 +876,66 @@ private fun MarkdownCodeBlockView(
     // phantom empty line inside the chip. Code/math blocks can be large, so
     // cache the sanitization work instead of repeating it on every recomposition.
     val text = remember(content) { markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n') }
+    val scrollState = rememberSaveable(content, leafId, saver = ScrollState.Saver) { ScrollState(0) }
 
-    MarkdownBodyText(
-        leafId = leafId,
-        text = AnnotatedString(text),
-        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    if (useDecorativeBackground) LocalContentColor.current.copy(alpha = 0.08f) else Color.Transparent,
-                    RoundedCornerShape(8.dp),
-                ).padding(horizontal = 10.dp, vertical = 8.dp),
-    )
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        if (useDecorativeBackground) {
+                            LocalContentColor.current.copy(alpha = 0.08f)
+                        } else {
+                            Color.Transparent
+                        },
+                        RoundedCornerShape(8.dp),
+                    ).padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            MarkdownBodyText(
+                leafId = leafId,
+                text = AnnotatedString(text),
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        textDirection = TextDirection.Ltr,
+                    ),
+                modifier =
+                    Modifier
+                        .codeOverflowFade(scrollState)
+                        .horizontalScroll(scrollState, enabled = scrollState.maxValue > 0),
+            )
+        }
+    }
 }
+
+/** Masks just the scroll viewport's text edges, retaining the caller's background in every theme. */
+private fun Modifier.codeOverflowFade(scrollState: ScrollState): Modifier =
+    if (scrollState.maxValue == 0) {
+        this
+    } else {
+        graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+            drawContent()
+            val width = minOf(16.dp.toPx(), size.width / 2f)
+            if (scrollState.canScrollBackward) {
+                drawRect(
+                    brush = Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), endX = width),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            if (scrollState.canScrollForward) {
+                drawRect(
+                    brush =
+                        Brush.horizontalGradient(
+                            listOf(Color.Black, Color.Transparent),
+                            startX = size.width - width,
+                            endX = size.width,
+                        ),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+        }
+    }
 
 /** One recognized `<details>` disclosure: optional summary label + the collapsed inline content. */
 internal data class MarkdownDetailsSection(
@@ -1208,7 +1258,7 @@ private fun MarkdownBlockQuoteView(
     depth: Int,
     path: String,
 ) {
-    Row(Modifier.height(IntrinsicSize.Min)) {
+    Row(Modifier.boundedIntrinsicHeight(IntrinsicSize.Min)) {
         Box(
             Modifier
                 .width(3.dp)
@@ -1375,12 +1425,12 @@ private fun rememberMarkdownInlineText(
     ctx: MarkdownBodyContext,
 ): AnnotatedString {
     val contentColor = LocalContentColor.current
-    // Collecting mentions is a structural O(nodes) walk; keep that keyed only on
+    // Collecting profile references is a structural O(nodes) walk; keep that keyed only on
     // the parsed inline tree. Resolving names still happens during composition so
     // the resolver can subscribe to profile state and invalidate the rendered
     // string when a profile arrives.
-    val mentionBech32s = remember(inlines) { markdownInlineMentionBech32s(inlines) }
-    val mentionNames = resolveMentionNames(mentionBech32s, ctx.mentionDisplayName)
+    val profileReferences = remember(inlines) { markdownInlineProfileReferenceBech32s(inlines) }
+    val profileNames = resolveProfileReferenceNames(profileReferences, ctx.mentionDisplayName)
     val timestampRevision = rememberTimestampRevision(remember(inlines) { markdownInlineTimestamps(inlines) })
     // A leaf that would be left empty keeps its references: only a top-level
     // paragraph may disappear, a heading, list item or cell stays readable.
@@ -1391,7 +1441,7 @@ private fun rememberMarkdownInlineText(
     // Links must derive from the content color like every other accent:
     // colorScheme.primary disappears on the outgoing bubble, whose container
     // IS primary. Underline alone carries the affordance on both surfaces.
-    return remember(inlines, contentColor, ctx, mentionNames, timestampRevision) {
+    return remember(inlines, contentColor, ctx, profileNames, timestampRevision) {
         markdownInlinesToAnnotatedString(
             inlines = inlines,
             codeStyle =
@@ -1410,16 +1460,15 @@ private fun rememberMarkdownInlineText(
                     textDecoration = TextDecoration.Underline,
                 ),
             linkListener = ctx.linkListener,
-            mentionDisplayName = mentionNames::get,
-            isGroupMember = ctx.isGroupMember,
+            mentionDisplayName = profileNames::get,
             useDecorativeBackgrounds = ctx.useDecorativeBackgrounds,
             hiddenEventIds = hiddenEventIds,
         )
     }
 }
 
-/** Mention bech32 → resolved display name (or null) for one inline tree. */
-private fun resolveMentionNames(
+/** Resolves display labels once per parsed reference for one visible inline tree. */
+private fun resolveProfileReferenceNames(
     bech32s: Set<String>,
     resolve: ((String) -> String?)?,
 ): Map<String, String?> {
@@ -1472,13 +1521,11 @@ internal const val CONFIRM_LINK_TAG_PREFIX = "confirm-link:"
  * [isOpenableMarkdownLink]) become tappable [LinkAnnotation.Url]s; anything
  * else (javascript:, data:, file:, …) renders its visible text with no
  * annotation at all, so there is nothing to tap and nothing to launch.
- * A resolved [MarkdownInlineFfi.NostrMention] renders as the bold "@Name"
- * mention only when [isGroupMember] reports its bech32 as a current member of
- * the active group; a resolved non-member keeps its display name but drops the
- * "@" and reads as an inline profile link (#1017). A null [isGroupMember]
- * treats every resolved mention as a member (the pre-#1017 behavior), so
- * roster-less callers are unaffected. Unresolved mentions fall back to their
- * shortened bech32 in [codeStyle].
+ * Parsed profile mentions and URIs share the bold "@Name" label, including external identities.
+ * Unresolved profiles keep a short "@" identity fallback. Roster membership, self-mention detection
+ * and native notification classification remain separate from this visual projection.
+ * Profile-bearing runs use first-strong Content direction for readable resolved names; other body
+ * runs retain their existing ambient direction. Composite previews set direction on their complete Text.
  */
 internal fun markdownInlinesToAnnotatedString(
     inlines: List<MarkdownInlineFfi>,
@@ -1486,7 +1533,6 @@ internal fun markdownInlinesToAnnotatedString(
     linkStyle: SpanStyle,
     linkListener: LinkInteractionListener? = null,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
     useDecorativeBackgrounds: Boolean = true,
     hiddenEventIds: Set<String> = emptySet(),
 ): AnnotatedString =
@@ -1498,12 +1544,14 @@ internal fun markdownInlinesToAnnotatedString(
                 linkStyle,
                 linkListener,
                 mentionDisplayName,
-                isGroupMember,
                 useDecorativeBackgrounds,
                 hiddenEventIds,
             ),
             depth = 0,
         )
+        if (length > 0 && markdownInlineProfileReferenceBech32s(inlines).isNotEmpty()) {
+            addStyle(ParagraphStyle(textDirection = TextDirection.Content), 0, length)
+        }
     }
 
 /** Immutable bundle threaded through the recursive inline walk. */
@@ -1512,7 +1560,6 @@ private class MarkdownInlineRenderContext(
     val linkStyle: SpanStyle,
     val linkListener: LinkInteractionListener?,
     val mentionDisplayName: ((String) -> String?)?,
-    val isGroupMember: ((String) -> Boolean)?,
     val useDecorativeBackgrounds: Boolean,
     val hiddenEventIds: Set<String>,
 ) {
@@ -1529,7 +1576,6 @@ private class MarkdownInlineRenderContext(
                 linkStyle,
                 linkListener,
                 mentionDisplayName,
-                isGroupMember,
                 useDecorativeBackgrounds,
                 hiddenEventIds = emptySet(),
             )
@@ -1598,84 +1644,68 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
 }
 
 /**
- * A group-member mention → "@DisplayName" (bold, tinted). A resolved
- * non-member reference (pasted npub/nprofile of someone outside the active
- * group) → its display name WITHOUT the "@" (underlined link styling), so the
- * "@" stays reserved for actually addressing a member (#1017). An unresolved
- * profile mention keeps the "@" only when no roster is available or the roster
- * snapshot says it is a member; known non-member misses render as shortened
- * bech32 without the "@" so cache misses do not leak a false mention signal.
- * A plain nostr: URI always renders as bare shortened bech32. npub/nprofile
- * entities carry a [LinkAnnotation.Clickable] routed (via the shared listener)
- * to the in-app profile sheet in every resolved/unresolved case; the other HRPs
- * (note/nevent/naddr/nrelay) have no in-app destination yet, so they stay inert.
+ * Parsed npub/nprofile references share a username label regardless of encoding or roster membership.
+ * The profile link retains the canonical native entity; visual treatment grants no membership or alert.
+ * Other Nostr entities retain their existing inert presentation.
  */
 internal data class MarkdownNostrEntityDisplay(
     val name: String?,
     val opensProfile: Boolean,
-    val mentionIsMember: Boolean,
+    val usesMentionStyle: Boolean,
     val shortened: String,
 ) {
-    val memberMention: Boolean = name != null && mentionIsMember
+    val resolvedMention: Boolean = name != null && usesMentionStyle
     val visibleText: String =
         when {
-            memberMention -> "@$name"
+            resolvedMention -> "@$name"
             name != null -> name
-            else -> (if (mentionIsMember) "@" else "") + shortened
+            else -> (if (usesMentionStyle) "@" else "") + shortened
         }
 }
 
 /**
- * Shared visible projection for bubbles, speech, and other non-interactive
- * Markdown surfaces. `@` is a group-membership signal for profile mentions;
- * without a roster snapshot, preserve the historical member treatment.
+ * Shares profile labels between visible text and speech without acquiring roster or notification authority.
  */
 internal fun markdownNostrEntityDisplay(
     entity: MarkdownNostrEntityFfi,
     mention: Boolean,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
 ): MarkdownNostrEntityDisplay {
-    val name = if (mention) mentionDisplayName?.invoke(entity.bech32) else null
-    val opensProfile =
-        entity.hrp == MarkdownNostrHrpFfi.NPUB || entity.hrp == MarkdownNostrHrpFfi.NPROFILE
-    val mentionIsMember =
-        mention &&
-            (!opensProfile || (isGroupMember?.invoke(entity.bech32) ?: true))
+    val opensProfile = entity.isProfileReference()
+    val name = if (opensProfile || mention) mentionDisplayName?.invoke(entity.bech32) else null
+    val usesMentionStyle = opensProfile || mention
     return MarkdownNostrEntityDisplay(
         name = name,
         opensProfile = opensProfile,
-        mentionIsMember = mentionIsMember,
+        usesMentionStyle = usesMentionStyle,
         shortened = shortenedBech32(entity.bech32),
     )
 }
 
+/** Applies the shared identity label and canonical profile target with the bubble's visible link colors. */
 private fun AnnotatedString.Builder.appendNostrEntity(
     entity: MarkdownNostrEntityFfi,
     mention: Boolean,
     ctx: MarkdownInlineRenderContext,
 ) {
-    val display = markdownNostrEntityDisplay(entity, mention, ctx.mentionDisplayName, ctx.isGroupMember)
+    val display = markdownNostrEntityDisplay(entity, mention, ctx.mentionDisplayName)
     val name = display.name
     val opensProfile = display.opensProfile
-    val mentionIsMember = display.mentionIsMember
-    val memberMention = display.memberMention
+    val resolvedMention = display.resolvedMention
     // The annotated run borrows the link color (LocalContentColor in the
     // bubble): a Clickable region is painted with ITS OWN TextLinkStyles —
     // when those are null, Material's Text falls back to the theme's default
     // link color (primary), which is invisible on the outgoing
     // primary-container bubble. Same color policy as linkStyle itself.
     //
-    // A resolved member mention also gets a slight background tint (#414) so it
+    // A resolved profile reference gets a slight background tint (#414) so it
     // reads as a highlighted token, not just bold text. The tint is an alpha
     // wash of the same content-derived link color rather than a scheme token,
     // so it stays visible on both the incoming surfaceVariant and outgoing
     // primaryContainer bubbles (a token fill would vanish into one of them).
-    // A resolved non-member name reads as an inline profile link (underline),
-    // not a mention: same content-derived color, no "@", no bold/tint.
     val style =
         when {
-            memberMention ->
+            resolvedMention ->
                 SpanStyle(
                     color = ctx.linkStyle.color,
                     fontWeight = FontWeight.Bold,
@@ -1705,7 +1735,7 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     } else {
         // Inert entities inherit the surrounding color normally — no
         // annotation, no color override needed.
-        withStyle(if (memberMention) SpanStyle(fontWeight = FontWeight.Bold) else ctx.codeStyle) {
+        withStyle(if (resolvedMention) SpanStyle(fontWeight = FontWeight.Bold) else ctx.codeStyle) {
             append(visible)
         }
     }
@@ -1901,25 +1931,29 @@ internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
         walk(inlines)
     }
 
-/** [markdownDocumentToPreviewAnnotatedString] with the chat-row code-chip style. */
+/**
+ * [markdownDocumentToPreviewAnnotatedString] with preview code-chip styling and live profile hydration.
+ * Concatenating callers disable [applyProfileDirection] and set direction on their complete Text instead.
+ */
 @Composable
 internal fun rememberMarkdownPreviewText(
     document: MarkdownDocumentFfi,
+    applyProfileDirection: Boolean = true,
     mentionDisplayName: ((String) -> String?)? = null,
 ): AnnotatedString {
     val contentColor = LocalContentColor.current
-    // Same name-resolution pattern as rememberMarkdownInlineText: resolve in
+    // Same profile-resolution pattern as rememberMarkdownInlineText: resolve in
     // composition (subscribing to the profile revision) and key the cache on
     // the result so a late-arriving profile re-flattens the row.
-    val mentionBech32s = remember(document) { markdownDocumentMentionBech32s(document) }
-    val mentionNames =
+    val profileReferences = remember(document) { markdownDocumentProfileReferenceBech32s(document) }
+    val profileNames =
         if (mentionDisplayName == null) {
             emptyMap()
         } else {
-            mentionBech32s.associateWith(mentionDisplayName)
+            profileReferences.associateWith(mentionDisplayName)
         }
     val timestampRevision = rememberTimestampRevision(remember(document) { markdownDocumentTimestamps(document) })
-    return remember(document, contentColor, mentionNames, timestampRevision) {
+    return remember(document, contentColor, profileNames, timestampRevision, applyProfileDirection) {
         markdownDocumentToPreviewAnnotatedString(
             document = document,
             codeStyle =
@@ -1927,7 +1961,8 @@ internal fun rememberMarkdownPreviewText(
                     fontFamily = FontFamily.Monospace,
                     background = contentColor.copy(alpha = 0.08f),
                 ),
-            mentionDisplayName = mentionNames::get,
+            mentionDisplayName = profileNames::get,
+            applyProfileDirection = applyProfileDirection,
         )
     }
 }
@@ -1953,17 +1988,24 @@ internal fun rememberMarkdownPreviewText(
  *   display name or shortened bech32) but, like links, stay annotation-free.
  * - The result is capped at [maxLength]; the walk stops early once the budget
  *   is spent so a huge message never builds a giant string for a one-line row.
+ *
+ * [applyProfileDirection] is disabled for fragments assembled into chat rows or focused previews;
+ * those callers style the complete text to avoid extra paragraph boundaries.
  */
 internal fun markdownDocumentToPreviewAnnotatedString(
     document: MarkdownDocumentFfi,
     codeStyle: SpanStyle,
     maxLength: Int = MARKDOWN_PREVIEW_MAX_LENGTH,
     mentionDisplayName: ((String) -> String?)? = null,
+    applyProfileDirection: Boolean = true,
 ): AnnotatedString {
     val projection = markdownDocumentToPreviewProjection(document, maxLength, mentionDisplayName, captureStyles = true)
     return EmojiShortcodes.annotate(
         buildAnnotatedString {
             append(projection.text)
+            if (applyProfileDirection && length > 0 && markdownDocumentProfileReferenceBech32s(document).isNotEmpty()) {
+                addStyle(ParagraphStyle(textDirection = TextDirection.Content), 0, length)
+            }
             projection.ranges.forEach { range ->
                 val style =
                     when (range.style) {

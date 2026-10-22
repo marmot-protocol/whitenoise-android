@@ -201,7 +201,6 @@ class MessageFullScreenSelectionBackTest {
             body = body,
             bodyMarkdownDocument = null,
             mentionDisplayName = null,
-            isGroupMember = null,
             onNostrProfileTap = null,
             onCopyMarkdownLink = {},
             timeText = "10:30",

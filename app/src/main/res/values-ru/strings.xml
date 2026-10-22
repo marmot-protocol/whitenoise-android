@@ -850,6 +850,7 @@
     <string name="toast_profile_published_detail">Ваш профиль теперь доступен на %1$d реле.</string>
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
+    <string name="toast_send_storage_full">Недостаточно места для отправки. Освободите место и попробуйте снова.</string>
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>
     <string name="toast_send_queue_full">В этом чате слишком много сообщений ожидает отправки, поэтому ваше не отправлено. Повторите попытку, когда очередь разберётся.</string>
     <string name="toast_send_chat_changed">Чат изменился во время отправки, поэтому сообщение не отправлено. Повторите попытку.</string>
@@ -1838,8 +1839,8 @@
     <string name="developer_tools_already_enabled">Инструменты разработчика уже включены</string>
     <string name="appearance_outline_colors_fixed">В теме AMOLED кнопки действий всегда белые. Цвета контуров сообщений можно настроить в разделе «Цвета сообщений».</string>
     <string name="appearance_theme">Тема</string>
-    <string name="appearance_theme_help">Системные настройки по умолчанию соответствуют вашему устройству. Светлый и Темный сохраняют выбранный вид. AMOLED использует черный фон с белыми контурами.</string>
-    <string name="appearance_amoled_detail">Чистый чёрный фон с чёткими белыми контурами.</string>
+    <string name="appearance_theme_help">Системный режим следует настройкам устройства. Светлый и тёмный режимы сохраняют выбранный вид. AMOLED сохраняет чёрный фон, настраиваемые контуры сообщений и белые кнопки действий.</string>
+    <string name="appearance_amoled_detail">Чёрный фон с настраиваемыми контурами сообщений.</string>
     <string name="appearance_font_size_help">Размер текста добавляется к настройке размера шрифта вашего устройства.</string>
     <string name="appearance_enter_help">Shift+Enter всегда вставляет новую строку на аппаратной клавиатуре.</string>
     <string name="appearance_font_system">Системный</string>
@@ -2329,7 +2330,7 @@
     <string name="profile_readiness_recommended">Рекомендуется</string>
     <string name="profile_readiness_field_optional">Необязательно</string>
     <string name="agent_connector_claude_subtitle">Агент для программирования Claude Code CLI</string>
-    <string name="agent_connector_claude_prompt">Это запрос на установку для подключения этой конфигурации Claude Code к White Noise через Marmot. Прочитайте авторитетное руководство по harness Claude Code: https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md и постоянное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Подтвердите предварительные требования: CLI Claude Code установлена, аутентифицирована и доступна в PATH, а эта машина использует тот же набор публичных релеев, что и мой телефон. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения используйте релизный поток install-claude-marmot.sh с проверкой контрольной суммы, выполните bootstrap wn-agent для этой npub с разрешенным welcomer и проверьте wn-claude --version. Затем ответьте npub вашего агента и попросите меня пригласить его из White Noise и отправить тестовое сообщение с этой разрешенной npub через настроенные реле. Не сообщайте о завершении настройки, пока wn-claude не ответит через White Noise; если этот обмен нельзя проверить автоматически, явно укажите, что требуется проверка на устройстве.</string>
+    <string name="agent_connector_claude_prompt">Это запрос на установку для подключения этой конфигурации Claude Code к White Noise через Marmot. Вставьте это в Claude Code в терминале компьютера, на котором будет работать агент. Мобильное приложение Claude и его облачные сеансы не могут установить коннектор на этот компьютер. Прочитайте авторитетное руководство по harness Claude Code: https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md и постоянное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Подтвердите предварительные требования: CLI Claude Code установлена, аутентифицирована и доступна в PATH. Если чего-то не хватает, объясните по https://code.claude.com/docs/en/setup необходимые шаги установки, настройки PATH или входа и запросите моё одобрение до любых изменений на компьютере, включая установку Claude Code и изменение PATH или настроек входа. Попросите меня проверить на телефоне, что список публичных релеев содержит wss://relay.eu.whitenoise.chat и wss://relay.us.whitenoise.chat; не утверждайте, что проверили настройки телефона с компьютера. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения используйте релизный поток install-claude-marmot.sh с проверкой контрольной суммы, выполните bootstrap wn-agent с этой npub как единственным разрешённым welcomer и проверьте wn-claude --version. Объясните, что скачанный установщик запускается командой bash install-claude-marmot.sh, а не двойным щелчком. Затем ответьте npub вашего агента и попросите меня пригласить его из White Noise. Моё первое сообщение в приглашённой группе должно выбрать существующую папку относительно домашнего каталога компьютера агента: /Claude означает $HOME/Claude, а не /Users/me/Claude. Затем попросите меня отправить тестовое сообщение с этой разрешенной npub через настроенные реле. Не сообщайте о завершении настройки, пока wn-claude не ответит через White Noise; если этот обмен нельзя проверить автоматически, явно укажите, что требуется проверка на устройстве.</string>
     <string name="ai_agents_project_groups_tip">Используй отдельную группу для каждого проекта и начинай с его расположения и контекста. Команды сеанса зависят от коннектора; проверь руководство перед возобновлением сеанса или созданием ветки.</string>
     <string name="nostr_event_view_image">Показать изображение</string>
     <string name="nostr_event_image_failed">Не удалось загрузить изображение. Попробуйте ещё раз.</string>
@@ -2403,6 +2404,9 @@
     <string name="chat_departure_confirm">Проверьте %1$d выбранных чатов. Вы выйдете из групп и удалите их с этого устройства; личные чаты удаляются локально. Другие участники сохранят свои копии. Перед удалением потребуется подтвердить передачу прав администратора.</string>
     <string name="chat_departure_result">%1$d завершено · %2$d не завершено · %3$d пропущено. Повторная попытка проверяет участие и продолжает только незавершённые действия.</string>
     <string name="chat_departure_admin_granted">Права администратора переданы. Выход из группы ещё не завершён.</string>
+    <string name="notification_push_storage_unavailable">Не удалось прочитать сохранённые настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку после разблокировки устройства.</string>
+    <string name="notification_push_import_pending">Не удалось восстановить некоторые прежние настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку, чтобы проверить их снова.</string>
+    <string name="notification_push_cleanup_unknown">Не удалось подтвердить прежнюю очистку push-уведомлений. Регистрация push-уведомлений приостановлена. Повторная попытка проверит сохранённое состояние, не удаляя и не сбрасывая его.</string>
     <string name="reaction_details_loading">Загрузка реакций…</string>
     <string name="reaction_details_load_failed">Не удалось загрузить реакции.</string>
     <string name="group_create_remove_and_continue">Удалить этого участника и продолжить</string>
@@ -2428,7 +2432,20 @@
     <string name="group_change_invite_anyway">Всё равно пригласить</string>
     <string name="starting_as">Начать от имени</string>
     <string name="starting_as_account">Начать от имени %1$s</string>
-    <string name="notification_push_storage_unavailable">Не удалось прочитать сохранённые настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку после разблокировки устройства.</string>
-    <string name="notification_push_import_pending">Не удалось восстановить некоторые прежние настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку, чтобы проверить их снова.</string>
-    <string name="notification_push_cleanup_unknown">Не удалось подтвердить прежнюю очистку push-уведомлений. Регистрация push-уведомлений приостановлена. Повторная попытка проверит сохранённое состояние, не удаляя и не сбрасывая его.</string>
+    <string name="group_action_acting_account">Аккаунт для действия</string>
+    <string name="group_action_local_nickname">Локальное имя: %1$s</string>
+    <string name="group_action_public_key_hex">Открытый ключ (hex)</string>
+    <string name="group_action_account_label">Локальная метка аккаунта: %1$s</string>
+    <string name="group_action_revoke_explanation">Это действие лишает прав администратора. Человек остаётся участником.</string>
+    <string name="group_action_add_members">Добавить участников</string>
+    <string name="group_action_transfer_and_leave">Передать права администратора и выйти</string>
+    <string name="group_action_step_down_and_leave">Сложить права администратора и выйти</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d группа</item>
+        <item quantity="few">%1$d группы</item>
+        <item quantity="many">%1$d групп</item>
+        <item quantity="other">%1$d группы</item>
+    </plurals>
+    <string name="group_review_add_member">Добавить участника</string>
+    <string name="group_review_invitation_visibility">Видно всем участникам.</string>
 </resources>

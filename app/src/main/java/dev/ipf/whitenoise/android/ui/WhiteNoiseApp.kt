@@ -772,7 +772,7 @@ internal fun WhiteNoiseApp(
         if (!groupChangeQuestionOwned) groupChangeQuestion?.answer(proceed = false)
     }
     if (!appState.appLockScreenVisible && groupChangeQuestion != null && groupChangeQuestionOwned) {
-        GroupChangeConfirmationDialog(groupChangeQuestion)
+        GroupChangeConfirmationDialog(groupChangeQuestion, appState)
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(

@@ -162,6 +162,15 @@ must keep Gradle verification strict. Version/security floors still apply before
 selection. A lock that conflicts with an intentional floor/update must be reviewed
 and updated, rather than weakening that floor or excluding transitives.
 
+The `dev.detekt:dev.detekt.gradle.plugin` marker resolves only from Maven Central.
+Its reviewed `2.0.0-alpha.6` POM hashes to
+`8490ffa5bad1d7f069a8dbbcd8ef90fa832c2a84aa66701f4025d4a2f95e4214`;
+the Plugin Portal publishes a different POM for that same coordinate. The narrow
+repository filter prevents cached Portal selection from substituting those
+unapproved metadata bytes. It leaves the existing supplier evidence, dependency
+locks and strict checksum verification intact. Revisit the filter during a
+reviewed Detekt update if the publication paths change.
+
 The reviewed bootstrap evidence in `gradle/dependency-inputs.json` binds the exact
 lock and verification files to a hosted source revision, observed configuration
 coverage, official HTTPS supplier URLs and independent checksum/payload checks.

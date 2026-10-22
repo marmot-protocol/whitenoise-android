@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
@@ -12,6 +13,73 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NostrEventReaderBlocksTest {
+    /** A URL's double slash moves together when the lazy-item budget lands immediately after it. */
+    @Test
+    fun codeChunkingKeepsDoubleSlashWithItsFollowingText() {
+        val prefix = "a".repeat(4088) + "https:"
+        val content = prefix + "//example.com/filename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals(prefix, chunks.first())
+        assertEquals("//example.com/filename", chunks.last())
+        assertTrue(chunks.all { it.length <= 4096 })
+    }
+
+    /** Raw math uses separate reader items and preserves the same slash boundary as fenced source. */
+    @Test
+    fun mathChunksKeepDoubleSlashWithItsFollowingText() {
+        val prefix = "a".repeat(4094)
+        val content = prefix + "//filename"
+        val document = MarkdownDocumentFfi(listOf(MarkdownBlockFfi.MathBlock(content)), false, byteArrayOf())
+        val chunks = nostrReaderBlocks(document).map { (it as MarkdownBlockFfi.MathBlock).content }
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals(listOf(prefix, "//filename"), chunks)
+    }
+
+    /** Even a slash-only run larger than one item must make progress without losing or growing source. */
+    @Test
+    fun oversizedSlashRunsRemainBoundedAndReconstructExactly() {
+        val content = "/".repeat(4200) + "filename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals(2, chunks.size)
+        assertTrue(chunks.all { it.isNotEmpty() && it.length <= 4096 })
+    }
+
+    /** Very long slash runs keep item count proportional to the text budget, rather than character count. */
+    @Test
+    fun largeSlashRunDoesNotAmplifyLazyItems() {
+        val content = "/".repeat(100_000) + "filename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals((content.length + 4095) / 4096, chunks.size)
+        assertTrue(chunks.all { it.isNotEmpty() && it.length <= 4096 })
+    }
+
+    /** Artificial lazy-item boundaries cannot strand a path's slash on the preceding item. */
+    @Test
+    fun codePathChunksKeepSlashWithTheFilenameAndRetainEveryCharacter() {
+        val content = "a".repeat(4095) + "/" + "\uD83D\uDE00_filename".repeat(900)
+        val block = MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", content)
+        val document = MarkdownDocumentFfi(listOf(block), false, byteArrayOf())
+        val chunks = nostrReaderBlocks(document).map { (it as MarkdownBlockFfi.CodeBlock).content }
+        assertTrue(chunks.size > 1)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals("a".repeat(4095), chunks.first())
+        assertTrue(chunks[1].startsWith("/\uD83D\uDE00_filename"))
+        assertTrue(chunks.all { it.length <= 4096 && !it.first().isLowSurrogate() && !it.last().isHighSurrogate() })
+    }
+
+    /** Source newlines remain intentional break opportunities even immediately after a slash. */
+    @Test
+    fun codeChunkingPreservesAnExplicitNewlineAfterTheSlash() {
+        val content = "a".repeat(4095) + "/\nfilename"
+        val chunks = nostrReaderTextChunks(content, keepSlashWithFollowingText = true)
+        assertEquals(content, chunks.joinToString(""))
+        assertEquals("a".repeat(4095) + "/", chunks.first())
+        assertEquals("\nfilename", chunks.last())
+    }
+
     @Test
     fun oversizedNestedMarkdownFallsBackRatherThanElidingEventContent() {
         val paragraph = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("context ".repeat(1000))))

@@ -800,6 +800,7 @@
     <string name="toast_profile_published_detail">你的个人资料已发布到 %1$d 个中继。</string>
     <string name="toast_couldnt_publish_profile">无法发布个人资料</string>
     <string name="toast_send_failed">发送失败</string>
+    <string name="toast_send_storage_full">存储空间不足，无法发送。请释放空间后重试。</string>
     <string name="toast_send_connection_failed">无法连接到中继。请检查网络连接，然后重试。</string>
     <string name="toast_send_queue_full">此聊天有太多消息在等待发送，因此你的消息未发送。等积压清空后再试。</string>
     <string name="toast_send_chat_changed">发送期间聊天已更改，因此消息未发出。请重试。</string>
@@ -1747,8 +1748,8 @@
     <string name="developer_tools_already_enabled">开发者工具已开启</string>
     <string name="appearance_outline_colors_fixed">AMOLED 操作按钮使用固定白色。消息气泡轮廓可在“气泡颜色”中自定义。</string>
     <string name="appearance_theme">主题</string>
-    <string name="appearance_theme_help">系统默认跟踪您的设备 。 光和暗保持选定的外观.AMOLED使用带有白色轮廓的黑色背景。</string>
-    <string name="appearance_amoled_detail">纯黑背景，搭配清晰的白色轮廓。</string>
+    <string name="appearance_theme_help">系统默认跟随设备设置。浅色和深色模式保持所选外观。AMOLED 保持纯黑背景、可自定义的消息气泡轮廓和白色操作按钮。</string>
+    <string name="appearance_amoled_detail">纯黑背景，搭配可自定义的消息气泡轮廓。</string>
     <string name="appearance_font_size_help">文本大小添加到设备字体大小设置中。</string>
     <string name="appearance_enter_help">Shift+Enter 总是在硬件键盘上插入新行.</string>
     <string name="appearance_font_system">系统</string>
@@ -2229,7 +2230,7 @@
     <string name="profile_readiness_recommended">建议填写</string>
     <string name="profile_readiness_field_optional">选填</string>
     <string name="agent_connector_claude_subtitle">Claude Code CLI 编程助手</string>
-    <string name="agent_connector_claude_prompt">这是一条安装提示，用于通过 Marmot 将此 Claude Code 设置连接到 White Noise。请阅读权威 Claude Code harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md，以及长期有效的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。确认前提条件：Claude Code CLI 已安装、已认证并可在 PATH 中使用，且此机器使用与手机相同的公共中继集合。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请使用经过校验和验证的 install-claude-marmot.sh 发布流程，为该 npub 引导 wn-agent 并使用允许的 welcomer，然后验证 wn-claude --version。接下来回复你的代理 npub，请我在 White Noise 中邀请它，并通过已配置的中继从这个允许的 npub 发送测试消息。在 wn-claude 通过 White Noise 回复之前，不要声称设置已完成；如果无法自动验证这一往返流程，请明确标记仍需设备验证。</string>
+    <string name="agent_connector_claude_prompt">这是一条安装提示，用于通过 Marmot 将此 Claude Code 设置连接到 White Noise。请将此提示粘贴到运行代理的电脑上、终端中的 Claude Code。Claude 手机应用及其云端会话无法在该电脑上安装连接器。请阅读权威 Claude Code harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md，以及长期有效的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。确认前提条件：Claude Code CLI 已安装、已认证并可在 PATH 中使用。如有缺失，请参考 https://code.claude.com/docs/en/setup 解释所需的安装、PATH 或登录步骤，并在对电脑进行任何更改之前请求我的批准，包括安装 Claude Code 或更改 PATH 或登录设置。请让我在手机上检查公共中继列表是否包含 wss://relay.eu.whitenoise.chat 和 wss://relay.us.whitenoise.chat；不要声称已从电脑验证手机设置。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请使用经过校验和验证的 install-claude-marmot.sh 发布流程，引导 wn-agent，并仅允许该 npub 作为 welcomer，然后验证 wn-claude --version。请说明下载的安装脚本应通过 bash install-claude-marmot.sh 运行，而非双击。 接下来回复你的代理 npub，请我在 White Noise 中邀请它。在受邀群组中，我的第一条消息应选择相对于代理电脑主目录的现有文件夹：/Claude 表示 $HOME/Claude，而非 /Users/me/Claude。然后请我通过已配置的中继从这个允许的 npub 发送测试消息。在 wn-claude 通过 White Noise 回复之前，不要声称设置已完成；如果无法自动验证这一往返流程，请明确标记仍需设备验证。</string>
     <string name="ai_agents_project_groups_tip">每个项目使用单独的群组，先说明项目位置和上下文。不同连接器的会话控制不同，使用恢复会话或分支命令前请查看对应指南。</string>
     <string name="nostr_event_view_image">查看图片</string>
     <string name="nostr_event_image_failed">无法加载此图片，请重试。</string>
@@ -2297,6 +2298,9 @@
     <string name="chat_departure_confirm">检查所选的 %1$d 个聊天。将退出已加入的群组并从此设备删除；私聊仅在本地删除。其他成员保留其副本。删除前会确认所需的管理员移交。</string>
     <string name="chat_departure_result">%1$d 个已完成 · %2$d 个未完成 · %3$d 个已跳过。重试会检查成员身份，仅继续未完成的操作。</string>
     <string name="chat_departure_admin_granted">管理员权限已转移。退出群组尚未完成。</string>
+    <string name="notification_push_storage_unavailable">无法读取已保存的推送设置。设置已保留，推送注册已暂停。请在设备解锁后重试。</string>
+    <string name="notification_push_import_pending">无法恢复部分旧推送设置。设置已保留，推送注册已暂停。请重试以再次检查。</string>
+    <string name="notification_push_cleanup_unknown">无法确认之前的推送清理是否完成。推送注册已暂停。重试会再次检查已保存的状态，不会将其删除或重置。</string>
     <string name="reaction_details_loading">正在加载回应…</string>
     <string name="reaction_details_load_failed">无法加载回应。</string>
     <string name="group_create_remove_and_continue">移除此人并继续</string>
@@ -2322,7 +2326,17 @@
     <string name="group_change_invite_anyway">仍然邀请</string>
     <string name="starting_as">以此身份发起</string>
     <string name="starting_as_account">以 %1$s 的身份发起</string>
-    <string name="notification_push_storage_unavailable">无法读取已保存的推送设置。设置已保留，推送注册已暂停。请在设备解锁后重试。</string>
-    <string name="notification_push_import_pending">无法恢复部分旧推送设置。设置已保留，推送注册已暂停。请重试以再次检查。</string>
-    <string name="notification_push_cleanup_unknown">无法确认之前的推送清理是否完成。推送注册已暂停。重试会再次检查已保存的状态，不会将其删除或重置。</string>
+    <string name="group_action_acting_account">操作账号</string>
+    <string name="group_action_local_nickname">本地昵称：%1$s</string>
+    <string name="group_action_public_key_hex">公钥（十六进制）</string>
+    <string name="group_action_account_label">本地账号标签：%1$s</string>
+    <string name="group_action_revoke_explanation">这将移除管理员权限。该用户仍是成员。</string>
+    <string name="group_action_add_members">添加成员</string>
+    <string name="group_action_transfer_and_leave">转让管理员权限并退出</string>
+    <string name="group_action_step_down_and_leave">放弃管理员权限并退出</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="other">%1$d 个群组</item>
+    </plurals>
+    <string name="group_review_add_member">添加成员</string>
+    <string name="group_review_invitation_visibility">所有成员可见。</string>
 </resources>

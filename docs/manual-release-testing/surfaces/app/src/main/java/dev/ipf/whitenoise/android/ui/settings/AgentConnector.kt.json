@@ -27,7 +27,8 @@
         "anchor": "R.string.agent_connector_claude_prompt",
         "test_ids": [
           "SET-016",
-          "SET-017"
+          "SET-017",
+          "SET-038"
         ]
       },
       {

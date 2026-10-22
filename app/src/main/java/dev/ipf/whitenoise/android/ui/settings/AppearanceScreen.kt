@@ -158,10 +158,10 @@ internal fun AppearanceScreen(
                 }
             }
             item { SettingsExplainer(stringResource(R.string.appearance_theme_help)) }
-            // AMOLED fixes both palettes to white, so the colour editors leave the list instead of sitting disabled.
-            if (!amoled) {
-                item {
-                    SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
+            item {
+                SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
+                    // AMOLED keeps white action buttons, while bubble outlines remain customizable.
+                    if (!amoled) {
                         row("action_color") { context ->
                             SettingsLink(
                                 context = context,
@@ -169,13 +169,13 @@ internal fun AppearanceScreen(
                                 onClick = onOpenActionColor,
                             )
                         }
-                        row("chat_bubble_colors") { context ->
-                            SettingsLink(
-                                context = context,
-                                title = stringResource(R.string.chat_bubble_colors),
-                                onClick = onOpenChatBubbleColors,
-                            )
-                        }
+                    }
+                    row("chat_bubble_colors") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.chat_bubble_colors),
+                            onClick = onOpenChatBubbleColors,
+                        )
                     }
                 }
             }

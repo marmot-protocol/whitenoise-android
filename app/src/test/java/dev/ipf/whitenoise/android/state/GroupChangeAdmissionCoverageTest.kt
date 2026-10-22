@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -15,15 +16,18 @@ class GroupChangeAdmissionCoverageTest {
         val calls =
             sources().flatMap { file ->
                 val lines = file.readLines()
+                val admittedBodies = groupChangeBodies(lines)
                 lines.indices
                     // Binding calls are unqualified inside marmotIo; a dotted call is a host wrapper, not MDK.
                     .filter { index -> GUARDED.any { Regex("""(?<![.\w])$it\(""").containsMatchIn(lines[index]) } }
                     .filterNot { lines[it].contains("fun ") }
-                    .map { index -> Triple(file.name, index + 1, lines.subList(maxOf(0, index - WINDOW), index)) }
+                    .map { index ->
+                        Triple(file.name, index + 1, admittedBodies.filter { index - it.first in 1..WINDOW })
+                    }
             }
 
         assertTrue("no guarded group change found; the gate is reading the wrong sources", calls.size >= MIN_CALLS)
-        val unguarded = calls.filterNot { (_, _, before) -> before.any { "runGroupChange(" in it } }
+        val unguarded = calls.filter { (_, _, bodies) -> bodies.isEmpty() }
         assertTrue(
             "group changes MDK can refuse must go through runGroupChange: " +
                 unguarded.joinToString { "${it.first}:${it.second}" },
@@ -43,11 +47,61 @@ class GroupChangeAdmissionCoverageTest {
                 lines.indices
                     .filter { "runGroupChange(" in lines[it] && "fun " !in lines[it] }
                     .filter { index ->
-                        val change = lines.subList(index + 1, minOf(lines.size, index + NESTED_WINDOW))
+                        val body = groupChangeBodies(lines).first { it.second == index }.first
+                        val change = lines.subList(body + 1, minOf(lines.size, body + NESTED_WINDOW))
                         change.any { "withGroupCommitLock(" in it }
                     }.map { "${file.name}:${it + 1}" }
             }
         assertTrue("runGroupChange must not take the commit lock inside its change: $nested", nested.isEmpty())
+    }
+
+    /** Every user-visible retry keeps its action; membership actions also keep the exact affected people. */
+    @Test
+    fun retryQuestionsKeepActionAndAffectedPeople() {
+        sources().forEach { file ->
+            val lines = file.readLines()
+            groupChangeBodies(lines).forEach { (body, start) ->
+                val header = lines.subList(start, body + 1).joinToString(" ")
+                assertTrue("${file.name}:${start + 1} loses the action", "actionLabel =" in header)
+                val native = lines.subList(body + 1, minOf(lines.size, body + WINDOW + 1)).joinToString(" ")
+                if (MEMBER_CHANGES.any { Regex("""(?<![.\w])$it\(""").containsMatchIn(native) }) {
+                    assertTrue("${file.name}:${start + 1} loses affected people", "affectedMemberIds =" in header)
+                }
+            }
+        }
+    }
+
+    /** Start the existing distance bound at the callback body, excluding a multiline metadata argument list. */
+    private fun groupChangeBodies(lines: List<String>): List<Pair<Int, Int>> =
+        lines.indices.filter { "runGroupChange(" in lines[it] && "fun " !in lines[it] }.map { start ->
+            var argumentDepth = 0
+            val body =
+                (start until minOf(lines.size, start + HEADER_WINDOW)).firstOrNull { index ->
+                    val line =
+                        lines[index]
+                            .replace(Regex("\"(?:\\\\.|[^\"\\\\])*\""), "")
+                            .substringBefore("//")
+                    argumentDepth += line.count { it == '(' } - line.count { it == ')' }
+                    argumentDepth == 0 && line.trimEnd().endsWith(") {")
+                } ?: error("Unbounded runGroupChange header at ${start + 1}")
+            body to start
+        }
+
+    /** Metadata may contain an if block; admission starts after the entire argument list closes. */
+    @Test
+    fun metadataConditionDoesNotStartTheGuardedCallback() {
+        val lines =
+            listOf(
+                "appState.runGroupChange(",
+                "    account, group,",
+                "    actionLabel = if (draft == null) {",
+                "        R.string.remove_photo",
+                "    } else { R.string.change_photo },",
+                ") {",
+                "    updateGroupImage(account, group, bytes, mediaType)",
+                "}",
+            )
+        assertEquals(listOf(5 to 0), groupChangeBodies(lines))
     }
 
     /** The admission helper acknowledges exactly the two advisory refusals MDK lets a user override. */
@@ -105,7 +159,19 @@ class GroupChangeAdmissionCoverageTest {
                 "updateGroupProfile",
             )
 
-        /** How far above a call its runGroupChange may open. */
+        val MEMBER_CHANGES =
+            listOf(
+                "inviteMembersDetailed",
+                "inviteMembersDetailedWithInitialAdmins",
+                "removeMembersDetailed",
+                "promoteAdminDetailed",
+                "demoteAdminDetailed",
+            )
+
+        /** Maximum metadata header size; the callback's original body window remains unchanged. */
+        const val HEADER_WINDOW = 32
+
+        /** How far above a call its runGroupChange callback may open. */
         const val WINDOW = 8
 
         /** How far below a runGroupChange call its change could open the commit lock. */

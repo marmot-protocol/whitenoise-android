@@ -52,7 +52,6 @@ class MessageBodyMarkdownComposeTest {
                     body = raw,
                     markdownDocument = resolved,
                     mentionDisplayName = null,
-                    isGroupMember = null,
                     onNostrProfileTap = null,
                     onCopyMarkdownLink = {},
                 )
@@ -93,7 +92,6 @@ class MessageBodyMarkdownComposeTest {
                     body = raw,
                     markdownDocument = resolved,
                     mentionDisplayName = null,
-                    isGroupMember = null,
                     onNostrProfileTap = null,
                     onCopyMarkdownLink = {},
                 )

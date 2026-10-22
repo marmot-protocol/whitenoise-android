@@ -196,6 +196,33 @@ class DependencyInputsTest(unittest.TestCase):
                 self.save()
                 inputs.validate_bundle(self.root)
 
+    def test_post_lock_selection_requires_declared_plugin_classpath(self):
+        """An app selection cannot stand in for the reviewed root plugin graph."""
+        self.manifest['post_lock_selection'] = [{
+            'scope': 'plugin', 'project': ':', 'configuration': 'classpath',
+            'additional_coordinates': ['example:library:1.0'],
+            'reason': 'Normal plugin graph retains this already checked coordinate',
+            'evidence': 'https://github.com/marmot-protocol/whitenoise-android/actions/runs/1/job/2'}]
+        app = self.root / 'app/gradle.lockfile'
+        rows = app.read_text().splitlines()
+        rows = ['empty=' + ','.join(c for c in row[6:].split(',') if c != 'devPlayDebugRuntimeClasspath')
+                if row.startswith('empty=') else row for row in rows]
+        app.write_text('\n'.join(rows) + '\nexample:library:1.0=devPlayDebugRuntimeClasspath\n')
+        self.manifest['files']['app/gradle.lockfile'] = hashlib.sha256(app.read_bytes()).hexdigest()
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'declared project/configuration'):
+            inputs.validate_bundle(self.root)
+        plugin = self.root / 'buildscript-gradle.lockfile'
+        plugin.write_text('example:library:1.0=otherConfiguration\nempty=classpath\n')
+        self.manifest['files']['buildscript-gradle.lockfile'] = hashlib.sha256(plugin.read_bytes()).hexdigest()
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'declared project/configuration'):
+            inputs.validate_bundle(self.root)
+        plugin.write_text('example:library:1.0=classpath\nempty=\n')
+        self.manifest['files']['buildscript-gradle.lockfile'] = hashlib.sha256(plugin.read_bytes()).hexdigest()
+        self.save()
+        self.assertEqual((10, 1), inputs.validate_bundle(self.root))
+
     def test_changed_bytes_and_missing_module_lock_fail(self):
         """A validly formatted changed lock is still stale evidence."""
         path = self.root / 'fuzz/gradle.lockfile'

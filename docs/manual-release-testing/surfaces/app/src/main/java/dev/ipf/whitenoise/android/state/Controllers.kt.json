@@ -633,6 +633,118 @@
           "CHL-027",
           "CHL-028"
         ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.change_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.change_photo",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.disappearing_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.disappearing_messages",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.edit_group_info_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.edit_group_info_title",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_action_add_members",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_step_down_and_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_action_step_down_and_leave",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_disband_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_disband_action",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_disband_enable_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_disband_enable_action",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.make_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.remove_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.remove_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.remove_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.remove_member",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.remove_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.remove_photo",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.step_down_as_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.step_down_as_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Transfer retry keeps the combined transfer action and affected successor",
+        "anchor": "R.string.transfer_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Chat-list successor retry names the combined transfer and departure",
+        "anchor": "R.string.group_action_transfer_and_leave",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ],
     "source_coverage": [

@@ -8,10 +8,14 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.GroupChangeCaution
 import dev.ipf.whitenoise.android.state.GroupChangeConfirmation
 import dev.ipf.whitenoise.android.state.GroupChangeTarget
+import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
 import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
+import dev.ipf.whitenoise.android.ui.share.emptyAppState
+import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -77,11 +81,22 @@ class GroupChangeConfirmationScreenshotTest {
         fontScale: Float = 1f,
     ): CompletableDeferred<Boolean> {
         val decision = CompletableDeferred<Boolean>()
-        val question = GroupChangeConfirmation(caution, invite, TARGET, decision)
+        val state =
+            emptyAppState(accounts = listOf(testAccount("alice", "a".repeat(64))), activeAccountRef = "alice")
+                .withGroupReviewActorNpub()
+        val target =
+            TARGET.copy(
+                actionLabel = if (invite) R.string.group_action_add_members else R.string.make_admin,
+                affectedMemberIds = listOf("b".repeat(64)),
+                initialAdminIds = if (invite) setOf("b".repeat(64)) else emptySet(),
+            )
+        val question = GroupChangeConfirmation(caution, invite, target, decision)
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) { GroupChangeConfirmationDialog(question) }
+                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
+                    GroupChangeConfirmationDialog(question, state)
+                }
             }
         }
         return decision

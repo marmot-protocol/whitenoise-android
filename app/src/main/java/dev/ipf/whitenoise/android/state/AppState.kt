@@ -1903,12 +1903,6 @@ class WhiteNoiseAppState private constructor(
                     conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
                     parseMarkdown = { parseMarkdownOrEmpty(it) },
                     mentionDisplayName = ::mentionSpeechName,
-                    isGroupMember =
-                        if (controller.membersLoaded) {
-                            { bech32 -> isRosterMember(bech32, controller.members) }
-                        } else {
-                            null
-                        },
                 )
         }
     }
@@ -4367,7 +4361,12 @@ class WhiteNoiseAppState private constructor(
         return runCatchingCancellable {
             // The lock is released only while the user decides, and held again for the acknowledgement and retry.
             withGroupCommitLock(account, groupId) {
-                runGroupChange(account, groupId) {
+                runGroupChange(
+                    account,
+                    groupId,
+                    actionLabel = R.string.make_admin,
+                    affectedMemberIds = listOf(target),
+                ) {
                     val result =
                         marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
                             promoteAdminDetailed(account, groupId, target)
@@ -4478,7 +4477,13 @@ class WhiteNoiseAppState private constructor(
         try {
             runCatchingCancellable {
                 withGroupCommitLock(account, groupIdHex) {
-                    runGroupChange(account, groupIdHex, invite = true) {
+                    runGroupChange(
+                        account,
+                        groupIdHex,
+                        invite = true,
+                        actionLabel = R.string.group_action_add_members,
+                        affectedMemberIds = listOf(ref),
+                    ) {
                         val result =
                             marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                                 inviteMembersDetailed(account, groupIdHex, listOf(ref))
@@ -11896,9 +11901,8 @@ class WhiteNoiseAppState private constructor(
     /**
      * Whether a mention/profile [bech32] (npub/nprofile) resolves to an account
      * that is in [members] — the active group's roster snapshot for this
-     * message render. The message renderer uses this to reserve the "@" mention
-     * treatment for real group members: a pasted npub/nprofile of a non-member
-     * still resolves to a display name but renders without the "@" (#1017).
+     * message render. Roster membership is separate from profile-name
+     * presentation: external profile references use the same username styling.
      * Pure FFI/local encoding + roster comparison (case-insensitive, as hex
      * casing round-trips through the FFI); an unresolvable reference is never a
      * member.

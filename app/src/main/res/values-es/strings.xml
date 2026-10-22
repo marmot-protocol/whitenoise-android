@@ -814,6 +814,7 @@
     <string name="toast_profile_published_detail">Tu perfil ya está en %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">No se pudo publicar el perfil</string>
     <string name="toast_send_failed">Envío fallido</string>
+    <string name="toast_send_storage_full">No hay suficiente espacio para enviar. Libera espacio e inténtalo de nuevo.</string>
     <string name="toast_send_connection_failed">No se pudo conectar con el relé. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="toast_send_queue_full">Este chat tiene demasiados mensajes esperando para enviarse, así que el tuyo no se envió. Inténtalo de nuevo cuando se ponga al día.</string>
     <string name="toast_send_chat_changed">El chat cambió mientras se enviaba tu mensaje, así que no se envió. Inténtalo de nuevo.</string>
@@ -1776,8 +1777,8 @@
     <string name="developer_tools_already_enabled">Las herramientas de desarrollador ya están activadas</string>
     <string name="appearance_outline_colors_fixed">AMOLED usa blanco fijo para los botones de acción. Los contornos de los globos se pueden personalizar en Colores de globos.</string>
     <string name="appearance_theme">Tema</string>
-    <string name="appearance_theme_help">El valor predeterminado del sistema sigue tu dispositivo. Claro y Oscuro mantienen la apariencia seleccionada. AMOLED usa un fondo negro con contornos blancos.</string>
-    <string name="appearance_amoled_detail">Negro puro con contornos blancos nítidos.</string>
+    <string name="appearance_theme_help">El valor predeterminado del sistema sigue tu dispositivo. Claro y Oscuro mantienen la apariencia seleccionada. AMOLED conserva fondos negros, contornos de burbujas personalizables y botones de acción blancos.</string>
+    <string name="appearance_amoled_detail">Fondos negros con contornos de burbujas personalizables.</string>
     <string name="appearance_font_size_help">El tamaño del texto se suma al ajuste de tamaño de fuente de tu dispositivo.</string>
     <string name="appearance_enter_help">Shift+Enter siempre inserta una nueva línea en un teclado físico.</string>
     <string name="appearance_font_system">Sistema</string>
@@ -2261,7 +2262,7 @@
     <string name="profile_readiness_recommended">Recomendado</string>
     <string name="profile_readiness_field_optional">Opcional</string>
     <string name="agent_connector_claude_subtitle">Agente de programación con Claude Code CLI</string>
-    <string name="agent_connector_claude_prompt">Esta es una instrucción de instalación para conectar esta configuración de Claude Code a White Noise mediante Marmot. Lee la guía autorizada del harness de Claude Code en https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md y la guía permanente del conector en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explícame cómo funciona el conector y qué cambiará la instalación. Confirma los requisitos previos: la CLI de Claude Code está instalada, autenticada y disponible en PATH, y esta máquina usa el mismo conjunto de relays públicos que mi teléfono. Después, propón los pasos de instalación para mi npub pública: %1$s, y pide mi aprobación antes de realizar cualquier cambio. Una vez que lo apruebe, usa el flujo de release install-claude-marmot.sh verificado por checksum, inicializa wn-agent para esa npub con el welcomer permitido y verifica wn-claude --version. A continuación, responde con la npub de tu agente y pídeme que lo invite desde White Noise y envíe un mensaje de prueba desde esta npub permitida mediante los relays configurados. No informes que la configuración está completa hasta que wn-claude responda a través de White Noise; si no se puede verificar automáticamente este recorrido, indica claramente que se requiere verificación en el dispositivo.</string>
+    <string name="agent_connector_claude_prompt">Esta es una instrucción de instalación para conectar esta configuración de Claude Code a White Noise mediante Marmot. Pega esto en Claude Code, en una terminal del ordenador donde se ejecutará el agente. La aplicación móvil de Claude y sus sesiones en la nube no pueden instalar el conector en ese ordenador. Lee la guía autorizada del harness de Claude Code en https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md y la guía permanente del conector en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explícame cómo funciona el conector y qué cambiará la instalación. Confirma los requisitos previos: la CLI de Claude Code está instalada, autenticada y disponible en PATH. Si falta algo, usa https://code.claude.com/docs/en/setup para explicar los pasos necesarios de instalación, PATH o inicio de sesión y pide mi aprobación antes de cualquier cambio en el ordenador, incluida la instalación de Claude Code o cambios en PATH o en el acceso. Pídeme que compruebe en el teléfono que la lista de relays públicos incluye wss://relay.eu.whitenoise.chat y wss://relay.us.whitenoise.chat; no afirmes verificar sus ajustes desde el ordenador. Después, propón los pasos de instalación para mi npub pública: %1$s, y pide mi aprobación antes de realizar cualquier cambio. Una vez que lo apruebe, usa el flujo de release install-claude-marmot.sh verificado por checksum, inicializa wn-agent con esa npub como único welcomer permitido y verifica wn-claude --version. Explica que el instalador descargado se ejecuta con bash install-claude-marmot.sh, no con doble clic. A continuación, responde con la npub de tu agente y pídeme que lo invite desde White Noise. Mi primer mensaje en el grupo invitado debe seleccionar una carpeta existente relativa al directorio personal del ordenador del agente: /Claude selecciona $HOME/Claude, no /Users/me/Claude. Después, pídeme que envíe un mensaje de prueba desde esta npub permitida mediante los relays configurados. No informes que la configuración está completa hasta que wn-claude responda a través de White Noise; si no se puede verificar automáticamente este recorrido, indica claramente que se requiere verificación en el dispositivo.</string>
     <string name="ai_agents_project_groups_tip">Usa un grupo distinto para cada proyecto y empieza con su ubicación y contexto. Los controles de sesión varían según el conector; consulta su guía antes de usar comandos para reanudar o crear ramas.</string>
     <string name="nostr_event_view_image">Ver imagen</string>
     <string name="nostr_event_image_failed">No se pudo cargar esta imagen. Inténtalo de nuevo.</string>
@@ -2331,6 +2332,9 @@
     <string name="chat_departure_confirm">Revisa %1$d chats seleccionados. Se abandonarán los grupos y se eliminarán de este dispositivo; los chats directos se eliminan localmente. Los demás miembros conservan sus copias. Los traspasos de administración se confirmarán antes de eliminar.</string>
     <string name="chat_departure_result">%1$d completados · %2$d sin terminar · %3$d omitidos. Reintentar comprueba la pertenencia y continúa solo el trabajo pendiente.</string>
     <string name="chat_departure_admin_granted">La transferencia de administrador se completó. La salida del grupo sigue pendiente.</string>
+    <string name="notification_push_storage_unavailable">No se pudieron leer los ajustes de notificaciones push guardados. Se han conservado y el registro push está en pausa. Reinténtalo cuando el dispositivo esté desbloqueado.</string>
+    <string name="notification_push_import_pending">No se pudieron recuperar algunos ajustes anteriores de notificaciones push. Se han conservado y el registro push está en pausa. Reinténtalo para comprobarlos de nuevo.</string>
+    <string name="notification_push_cleanup_unknown">No se puede confirmar una limpieza push anterior. El registro push está en pausa. Reintentar comprueba de nuevo el estado guardado, sin borrarlo ni restablecerlo.</string>
     <string name="reaction_details_loading">Cargando reacciones…</string>
     <string name="reaction_details_load_failed">No se pudieron cargar las reacciones.</string>
     <string name="group_create_remove_and_continue">Quitar a esta persona y continuar</string>
@@ -2356,7 +2360,18 @@
     <string name="group_change_invite_anyway">Invitar de todos modos</string>
     <string name="starting_as">Iniciar como</string>
     <string name="starting_as_account">Iniciar como %1$s</string>
-    <string name="notification_push_storage_unavailable">No se pudieron leer los ajustes de notificaciones push guardados. Se han conservado y el registro push está en pausa. Reinténtalo cuando el dispositivo esté desbloqueado.</string>
-    <string name="notification_push_import_pending">No se pudieron recuperar algunos ajustes anteriores de notificaciones push. Se han conservado y el registro push está en pausa. Reinténtalo para comprobarlos de nuevo.</string>
-    <string name="notification_push_cleanup_unknown">No se puede confirmar una limpieza push anterior. El registro push está en pausa. Reintentar comprueba de nuevo el estado guardado, sin borrarlo ni restablecerlo.</string>
+    <string name="group_action_acting_account">Cuenta utilizada</string>
+    <string name="group_action_local_nickname">Apodo local: %1$s</string>
+    <string name="group_action_public_key_hex">Clave pública (hexadecimal)</string>
+    <string name="group_action_account_label">Etiqueta local de la cuenta: %1$s</string>
+    <string name="group_action_revoke_explanation">Esto elimina los permisos de administrador. La persona sigue siendo miembro.</string>
+    <string name="group_action_add_members">Añadir miembros</string>
+    <string name="group_action_transfer_and_leave">Transferir la administración y salir</string>
+    <string name="group_action_step_down_and_leave">Dejar de ser administrador y salir</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d grupo</item>
+        <item quantity="other">%1$d grupos</item>
+    </plurals>
+    <string name="group_review_add_member">Añadir miembro</string>
+    <string name="group_review_invitation_visibility">Visible para todos los miembros.</string>
 </resources>

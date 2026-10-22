@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentSelection.kt",
+  "legacy_sha256": "f13073b3a5c5193ed7a3fd4ddabc8c2585578b35f554097ccd2895ba5ca1f52f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.textAttachmentSelectionLongPress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentSelection.kt",
+        "anchor": "fun Modifier.textAttachmentSelectionLongPress(",
+        "test_ids": [
+          "MED-010",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "TextAttachmentSelectableContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentSelection.kt",
+        "anchor": "fun TextAttachmentSelectableContent(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Code path layout and selection lifetime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentSelection.kt",
+        "anchor": "fun TextAttachmentSelectableContent(",
+        "test_ids": [
+          "RDR-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
