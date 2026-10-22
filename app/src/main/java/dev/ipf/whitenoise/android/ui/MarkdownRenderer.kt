@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -38,6 +37,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -864,6 +864,7 @@ internal fun markdownHeadingTextStyle(
  * Fitting source leaves horizontal drags to the bubble's swipe action. Overflowing source owns
  * horizontal drags in either direction, including at its edges, so panning never unexpectedly replies.
  * Fades indicate only the edges with more source to read; source text and selection remain unchanged.
+ * Saved offsets belong to this source and leaf: replacement resets them, while unchanged content stays restorable.
  */
 @Composable
 private fun MarkdownCodeBlockView(
@@ -875,7 +876,7 @@ private fun MarkdownCodeBlockView(
     // phantom empty line inside the chip. Code/math blocks can be large, so
     // cache the sanitization work instead of repeating it on every recomposition.
     val text = remember(content) { markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n') }
-    val scrollState = rememberScrollState()
+    val scrollState = rememberSaveable(content, leafId, saver = ScrollState.Saver) { ScrollState(0) }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(

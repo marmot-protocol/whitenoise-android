@@ -122,6 +122,35 @@ class MarkdownCodePathLayoutCoverageTest {
         composeRule.onNodeWithText(original).assertDoesNotExist()
     }
 
+    /** The shared renderer owns source reset even when its caller keeps the surrounding composition alive. */
+    @Test
+    fun changingMarkdownSourceResetsTheLeafWithoutReplacingItsCaller() {
+        val original = "/" + "directory/".repeat(40) + "old.md"
+        val replacement = "/" + "different/".repeat(40) + "new.md"
+        var source by mutableStateOf(original)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MarkdownMessageBody(
+                    document =
+                        MarkdownDocumentFfi(
+                            listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", source)),
+                            false,
+                            byteArrayOf(),
+                        ),
+                    modifier = Modifier.width(240.dp),
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        scrollToEnd(original)
+        composeRule.runOnIdle { source = replacement }
+        composeRule.waitForIdle()
+        val range = horizontalRange(replacement)
+        assertTrue("replacement still overflows, so clamping cannot conceal a stale offset", range.maxValue() > 0f)
+        assertEquals(0f, range.value(), 0.1f)
+        composeRule.onNodeWithText(original).assertDoesNotExist()
+    }
+
     /** Indented native source retains Unicode characters, indentation and explicit newlines at system 200%. */
     @Test
     fun indentedUnicodePathsKeepTheirSourceLinesBesideRtlProse() {
