@@ -31,6 +31,11 @@ on:
         required: false
         default: false
         type: boolean
+      capture_benchmark_dependency_inputs:
+        description: Also capture benchmark-release Android test dependency candidates
+        required: false
+        default: false
+        type: boolean
 
 # Superseded PR runs retain normal cancellation. Queue integrations use their
 # run identity so two attempts for the same integration remain independent.
@@ -427,16 +432,28 @@ jobs:
       # Explicit operator mode only: captured downloads remain unapproved candidates.
       # A capture does not bypass any normal build or aggregate outcome.
       - name: Capture dependency-control bootstrap candidates
-        if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs
+        if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' && (inputs.capture_dependency_inputs || inputs.capture_benchmark_dependency_inputs)
         run: |
           ./gradlew -I gradle/dependency-inputs-bootstrap.init.gradle \
             captureDependencyInputs -Pwhitenoise.previewE2eTestBuild=true \
             -Pwhitenoise.previewProviderMatrixBuild=true --refresh-dependencies --write-locks --write-verification-metadata sha256 \
             --no-daemon --stacktrace
           python3 scripts/capture_dependency_candidates.py
+          if [[ '${{ inputs.capture_benchmark_dependency_inputs }}' == 'true' ]]; then
+            # Keep the complete normal capture even if the second pass fails.
+            test ! -e build/dependency-inputs-bootstrap-default
+            trap 'if [[ -d build/dependency-inputs-bootstrap-default ]]; then mkdir -p build/dependency-inputs-bootstrap; mv build/dependency-inputs-bootstrap-default build/dependency-inputs-bootstrap/default-capture; fi' EXIT
+            mv build/dependency-inputs-bootstrap build/dependency-inputs-bootstrap-default
+            ./gradlew -I scripts/hosted-startup-trace.init.gradle \
+              -I gradle/dependency-inputs-bootstrap.init.gradle \
+              captureDependencyInputs -Pwhitenoise.previewE2eTestBuild=true \
+              -Pwhitenoise.previewProviderMatrixBuild=true --refresh-dependencies --write-locks --write-verification-metadata sha256 \
+              --no-daemon --stacktrace
+            python3 scripts/capture_dependency_candidates.py
+          fi
 
       - name: Retain dependency-control bootstrap candidates
-        if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs
+        if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' && (inputs.capture_dependency_inputs || inputs.capture_benchmark_dependency_inputs)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dependency-inputs-bootstrap
@@ -449,7 +466,7 @@ jobs:
       - name: Require the committed dependency trust root for qualification
         if: matrix.phase == 'tooling'
         env:
-          RESTORE_CAPTURE: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs }}
+          RESTORE_CAPTURE: ${{ github.event_name == 'workflow_dispatch' && (inputs.capture_dependency_inputs || inputs.capture_benchmark_dependency_inputs) }}
         run: ./scripts/require-committed-dependency-trust-root.sh
 
       # Exercise the same init-script plugin under strict verification before master
