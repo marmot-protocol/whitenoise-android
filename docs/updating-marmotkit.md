@@ -5,7 +5,7 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [21 October 2026 nightly evaluation](marmotkit-nightly-20261021.md) records its
+The [22 October 2026 nightly evaluation](marmotkit-nightly-20261022.md) records its
 artifact verification, API changes, migration qualification and 30-day retention
 limits. It is testing-only and does not authorize production adoption.
 
@@ -52,46 +52,50 @@ Snapshot `88d1683e` adds typed outcomes that Android must not collapse into gene
 
 ### Recovery qualification
 
-`MarmotKitRecoveryQualificationTest` checks a candidate's offline replay, epoch-gap fallback and lookup retry
-on recovered messages, against a loopback relay that clamps queries to 500 events and refuses history
-comparison. It is an opt-in fixture of about five minutes per comparison mode; run it on a hosted emulator before adopting a pin
-that touches replay or recovery.
+`MarmotKitRecoveryQualificationTest` checks actual decrypted messages against a
+loopback relay that clamps queries to 500 events and either refuses or silently
+ignores history comparison. The October 22 nightly includes MDK #2513's fixes for
+[#2375](https://github.com/marmot-protocol/mdk/issues/2375) and
+[#2381](https://github.com/marmot-protocol/mdk/issues/2381). All seven cases must
+execute: no ignored recovery case can satisfy adoption.
 
-The populated upgrade campaign builds current master and the candidate with the
-same disposable signer and isolated `.mdkqualification` package, then runs both
-recovery modes without changing the two ignored upstream cases:
+The populated campaign builds current master and the candidate with one disposable
+signer and isolated `.mdkqualification` package. It fails closed if master no
+longer pins the reviewed October 21 source `8c214fee`. Dispatch once on the
+candidate branch and reuse a matching active run:
 
 ```bash
 gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-android \
   --ref <candidate-branch> -f mdk_qualification=true
 ```
 
-The isolated package disables its boot receiver and WorkManager job service so a
-background preflight cannot migrate the root ahead of measurement. Instrumentation
-omits Application scheduling; UI checks launch the normal manifest Application.
-The original encrypted synthetic root stays on the runner until job teardown;
-artifacts retain its digest, APK/native/signer provenance, storage states, UI
-observations and individual test outcomes without account secrets. A failed
-baseline prevents dependent upgrade claims. The expanded fixture also requires
-large-database shrinkage and controlled native faults as described in the nightly
-evaluation record. The separate `mdk_preview_qualification` campaign must qualify
-the exact trusted signed APK through ordinary release UI. The baseline adapter
-fails closed unless master still uses the reviewed `88d1683e` artifact.
+It seeds two accounts, history, retained attachments, a pending upload and cached
+avatars through MDK. Upgrade and cold restart must preserve their original bytes
+with acquisition disabled, and normal MainActivity must open usable retained
+chats. Separate phases promote the pending upload, restart again and recover
+corrupt/lost disposable media. Both recovery modes then require all seven named
+cases, including the formerly ignored single-sender and long-offline replays.
+Avatar seeding uses an immutable public HTTPS image with a checked SHA-256,
+respecting MDK's URL validation. Before the first candidate launch, the runner
+blocks public IPv4 and IPv6 egress for only the disposable app's UID, while
+retaining loopback access to its relay/blob fixtures. It verifies those rules
+before upgrade and after cold reads so avatar refetch cannot hide migration loss.
+The Android healthy-receive test covers local deletion and restart; MDK's
+exact-source composed tests separately cover hydration quarantine and
+send-before-drain ordering. Keep those evidence boundaries explicit.
 
-For diagnosis within an already prepared disposable emulator only:
+The package disables background boot/job entry points so no preflight migrates
+its root before measurement. The encrypted synthetic root stays private on the
+runner; artifacts retain its digest, APK/native/signer provenance, storage states,
+UI observations and test outcomes. A failed baseline prevents upgrade claims.
+Current master already stores completed attachments in files; the old 0113
+SQL-body compaction/fault campaign and its byte-pinned hooks do not apply to this
+upgrade pair. Its historical evidence remains in the October 21 record.
 
-```bash
-adb shell am instrument -w -r \
-  -e class dev.ipf.whitenoise.android.state.MarmotKitRecoveryQualificationTest \
-  dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
-```
-
-Pass `-e comparison ignore` to make the relay drop comparison requests instead of refusing them, and
-`-e offlineMillis <ms>` to keep the replay receiver offline longer. Two cases stay ignored until MDK fixes
-ship: one sender beyond 100 messages ([MDK #2375](https://github.com/marmot-protocol/mdk/issues/2375)) and
-a receiver offline past the two-minute replay lookback ([MDK #2381](https://github.com/marmot-protocol/mdk/issues/2381)).
-A physical phone sends the 600 replay messages too slowly to stay inside that lookback, so run the replay case
-on an emulator; the other cases also pass on a Pixel 9a.
+A disposable debug-signed pair is not proof for a trusted preview APK. Request a
+preview only for a concrete handoff/debugging need, then separately qualify the
+exact signed APK under [CI policy](ci-request-policy.md). Never use a physical
+installation, clear data, downgrade or rewrite migration records for this campaign.
 
 ## 1. Select and inspect the release
 
@@ -140,13 +144,12 @@ Android CI run so additions, removals, and signature changes are explicit.
 
 ## 3. Validate the consumer
 
-Run only the focused local checks needed for the pin:
-
-```bash
-./scripts/test-prepare-marmotkit-artifact.sh
-./gradlew :app:stageMarmotKitApiSignature :app:compileDevZapstoreDebugKotlin
-git diff --check
-```
+Run `git diff --check` and the manual-guide preflight locally. All CI-covered
+compilation, tests and lint run on hosted GitHub CI, including
+`:app:stageMarmotKitApiSignature`, Kotlin compilation and the artifact-preparation
+contract tests. The staging command above describes the hosted review process;
+do not duplicate it locally. Local archive hashing, manifest/ELF inspection and
+static generated-source comparison remain required before changing the pin.
 
 In the pull request, confirm these CI paths complete:
 
