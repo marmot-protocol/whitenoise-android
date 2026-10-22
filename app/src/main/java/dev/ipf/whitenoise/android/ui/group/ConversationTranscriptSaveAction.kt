@@ -21,8 +21,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.discardInterruptedCreatedDocument
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.IOException
 
 private const val TRANSCRIPT_FILENAME_GROUP_PREFIX_LENGTH = 12
