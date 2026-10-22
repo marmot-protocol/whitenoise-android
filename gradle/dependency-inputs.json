@@ -829,13 +829,13 @@
     }
   ],
   "reviewed_from": {
-    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/39656759025/artifacts/12372546047",
+    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/39735374489/artifacts/12407182015",
     "repository": "marmot-protocol/whitenoise-android",
     "retained": {
       "path": "gradle/dependency-evidence/capture.json",
-      "sha256": "ddfa3fc5019d1e3551b883ccdb23b502174d06048954125a5cb6850ac31faeb4"
+      "sha256": "2d06d8586f0c793c8a2362b7c24143cb2fff49cf145b7b38bd29089d45dc4fa4"
     },
-    "source_sha": "ec9d3eb4412536693648aec9111983df62a43816"
+    "source_sha": "a38157424f61825e54f8b0bc324532967d55286d"
   },
   "schema": 1,
   "supplemental_tools": {
