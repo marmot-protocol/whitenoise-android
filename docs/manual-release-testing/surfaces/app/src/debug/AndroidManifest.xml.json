@@ -1,0 +1,17 @@
+{
+  "source": "app/src/debug/AndroidManifest.xml",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "debug native heap memory-tagging application policy",
+        "source": "app/src/debug/AndroidManifest.xml",
+        "anchor": "android:memtagMode",
+        "test_ids": [
+          "SYS-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

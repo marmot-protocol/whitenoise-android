@@ -78,6 +78,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="${appIcon}"
         android:label="${appName}"
+        android:memtagMode="async"
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="${appRoundIcon}"
         android:supportsRtl="true"
