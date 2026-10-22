@@ -124,13 +124,19 @@ class ProfileReferenceScreenshotTest {
         }
         val layout = layouts.single()
         assertEquals(1, layout.lineCount)
-        val captionEnd = layout.layoutInput.text.text.indexOf("hi @Alice") + "hi @Alice".length
+        val captionText = layout.layoutInput.text.text
+        val captionEnd = captionText.indexOf("hi @Alice") + "hi @Alice".length
         assertTrue("The native caption must exist in the composed text", captionEnd >= "hi @Alice".length)
         assertTrue(
             "The caption must be on the visible first line",
             layout.getLineEnd(0, visibleEnd = true) >= captionEnd,
         )
-        val suffix = if (largeRtl) "amoled_large_rtl" else if (dark) "dark" else "light"
+        val suffix =
+            when {
+                largeRtl -> "amoled_large_rtl"
+                dark -> "dark"
+                else -> "light"
+            }
         composeRule
             .onNodeWithTag("photo-caption")
             .captureRoboImage("src/test/snapshots/profile_photo_caption_$suffix.png")
