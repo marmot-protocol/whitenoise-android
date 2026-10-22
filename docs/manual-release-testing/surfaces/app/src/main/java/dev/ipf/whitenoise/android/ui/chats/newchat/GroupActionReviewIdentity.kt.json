@@ -1,0 +1,83 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupReviewPersonIdentity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupReviewPersonIdentity(",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupActingAccountIdentity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupActingAccountIdentity(",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupReviewDestinationIdentity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupReviewDestinationIdentity(",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupReviewNpub",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupReviewNpub(",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Reviewed group action context: R.string.group_action_acting_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "R.string.group_action_acting_account",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_local_nickname",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "R.string.group_action_local_nickname",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Explicit local account label fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "R.string.group_action_account_label",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "surface": "R.string.copy",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "surface": "R.string.unknown",
+        "anchor": "R.string.unknown",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

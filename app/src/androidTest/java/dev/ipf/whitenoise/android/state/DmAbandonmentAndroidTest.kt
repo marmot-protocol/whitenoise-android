@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -215,7 +216,11 @@ class DmAbandonmentAndroidTest {
     }
 
     /** Loopback relays are allowed only in this fixture's native configuration. */
-    private fun loopbackOptions() = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
+    private fun loopbackOptions() =
+        MarmotOptions(
+            relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+            deployment = marmotDeploymentWhiteNoise(),
+        )
 
     private companion object {
         const val TAG = "DmAbandonmentTest"

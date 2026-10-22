@@ -814,6 +814,7 @@
     <string name="toast_profile_published_detail">Il tuo profilo è ora su %1$d relay.</string>
     <string name="toast_couldnt_publish_profile">Impossibile pubblicare il profilo</string>
     <string name="toast_send_failed">Invio non riuscito</string>
+    <string name="toast_send_storage_full">Spazio insufficiente per l’invio. Libera spazio e riprova.</string>
     <string name="toast_send_connection_failed">Impossibile raggiungere il relay. Controlla la connessione e riprova.</string>
     <string name="toast_send_queue_full">Questa chat ha troppi messaggi in attesa di invio, quindi il tuo non è stato inviato. Riprova quando sarà in pari.</string>
     <string name="toast_send_chat_changed">La chat è cambiata durante l\'invio, quindi il messaggio non è stato inviato. Riprova.</string>
@@ -1776,8 +1777,8 @@
     <string name="developer_tools_already_enabled">Gli strumenti sviluppatore sono già attivi</string>
     <string name="appearance_outline_colors_fixed">AMOLED usa il bianco fisso per i pulsanti di azione. I contorni dei fumetti si possono personalizzare in Colori fumetti.</string>
     <string name="appearance_theme">Tema</string>
-    <string name="appearance_theme_help">L\'impostazione di sistema segue il dispositivo. Chiaro e Scuro mantengono l\'aspetto selezionato. AMOLED usa uno sfondo nero con contorni bianchi.</string>
-    <string name="appearance_amoled_detail">Nero puro con contorni bianchi netti.</string>
+    <string name="appearance_theme_help">L\'impostazione di sistema segue il dispositivo. Chiaro e Scuro mantengono l\'aspetto selezionato. AMOLED mantiene sfondi neri, contorni dei messaggi personalizzabili e pulsanti di azione bianchi.</string>
+    <string name="appearance_amoled_detail">Sfondi neri con contorni dei messaggi personalizzabili.</string>
     <string name="appearance_font_size_help">La dimensione del testo si aggiunge all\'impostazione della dimensione dei caratteri del dispositivo.</string>
     <string name="appearance_enter_help">Maiusc+Invio inserisce sempre una nuova riga su una tastiera fisica.</string>
     <string name="appearance_font_system">Sistema</string>
@@ -2261,7 +2262,7 @@
     <string name="profile_readiness_recommended">Consigliato</string>
     <string name="profile_readiness_field_optional">Facoltativo</string>
     <string name="agent_connector_claude_subtitle">Agente di programmazione Claude Code CLI</string>
-    <string name="agent_connector_claude_prompt">Questo è un prompt di installazione per collegare questa configurazione Claude Code a White Noise tramite Marmot. Leggi la guida autorevole del harness Claude Code all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md e la guida permanente del connettore all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Spiegami come funziona il connettore e cosa cambierà l’installazione. Conferma i prerequisiti: la CLI Claude Code è installata, autenticata e disponibile in PATH, e questa macchina usa lo stesso set di relay pubblici del mio telefono. Quindi proponi i passaggi di installazione per la mia npub pubblica: %1$s e chiedi la mia approvazione prima di apportare qualsiasi modifica. Dopo la mia approvazione, usa il flusso di release install-claude-marmot.sh verificato tramite checksum, avvia wn-agent per quella npub con il welcomer consentito e verifica wn-claude --version. Quindi rispondi con la npub del tuo agente e chiedimi di invitarlo da White Noise e inviare un messaggio di prova da questa npub consentita tramite i relay configurati. Non dichiarare completata la configurazione finché wn-claude non risponde tramite White Noise; se non è possibile verificare automaticamente questo percorso di andata e ritorno, indica chiaramente che è necessaria la verifica sul dispositivo.</string>
+    <string name="agent_connector_claude_prompt">Questo è un prompt di installazione per collegare questa configurazione Claude Code a White Noise tramite Marmot. Incolla questo in Claude Code, in un terminale sul computer dove verrà eseguito l’agente. L’app mobile Claude e le sue sessioni cloud non possono installare il connettore su quel computer. Leggi la guida autorevole del harness Claude Code all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md e la guida permanente del connettore all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Spiegami come funziona il connettore e cosa cambierà l’installazione. Conferma i prerequisiti: la CLI Claude Code è installata, autenticata e disponibile in PATH. Se manca qualcosa, usa https://code.claude.com/docs/en/setup per spiegare i passaggi necessari per installazione, PATH o accesso e chiedi la mia approvazione prima di qualsiasi modifica al computer, inclusa l’installazione di Claude Code o modifiche a PATH o all’accesso. Chiedimi di verificare sul telefono che l’elenco dei relay pubblici includa wss://relay.eu.whitenoise.chat e wss://relay.us.whitenoise.chat; non affermare di verificarne le impostazioni dal computer. Quindi proponi i passaggi di installazione per la mia npub pubblica: %1$s e chiedi la mia approvazione prima di apportare qualsiasi modifica. Dopo la mia approvazione, usa il flusso di release install-claude-marmot.sh verificato tramite checksum, avvia wn-agent con quella npub come unico welcomer consentito e verifica wn-claude --version. Spiega che lo script scaricato si esegue con bash install-claude-marmot.sh, non con un doppio clic. Quindi rispondi con la npub del tuo agente e chiedimi di invitarlo da White Noise. Il mio primo messaggio nel gruppo invitato deve selezionare una cartella esistente relativa alla home del computer dell’agente: /Claude seleziona $HOME/Claude, non /Users/me/Claude. Poi chiedimi di inviare un messaggio di prova da questa npub consentita tramite i relay configurati. Non dichiarare completata la configurazione finché wn-claude non risponde tramite White Noise; se non è possibile verificare automaticamente questo percorso di andata e ritorno, indica chiaramente che è necessaria la verifica sul dispositivo.</string>
     <string name="ai_agents_project_groups_tip">Usa un gruppo separato per ogni progetto e inizia dalla sua posizione e dal contesto. I comandi di sessione variano per connettore; consulta la sua guida prima di riprendere sessioni o creare rami.</string>
     <string name="nostr_event_view_image">Visualizza immagine</string>
     <string name="nostr_event_image_failed">Impossibile caricare questa immagine. Riprova.</string>
@@ -2356,6 +2357,20 @@
     <string name="group_change_invite_anyway">Invita comunque</string>
     <string name="starting_as">Avvio come</string>
     <string name="starting_as_account">Avvio come %1$s</string>
+    <string name="group_action_acting_account">Account utilizzato</string>
+    <string name="group_action_local_nickname">Soprannome locale: %1$s</string>
+    <string name="group_action_public_key_hex">Chiave pubblica (esadecimale)</string>
+    <string name="group_action_account_label">Etichetta locale dell’account: %1$s</string>
+    <string name="group_action_revoke_explanation">Questa azione rimuove i diritti di amministratore. La persona rimane membro.</string>
+    <string name="group_action_add_members">Aggiungi membri</string>
+    <string name="group_action_transfer_and_leave">Trasferisci i diritti di amministratore ed esci</string>
+    <string name="group_action_step_down_and_leave">Rinuncia ai diritti di amministratore ed esci</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d gruppo</item>
+        <item quantity="other">%1$d gruppi</item>
+    </plurals>
+    <string name="group_review_add_member">Aggiungi membro</string>
+    <string name="group_review_invitation_visibility">Visibile a tutti i membri.</string>
     <string name="search_scope_this_chat">Questa chat · %1$s</string>
     <string name="search_scope_all_chats">Tutte le chat</string>
     <string name="search_scope_other_chats">Cerca in altre chat</string>

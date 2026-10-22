@@ -49,7 +49,8 @@
           "CHL-027",
           "CHL-028",
           "FIND-003",
-          "FIND-015"
+          "FIND-015",
+          "GRP-034"
         ]
       }
     ],
@@ -201,6 +202,14 @@
           "CHL-026",
           "CHL-027",
           "CHL-028"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.delete_from_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.delete_from_device",
+        "test_ids": [
+          "GRP-034"
         ]
       }
     ],

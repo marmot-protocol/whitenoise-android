@@ -125,7 +125,6 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -176,40 +175,6 @@ private fun interpolateDp(
     end: Dp,
     fraction: Float,
 ): Dp = start + (end - start) * fraction
-
-/**
- * Padding whose state is read during measurement instead of composition.
- * This lets the composer animate geometry without recomposing BasicTextField
- * on every frame.
- */
-private fun Modifier.deferredPadding(
-    start: () -> Dp = { 0.dp },
-    top: () -> Dp = { 0.dp },
-    end: () -> Dp = { 0.dp },
-    bottom: () -> Dp = { 0.dp },
-): Modifier =
-    layout { measurable, constraints ->
-        val startPx = start().roundToPx()
-        val topPx = top().roundToPx()
-        val endPx = end().roundToPx()
-        val bottomPx = bottom().roundToPx()
-        val horizontal = startPx + endPx
-        val vertical = topPx + bottomPx
-        val childConstraints =
-            Constraints(
-                minWidth = (constraints.minWidth - horizontal).coerceAtLeast(0),
-                maxWidth = (constraints.maxWidth - horizontal).coerceAtLeast(0),
-                minHeight = (constraints.minHeight - vertical).coerceAtLeast(0),
-                maxHeight = (constraints.maxHeight - vertical).coerceAtLeast(0),
-            )
-        val placeable =
-            measurable.measure(childConstraints)
-        val width = (placeable.width + horizontal).coerceIn(constraints.minWidth, constraints.maxWidth)
-        val height = (placeable.height + vertical).coerceIn(constraints.minHeight, constraints.maxHeight)
-        layout(width, height) {
-            placeable.placeRelative(startPx, topPx)
-        }
-    }
 
 internal data class ComposerSelectionLayout(
     val top: Float,

@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.core.MarmotClient
@@ -97,7 +98,7 @@ class DocumentProviderRelayMatrixTest {
 
             MarmotAndroid.initialize(context)
             val root = File(context.cacheDir, "document-provider-matrix-${UUID.randomUUID()}").apply { mkdirs() }
-            val marmot = Marmot(root.absolutePath, MarmotClient.bootstrapRelays)
+            val marmot = Marmot(root.absolutePath, MarmotClient.bootstrapRelays, marmotDeploymentWhiteNoise())
             val accounts = mutableListOf<String>()
             try {
                 withTimeout(600_000) {

@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
@@ -71,3 +73,15 @@ internal fun PendingGroupInviteRow(
         },
     )
 }
+
+/** Shared presentation/admission ownership, with the same ordered account and runtime fences. */
+internal fun ConversationController.isCurrentGroupMutationOwner(
+    appState: WhiteNoiseAppState,
+    reviewedRuntime: Int,
+): Boolean =
+    when {
+        boundAccountRef == null || boundAccountRef != appState.activeAccountRef -> false
+        reviewedRuntime != appState.runtimeGeneration -> false
+        appState.signOutInProgress || appState.wipeInProgress -> false
+        else -> true
+    }

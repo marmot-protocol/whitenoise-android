@@ -1,6 +1,7 @@
 """Select required validation and supplemental campaigns from the complete Git diff."""
 
 import argparse
+import json
 import os
 from pathlib import PurePosixPath
 import re
@@ -74,14 +75,6 @@ def complete_diff(event, base, head):
     return diff.stdout
 
 
-def classify(event, base, head):
-    if event not in {'pull_request', 'merge_group'}:
-        return False
-    diff = complete_diff(event, base, head)
-    return diff is not None and docs_only_diff(diff)
-
-
-
 def supplemental_campaigns_diff(raw):
     """Only known ordinary source/prose changes defer report/reproduction campaigns.
 
@@ -122,9 +115,21 @@ def supplemental_campaigns_diff(raw):
     return False
 
 
-def supplemental_campaigns(event, base, head):
-    diff = complete_diff(event, base, head)
-    return diff is None or supplemental_campaigns_diff(diff)
+def validation_selection(event, configured_mode, labels, raw):
+    """Derive mutually exclusive modes from one complete-diff observation."""
+    activated = configured_mode == 'merge-queue'
+    labels_valid = isinstance(labels, list) and all(isinstance(label, str) for label in labels)
+    has_full_label = labels_valid and 'ci:full' in labels
+    risky = raw is None or supplemental_campaigns_diff(raw)
+    if event != 'pull_request' or has_full_label or (activated and (not labels_valid or risky)):
+        mode = 'full'
+    else:
+        mode = 'precheck' if activated else 'legacy-pr'
+    full = mode == 'full'
+    docs = event == 'pull_request' and raw is not None and docs_only_diff(raw) and not full
+    return {'ci_mode': mode, 'precheck': str(mode == 'precheck').lower(),
+            'full_matrix': str(full).lower(), 'docs_only': str(docs).lower(),
+            'supplemental_campaigns': str(risky).lower()}
 
 
 def main():
@@ -133,9 +138,13 @@ def main():
     parser.add_argument('--base', default='')
     parser.add_argument('--head', required=True)
     args = parser.parse_args()
-    value = 'true' if classify(args.event, args.base, args.head) else 'false'
-    campaigns = 'true' if supplemental_campaigns(args.event, args.base, args.head) else 'false'
-    line = f'docs_only={value}\nsupplemental_campaigns={campaigns}\n'
+    try:
+        labels = json.loads(os.environ.get('CI_CURRENT_LABELS', 'null'))
+    except (ValueError, TypeError):
+        labels = None
+    raw = complete_diff(args.event, args.base, args.head)
+    selection = validation_selection(args.event, os.environ.get('ANDROID_CI_MODE', ''), labels, raw)
+    line = ''.join(f'{key}={value}\n' for key, value in selection.items())
     print(line, end='')
     if output := os.environ.get('GITHUB_OUTPUT'):
         with open(output, 'a', encoding='utf-8') as stream:

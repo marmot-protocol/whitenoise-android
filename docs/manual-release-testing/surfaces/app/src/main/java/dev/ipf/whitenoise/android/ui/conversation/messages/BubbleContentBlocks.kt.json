@@ -33,6 +33,16 @@
           "MED-007"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Code source viewport through selection and collapsed parents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "val movableMessageTextBody =",
+        "test_ids": [
+          "RDR-006"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

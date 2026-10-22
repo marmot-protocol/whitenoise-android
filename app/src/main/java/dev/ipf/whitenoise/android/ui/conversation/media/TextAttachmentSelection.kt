@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
@@ -77,9 +81,13 @@ internal fun TextAttachmentSelectableContent(
             sentenceActions = speech?.sentenceActions,
         )
     }
+    // Selection changes the parent, while the source leaf and its viewport retain the same lifetime.
+    val latestContent by rememberUpdatedState(content)
+    val movableContent =
+        remember(selection, preview.text, preview.markdownDocument) { movableContentOf { latestContent() } }
     if (selection.active) {
-        SelectionContainer(state = selection.selectionState) { content() }
+        SelectionContainer(state = selection.selectionState) { movableContent() }
     } else {
-        content()
+        movableContent()
     }
 }

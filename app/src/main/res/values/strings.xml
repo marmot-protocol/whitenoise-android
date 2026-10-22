@@ -1158,6 +1158,7 @@
     <string name="toast_profile_published_detail">Your profile is now on %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
+    <string name="toast_send_storage_full">Not enough storage to send. Free up space and try again.</string>
     <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
     <string name="toast_send_queue_full">This chat has too many messages waiting to send, so yours wasn\'t sent. Try again once it catches up.</string>
     <string name="toast_send_chat_changed">The chat changed while your message was sending, so it wasn\'t sent. Try again.</string>
@@ -1340,9 +1341,9 @@
     <string name="theme_amoled">AMOLED</string>
     <string name="appearance_outline_colors_fixed">AMOLED action buttons use fixed white. Message bubble outlines can be customized under Chat bubble colors.</string>
     <string name="appearance_theme">Theme</string>
-    <string name="appearance_theme_help">System default follows your device. Light and Dark keep the selected appearance. AMOLED uses a black background with white outlines.</string>
+    <string name="appearance_theme_help">System default follows your device. Light and Dark keep the selected appearance. AMOLED keeps pure-black backgrounds, customizable bubble outlines, and white action buttons.</string>
     <string name="appearance_amoled" translatable="false">AMOLED</string>
-    <string name="appearance_amoled_detail">Pure black with crisp white outlines.</string>
+    <string name="appearance_amoled_detail">Pure-black backgrounds with customizable bubble outlines.</string>
     <string name="appearance_font_size_help">Text size adds to your device font-size setting.</string>
     <string name="appearance_enter_help">Shift+Enter always inserts a new line on a hardware keyboard.</string>
     <string name="appearance_font_system">System</string>
@@ -2429,7 +2430,7 @@
     <string name="profile_readiness_field" translatable="false">%1$s · %2$s</string>
     <string name="agent_connector_claude_name" translatable="false">Claude Code</string>
     <string name="agent_connector_claude_subtitle">Claude Code CLI coding agent</string>
-    <string name="agent_connector_claude_prompt">This is an installation prompt for connecting this Claude Code setup to White Noise through Marmot. Read the authoritative Claude Code harness guide at https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md and the evergreen connector guide at https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Confirm prerequisites: Claude Code CLI is installed, authenticated, and available on PATH, and this machine uses the same public relay set as my phone. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, use the checksum-verified install-claude-marmot.sh release flow, bootstrap wn-agent for that npub with the allowed welcomer, and verify wn-claude --version. Then reply with your agent npub and ask me to invite it from White Noise and send a test message from this allowed npub over the configured relays. Do not report setup complete until wn-claude returns a reply through White Noise; if that round trip cannot be verified automatically, clearly mark device verification required.</string>
+    <string name="agent_connector_claude_prompt">Installation prompt for connecting Claude Code to White Noise through Marmot. Paste this into Claude Code in a terminal on the computer where the agent will run. The Claude mobile app and its cloud sessions cannot install the connector on that computer. Read the authoritative Claude Code harness guide at https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md and the evergreen connector guide at https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Confirm prerequisites: Claude Code CLI is installed, authenticated, and available on PATH. If anything is missing, use https://code.claude.com/docs/en/setup to explain the required installation, PATH or sign-in steps and ask for my approval before any host changes, including installing Claude Code or changing PATH or sign-in setup. Ask me to check on my phone that its public relay list contains wss://relay.eu.whitenoise.chat and wss://relay.us.whitenoise.chat; do not claim to verify phone settings from this computer. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, use the checksum-verified install-claude-marmot.sh release flow, bootstrap wn-agent with that npub as the only allowed welcomer, and verify wn-claude --version. Explain that the downloaded installer runs with bash install-claude-marmot.sh. Then reply with your agent npub and ask me to invite it from White Noise. In the invited group, my first message should select an existing folder relative to the agent computer’s home: /Claude selects $HOME/Claude, not /Users/me/Claude. Then ask me to send a test message from this allowed npub over the configured relays. Do not report setup complete until wn-claude returns a reply through White Noise; if that round trip cannot be verified automatically, mark device verification required.</string>
     <string name="ai_agents_project_groups_tip">Use a separate group for each project and start with its location and context. Session controls vary by connector; check its guide before using resume or branch commands.</string>
     <string name="nostr_event_view_image">View image</string>
     <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
@@ -2521,6 +2522,20 @@
     <string name="group_change_wait">Wait</string>
     <string name="group_change_continue_anyway">Continue anyway</string>
     <string name="group_change_invite_anyway">Invite anyway</string>
+    <string name="group_action_acting_account">Acting account</string>
+    <string name="group_action_local_nickname">Local nickname: %1$s</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d group</item>
+        <item quantity="other">%1$d groups</item>
+    </plurals>
+    <string name="group_action_public_key_hex">Public key (hex)</string>
+    <string name="group_action_account_label">Local account label: %1$s</string>
+    <string name="group_action_revoke_explanation">This removes admin rights. The person stays a member.</string>
+    <string name="group_action_add_members">Add members</string>
+    <string name="group_action_transfer_and_leave">Transfer admin and leave</string>
+    <string name="group_action_step_down_and_leave">Step down and leave</string>
+    <string name="group_review_add_member">Add member</string>
+    <string name="group_review_invitation_visibility">Visible to all members.</string>
     <string name="search_scope_this_chat">This chat · %1$s</string>
     <string name="search_scope_all_chats">All chats</string>
     <string name="search_scope_other_chats">Search other chats</string>

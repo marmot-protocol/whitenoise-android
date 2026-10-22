@@ -697,6 +697,12 @@ class NotificationStartupOrderingTest {
                 assertEquals(1, fixture.runtimeStartCalls.get())
 
                 fixture.allowRuntimeStart()
+                // Releasing the native gate does not await process-owned bootstrap completion.
+                fixture.runWithMainLooperPumping {
+                    withTimeout(5_000L) {
+                        while (fixture.appState.phase !is AppPhase.Onboarding) yield()
+                    }
+                }
                 fixture.ensureNotificationRuntimeStarted()
 
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
@@ -728,6 +734,12 @@ class NotificationStartupOrderingTest {
                 fixture.allowRuntimeStart()
                 retry.await()
 
+                // The retry caller can time out before the process-owned bootstrap finishes.
+                fixture.runWithMainLooperPumping {
+                    withTimeout(5_000L) {
+                        while (fixture.appState.phase !is AppPhase.Onboarding) yield()
+                    }
+                }
                 assertTrue(fixture.appState.phase is AppPhase.Onboarding)
                 assertEquals(1, fixture.runtimeStartCalls.get())
             } finally {

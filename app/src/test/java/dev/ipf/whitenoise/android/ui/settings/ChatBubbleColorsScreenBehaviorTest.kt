@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -123,6 +124,7 @@ class ChatBubbleColorsScreenBehaviorTest {
     /** AMOLED exposes the same editor and saves its choices in the theme-specific account defaults. */
     @Test
     fun amoledEditorSavesOutlineColors() {
+        appState.updateGlobalBubbleColor(BubbleTheme.Light, BubbleSide.Mine, 0xFF6D28D9L)
         appState.updateThemeMode(AppThemeMode.Amoled)
         show(darkTheme = true, amoled = true)
 
@@ -130,10 +132,29 @@ class ChatBubbleColorsScreenBehaviorTest {
         composeRule.onNodeWithText("Your message").assertExists()
         composeRule.onNodeWithText("AMOLED action buttons use fixed white", substring = true).assertDoesNotExist()
         composeRule.onNode(swatch("#B91C1C", "mine")).performScrollTo().performClick()
+        composeRule.onNode(swatch("#15803D", "other")).performScrollTo().performClick()
         composeRule.onNodeWithTag("bubble_colors.save").assertIsEnabled().performClick()
 
         composeRule.runOnIdle {
             assertEquals(0xFFB91C1CL, appState.globalBubbleColorArgb(BubbleTheme.Amoled, BubbleSide.Mine))
+            assertEquals(0xFF15803DL, appState.globalBubbleColorArgb(BubbleTheme.Amoled, BubbleSide.Other))
+            assertEquals(0xFF6D28D9L, appState.globalBubbleColorArgb(BubbleTheme.Light, BubbleSide.Mine))
+            assertEquals(1, backCount)
+        }
+    }
+
+    /** Leaving the global AMOLED editor without Save preserves the stored outline choices. */
+    @Test
+    fun amoledBackDiscardsUnsavedOutlineChanges() {
+        appState.updateThemeMode(AppThemeMode.Amoled)
+        appState.updateGlobalBubbleColor(BubbleTheme.Amoled, BubbleSide.Mine, 0xFFB91C1CL)
+        show(darkTheme = true, amoled = true)
+        composeRule.onNode(swatch("#15803D", "mine")).performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("Back").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(0xFFB91C1CL, appState.globalBubbleColorArgb(BubbleTheme.Amoled, BubbleSide.Mine))
+            assertNull(appState.globalBubbleColorArgb(BubbleTheme.Amoled, BubbleSide.Other))
             assertEquals(1, backCount)
         }
     }

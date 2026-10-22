@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.app.Application
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ResolveInfo
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -35,6 +38,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -44,10 +48,12 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
@@ -61,6 +67,8 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
+import dev.ipf.whitenoise.android.state.SwipeAction
+import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -81,6 +89,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -621,6 +630,209 @@ class MessageBubbleTextSelectionSpeakTest {
                 ?.messageIdHex,
         )
         assertTrue(engine.spoken[submissions].text.endsWith("Second sentence."))
+    }
+
+    /** Selecting a scrolled filename keeps the source viewport and copies the visible word through the native menu. */
+    @Test
+    @Suppress("LongMethod")
+    @Config(qualifiers = "en-w360dp-h240dp-mdpi")
+    fun codePathNativeSelectionKeepsScrolledFilename() {
+        withCodePathClock {
+            val appState = appStateWithTts(FakeSessionEngine())
+            val path = "directory/".repeat(12) + "ENDTARGET"
+            val original = timelineMessage("```\n$path\n```")
+            val item =
+                original.copy(
+                    record =
+                        original.record.copy(
+                            contentTokens =
+                                MarkdownDocumentFfi(
+                                    listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", path)),
+                                    false,
+                                    byteArrayOf(),
+                                ),
+                        ),
+                )
+            val controller = conversationController(appState)
+            var textSelectionMode by mutableStateOf(false)
+            var actionMenuOpen by mutableStateOf(false)
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                        messageBubbleHost(
+                            item = item,
+                            controller = controller,
+                            appState = appState,
+                            textSelectionMode = textSelectionMode,
+                            onTextSelectionModeChange = { textSelectionMode = it },
+                            isActionMenuOpen = actionMenuOpen,
+                            onActionMenuOpenChange = { actionMenuOpen = it },
+                        )
+                    }
+                }
+            }
+            composeRule.waitForIdle()
+            val node = composeRule.onNodeWithText(path, useUnmergedTree = true)
+            val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+            node.performSemanticsAction(SemanticsActions.ScrollBy) { action ->
+                assertTrue(action(range.maxValue(), 0f))
+            }
+            composeRule.waitForIdle()
+            composeRule
+                .onNodeWithTag(MESSAGE_HOST_TAG)
+                .captureRoboImage("src/test/snapshots/message_bubble_code_path_end.png")
+            val host = composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
+            val hostBounds = host.fetchSemanticsNode().boundsInRoot
+            val textBounds = node.fetchSemanticsNode().boundsInRoot
+            host.performTouchInput {
+                down(Offset(textBounds.right - hostBounds.left - 20f, textBounds.center.y - hostBounds.top))
+                advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+                up()
+            }
+            composeRule.waitForIdle()
+            assertTrue(actionMenuOpen)
+            composeRule.onNodeWithText(app.getString(R.string.select_text)).performScrollTo().performClick()
+            composeRule.waitForIdle()
+            assertTrue(textSelectionMode)
+            val selectedRange = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+            assertEquals(selectedRange.maxValue(), selectedRange.value(), 1f)
+            composeRule.waitUntil(timeoutMillis = 5_000) { nativeTextMenuProvider.dataProvider != null }
+            composeRule
+                .onNodeWithTag(MESSAGE_HOST_TAG)
+                .captureRoboImage("src/test/snapshots/message_bubble_code_path_selection.png")
+            composeRule.runOnIdle {
+                val copy =
+                    checkNotNull(nativeTextMenuProvider.dataProvider)
+                        .data()
+                        .components
+                        .filterIsInstance<TextContextMenuItem>()
+                        .single { it.label == app.getString(android.R.string.copy) }
+                copy.onClick(nativeTextMenuSession)
+            }
+            val clipboard = app.getSystemService(ClipboardManager::class.java)
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.coerceToText(app)
+                    ?.toString() == "ENDTARGET"
+            }
+        }
+    }
+
+    /** A fitting code leaf must leave horizontal movement available to the bubble's real reply action. */
+    @Test
+    fun swipeOnFittingCodeBlockBeginsReply() {
+        withCodePathClock {
+            val controller = renderSwipeBlock(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", "ls -la"))
+            swipeSource("ls -la", right = true, captureFile = "message_bubble_fitting_code_reply_swipe.png")
+            assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+        }
+    }
+
+    /** Math shares the code viewport and must not absorb a reply gesture when all source fits. */
+    @Test
+    fun swipeOnFittingMathBlockBeginsReply() {
+        withCodePathClock {
+            val controller = renderSwipeBlock(MarkdownBlockFfi.MathBlock("a + b"))
+            swipeSource("a + b", right = true, captureFile = "message_bubble_fitting_math_reply_swipe.png")
+            assertEquals(SWIPE_TEST_MESSAGE_ID, controller.replyingTo?.messageIdHex)
+        }
+    }
+
+    /** Overflow keeps both horizontal directions, even at an edge, without falling through to reply. */
+    @Test
+    fun overflowingCodeOwnsHorizontalDragsAtBothEdges() {
+        val path = "directory/".repeat(20) + "ENDTARGET"
+        val controller = renderSwipeBlock(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", path))
+        val node = composeRule.onNodeWithText(path, useUnmergedTree = true)
+        val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+        assertTrue(range.maxValue() > 0f)
+        swipeSource(path, right = true)
+        assertEquals(null, controller.replyingTo)
+        assertEquals(0f, range.value(), 1f)
+        swipeSource(path, right = false)
+        assertTrue(range.value() > 0f)
+        assertEquals(null, controller.replyingTo)
+        node.performSemanticsAction(SemanticsActions.ScrollBy) { action -> assertTrue(action(range.maxValue(), 0f)) }
+        composeRule.waitForIdle()
+        swipeSource(path, right = false)
+        assertEquals(range.maxValue(), range.value(), 1f)
+        assertEquals(null, controller.replyingTo)
+        swipeSource(path, right = true)
+        assertTrue(range.value() < range.maxValue())
+        assertEquals(null, controller.replyingTo)
+    }
+
+    /** Uses the real bubble host with both physical swipe bindings set to Reply to detect accidental fallthrough. */
+    private fun renderSwipeBlock(block: MarkdownBlockFfi): ConversationController {
+        val appState = appStateWithTts(FakeSessionEngine())
+        appState.swipePreferences.set(SwipeBinding.MessageLeft, SwipeAction.Reply)
+        appState.swipePreferences.set(SwipeBinding.MessageRight, SwipeAction.Reply)
+        val source =
+            when (block) {
+                is MarkdownBlockFfi.CodeBlock -> "```\n${block.content}\n```"
+                is MarkdownBlockFfi.MathBlock -> "\$\$\n${block.content}\n\$\$"
+                else -> error("The swipe fixture requires code or math source")
+            }
+        val record =
+            swipeTestProjectedRecord(reacted = false, mine = false, media = false).copy(
+                plaintext = source,
+                contentTokens = MarkdownDocumentFfi(listOf(block), false, byteArrayOf()),
+            )
+        val controller = conversationController(appState)
+        runBlocking {
+            controller.testRefreshCurrentTimeline(ACCOUNT_REF) {
+                TimelinePageFfi(listOf(record), hasMoreBefore = false, hasMoreAfter = false)
+            }
+        }
+        val item = controller.timeline.single()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return controller
+    }
+
+    /** Starts on the source's clipped visible text, rather than the outer bubble gutter. */
+    private fun swipeSource(
+        text: String,
+        right: Boolean,
+        captureFile: String? = null,
+    ) {
+        val source = composeRule.onNodeWithText(text, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val host = composeRule.onNodeWithTag(MESSAGE_HOST_TAG)
+        val bounds = host.fetchSemanticsNode().boundsInRoot
+        host.performTouchInput {
+            val startX = if (right) source.left + 8f else source.right - 8f
+            down(Offset(startX - bounds.left, source.center.y - bounds.top))
+            repeat(4) { moveBy(Offset(if (right) 30f else -30f, 0f), delayMillis = 40) }
+        }
+        composeRule.waitForIdle()
+        if (captureFile != null) host.captureRoboImage("src/test/snapshots/$captureFile")
+        host.performTouchInput { up() }
+        composeRule.waitForIdle()
+    }
+
+    /** Pins only this golden's clock inputs and restores them even if capture or native selection fails. */
+    private inline fun withCodePathClock(block: () -> Unit) {
+        val originalZone = TimeZone.getDefault()
+        val originalTimeFormat = Settings.System.getString(app.contentResolver, Settings.System.TIME_12_24)
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            Settings.System.putString(app.contentResolver, Settings.System.TIME_12_24, "12")
+            block()
+        } finally {
+            try {
+                Settings.System.putString(app.contentResolver, Settings.System.TIME_12_24, originalTimeFormat)
+            } finally {
+                TimeZone.setDefault(originalZone)
+            }
+        }
     }
 
     /** Select text from action menu speak clears mode and starts at pressed sentence. */

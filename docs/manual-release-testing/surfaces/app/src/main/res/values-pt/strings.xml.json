@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/res/values-pt/strings.xml",
+  "legacy_sha256": "1f06098d49d44074c09f2a47dbe3444772f95e29233862879acedfbc14611018",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Portuguese local deletion keeps the user in the conversation",
+        "source": "app/src/main/res/values-pt/strings.xml",
+        "anchor": "<string name=\"delete_local_does_not_leave\">",
+        "test_ids": [
+          "CHL-010"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Claude Code first-installation prompt, approval boundaries and phone setup guidance",
+        "source": "app/src/main/res/values-pt/strings.xml",
+        "anchor": "name=\"agent_connector_claude_prompt\"",
+        "test_ids": [
+          "SET-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,178 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+  "legacy_sha256": "24b453799071fcbbbfd2caa37f025ca4b562295096b9cdbfd1a084fcfc589d70",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AppFont.pickerLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "fun AppFont.pickerLabel(",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "AppearanceScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "fun AppearanceScreen(",
+        "test_ids": [
+          "SET-001",
+          "SET-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:custom_emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "SET-001",
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:action_color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.action_color",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:app_font",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.app_font",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:appearance_amoled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_amoled",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_amoled_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_amoled_detail",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_enter_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_enter_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:appearance_font_size_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_font_size_help",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:appearance_font_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_font_system",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "setting:appearance_theme",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_theme",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_theme_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_theme_help",
+        "test_ids": [
+          "SET-002",
+          "SET-003"
+        ]
+      },
+      {
+        "surface": "setting:chat_bubble_colors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.chat_bubble_colors",
+        "test_ids": [
+          "SET-001",
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:enter_key_behavior_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.enter_key_behavior_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:font_size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.font_size",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.language",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:language_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.language_system",
+        "test_ids": [
+          "SET-002",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "R.string.quick_account_switching",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.quick_account_switching",
+        "test_ids": [
+          "ACC-017",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "R.string.quick_account_switching_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.quick_account_switching_detail",
+        "test_ids": [
+          "ACC-017",
+          "SET-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
