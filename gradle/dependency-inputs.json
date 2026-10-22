@@ -11,6 +11,11 @@
     ":app project coreLibraryDesugaring",
     ":app project detekt",
     ":app project detektPlugins",
+    ":app project devPlayBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devPlayBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devPlayBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devPlayBenchmarkReleaseCompileClasspath",
     ":app project devPlayBenchmarkReleaseImplementationDependenciesMetadata",
@@ -39,6 +44,11 @@
     ":app project devPlayNonMinifiedReleaseLintChecksClasspath",
     ":app project devPlayNonMinifiedReleaseReverseMetadataValues",
     ":app project devPlayNonMinifiedReleaseRuntimeClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devZapstoreBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devZapstoreBenchmarkReleaseCompileClasspath",
     ":app project devZapstoreBenchmarkReleaseImplementationDependenciesMetadata",
@@ -73,11 +83,13 @@
     ":app project kotlinCompilerClasspath",
     ":app project kotlinCompilerPluginClasspath",
     ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevPlayDebug",
     ":app project kotlinCompilerPluginClasspathDevPlayDebugAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevPlayDebugUnitTest",
     ":app project kotlinCompilerPluginClasspathDevPlayNonMinifiedRelease",
     ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebug",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebugAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebugUnitTest",
@@ -289,7 +301,7 @@
   ],
   "files": {
     "app/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "app/gradle.lockfile": "33738ec8707fab79c1bb7e025e5c790b0f8ebfd0fe425681cfbcaa639bd8bb46",
+    "app/gradle.lockfile": "8841550dae68cf56133c7e182de9ffba5420f1047269fc59705ddd43d91cf457",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "benchmark/gradle.lockfile": "84ad20fc856d355c834209acada461c59bf6772856511c42a1c29a5190f7673c",
     "buildscript-gradle.lockfile": "372f4c86a0256c61f27b2ec649f2e891f53d71e0d2115cc7ab4bc4ec5d7de6bb",
@@ -826,6 +838,17 @@
       "nonliteral_optional_references": [],
       "reason": "Normal strict lint/unit/fuzz resolution exposed bc-jdk18on-bom 1.85 and guava-parent 33.6.0-jre POMs missing from the warm-cache capture. Independently checked exact POM/module counterparts for already reviewed coordinates and recursively followed supplier POM parent/imported-BOM ancestry. Each added record authorizes metadata only, with retained official HTTPS payload SHA-256; no binary, wildcard trust or resolution-lock exception is added.",
       "scope": "metadata"
+    },
+    {
+      "configuration": "benchmarkRelease AndroidTest configurations",
+      "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/39770133039/artifacts/12421094775",
+      "project": ":app",
+      "reason": "The retained normal and benchmark captures from source revision 8066f421b677e98bfb081968f26dd22854143c2e agree on their shared configurations and existing artifact checksums. Restore their twelve benchmark AndroidTest configuration memberships using the separately reviewed current master lock selections, including tracing 2.0.4 in place of the historical captures' tracing 2.0.3. This is a reviewed lock-membership continuation, not a fresh benchmark capture of the current source; supplier records, verification metadata and root plugin lock selections remain unchanged.",
+      "retained": {
+        "path": "gradle/dependency-evidence/post-lock-selection/benchmark-android-test-configurations.json.gz",
+        "sha256": "b78881ed34baa0b924cbf2a8b53778aa0e7d6f90b5775efd50b132e431ff18c5"
+      },
+      "scope": "project"
     }
   ],
   "reviewed_from": {
