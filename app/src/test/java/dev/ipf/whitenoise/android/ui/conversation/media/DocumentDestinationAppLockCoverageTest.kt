@@ -34,9 +34,13 @@ import dev.ipf.whitenoise.android.ui.group.ConversationTranscriptSaveAction
 import dev.ipf.whitenoise.android.ui.group.rememberConversationTranscriptSave
 import dev.ipf.whitenoise.android.ui.navigation.rememberProtectedShellSavedState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -120,6 +124,41 @@ class DocumentDestinationAppLockCoverageTest {
         awaitIo { !documentFile().exists() }
         assertNextSaveLaunches(expectedLaunches = 2)
     }
+
+    /** An accepted empty-output cleanup survives cancellation before its IO dispatcher gets a turn. */
+    @Test
+    fun acceptedEmptyOutputCleanupFinishesAfterItsOwnerIsCancelled() = assertCancelledCleanup(empty = true)
+
+    /** Retiring the owner cannot authorize cleanup to delete a provider document that already holds bytes. */
+    @Test
+    fun cancelledOutputCleanupKeepsExistingProviderBytes() = assertCancelledCleanup(empty = false)
+
+    /** Parks accepted cleanup before IO, retires its caller, and drains only then to exercise dispatch cancellation. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun assertCancelledCleanup(empty: Boolean) =
+        runBlocking {
+            val io = StandardTestDispatcher()
+            createDocument(empty = empty)
+            val cleanup =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    discardInterruptedCreatedDocument(context, destination, io)
+                }
+            try {
+                cleanup.cancel()
+                assertTrue("the IO operation has not run yet", documentFile().exists())
+                io.scheduler.runCurrent()
+                cleanup.join()
+                assertTrue("finishing cleanup must not revive the retired owner", cleanup.isCancelled)
+                if (empty) {
+                    assertFalse("accepted cleanup must outlive UI cancellation", documentFile().exists())
+                } else {
+                    assertArrayEquals(byteArrayOf(9, 9), documentFile().readBytes())
+                }
+            } finally {
+                io.scheduler.runCurrent()
+                cleanup.cancel()
+            }
+        }
 
     /** A non-empty provider document is never deleted by interruption cleanup. */
     @Test

@@ -19,7 +19,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.ui.conversation.media.discardEmptyCreatedDocument
+import dev.ipf.whitenoise.android.ui.conversation.media.discardInterruptedCreatedDocument
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -100,9 +100,7 @@ internal fun rememberConversationTranscriptSave(
             resultReady = false
             if (uri != null) {
                 if (requestedAccount == appState.activeAccountRef) appState.present(R.string.document_save_interrupted)
-                withContext(Dispatchers.IO) {
-                    discardEmptyCreatedDocument(context, uri)
-                }
+                discardInterruptedCreatedDocument(context, uri)
             }
             return@LaunchedEffect
         }

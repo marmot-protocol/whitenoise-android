@@ -22,7 +22,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -145,6 +147,15 @@ internal fun discardEmptyCreatedDocument(
     }
 }
 
+/** Finishes accepted empty-output cleanup even if clearing its result key or relocking retires the UI owner. */
+internal suspend fun discardInterruptedCreatedDocument(
+    context: Context,
+    destination: Uri,
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    withContext(NonCancellable + dispatcher) { discardEmptyCreatedDocument(context, destination) }
+}
+
 /** Builds the system create-document request with a normalized MIME type and a safe suggested name. */
 internal fun createDocumentIntent(
     fileName: String,
@@ -202,7 +213,7 @@ private suspend fun settleDocumentDestination(
         // guards. Do not revive stale plaintext or bypass message-expiry checks.
         // Remove the empty CREATE_DOCUMENT output and invite a fresh guarded save.
         presentInterruption()
-        withContext(Dispatchers.IO) { discardEmptyCreatedDocument(context, destination) }
+        discardInterruptedCreatedDocument(context, destination)
     }
 }
 
