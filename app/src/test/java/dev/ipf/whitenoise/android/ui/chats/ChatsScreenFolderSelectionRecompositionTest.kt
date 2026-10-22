@@ -325,14 +325,19 @@ class ChatsScreenFolderSelectionRecompositionTest {
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$deleted").assertExists()
             composeRule.onNodeWithTag("chat.row.$surviving").assertExists()
-            composeRule.runOnIdle {
-                controller.applyChatListSubscriptionUpdate(
-                    ACCOUNT_REF,
-                    ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, deleted),
-                )
-                assertFalse(controller.containsGroup(deleted))
-            }
+            val revisionBeforeRemoval =
+                composeRule.runOnIdle {
+                    assertTrue(controller.containsGroup(deleted))
+                    val revision = controller.forwardTargetsRevision
+                    controller.applyChatListSubscriptionUpdate(
+                        ACCOUNT_REF,
+                        ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, deleted),
+                    )
+                    assertFalse(controller.containsGroup(deleted))
+                    revision
+                }
             ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            composeRule.runOnIdle { assertTrue(controller.forwardTargetsRevision > revisionBeforeRemoval) }
             composeRule.waitUntil { reads >= 2 }
             composeRule.onNodeWithTag("chat.row.$deleted").assertDoesNotExist()
             composeRule.onNodeWithTag("chat.row.$surviving").assertExists()

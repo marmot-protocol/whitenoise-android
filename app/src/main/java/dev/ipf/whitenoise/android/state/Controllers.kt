@@ -4339,6 +4339,13 @@ class ChatsController private constructor(
         )
     }
 
+    /** Captures rollback state and hides the row together at admitted local-removal time. */
+    private fun removeChatRowOptimistically(groupIdHex: String): RemovedChatRowSnapshot? {
+        val snapshot = snapshotChatRowForRemoval(groupIdHex)
+        removeChatRow(groupIdHex, optimistic = true)
+        return snapshot
+    }
+
     private fun removeChatRow(
         groupIdHex: String,
         optimistic: Boolean = false,
@@ -4931,8 +4938,7 @@ class ChatsController private constructor(
                         isCurrent,
                         observer.readinessBudget,
                         onAdmitted = {
-                            removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-                            removeChatRow(groupIdHex, optimistic = true)
+                            removedSnapshot = removeChatRowOptimistically(groupIdHex)
                         },
                     ) {
                         nativeCommitted = true

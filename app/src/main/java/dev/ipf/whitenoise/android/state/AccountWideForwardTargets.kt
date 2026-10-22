@@ -96,16 +96,18 @@ internal class AccountWideForwardTargets(
         if (!isCurrent) return emptyList()
         // Keep the live window useful while a replacement read is pending or has failed. An old
         // off-window row cannot distinguish window eviction from deletion, so withhold all extras.
-        if (!hasCurrentMembership) return sortChatListItems(retained, draftedAtSeconds)
-        val retainedIds = retained.mapTo(hashSetOf()) { it.foldedId }
-        val accountId = controller.boundAccountIdHex()
-        return sortChatListItems(
-            retained +
-                presented
-                    .filterNot { it.row.groupIdHex.lowercase(Locale.ROOT) in retainedIds }
-                    .map { controller.projectPresentedRow(it, accountId) },
-            draftedAtSeconds,
-        )
+        val rows =
+            if (hasCurrentMembership) {
+                val retainedIds = retained.mapTo(hashSetOf()) { it.foldedId }
+                val accountId = controller.boundAccountIdHex()
+                retained +
+                    presented
+                        .filterNot { it.row.groupIdHex.lowercase(Locale.ROOT) in retainedIds }
+                        .map { controller.projectPresentedRow(it, accountId) }
+            } else {
+                retained
+            }
+        return sortChatListItems(rows, draftedAtSeconds)
     }
 
     /**

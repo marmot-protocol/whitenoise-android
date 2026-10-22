@@ -16,9 +16,8 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -39,41 +38,61 @@ class ChatsScreenOffWindowUnreadRemovalTest {
         composeRule.runOnIdle { controllers.forEach(ChatsController::onCleared) }
     }
 
-    @Test fun offWindowDeleteRefreshWaitsForNativeCommitAndSettlesWithoutDeletedRow() =
-        runTest {
-            val entered = CompletableDeferred<Unit>()
-            val release = CompletableDeferred<Unit>()
-            var reads = 0
-            val fixture = heldRemovalFixture(entered, release) { reads++ }
+    @Test fun offWindowDeleteRefreshWaitsForNativeCommitAndSettlesWithoutDeletedRow() {
+        val nativeScope = TestScope()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var reads = 0
+        var deletion: kotlinx.coroutines.Deferred<Boolean>? = null
+        try {
+            val fixture = nativeScope.heldRemovalFixture(entered, release) { reads++ }
             prepareOffWindowRow(fixture.controller)
             composeRule.setContent {
                 WhiteNoiseTheme { ChatsScreen(fixture.state, fixture.controller, {}, { _, _, _, _ -> }) }
             }
             composeRule.onNodeWithTag("chats.unread_filter").performClick()
-            composeRule.waitUntil { reads == 1 }
+            awaitNativeProgress(nativeScope) { reads == 1 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertExists()
-            val deletion = async { fixture.controller.deleteGroupLocalFromChatList(LOCAL_DELETE_GROUP) }
+            val pending = nativeScope.async { fixture.controller.deleteGroupLocalFromChatList(LOCAL_DELETE_GROUP) }
+            deletion = pending
+            awaitNativeProgress(nativeScope) { entered.isCompleted }
+            assertTrue(fixture.state.localGroupDeleteCleanupMutex.isLocked)
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.row.$SURVIVOR").assertExists()
+            composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
+            release.complete(Unit)
+            awaitNativeProgress(nativeScope) { pending.isCompleted }
+            assertTrue(pending.getCompleted())
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            awaitNativeProgress(nativeScope) { reads >= 2 }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.row.$SURVIVOR").assertExists()
+            composeRule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+        } finally {
+            release.complete(Unit)
+            deletion?.cancel()
             try {
-                entered.await()
-                ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
-                composeRule.waitForIdle()
-                composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertDoesNotExist()
-                composeRule.onNodeWithTag("chat.row.$SURVIVOR").assertExists()
-                composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
-                release.complete(Unit)
-                assertTrue(deletion.await())
-                ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
-                composeRule.waitUntil { reads >= 2 }
-                composeRule.waitForIdle()
-                composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertDoesNotExist()
-                composeRule.onNodeWithTag("chat.row.$SURVIVOR").assertExists()
-                composeRule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+                awaitNativeProgress(nativeScope) { deletion?.isCompleted != false }
             } finally {
-                release.complete(Unit)
-                deletion.cancelAndJoin()
+                nativeScope.cancel()
             }
         }
+    }
+
+    /** Advances the native fixture scheduler at Compose's blocking test boundaries. */
+    private fun awaitNativeProgress(
+        scope: TestScope,
+        ready: () -> Boolean,
+    ) {
+        composeRule.waitUntil {
+            scope.testScheduler.runCurrent()
+            ready()
+        }
+    }
 
     private fun TestScope.heldRemovalFixture(
         entered: CompletableDeferred<Unit>,
