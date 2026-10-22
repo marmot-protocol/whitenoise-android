@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -30,6 +32,20 @@ class PublicEventAuthorRefreshThrottleTest {
         runTest {
             val failure = runCatching { throttle.refreshing(AUTHOR) { throw IOException("offline") } }
             assertTrue(failure.exceptionOrNull() is IOException)
+
+            assertEquals(PublicEventAuthorRefreshThrottle.Refreshed("online"), throttle.refreshing(AUTHOR) { "online" })
+        }
+
+    /**
+     * Offline, MDK's `refreshProfile` fails with a MarmotKitException because no relay connects, so the slot is
+     * released and the next card for the author retries once a relay is reachable.
+     */
+    @Test
+    fun nativeRefreshFailureWithNoRelayReachableReleasesTheSlot() =
+        runTest {
+            val offline = MarmotKitException.Runtime("connect relays failed")
+            val failure = runCatching { throttle.refreshing(AUTHOR) { throw offline } }
+            assertSame(offline, failure.exceptionOrNull())
 
             assertEquals(PublicEventAuthorRefreshThrottle.Refreshed("online"), throttle.refreshing(AUTHOR) { "online" })
         }

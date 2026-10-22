@@ -43,8 +43,9 @@ internal suspend fun WhiteNoiseAppState.refreshPublicEventCard(
 /**
  * Refreshes the card author's kind-0 profile at most once per [PublicEventAuthorRefreshThrottle] interval, then
  * returns the card with MDK's cached author metadata. A cached card already carries that metadata, so this only
- * updates the header in place when the profile itself changed. A failed refresh, offline for example, does not use
- * up the interval, so the next card for that author tries again.
+ * updates the header in place when the profile itself changed. A failed refresh does not use up the interval, so the
+ * next card for that author tries again. Offline is such a failure: MDK's `refreshProfile` throws when no relay
+ * connects. A refresh that reached a relay but found no newer profile returns normally and keeps the interval.
  */
 internal suspend fun WhiteNoiseAppState.refreshPublicEventCardAuthor(
     loaded: Loaded,
