@@ -162,7 +162,9 @@ internal fun ReplyPreviewCard(
         bodyDocument = if (mediaLabel == null) appState?.parseMarkdownOrEmpty(body) else null
     }
     val projectedBody =
-        bodyDocument?.takeIf { it.blocks.isNotEmpty() }?.let { rememberMarkdownPreviewText(it, mentionDisplayName) }
+        bodyDocument?.takeIf { it.blocks.isNotEmpty() }?.let {
+            rememberMarkdownPreviewText(it, mentionDisplayName = mentionDisplayName)
+        }
             ?: remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) }
     val resolvedAccentColor =
         accentColor

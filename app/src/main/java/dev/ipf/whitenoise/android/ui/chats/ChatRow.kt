@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -398,6 +400,7 @@ internal fun ChatRow(
                 if (markdownPreview != null) {
                     rememberMarkdownPreviewText(
                         markdownPreview,
+                        applyProfileDirection = false,
                         mentionDisplayName =
                             remember(appState) {
                                 { bech32: String -> appState.mentionDisplayName(bech32) }
@@ -518,7 +521,10 @@ private fun ChatRowTitleStatus(
     )
 }
 
-/** One-line production preview with native typed attachment decoration; status lives in the trailing badge. */
+/**
+ * One-line preview with native attachment decoration; direction belongs to the whole assembled text.
+ * First-strong direction applies equally to captions with and without profile references.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatRowPreviewLine(
@@ -559,6 +565,7 @@ internal fun ChatRowPreviewLine(
     MarkdownTimestampText(
         text = remember(text) { EmojiShortcodes.annotate(text) },
         inlineContent = EmojiShortcodes.content() + inlineContent,
+        style = LocalTextStyle.current.copy(textDirection = TextDirection.Content),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         fontStyle = fontStyle,

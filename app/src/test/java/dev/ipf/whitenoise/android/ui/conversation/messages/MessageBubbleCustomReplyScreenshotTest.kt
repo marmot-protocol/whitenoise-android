@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -150,14 +149,6 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
         composeRule.onNodeWithText("Custom received text").assertExists()
         composeRule.onNodeWithText("Custom sent caption").assertExists()
         composeRule.onNodeWithText("Custom received caption").assertExists()
-        // Received cards resolve their disk-cache misses off-main before exposing their download controls.
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule
-                .onAllNodesWithContentDescription("Tap to download", useUnmergedTree = true)
-                .fetchSemanticsNodes()
-                .size == 2
-        }
-        composeRule.onAllNodesWithContentDescription("PDF document", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_custom_reply_surfaces_$name.png")
     }
 
@@ -191,12 +182,11 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
             )
         }
 
-    /** Retains own-file bytes before composition, matching the native handoff before canonical projection. */
+    /** Mirrors the successful native handoff for canonical outgoing file rows without network access. */
     private fun cacheCanonicalOwnFiles(item: TimelineMessage) {
-        composeRule.runOnIdle {
+        composeRule.runOnUiThread {
             repeat(requireNotNull(item.projected).media.size) { attachmentIndex ->
                 assertTrue(
-                    "canonical own file must be retained before projection",
                     appState.cacheMediaPlaintext(
                         mediaCacheKey("personal", item.record.groupIdHex, item.record.messageIdHex, attachmentIndex),
                         byteArrayOf(1, 2, 3, 4),

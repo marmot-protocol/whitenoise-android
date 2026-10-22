@@ -308,19 +308,16 @@ class MarkdownSpeakableTextTest {
             markdownDocumentToSpeakableProjection(
                 document = document,
                 mentionDisplayName = { "Alice" },
-                isGroupMember = { true },
             )
         val repeated =
             markdownDocumentToSpeakableProjection(
                 document = document,
                 mentionDisplayName = { "Alice" },
-                isGroupMember = { true },
             )
         val renamed =
             markdownDocumentToSpeakableProjection(
                 document = document,
                 mentionDisplayName = { "Alicia" },
-                isGroupMember = { true },
             )
 
         assertEquals("item. code. head. cell. @Alice.", projection.text)
@@ -339,6 +336,7 @@ class MarkdownSpeakableTextTest {
         assertTrue(projection.projectionId != renamed.projectionId)
     }
 
+    /** Speech uses the visible member/external username and omits unresolved identities rather than spelling keys. */
     @Test
     fun namedMentionsAreSpokenAndUnresolvedKeysAreOmitted() {
         val alice = "npub1" + "q".repeat(58)
@@ -347,6 +345,7 @@ class MarkdownSpeakableTextTest {
         val unknownNonMember = "npub1" + "x".repeat(58)
         val note = "note1" + "n".repeat(58)
 
+        /** Supplies typed native entities without exercising or replacing native validation. */
         fun entity(
             hrp: MarkdownNostrHrpFfi,
             bech32: String,
@@ -377,7 +376,7 @@ class MarkdownSpeakableTextTest {
         // readable form, so speech omits it exactly as it omits a bare URL;
         // the bubble still shows the shortened bech32, which is selectable.
         assertEquals(
-            "@Alice Bob.",
+            "@Alice @Bob.",
             markdownDocumentToSpeakableText(
                 document = document,
                 mentionDisplayName = {
@@ -387,7 +386,6 @@ class MarkdownSpeakableTextTest {
                         else -> null
                     }
                 },
-                isGroupMember = { it == alice || it == unknownMember },
             ),
         )
     }
@@ -442,7 +440,6 @@ class MarkdownSpeakableTextTest {
             markdownDocumentToSpeakableText(
                 document = mentionOnly,
                 mentionDisplayName = { "Someone" },
-                isGroupMember = { true },
             ),
         )
     }

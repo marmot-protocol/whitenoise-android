@@ -152,6 +152,14 @@
         ]
       },
       {
+        "surface": "Canonical profile targets and uniform username labels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun markdownNostrEntityDisplay(",
+        "test_ids": [
+          "CON-011"
+        ]
+      },
+      {
         "surface": "Bounded Compose measurement and preview safety",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "boundedIntrinsicHeight(",

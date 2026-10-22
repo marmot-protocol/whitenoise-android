@@ -192,7 +192,6 @@ class MessageFullScreenMarkdownTest {
                     ),
                 ),
             mentionDisplayName = { "Alice" },
-            isGroupMember = { true },
             onNostrProfileTap = { opened = it },
         )
 
@@ -227,7 +226,6 @@ class MessageFullScreenMarkdownTest {
         body: String,
         document: MarkdownDocumentFfi?,
         mentionDisplayName: ((String) -> String?)? = null,
-        isGroupMember: ((String) -> Boolean)? = null,
         onNostrProfileTap: ((String) -> Unit)? = null,
         onCopyLink: (String) -> Unit = {},
         onSelectionReady: (ReaderTextSelectionController) -> Unit = {},
@@ -240,7 +238,6 @@ class MessageFullScreenMarkdownTest {
                     body = body,
                     markdownDocument = document,
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     onNostrProfileTap = onNostrProfileTap,
                     onCopyMarkdownLink = onCopyLink,
                     selectionController = selection,
@@ -283,7 +280,6 @@ class MessageFullScreenMarkdownTest {
                         body = words.joinToString("\n"),
                         markdownDocument = markdown,
                         mentionDisplayName = null,
-                        isGroupMember = null,
                         onNostrProfileTap = null,
                         onCopyMarkdownLink = {},
                         selectionController = controller,

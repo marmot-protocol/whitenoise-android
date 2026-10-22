@@ -775,7 +775,6 @@ internal fun MessageBubble(
             activeSpeakableDocument,
             effectiveTtsCandidate,
             speakableIdentity,
-            controller.membersLoaded,
         ) {
             if (queuedTtsPresentation != null) {
                 queuedTtsPresentation.speakableProjection()
@@ -787,12 +786,6 @@ internal fun MessageBubble(
                         bodyText = speakableIdentity.bodyText,
                         document = document,
                         mentionDisplayName = appState::mentionSpeechName,
-                        isGroupMember =
-                            if (controller.membersLoaded) {
-                                { bech32: String -> appState.isRosterMember(bech32, controller.members) }
-                            } else {
-                                null
-                            },
                     )
                 }
             }
@@ -1072,7 +1065,7 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
-    /** Captures the resolved roster alongside the rendered speech projection for this request. */
+    /** Captures display names and the conversation size alongside the rendered speech projection. */
     suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
         projectTtsSpeakableEntry(
             message = entryRecord,
@@ -1081,12 +1074,6 @@ internal fun MessageBubble(
             conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
             parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
             mentionDisplayName = appState::mentionSpeechName,
-            isGroupMember =
-                if (controller.membersLoaded) {
-                    { bech32 -> appState.isRosterMember(bech32, controller.members) }
-                } else {
-                    null
-                },
         )
 
     // Speak aloud reads from this message onward: catch-up listening is the
@@ -2885,12 +2872,6 @@ internal fun MessageBubble(
                                 showStatus = showOutgoingStatus,
                                 senderName = appState.displayName(record.sender).takeIf { showSenderName },
                                 mentionDisplayName = appState::mentionDisplayName,
-                                isGroupMember =
-                                    if (controller.membersLoaded) {
-                                        { bech32 -> appState.isRosterMember(bech32, controller.members) }
-                                    } else {
-                                        null
-                                    },
                                 media = mediaPreview,
                                 footerContent = previewFooter,
                                 warning = outerInvalidationWarning,
@@ -2962,14 +2943,6 @@ internal fun MessageBubble(
                         mentionDisplayName =
                             remember(appState) {
                                 { bech32: String -> appState.mentionDisplayName(bech32) }
-                            },
-                        isGroupMember =
-                            if (controller.membersLoaded) {
-                                remember(appState, controller) {
-                                    { bech32: String -> appState.isRosterMember(bech32, controller.members) }
-                                }
-                            } else {
-                                null
                             },
                         onNostrProfileTap =
                             remember(appState) {
