@@ -11,6 +11,11 @@
     ":app project coreLibraryDesugaring",
     ":app project detekt",
     ":app project detektPlugins",
+    ":app project devPlayBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devPlayBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devPlayBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devPlayBenchmarkReleaseCompileClasspath",
     ":app project devPlayBenchmarkReleaseImplementationDependenciesMetadata",
@@ -39,6 +44,11 @@
     ":app project devPlayNonMinifiedReleaseLintChecksClasspath",
     ":app project devPlayNonMinifiedReleaseReverseMetadataValues",
     ":app project devPlayNonMinifiedReleaseRuntimeClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devZapstoreBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devZapstoreBenchmarkReleaseCompileClasspath",
     ":app project devZapstoreBenchmarkReleaseImplementationDependenciesMetadata",
@@ -73,11 +83,13 @@
     ":app project kotlinCompilerClasspath",
     ":app project kotlinCompilerPluginClasspath",
     ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevPlayDebug",
     ":app project kotlinCompilerPluginClasspathDevPlayDebugAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevPlayDebugUnitTest",
     ":app project kotlinCompilerPluginClasspathDevPlayNonMinifiedRelease",
     ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebug",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebugAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebugUnitTest",
@@ -289,7 +301,7 @@
   ],
   "files": {
     "app/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "app/gradle.lockfile": "dea17870d1ce0185ff464461f812f63a82eacb544d907da77fd122fb4d9768ec",
+    "app/gradle.lockfile": "4bfecbed80c4f84b6202105957a90765c91078be400b0365a24d4ad14fec081a",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "benchmark/gradle.lockfile": "bb2351e679ee08a2c9973a7f558e6ca5367db0a28f1e1669e35829a4ce432887",
     "buildscript-gradle.lockfile": "372f4c86a0256c61f27b2ec649f2e891f53d71e0d2115cc7ab4bc4ec5d7de6bb",
@@ -826,6 +838,17 @@
       "nonliteral_optional_references": [],
       "reason": "Normal strict lint/unit/fuzz resolution exposed bc-jdk18on-bom 1.85 and guava-parent 33.6.0-jre POMs missing from the warm-cache capture. Independently checked exact POM/module counterparts for already reviewed coordinates and recursively followed supplier POM parent/imported-BOM ancestry. Each added record authorizes metadata only, with retained official HTTPS payload SHA-256; no binary, wildcard trust or resolution-lock exception is added.",
       "scope": "metadata"
+    },
+    {
+      "configuration": "benchmarkRelease AndroidTest configurations",
+      "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/39770133039/artifacts/12421094775",
+      "project": ":app",
+      "reason": "The source-bound normal and benchmark captures agree on every shared configuration and existing artifact checksum. Retain the twelve newly resolved benchmark AndroidTest configurations without changing dependency versions, supplier records, verification metadata or the reviewed root plugin lock selections.",
+      "retained": {
+        "path": "gradle/dependency-evidence/post-lock-selection/benchmark-android-test-configurations.json.gz",
+        "sha256": "b78881ed34baa0b924cbf2a8b53778aa0e7d6f90b5775efd50b132e431ff18c5"
+      },
+      "scope": "project"
     }
   ],
   "reviewed_from": {
