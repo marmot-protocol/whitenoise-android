@@ -89,11 +89,12 @@ internal suspend fun verifyUpgradeAvatar(
     repeat(avatars.length()) { index ->
         val avatar = avatars.getJSONObject(index)
         val payload =
-            runtime.readAvatarAssets(
-                avatar.getString("account"),
-                listOf(avatar.getString("reference")),
-                1_048_576uL,
-            ).single()
+            runtime
+                .readAvatarAssets(
+                    avatar.getString("account"),
+                    listOf(avatar.getString("reference")),
+                    1_048_576uL,
+                ).single()
         check(!payload.deferred && payload.availability == AvatarAvailabilityFfi.READY)
         check(avatarDigest(payload.bytes) == avatar.getString("sha256")) { "Migrated avatar bytes changed or vanished" }
     }
@@ -101,4 +102,7 @@ internal suspend fun verifyUpgradeAvatar(
 
 /** Compares only generated image content; account identifiers and native descriptors stay in the private receipt. */
 private fun avatarDigest(bytes: ByteArray): String =
-    MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    MessageDigest
+        .getInstance("SHA-256")
+        .digest(bytes)
+        .joinToString("") { "%02x".format(it) }

@@ -48,7 +48,8 @@ private fun upgradeReceiverMediaBodies(
     return File(account, "media")
         .walkTopDown()
         .filter {
-            it.isFile && it.name.matches(Regex("[0-9a-f]{32}")) &&
+            it.isFile &&
+                it.name.matches(Regex("[0-9a-f]{32}")) &&
                 it.length() in (16L * 1024L * 1024L) until (17L * 1024L * 1024L)
         }.toList()
 }

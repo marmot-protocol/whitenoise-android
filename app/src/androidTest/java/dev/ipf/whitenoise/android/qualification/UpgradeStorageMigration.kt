@@ -16,7 +16,9 @@ private var initialLegacyBytes = 0uL
 
 /** Selects the reviewed October 21 baseline, whose completed attachments already live outside SQL. */
 internal fun fileStoreBaseline(): Boolean =
-    InstrumentationRegistry.getArguments().getString("fileStoreBaseline") == "true"
+    InstrumentationRegistry
+        .getArguments()
+        .getString("fileStoreBaseline") == "true"
 
 /** Waits for an external, byte-pinned native hook; only the hosted emulator may release this barrier. */
 internal suspend fun runUpgradeFault(
