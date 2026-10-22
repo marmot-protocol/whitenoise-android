@@ -20,7 +20,7 @@ internal class ChatListArchiveActions(
     private val rowForGroup: (String) -> ChatListRowFfi?,
     private val isCurrent: (Long) -> Boolean,
     private val onChanged: () -> Unit,
-    private val updateGroup: suspend (String, String, Boolean, Long) -> Boolean,
+    private val updateGroup: suspend (String, String, Boolean, OptimisticArchiveIntent) -> Boolean,
     private val onFailure: (Throwable) -> Unit,
     private val onSuccess: (Boolean) -> Unit,
 ) {
@@ -41,7 +41,7 @@ internal class ChatListArchiveActions(
             intents.forEach { (groupIdHex, intent) ->
                 val applied =
                     runCatchingCancellable {
-                        updateGroup(account, groupIdHex, archived, epoch)
+                        updateGroup(account, groupIdHex, archived, intent)
                     }.onFailure { error ->
                         if (isCurrent(epoch)) onFailure(error)
                     }.getOrDefault(false)
@@ -86,22 +86,26 @@ internal class ChatListArchiveActions(
         intent: OptimisticArchiveIntent,
     ) {
         val rowKey = groupIdHex.lowercase()
-        if (isCurrent(intent.bindEpoch) && intentsByGroup[rowKey] === intent) {
+        if (ownsIntent(groupIdHex, intent)) {
             intentsByGroup.remove(rowKey)
             onChanged()
         }
     }
 
+    /** Rechecks unstarted batch admission inside the native adapter's account/group lock. */
+    fun ownsIntent(
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent,
+    ): Boolean = isCurrent(intent.bindEpoch) && intentsByGroup[groupIdHex.lowercase()] === intent
+
     /** Applies the temporary archive flag without changing the authoritative row. */
-    fun projectRow(row: ChatListRowFfi): ChatListRowFfi =
-        intentsByGroup[row.groupIdHex.lowercase()]?.let { row.copy(archived = it.archived) } ?: row
+    fun projectRow(row: ChatListRowFfi): ChatListRowFfi = intentsByGroup[row.groupIdHex.lowercase()]?.let { row.copy(archived = it.archived) } ?: row
 
     /** Keeps the projected group flag consistent with its row while an action is pending. */
     fun projectGroup(
         groupIdHex: String,
         group: AppGroupRecordFfi?,
-    ): AppGroupRecordFfi? =
-        intentsByGroup[groupIdHex.lowercase()]?.let { group?.copy(archived = it.archived) } ?: group
+    ): AppGroupRecordFfi? = intentsByGroup[groupIdHex.lowercase()]?.let { group?.copy(archived = it.archived) } ?: group
 
     /** Drops presentation intents when the controller resets its account binding or is cleared. */
     fun clear() {

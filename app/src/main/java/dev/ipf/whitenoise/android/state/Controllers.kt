@@ -4563,16 +4563,17 @@ class ChatsController private constructor(
         return archiveActions.setArchived(account, bindEpoch, groupIds, archived, notify)
     }
 
-    /** Publishes an archive result inside the existing group lock only for the captured binding. */
+    /** Admits only the current intent under the group lock; native work already started keeps its completion path. */
     private suspend fun applyArchiveMutation(
         account: String,
         groupIdHex: String,
         archived: Boolean,
-        epoch: Long,
+        intent: OptimisticArchiveIntent,
     ): Boolean =
         appState.withGroupCommitLock(account, groupIdHex) {
+            if (!archiveActions.ownsIntent(groupIdHex, intent)) return@withGroupCommitLock false
             val updated = groupArchivedUpdater(account, groupIdHex, archived)
-            if (isActiveBindEpoch(epoch)) {
+            if (isActiveBindEpoch(intent.bindEpoch)) {
                 applyLocalGroupUpdate(updated)
                 true
             } else {

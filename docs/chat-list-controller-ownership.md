@@ -17,12 +17,18 @@ Both bulk chat-list actions and conversation-originated archive intents use the
 same owner. It installs all eligible overlays before the first native call, then
 retires each intent by object identity. Failure exposes the latest authoritative
 row, and cancellation releases unstarted overlays. A reset clears the intents;
-an old completion cannot remove a replacement binding's intent. Native command
-acceptance, ordering, cancellation and retry policy are unchanged.
+an old completion cannot remove a replacement binding's intent. Before a batch
+enters MDK, the adapter rechecks the binding and exact intent
+inside the existing group lock. A superseded or retired entry never starts a
+native write. Once a native call starts, its existing completion path,
+cancellation behavior and post-call binding check remain in place; conversation
+command acceptance and disposal behavior are unchanged.
 
 `ChatsControllerOptimisticArchiveTest` exercises the real controller wiring with
 delayed native adapters: partial success with a newer unread row, account rebind,
-batch cancellation, opposite intents in one binding and completion after clear.
+batch cancellation, opposite intents in one binding, completion after clear,
+a completed restore superseding an unstarted batch entry, and bind reset while
+an archive waits for its group lock, and intent replacement during that lock wait.
 The existing initial-load, list-visibility and conversation-archive suites remain
 regression targets. Hosted CI executes these tests; source inspection alone does
 not establish a passing runtime result.
