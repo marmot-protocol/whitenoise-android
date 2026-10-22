@@ -2374,4 +2374,10 @@
     </plurals>
     <string name="group_review_add_member">Adicionar membro</string>
     <string name="group_review_invitation_visibility">Visível para todos os membros.</string>
+    <string name="search_scope_this_chat">Esta conversa · %1$s</string>
+    <string name="search_scope_all_chats">Todas as conversas</string>
+    <string name="search_scope_other_chats">Pesquisar noutras conversas</string>
+    <string name="search_scope_selected_chats">Conversas selecionadas</string>
+    <string name="search_message_content_loading">A pesquisar o conteúdo das mensagens…</string>
+    <string name="search_message_content_failed">Não foi possível pesquisar o conteúdo das mensagens.</string>
 </resources>

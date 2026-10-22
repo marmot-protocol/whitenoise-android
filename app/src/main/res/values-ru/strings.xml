@@ -2448,4 +2448,10 @@
     </plurals>
     <string name="group_review_add_member">Добавить участника</string>
     <string name="group_review_invitation_visibility">Видно всем участникам.</string>
+    <string name="search_scope_this_chat">Этот чат · %1$s</string>
+    <string name="search_scope_all_chats">Все чаты</string>
+    <string name="search_scope_other_chats">Искать в других чатах</string>
+    <string name="search_scope_selected_chats">Выбранные чаты</string>
+    <string name="search_message_content_loading">Поиск по содержимому сообщений…</string>
+    <string name="search_message_content_failed">Не удалось выполнить поиск по содержимому сообщений.</string>
 </resources>

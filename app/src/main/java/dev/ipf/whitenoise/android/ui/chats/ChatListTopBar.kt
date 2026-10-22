@@ -298,6 +298,7 @@ internal fun ChatListSearchFilterAction(
     state: GlobalSearchState,
     onCategory: (GlobalSearchFilterCategory) -> Unit,
     onClearAll: () -> Unit,
+    conversationScope: Boolean = false,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
@@ -317,6 +318,7 @@ internal fun ChatListSearchFilterAction(
             onDismiss = { menuOpen = false },
             onCategory = onCategory,
             onClearAll = onClearAll,
+            conversationScope = conversationScope,
         )
     }
 }

@@ -209,7 +209,7 @@ jobs:
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate
-        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_verify_compose_release_apk.py
+        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py
 
       - name: Check committed screenshot golden owners
         run: |
@@ -806,6 +806,12 @@ jobs:
       matrix:
         flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
     steps:
+      # Include checkout/setup time; never reset this budget when tests start.
+      - name: Reserve unit-test diagnostics and upload time
+        shell: bash
+        run: |
+          python3 -c 'import time; print("UNIT_TEST_DEADLINE_MONOTONIC=" + str(time.monotonic() + 32 * 60))' >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -854,7 +860,25 @@ jobs:
           if [[ "$CI_FULL_MATRIX" == true ]]; then
             compile_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)
           fi
-          ./gradlew "${compile_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+          python3 scripts/run_unit_tests_with_diagnostics.py -- \
+            ./gradlew "${compile_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest \
+            -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
+
+      # Upload before later gates: a timed-out child must not lose its actual PNGs.
+      # Hard runner/job cancellation remains best effort; keep the 40-minute job cap.
+      - name: Upload reports
+        if: always()
+        timeout-minutes: 3
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-ci-reports-${{ matrix.flavor }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/roborazzi/
+            build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Require every committed screenshot golden to be compared
         run: >-
@@ -930,19 +954,6 @@ jobs:
           name: kover-coverage-report-${{ matrix.flavor }}
           path: |
             app/build/reports/kover/
-          if-no-files-found: ignore
-          retention-days: 7
-
-      # Preserve failure diagnostics with a unique artifact name per job.
-      - name: Upload reports
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: android-ci-reports-${{ matrix.flavor }}
-          path: |
-            app/build/reports/
-            app/build/test-results/
-            app/build/outputs/roborazzi/
           if-no-files-found: ignore
           retention-days: 7
 

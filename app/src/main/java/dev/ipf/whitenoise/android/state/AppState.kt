@@ -1050,6 +1050,7 @@ class WhiteNoiseAppState private constructor(
     private val accountIdHexResolver: (suspend (String) -> String?)?,
     private val profileReader: (suspend (String) -> UserProfileMetadataFfi?)?,
     private val profileDisplayNameReader: (suspend (String) -> String?)?,
+    private val npubPresentationReader: (suspend (String) -> String?)?,
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
     private val identityLoginCalls: IdentityLoginCalls?,
     private val marmotAccessObserver: (() -> Unit)?,
@@ -1114,6 +1115,7 @@ class WhiteNoiseAppState private constructor(
             accountIdHexResolver = null,
             profileReader = null,
             profileDisplayNameReader = null,
+            npubPresentationReader = null,
             profileRefreshRequest = null,
             identityLoginCalls = null,
             marmotAccessObserver = null,
@@ -1151,6 +1153,7 @@ class WhiteNoiseAppState private constructor(
         activeAccountRef: String?,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
+        npubPresentationReader: (suspend (String) -> String?)? = { null },
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
         identityLoginCalls: IdentityLoginCalls? = null,
         marmotAccessObserver: (() -> Unit)? = null,
@@ -1185,6 +1188,7 @@ class WhiteNoiseAppState private constructor(
         accountIdHexResolver = accountIdHexResolver,
         profileReader = profileReader,
         profileDisplayNameReader = profileDisplayNameReader,
+        npubPresentationReader = npubPresentationReader,
         profileRefreshRequest = profileRefreshRequest,
         identityLoginCalls = identityLoginCalls,
         marmotAccessObserver = marmotAccessObserver,
@@ -11194,7 +11198,7 @@ class WhiteNoiseAppState private constructor(
         contactNicknameFor(activeAccountRef, accountIdHex)?.let { return it }
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
-        return shortNpub(accountIdHex)
+        return cachedShortNpubOrUnknown(accountIdHex)
     }
 
     fun contactNickname(accountIdHex: String): String? = contactNicknameFor(activeAccountRef, accountIdHex)
@@ -11269,7 +11273,7 @@ class WhiteNoiseAppState private constructor(
 
     fun chatMemberTitleCached(accountIdHex: String): String {
         val cachedName = chatMemberNameCached(accountIdHex)
-        return cachedName ?: shortNpub(accountIdHex)
+        return cachedName ?: cachedShortNpubOrUnknown(accountIdHex)
     }
 
     internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? =
@@ -11288,7 +11292,7 @@ class WhiteNoiseAppState private constructor(
 
     fun contactDisplayNameCached(accountIdHex: String): String {
         val cachedName = contactDisplayNameCachedOrNull(accountIdHex)
-        return cachedName ?: shortNpub(accountIdHex)
+        return cachedName ?: cachedShortNpubOrUnknown(accountIdHex)
     }
 
     /**
@@ -11305,7 +11309,7 @@ class WhiteNoiseAppState private constructor(
     internal fun contactDisplayNameCached(
         accountRef: String?,
         accountIdHex: String,
-    ): String = contactDisplayNameCachedOrNull(accountRef, accountIdHex) ?: shortNpub(accountIdHex)
+    ): String = contactDisplayNameCachedOrNull(accountRef, accountIdHex) ?: cachedShortNpubOrUnknown(accountIdHex)
 
     private fun profileDisplayName(accountIdHex: String): String? =
         resolvedProfileDisplayName(
@@ -11609,7 +11613,7 @@ class WhiteNoiseAppState private constructor(
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
         // Always materialize the local SQLite record independently of relay freshness.
         // This only schedules off-main binding work; render/timeline callers stay non-blocking.
-        ensureProfileMaterialized(id)
+        ensureProfileMaterialized(id, includeMissingIdentity = true)
         if (!profileRefreshGate.tryStart(id, System.currentTimeMillis())) return
         // Snapshot the cache epoch now, before the job is queued. A switch or
         // sign-out can clear the caches in the gap before this coroutine starts,
@@ -11762,26 +11766,17 @@ class WhiteNoiseAppState private constructor(
             } finally {
                 profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
             }
-        // A total miss is not an authoritative deletion and must not blank a
-        // first-frame value while relay/local refresh is pending (#2094).
-        val localReadInFlight =
-            synchronized(profilePresentationLock) { profileMaterializations.containsKey(accountIdHex) }
-        val rawDisplayName =
-            if (profile == null && localReadInFlight) {
-                null // The shared local materialization owns this read.
-            } else if (profileDisplayNameReader != null) {
-                runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
-            } else {
-                runCatchingCancellable {
-                    marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) }
-                }.getOrNull()
-            }
-        if (profile != null || rawDisplayName != null) {
+        val rawDisplayName = readRefreshedProfileDisplayName(accountIdHex, profile)
+        val canonicalNpub = readNpubPresentation(accountIdHex)
+        val hasProfileData = profile != null || rawDisplayName != null
+        if (hasProfileData || canonicalNpub != null) {
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
             withContext(Dispatchers.Main.immediate) {
                 if (profileCacheLifetime.isCurrent(epoch)) {
+                    publishNpubPresentation(accountIdHex, canonicalNpub)
+                    if (!hasProfileData) return@withContext
                     val current =
                         synchronized(profilePresentationLock) {
                             profilePresentations[accountIdHex] ?: ProfilePresentation.Empty
@@ -11793,6 +11788,26 @@ class WhiteNoiseAppState private constructor(
                     )
                 }
             }
+        }
+    }
+
+    /** A missing relay result leaves the shared local materialization in charge of the name. */
+    private suspend fun readRefreshedProfileDisplayName(
+        accountIdHex: String,
+        profile: UserProfileMetadataFfi?,
+    ): String? {
+        // A total miss is not an authoritative deletion and must not blank a
+        // first-frame value while relay/local refresh is pending (#2094).
+        val localReadInFlight =
+            synchronized(profilePresentationLock) { profileMaterializations.containsKey(accountIdHex) }
+        return if (profile == null && localReadInFlight) {
+            null // The shared local materialization owns this read.
+        } else if (profileDisplayNameReader != null) {
+            runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
+        } else {
+            runCatchingCancellable {
+                marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) }
+            }.getOrNull()
         }
     }
 
@@ -13263,9 +13278,12 @@ class WhiteNoiseAppState private constructor(
      * run after a cache clear (e.g. account switch) so names re-resolve at once
      * instead of waiting on a gated network round-trip.
      */
-    private fun ensureProfileMaterialized(accountIdHex: String) {
+    private fun ensureProfileMaterialized(
+        accountIdHex: String,
+        includeMissingIdentity: Boolean = false,
+    ) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        val reservation = reserveProfileMaterialization(id)
+        val reservation = reserveProfileMaterialization(id, includeMissingIdentity)
         if (reservation?.ownsRead == true) {
             profileScope.launch {
                 completeProfileMaterialization(id, reservation.completion)
@@ -13278,11 +13296,16 @@ class WhiteNoiseAppState private constructor(
      * the blocking first-frame warm use this reservation, so they perform at
      * most one user-profile/display-name read for an uncached id.
      */
-    private fun reserveProfileMaterialization(id: String): ProfileMaterializationReservation? =
+    private fun reserveProfileMaterialization(
+        id: String,
+        includeMissingIdentity: Boolean = false,
+    ): ProfileMaterializationReservation? =
         synchronized(profilePresentationLock) {
+            val needsIdentity =
+                includeMissingIdentity && npubs.get(id) == null && profilePresentations[id]?.displayName.isNullOrBlank()
             profileMaterializations[id]?.let { running ->
                 ProfileMaterializationReservation(running, ownsRead = false)
-            } ?: if (profilePresentations.containsKey(id)) {
+            } ?: if (profilePresentations.containsKey(id) && !needsIdentity) {
                 null
             } else {
                 CompletableDeferred<Unit>().let { completion ->
@@ -13321,12 +13344,43 @@ class WhiteNoiseAppState private constructor(
      */
     private suspend fun materializeProfileLocally(id: String) {
         val epoch = profileCacheLifetime.capture()
-        val seed = loadAccountSwitchProfileSeed(id)
+        // Account-switch seeds can already own the profile while identity encoding is still cold.
+        // Reuse the same flight without rereading or replacing that authoritative presentation.
+        val hasProfile = synchronized(profilePresentationLock) { profilePresentations.containsKey(id) }
+        val seed = if (hasProfile) null else loadAccountSwitchProfileSeed(id)
+        val localName =
+            seed?.displayName ?: synchronized(profilePresentationLock) { profilePresentations[id]?.displayName }
+        val canonicalNpub = if (localName.isNullOrBlank()) readNpubPresentation(id) else null
         withContext(Dispatchers.Main.immediate) {
             if (profileCacheLifetime.isCurrent(epoch)) {
-                applyAccountSwitchProfileSeed(seed)
+                publishNpubPresentation(id, canonicalNpub)
+                seed?.let(::applyAccountSwitchProfileSeed)
             }
         }
+    }
+
+    /** Uses the existing materialization/refresh owners; identity encoding never runs in name composition. */
+    private suspend fun readNpubPresentation(accountIdHex: String): String? =
+        runCatchingCancellable {
+            val cached = npubs.get(accountIdHex)
+            val encoded =
+                cached ?: if (npubPresentationReader != null) {
+                    withContext(marmotIoDispatcher) { npubPresentationReader.invoke(accountIdHex) }
+                } else {
+                    marmotIo { this.npub(accountIdHex) }
+                }
+            npubPresentation(accountIdHex, encoded) { null }.takeIf(String::isNotEmpty)
+        }.getOrNull()
+
+    /** Canonical encoding is presentation-only; publish its revision behind the caller's lifetime fence. */
+    private fun publishNpubPresentation(
+        accountIdHex: String,
+        canonicalNpub: String?,
+    ) {
+        if (canonicalNpub == null || npubs.get(accountIdHex) == canonicalNpub) return
+        npubs.put(accountIdHex, canonicalNpub)
+        profileRevision += 1
+        bumpProfileAccountRevision(accountIdHex)
     }
 
     /** Read one persisted profile without mutating the active account caches. */
