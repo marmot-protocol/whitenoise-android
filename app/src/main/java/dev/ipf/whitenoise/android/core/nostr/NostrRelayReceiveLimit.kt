@@ -10,6 +10,8 @@ import okio.Source
 import java.io.EOFException
 import java.net.ProtocolException
 
+private const val HTTP_SWITCHING_PROTOCOLS = 101
+
 // Safe UTF-8 allowance for the existing 256 Ki UTF-16-character check.
 private const val MAX_RELAY_MESSAGE_BYTES = 1024 * 1024L
 
@@ -36,7 +38,7 @@ internal class NostrRelayReceiveLimitInterceptor(
                 .removeHeader("Sec-WebSocket-Extensions")
                 .build()
         val response = chain.proceed(request)
-        if (response.code != 101) return response
+        if (response.code != HTTP_SWITCHING_PROTOCOLS) return response
         val socket = response.socket
         if (socket == null) {
             response.close()
@@ -81,13 +83,17 @@ internal class BoundedRelayMessageSource(
         byteCount: Long,
     ): Long {
         require(byteCount >= 0)
-        if (byteCount == 0L) return 0
-        if (payloadRemaining == 0L) return readHeader(sink, byteCount)
-        val count = super.read(sink, minOf(byteCount, payloadRemaining, MAX_READ_BYTES))
-        if (count == -1L) throw EOFException("Truncated relay message")
-        payloadRemaining -= count
-        if (payloadRemaining == 0L) finishFrame()
-        return count
+        return when {
+            byteCount == 0L -> 0
+            payloadRemaining == 0L -> readHeader(sink, byteCount)
+            else -> {
+                val count = super.read(sink, minOf(byteCount, payloadRemaining, MAX_READ_BYTES))
+                if (count == -1L) throw EOFException("Truncated relay message")
+                payloadRemaining -= count
+                if (payloadRemaining == 0L) finishFrame()
+                count
+            }
+        }
     }
 
     private fun readHeader(
@@ -117,17 +123,15 @@ internal class BoundedRelayMessageSource(
         val flags = header[0].toInt() and BYTE_MASK
         val opcode = flags and OPCODE_MASK
         val isFinal = flags and FINAL_FLAG != 0
-        if (flags and RESERVED_FLAGS != 0 || header[1].toInt() and MASK_FLAG != 0) {
-            throw ProtocolException("Unsupported relay frame flags")
-        }
+        validateFrameFlags(flags)
         val length = payloadLength()
         when (opcode) {
             CONTINUATION -> {
-                if (!messageOpen) throw ProtocolException("Unexpected relay continuation")
+                requireMessageState(expectedOpen = true)
                 admitData(length, isFinal)
             }
             TEXT, BINARY -> {
-                if (messageOpen) throw ProtocolException("Unfinished relay message")
+                requireMessageState(expectedOpen = false)
                 messageOpen = true
                 admitData(length, isFinal)
             }
@@ -143,6 +147,18 @@ internal class BoundedRelayMessageSource(
         if (payloadRemaining == 0L) finishFrame()
     }
 
+    private fun validateFrameFlags(flags: Int) {
+        if (flags and RESERVED_FLAGS != 0 || header[1].toInt() and MASK_FLAG != 0) {
+            throw ProtocolException("Unsupported relay frame flags")
+        }
+    }
+
+    private fun requireMessageState(expectedOpen: Boolean) {
+        if (messageOpen != expectedOpen) {
+            throw ProtocolException(if (expectedOpen) "Unexpected relay continuation" else "Unfinished relay message")
+        }
+    }
+
     private fun payloadLength(): Long {
         val marker = header[1].toInt() and LENGTH_MASK
         if (marker < LENGTH_16) return marker.toLong()
@@ -151,7 +167,7 @@ internal class BoundedRelayMessageSource(
         }
         var length = 0L
         for (index in BASE_HEADER_BYTES until headerSize) {
-            length = (length shl 8) or (header[index].toLong() and BYTE_MASK.toLong())
+            length = (length shl BITS_PER_BYTE) or (header[index].toLong() and BYTE_MASK.toLong())
         }
         if (length < LENGTH_16 || marker == LENGTH_64 && length <= MAX_LENGTH_16) {
             throw ProtocolException("Non-minimal relay frame length")
@@ -176,6 +192,7 @@ internal class BoundedRelayMessageSource(
     }
 
     private companion object {
+        const val BITS_PER_BYTE = 8
         const val MAX_READ_BYTES = 8192L
         const val BASE_HEADER_BYTES = 2
         const val MAX_HEADER_BYTES = 10

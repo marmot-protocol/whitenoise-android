@@ -54,6 +54,14 @@ class NostrRelayReceiveLimitCoverageTest {
                         webSocket.send("ignored".encodeUtf8())
                         webSocket.send(JSONArray().put("EOSE").put(subscription).toString())
                     }
+
+                    override fun onClosing(
+                        webSocket: WebSocket,
+                        code: Int,
+                        reason: String,
+                    ) {
+                        webSocket.close(code, reason)
+                    }
                 },
             ),
         )
@@ -99,6 +107,14 @@ class NostrRelayReceiveLimitCoverageTest {
                         text: String,
                     ) {
                         webSocket.send(JSONArray().put("EOSE").put(JSONArray(text).getString(1)).toString())
+                    }
+
+                    override fun onClosing(
+                        webSocket: WebSocket,
+                        code: Int,
+                        reason: String,
+                    ) {
+                        webSocket.close(code, reason)
                     }
                 },
             ),
