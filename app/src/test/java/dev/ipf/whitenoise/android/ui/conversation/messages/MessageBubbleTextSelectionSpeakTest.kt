@@ -372,6 +372,23 @@ class MessageBubbleTextSelectionSpeakTest {
         assertTrue(engine.spoken.isEmpty())
     }
 
+    /** A link tap followed by a nearby text tap already activated the link, so the pair never opens the editor. */
+    @Test
+    fun linkTapThenAdjacentTextTapInYourOwnMessageDoesNotEdit() {
+        val appState = appStateWithTts()
+        val item = ownCopy(timelineMessageWithAutolink())
+        val controller = conversationController(appState)
+        renderSingleBubble(item, controller, appState)
+        val linkEnd = messageTextPositionOnHost("https://example.com", charIndex = "https://example.com".length - 1)
+        val spaceAfterLink = messageTextPositionOnHost(" now", charIndex = 0)
+
+        // The first tap lands on the link's last glyph, the second on the plain space after it, within touch slop.
+        doubleTapAcross(linkEnd, spaceAfterLink)
+        composeRule.waitForIdle()
+
+        assertEquals(null, controller.editingMessageId)
+    }
+
     /** Double-tapping the empty width beside your own bubble is not a text gesture and never edits. */
     @Test
     fun doubleTapBesideYourOwnBubbleDoesNotEdit() {
@@ -1206,14 +1223,20 @@ class MessageBubbleTextSelectionSpeakTest {
     private fun doubleTapOnMessageText(substring: String) = doubleTapAt(messageTextPositionOnHost(substring))
 
     /** Performs two taps at one host position, spaced inside the platform double-tap window. */
-    private fun doubleTapAt(pressOnHost: Offset) {
+    private fun doubleTapAt(pressOnHost: Offset) = doubleTapAcross(pressOnHost, pressOnHost)
+
+    /** Performs a tap at [first] and another at [second], spaced inside the platform double-tap window. */
+    private fun doubleTapAcross(
+        first: Offset,
+        second: Offset,
+    ) {
         composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
-            down(pressOnHost)
+            down(first)
             up()
             advanceEventTime(
                 (viewConfiguration.doubleTapMinTimeMillis + viewConfiguration.doubleTapTimeoutMillis) / 2,
             )
-            down(pressOnHost)
+            down(second)
             up()
         }
     }
@@ -1226,7 +1249,11 @@ class MessageBubbleTextSelectionSpeakTest {
         }
     }
 
-    private fun messageTextPositionOnHost(substring: String): Offset {
+    /** Host-space centre of the glyph at [charIndex] within [substring], defaulting to the substring's middle. */
+    private fun messageTextPositionOnHost(
+        substring: String,
+        charIndex: Int = substring.length / 2,
+    ): Offset {
         val layoutResults = mutableListOf<TextLayoutResult>()
         composeRule
             .onNodeWithText(substring, substring = true, useUnmergedTree = true)
@@ -1237,7 +1264,7 @@ class MessageBubbleTextSelectionSpeakTest {
                 .onNodeWithText(substring, substring = true, useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
         val fullText = layout.layoutInput.text.text
-        val targetOffset = fullText.indexOf(substring) + (substring.length / 2)
+        val targetOffset = fullText.indexOf(substring) + charIndex
         val glyphBounds = layout.getBoundingBox(targetOffset.coerceIn(0, fullText.length - 1))
         val pressInRoot =
             Offset(

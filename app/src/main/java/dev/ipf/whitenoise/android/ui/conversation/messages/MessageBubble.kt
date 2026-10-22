@@ -1449,6 +1449,9 @@ internal fun MessageBubble(
                     )
             )
 
+    // Whether each of the two most recent presses landed on a link: a link tap followed by a nearby text tap has
+    // already activated the link, so that pair must not also open the editor.
+    val recentPressesOnLink = remember { BooleanArray(2) }
     val canEditMessage =
         !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted
 
@@ -1481,7 +1484,8 @@ internal fun MessageBubble(
         val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
         when {
             pressInWindow == null -> Unit
-            canEditMessage && !ownsActiveReadAloud() -> if (ordinaryTextHitAt(pressInWindow)) beginEdit()
+            canEditMessage && !ownsActiveReadAloud() ->
+                if (recentPressesOnLink.none { it } && ordinaryTextHitAt(pressInWindow)) beginEdit()
             else -> seekSpeakAloudAt(pressInWindow)
         }
     }
@@ -1755,12 +1759,12 @@ internal fun MessageBubble(
                             },
                             onPointerDown = { position ->
                                 val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
-                                if (
-                                    pressInWindow != null &&
-                                    markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow)
-                                ) {
-                                    ttsLinkTapCoordinator.beginPointerActivation()
-                                }
+                                val linkLayouts = textLayouts.markdownLinkLayouts.values
+                                val onLink =
+                                    pressInWindow != null && markdownHasLinkAnnotationAt(linkLayouts, pressInWindow)
+                                recentPressesOnLink[0] = recentPressesOnLink[1]
+                                recentPressesOnLink[1] = onLink
+                                if (onLink) ttsLinkTapCoordinator.beginPointerActivation()
                             },
                             onPointerFinished = ttsLinkTapCoordinator::endPointerActivation,
                             onDoubleTap = messageTextDoubleTap,

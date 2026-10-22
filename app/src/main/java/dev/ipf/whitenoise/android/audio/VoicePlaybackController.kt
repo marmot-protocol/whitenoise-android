@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.SystemClock
 import android.util.Log
 import android.util.LruCache
 import dev.ipf.whitenoise.android.state.StalenessGuard
@@ -47,6 +48,11 @@ object VoicePlaybackController {
     // Audio codecs can land a little before the requested position; a completion
     // this close to the latest target means that target has been reached.
     private const val SEEK_SETTLE_TOLERANCE_MS = 500
+
+    // A pending target only bridges a quick burst of taps. Past this window the
+    // player's own position is authoritative again, so a completion that was
+    // missed or landed off target cannot steer later seeks for the rest of a clip.
+    private const val PENDING_SEEK_WINDOW_MS = 1_000L
 
     // Cap on cached per-clip durations. Each entry is a boxed Int keyed by an
     // absolute file path; without a bound the map held one entry per distinct
@@ -557,8 +563,11 @@ object VoicePlaybackController {
         val active = player?.takeIf { sessionId == current.sessionId && current.ready }
         val key = currentKey
         if (active == null || key == null) return false
+        val now = SystemClock.uptimeMillis()
         val position =
-            pendingSeek?.takeIf { it.player === active }?.targetMs
+            pendingSeek
+                ?.takeIf { it.player === active && now - it.requestedAtMs <= PENDING_SEEK_WINDOW_MS }
+                ?.targetMs
                 ?: runCatching { active.currentPosition }.getOrDefault(current.positionMs)
         return seekTo(key, position + deltaMs)
     }
@@ -674,7 +683,7 @@ object VoicePlaybackController {
         val clamped = positionMs.coerceIn(0, duration.coerceAtLeast(0))
         val seeked = duration > 0 && runCatching { mp.seekTo(clamped) }.isSuccess
         if (seeked) {
-            pendingSeek = PendingSeek(mp, clamped)
+            pendingSeek = PendingSeek(mp, clamped, SystemClock.uptimeMillis())
             _state.value = _state.value.copy(positionMs = clamped, durationMs = duration)
         }
         return seeked
@@ -735,10 +744,11 @@ object VoicePlaybackController {
         if (position == null || abs(position - pending.targetMs) <= SEEK_SETTLE_TOLERANCE_MS) pendingSeek = null
     }
 
-    /** The target of a seek [player] accepted but has not yet reported complete. */
+    /** The target of a seek [player] accepted at [requestedAtMs] but has not yet reported complete. */
     private class PendingSeek(
         val player: MediaPlayer,
         val targetMs: Int,
+        val requestedAtMs: Long,
     )
 
     private fun stopTicker() {

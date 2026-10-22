@@ -18,7 +18,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 import java.io.File
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -179,6 +181,24 @@ class VoicePlaybackControllerFocusTest {
         player.positionMs = 3_500
         assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
         assertEquals(4_500, player.seekedToMs)
+    }
+
+    /** An off-target completion cannot pin a stale target: after the tap window the player's position wins again. */
+    @Test fun missedSettleExpiresSoLaterSeeksStartFromThePlayhead() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        player.durationMs = 120_000
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 120_000))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        player.positionMs = 10_723
+        settlePendingSeek(player)
+        player.positionMs = 40_000
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(30))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, -10_000))
+        assertEquals(30_000, player.seekedToMs)
     }
 
     /** A seek the codec rejects reports failure and leaves the published playhead where it was. */
