@@ -45,6 +45,39 @@ class PerformanceDiagnosticSchemaTest {
         )
     }
 
+    /** Fast catch-up gates preserve the shared event budget for slow gates and push-recovery evidence. */
+    @Test
+    fun routineNotificationGatesDoNotCrowdOutPushRecovery() {
+        val lines = mutableListOf<String>()
+        val emitter = emitter(lines = lines)
+        emitter.start()
+        repeat(300) {
+            emitter.record(
+                trace = emitter.begin(PerformanceOperation.NOTIFICATION_POST),
+                phase = PerformancePhase.NOTIFICATION_CANDIDATE_GATE,
+                elapsedMs = 99L,
+                durationMs = 99L,
+            )
+        }
+        assertTrue(lines.isEmpty())
+        emitter.record(
+            trace = emitter.begin(PerformanceOperation.NOTIFICATION_POST),
+            phase = PerformancePhase.NOTIFICATION_CANDIDATE_GATE,
+            elapsedMs = 100L,
+            durationMs = 100L,
+        )
+        emitter.record(
+            trace = emitter.begin(PerformanceOperation.PUSH_RECOVERY),
+            phase = PerformancePhase.PUSH_RECEIVED_NORMAL,
+            elapsedMs = 0L,
+        )
+        assertEquals(2, lines.size)
+        assertTrue(lines.first().contains("duration_ms=100"))
+        assertTrue(lines.last().contains("op=push_recovery"))
+        assertEquals(2, emitter.status().emittedCount)
+        assertEquals(0, emitter.status().droppedCount)
+    }
+
     @Test
     fun schemaUsesOnlyClosedEnumsAndBoundedNumbers() {
         val lines = mutableListOf<String>()

@@ -7,7 +7,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -181,8 +183,134 @@ class NotificationCandidateReadCoordinatorTest {
                     )
                 }
                 assertTrue(entered.await(1, TimeUnit.SECONDS))
-                val fifth = NotificationCandidateReadKey("account", "fifth", "message", 1, 1)
-                assertNull(coordinator.read(fifth, 100) { error("no fifth native read is admitted") })
+                val fifth =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        val key = NotificationCandidateReadKey("account", "fifth", "message", 1, 1)
+                        coordinator.read(key, 2_000) { error("no fifth native read is admitted") }
+                    }
+                assertTrue("abandoned saturation rejects without suspending for its deadline", fifth.isCompleted)
+                assertNull(fifth.await())
+            } finally {
+                release.countDown()
+                scope.cancel()
+            }
+        }
+
+    /** A different candidate rejects synchronously after timeout; only actual completion frees its native slot. */
+    @Test
+    fun aDifferentCandidateRejectsAnAbandonedConversationWithoutWaiting() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val coordinator = NotificationCandidateReadCoordinator(scope, Dispatchers.IO)
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val key = NotificationCandidateReadKey("account", "chat", "first", 1, 1)
+            try {
+                assertNull(
+                    coordinator.read(key, 100) {
+                        entered.countDown()
+                        check(release.await(10, TimeUnit.SECONDS))
+                        NotificationCandidateState.Unread
+                    },
+                )
+                assertTrue(entered.await(1, TimeUnit.SECONDS))
+                val binding = scope.coroutineContext.job.children.single()
+                val nextKey = key.copy(messageIdHex = "second")
+                val second =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        coordinator.read(nextKey, 2_000) { error("an abandoned slot must remain occupied") }
+                    }
+                assertTrue("rejection must complete before yielding to another budget", second.isCompleted)
+                assertNull(second.await())
+                assertEquals("the native binding is still held", 1L, release.count)
+                release.countDown()
+                binding.join()
+                assertEquals(
+                    NotificationCandidateState.Read,
+                    coordinator.read(nextKey, 1_000) { NotificationCandidateState.Read },
+                )
+            } finally {
+                release.countDown()
+                scope.cancel()
+            }
+        }
+
+    /** Abandoned holders must not turn a healthy fourth slot into global fail-fast suppression. */
+    @Test
+    fun mixedSaturationStillWaitsForTheHealthyHolder() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val coordinator = NotificationCandidateReadCoordinator(scope, Dispatchers.IO)
+            val abandonedRelease = CountDownLatch(1)
+            val healthyRelease = CountDownLatch(1)
+            val healthyEntered = CountDownLatch(1)
+            try {
+                repeat(3) { index ->
+                    val key = NotificationCandidateReadKey("account", "abandoned$index", "message", 1, 1)
+                    assertNull(
+                        coordinator.read(key, 100) {
+                            check(abandonedRelease.await(10, TimeUnit.SECONDS))
+                            NotificationCandidateState.Unread
+                        },
+                    )
+                }
+                val healthy =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        val key = NotificationCandidateReadKey("account", "healthy", "message", 1, 1)
+                        coordinator.read(key, 2_000) {
+                            healthyEntered.countDown()
+                            check(healthyRelease.await(10, TimeUnit.SECONDS))
+                            NotificationCandidateState.Unread
+                        }
+                    }
+                assertTrue(healthyEntered.await(1, TimeUnit.SECONDS))
+                val fifth =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        val key = NotificationCandidateReadKey("account", "fifth", "message", 1, 1)
+                        coordinator.read(key, 2_000) { NotificationCandidateState.Read }
+                    }
+                assertFalse("a healthy holder can still retire within budget", fifth.isCompleted)
+                healthyRelease.countDown()
+                assertEquals(NotificationCandidateState.Unread, healthy.await())
+                assertEquals(NotificationCandidateState.Read, fifth.await())
+                assertEquals("abandoned bindings are still held", 1L, abandonedRelease.count)
+            } finally {
+                abandonedRelease.countDown()
+                healthyRelease.countDown()
+                scope.cancel()
+            }
+        }
+
+    /** A waiting fifth chat wakes when the last healthy holder expires, without renewing its own deadline. */
+    @Test
+    fun anAdmissionWaiterWakesWhenAllHoldersBecomeAbandoned() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val coordinator = NotificationCandidateReadCoordinator(scope, Dispatchers.IO)
+            val release = CountDownLatch(1)
+            val entered = CountDownLatch(4)
+            try {
+                val holders =
+                    List(4) { index ->
+                        async(start = CoroutineStart.UNDISPATCHED) {
+                            val key = NotificationCandidateReadKey("account", "chat$index", "message", 1, 1)
+                            coordinator.read(key, 1_000) {
+                                entered.countDown()
+                                check(release.await(10, TimeUnit.SECONDS))
+                                NotificationCandidateState.Unread
+                            }
+                        }
+                    }
+                assertTrue(entered.await(1, TimeUnit.SECONDS))
+                val fifth =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        val key = NotificationCandidateReadKey("account", "fifth", "message", 1, 1)
+                        coordinator.read(key, 5_000) { error("all native slots remain occupied") }
+                    }
+                assertFalse("initially healthy holders must permit waiting", fifth.isCompleted)
+                holders.forEach { assertNull(it.await()) }
+                assertNull(withTimeout(1_000) { fifth.await() })
+                assertEquals("abandonment does not release native bindings", 1L, release.count)
             } finally {
                 release.countDown()
                 scope.cancel()

@@ -853,7 +853,7 @@ class NotificationContentRetractionTest {
         }
     }
 
-    /** Ordinary relay posts reach WNPerf even with no timing observer or push-recovery trace installed. */
+    /** Slow ordinary relay posts reach WNPerf without a timing observer or push-recovery trace installed. */
     @Test
     fun aNotificationCandidateGateEmitsRealPrivacySafePerformanceEvidence() =
         runBlocking {
@@ -865,6 +865,10 @@ class NotificationContentRetractionTest {
                     groupIdHex = GROUP_ID,
                     messageIdHex = MESSAGE_ID,
                     previewText = "Private notification candidate",
+                    onChatListRow = { _, _ ->
+                        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofMillis(150L))
+                        null
+                    },
                 )
             try {
                 fixture.bootstrap()

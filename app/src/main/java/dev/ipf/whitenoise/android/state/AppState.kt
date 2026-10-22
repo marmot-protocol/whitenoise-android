@@ -12483,6 +12483,7 @@ class WhiteNoiseAppState private constructor(
     /**
      * Bounds each await to [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS], at most [NOTIFICATION_CANDIDATE_ATTEMPTS]
      * times. A synchronous binding may keep running; retries join it and its slot stays occupied until completion.
+     * Different candidates fail fast behind an abandoned holder, including globally when all slots are abandoned.
      */
     private suspend fun readNotificationCandidateStateWithinBudget(
         update: NotificationUpdateFfi,
