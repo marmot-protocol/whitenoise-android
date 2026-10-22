@@ -612,6 +612,7 @@ android {
         // reuse the dev package so an authenticated dev fixture survives swaps
         // between the debug and release-like benchmark APKs.
         create("benchmarkRelease") {
+            initWith(getByName("release"))
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")
         }

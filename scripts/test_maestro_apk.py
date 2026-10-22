@@ -278,7 +278,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
     def enabled(self, name, event, selected, responsiveness=False, media_sandbox=False, outbound_share=False,
-                mdk_adoption=False, startup_trace=False):
+                mdk_adoption=False, startup_trace=False, mdk_qualification=False, mdk_preview_qualification=False):
         """Evaluate the trusted job condition with restricted event/input fixtures.
 
         Lane narrowing is tested in test_select_instrumented_lanes.py; here the
@@ -294,9 +294,46 @@ class MaestroWorkflowTest(unittest.TestCase):
                      'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding',
                          responsiveness_only=responsiveness, media_sandbox_only=media_sandbox,
                          outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption,
-                         media_startup_trace=startup_trace),
+                         media_startup_trace=startup_trace, mdk_qualification=mdk_qualification,
+                          mdk_preview_qualification=mdk_preview_qualification),
                      'needs': SimpleNamespace(changes=lanes),
                      'startsWith': lambda value, prefix: value.startswith(prefix)})
+
+    def test_startup_trace_cannot_mix_with_mdk_campaigns(self):
+        for name in ('mdk-qualification', 'mdk-signed-preview'):
+            job = self.job(name)
+            reject = job.split('      - name: Reject mixed campaigns\n', 1)[1].split('      - name:', 1)[0]
+            self.assertIn('if: inputs.media_startup_trace || ', reject)
+            self.assertIn('run: exit 2', reject)
+        for name in ('instrumented', 'attachment-fixture', 'maestro-pilot', 'maestro-runtime-build'):
+            self.assertFalse(self.enabled(name, 'workflow_dispatch', False, startup_trace=True,
+                                          mdk_qualification=True))
+            self.assertFalse(self.enabled(name, 'workflow_dispatch', False, startup_trace=True,
+                                          mdk_preview_qualification=True))
+
+    def test_mdk_qualification_excludes_ordinary_instrumentation(self):
+        """The opt-in upgrade runner must not race another test job over its fixture or run unrelated suites."""
+        for name in ('instrumented', 'attachment-fixture'):
+            self.assertFalse(self.enabled(name, 'workflow_dispatch', False, mdk_qualification=True))
+        self.assertIn("inputs.mdk_qualification && 'mdk-qualification'", self.workflow)
+        self.assertTrue(self.enabled('mdk-qualification', 'workflow_dispatch', False, mdk_qualification=True))
+        self.assertFalse(self.enabled('mdk-qualification', 'pull_request', False, mdk_qualification=True))
+
+    def test_signed_preview_selection_excludes_other_campaigns(self):
+        """Only the signed-preview job admits its selection, including mixed inputs that it must reject."""
+        for selected in (False, True):
+            for native in (False, True):
+                for name in ('instrumented', 'attachment-fixture', 'maestro-pilot', 'mdk-qualification'):
+                    self.assertFalse(self.enabled(name, 'workflow_dispatch', selected,
+                                                  mdk_qualification=native, mdk_preview_qualification=True))
+                self.assertTrue(self.enabled('mdk-signed-preview', 'workflow_dispatch', selected,
+                                             mdk_qualification=native, mdk_preview_qualification=True))
+        for event in ('push', 'pull_request'):
+            self.assertFalse(self.enabled('mdk-signed-preview', event, False, mdk_preview_qualification=True))
+        self.assertFalse(self.enabled('mdk-signed-preview', 'workflow_dispatch', False))
+        self.assertIn("inputs.mdk_preview_qualification && 'mdk-signed-preview'", self.workflow)
+        self.assertIn('inputs.mdk_qualification || inputs.mdk_adoption_only || inputs.maestro_pilot',
+                      self.job('mdk-signed-preview'))
 
     def test_pilot_and_normal_jobs_are_exclusive_for_every_event(self):
         """Ensure only a selected manual pilot skips the normal instrumented jobs."""
@@ -350,8 +387,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         self.assertNotIn('secrets.', job)
         self.assertIn('actions: read', job)
         self.assertIn("&& 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}'", self.workflow)
-        self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && "
-                      "(inputs.maestro_pilot || inputs.media_startup_trace)) }}", self.workflow)
+        self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.media_startup_trace || inputs.mdk_qualification || inputs.mdk_preview_qualification)) }}", self.workflow)
         self.assertIn('if: always()', job)
         self.assertIn('retention-days: 7', job)
         self.assertIn('timeout-minutes: 15', job)
@@ -390,7 +426,8 @@ class MaestroWorkflowTest(unittest.TestCase):
                         {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(**fields)})
         defaults = dict(media_startup_trace=False, media_sandbox_only=True, media_sandbox_api='30',
                         maestro_pilot=False, responsiveness_only=False, outbound_share_only=False,
-                        mdk_adoption_only=False, review_demo_e2e=False, document_provider_matrix=False)
+                        mdk_adoption_only=False, mdk_qualification=False, mdk_preview_qualification=False,
+                        review_demo_e2e=False, document_provider_matrix=False)
         conflicts = ({}, {'media_sandbox_only': False}, {'media_sandbox_api': '34'},
                      *({field: True} for field in ('maestro_pilot', 'responsiveness_only',
                        'outbound_share_only', 'mdk_adoption_only', 'review_demo_e2e', 'document_provider_matrix')))

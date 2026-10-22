@@ -9,6 +9,10 @@
 
 *ScreenshotTest
 
+*.MessageBubbleTextSelectionSpeakTest.codePathNativeSelectionKeepsScrolledFilename
+*.MessageBubbleTextSelectionSpeakTest.swipeOnFittingCodeBlockBeginsReply
+*.MessageBubbleTextSelectionSpeakTest.swipeOnFittingMathBlockBeginsReply
+
 *.StartupReadyRecoveryRouteTest.rootRendersRecoveryWithoutRemountingTheBindOrRestoringProtectedContent
 
 *.AutoDownloadBacklogControlTest
@@ -179,3 +183,9 @@
 *.ProfileAddToGroupsFlowTest.profileWithoutSharedGroupsKeepsAddEntryReachable
 
 *.GroupDetailsEditNavigationTest.soleAdminLeaveReviewsChosenSuccessorBeforeMutation
+*.GroupEditNameEmojiPickerTest.changePhotoEmojiMenuDark
+*.GroupEditNameEmojiPickerTest.addPhotoEmojiMenuLargeRtl
+
+# Group action review: exact captured bulk targets and successor identity.
+*.ChatDepartureReviewScreenshotTest.bulkDepartureNamesEachCapturedGroupAndActor
+*.ChatDepartureReviewScreenshotTest.successorReviewLargeRtlKeepsActorGroupAndCombinedAction

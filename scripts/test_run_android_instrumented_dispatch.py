@@ -103,6 +103,35 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("MediaContainmentAcceptance", smoke)
         self.assertNotIn(case, smoke)
 
+    def test_healthy_timing_fixture_is_excluded_from_all_existing_suites(self):
+        directory=ROOT/'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox'
+        source=(directory/'MediaWorkerHealthyBaselineDeviceTest.kt').read_text()
+        self.assertIn('@ManualDeviceFixture',source)
+        for annotation in ('@PullRequestDeviceSmoke','@MediaContainmentAcceptance','@ResponsivenessDeviceAcceptance','@MdkAdoptionDeviceAcceptance'):
+            self.assertNotIn(annotation,source)
+        healthy='MediaWorkerHealthyBaselineDeviceTest'
+        routes = [
+            ('pull_request',),
+            ('push',),
+            ('workflow_dispatch',),
+            ('workflow_dispatch','false','false','false','true'),
+            ('workflow_dispatch','false','false','true'),
+            ('workflow_dispatch','false','false','false','false','false','true'),
+        ]
+        for args in routes:
+            output=self.run_dispatch(*args)
+            self.assertNotIn(healthy,output)
+            if len(args) == 1:
+                self.assertIn('notAnnotation=dev.ipf.whitenoise.android.ManualDeviceFixture',output)
+        required=(ROOT/'config/instrumented-required-cases.txt').read_text()
+        self.assertNotIn(healthy,required)
+        runner=(directory/'MediaWorkerBaseline.kt').read_text()
+        self.assertIn('run(it, includeNegativeProbes = true)',runner)
+        self.assertIn('run(it, includeNegativeProbes = false)',runner)
+        self.assertIn('if (includeNegativeProbes)',runner)
+        self.assertIn('probe("watchdog_stimulus", transport, binding, MediaDecodePolicy.DEBUG_HANG)',runner)
+        self.assertIn('"application_debuggable"',runner)
+
     def test_av_capability_capture_is_required_only_by_containment_selection(self):
         directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
         source = (directory / "MediaAvCapabilityDeviceTest.kt").read_text()

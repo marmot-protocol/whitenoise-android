@@ -33,9 +33,9 @@ data_sources { config { name: "linux.process_stats" process_stats_config {
  scan_all_processes_on_start: true
 } } }
 '''
-COMMAND = ['./gradlew', ':app:connectedDevZapstoreDebugAndroidTest',
+COMMAND = ['./gradlew', ':app:connectedDevZapstoreBenchmarkReleaseAndroidTest',
  '--init-script', 'scripts/hosted-startup-trace.init.gradle',
- '-Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.media.sandbox.MediaWorkerBaselineDeviceTest#characterizeDirectStillTransportWithFixedSyntheticCorpus',
+ '-Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.media.sandbox.MediaWorkerHealthyBaselineDeviceTest#characterizeHealthyDirectStillTransportWithFixedSyntheticCorpus',
  '-Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000',
  '-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true',
  '--no-daemon', '--stacktrace']
@@ -140,6 +140,7 @@ def finish(state):
                 state['trace_sha256'] = hashlib.sha256(local.read_bytes()).hexdigest()
             except (RuntimeError, ValueError, OSError) as error:
                 issues.append(str(error))
+                return issues
         else:
             issues.append('connected-task capture never started')
         # Only this unique output. No remote config, directory or broad cleanup.
@@ -202,7 +203,7 @@ def run():
         test_code = r['code'] if r['code'] is not None else 124
         if test_code == 0:
             required = OUT / 'required-cases.txt'
-            required.write_text('dev.ipf.whitenoise.android.media.sandbox.MediaWorkerBaselineDeviceTest#characterizeDirectStillTransportWithFixedSyntheticCorpus\n')
+            required.write_text('dev.ipf.whitenoise.android.media.sandbox.MediaWorkerHealthyBaselineDeviceTest#characterizeHealthyDirectStillTransportWithFixedSyntheticCorpus\n')
             checked = command(['python3', 'scripts/check_instrumented_required_cases.py',
                                'app/build/outputs/androidTest-results/connected', '--required', str(required)], 'required-case', 10)
             test_code = checked['code'] if checked['code'] is not None else 124

@@ -92,3 +92,22 @@ manual IDs and unchecked results are retained.
 
 The [still-image lifetime candidate](media-worker-lifetime.md) documents the
 successor owner and its separate qualification requirements.
+
+## Healthy startup timing
+
+The opt-in hosted API 30 startup trace runs
+`MediaWorkerHealthyBaselineDeviceTest.characterizeHealthyDirectStillTransportWithFixedSyntheticCorpus`
+against the existing release-derived `benchmarkRelease` app variant. This manual
+fixture reuses the same 100 ordered synthetic operations and transport cleanup,
+but omits the two debug fault probes. It is excluded from routine and focused
+debug suites. The original containment selector and its fault probes are unchanged.
+
+The header records the actual application debuggable flag, build configuration
+and whether negative probes were selected. The trace init script requires a
+nondebuggable, minified variant with resource shrinking. A successful capture
+still does not establish production timing, lossless trace coverage or security
+qualification: retain exact APK, compilation/runtime, corpus and device evidence
+before comparing measurements. Debug characterization results must not be
+relabeled as release performance.
+
+The release-like trace mode does not retain its benchmark APK through the existing debug-APK failure upload. Preserve the trace reports; a failed run without a retained exact benchmark APK cannot qualify a performance comparison.

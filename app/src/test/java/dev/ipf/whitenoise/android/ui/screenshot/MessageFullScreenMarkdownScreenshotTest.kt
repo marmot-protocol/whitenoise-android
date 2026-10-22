@@ -60,6 +60,36 @@ class MessageFullScreenMarkdownScreenshotTest {
     private lateinit var selectionController: ReaderTextSelectionController
     private val selectionToolbar = SelectionScreenshotToolbarProvider()
 
+    /** The source ending remains reachable and selects the word actually pressed after horizontal movement. */
+    @Test
+    fun codePathSelectionAfterHorizontalScroll() {
+        val path = "directory/".repeat(12) + "ENDTARGET"
+        val document =
+            MarkdownDocumentFfi(
+                listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", path)),
+                false,
+                byteArrayOf(),
+            )
+        render(false, 1f, LayoutDirection.Ltr, reader = ReaderContent("```\n$path\n```", document))
+        val node = composeRule.onNodeWithText(path)
+        val range = node.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+        node.performSemanticsAction(SemanticsActions.ScrollBy) { action -> assertTrue(action(range.maxValue(), 0f)) }
+        composeRule.waitForIdle()
+        assertEquals(range.maxValue(), range.value(), 1f)
+        val root = composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
+        root.captureRoboImage("src/test/snapshots/message_full_screen_code_path_end.png")
+        val rootBounds = root.fetchSemanticsNode().boundsInRoot
+        val bounds = node.fetchSemanticsNode().boundsInRoot
+        root.performTouchInput {
+            longClick(Offset(bounds.right - rootBounds.left - 20f, bounds.center.y - rootBounds.top))
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) { selectionToolbar.requested }
+        composeRule.runOnIdle {
+            assertEquals("ENDTARGET", selectionController.selectedText(path))
+        }
+        root.captureRoboImage("src/test/snapshots/message_full_screen_code_path_selection.png")
+    }
+
     @Test fun scrollingReaderTopLight() = captureScrollingReader(ReaderSnapshot("reader_scroll_top_light", 0f))
 
     @Test fun scrollingReaderMiddleDark() {
@@ -247,7 +277,6 @@ class MessageFullScreenMarkdownScreenshotTest {
                         body = reader.body,
                         bodyMarkdownDocument = reader.document,
                         mentionDisplayName = null,
-                        isGroupMember = null,
                         onNostrProfileTap = null,
                         onCopyMarkdownLink = {},
                         timeText = "11:22",

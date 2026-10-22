@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -48,7 +49,7 @@ class NostrEventCardLayoutTest {
                         mine = true,
                         mentionedSelf = false,
                         mentionedYouLabel = "",
-                        contentModifier = Modifier.width(IntrinsicSize.Max),
+                        contentModifier = Modifier.boundedIntrinsicWidth(IntrinsicSize.Max),
                     ) {
                         NostrEventCardLayout(140.dp, onExpand = { expansions++ }) { Box(Modifier.height(220.dp)) }
                     }

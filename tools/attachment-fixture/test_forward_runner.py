@@ -70,11 +70,9 @@ class ForwardRunnerTest(unittest.TestCase):
         self.assertFalse({"uninstall", "install", "clear"} & set(command))
 
     def test_expected_request_counts_follow_the_source_contract(self):
-        """Uploads count every send once; GETs count contracted source downloads, one acquisition and the first receipt."""
+        """Each uncached forward downloads once; native setup and all exact receipts reuse already-owned content."""
         self.assertEqual(22, checker.expected_uploads())
-        downloads = sum(checker.REPETITIONS for v in checker.VARIANTS if checker.SOURCE[v]["download"])
-        # One receipt only: every later forwarded copy repeats the first one's bytes, which the author already holds.
-        self.assertEqual(downloads + 1 + 1, checker.expected_gets())
+        self.assertEqual(5, checker.expected_gets())
 
 
 if __name__ == "__main__":

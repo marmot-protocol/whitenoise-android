@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -81,6 +82,7 @@ internal object ControlledAttachmentProbe {
                 root.absolutePath,
                 relays,
                 MarmotOptions(
+                    deployment = marmotDeploymentWhiteNoise(),
                     relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
                     attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
                 ),
@@ -227,6 +229,7 @@ internal object ControlledAttachmentProbe {
                         root.absolutePath,
                         relays,
                         MarmotOptions(
+                            deployment = marmotDeploymentWhiteNoise(),
                             relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
                             attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
                         ),

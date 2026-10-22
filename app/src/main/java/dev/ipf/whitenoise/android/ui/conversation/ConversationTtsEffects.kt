@@ -418,10 +418,4 @@ private suspend fun projectConversationTtsEntry(
         conversationMemberCount = controller.memberCount.takeIf { controller.membersLoaded },
         parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
         mentionDisplayName = appState::mentionSpeechName,
-        isGroupMember =
-            if (controller.membersLoaded) {
-                { bech32 -> appState.isRosterMember(bech32, controller.members) }
-            } else {
-                null
-            },
     )

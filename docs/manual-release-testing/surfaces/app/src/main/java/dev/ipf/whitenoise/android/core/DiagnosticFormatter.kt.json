@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
+  "legacy_sha256": "dc55f6f37c59d104fa2cabac011313abcc22e0b04f521e0e4b862a02e1dd170a",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Superseded group-change diagnostic summary and payload privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
+        "anchor": "is MarmotEventFfi.GroupChangeSuperseded ->",
+        "test_ids": [
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "Storage-full send diagnostic category and private error details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
+        "anchor": "marmotError is MarmotKitException.StorageFull -> \"STORAGE_FULL\"",
+        "test_ids": [
+          "MED-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

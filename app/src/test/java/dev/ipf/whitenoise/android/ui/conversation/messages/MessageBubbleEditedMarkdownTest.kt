@@ -184,7 +184,6 @@ class MessageBubbleEditedMarkdownTest {
                 bodyText = "Edited *value*",
                 document = editedDocument,
                 mentionDisplayName = null,
-                isGroupMember = null,
             )!!
         val passage =
             TtsPassage(
@@ -232,7 +231,6 @@ class MessageBubbleEditedMarkdownTest {
                 bodyText = editedText,
                 document = editedDocument,
                 mentionDisplayName = null,
-                isGroupMember = null,
             )
         assertNotNull(projection)
         val appState = appState()

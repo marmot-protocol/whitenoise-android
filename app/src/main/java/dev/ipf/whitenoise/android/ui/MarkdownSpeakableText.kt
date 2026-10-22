@@ -103,14 +103,12 @@ private const val INT_BYTE_ONE_SHIFT = 8
 internal fun markdownDocumentToSpeakableText(
     document: MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
-): String = markdownDocumentToSpeakableProjection(document, mentionDisplayName, isGroupMember).text
+): String = markdownDocumentToSpeakableProjection(document, mentionDisplayName).text
 
 /** Same speech policy as [markdownDocumentToSpeakableText], with reversible leaf mappings. */
 internal fun markdownDocumentToSpeakableProjection(
     document: MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)? = null,
-    isGroupMember: ((String) -> Boolean)? = null,
 ): SpeakableTextProjection {
     val collector = SpeakableCollector()
     val blockLimit = minOf(document.blocks.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
@@ -121,7 +119,6 @@ internal fun markdownDocumentToSpeakableProjection(
             block = block,
             collector = collector,
             mentionDisplayName = mentionDisplayName,
-            isGroupMember = isGroupMember,
             depth = 0,
             path = "b$blockIndex",
         )
@@ -148,28 +145,27 @@ private fun collectSpeakableBlock(
     block: MarkdownBlockFfi,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     depth: Int,
     path: String,
 ) {
     if (markdownDepthExceeded(depth) || !collector.visitNode()) return
     when (block) {
         is MarkdownBlockFfi.Paragraph ->
-            collectSpeakableInlineSegment(block.inlines, collector, mentionDisplayName, isGroupMember, path)
+            collectSpeakableInlineSegment(block.inlines, collector, mentionDisplayName, path)
         is MarkdownBlockFfi.Heading ->
-            collectSpeakableInlineSegment(block.inlines, collector, mentionDisplayName, isGroupMember, path)
+            collectSpeakableInlineSegment(block.inlines, collector, mentionDisplayName, path)
         MarkdownBlockFfi.ThematicBreak -> Unit
         is MarkdownBlockFfi.CodeBlock -> collector.addCodeSegment(block.content, "$path/code", block.info)
         is MarkdownBlockFfi.BlockQuote ->
-            collectSpeakableBlocks(block.blocks, collector, mentionDisplayName, isGroupMember, depth + 1, "$path/q")
+            collectSpeakableBlocks(block.blocks, collector, mentionDisplayName, depth + 1, "$path/q")
         is MarkdownBlockFfi.ListBlock ->
-            collectSpeakableList(block, collector, mentionDisplayName, isGroupMember, depth + 1, path)
+            collectSpeakableList(block, collector, mentionDisplayName, depth + 1, path)
         is MarkdownBlockFfi.Details -> {
-            collectSpeakableInlineSegment(block.summary, collector, mentionDisplayName, isGroupMember, "$path/summary")
-            collectSpeakableBlocks(block.body, collector, mentionDisplayName, isGroupMember, depth + 1, "$path/d")
+            collectSpeakableInlineSegment(block.summary, collector, mentionDisplayName, "$path/summary")
+            collectSpeakableBlocks(block.body, collector, mentionDisplayName, depth + 1, "$path/d")
         }
         is MarkdownBlockFfi.Table ->
-            collectSpeakableTable(block, collector, mentionDisplayName, isGroupMember, path)
+            collectSpeakableTable(block, collector, mentionDisplayName, path)
         is MarkdownBlockFfi.MathBlock -> {
             collector.recordCode(block.content, "$path/math", SpeechRole.Math)
             collector.addLeafSegment(block.content, "$path/math")
@@ -181,7 +177,6 @@ private fun collectSpeakableBlocks(
     blocks: List<MarkdownBlockFfi>,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     depth: Int,
     path: String,
 ) {
@@ -193,7 +188,6 @@ private fun collectSpeakableBlocks(
             block,
             collector,
             mentionDisplayName,
-            isGroupMember,
             depth,
             "$path/b$blockIndex",
         )
@@ -204,7 +198,6 @@ private fun collectSpeakableList(
     list: MarkdownBlockFfi.ListBlock,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     depth: Int,
     path: String,
 ) {
@@ -216,7 +209,6 @@ private fun collectSpeakableList(
             item.blocks,
             collector,
             mentionDisplayName,
-            isGroupMember,
             depth,
             "$path/i$itemIndex",
         )
@@ -227,7 +219,6 @@ private fun collectSpeakableTable(
     table: MarkdownBlockFfi.Table,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     path: String,
 ) {
     var remainingCells = MARKDOWN_MAX_TABLE_CELLS
@@ -245,7 +236,6 @@ private fun collectSpeakableTable(
                 cell.inlines,
                 collector,
                 mentionDisplayName,
-                isGroupMember,
                 "$rowPath$cellIndex",
             )
         }
@@ -263,7 +253,6 @@ private fun collectSpeakableInlineSegment(
     inlines: List<MarkdownInlineFfi>,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     path: String,
 ) {
     val text =
@@ -273,7 +262,6 @@ private fun collectSpeakableInlineSegment(
                     inlines = inlines,
                     collector = collector,
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     depth = 0,
                     maxChars = collector.remainingChars,
                     path = path,
@@ -291,7 +279,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
     inlines: List<MarkdownInlineFfi>,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     depth: Int,
     maxChars: Int,
     path: String,
@@ -315,7 +302,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                     inline.children,
                     collector,
                     mentionDisplayName,
-                    isGroupMember,
                     depth + 1,
                     maxChars,
                     inlinePath,
@@ -325,7 +311,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                     inline.children,
                     collector,
                     mentionDisplayName,
-                    isGroupMember,
                     depth + 1,
                     maxChars,
                     inlinePath,
@@ -335,7 +320,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                     inline.children,
                     collector,
                     mentionDisplayName,
-                    isGroupMember,
                     depth + 1,
                     maxChars,
                     inlinePath,
@@ -347,7 +331,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                     destinationIsWeb = inline.classification == MarkdownLinkDestinationKindFfi.WEB,
                     collector = collector,
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     depth = depth + 1,
                     maxChars = maxChars - length,
                     path = inlinePath,
@@ -359,7 +342,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                     destinationIsWeb = inline.classification == MarkdownLinkDestinationKindFfi.WEB,
                     collector = collector,
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     depth = depth + 1,
                     maxChars = maxChars - length,
                     path = inlinePath,
@@ -377,7 +359,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                     entity = inline.entity,
                     isMention = true,
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     maxChars = maxChars - length,
                     leafId = inlinePath,
                 )
@@ -386,7 +367,6 @@ private fun MappedTextBuilder.appendSpeakableInlines(
                     entity = inline.entity,
                     isMention = false,
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     maxChars = maxChars - length,
                     leafId = inlinePath,
                 )
@@ -400,7 +380,6 @@ private fun MappedTextBuilder.appendSpeakableLinkLabel(
     destinationIsWeb: Boolean,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     depth: Int,
     maxChars: Int,
     path: String,
@@ -412,7 +391,6 @@ private fun MappedTextBuilder.appendSpeakableLinkLabel(
                     inlines = children,
                     collector = collector,
                     mentionDisplayName = mentionDisplayName,
-                    isGroupMember = isGroupMember,
                     depth = depth,
                     maxChars = maxChars,
                     path = path,
@@ -425,7 +403,6 @@ private fun MappedTextBuilder.appendSpeakableNostrEntity(
     entity: MarkdownNostrEntityFfi,
     isMention: Boolean,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
     maxChars: Int,
     leafId: String,
 ) {
@@ -434,7 +411,6 @@ private fun MappedTextBuilder.appendSpeakableNostrEntity(
             entity = entity,
             mention = isMention,
             mentionDisplayName = mentionDisplayName,
-            isGroupMember = isGroupMember,
         )
     // With no profile to name the key, the bubble still shows a shortened
     // bech32 because it is selectable and tappable. Speech has neither

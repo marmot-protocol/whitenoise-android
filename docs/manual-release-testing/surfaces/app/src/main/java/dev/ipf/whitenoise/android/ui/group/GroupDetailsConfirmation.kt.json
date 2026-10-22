@@ -10,7 +10,8 @@
         "test_ids": [
           "GRP-001",
           "GRP-008",
-          "GRP-009"
+          "GRP-009",
+          "GRP-034"
         ]
       },
       {
@@ -331,6 +332,14 @@
         "anchor": "R.string.sole_admin_transfer_hint",
         "test_ids": [
           "GRP-001"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_transfer_and_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.group_action_transfer_and_leave",
+        "test_ids": [
+          "GRP-034"
         ]
       }
     ],

@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MdkAdoptionDeviceAcceptance
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -35,7 +36,11 @@ class DiscoveryInvitationFfiIntegrationTest {
             try {
                 LoopbackNostrRelay().use { relay ->
                     val relays = listOf(relay.url)
-                    val options = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
+                    val options =
+                        MarmotOptions(
+                            relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                            deployment = marmotDeploymentWhiteNoise(),
+                        )
                     val sender = Marmot.newWithConfiguration(File(root, "sender").path, relays, options)
                     val peer = Marmot.newWithConfiguration(File(root, "peer").path, relays, options)
                     try {
@@ -105,7 +110,11 @@ class DiscoveryInvitationFfiIntegrationTest {
                     LoopbackNostrRelay().use { advertised ->
                         advertised.hiddenKinds = setOf(KEY_PACKAGE)
                         val relays = listOf(discovery.url)
-                        val options = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
+                        val options =
+                            MarmotOptions(
+                                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                                deployment = marmotDeploymentWhiteNoise(),
+                            )
                         val sender = Marmot.newWithConfiguration(File(root, "sender").path, relays, options)
                         val peer = Marmot.newWithConfiguration(File(root, "peer").path, relays, options)
                         try {

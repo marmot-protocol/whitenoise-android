@@ -36,10 +36,13 @@ elif a[:2]==['shell','perfetto']:
  if '--stop' in a and mode=='flush-fail':sys.exit(8)
  if '--stop' in a and mode=='flush-timeout':time.sleep(15)
  if '--stop' in a and mode=='split-deadlines':time.sleep(7)
-elif a[:2]==['shell','stat']:print(134217728 if mode=='oversize' else 4194304 if mode=='split-deadlines' else 9)
+elif a[:2]==['shell','stat']:
+ if mode=='stat-fail':sys.exit(8)
+ print('invalid' if mode=='stat-invalid' else 0 if mode=='empty-trace' else 134217729 if mode=='over-cap' else 134217728 if mode=='oversize' else 4194304 if mode=='split-deadlines' else 9)
 elif a and a[0]=='pull':
+ if mode=='pull-fail':sys.exit(8)
  if mode=='split-deadlines':time.sleep(5)
- pathlib.Path(a[2]).write_bytes(b'T'*4194304 if mode=='split-deadlines' else b'LOSS_TEST' if mode=='loss' else b'FAKETRACE')
+ pathlib.Path(a[2]).write_bytes(b'T'*4194304 if mode=='split-deadlines' else b'LOSS_TEST' if mode=='loss' else b'SHORT' if mode=='size-mismatch' else b'FAKETRACE')
 elif a[:2]==['shell','rm'] and mode=='cleanup-fail':sys.exit(9)
 elif a[:2]==['shell','test'] and mode=='existing-output':sys.exit(1)
 '''
@@ -58,7 +61,7 @@ class HostedStartupTraceTests(unittest.TestCase):
         adb = root/'bin/adb';adb.write_text(FAKE_ADB);adb.chmod(0o755)
         git=root/'bin/git';git.write_text('#!/bin/sh\nprintf \"%s\\n\" \"$GITHUB_SHA\"\n');git.chmod(0o755)
         gradle = root/'gradlew'
-        gradle.write_text('#!/bin/sh\npython3 scripts/hosted-startup-trace.py start || exit $?\nexit '+str(code)+'\n')
+        gradle.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > gradle-arguments.txt\npython3 scripts/hosted-startup-trace.py start || exit $?\nexit '+str(code)+'\n')
         gradle.chmod(0o755)
         env = {**os.environ,'PATH':str(root/'bin')+os.pathsep+os.environ['PATH'],'FAKE_MODE':mode,
                'GITHUB_EVENT_NAME':'workflow_dispatch','GITHUB_RUN_ID':'7','GITHUB_RUN_ATTEMPT':'1','GITHUB_JOB':'instrumented','GITHUB_SHA':'a'*40}
@@ -78,6 +81,27 @@ class HostedStartupTraceTests(unittest.TestCase):
         self.assertTrue((root/'app/build/reports/media-startup-trace/startup.perfetto-trace').exists())
         self.assertEqual(sum('--stop' in c for c in calls),1)
         self.assertTrue(any(c[:1]==['pull'] for c in calls))
+
+    def test_actual_entrypoint_uses_only_healthy_release_like_selector(self):
+        root,r,receipt,_=self.execute()
+        self.assertEqual(r.returncode,0,r.stderr)
+        arguments=(root/'gradle-arguments.txt').read_text().splitlines()
+        self.assertIn(':app:connectedDevZapstoreBenchmarkReleaseAndroidTest',arguments)
+        self.assertNotIn(':app:connectedDevZapstoreDebugAndroidTest',arguments)
+        healthy='dev.ipf.whitenoise.android.media.sandbox.MediaWorkerHealthyBaselineDeviceTest#characterizeHealthyDirectStillTransportWithFixedSyntheticCorpus'
+        self.assertIn('-Pandroid.testInstrumentationRunnerArguments.class='+healthy,arguments)
+        self.assertEqual((root/'app/build/reports/media-startup-trace/required-cases.txt').read_text(),healthy+'\n')
+        self.assertFalse(receipt['capture_qualified'])
+
+    def test_static_gradle_api_selects_variant_before_task_and_keeps_release_flags(self):
+        init=(ROOT/'scripts/hosted-startup-trace.init.gradle').read_text()
+        self.assertIn("finalizeDsl { android ->",init)
+        self.assertIn("android.testBuildType = 'benchmarkRelease'",init)
+        self.assertIn('benchmark.debuggable || !benchmark.minifyEnabled || !benchmark.shrinkResources',init)
+        self.assertLess(init.index('finalizeDsl'),init.index('projectsEvaluated'))
+        build=(ROOT/'app/build.gradle.kts').read_text().split('create("benchmarkRelease") {',1)[1].split('\n        }',1)[0]
+        self.assertIn('initWith(getByName("release"))',build)
+        self.assertIn('signingConfigs.getByName("debug")',build)
 
     def test_unsupported_runtime_stops_before_instrumentation_and_start(self):
         _,r,receipt,calls=self.execute('unsupported')
@@ -109,6 +133,28 @@ class HostedStartupTraceTests(unittest.TestCase):
         self.assertEqual(r.returncode,2)
         self.assertTrue(any('oversized' in i for i in receipt['issues']))
         self.assertFalse(any(c[:1]==['pull'] for c in calls))
+        self.assertEqual(receipt['cleanup'],'HELD')
+        self.assertFalse(any(c[:2]==['shell','rm'] for c in calls))
+
+    def test_failed_trace_retrieval_preserves_remote_evidence(self):
+        for mode in ('stat-fail','stat-invalid','empty-trace','over-cap','pull-fail','size-mismatch'):
+            with self.subTest(mode=mode):
+                _,r,receipt,calls=self.execute(mode)
+                self.assertEqual(r.returncode,2)
+                self.assertEqual(receipt['cleanup'],'HELD')
+                self.assertFalse(receipt['capture_qualified'])
+                self.assertNotIn('trace_sha256',receipt)
+                self.assertFalse(any(c[:2]==['shell','rm'] for c in calls))
+                self.assertEqual(sum('--stop' in c for c in calls),1)
+
+    def test_verified_local_trace_allows_only_owned_remote_cleanup(self):
+        _,r,receipt,calls=self.execute()
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertEqual(receipt['cleanup'],'CONFIRMED')
+        self.assertEqual(len(receipt['trace_sha256']),64)
+        self.assertEqual([c for c in calls if c[:2]==['shell','rm']],
+                         [['shell','rm','-f',receipt['remote']]])
+        self.assertFalse(receipt['capture_qualified'])
 
     def test_flush_failure_holds_owned_remote_files_no_cleanup_or_retry(self):
         _,r,receipt,calls=self.execute('flush-fail')
@@ -156,7 +202,8 @@ class HostedStartupTraceTests(unittest.TestCase):
         condition=workflow.split(marker,1)[1].splitlines()[0].strip().removeprefix('if: ')
         defaults=dict(media_startup_trace=True,media_sandbox_only=True,media_sandbox_api='30',
                       maestro_pilot=False,responsiveness_only=False,outbound_share_only=False,
-                      mdk_adoption_only=False,review_demo_e2e=False,document_provider_matrix=False)
+                      mdk_adoption_only=False,mdk_qualification=False,mdk_preview_qualification=False,
+                      review_demo_e2e=False,document_provider_matrix=False)
         def evaluate(expression,event='workflow_dispatch',status='failure',**changes):
             values={**defaults,**changes}
             expression=expression.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
@@ -222,7 +269,7 @@ class HostedStartupTraceTests(unittest.TestCase):
         self.assertIn('selected.objects.newInstance(StartupTraceExecution)',script)
         self.assertIn('execution.execOperations.exec { spec ->',script)
         self.assertIn('spec.workingDir(workspace)',script)
-        self.assertIn("selected.tasks.named('connectedDevZapstoreDebugAndroidTest')",script)
+        self.assertIn("selected.tasks.named('connectedDevZapstoreBenchmarkReleaseAndroidTest')",script)
         self.assertLess(script.index('doFirst {'),script.index('execution.execOperations.exec {'))
         self.assertIn("spec.commandLine 'python3', 'scripts/hosted-startup-trace.py', 'start'",script)
         self.assertNotRegex(script,r'\b(?:selected|project)\.exec\s*\{')

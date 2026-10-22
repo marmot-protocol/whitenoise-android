@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.marmotkit.verifyPublicNostrEventJson
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import kotlinx.coroutines.CancellationException
@@ -70,7 +71,10 @@ class SignedInvitationVectorDeviceTest {
             Marmot.newWithConfiguration(
                 root.path,
                 relays,
-                MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+                MarmotOptions(
+                    relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                    deployment = marmotDeploymentWhiteNoise(),
+                ),
             )
         try {
             native.start()

@@ -9,7 +9,8 @@
         "anchor": "fun ChatAbandonmentHost(",
         "test_ids": [
           "CHL-026",
-          "GRP-033"
+          "GRP-033",
+          "GRP-034"
         ]
       }
     ]

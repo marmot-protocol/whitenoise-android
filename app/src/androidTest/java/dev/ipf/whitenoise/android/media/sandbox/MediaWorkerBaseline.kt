@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
@@ -20,14 +21,21 @@ internal object MediaWorkerBaseline {
     private const val CORPUS_DEADLINE_MS = 90_000L
 
     fun run() {
-        MediaWorkerBaselineReport().use { run(it) }
+        MediaWorkerBaselineReport().use { run(it, includeNegativeProbes = true) }
     }
 
-    private fun run(report: MediaWorkerBaselineReport) {
+    fun runHealthy() {
+        MediaWorkerBaselineReport().use { run(it, includeNegativeProbes = false) }
+    }
+
+    private fun run(
+        report: MediaWorkerBaselineReport,
+        includeNegativeProbes: Boolean,
+    ) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val start = SystemClock.elapsedRealtimeNanos()
         val corpus = corpus()
-        report.emit(header(corpus, SystemClock.elapsedRealtimeNanos() - start))
+        report.emit(header(corpus, SystemClock.elapsedRealtimeNanos() - start, includeNegativeProbes))
         val binding = MediaWorkerBaselineBinding(context)
         val constructStart = SystemClock.elapsedRealtimeNanos()
         val transport = IsolatedMediaTransport(binding, "baseline_images")
@@ -44,12 +52,14 @@ internal object MediaWorkerBaseline {
                 completed++
                 if (sample.getString("outcome") == "success") successes++
             }
-            val malformed = probe("malformed_input", transport, binding, MediaDecodePolicy.DECODE)
-            report.emit(malformed)
-            assertFalse(malformed.getBoolean("returned_bitmap"))
-            val watchdog = probe("watchdog_stimulus", transport, binding, MediaDecodePolicy.DEBUG_HANG)
-            report.emit(watchdog)
-            assertFalse(watchdog.getBoolean("returned_bitmap"))
+            if (includeNegativeProbes) {
+                val malformed = probe("malformed_input", transport, binding, MediaDecodePolicy.DECODE)
+                report.emit(malformed)
+                assertFalse(malformed.getBoolean("returned_bitmap"))
+                val watchdog = probe("watchdog_stimulus", transport, binding, MediaDecodePolicy.DEBUG_HANG)
+                report.emit(watchdog)
+                assertFalse(watchdog.getBoolean("returned_bitmap"))
+            }
         } finally {
             try {
                 val closeStart = SystemClock.elapsedRealtimeNanos()
@@ -61,7 +71,7 @@ internal object MediaWorkerBaseline {
             }
         }
         assertEquals("Baseline corpus did not finish within its bounded observation window", CASES, completed)
-        assertEquals("Healthy baseline operations returned refusals or failed results", CASES, successes)
+        assertEquals("Baseline operations returned refusals or failed results", CASES, successes)
     }
 
     private fun sample(
@@ -159,6 +169,7 @@ internal object MediaWorkerBaseline {
     private fun header(
         corpus: List<ByteArray>,
         elapsed: Long,
+        includeNegativeProbes: Boolean,
     ): JSONObject =
         JSONObject()
             .put("kind", "header")
@@ -170,6 +181,13 @@ internal object MediaWorkerBaseline {
             .put("package", InstrumentationRegistry.getInstrumentation().targetContext.packageName)
             .put("flavor", dev.ipf.whitenoise.android.BuildConfig.FLAVOR)
             .put("build_type", dev.ipf.whitenoise.android.BuildConfig.BUILD_TYPE)
+            .put("build_config_debug", dev.ipf.whitenoise.android.BuildConfig.DEBUG)
+            .put(
+                "application_debuggable",
+                InstrumentationRegistry.getInstrumentation().targetContext.applicationInfo.flags and
+                    ApplicationInfo.FLAG_DEBUGGABLE != 0,
+            )
+            .put("includes_negative_probes", includeNegativeProbes)
             .put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
             .put("build_fingerprint", Build.FINGERPRINT)
             .put("corpus_prepare_ns", elapsed)

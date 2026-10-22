@@ -213,6 +213,7 @@ class AttachmentDownloadInterruptionBackoffTest {
 
         AttachmentDownloadWorker.enqueue(application, testRequest(), AttachmentDownloadPriority.Interactive)
 
+        eventually("explicit work replaces backed-off automatic work") { uniqueWorkId() != automaticId }
         val explicitId = uniqueWorkId()
         assertNotEquals(automaticId, explicitId)
         val replaced = WorkManager.getInstance(application).getWorkInfoById(automaticId).get()
@@ -230,17 +231,19 @@ class AttachmentDownloadInterruptionBackoffTest {
         val automaticId = uniqueWorkId()
         intentStore().setInteractive(testRequest(), interactive = true)
         val lookups = AtomicInteger(0)
+        val explicit = AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive)
 
         AttachmentDownloadWorker.enqueueExplicit(
             application,
             testRequest(),
-            AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive),
+            explicit,
             intentStore(),
             lookup = { manager, name ->
                 if (lookups.incrementAndGet() == 1) failedLookup() else manager.getWorkInfosForUniqueWork(name)
             },
         )
 
+        eventually("the retried lookup installs the requested explicit work") { uniqueWorkId() == explicit.id }
         assertEquals(2, lookups.get())
         assertNotEquals(automaticId, uniqueWorkId())
     }
@@ -339,15 +342,17 @@ class AttachmentDownloadInterruptionBackoffTest {
         val retiredId = uniqueWorkId()
         assertTrue(AttachmentDownloadWorker.RETIRED_TAG in workInfo(retiredId).tags)
         intentStore().setInteractive(testRequest(), interactive = true)
+        val explicitWork = AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive)
 
         AttachmentDownloadWorker.enqueueExplicit(
             application,
             testRequest(),
-            AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive),
+            explicitWork,
             intentStore(),
             fence = ExplicitEnqueueFence(),
         )
 
+        eventually("explicit work replaces the pending retirement") { uniqueWorkId() == explicitWork.id }
         val installedId = uniqueWorkId()
         assertNotEquals("the fresh request was discarded behind the retirement spec", retiredId, installedId)
         assertFalse(AttachmentDownloadWorker.RETIRED_TAG in workInfo(installedId).tags)
@@ -385,6 +390,7 @@ class AttachmentDownloadInterruptionBackoffTest {
             intentStore(),
             fence = fence,
         )
+        eventually("the successor installs its explicit work") { uniqueWorkId() == successorWork.id }
         val explicitId = uniqueWorkId()
         assertEquals(successorWork.id, explicitId)
 
@@ -398,6 +404,13 @@ class AttachmentDownloadInterruptionBackoffTest {
     @Test
     fun explicitAndAutomaticEnqueuesCoalesceOnTheUniqueWork() {
         AttachmentDownloadWorker.enqueue(application, testRequest(), AttachmentDownloadPriority.Interactive)
+        eventually("initial explicit work is installed") {
+            WorkManager
+                .getInstance(application)
+                .getWorkInfosForUniqueWork(workName())
+                .get()
+                .any { !it.state.isFinished }
+        }
         val explicitId = uniqueWorkId()
 
         AttachmentDownloadWorker.enqueue(application, testRequest(), AttachmentDownloadPriority.Interactive)

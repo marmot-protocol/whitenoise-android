@@ -238,6 +238,7 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.MissingKeyPackage ||
                 marmotError is MarmotKitException.MemberNotInGroup ||
                 marmotError is MarmotKitException.SecretNotFound -> "NOT_FOUND"
+            marmotError is MarmotKitException.StorageFull -> "STORAGE_FULL"
             marmotError is MarmotKitException.AccountWorkerBusy ||
                 marmotError is MarmotKitException.RuntimeBusy ||
                 marmotError is MarmotKitException.AccountSessionBusy ||

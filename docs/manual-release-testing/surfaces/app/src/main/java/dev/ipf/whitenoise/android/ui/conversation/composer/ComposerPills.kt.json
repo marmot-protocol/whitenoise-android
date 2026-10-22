@@ -148,6 +148,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Bounded Compose measurement and preview safety",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": ".deferredPadding(",
+        "test_ids": [
+          "CON-017"
+        ]
       }
     ]
   },

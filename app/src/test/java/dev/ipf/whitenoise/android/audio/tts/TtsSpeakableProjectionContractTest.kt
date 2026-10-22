@@ -32,7 +32,6 @@ class TtsSpeakableProjectionContractTest {
                     bodyText = editedText,
                     document = emptyDocument,
                     mentionDisplayName = null,
-                    isGroupMember = null,
                 )!!
 
             assertEquals(ttsEntry.projectionId, uiProjection.projectionId)
@@ -67,7 +66,6 @@ class TtsSpeakableProjectionContractTest {
                     bodyText = editedText,
                     document = editedDocument,
                     mentionDisplayName = null,
-                    isGroupMember = null,
                 )!!
 
             assertEquals(ttsEntry.projectionId, uiProjection.projectionId)
@@ -103,7 +101,6 @@ class TtsSpeakableProjectionContractTest {
                     bodyText = editedText,
                     document = emptyDocument(),
                     mentionDisplayName = null,
-                    isGroupMember = null,
                 )
 
             assertNotNull(legacyUiProjection)
