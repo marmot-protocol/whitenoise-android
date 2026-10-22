@@ -101,6 +101,7 @@ import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
+import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -3868,12 +3869,13 @@ internal fun ConversationScreen(
                         searchFilterAction = {
                             ChatListSearchFilterAction(
                                 state = conversationSearchState,
+                                conversationScope = true,
                                 onCategory = { category ->
                                     updateConversationSearch {
                                         GlobalSearchTransitions.openFilterCategory(it, category)
                                     }
                                 },
-                                onClearAll = { updateConversationSearch(GlobalSearchTransitions::clearAllFilters) },
+                                onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
                             )
                         },
                         searchFilterControls = {
@@ -3888,8 +3890,13 @@ internal fun ConversationScreen(
                                 onRemoveFilter = { chip ->
                                     updateConversationSearch { GlobalSearchTransitions.removeFilter(it, chip) }
                                 },
-                                onClearAll = { updateConversationSearch(GlobalSearchTransitions::clearAllFilters) },
+                                onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
                                 folderNames = searchControls.folderNames,
+                                conversationScope =
+                                    conversationSearchState.chatFilters.singleOrNull()?.takeIf {
+                                        canonicalChatListGroupId(it.stableId) == canonicalChatListGroupId(chat.id)
+                                    },
+                                onSearchOtherChats = { updateConversationSearch(::broadenConversationSearch) },
                             )
                         },
                         appState = appState,

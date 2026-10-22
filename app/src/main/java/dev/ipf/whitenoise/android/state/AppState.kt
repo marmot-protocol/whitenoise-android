@@ -152,6 +152,8 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
+import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
+import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeAdmission
 import dev.ipf.whitenoise.android.notifications.PushWakeAttemptBudget
@@ -1048,6 +1050,7 @@ class WhiteNoiseAppState private constructor(
     private val accountIdHexResolver: (suspend (String) -> String?)?,
     private val profileReader: (suspend (String) -> UserProfileMetadataFfi?)?,
     private val profileDisplayNameReader: (suspend (String) -> String?)?,
+    private val npubPresentationReader: (suspend (String) -> String?)?,
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
     private val identityLoginCalls: IdentityLoginCalls?,
     private val marmotAccessObserver: (() -> Unit)?,
@@ -1068,6 +1071,7 @@ class WhiteNoiseAppState private constructor(
     private val messageDraftRepositoryOverride: MessageDraftRepository?,
     private val nativePushFallbackPlatform: NativePushFallbackPlatform,
     private val pushServerConfigProvider: () -> PushServerConfig?,
+    private val fcmTokenReaderOverride: (suspend () -> String?)?,
     private val nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability,
     preferencesOverride: SharedPreferences?,
     pushTokenStoreOverride: PushTokenStore?,
@@ -1083,11 +1087,17 @@ class WhiteNoiseAppState private constructor(
             mutationsScope,
             onPhaseChange = { phase = it },
             awaitActivationReadiness = ::completeReceiverGatedStartup,
-        ) { runtime, account ->
+        ) { runtime, account, isMountCurrent ->
+            if (!isMountCurrent()) throw CancellationException("Setup mount was replaced")
             val reported = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
-            val canonical = withContext(Dispatchers.IO) { runtime.accountIdHex(reported) }
-            check(canonical == account) { "signer account does not match setup" }
-            withContext(Dispatchers.IO) { runtime.registerExternalSigner(account, amberSigner.buildSigner(account)) }
+            withAccountLifetime {
+                if (!isMountCurrent() || marmot() !== runtime) throw CancellationException("Setup mount was replaced")
+                val canonical = withContext(Dispatchers.IO) { runtime.accountIdHex(reported) }
+                check(canonical == account) { "signer account does not match setup" }
+                withContext(Dispatchers.IO) {
+                    runtime.registerExternalSigner(account, amberSigner.buildSigner(account))
+                }
+            }
         }
     }
 
@@ -1105,6 +1115,7 @@ class WhiteNoiseAppState private constructor(
             accountIdHexResolver = null,
             profileReader = null,
             profileDisplayNameReader = null,
+            npubPresentationReader = null,
             profileRefreshRequest = null,
             identityLoginCalls = null,
             marmotAccessObserver = null,
@@ -1125,6 +1136,7 @@ class WhiteNoiseAppState private constructor(
             messageDraftRepositoryOverride = null,
             nativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
             pushServerConfigProvider = PushServerConfig::current,
+            fcmTokenReaderOverride = null,
             nativePushCapabilityResolver = { nativePushCapabilityForContext(context.applicationContext, it) },
             preferencesOverride = null,
             pushTokenStoreOverride = null,
@@ -1141,6 +1153,7 @@ class WhiteNoiseAppState private constructor(
         activeAccountRef: String?,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
+        npubPresentationReader: (suspend (String) -> String?)? = { null },
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
         identityLoginCalls: IdentityLoginCalls? = null,
         marmotAccessObserver: (() -> Unit)? = null,
@@ -1162,6 +1175,7 @@ class WhiteNoiseAppState private constructor(
         messageDraftRepository: MessageDraftRepository? = null,
         nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
         pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+        fcmTokenReader: (suspend () -> String?)? = null,
         nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
             nativePushCapabilityForContext(context.applicationContext, it)
         },
@@ -1174,6 +1188,7 @@ class WhiteNoiseAppState private constructor(
         accountIdHexResolver = accountIdHexResolver,
         profileReader = profileReader,
         profileDisplayNameReader = profileDisplayNameReader,
+        npubPresentationReader = npubPresentationReader,
         profileRefreshRequest = profileRefreshRequest,
         identityLoginCalls = identityLoginCalls,
         marmotAccessObserver = marmotAccessObserver,
@@ -1194,6 +1209,7 @@ class WhiteNoiseAppState private constructor(
         messageDraftRepositoryOverride = messageDraftRepository,
         nativePushFallbackPlatform = nativePushFallbackPlatform,
         pushServerConfigProvider = pushServerConfigProvider,
+        fcmTokenReaderOverride = fcmTokenReader,
         nativePushCapabilityResolver = nativePushCapabilityResolver,
         preferencesOverride = preferences,
         pushTokenStoreOverride = pushTokenStore,
@@ -1640,6 +1656,7 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
+    private val pushTokenRotationSequence = AtomicLong()
     private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     private val notificationDeliveryModeMutex = Mutex()
     private val notificationDeliveryModeIntent = StalenessGuard()
@@ -2258,6 +2275,14 @@ class WhiteNoiseAppState private constructor(
     var relationshipRevision by mutableLongStateOf(0L)
         private set
 
+    /** Presentation only: encrypted/native storage remains the authority for push cleanup admission. */
+    var pushStorageRecovery by mutableStateOf(PushStorageRecovery.Checking)
+        private set
+
+    /** Prevents concurrent user retries without clearing unresolved cleanup or import fences. */
+    var pushStorageRecoveryBusy by mutableStateOf(false)
+        private set
+
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
         private set
 
@@ -2773,6 +2798,23 @@ class WhiteNoiseAppState private constructor(
     private val accountCatchUpCoordinator =
         AccountCatchUpCoordinator(notificationScope, localNotificationPresenter.catchUpWindow)
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
+
+    /** Native identity commands and lifecycle transitions share the account-session owner. */
+    internal suspend fun <T> withAccountLifetime(block: suspend () -> T): T = accountSession.withLifetime(block)
+
+    /** A queued native command cannot silently retarget a replacement runtime or active owner. */
+    internal suspend fun <T> withCurrentAccountLifetime(block: suspend () -> T): T {
+        val runtime = marmotRuntime
+        val epoch = runtimeGeneration
+        val owner = activeAccountRef
+        return withAccountLifetime {
+            if (marmotRuntime !== runtime || runtimeGeneration != epoch || activeAccountRef != owner) {
+                throw CancellationException("Native account command owner was replaced")
+            }
+            block()
+        }
+    }
+
     private val accountSwitchHandoff get() = accountSession.handoff
 
     // Bumped whenever cross-account caches are cleared (switch / sign-out). An
@@ -3576,7 +3618,6 @@ class WhiteNoiseAppState private constructor(
             // Fence recovery before setup cancellation suspends; capture controller handles before their drain.
             notificationRuntimeRecovery.advance()
             networkNotificationRecoverySuppressed = true
-            accountSetup.close()
             val restartNotifications =
                 backgroundConnectionEnabled ||
                     notificationJob.isActive() ||
@@ -4618,13 +4659,24 @@ class WhiteNoiseAppState private constructor(
         if (!isCatchUpKeyCurrent(key)) {
             false
         } else {
-            when (val admission = pushWakeAttemptBudget().reserve()) {
+            val admission =
+                observePushState { pushWakeAttemptBudget().reserve() }
+                    ?: if (trigger == PerformanceTrigger.PUSH_WAKE) {
+                        PushWakeAdmission.Rejected
+                    } else {
+                        // Ordinary foreground/connectivity work is independently bounded
+                        // and cannot settle an unknown wake.
+                        PushWakeAdmission.Admitted(claim = null)
+                    }
+            when (admission) {
                 PushWakeAdmission.Rejected -> false
                 is PushWakeAdmission.Admitted -> {
                     if (isCatchUpKeyCurrent(key)) {
                         performAdmittedAccountCatchUp(key, trigger, admission.claim)
                     } else {
-                        admission.claim?.let { reserved -> pushWakeAttemptBudget().release(reserved) }
+                        admission.claim?.let { reserved ->
+                            observePushState { pushWakeAttemptBudget().release(reserved) }
+                        }
                         false
                     }
                 }
@@ -4640,7 +4692,10 @@ class WhiteNoiseAppState private constructor(
         val nativeSucceeded = instrumentedCatchUpAccounts(trigger)
         var settlementSucceeded = nativeSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
-            settlementSucceeded = pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) }
+            settlementSucceeded =
+                observePushState {
+                    pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) }
+                } == true
         }
         val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
@@ -4669,7 +4724,9 @@ class WhiteNoiseAppState private constructor(
                     )
                 },
                 onSucceeded = { result ->
-                    result.key?.let { key -> acknowledgePendingPushWakeCatchUp(pendingGeneration, key) } == true
+                    observePushState {
+                        result.key?.let { key -> acknowledgePendingPushWakeCatchUp(pendingGeneration, key) } == true
+                    } == true
                 },
             )
         if (result.succeeded) recordStartupRelayCatchUpReady()
@@ -4729,9 +4786,12 @@ class WhiteNoiseAppState private constructor(
             return
         }
         admitPushWakeEpisodeFromLifecycle()
+        val pendingGeneration =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+            } ?: 0L // Unknown storage must not acknowledge a saved generation.
         isForegroundCatchUpRunning = true
         try {
-            val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
             catchUpAfterObservedPushWake(
                 pendingGeneration = pendingGeneration,
                 trigger = PerformanceTrigger.FOREGROUND,
@@ -5179,14 +5239,7 @@ class WhiteNoiseAppState private constructor(
             }
             val targetAccount = startupAccount()
             if (targetAccount == null) {
-                accountSession.publishSignedOutIdentity {
-                    activeAccountRef = null
-                    preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
-                }
-                localNotificationSettings = null
-                pendingStartupUnreadRefresh = null
-                completeReceiverGatedStartup()
-                phase = AppPhase.Onboarding
+                completeStartupWithoutAccount()
             } else {
                 val target = targetAccount.label
                 val activated =
@@ -5213,6 +5266,26 @@ class WhiteNoiseAppState private constructor(
             }
             appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
             phase = AppPhase.Failed(bootstrapFailure(error))
+        }
+    }
+
+    private suspend fun completeStartupWithoutAccount() {
+        val startupRuntime = marmotRuntime
+        val startupEpoch = runtimeGeneration
+        val startupSelection = accountSession.handoff.capture()
+        completeReceiverGatedStartup()
+        withAccountLifetime {
+            if (marmotRuntime !== startupRuntime ||
+                runtimeGeneration != startupEpoch ||
+                !accountSession.handoff.isCurrent(startupSelection)
+            ) {
+                return@withAccountLifetime
+            }
+            activeAccountRef = null
+            preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
+            localNotificationSettings = null
+            pendingStartupUnreadRefresh = null
+            phase = AppPhase.Onboarding
         }
     }
 
@@ -5249,76 +5322,77 @@ class WhiteNoiseAppState private constructor(
 
     /** Binds the consent projection before configuring and starting the process-owned native runtime. */
     @Suppress("LongMethod", "ThrowsCount") // Native startup stages share one terminal telemetry boundary.
-    private suspend fun startBootstrapRuntime(): AppMarmotRuntime {
+    private suspend fun startBootstrapRuntime(): AppMarmotRuntime =
+        withAccountLifetime {
+            startBootstrapRuntimeLocked()
+        }
+
+    private suspend fun startBootstrapRuntimeLocked(): AppMarmotRuntime {
         val startedAtElapsedMs = SystemClock.elapsedRealtime()
         return try {
-            val opened =
-                bootstrapRuntime.open(
-                    construct = {
-                        startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
-                            withContext(Dispatchers.IO) {
-                                StartupDiagnostics.stage(StartupDiagnosticStage.ROOT_LEASE) {
-                                    MarmotClientRootGate.withLease {
-                                        marmotRuntimeFactory(appContext).also { runtime ->
-                                            // Publish before start so lifecycle consumers
-                                            // and later listener retries can resolve Marmot.
-                                            publishMarmotRuntime(runtime)
-                                            diagnostics.bind(runtime.marmot)
-                                            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                                                runtime.marmot.downloadProfileImage(url, maxBytes)
-                                            }
-                                        }
+            val opened = openBootstrapRuntimeLocked()
+            publishMarmotRuntime(opened)
+            recordHostPerformanceSince(HostPerformanceOperationFfi.RUNTIME_INIT, startedAtElapsedMs)
+            opened
+        } catch (error: Throwable) {
+            val outcome = bootstrapFailureOutcome(error)
+            recordHostPerformanceSince(HostPerformanceOperationFfi.RUNTIME_INIT, startedAtElapsedMs, outcome)
+            throw error
+        }
+    }
+
+    private fun bootstrapFailureOutcome(error: Throwable): HostPerformanceOutcomeFfi =
+        when (error) {
+            is TimeoutCancellationException -> HostPerformanceOutcomeFfi.TIMEOUT
+            is CancellationException -> HostPerformanceOutcomeFfi.CANCELLED
+            else -> HostPerformanceOutcomeFfi.FAILURE
+        }
+
+    private suspend fun openBootstrapRuntimeLocked(): AppMarmotRuntime =
+        bootstrapRuntime.open(
+            construct = {
+                startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
+                    withContext(Dispatchers.IO) {
+                        StartupDiagnostics.stage(StartupDiagnosticStage.ROOT_LEASE) {
+                            MarmotClientRootGate.withLease {
+                                marmotRuntimeFactory(appContext).also { runtime ->
+                                    // Publish before start so lifecycle consumers
+                                    // and later listener retries can resolve Marmot.
+                                    publishMarmotRuntime(runtime)
+                                    diagnostics.bind(runtime.marmot)
+                                    AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                        runtime.marmot.downloadProfileImage(url, maxBytes)
                                     }
                                 }
                             }
                         }
-                    },
-                    configure = { runtime ->
-                        appStateDebug { "bootstrap root=${runtime.rootPath}" }
-                        startupPerformance.stage(PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION) {
-                            withContext(Dispatchers.IO) {
-                                runtime.marmot.configurePrivacyRuntime()
-                                runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
-                            }
-                        }
-                    },
-                    start = { runtime ->
-                        startMarmotWithNotificationListener(runtime)
-                        appStateDebug { "marmot started" }
-                    },
-                    closeAfterFailure = { runtime ->
-                        startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
+                    }
+                }
+            },
+            configure = { runtime ->
+                appStateDebug { "bootstrap root=${runtime.rootPath}" }
+                startupPerformance.stage(PerformancePhase.PRIVACY_RUNTIME_CONFIGURATION) {
+                    withContext(Dispatchers.IO) {
+                        runtime.marmot.configurePrivacyRuntime()
+                        runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
+                    }
+                }
+            },
+            start = { runtime ->
+                startMarmotWithNotificationListener(runtime)
+                appStateDebug { "marmot started" }
+            },
+            closeAfterFailure = { runtime ->
+                startupPerformance.stage(PerformancePhase.FAILED_RUNTIME_CLOSE) {
+                    notificationDeliveryModeMutex.withLock {
+                        nativePushSyncMutex.withLock {
                             withContext(Dispatchers.IO) { runtime.marmot.shutdownAndClose() }
+                            clearMarmotRuntime(runtime)
                         }
-                        clearMarmotRuntime(runtime)
-                    },
-                )
-            publishMarmotRuntime(opened)
-            recordHostPerformanceSince(HostPerformanceOperationFfi.RUNTIME_INIT, startedAtElapsedMs)
-            opened
-        } catch (timeout: TimeoutCancellationException) {
-            recordHostPerformanceSince(
-                HostPerformanceOperationFfi.RUNTIME_INIT,
-                startedAtElapsedMs,
-                HostPerformanceOutcomeFfi.TIMEOUT,
-            )
-            throw timeout
-        } catch (cancel: CancellationException) {
-            recordHostPerformanceSince(
-                HostPerformanceOperationFfi.RUNTIME_INIT,
-                startedAtElapsedMs,
-                HostPerformanceOutcomeFfi.CANCELLED,
-            )
-            throw cancel
-        } catch (throwable: Throwable) {
-            recordHostPerformanceSince(
-                HostPerformanceOperationFfi.RUNTIME_INIT,
-                startedAtElapsedMs,
-                HostPerformanceOutcomeFfi.FAILURE,
-            )
-            throw throwable
-        }
-    }
+                    }
+                }
+            },
+        )
 
     /**
      * Start MDK and enter its passive subscription from one IO coroutine. The
@@ -5416,10 +5490,23 @@ class WhiteNoiseAppState private constructor(
 
     /** Keeps storage failure in recovery bookkeeping from interrupting unlock or connectivity handling. */
     private suspend fun admitPushWakeEpisodeFromLifecycle() {
-        if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.admitPushWakeEpisode(pushWakeNowMs()) }) {
+        val admitted =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState { pushTokenStore.admitPushWakeEpisode(pushWakeNowMs()) }
+            }
+        if (admitted != true) {
             PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
         }
     }
+
+    /** Defers passive push work when encrypted state is unavailable without inventing an empty queue. */
+    private inline fun <T> observePushState(read: () -> T): T? =
+        try {
+            read()
+        } catch (_: PushTokenStorageException) {
+            android.util.Log.w("PushTokenStorage", "lifecycle_work_deferred")
+            null
+        }
 
     /** Acknowledges the concrete foreground-service instance that currently owns background runtime. */
     internal fun acknowledgePushWakeServiceOwner(owner: Any) {
@@ -5567,19 +5654,28 @@ class WhiteNoiseAppState private constructor(
 
     /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
-        if (pushTokenStore.nativePushRegistrationSyncPending()) {
+        val pending =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState {
+                    pushTokenStore.nativePushRegistrationSyncPending() || pushTokenStore.lastToken() != null
+                }
+            } ?: return
+        if (pending) {
             syncNativePushRegistrationIfEnabled()
         }
     }
 
     /** Returns fetch success, acknowledging only the matching durable wake after fresh work. */
     private suspend fun drainPendingPushWakeCatchUpIfNeeded(): Boolean {
-        val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
-        if (pendingGeneration == 0L) return true
-        return catchUpAfterObservedPushWake(
-            pendingGeneration = pendingGeneration,
-            trigger = PerformanceTrigger.PUSH_WAKE,
-        ).succeeded
+        val pendingGeneration =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+            } ?: return false
+        return pendingGeneration == 0L ||
+            catchUpAfterObservedPushWake(
+                pendingGeneration = pendingGeneration,
+                trigger = PerformanceTrigger.PUSH_WAKE,
+            ).succeeded
     }
 
     /**
@@ -5662,20 +5758,23 @@ class WhiteNoiseAppState private constructor(
     suspend fun createIdentity() = profileSignUp.createIdentityWithoutProfile()
 
     /** Activates a newly created identity and invalidates older account-list reads atomically. */
-    private fun activateCreatedIdentity(summary: AccountSummaryFfi) =
-        accountSession.publishCreatedIdentity(summary.label) {
-            if (summary.label != activeAccountRef) {
-                clearInMemoryMediaCaches()
-                clearCrossAccountCaches()
-            }
-            accountListLifetime.advance {
-                accounts = accountSummariesWithCreatedIdentity(accounts, summary)
-            }
-            activeAccountRef = summary.label
-            preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
-            localNotificationSettings = null
-            reloadMediaAutoDownloadMatrix()
+    private suspend fun activateCreatedIdentity(
+        summary: AccountSummaryFfi,
+        mayPublish: () -> Boolean,
+    ) = accountSession.publishCreatedIdentity(summary.label) {
+        if (!mayPublish()) throw CancellationException("Creating runtime was replaced")
+        if (summary.label != activeAccountRef) {
+            clearInMemoryMediaCaches()
+            clearCrossAccountCaches()
         }
+        accountListLifetime.advance {
+            accounts = accountSummariesWithCreatedIdentity(accounts, summary)
+        }
+        activeAccountRef = summary.label
+        preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
+        localNotificationSettings = null
+        reloadMediaAutoDownloadMatrix()
+    }
 
     /** Runs post-create enrichment without delaying the accepted identity or actionable route. */
     private fun launchIdentityPostCreateWarmup(summary: AccountSummaryFfi) = profileSignUp.launchIdentityPostCreateWarmup(summary)
@@ -5690,12 +5789,21 @@ class WhiteNoiseAppState private constructor(
         val trimmed = identity.trim()
         if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val setup = beginIdentitySetup(trimmed)
+            // Read without requiring a runtime, so an injected login seam reaches its engine calls unchanged.
+            val originRuntime = marmotRuntime?.marmot
+            val originEpoch = runtimeGeneration
+            val originSelection = accountSession.handoff.capture()
+            val ownsOrigin = {
+                runtimeGeneration == originEpoch &&
+                    marmotRuntime?.marmot === originRuntime &&
+                    accountSession.handoff.isCurrent(originSelection)
+            }
+            val setup = beginIdentitySetup(trimmed, originRuntime, originEpoch, ownsOrigin)
             if (setup != null) {
                 IdentityImportOutcome.SetupStarted
             } else {
-                val summary = engineLogin(trimmed)
-                activateImportedIdentity(summary)
+                val summary = engineLogin(trimmed, ownsOrigin)
+                activateImportedIdentity(summary, originRuntime, originEpoch, originSelection)
                 IdentityImportOutcome.Success
             }
         } catch (error: Throwable) {
@@ -5719,8 +5827,16 @@ class WhiteNoiseAppState private constructor(
         val trimmed = identity.trim()
         if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val summary = engineRecoveringLogin(trimmed)
-            activateImportedIdentity(summary)
+            val originRuntime = marmotRuntime?.marmot
+            val originEpoch = runtimeGeneration
+            val originSelection = accountSession.handoff.capture()
+            val ownsOrigin = {
+                runtimeGeneration == originEpoch &&
+                    marmotRuntime?.marmot === originRuntime &&
+                    accountSession.handoff.isCurrent(originSelection)
+            }
+            val summary = engineRecoveringLogin(trimmed, ownsOrigin)
+            activateImportedIdentity(summary, originRuntime, originEpoch, originSelection)
             IdentityImportOutcome.Success
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
@@ -5729,13 +5845,27 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** The import's captured runtime, failing like any native call when the import started without one. */
+    private fun requireImportRuntime(runtime: MarmotInterface?): MarmotInterface = requireNotNull(runtime) { "Marmot is not initialized" }
+
     /** Only MDK's explicit legacy-account refusal retains the consent-gated old login path. */
-    private suspend fun beginIdentitySetup(nsec: String): OnboardingSnapshotFfi? {
+    private suspend fun beginIdentitySetup(
+        nsec: String,
+        originRuntime: MarmotInterface?,
+        originEpoch: Int,
+        ownsOrigin: () -> Boolean,
+    ): OnboardingSnapshotFfi? {
         identityLoginCalls?.let { calls ->
-            return calls.beginOnboarding(nsec)?.also { accountSetup.open(it) }
+            val snapshot =
+                withAccountLifetime {
+                    if (!ownsOrigin()) throw CancellationException("Import origin was replaced")
+                    calls.beginOnboarding(nsec)
+                }
+            snapshot?.let { accountSetup.open(it, requireImportRuntime(originRuntime), originEpoch, ownsOrigin) }
+            return snapshot
         }
         return try {
-            accountSetup.begin(nsec)
+            accountSetup.begin(nsec, ownsOrigin)
         } catch (_: MarmotKitException.OnboardingActionUnavailable) {
             // An unfinished interactive checkpoint is returned by begin, never routed here.
             // MDK also rejects legacy login for interactive ownership as a second barrier.
@@ -5744,7 +5874,16 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Imports an identity with public NIP-65 defaults and White Noise key-package and inbox routes. */
-    private suspend fun engineLogin(nsec: String): AccountSummaryFfi {
+    private suspend fun engineLogin(
+        nsec: String,
+        ownsOrigin: () -> Boolean,
+    ): AccountSummaryFfi =
+        withAccountLifetime {
+            if (!ownsOrigin()) throw CancellationException("Import origin was replaced")
+            engineLoginLocked(nsec)
+        }
+
+    private suspend fun engineLoginLocked(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
         if (injected != null) return injected.login(nsec, MarmotClient.accountRelays, relays)
@@ -5755,7 +5894,16 @@ class WhiteNoiseAppState private constructor(
      * Recovers an incomplete setup only after the consent prompt confirms the invitation-key risk.
      * The acknowledgement is constant; recovery keeps the same NIP-65 and inbox defaults as login.
      */
-    private suspend fun engineRecoveringLogin(nsec: String): AccountSummaryFfi {
+    private suspend fun engineRecoveringLogin(
+        nsec: String,
+        ownsOrigin: () -> Boolean,
+    ): AccountSummaryFfi =
+        withAccountLifetime {
+            if (!ownsOrigin()) throw CancellationException("Import origin was replaced")
+            engineRecoveringLoginLocked(nsec)
+        }
+
+    private suspend fun engineRecoveringLoginLocked(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
         if (injected != null) {
@@ -5777,11 +5925,27 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Pending setup keeps its route; only a completed activation receipt can announce an imported identity. */
-    private suspend fun activateImportedIdentity(summary: AccountSummaryFfi) {
-        marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
+    /**
+     * Pending setup keeps its route; only a completed activation receipt can announce an imported identity.
+     * An import that started without a runtime fails its ownership check like any native call.
+     */
+    private suspend fun activateImportedIdentity(
+        summary: AccountSummaryFfi,
+        expectedRuntime: MarmotInterface?,
+        expectedEpoch: Int,
+        expectedSelection: Long? = null,
+    ) {
+        val ownsRuntime = { runtimeGeneration == expectedEpoch && marmot() === expectedRuntime }
+        withAccountLifetime {
+            if (!ownsRuntime()) throw CancellationException("Import runtime was replaced")
+            marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
+        }
         refreshAccounts()
-        val receipt = activateAccountSession(AccountSessionActivationRequest(summary.label))
+        if (expectedSelection != null && !accountSession.handoff.isCurrent(expectedSelection)) {
+            throw CancellationException("Import selection was replaced")
+        }
+        val receipt =
+            activateAccountSession(AccountSessionActivationRequest(summary.label, shouldActivate = ownsRuntime))
         if (receipt != null) {
             accountSession.finishImportedIdentity(
                 receipt = receipt,
@@ -5815,51 +5979,53 @@ class WhiteNoiseAppState private constructor(
      */
     suspend fun loginWithAmber() {
         try {
+            val runtime = marmot()
+            val epoch = runtimeGeneration
+            val selection = accountSession.handoff.capture()
             amberSignInStage = 1
             val reportedPubkey = withContext(Dispatchers.IO) { amberPublicKeyRequest() }
+
             // Normalize npub/hex to the canonical hex the account is keyed by, so
             // the login-time signer and the startup re-registration signer share
             // the same current_user.
+            fun requireRuntime() {
+                if (
+                    runtimeGeneration != epoch ||
+                    marmot() !== runtime ||
+                    !accountSession.handoff.isCurrent(selection)
+                ) {
+                    throw CancellationException("Amber owner was replaced")
+                }
+            }
             val pubkeyHex =
-                marmotIo { accountIdHex(reportedPubkey) }
+                withAccountLifetime {
+                    requireRuntime()
+                    withContext(marmotIoDispatcher) { runtime.accountIdHex(reportedPubkey) }
+                }
                     ?: throw MarmotKitException.Runtime("signer returned an invalid public key")
             amberSignInStage = 2
             val snapshot =
                 try {
-                    marmotIo {
-                        beginExternalSignerOnboarding(pubkeyHex, amberSigner.buildSigner(pubkeyHex), setupOptions())
+                    withAccountLifetime {
+                        requireRuntime()
+                        withContext(marmotIoDispatcher) {
+                            runtime.beginExternalSignerOnboarding(
+                                pubkeyHex,
+                                amberSigner.buildSigner(pubkeyHex),
+                                setupOptions(),
+                            )
+                        }
                     }
                 } catch (_: MarmotKitException.OnboardingActionUnavailable) {
                     null
                 }
             if (snapshot != null) {
-                accountSetup.open(snapshot)
+                requireRuntime()
+                accountSetup.open(snapshot, runtime, epoch) { accountSession.handoff.isCurrent(selection) }
                 return
             }
-            val summary =
-                marmotIo {
-                    loginExternalSigner(
-                        pubkeyHex,
-                        amberSigner.buildSigner(pubkeyHex),
-                        MarmotClient.accountRelays,
-                        MarmotClient.bootstrapRelays,
-                        MarmotClient.bootstrapRelays,
-                    )
-                }
-            // Mirror the cold-start restore barrier before exposing the main
-            // shell. loginExternalSigner creates and reconciles the account,
-            // but a fresh account's worker/relay runtime can still be replacing
-            // its setup-time signer as that call returns. Re-registering through
-            // the restore path performs one final reconciliation with a stable
-            // callback, so an immediate createGroup cannot race that transition
-            // and fail until the next process restart (issue #1551).
-            marmotIo {
-                registerExternalSigner(
-                    summary.label,
-                    amberSigner.buildSigner(pubkeyHex),
-                )
-            }
-            activateImportedIdentity(summary)
+            val summary = loginAmberFallback(runtime, pubkeyHex, ::requireRuntime)
+            activateImportedIdentity(summary, runtime, epoch, selection)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             if (error is MarmotKitException.ExternalSignerRejected) {
@@ -5876,6 +6042,40 @@ class WhiteNoiseAppState private constructor(
         } finally {
             amberSignInStage = null
         }
+    }
+
+    private suspend fun loginAmberFallback(
+        runtime: MarmotInterface,
+        pubkeyHex: String,
+        requireRuntime: () -> Unit,
+    ): AccountSummaryFfi {
+        val summary =
+            withAccountLifetime {
+                requireRuntime()
+                withContext(marmotIoDispatcher) {
+                    runtime.loginExternalSigner(
+                        pubkeyHex,
+                        amberSigner.buildSigner(pubkeyHex),
+                        MarmotClient.accountRelays,
+                        MarmotClient.bootstrapRelays,
+                        MarmotClient.bootstrapRelays,
+                    )
+                }
+            }
+        // Mirror the cold-start restore barrier before exposing the main
+        // shell. loginExternalSigner creates and reconciles the account,
+        // but a fresh account's worker/relay runtime can still be replacing
+        // its setup-time signer as that call returns. Re-registering through
+        // the restore path performs one final reconciliation with a stable
+        // callback, so an immediate createGroup cannot race that transition
+        // and fail until the next process restart (issue #1551).
+        withAccountLifetime {
+            requireRuntime()
+            withContext(marmotIoDispatcher) {
+                runtime.registerExternalSigner(summary.label, amberSigner.buildSigner(pubkeyHex))
+            }
+        }
+        return summary
     }
 
     /**
@@ -6399,9 +6599,28 @@ class WhiteNoiseAppState private constructor(
         }
 
     /** Diverts pending account selection before legacy sign-in or chat projection starts. */
-    private suspend fun routePendingAccountSetup(label: String): Boolean {
-        val required = marmotRuntime != null && accountSetup.routeIfPending(label)
-        if (required && activeAccountRef == label) activeAccountRef = null
+    private suspend fun routePendingAccountSetup(
+        label: String,
+        selectionGeneration: Long,
+    ): Boolean {
+        val runtime = marmotRuntime
+        val epoch = runtimeGeneration
+        val required =
+            runtime != null &&
+                accountSetup.routeIfPending(label) {
+                    accountSession.handoff.isCurrent(selectionGeneration)
+                }
+        if (required) {
+            withAccountLifetime {
+                val runtimeCurrent = marmotRuntime === runtime && runtimeGeneration == epoch
+                if (runtimeCurrent &&
+                    activeAccountRef == label &&
+                    accountSwitchHandoff.isCurrent(selectionGeneration)
+                ) {
+                    activeAccountRef = null
+                }
+            }
+        }
         return required
     }
 
@@ -6412,12 +6631,17 @@ class WhiteNoiseAppState private constructor(
         shouldActivate: () -> Boolean = { true },
         preloadPolicy: AccountSwitchPreloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
         awaitPostActivationWork: suspend () -> Unit = {},
+        expectedSelection: Long? = null,
         onActivated: () -> Unit = {},
     ): Boolean =
         activateAccountSession(
             AccountSessionActivationRequest(label, deferUnreadRefresh, shouldActivate, preloadPolicy),
             awaitPostActivationWork,
-            onActivated,
+            {
+                phase = AppPhase.Ready
+                onActivated()
+            },
+            expectedSelection,
         ) != null
 
     /** Retains host telemetry and pending setup routing without recapturing the accepted activation's lifetime. */
@@ -6426,8 +6650,8 @@ class WhiteNoiseAppState private constructor(
         request: AccountSessionActivationRequest,
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
+        expectedSelection: Long? = null,
     ): AccountSessionActivationReceipt? {
-        if (routePendingAccountSetup(request.label)) return null
         val accountSwitchAttempt =
             if (request.label != activeAccountRef) {
                 beginHostPerformance(HostPerformanceOperationFfi.ACCOUNT_SWITCH)
@@ -6436,7 +6660,14 @@ class WhiteNoiseAppState private constructor(
             }
         var accountSwitchOutcome = HostPerformanceOutcomeFfi.UNAVAILABLE
         try {
-            val receipt = accountSession.activate(request, awaitPostActivationWork, onActivated)
+            val receipt =
+                accountSession.activate(
+                    request,
+                    awaitPostActivationWork,
+                    onActivated,
+                    beforePrepare = { generation -> !routePendingAccountSetup(request.label, generation) },
+                    expectedGeneration = expectedSelection,
+                )
             if (receipt != null) accountSwitchOutcome = HostPerformanceOutcomeFfi.SUCCESS
             return receipt
         } catch (timeout: TimeoutCancellationException) {
@@ -6457,7 +6688,7 @@ class WhiteNoiseAppState private constructor(
     private inner class AccountSessionActivation : AppAccountSessionActivation {
         override val activeAccount: String? get() = activeAccountRef
 
-        /** Restores native sign-in and reads the selected policy's local projection before publication. */
+        /** Restores native sign-in and captures the runtime it ran against, leaving local reads to the projection. */
         override suspend fun prepare(
             request: AccountSessionActivationRequest,
             generation: Long,
@@ -6466,16 +6697,30 @@ class WhiteNoiseAppState private constructor(
             updatePendingAccountSwitchTrace(request.label, switchingAccounts)
             val target = accounts.firstOrNull { it.label == request.label }
             if (!restoreSignedOutAccountForActivation(target, request.label, request.deferUnreadRefresh)) return null
+            return PreparedAccountSessionActivation(
+                runtimeGeneration,
+                StartupSelfProfilePresentation(revision = null, seeds = emptyList()),
+                snapshot = null,
+            )
+        }
+
+        /** Reads the selected policy's local profile and rows outside the lifetime gate, before publication. */
+        override suspend fun loadLocalProjection(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+            switchingAccounts: Boolean,
+            restored: PreparedAccountSessionActivation,
+        ): PreparedAccountSessionActivation {
+            val target = accounts.firstOrNull { it.label == request.label }
             val activationStillWanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
             val plan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, request.preloadPolicy)
-            val activationRuntimeGeneration = runtimeGeneration
             val profile =
                 preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, activationStillWanted) {
                     loadAccountSwitchProfileSeed(it)
                 }
             val snapshot =
                 if (plan.loadLocalRows) loadAccountSwitchLocalSnapshot(request.label, generation, plan) else null
-            return PreparedAccountSessionActivation(activationRuntimeGeneration, profile, snapshot)
+            return restored.copy(profilePresentation = profile, snapshot = snapshot)
         }
 
         /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
@@ -6894,104 +7139,282 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
-     * the established local fail-open behavior; a structured unfinished-local
-     * outcome retains the active session. Credential revocation failure returns an incomplete result before
+     * local fallback behavior only after durable push cleanup admission; a structured unfinished-local
+     * outcome or unavailable cleanup authority retains the active session. Credential revocation failure
+     * returns an incomplete result before
      * native admission; errors after admission retain their established propagation.
      * Final deactivation retires selections through the account session; native per-account cleanup remains
      * here, while the shared process runtime/listener is retained for other identities and later sign-in.
      * Returns null when no account is active.
      */
-    @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
+    private data class OwnedSignOutCompletion(
+        val completion: SignOutCompletion,
+        val successor: String? = null,
+        val selectionGeneration: Long = 0,
+        val nativeCancellation: CancellationException? = null,
+    )
+
+    private data class NativeSignOutAttempt(
+        val result: Result<dev.ipf.marmotkit.SignOutOutcomeFfi>?,
+        val nativeFalse: Boolean,
+        val cancellation: CancellationException? = null,
+    )
+
+    /** A queued request retains its requested owner; accepted cleanup finishes before cancellation escapes. */
+    @Suppress("ReturnCount")
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
-        val signedOutRef = activeAccountRef ?: return null
-        val draftsSaved = draftWriter.flushAccount(signedOutRef)
+        val requested = activeAccountRef ?: return null
+        val runtime = marmotRuntime
+        val runtimeEpoch = runtimeGeneration
+        val selectionEpoch = accountSwitchHandoff.capture()
+        var completedOwned: OwnedSignOutCompletion? = null
+        var boundaryCancellation: CancellationException? = null
+        val owned =
+            try {
+                withAccountLifetime {
+                    val ownerCurrent =
+                        activeAccountRef == requested && marmotRuntime === runtime && runtimeGeneration == runtimeEpoch
+                    if (!ownerCurrent ||
+                        !accountSwitchHandoff.isCurrent(selectionEpoch)
+                    ) {
+                        return@withAccountLifetime OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
+                    }
+                    revokeAndFinishSignOutLocked(
+                        SignOutRequest(requested, runtime, runtimeEpoch, selectionEpoch, deleteKeyPackages),
+                    ) {
+                        completedOwned = it
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                // Pinned credential cleanup may discard delivery when its IO finally returns to cancelled Main.
+                boundaryCancellation = cancelled
+                completedOwned ?: throw cancelled
+            }
+        val successor =
+            withContext(NonCancellable) {
+                runCatching {
+                    owned.successor?.let { next ->
+                        accountSession.activateAfterSignOutIfCurrent(
+                            owned.selectionGeneration,
+                            AccountSessionActivationRequest(next),
+                            beforePrepare = { generation -> !routePendingAccountSetup(next, generation) },
+                            onActivated = { phase = AppPhase.Ready },
+                            ownerIsCurrent = { marmotRuntime === runtime && runtimeGeneration == runtimeEpoch },
+                        )
+                    }
+                }
+            }
+        rethrowSignOutCancellation(owned.nativeCancellation, boundaryCancellation)
+        successor.getOrThrow()?.let { accountSession.refreshAfterSignOut(it) }
+        return owned.completion
+    }
+
+    private data class SignOutRequest(
+        val requested: String,
+        val runtime: AppMarmotRuntime?,
+        val runtimeEpoch: Int,
+        val selectionEpoch: Long,
+        val deleteKeyPackages: Boolean,
+    )
+
+    private suspend fun revokeAndFinishSignOutLocked(
+        request: SignOutRequest,
+        completed: (OwnedSignOutCompletion) -> Unit,
+    ): OwnedSignOutCompletion {
+        val draftsSaved = draftWriter.flushAccount(request.requested)
         var admitted = false
         return runCatchingCancellable {
-            withRevokedPinnedTarget(signedOutRef) {
+            withRevokedPinnedTarget(request.requested) {
                 admitted = true
-                finishRevokedAccountSignOut(signedOutRef, deleteKeyPackages, draftsSaved)
+                finishRevokedAccountSignOut(
+                    request.requested,
+                    request.runtime,
+                    request.runtimeEpoch,
+                    request.selectionEpoch,
+                    request.deleteKeyPackages,
+                    draftsSaved,
+                ).also(completed)
             }
         }.getOrElse { failure ->
             if (admitted) throw failure
             appStateDebug(failure) { "account sign-out credential revocation failed before native work" }
-            SignOutCompletion.AccountCleanupIncomplete
+            OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
         }
     }
 
-    /** Keeps launcher issuance fenced until native completion and Android account ownership agree. */
-    @Suppress("ReturnCount", "LongMethod")
+    private suspend fun rethrowSignOutCancellation(
+        native: CancellationException?,
+        boundary: CancellationException?,
+    ) {
+        val cancellation = native ?: boundary
+        if (cancellation != null) throw cancellation
+        currentCoroutineContext().ensureActive()
+    }
+
+    /** Lifetime is already owned; acquire both push locks cancellably before admitting any cleanup intent. */
+    @Suppress("LongMethod", "ReturnCount")
     private suspend fun finishRevokedAccountSignOut(
-        signedOutRef: String,
+        account: String,
+        runtime: AppMarmotRuntime?,
+        runtimeEpoch: Int,
+        selectionEpoch: Long,
         deleteKeyPackages: Boolean,
         draftsSaved: Boolean,
-    ): SignOutCompletion {
-        // Credential persistence failures never enter the native-error fail-open path.
-        val engineResult = runCatchingCancellable { marmotIo { signOut(signedOutRef, deleteKeyPackages) } }
-        val engineOutcome = engineResult.getOrNull()
-        if (engineOutcome?.localCleanup?.completed == false) {
-            appStateDebug {
-                "signOut kept active account=${signedOutRef.take(8)} because engine cleanup did not complete"
+    ): OwnedSignOutCompletion {
+        notificationDeliveryModeMutex.lock()
+        var pushOwned = false
+        var deliveryOwned = true
+        try {
+            nativePushSyncMutex.lock()
+            pushOwned = true
+            currentCoroutineContext().ensureActive()
+            val ownerCurrent =
+                activeAccountRef == account && marmotRuntime === runtime && runtimeGeneration == runtimeEpoch
+            if (!ownerCurrent ||
+                !accountSwitchHandoff.isCurrent(selectionEpoch)
+            ) {
+                return OwnedSignOutCompletion(SignOutCompletion.AccountCleanupIncomplete)
             }
-            return SignOutCompletion.AccountCleanupIncomplete
-        }
-        accountSession.retireSelectionsForSignOut()
-        engineResult.exceptionOrNull()?.let { failure ->
-            appStateDebug(failure) {
-                "signOut failed account=${signedOutRef.take(8)}: ${failure.readableMessage()}"
+            // After this point the explicit logout owns its cleanup intent, including failed disk acknowledgement.
+            val selectionGeneration = accountSession.retireSelectionsForSignOut()
+            notificationDeliveryModeIntent.advance()
+            nativePushFallback.invalidateAll()
+            return withContext(NonCancellable) {
+                val attempt =
+                    try {
+                        admittedNativeSignOutLocked(account, runtime, deleteKeyPackages)
+                    } finally {
+                        nativePushSyncMutex.unlock()
+                        pushOwned = false
+                        notificationDeliveryModeMutex.unlock()
+                        deliveryOwned = false
+                    }
+                // Shared and account-keyed cleanup finishes while lifetime is still owned, before any successor.
+                finishOwnedSignOutLocked(account, runtime, attempt, selectionGeneration, draftsSaved)
             }
+        } finally {
+            if (pushOwned) nativePushSyncMutex.unlock()
+            if (deliveryOwned) notificationDeliveryModeMutex.unlock()
         }
-        if (engineOutcome != null) {
-            // Publish known native completion before any fallible/suspending cleanup can release the fence.
-            accountListLifetime.advance {
-                accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
-            }
-            // MDK deactivated push; discard stale retries and registration cache.
-            pushTokenStore.clearPendingDisable(signedOutRef)
-            nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
-        } else {
-            // Queue push disable while preserving the local fail-open contract.
-            pushTokenStore.recordPendingDisable(signedOutRef)
-        }
+    }
 
-        // Preserve per-account durable state for later account switching, but
-        // synchronously drop plaintext memory and await the decrypted-disk wipe.
-        composerExpansionStateRetention.removeAccount(signedOutRef)
-        composerDraftExpansionBridge.removeAccount(signedOutRef)
-        pendingMessageEditHandoff.removeAccount(signedOutRef)
-        notificationReplyDraftHandoff.removeAccount(signedOutRef)
-        draftWriter.removeAccount(signedOutRef)
-        conversationDictation.onAccountUnavailable(signedOutRef)
-        stopTtsForRemovedAccount(signedOutRef)
+    /** All three locks are owned. A confirmed transactional false receipt is required before native logout. */
+    private suspend fun admittedNativeSignOutLocked(
+        account: String,
+        runtime: AppMarmotRuntime?,
+        deleteKeyPackages: Boolean,
+    ): NativeSignOutAttempt {
+        val recorded =
+            withContext(pushWakeStorageDispatcher) {
+                runCatching { pushTokenStore.recordPendingDisable(account) }.getOrDefault(false)
+            }
+        if (runtime == null) {
+            return NativeSignOutAttempt(
+                if (recorded) Result.failure(IllegalStateException("Native runtime unavailable")) else null,
+                nativeFalse = false,
+            )
+        }
+        return signOutAfterNativeDisableLocked(account, runtime, deleteKeyPackages)
+    }
+
+    private suspend fun signOutAfterNativeDisableLocked(
+        account: String,
+        runtime: AppMarmotRuntime,
+        deleteKeyPackages: Boolean,
+    ): NativeSignOutAttempt {
+        perAccountSyncedFingerprints.remove(account)
+        localNotificationSettings = null
+        val disabled =
+            runCatching {
+                withContext(marmotIoDispatcher) { runtime.marmot.setNativePushEnabled(account, false) }
+            }
+        val settings = disabled.getOrNull()
+        if (settings?.nativePushEnabled != false) {
+            return NativeSignOutAttempt(null, false, disabled.exceptionOrNull() as? CancellationException)
+        }
+        localNotificationSettings = settings
+        // The native SQLite transaction committed false plus durable registration removals before returning.
+        withContext(pushWakeStorageDispatcher) { runCatching { pushTokenStore.clearPendingDisable(account) } }
+        val result =
+            runCatching {
+                withContext(marmotIoDispatcher) { runtime.marmot.signOut(account, deleteKeyPackages) }
+            }
+        return NativeSignOutAttempt(result, true, result.exceptionOrNull() as? CancellationException)
+    }
+
+    /** Native partial cleanup is not evidence that the native identity remained signed in. */
+    @Suppress("LongMethod", "ReturnCount")
+    private suspend fun finishOwnedSignOutLocked(
+        account: String,
+        runtime: AppMarmotRuntime?,
+        attempt: NativeSignOutAttempt,
+        selectionGeneration: Long,
+        draftsSaved: Boolean,
+    ): OwnedSignOutCompletion {
+        val result =
+            attempt.result ?: return OwnedSignOutCompletion(
+                SignOutCompletion.AccountCleanupIncomplete,
+                nativeCancellation = attempt.cancellation,
+            )
+        val native = result.getOrNull()
+        var partial = native?.localCleanup?.completed == false
+        var knownSignedOut = native?.localCleanup?.completed == true
+        if (partial || attempt.cancellation != null) {
+            val observed =
+                runCatching {
+                    withContext(marmotIoDispatcher) { checkNotNull(runtime).marmot.listAccounts() }
+                }.getOrNull()?.firstOrNull { it.label == account }
+            if (observed?.signedOut != true) {
+                return OwnedSignOutCompletion(
+                    SignOutCompletion.AccountCleanupIncomplete,
+                    nativeCancellation = attempt.cancellation,
+                )
+            }
+            partial = true
+            knownSignedOut = true
+        }
+        if (knownSignedOut) {
+            accountListLifetime.advance {
+                accounts = reconcileCachedAccountsAfterSignOut(accounts, account)
+            }
+        }
+        clearSignedOutAccountMemory(account)
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
         clearRevokedConversationShortcutsForAccount(
-            accountRef = signedOutRef,
-            includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
+            accountRef = account,
+            includeUnscopedLegacy = accounts.none { it.label != account && it.isSignedInSigningAccount() },
         )
-        clearContactPrivateDetailsForAccount(signedOutRef)
-        val refreshedAccounts = accountsAfterSignOut(signedOutRef, engineOutcome != null)
-        val outcome = signOutOutcome(refreshedAccounts, signedOutRef)
-        val next = outcome.nextActiveRef
-        if (next != null) {
-            setActiveAccount(next)
-        } else {
-            accountSession.publishSignedOutIdentity {
-                activeAccountRef = null
-                preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
-                reloadMediaAutoDownloadMatrix()
-            }
-        }
-        // Signing out the last active account must leave a usable state, not a
-        // MainShell with no active account. See issue #11.
-        phase = outcome.phase
+        clearContactPrivateDetailsForAccount(account)
+        val refreshed = accountsAfterSignOut(account, knownSignedOut)
+        val next = signOutOutcome(refreshed, account).nextActiveRef
+        // Do not advance handoff here: an explicit selection queued after admission must remain newer.
+        activeAccountRef = null
+        preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
+        reloadMediaAutoDownloadMatrix()
+        phase = AppPhase.Onboarding
         wipeDecryptedMediaFromDisk()
-        // Drop the cached FCM token only when no accounts remain on the
-        // device — other identities still need it on multi-account switch.
-        if (next == null) pushTokenStore.clear()
-        refreshLocalNotificationSettings()
+        if (next == null && refreshed.isEmpty()) runCatching { pushTokenStore.clear() }
+        localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
-        return signOutCompletion(engineOutcome)
+        return OwnedSignOutCompletion(
+            if (partial) SignOutCompletion.AccountCleanupIncomplete else signOutCompletion(native),
+            next,
+            selectionGeneration,
+            attempt.cancellation,
+        )
+    }
+
+    /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
+    private fun clearSignedOutAccountMemory(account: String) {
+        composerExpansionStateRetention.removeAccount(account)
+        composerDraftExpansionBridge.removeAccount(account)
+        pendingMessageEditHandoff.removeAccount(account)
+        notificationReplyDraftHandoff.removeAccount(account)
+        draftWriter.removeAccount(account)
+        conversationDictation.onAccountUnavailable(account)
+        stopTtsForRemovedAccount(account)
     }
 
     suspend fun exportActiveAccountNsec(): String? {
@@ -7014,7 +7437,20 @@ class WhiteNoiseAppState private constructor(
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
-        val wipedRef = activeAccountRef ?: return null
+        val requested = activeAccountRef ?: return null
+        val runtime = marmotRuntime
+        val epoch = runtimeGeneration
+        // A cancelled setup child may need lifetime for final native preview cleanup before it can join.
+        accountSetup.close()
+        return withAccountLifetime {
+            if (activeAccountRef != requested || marmotRuntime !== runtime || runtimeGeneration != epoch) {
+                return@withAccountLifetime null
+            }
+            signOutAndWipeActiveAccountLocked(requested)
+        }
+    }
+
+    private suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): WipeOutcomeFfi? {
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {
@@ -7043,11 +7479,11 @@ class WhiteNoiseAppState private constructor(
                             if (outcome.localCleanup.completed) {
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
-                                pushTokenStore.clearPendingDisable(wipedRef)
+                                runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // The wipe invalidates server-side registration state for this account.
                                 // withSerializedNativePushWipe already holds nativePushSyncMutex here.
                                 perAccountSyncedFingerprints.remove(wipedRef)
-                                pushTokenStore.clear()
+                                runCatching { pushTokenStore.clear() }
                             }
                         }
                 }
@@ -8383,7 +8819,11 @@ class WhiteNoiseAppState private constructor(
             },
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
             catchUpAccounts = {
-                val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                val pendingGeneration =
+                    withContext(pushWakeStorageDispatcher) {
+                        observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+                    } ?: 0L
+                // Unknown push storage cannot prevent ordinary relay catch-up or authorize marker acknowledgement.
                 catchUpAfterObservedPushWake(
                     pendingGeneration = pendingGeneration,
                     trigger = PerformanceTrigger.NETWORK_RECONNECT,
@@ -8398,10 +8838,12 @@ class WhiteNoiseAppState private constructor(
                 )
             },
             onRecoveryAttemptStarted = { networkGeneration ->
-                notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
-                    networkGeneration = networkGeneration,
-                    pushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration(),
-                )
+                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }?.let { generation ->
+                    notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
+                        networkGeneration = networkGeneration,
+                        pushWakeGeneration = generation,
+                    )
+                }
             },
             onRecoveryExhausted = { networkGeneration, _ ->
                 notificationPushWakeRecoveryCircuit.noteRecoveryExhausted(networkGeneration)
@@ -8642,10 +9084,11 @@ class WhiteNoiseAppState private constructor(
 
     /** Starts push-wake catch-up only when network recovery does not own the receiver. */
     private fun schedulePendingPushWakeCatchUpDrain() {
-        if (pushTokenStore.pushWakeCatchUpPending() && !networkNotificationRecoverySuppressed) {
+        val pendingPushWakeGeneration =
+            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() } ?: return
+        if (pendingPushWakeGeneration != 0L && !networkNotificationRecoverySuppressed) {
             notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
         }
-        val pendingPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         val networkGeneration = validatedConnectivityRecoveryGenerationMutable.value
         val runtimeUnavailable =
             networkNotificationRecoverySuppressed ||
@@ -8672,7 +9115,9 @@ class WhiteNoiseAppState private constructor(
                     }
                 }.also { drainJob ->
                     drainJob.invokeOnCompletion {
-                        val currentPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                        val currentPushWakeGeneration =
+                            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+                                ?: return@invokeOnCompletion
                         val currentNetworkGeneration = validatedConnectivityRecoveryGenerationMutable.value
                         if (
                             currentPushWakeGeneration != 0L &&
@@ -9216,8 +9661,29 @@ class WhiteNoiseAppState private constructor(
 
     fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
 
+    /** Reads retained push recovery state off Main, including before an active account exists. */
+    suspend fun refreshPushStorageRecovery() {
+        pushStorageRecovery = withContext(pushWakeStorageDispatcher) { pushTokenStore.recoveryState() }
+    }
+
+    /** Retries original sources and normal cleanup; unknown cleanup provenance remains explicitly held. */
+    suspend fun retryPushStorageRecovery() {
+        if (pushStorageRecoveryBusy) return
+        pushStorageRecoveryBusy = true
+        try {
+            withContext(pushWakeStorageDispatcher) { pushTokenStore.recoveryState(retry = true) }
+            notificationDeliveryModeMutex.withLock {
+                if (!notificationDeliveryModeBusy) syncNativePushRegistrationIfEnabled()
+            }
+            refreshPushStorageRecovery()
+        } finally {
+            pushStorageRecoveryBusy = false
+        }
+    }
+
     /** Publishes native settings only for the same account selection and runtime that requested them. */
     suspend fun refreshLocalNotificationSettings() {
+        refreshPushStorageRecovery()
         val account = activeAccountRef
         val activationGeneration = accountSwitchHandoff.capture()
         val requestRuntimeGeneration = runtimeGeneration
@@ -9535,7 +10001,7 @@ class WhiteNoiseAppState private constructor(
                 val owner = captureNotificationDeliveryModeOwner(intentGeneration) ?: return@withLock false
                 if (enableRendering && !ensureNotificationRenderingEnabled(owner)) return@withLock false
                 when (mode) {
-                    NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner)
+                    NotificationDeliveryMode.Fcm -> selectFcmDelivery(owner, explicit = true)
                     NotificationDeliveryMode.Local -> selectPersistentDelivery(owner)
                 }
             }
@@ -9567,14 +10033,19 @@ class WhiteNoiseAppState private constructor(
 
     /** Registers every notification-enabled account before the device-wide persistent path is stopped. */
     @Suppress("ReturnCount", "TooGenericExceptionCaught")
-    private suspend fun selectFcmDelivery(owner: NotificationDeliveryModeOwner): Boolean {
+    private suspend fun selectFcmDelivery(
+        owner: NotificationDeliveryModeOwner,
+        explicit: Boolean = false,
+    ): Boolean {
         val config = pushServerConfigProvider() ?: return false
         if (!nativePushCapability(config).isAvailable) return false
+        if (explicit && !clearExplicitPendingDisable(owner)) return false
         val previousPersistent = backgroundConnectionEnabled
         val previous = Collections.synchronizedMap(linkedMapOf<String, NotificationSettingsFfi>())
         val persistentStopAttempted = AtomicBoolean(false)
         return try {
-            val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
+            if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
+            val token = fetchFcmTokenOrNull() ?: return false
             val registered = enableNativeDeliveryForAccounts(owner, config, token, previous)
             if (!registered) {
                 rollbackNativePushMode(owner, previous)
@@ -9617,6 +10088,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    private suspend fun clearExplicitPendingDisable(owner: NotificationDeliveryModeOwner): Boolean {
+        val cleared =
+            nativePushSyncMutex.withLock {
+                withContext(pushWakeStorageDispatcher) { pushTokenStore.clearPendingDisable(owner.activeAccountRef) }
+            }
+        return cleared && ownsNotificationDeliveryMode(owner)
+    }
+
     /** Registers at most three accounts together while the native sync lock fences other mutations. */
     private suspend fun enableNativeDeliveryForAccounts(
         owner: NotificationDeliveryModeOwner,
@@ -9653,6 +10132,7 @@ class WhiteNoiseAppState private constructor(
         if (!ownsNotificationDeliveryMode(owner)) return false
         previous[account] = settings
         val desiredNative = settings.localNotificationsEnabled
+        if (desiredNative && account in pushTokenStore.pendingDisables()) return false
         val updated =
             if (settings.nativePushEnabled == desiredNative) {
                 settings
@@ -9888,7 +10368,9 @@ class WhiteNoiseAppState private constructor(
             if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
             notificationDeliveryModeMutex.withLock {
                 val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
-                if (latest && pushTokenStore.nativePushRegistrationSyncPending()) syncNativePushRegistrationIfEnabled()
+                val pending =
+                    latest && runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
+                if (pending) syncNativePushRegistrationIfEnabled()
             }
         }
 
@@ -9941,6 +10423,7 @@ class WhiteNoiseAppState private constructor(
         if (perAccountSyncedFingerprints[account] == fingerprint) return ownsNotificationDeliveryMode(owner)
         val outcome =
             withContext(Dispatchers.IO) {
+                if (!pushTokenStore.registrationAllowed()) throw PushTokenStorageException()
                 owner.runtime.marmot.upsertPushRegistration(
                     accountRef = account,
                     platform = PushPlatformFfi.FCM,
@@ -9991,6 +10474,7 @@ class WhiteNoiseAppState private constructor(
             if (!ownsNotificationDeliveryMode(owner)) return@withLock
             previous.forEach { (account, settings) ->
                 if (!ownsNotificationDeliveryMode(owner)) return@withLock
+                if (settings.nativePushEnabled && account in pushTokenStore.pendingDisables()) return@forEach
                 val restored =
                     runCatchingCancellable {
                         withContext(Dispatchers.IO) {
@@ -10141,13 +10625,42 @@ class WhiteNoiseAppState private constructor(
      * lifecycle.
      */
     fun onPushTokenRotated(token: String) {
-        pushTokenStore.setToken(token)
-        notificationScope.launch {
-            withContext(pushWakeStorageDispatcher) {
-                pushTokenStore.recordPendingNativePushRegistrationSync()
+        if (token.isBlank()) return
+        val rotation = pushTokenRotationSequence.incrementAndGet()
+        val runtime = marmotRuntime
+        val generation = runtimeGeneration
+        val account = activeAccountRef
+        val accountSwitch = accountSwitchHandoff.capture()
+        val ownerIsCurrent = {
+            pushTokenRotationSequence.get() == rotation &&
+                marmotRuntime === runtime &&
+                runtimeGeneration == generation &&
+                activeAccountRef == account &&
+                accountSwitchHandoff.isCurrent(accountSwitch) &&
+                !signOutInProgress &&
+                !wipeInProgress
+        }
+        val retained =
+            try {
+                pushTokenStore.setTokenIfCurrent(token) { pushTokenRotationSequence.get() == rotation }
+            } catch (_: PushTokenStorageException) {
+                android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
+                false
             }
+        if (!retained) return
+        notificationScope.launch {
+            val recorded =
+                withContext(pushWakeStorageDispatcher) {
+                    observePushState {
+                        pushTokenStore.recordPendingNativePushRegistrationSync()
+                        true
+                    }
+                }
+            if (recorded != true) return@launch
             notificationDeliveryModeMutex.withLock {
-                if (!notificationDeliveryModeBusy) syncNativePushRegistrationIfEnabled()
+                if (!notificationDeliveryModeBusy) {
+                    if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
+                }
             }
         }
     }
@@ -10161,7 +10674,21 @@ class WhiteNoiseAppState private constructor(
      * something changes. Returns true only when every account that currently
      * requires native push is registered (or does not require registration).
      */
-    suspend fun syncNativePushRegistrationIfEnabled(): Boolean = nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
+    suspend fun syncNativePushRegistrationIfEnabled(): Boolean = syncNativePushRegistration()
+
+    /** A callback token is ephemeral authority for this rotation only, never a persisted-cache fallback. */
+    private suspend fun syncNativePushRegistration(
+        freshCallbackToken: String? = null,
+        callbackOwnerIsCurrent: () -> Boolean = { true },
+    ): Boolean =
+        try {
+            nativePushSyncMutex.withLock {
+                syncNativePushRegistrationIfEnabledLocked(freshCallbackToken, callbackOwnerIsCurrent)
+            }
+        } catch (_: PushTokenStorageException) {
+            android.util.Log.w("PushTokenStorage", "registration_deferred")
+            false
+        }
 
     /** Retains required sign-out cleanup while permission loss pauses registration and fallback mutation. */
     private suspend fun pauseNotificationDeliveryReconciliation(): Boolean {
@@ -10178,7 +10705,13 @@ class WhiteNoiseAppState private constructor(
 
     /** Replays pending cleanup before registration and gates token acquisition on capability. */
     @Suppress("ReturnCount")
-    private suspend fun syncNativePushRegistrationIfEnabledLocked(): Boolean {
+    private suspend fun syncNativePushRegistrationIfEnabledLocked(
+        freshCallbackToken: String? = null,
+        callbackOwnerIsCurrent: () -> Boolean = { true },
+    ): Boolean {
+        val rotation = pushTokenRotationSequence.get()
+        val operationIsCurrent = { pushTokenRotationSequence.get() == rotation && callbackOwnerIsCurrent() }
+
         // Drain before resolving the push-server config so a clear that
         // failed earlier still retries even if the config is later blanked
         // or GMS is uninstalled — otherwise a stale server-side registration
@@ -10207,22 +10740,54 @@ class WhiteNoiseAppState private constructor(
                     .filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
                     .map { it.label }
             if (accountRefs.isEmpty()) {
-                pushTokenStore.clearPendingNativePushRegistrationSync()
-                return true
+                return withContext(pushWakeStorageDispatcher) {
+                    pushTokenStore.completeRegistrationSyncIfCurrent(ownerIsCurrent = operationIsCurrent)
+                }
             }
         }
         val config = pushServerConfigProvider()
         val capability = nativePushCapability(config)
         if (!capability.isAvailable) return reconcileUnavailableNativePushFallback(capability, accountRefs)
         config ?: return false
-        val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
-        for (account in accountRefs) {
-            val synced = syncPushForAccount(account, config, token)
-            if (!synced) return false
-        }
-        pushTokenStore.clearPendingNativePushRegistrationSync()
-        return true
+        if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
+        if (!operationIsCurrent()) return false
+        return syncNativePushRegistrationForAccountsLocked(accountRefs, config, freshCallbackToken, operationIsCurrent)
     }
+
+    /** The caller holds the sync mutex through every account and the atomic pending-marker acknowledgement. */
+    private suspend fun syncNativePushRegistrationForAccountsLocked(
+        accountRefs: List<String>,
+        config: PushServerConfig,
+        freshCallbackToken: String?,
+        operationIsCurrent: () -> Boolean,
+    ): Boolean {
+        val token = tokenForNativePushSync(freshCallbackToken, operationIsCurrent) ?: return false
+        val tokenIsCurrent: suspend () -> Boolean = {
+            operationIsCurrent() &&
+                (
+                    freshCallbackToken == null ||
+                        withContext(pushWakeStorageDispatcher) { pushTokenStore.lastToken() == token }
+                ) &&
+                operationIsCurrent()
+        }
+        return tokenIsCurrent() &&
+            accountRefs.all { account -> syncPushForAccount(account, config, token, tokenIsCurrent) } &&
+            tokenIsCurrent() &&
+            withContext(pushWakeStorageDispatcher) {
+                pushTokenStore.completeRegistrationSyncIfCurrent(token, operationIsCurrent)
+            }
+    }
+
+    /** Only this invocation's fresh callback can replace a failed SDK acquisition. */
+    private suspend fun tokenForNativePushSync(
+        freshCallbackToken: String?,
+        operationIsCurrent: () -> Boolean,
+    ): String? =
+        fetchFcmTokenOrNull(freshCallbackToken, operationIsCurrent)
+            ?: freshCallbackToken?.takeIf {
+                operationIsCurrent() &&
+                    withContext(pushWakeStorageDispatcher) { pushTokenStore.lastToken() == it }
+            }
 
     /** Migrates the active account while reporting unknown or background-owned state as incomplete. */
     private suspend fun reconcileUnavailableNativePushFallback(
@@ -10328,13 +10893,18 @@ class WhiteNoiseAppState private constructor(
 
     // Retry sign-out push-disables that failed; on success the account leaves the pending set.
     private suspend fun drainPendingPushDisables() {
+        val runtime = marmotRuntime ?: return
         for (account in pushTokenStore.pendingDisables()) {
-            val disabled =
-                runCatchingCancellable { marmotIo { setNativePushEnabled(account, false) } }
-                    .onFailure {
-                        appStateDebug { "pending setNativePushEnabled(false) retry failed: ${it.readableMessage()}" }
-                    }.isSuccess
-            if (disabled) {
+            val settings =
+                runCatchingCancellable {
+                    withContext(marmotIoDispatcher) { runtime.marmot.setNativePushEnabled(account, false) }
+                }.onFailure {
+                    appStateDebug { "pending setNativePushEnabled(false) retry failed: ${it.readableMessage()}" }
+                }.getOrNull()
+            if (marmotRuntime !== runtime) return
+            if (settings?.nativePushEnabled == false) {
+                perAccountSyncedFingerprints.remove(account)
+                if (account == activeAccountRef) localNotificationSettings = settings
                 pushTokenStore.clearPendingDisable(account)
                 appStateDebug { "pending native-push disable drained account=${account.take(8)}" }
             }
@@ -10345,6 +10915,7 @@ class WhiteNoiseAppState private constructor(
         account: String,
         config: PushServerConfig,
         token: String,
+        tokenIsCurrent: suspend () -> Boolean = { true },
     ): Boolean {
         val settings = runCatchingCancellable { marmotIo { notificationSettings(account) } }.getOrNull() ?: return false
         if (account == activeAccountRef) localNotificationSettings = settings
@@ -10362,6 +10933,7 @@ class WhiteNoiseAppState private constructor(
         return runCatching {
             val syncResult =
                 marmotIo {
+                    if (!pushTokenStore.registrationAllowed() || !tokenIsCurrent()) throw PushTokenStorageException()
                     upsertPushRegistration(
                         accountRef = account,
                         platform = PushPlatformFfi.FCM,
@@ -10387,11 +10959,12 @@ class WhiteNoiseAppState private constructor(
                     false.also {
                         appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }
                     }
-                settingsAfter.nativePushEnabled -> {
+                settingsAfter.nativePushEnabled && tokenIsCurrent() -> {
                     perAccountSyncedFingerprints[account] = fingerprint
                     appStateDebug { "push registration synced account=${account.take(8)}" }
                     true
                 }
+                settingsAfter.nativePushEnabled -> false
                 else -> {
                     appStateDebug { "push registration raced disable; rolling back account=${account.take(8)}" }
                     // Shares the pending-clear bookkeeping: a failed rollback
@@ -10418,19 +10991,44 @@ class WhiteNoiseAppState private constructor(
      * the device no longer wants.
      */
     suspend fun setNativePushEnabled(enabled: Boolean): Boolean {
-        val account =
-            activeAccountRef ?: run {
-                present(R.string.toast_no_active_account)
-                return false
+        val requested = activeAccountRef ?: return false
+        val runtime = marmotRuntime
+        val epoch = runtimeGeneration
+        val intent = notificationDeliveryModeIntent.capture()
+        return withAccountLifetime {
+            notificationDeliveryModeMutex.withLock {
+                val ownerCurrent =
+                    activeAccountRef == requested && marmotRuntime === runtime && runtimeGeneration == epoch
+                if (!ownerCurrent ||
+                    !notificationDeliveryModeIntent.isCurrent(intent)
+                ) {
+                    return@withLock false
+                }
+                setNativePushEnabledLocked(requested, enabled)
             }
+        }
+    }
+
+    private suspend fun setNativePushEnabledLocked(
+        account: String,
+        enabled: Boolean,
+    ): Boolean {
         if (enabled && !nativePushCapability().isAvailable) return false
         return runCatching {
-            val settings = marmotIo { setNativePushEnabled(account, enabled) }
+            val settings =
+                nativePushSyncMutex.withLock {
+                    if (
+                        enabled &&
+                        !withContext(pushWakeStorageDispatcher) { pushTokenStore.clearPendingDisable(account) }
+                    ) {
+                        return@runCatching false
+                    }
+                    marmotIo { setNativePushEnabled(account, enabled) }
+                }
             localNotificationSettings = settings
             if (settings.nativePushEnabled != enabled) return@runCatching false
             if (enabled) {
-                // Explicit enable beats a queued sign-out disable for this account.
-                pushTokenStore.clearPendingDisable(account)
+                // Durable supersession was confirmed before the native positive write.
                 val allAccountsReady = syncNativePushRegistrationIfEnabled()
                 // The runtime flag alone is not a usable delivery path. Only
                 // report enablement after upsertPushRegistration succeeded
@@ -10492,35 +11090,52 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Fetches and retains a non-blank FCM token only when every push prerequisite is available. */
-    private suspend fun fetchFcmTokenOrNull(): String? {
+    private suspend fun fetchFcmTokenOrNull(
+        expectedCallbackToken: String? = null,
+        tokenOwnerIsCurrent: () -> Boolean = { true },
+    ): String? {
+        val rotation = pushTokenRotationSequence.get()
         if (!nativePushCapability().isAvailable) return null
         val token =
             runCatchingCancellable {
-                suspendCancellableCoroutine<String?> { continuation ->
-                    // The Firebase Task API has no cancel surface, so the
-                    // completion listener can fire after this coroutine is
-                    // cancelled. Guard the resume on isActive so a stale
-                    // callback doesn't try to push a value onto a closed
-                    // continuation; the task completes in the background and
-                    // its result is dropped. The outer runCatching is a
-                    // belt — `getInstance()` itself can throw
-                    // IllegalStateException if FirebaseApp isn't initialized,
-                    // and we'd rather drop the token fetch than crash.
-                    FirebaseMessaging
-                        .getInstance()
-                        .token
-                        .addOnCompleteListener { task ->
-                            if (continuation.isActive) {
-                                continuation.resume(if (task.isSuccessful) task.result else null)
-                            }
-                        }
-                }
+                val reader: suspend () -> String? = fcmTokenReaderOverride ?: ::readFcmTokenFromSdk
+                reader()
             }.onFailure {
                 appStateDebug { "FCM token fetch failed: ${it.readableMessage()}" }
             }.getOrNull()
-        if (!token.isNullOrBlank()) pushTokenStore.setToken(token)
-        return token?.takeIf { it.isNotBlank() }
+        return if (token.isNullOrBlank()) {
+            null
+        } else {
+            val retained =
+                withContext(pushWakeStorageDispatcher) {
+                    pushTokenStore.setTokenIfCurrent(token, expectedCallbackToken) {
+                        pushTokenRotationSequence.get() == rotation && tokenOwnerIsCurrent()
+                    }
+                }
+            token.takeIf { retained }
+        }
     }
+
+    private suspend fun readFcmTokenFromSdk(): String? =
+        suspendCancellableCoroutine<String?> { continuation ->
+            // The Firebase Task API has no cancel surface, so the
+            // completion listener can fire after this coroutine is
+            // cancelled. Guard the resume on isActive so a stale
+            // callback doesn't try to push a value onto a closed
+            // continuation; the task completes in the background and
+            // its result is dropped. The outer runCatching is a
+            // belt — `getInstance()` itself can throw
+            // IllegalStateException if FirebaseApp isn't initialized,
+            // and we'd rather drop the token fetch than crash.
+            FirebaseMessaging
+                .getInstance()
+                .token
+                .addOnCompleteListener { task ->
+                    if (continuation.isActive) {
+                        continuation.resume(if (task.isSuccessful) task.result else null)
+                    }
+                }
+        }
 
     fun shouldRequestDefaultNotificationPermission(): Boolean =
         activeAccountRef != null &&
@@ -10583,7 +11198,7 @@ class WhiteNoiseAppState private constructor(
         contactNicknameFor(activeAccountRef, accountIdHex)?.let { return it }
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
-        return shortNpub(accountIdHex)
+        return cachedShortNpubOrUnknown(accountIdHex)
     }
 
     fun contactNickname(accountIdHex: String): String? = contactNicknameFor(activeAccountRef, accountIdHex)
@@ -10658,7 +11273,7 @@ class WhiteNoiseAppState private constructor(
 
     fun chatMemberTitleCached(accountIdHex: String): String {
         val cachedName = chatMemberNameCached(accountIdHex)
-        return cachedName ?: shortNpub(accountIdHex)
+        return cachedName ?: cachedShortNpubOrUnknown(accountIdHex)
     }
 
     internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? =
@@ -10677,7 +11292,7 @@ class WhiteNoiseAppState private constructor(
 
     fun contactDisplayNameCached(accountIdHex: String): String {
         val cachedName = contactDisplayNameCachedOrNull(accountIdHex)
-        return cachedName ?: shortNpub(accountIdHex)
+        return cachedName ?: cachedShortNpubOrUnknown(accountIdHex)
     }
 
     /**
@@ -10694,7 +11309,7 @@ class WhiteNoiseAppState private constructor(
     internal fun contactDisplayNameCached(
         accountRef: String?,
         accountIdHex: String,
-    ): String = contactDisplayNameCachedOrNull(accountRef, accountIdHex) ?: shortNpub(accountIdHex)
+    ): String = contactDisplayNameCachedOrNull(accountRef, accountIdHex) ?: cachedShortNpubOrUnknown(accountIdHex)
 
     private fun profileDisplayName(accountIdHex: String): String? =
         resolvedProfileDisplayName(
@@ -10998,7 +11613,7 @@ class WhiteNoiseAppState private constructor(
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
         // Always materialize the local SQLite record independently of relay freshness.
         // This only schedules off-main binding work; render/timeline callers stay non-blocking.
-        ensureProfileMaterialized(id)
+        ensureProfileMaterialized(id, includeMissingIdentity = true)
         if (!profileRefreshGate.tryStart(id, System.currentTimeMillis())) return
         // Snapshot the cache epoch now, before the job is queued. A switch or
         // sign-out can clear the caches in the gap before this coroutine starts,
@@ -11151,26 +11766,17 @@ class WhiteNoiseAppState private constructor(
             } finally {
                 profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
             }
-        // A total miss is not an authoritative deletion and must not blank a
-        // first-frame value while relay/local refresh is pending (#2094).
-        val localReadInFlight =
-            synchronized(profilePresentationLock) { profileMaterializations.containsKey(accountIdHex) }
-        val rawDisplayName =
-            if (profile == null && localReadInFlight) {
-                null // The shared local materialization owns this read.
-            } else if (profileDisplayNameReader != null) {
-                runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
-            } else {
-                runCatchingCancellable {
-                    marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) }
-                }.getOrNull()
-            }
-        if (profile != null || rawDisplayName != null) {
+        val rawDisplayName = readRefreshedProfileDisplayName(accountIdHex, profile)
+        val canonicalNpub = readNpubPresentation(accountIdHex)
+        val hasProfileData = profile != null || rawDisplayName != null
+        if (hasProfileData || canonicalNpub != null) {
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
             withContext(Dispatchers.Main.immediate) {
                 if (profileCacheLifetime.isCurrent(epoch)) {
+                    publishNpubPresentation(accountIdHex, canonicalNpub)
+                    if (!hasProfileData) return@withContext
                     val current =
                         synchronized(profilePresentationLock) {
                             profilePresentations[accountIdHex] ?: ProfilePresentation.Empty
@@ -11182,6 +11788,26 @@ class WhiteNoiseAppState private constructor(
                     )
                 }
             }
+        }
+    }
+
+    /** A missing relay result leaves the shared local materialization in charge of the name. */
+    private suspend fun readRefreshedProfileDisplayName(
+        accountIdHex: String,
+        profile: UserProfileMetadataFfi?,
+    ): String? {
+        // A total miss is not an authoritative deletion and must not blank a
+        // first-frame value while relay/local refresh is pending (#2094).
+        val localReadInFlight =
+            synchronized(profilePresentationLock) { profileMaterializations.containsKey(accountIdHex) }
+        return if (profile == null && localReadInFlight) {
+            null // The shared local materialization owns this read.
+        } else if (profileDisplayNameReader != null) {
+            runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
+        } else {
+            runCatchingCancellable {
+                marmotIo(MarmotTraceSection.DISPLAY_NAME_READ) { displayName(accountIdHex) }
+            }.getOrNull()
         }
     }
 
@@ -12652,9 +13278,12 @@ class WhiteNoiseAppState private constructor(
      * run after a cache clear (e.g. account switch) so names re-resolve at once
      * instead of waiting on a gated network round-trip.
      */
-    private fun ensureProfileMaterialized(accountIdHex: String) {
+    private fun ensureProfileMaterialized(
+        accountIdHex: String,
+        includeMissingIdentity: Boolean = false,
+    ) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        val reservation = reserveProfileMaterialization(id)
+        val reservation = reserveProfileMaterialization(id, includeMissingIdentity)
         if (reservation?.ownsRead == true) {
             profileScope.launch {
                 completeProfileMaterialization(id, reservation.completion)
@@ -12667,11 +13296,16 @@ class WhiteNoiseAppState private constructor(
      * the blocking first-frame warm use this reservation, so they perform at
      * most one user-profile/display-name read for an uncached id.
      */
-    private fun reserveProfileMaterialization(id: String): ProfileMaterializationReservation? =
+    private fun reserveProfileMaterialization(
+        id: String,
+        includeMissingIdentity: Boolean = false,
+    ): ProfileMaterializationReservation? =
         synchronized(profilePresentationLock) {
+            val needsIdentity =
+                includeMissingIdentity && npubs.get(id) == null && profilePresentations[id]?.displayName.isNullOrBlank()
             profileMaterializations[id]?.let { running ->
                 ProfileMaterializationReservation(running, ownsRead = false)
-            } ?: if (profilePresentations.containsKey(id)) {
+            } ?: if (profilePresentations.containsKey(id) && !needsIdentity) {
                 null
             } else {
                 CompletableDeferred<Unit>().let { completion ->
@@ -12710,12 +13344,43 @@ class WhiteNoiseAppState private constructor(
      */
     private suspend fun materializeProfileLocally(id: String) {
         val epoch = profileCacheLifetime.capture()
-        val seed = loadAccountSwitchProfileSeed(id)
+        // Account-switch seeds can already own the profile while identity encoding is still cold.
+        // Reuse the same flight without rereading or replacing that authoritative presentation.
+        val hasProfile = synchronized(profilePresentationLock) { profilePresentations.containsKey(id) }
+        val seed = if (hasProfile) null else loadAccountSwitchProfileSeed(id)
+        val localName =
+            seed?.displayName ?: synchronized(profilePresentationLock) { profilePresentations[id]?.displayName }
+        val canonicalNpub = if (localName.isNullOrBlank()) readNpubPresentation(id) else null
         withContext(Dispatchers.Main.immediate) {
             if (profileCacheLifetime.isCurrent(epoch)) {
-                applyAccountSwitchProfileSeed(seed)
+                publishNpubPresentation(id, canonicalNpub)
+                seed?.let(::applyAccountSwitchProfileSeed)
             }
         }
+    }
+
+    /** Uses the existing materialization/refresh owners; identity encoding never runs in name composition. */
+    private suspend fun readNpubPresentation(accountIdHex: String): String? =
+        runCatchingCancellable {
+            val cached = npubs.get(accountIdHex)
+            val encoded =
+                cached ?: if (npubPresentationReader != null) {
+                    withContext(marmotIoDispatcher) { npubPresentationReader.invoke(accountIdHex) }
+                } else {
+                    marmotIo { this.npub(accountIdHex) }
+                }
+            npubPresentation(accountIdHex, encoded) { null }.takeIf(String::isNotEmpty)
+        }.getOrNull()
+
+    /** Canonical encoding is presentation-only; publish its revision behind the caller's lifetime fence. */
+    private fun publishNpubPresentation(
+        accountIdHex: String,
+        canonicalNpub: String?,
+    ) {
+        if (canonicalNpub == null || npubs.get(accountIdHex) == canonicalNpub) return
+        npubs.put(accountIdHex, canonicalNpub)
+        profileRevision += 1
+        bumpProfileAccountRevision(accountIdHex)
     }
 
     /** Read one persisted profile without mutating the active account caches. */

@@ -40,6 +40,9 @@ internal interface AccountSetupClient {
     /** Creates an unapproved relay preview without advancing optional setup decisions. */
     suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi
 
+    /** Releases only this exact undisplayed preview; native clients keep its read and cancel in one owned gate. */
+    suspend fun discardOwnedRelayPreview(preview: OnboardingSnapshotFfi) = discardCurrentPreview(preview)
+
     /** Loads existing metadata so profile edits can preserve untouched fields. */
     suspend fun profile(): UserProfileMetadataFfi?
 }
@@ -60,6 +63,9 @@ internal data class SetupRequest(
 internal class MarmotAccountSetupClient(
     private val marmot: MarmotInterface,
     private val account: String,
+    private val withLifetime: suspend (suspend () -> OnboardingSnapshotFfi?) -> OnboardingSnapshotFfi? = { it() },
+    private val withOwnedPreviewCleanup:
+        suspend (suspend () -> OnboardingSnapshotFfi?) -> OnboardingSnapshotFfi? = withLifetime,
     private val reconnectSigner: suspend () -> Unit,
 ) : AccountSetupClient {
     private val defaults = AccountSetupDefaults(marmot, account)
@@ -105,9 +111,11 @@ internal class MarmotAccountSetupClient(
 
     /** Runs native preflight away from the UI dispatcher. */
     override suspend fun run(): OnboardingSnapshotFfi =
-        withContext(Dispatchers.IO) {
-            defaults.advance(marmot.runOnboarding(account))
-        }
+        checkNotNull(
+            withLifetime {
+                withContext(Dispatchers.IO) { defaults.advance(marmot.runOnboarding(account)) }
+            },
+        )
 
     /** Loads metadata on IO before constructing a profile-edit proposal. */
     override suspend fun profile(): UserProfileMetadataFfi? =
@@ -116,14 +124,22 @@ internal class MarmotAccountSetupClient(
         }
 
     /** Executes explicit decisions, then advances optional follows. */
-    override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi? =
-        withContext(Dispatchers.IO) {
-            val result = dispatch(request)
-            val cancelledRelayDraft =
-                request.action == OnboardingActionFfi.CANCEL_REPAIR &&
-                    request.step in setOf(OnboardingStepFfi.RELAYS, OnboardingStepFfi.INBOX_RELAYS)
-            if (result == null || cancelledRelayDraft) result else defaults.advance(result)
+    override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi? {
+        // The signer UI waits outside the native lifetime; its registration adapter rechecks the runtime.
+        if (request.action == OnboardingActionFfi.RECONNECT_SIGNER) {
+            withLifetime { null }
+            reconnectSigner()
         }
+        return withLifetime {
+            withContext(Dispatchers.IO) {
+                val result = dispatch(request)
+                val cancelledRelayDraft =
+                    request.action == OnboardingActionFfi.CANCEL_REPAIR &&
+                        request.step in setOf(OnboardingStepFfi.RELAYS, OnboardingStepFfi.INBOX_RELAYS)
+                if (result == null || cancelledRelayDraft) result else defaults.advance(result)
+            }
+        }
+    }
 
     /** Retains ownership until IO delivery succeeds, cleaning up previews discarded by cancellation. */
     override suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi {
@@ -132,9 +148,13 @@ internal class MarmotAccountSetupClient(
         var failure: Exception? = null
         try {
             val preview =
-                withContext(Dispatchers.IO) {
-                    marmot.proposeOnboardingRelayRepair(account, step).also { acquired = it }
-                }
+                checkNotNull(
+                    withLifetime {
+                        withContext(Dispatchers.IO) {
+                            marmot.proposeOnboardingRelayRepair(account, step).also { acquired = it }
+                        }
+                    },
+                )
             delivered = true
             return preview
         } catch (expectedFailure: Exception) {
@@ -144,6 +164,19 @@ internal class MarmotAccountSetupClient(
             if (!delivered) acquired?.let { discardRelayPreview(it, failure) }
         }
     }
+
+    /** A draining controller may discard its own preview, but never a newer native proposal. */
+    override suspend fun discardOwnedRelayPreview(preview: OnboardingSnapshotFfi): OnboardingSnapshotFfi? =
+        withOwnedPreviewCleanup {
+            withContext(Dispatchers.IO) {
+                val latest = marmot.onboardingSnapshot(account)
+                if (preview.accountIdHex == account && latest != null && preview.isCurrentRelayPreview(latest)) {
+                    marmot.cancelOnboardingRepair(account)
+                } else {
+                    null
+                }
+            }
+        }
 
     /** Keeps full replacement an explicit action separate from the default native minimal preview. */
     private suspend fun proposeRelayRepair(request: SetupRequest): OnboardingSnapshotFfi =
@@ -193,7 +226,6 @@ internal class MarmotAccountSetupClient(
                 OnboardingActionFfi.CONTINUE_ANYWAY ->
                     marmot.acknowledgeSetupSingleDevice(account, revision, recoveryEpoch)
                 OnboardingActionFfi.RECONNECT_SIGNER -> {
-                    reconnectSigner()
                     marmot.retryOnboardingStep(account, step)
                 }
                 OnboardingActionFfi.CANCEL_ONBOARDING -> {

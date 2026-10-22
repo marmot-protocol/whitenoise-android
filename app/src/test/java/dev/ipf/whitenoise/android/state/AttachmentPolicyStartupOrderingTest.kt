@@ -12,7 +12,18 @@ class AttachmentPolicyStartupOrderingTest {
     /** Runtime policy I/O precedes startup without widening the passive notification boundary. */
     @Test
     fun existingAccountsAreContainedBeforeStartAndListenerStillFollowsImmediately() {
-        val bootstrap = source("AppState.kt").readText().functionBody("startBootstrapRuntime")
+        val appState = source("AppState.kt").readText()
+        // The wrapper is an expression body, so read its declaration up to the locked implementation.
+        val wrapper =
+            appState
+                .substringAfter("fun startBootstrapRuntime(")
+                .substringBefore("fun startBootstrapRuntimeLocked(")
+        assertOrdered(wrapper, "withAccountLifetime", "startBootstrapRuntimeLocked()")
+        // Runtime construction lives in the locked opener's expression body, so read through to the next helper.
+        val bootstrap =
+            appState
+                .substringAfter("fun startBootstrapRuntimeLocked(")
+                .substringBefore("fun startMarmotWithNotificationListener(")
         val configure = bootstrap.indexOf("enforceAppOwnedAttachmentAcquisitionForKnownAccounts()")
         val startCall = bootstrap.indexOf("startMarmotWithNotificationListener(runtime)")
         val body = source("AppState.kt").readText().functionBody("startMarmotWithNotificationListener")
@@ -42,16 +53,21 @@ class AttachmentPolicyStartupOrderingTest {
     /** Both identity creation entry points install containment before accepting the new account. */
     @Test
     fun createdIdentitiesAreContainedBeforeActivation() {
-        val direct = source("AppProfileSignUp.kt").readText().functionBody("createIdentityWithoutProfile")
-        assertOrdered(direct, "createIdentityWithBootstrapRelays()", "enforceAppOwnedAttachmentAcquisitionPolicy")
-        assertOrdered(direct, "enforceAppOwnedAttachmentAcquisitionPolicy", "accept = activateCreatedIdentity")
+        val adapter = source("AppProfileSignUp.kt").readText()
+        val create = adapter.functionBody("createOwnedIdentity")
+        assertOrdered(create, "withCurrentAccountLifetime", "createIdentityWithBootstrapRelays()")
+        val qualify = adapter.functionBody("qualifyOwnedIdentity")
+        assertOrdered(qualify, "ownsCreatingRuntime(summary)", "enforceAppOwnedAttachmentAcquisitionPolicy")
+        val direct = adapter.functionBody("createIdentityWithoutProfile")
+        assertOrdered(direct, "createOwnedIdentity(", "qualifyOwnedIdentity(account)")
+        assertOrdered(direct, "qualifyOwnedIdentity(account)", "activateCreatedIdentity(summary)")
 
         val profileSignUp = source("AppProfileSignUp.kt").readText().functionBody("begin")
-        assertTrue(profileSignUp.contains("createIdentityWithBootstrapRelays()"))
+        assertTrue(profileSignUp.contains("createOwnedIdentity("))
         assertTrue(profileSignUp.contains("qualify ="))
         val qualification = profileSignUp.substringAfter("qualify =").substringBefore("accept =")
-        assertOrdered(qualification, "runCatchingCancellable", "enforceAppOwnedAttachmentAcquisitionPolicy")
-        assertOrdered(qualification, "enforceAppOwnedAttachmentAcquisitionPolicy", "presentFailure")
+        assertOrdered(qualification, "runCatchingCancellable", "qualifyOwnedIdentity(account)")
+        assertOrdered(qualification, "qualifyOwnedIdentity(account)", "presentFailure")
         assertOrdered(qualification, "presentFailure", "getOrThrow()")
     }
 
@@ -63,8 +79,10 @@ class AttachmentPolicyStartupOrderingTest {
         assertOrdered(imported, "enforceAppOwnedAttachmentAcquisitionPolicy", "refreshAccounts()")
         assertOrdered(imported, "refreshAccounts()", "activateAccountSession(")
 
+        val amberFallback = appState.functionBody("loginAmberFallback")
+        assertOrdered(amberFallback, "loginExternalSigner(", "registerExternalSigner(")
         val amber = appState.functionBody("loginWithAmber")
-        assertOrdered(amber, "registerExternalSigner(", "activateImportedIdentity(summary)")
+        assertOrdered(amber, "loginAmberFallback(", "activateImportedIdentity(summary, runtime, epoch, selection)")
 
         val refresh = appState.functionBody("refreshAccountSnapshot")
         assertTrue(refresh.contains("listAccountsWithAppAttachmentPolicy()"))

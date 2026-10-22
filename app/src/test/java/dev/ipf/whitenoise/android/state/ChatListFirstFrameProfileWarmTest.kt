@@ -5,10 +5,19 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -81,38 +90,56 @@ class ChatListFirstFrameProfileWarmTest {
     @Test
     fun blockingWarmSharesAnAlreadyRunningLazyMaterialization() =
         runTest {
-            val readStarted = CompletableDeferred<Unit>()
+            // The lazy owner publishes back to Main after off-thread identity encoding.
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val releaseRead = CompletableDeferred<Unit>()
-            var profileReads = 0
-            var displayNameReads = 0
-            val appState =
-                appState(
-                    profileReader = {
-                        profileReads += 1
-                        readStarted.complete(Unit)
-                        releaseRead.await()
-                        peerProfile()
-                    },
-                    profileDisplayNameReader = {
-                        displayNameReads += 1
-                        PEER_NAME
-                    },
-                    profileRefreshRequest = { error("relay unavailable") },
-                )
+            var profileJob: Job? = null
+            try {
+                val readStarted = CompletableDeferred<Unit>()
+                var profileReads = 0
+                var displayNameReads = 0
+                val appState =
+                    appState(
+                        profileReader = {
+                            profileReads += 1
+                            readStarted.complete(Unit)
+                            releaseRead.await()
+                            peerProfile()
+                        },
+                        profileDisplayNameReader = {
+                            displayNameReads += 1
+                            PEER_NAME
+                        },
+                        profileRefreshRequest = { error("relay unavailable") },
+                    )
 
-            appState.requestProfile(PEER_ID)
-            readStarted.await()
-            val warm = async { appState.warmProfilePresentationsBlocking(listOf(PEER_ID)) }
-            runCurrent()
+                val profileScope =
+                    WhiteNoiseAppState::class.java
+                        .getDeclaredField("profileScope")
+                        .apply { isAccessible = true }
+                        .get(appState) as CoroutineScope
+                profileJob = profileScope.coroutineContext[Job]
+                appState.requestProfile(PEER_ID)
+                readStarted.await()
+                val warm = async { appState.warmProfilePresentationsBlocking(listOf(PEER_ID)) }
+                runCurrent()
 
-            assertFalse("the warm must await the shared local read", warm.isCompleted)
-            assertEquals("the lazy and blocking paths must not duplicate userProfile", 1, profileReads)
-            releaseRead.complete(Unit)
-            warm.await()
+                assertFalse("the warm must await the shared local read", warm.isCompleted)
+                assertEquals("the lazy and blocking paths must not duplicate userProfile", 1, profileReads)
+                releaseRead.complete(Unit)
+                warm.await()
 
-            assertEquals(1, profileReads)
-            assertEquals("a persisted profile must not trigger a redundant displayName read", 0, displayNameReads)
-            assertEquals(PEER_NAME, appState.chatMemberTitleCached(PEER_ID))
+                assertEquals(1, profileReads)
+                assertEquals("a persisted profile must not trigger a redundant displayName read", 0, displayNameReads)
+                assertEquals(PEER_NAME, appState.chatMemberTitleCached(PEER_ID))
+            } finally {
+                releaseRead.complete(Unit)
+                try {
+                    withContext(NonCancellable) { profileJob?.cancelAndJoin() }
+                } finally {
+                    Dispatchers.resetMain()
+                }
+            }
         }
 
     private fun appState(

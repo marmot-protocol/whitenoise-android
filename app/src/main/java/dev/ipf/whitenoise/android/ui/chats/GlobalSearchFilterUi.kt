@@ -3,8 +3,12 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilledIconButton
@@ -16,6 +20,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -23,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
@@ -113,9 +119,10 @@ internal fun GlobalSearchFilterMenu(
     onDismiss: () -> Unit,
     onCategory: (GlobalSearchFilterCategory) -> Unit,
     onClearAll: () -> Unit,
+    conversationScope: Boolean = false,
 ) {
     val categories =
-        GlobalSearchFilterCategory.entries.map { category ->
+        globalSearchVisibleFilterCategories(conversationScope).map { category ->
             WhiteNoiseMenuItem(
                 label = stringResource(category.labelRes()),
                 selected = state.isCategoryActive(category),
@@ -124,7 +131,7 @@ internal fun GlobalSearchFilterMenu(
             )
         }
     val clearAll =
-        if (state.hasActiveFilters) {
+        if (state.hasActiveFilters && (!conversationScope || state.hasNonScopeFilters)) {
             listOf(
                 WhiteNoiseMenuItem(
                     label = stringResource(R.string.chat_list_search_clear_all_filters),
@@ -143,7 +150,11 @@ internal fun GlobalSearchFilterMenu(
     )
 }
 
-/** The prototype's active-filter bar: Clear All first, then one removable chip per filter. */
+/** Conversation Clear all preserves chat scope, so only filters it can remove offer that action. */
+private val GlobalSearchState.hasNonScopeFilters: Boolean
+    get() = messageFiltersActive || folderFilters.isNotEmpty() || chatTypeFilters.isNotEmpty()
+
+/** The active-filter bar shares the menu's Clear all eligibility and keeps individual chips removable. */
 @Composable
 internal fun GlobalSearchFilterControlsRow(
     state: GlobalSearchState,
@@ -151,41 +162,92 @@ internal fun GlobalSearchFilterControlsRow(
     onClearAll: () -> Unit,
     modifier: Modifier = Modifier,
     folderNames: Map<String, String> = emptyMap(),
+    conversationScope: GlobalSearchChatFilter? = null,
+    onSearchOtherChats: (() -> Unit)? = null,
 ) {
     val chips = GlobalSearchActiveChips.from(state)
     val clearAllDescription = stringResource(R.string.chat_list_search_clear_all_filters)
-    LazyRow(
-        modifier = modifier.fillMaxWidth().testTag(CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG),
-        contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (chips.count > 0) {
-            item(key = "clear-all") {
-                TextButton(
-                    onClick = onClearAll,
-                    modifier =
-                        Modifier
-                            .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
-                            .semantics { contentDescription = clearAllDescription },
-                ) {
-                    Text(stringResource(R.string.chat_list_search_clear_all_filters))
+    Column(modifier = modifier.fillMaxWidth().testTag("search-scope-controls")) {
+        GlobalSearchScopeControlsHeader(state, conversationScope, onSearchOtherChats)
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().testTag(CHAT_LIST_SEARCH_FILTER_CONTROLS_TAG),
+            contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (state.hasActiveFilters && (conversationScope == null || state.hasNonScopeFilters)) {
+                item(key = "clear-all") {
+                    TextButton(
+                        onClick = onClearAll,
+                        modifier =
+                            Modifier
+                                .testTag(CHAT_LIST_SEARCH_CLEAR_ALL_FILTERS_TAG)
+                                .semantics { contentDescription = clearAllDescription },
+                    ) {
+                        Text(stringResource(R.string.chat_list_search_clear_all_filters))
+                    }
                 }
             }
+            items(chips.items.filterNot { it.chipId == conversationScope?.chipId }, key = { it.chipId }) { chip ->
+                val chipLabel = globalSearchActiveChipLabel(chip, state, folderNames)
+                val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
+                InputChip(
+                    selected = true,
+                    onClick = { onRemoveFilter(chip.chipId) },
+                    label = { Text(chipLabel) },
+                    trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = null) },
+                    modifier =
+                        Modifier
+                            .testTag(globalSearchFilterChipTag(chip.chipId))
+                            .semantics { contentDescription = removeDescription },
+                )
+            }
         }
-        items(chips.items, key = { it.chipId }) { chip ->
-            val chipLabel = globalSearchActiveChipLabel(chip, state, folderNames)
-            val removeDescription = stringResource(R.string.chat_list_search_filter_remove, chipLabel)
-            InputChip(
-                selected = true,
-                onClick = { onRemoveFilter(chip.chipId) },
-                label = { Text(chipLabel) },
-                trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = null) },
-                modifier =
-                    Modifier
-                        .testTag(globalSearchFilterChipTag(chip.chipId))
-                        .semantics { contentDescription = removeDescription },
-            )
+    }
+}
+
+/** Scope label and explicit broadening action keep their responsive layout independent of active chips. */
+@Composable
+private fun GlobalSearchScopeControlsHeader(
+    state: GlobalSearchState,
+    conversationScope: GlobalSearchChatFilter?,
+    onSearchOtherChats: (() -> Unit)?,
+) {
+    val scopeLabel =
+        when {
+            conversationScope != null ->
+                stringResource(R.string.search_scope_this_chat, conversationScope.displayLabel)
+            state.chatFilters.size == 1 ->
+                stringResource(R.string.search_scope_this_chat, state.chatFilters.single().displayLabel)
+            state.chatFilters.isNotEmpty() -> stringResource(R.string.search_scope_selected_chats)
+            else -> stringResource(R.string.search_scope_all_chats)
+        }
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+    ) {
+        val stacked = maxWidth < 360.dp && LocalDensity.current.fontScale >= 1.5f && onSearchOtherChats != null
+        if (stacked) {
+            Column(Modifier.fillMaxWidth()) {
+                Text(text = scopeLabel, modifier = Modifier.testTag("search-scope-label"))
+                TextButton(
+                    onClick = requireNotNull(onSearchOtherChats),
+                    modifier = Modifier.fillMaxWidth().testTag("search-other-chats"),
+                ) {
+                    Text(stringResource(R.string.search_scope_other_chats))
+                }
+            }
+        } else {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(text = scopeLabel, modifier = Modifier.weight(1f).testTag("search-scope-label"))
+                if (onSearchOtherChats != null) {
+                    TextButton(
+                        onClick = onSearchOtherChats,
+                        modifier = Modifier.testTag("search-other-chats"),
+                    ) {
+                        Text(stringResource(R.string.search_scope_other_chats))
+                    }
+                }
+            }
         }
     }
 }

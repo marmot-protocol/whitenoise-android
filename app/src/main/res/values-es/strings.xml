@@ -2332,6 +2332,9 @@
     <string name="chat_departure_confirm">Revisa %1$d chats seleccionados. Se abandonarán los grupos y se eliminarán de este dispositivo; los chats directos se eliminan localmente. Los demás miembros conservan sus copias. Los traspasos de administración se confirmarán antes de eliminar.</string>
     <string name="chat_departure_result">%1$d completados · %2$d sin terminar · %3$d omitidos. Reintentar comprueba la pertenencia y continúa solo el trabajo pendiente.</string>
     <string name="chat_departure_admin_granted">La transferencia de administrador se completó. La salida del grupo sigue pendiente.</string>
+    <string name="notification_push_storage_unavailable">No se pudieron leer los ajustes de notificaciones push guardados. Se han conservado y el registro push está en pausa. Reinténtalo cuando el dispositivo esté desbloqueado.</string>
+    <string name="notification_push_import_pending">No se pudieron recuperar algunos ajustes anteriores de notificaciones push. Se han conservado y el registro push está en pausa. Reinténtalo para comprobarlos de nuevo.</string>
+    <string name="notification_push_cleanup_unknown">No se puede confirmar una limpieza push anterior. El registro push está en pausa. Reintentar comprueba de nuevo el estado guardado, sin borrarlo ni restablecerlo.</string>
     <string name="reaction_details_loading">Cargando reacciones…</string>
     <string name="reaction_details_load_failed">No se pudieron cargar las reacciones.</string>
     <string name="group_create_remove_and_continue">Quitar a esta persona y continuar</string>
@@ -2371,4 +2374,10 @@
     </plurals>
     <string name="group_review_add_member">Añadir miembro</string>
     <string name="group_review_invitation_visibility">Visible para todos los miembros.</string>
+    <string name="search_scope_this_chat">Este chat · %1$s</string>
+    <string name="search_scope_all_chats">Todos los chats</string>
+    <string name="search_scope_other_chats">Buscar en otros chats</string>
+    <string name="search_scope_selected_chats">Chats seleccionados</string>
+    <string name="search_message_content_loading">Buscando en el contenido de los mensajes…</string>
+    <string name="search_message_content_failed">No se pudo buscar en el contenido de los mensajes.</string>
 </resources>

@@ -24,7 +24,7 @@ class ConversationShortcutLifecycleCoverageTest {
 
         assertTrue(
             "sign-out must clear dynamic and long-lived shortcuts for the signed-out account",
-            "accountRef = signedOutRef" in body && "includeUnscopedLegacy = accounts.none" in body,
+            "accountRef = account" in body && "includeUnscopedLegacy = accounts.none" in body,
         )
     }
 
@@ -42,6 +42,35 @@ class ConversationShortcutLifecycleCoverageTest {
         assertTrue(
             "destructive wipe must clear only the wiped account's shortcuts after cleanup completes",
             wipeIndex >= 0 && completedCleanupIndex > wipeIndex && clearIndex > completedCleanupIndex,
+        )
+    }
+
+    /** Causal facade/coordinator tests execute these entrypoints; the registered gate prevents bypassing them. */
+    @Test
+    fun lifetimeAndNativeFalseRemainAtTheActualOwnershipMutationBoundaries() {
+        val source = appStateSource().readText()
+        val bootstrap =
+            appStateSection(
+                "private suspend fun startBootstrapRuntime()",
+                "private suspend fun startBootstrapRuntimeLocked",
+            )
+        assertTrue("bootstrap open/start/failure close must share lifetime", "withAccountLifetime" in bootstrap)
+        val signOut =
+            appStateSection(
+                "private suspend fun admittedNativeSignOutLocked",
+                "private suspend fun finishOwnedSignOutLocked",
+            )
+        val falseCall = signOut.indexOf("setNativePushEnabled(account, false)")
+        val nativeCall = signOut.indexOf("runtime.marmot.signOut(account")
+        assertTrue("native false must precede native signout", falseCall >= 0 && nativeCall > falseCall)
+        val route = appStateSection("private suspend fun routePendingAccountSetup", "suspend fun setActiveAccount")
+        assertTrue(
+            "pending route null publication must retain original selection identity",
+            "accountSwitchHandoff.isCurrent(selectionGeneration)" in route,
+        )
+        assertTrue(
+            "explicit settings must durably supersede cleanup before positive write",
+            "pushTokenStore.clearPendingDisable(account)" in source && "setNativePushEnabledLocked" in source,
         )
     }
 

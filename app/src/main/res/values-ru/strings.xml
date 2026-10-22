@@ -2404,6 +2404,9 @@
     <string name="chat_departure_confirm">Проверьте %1$d выбранных чатов. Вы выйдете из групп и удалите их с этого устройства; личные чаты удаляются локально. Другие участники сохранят свои копии. Перед удалением потребуется подтвердить передачу прав администратора.</string>
     <string name="chat_departure_result">%1$d завершено · %2$d не завершено · %3$d пропущено. Повторная попытка проверяет участие и продолжает только незавершённые действия.</string>
     <string name="chat_departure_admin_granted">Права администратора переданы. Выход из группы ещё не завершён.</string>
+    <string name="notification_push_storage_unavailable">Не удалось прочитать сохранённые настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку после разблокировки устройства.</string>
+    <string name="notification_push_import_pending">Не удалось восстановить некоторые прежние настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку, чтобы проверить их снова.</string>
+    <string name="notification_push_cleanup_unknown">Не удалось подтвердить прежнюю очистку push-уведомлений. Регистрация push-уведомлений приостановлена. Повторная попытка проверит сохранённое состояние, не удаляя и не сбрасывая его.</string>
     <string name="reaction_details_loading">Загрузка реакций…</string>
     <string name="reaction_details_load_failed">Не удалось загрузить реакции.</string>
     <string name="group_create_remove_and_continue">Удалить этого участника и продолжить</string>
@@ -2445,4 +2448,10 @@
     </plurals>
     <string name="group_review_add_member">Добавить участника</string>
     <string name="group_review_invitation_visibility">Видно всем участникам.</string>
+    <string name="search_scope_this_chat">Этот чат · %1$s</string>
+    <string name="search_scope_all_chats">Все чаты</string>
+    <string name="search_scope_other_chats">Искать в других чатах</string>
+    <string name="search_scope_selected_chats">Выбранные чаты</string>
+    <string name="search_message_content_loading">Поиск по содержимому сообщений…</string>
+    <string name="search_message_content_failed">Не удалось выполнить поиск по содержимому сообщений.</string>
 </resources>

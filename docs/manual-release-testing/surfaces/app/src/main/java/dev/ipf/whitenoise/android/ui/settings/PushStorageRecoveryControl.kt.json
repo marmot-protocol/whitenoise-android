@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/PushStorageRecoveryControl.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PushStorageRecoveryControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/PushStorageRecoveryControl.kt",
+        "anchor": "internal fun PushStorageRecoveryControl(",
+        "test_ids": [
+          "SEC-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/PushStorageRecoveryControl.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SEC-017"
+        ]
+      },
+      {
+        "surface": "string:notification_push_storage_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/PushStorageRecoveryControl.kt",
+        "anchor": "R.string.notification_push_storage_unavailable",
+        "test_ids": [
+          "SEC-017"
+        ]
+      },
+      {
+        "surface": "string:notification_push_import_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/PushStorageRecoveryControl.kt",
+        "anchor": "R.string.notification_push_import_pending",
+        "test_ids": [
+          "SEC-017"
+        ]
+      },
+      {
+        "surface": "string:notification_push_cleanup_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/PushStorageRecoveryControl.kt",
+        "anchor": "R.string.notification_push_cleanup_unknown",
+        "test_ids": [
+          "SEC-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

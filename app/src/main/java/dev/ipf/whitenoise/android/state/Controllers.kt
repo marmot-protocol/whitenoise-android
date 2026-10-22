@@ -86,7 +86,12 @@ import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
+import dev.ipf.whitenoise.android.diagnostics.CreationOperation
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
+import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
+import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
+import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.diagnostics.GroupMembershipTimings
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
@@ -95,6 +100,9 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceSendStage
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
+import dev.ipf.whitenoise.android.diagnostics.invitationFailed
+import dev.ipf.whitenoise.android.diagnostics.projectionFinished
+import dev.ipf.whitenoise.android.diagnostics.traceInvitation
 import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -1905,11 +1913,6 @@ private data class RemovedChatRowSnapshot(
     val optimisticState: OptimisticChatListPreviewState?,
 )
 
-internal class OptimisticArchiveIntent(
-    val bindEpoch: Long,
-    val archived: Boolean,
-)
-
 /** Owns the active account's chat-list projection and live subscription lifecycle. */
 class ChatsController private constructor(
     internal val appState: WhiteNoiseAppState,
@@ -2591,7 +2594,19 @@ class ChatsController private constructor(
     // staleness-exempt: ordered activity tie-breaker, not an async publication fence.
     private var nextActivitySequence = 0uL
     private val optimisticChatListPreviewByGroup = mutableMapOf<String, OptimisticChatListPreviewState>()
-    private val optimisticArchiveByGroup = mutableMapOf<String, OptimisticArchiveIntent>()
+    private val archiveActions =
+        ChatListArchiveActions(
+            rowForGroup = { chatRowsByGroup[chatRowKey(it)] },
+            isCurrent = ::isActiveBindEpoch,
+            onChanged = { recompute() },
+            updateGroup = ::applyArchiveMutation,
+            onFailure = { error ->
+                appState.presentFailure(R.string.toast_couldnt_update_chat, "CHAT_ARCHIVE_UPDATE", error)
+            },
+            onSuccess = { archived ->
+                appState.presentTransient(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+            },
+        )
 
     // Whether the chat list is on screen. While a conversation is foregrounded
     // the subscription stays warm (updates keep folding into the maps above),
@@ -2695,15 +2710,14 @@ class ChatsController private constructor(
     private var isCleared = false
 
     internal val folderSource = ChatFolderLiveSource()
-    private val liveSubscriptionLock = Any()
-    internal var chatListWindows: ChatListWindowSet? = null
-    private var activeChatsSubscription: ChatsSubscriptionHandle? = null
-    private var bindJob: Job? = null
+    private val subscriptionOwner = ChatListSubscriptionOwner()
+    private val liveSubscriptionLock get() = subscriptionOwner.lock
+    internal val chatListWindows: ChatListWindowSet? get() = subscriptionOwner.windows
     private val connectionOwner =
         ChatListConnectionOwner(appState) {
             synchronized(liveSubscriptionLock) {
                 chatListWindows != null &&
-                    activeChatsSubscription != null &&
+                    subscriptionOwner.hasChats &&
                     accountRef == boundAccountRef &&
                     accountRef == appState.activeAccountRef
             }
@@ -2744,17 +2758,11 @@ class ChatsController private constructor(
                     this.accountRef = null
                     boundAccountRef = null
                     invalidateConnectionReadiness()
-                    val current = Triple(chatListWindows, activeChatsSubscription, bindJob)
-                    chatListWindows = null
-                    activeChatsSubscription = null
-                    current
+                    subscriptionOwner.take()
                 }
             } ?: return
-        val (chatListSubscription, chatsSubscription, job) = teardown
-        withContext(NonCancellable + Dispatchers.IO) {
-            runCatching { chatListSubscription?.close() }
-            runCatching { chatsSubscription?.close() }
-        }
+        val (attempt, job) = teardown
+        withContext(NonCancellable + Dispatchers.IO) { attempt?.close() }
         if (shouldCancelLiveSubscriptionJob(job, coroutineContext[Job])) {
             job?.cancelAndJoin()
         }
@@ -2767,7 +2775,7 @@ class ChatsController private constructor(
     ) {
         if (isCleared) return
         val currentBindJob = coroutineContext[Job]
-        synchronized(liveSubscriptionLock) { bindJob = currentBindJob }
+        synchronized(liveSubscriptionLock) { subscriptionOwner.bindJob = currentBindJob }
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
@@ -2799,8 +2807,8 @@ class ChatsController private constructor(
 
         if (accountRef == null) {
             synchronized(liveSubscriptionLock) {
-                if (bindJob === currentBindJob) {
-                    bindJob = null
+                if (subscriptionOwner.bindJob === currentBindJob) {
+                    subscriptionOwner.bindJob = null
                 }
             }
             return
@@ -2833,9 +2841,8 @@ class ChatsController private constructor(
                 }
             }
             while (coroutineContext.isActive && isActiveBindEpoch(epoch)) {
-                var chatListSubscription: ChatListWindowSet? = null
+                val subscriptionAttempt = ChatListSubscriptionOwner.Attempt()
                 lastFailureNotReady = false
-                var chatsSubscription: ChatsSubscriptionHandle? = null
                 var receivedLiveUpdate = false
                 val completeChatList = folderSource.complete.value
                 var folderSourceChanged = false
@@ -2853,20 +2860,19 @@ class ChatsController private constructor(
                 try {
                     val chatListStream =
                         liveSubscriptions.openFolderSource(accountRef, completeChatList)
-                    chatListSubscription = chatListStream
+                    subscriptionAttempt.windows = chatListStream
                     if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
                     connectionOwner.noteSubscriptionBoundary(
                         connectionAttempt,
                         PerformancePhase.CONNECTION_CHAT_LIST_OPEN,
                     )
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
-                    chatsSubscription = chatStream
+                    subscriptionAttempt.chats = chatStream
                     if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
                     connectionOwner.noteSubscriptionBoundary(connectionAttempt, PerformancePhase.CONNECTION_CHATS_OPEN)
                     synchronized(liveSubscriptionLock) {
                         if (isActiveBindEpoch(epoch)) {
-                            chatListWindows = chatListStream
-                            activeChatsSubscription = chatStream
+                            subscriptionOwner.install(subscriptionAttempt)
                         }
                     }
                     val initialFrame = chatListStream.frame()
@@ -2946,6 +2952,7 @@ class ChatsController private constructor(
                                                 withContext(Dispatchers.IO) {
                                                     chatStream.next()
                                                 } ?: break
+                                            if (!isActiveBindEpoch(epoch) || !isActive) break
                                             receivedLiveUpdate = true
                                             connectionOwner.noteLiveUpdate(connectionAttempt)
                                             requestGroupProfiles(update)
@@ -3003,21 +3010,9 @@ class ChatsController private constructor(
                                 ),
                         )
                 } finally {
-                    synchronized(liveSubscriptionLock) {
-                        if (chatListWindows === chatListSubscription) {
-                            chatListWindows = null
-                        }
-                        if (activeChatsSubscription === chatsSubscription) {
-                            activeChatsSubscription = null
-                        }
-                    }
+                    subscriptionOwner.detach(subscriptionAttempt)
                     connectionOwner.finishSessionAttempt(connectionAttempt)
-                    // NonCancellable cleanup prevents a cancelled bind, retry, or account switch
-                    // from leaking account-wide chat-list/chats handles (#270).
-                    withContext(NonCancellable + Dispatchers.IO) {
-                        runCatching { chatListSubscription?.close() }
-                        runCatching { chatsSubscription?.close() }
-                    }
+                    withContext(NonCancellable + Dispatchers.IO) { subscriptionAttempt.close() }
                 }
                 if (!coroutineContext.isActive || !isActiveBindEpoch(epoch)) break
                 if (folderSourceChanged || folderSource.complete.value != completeChatList) {
@@ -3069,8 +3064,8 @@ class ChatsController private constructor(
             chatListLoad.unavailable()
             archivedChatListLoad.unavailable()
             synchronized(liveSubscriptionLock) {
-                if (bindJob === currentBindJob) {
-                    bindJob = null
+                if (subscriptionOwner.bindJob === currentBindJob) {
+                    subscriptionOwner.bindJob = null
                 }
             }
             chatsDebug { "unbind account=${accountRef.take(8)} (chat-list + chats subscriptions closed)" }
@@ -3835,14 +3830,14 @@ class ChatsController private constructor(
     /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
         chatRows.map { authoritativeRow ->
-            val row = optimisticArchiveRow(authoritativeRow)
+            val row = archiveActions.projectRow(authoritativeRow)
             chatListItemFromProjection(
                 row = row,
                 selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
                 selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
                 selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
                 actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
-                group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
+                group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
                 presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
@@ -3866,14 +3861,14 @@ class ChatsController private constructor(
         authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
     ): ChatListItem {
-        val row = optimisticArchiveRow(authoritativeRow)
+        val row = archiveActions.projectRow(authoritativeRow)
         return chatListItemFromProjection(
             row = row,
             selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
             selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
             selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
             actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
-            group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
+            group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
             presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
@@ -3896,14 +3891,14 @@ class ChatsController private constructor(
         presented: PresentedChatRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
     ): ChatListItem {
-        val row = optimisticArchiveRow(presented.row)
+        val row = archiveActions.projectRow(presented.row)
         return chatListItemFromProjection(
             row = row,
             selectedPresentation = localGroupNames.reconciledPresentation(presented.row, presented.presentation),
             selectedAvatarAsset = presented.avatarAsset,
             selectedPreview = presented.preview,
             actions = presented.actions,
-            group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
+            group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
             presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
@@ -3924,19 +3919,6 @@ class ChatsController private constructor(
         val sourceGroup = chatListDisplayGroup(row, groupRecordsById[row.groupIdHex] ?: emptyGroupRecord(row))
         return item.copy(group = sourceGroup)
     }
-
-    private fun optimisticArchiveRow(row: ChatListRowFfi): ChatListRowFfi =
-        optimisticArchiveByGroup[chatRowKey(row.groupIdHex)]
-            ?.let { intent -> row.copy(archived = intent.archived) }
-            ?: row
-
-    private fun optimisticArchiveGroup(
-        groupIdHex: String,
-        group: AppGroupRecordFfi?,
-    ): AppGroupRecordFfi? =
-        optimisticArchiveByGroup[chatRowKey(groupIdHex)]
-            ?.let { intent -> group?.copy(archived = intent.archived) }
-            ?: group
 
     fun profileAddableGroups(
         targetAccountIdHex: String,
@@ -4560,50 +4542,32 @@ class ChatsController private constructor(
      * whole selection leaves the current folder in one frame. The authoritative
      * chat/group maps remain untouched until Marmot confirms each mutation.
      */
-    @Suppress("ReturnCount") // Guard returns avoid starting or reporting an empty archive batch.
     suspend fun setArchived(
         groupIds: Collection<String>,
         archived: Boolean,
         notify: Boolean = true,
     ): Int {
         val account = accountRef ?: return 0
-        val epoch = bindEpoch
-        val intents = beginOptimisticArchive(groupIds, archived, epoch)
-        if (intents.isEmpty()) return 0
-
-        var succeeded = 0
-        try {
-            intents.forEach { (groupIdHex, intent) ->
-                val applied =
-                    runCatchingCancellable {
-                        appState.withGroupCommitLock(account, groupIdHex) {
-                            val updated = groupArchivedUpdater(account, groupIdHex, archived)
-                            if (isActiveBindEpoch(epoch)) {
-                                applyLocalGroupUpdate(updated)
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                    }.onFailure { error ->
-                        if (isActiveBindEpoch(epoch)) {
-                            appState.presentFailure(R.string.toast_couldnt_update_chat, "CHAT_ARCHIVE_UPDATE", error)
-                        }
-                    }.getOrDefault(false)
-
-                if (applied) succeeded += 1
-                finishOptimisticArchive(groupIdHex, intent)
-            }
-        } finally {
-            // Cancellation (for example an account/runtime switch) must not
-            // strand presentation overlays for commits that never started.
-            intents.forEach { (groupIdHex, intent) -> finishOptimisticArchive(groupIdHex, intent) }
-        }
-        if (notify && succeeded > 0 && isActiveBindEpoch(epoch)) {
-            appState.presentTransient(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
-        }
-        return succeeded
+        return archiveActions.setArchived(account, bindEpoch, groupIds, archived, notify)
     }
+
+    /** Admits only the current intent under the group lock; native work already started keeps its completion path. */
+    private suspend fun applyArchiveMutation(
+        account: String,
+        groupIdHex: String,
+        archived: Boolean,
+        intent: OptimisticArchiveIntent,
+    ): Boolean =
+        appState.withGroupCommitLock(account, groupIdHex) {
+            if (!archiveActions.ownsIntent(groupIdHex, intent)) return@withGroupCommitLock false
+            val updated = groupArchivedUpdater(account, groupIdHex, archived)
+            if (isActiveBindEpoch(intent.bindEpoch)) {
+                applyLocalGroupUpdate(updated)
+                true
+            } else {
+                false
+            }
+        }
 
     /**
      * Begin a single-row presentation-only archive intent on behalf of a
@@ -4615,51 +4579,13 @@ class ChatsController private constructor(
     internal fun beginConversationArchiveIntent(
         groupIdHex: String,
         archived: Boolean,
-    ): OptimisticArchiveIntent? = beginOptimisticArchive(listOf(groupIdHex), archived, bindEpoch).singleOrNull()?.second
+    ): OptimisticArchiveIntent? = archiveActions.begin(listOf(groupIdHex), archived, bindEpoch).singleOrNull()?.second
 
     /** Retire a conversation-surface archive intent; stale or rebound intents are ignored. */
     internal fun finishConversationArchiveIntent(
         groupIdHex: String,
         intent: OptimisticArchiveIntent,
-    ) = finishOptimisticArchive(groupIdHex, intent)
-
-    private fun beginOptimisticArchive(
-        groupIds: Collection<String>,
-        archived: Boolean,
-        epoch: Long,
-    ): List<Pair<String, OptimisticArchiveIntent>> {
-        val intents =
-            groupIds
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-                .distinctBy { it.lowercase() }
-                .mapNotNull { groupIdHex ->
-                    val rowKey = chatRowKey(groupIdHex)
-                    val currentRow = chatRowsByGroup[rowKey] ?: return@mapNotNull null
-                    val currentArchived = optimisticArchiveByGroup[rowKey]?.archived ?: currentRow.archived
-                    if (currentArchived == archived) return@mapNotNull null
-                    val intent =
-                        OptimisticArchiveIntent(
-                            bindEpoch = epoch,
-                            archived = archived,
-                        )
-                    optimisticArchiveByGroup[rowKey] = intent
-                    groupIdHex to intent
-                }
-        if (intents.isNotEmpty()) recompute()
-        return intents
-    }
-
-    private fun finishOptimisticArchive(
-        groupIdHex: String,
-        intent: OptimisticArchiveIntent,
-    ) {
-        val rowKey = chatRowKey(groupIdHex)
-        if (isActiveBindEpoch(intent.bindEpoch) && optimisticArchiveByGroup[rowKey] === intent) {
-            optimisticArchiveByGroup.remove(rowKey)
-            recompute()
-        }
-    }
+    ) = archiveActions.finish(groupIdHex, intent)
 
     /**
      * Leave `groupIdHex` from the chat-list long-press menu. Mirrors the
@@ -5375,7 +5301,7 @@ class ChatsController private constructor(
             synchronized(liveSubscriptionLock) {
                 accountRef = null
                 boundAccountRef = null
-                bindJob.also { bindJob = null }
+                subscriptionOwner.bindJob.also { subscriptionOwner.bindJob = null }
             }
         jobToCancel?.cancel()
         connectionOwner.clear()
@@ -5403,7 +5329,7 @@ class ChatsController private constructor(
         activitySequenceByGroup.clear()
         nextActivitySequence = 0uL
         optimisticChatListPreviewByGroup.clear()
-        optimisticArchiveByGroup.clear()
+        archiveActions.clear()
         memberCacheByGroup = emptyMap()
         presentationMembersByGroup = emptyMap()
         memberSnapshotsRevision += 1L
@@ -11658,10 +11584,14 @@ class ConversationController(
         appState.present(title, R.string.toast_group_roster_changed)
     }
 
-    private suspend fun resolveCanonicalInviteRefs(memberRefs: List<String>): List<String>? =
+    private suspend fun resolveCanonicalInviteRefs(
+        memberRefs: List<String>,
+        diagnostic: DmCreationAttempt? = null,
+    ): List<String>? =
         try {
             canonicalGroupInviteRefs(memberRefs, appState::resolveAccountIdHex)
         } catch (throwable: Throwable) {
+            diagnostic?.failed(DmCreationPhase.RECIPIENTS, throwable)
             throwable.rethrowIfCancellation()
             recordMutationFailure(R.string.toast_couldnt_add_members, "GROUP_INVITE_RESOLVE", throwable)
             null
@@ -11705,84 +11635,148 @@ class ConversationController(
         addAsAdmin: Boolean = false,
         initialAdminRefs: List<String> = if (addAsAdmin) memberRefs else emptyList(),
     ): Boolean {
-        return withMutationLockResult(false) {
-            lastMutationError = null
-            if (!canAdministerMembersFromAuthoritativeRoster()) return@withMutationLockResult false
-            val account = conversationAccountRef ?: return@withMutationLockResult false
-            val refs = resolveCanonicalInviteRefs(memberRefs) ?: return@withMutationLockResult false
-            if (refs.isEmpty()) return@withMutationLockResult false
-            optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
-                val activityId = pendingMembershipActivity?.id
-                var nativeInvoked = false
-                var canonicalAdmins = emptyList<String>()
-                val runtimeGeneration = appState.runtimeGeneration
-                val absentBefore = refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
-                try {
-                    val adminTargets = resolveCanonicalInviteRefs(initialAdminRefs) ?: return@track false
-                    canonicalAdmins = adminTargets
-                    check(adminTargets.all { admin -> refs.any { it.equals(admin, ignoreCase = true) } }) {
-                        "Initial admin selection contains an unselected recipient"
-                    }
-                    val outcome =
-                        appState.withGroupCommitLock(account, group.groupIdHex) {
-                            if (!canAdministerMembersFromAuthoritativeRoster()) {
-                                return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
-                            }
-                            val authorityEpoch = mutationPresentation.groupAuthorityEpoch
-                            nativeInvoked = true
-                            val inviteResult = initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
-                            publishInitialAdminInviteResult(account, inviteResult, authorityEpoch, runtimeGeneration)
-                            optimisticGroupRosterMutation.settleMembershipActivity(activityId)
-                            GroupAdministrationCommitOutcome.COMMITTED
+        val diagnostic = DmCreationInteraction(operation = CreationOperation.GROUP_INVITE).nextAttempt()
+        return diagnostic.traceInvitation {
+            diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.START)
+            withMutationLockResult(false) {
+                lastMutationError = null
+                if (!canAdministerMembersFromAuthoritativeRoster()) {
+                    diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.FAILURE, DmCreationFailure.UNKNOWN)
+                    return@withMutationLockResult false
+                }
+                diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.SUCCESS)
+                val account = conversationAccountRef ?: return@withMutationLockResult false
+                diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.START)
+                val refs =
+                    resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: return@withMutationLockResult false
+                if (refs.isEmpty()) {
+                    diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
+                    return@withMutationLockResult false
+                }
+                optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
+                    val adminTargets =
+                        resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false
+                    diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
+                    val activityId = pendingMembershipActivity?.id
+                    var nativeInvoked = false
+                    var nativeAccepted = false
+                    var canonicalAdmins = emptyList<String>()
+                    val runtimeGeneration = appState.runtimeGeneration
+                    val absentBefore =
+                        refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
+                    try {
+                        canonicalAdmins = adminTargets
+                        check(adminTargets.all { admin -> refs.any { it.equals(admin, ignoreCase = true) } }) {
+                            "Initial admin selection contains an unselected recipient"
                         }
-                    if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
-                        presentRosterChanged(R.string.toast_couldnt_add_members)
-                        return@track false
-                    }
-                    presentConversationTransient(R.string.toast_invite_sent)
-                    true
-                } catch (throwable: Throwable) {
-                    throwable.rethrowIfCancellation()
-                    if (reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)) {
+                        val outcome =
+                            appState.withGroupCommitLock(account, group.groupIdHex) {
+                                if (!canAdministerMembersFromAuthoritativeRoster()) {
+                                    return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
+                                }
+                                val authorityEpoch = mutationPresentation.groupAuthorityEpoch
+                                diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
+                                nativeInvoked = true
+                                val inviteResult =
+                                    initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
+                                nativeAccepted = true
+                                diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
+                                diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
+                                publishInitialAdminInviteResult(
+                                    account,
+                                    inviteResult,
+                                    authorityEpoch,
+                                    runtimeGeneration,
+                                )
+                                diagnostic.projectionFinished(
+                                    appState.runtimeGeneration == runtimeGeneration &&
+                                        !controllerCleared &&
+                                        !isAccountTeardownRequested(),
+                                )
+                                optimisticGroupRosterMutation.settleMembershipActivity(activityId)
+                                GroupAdministrationCommitOutcome.COMMITTED
+                            }
+                        if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
+                            diagnostic.record(
+                                DmCreationPhase.ROSTER,
+                                DmCreationOutcome.FAILURE,
+                                DmCreationFailure.UNKNOWN,
+                            )
+                            presentRosterChanged(R.string.toast_couldnt_add_members)
+                            return@track false
+                        }
                         presentConversationTransient(R.string.toast_invite_sent)
-                        return@track true
-                    }
-                    val rawMessage = throwable.message.orEmpty()
-                    if (isDuplicateSignatureKeyError(rawMessage)) {
-                        // MLS rejected the add commit because the proposed member
-                        // already holds a seat (or their signing key collides with
-                        // an existing member's). The UI pre-checks membership, but a
-                        // race or key collision can still land here — surface plain
-                        // language with the resolved name instead of the raw
-                        // CreateCommitError(ProposalValidationError(...)) enum (#899).
-                        val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
-                        val friendly = copy.couldntAddMemberDuplicate(name)
-                        recordMutationFailure(
-                            R.string.toast_couldnt_add_members,
-                            "GROUP_INVITE_DUPLICATE_MEMBER",
-                            throwable,
-                            AppText.Plain(friendly),
-                        )
-                        false
-                    } else {
-                        recordMutationFailure(
-                            R.string.toast_couldnt_add_members,
-                            "GROUP_INVITE_MEMBER",
-                            throwable,
-                            inviteFailureDetail(
-                                throwable,
-                                appState::displayName,
-                                if (throwable is MarmotKitException.InvalidKeyPackageEvent) {
-                                    refs.singleOrNull()?.let(appState::displayName)
-                                } else {
-                                    null
-                                },
-                            ),
-                        )
-                        false
+                        true
+                    } catch (throwable: Throwable) {
+                        diagnostic.invitationFailed(throwable, nativeInvoked, nativeAccepted)
+                        throwable.rethrowIfCancellation()
+                        val reconcilable = canReconcileInviteReply(nativeInvoked, absentBefore, throwable)
+                        if (reconcilable) {
+                            diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.START)
+                            val reconciled =
+                                reconcileInitialAdminInvite(
+                                    refs,
+                                    canonicalAdmins,
+                                    absentBefore,
+                                    nativeInvoked,
+                                    throwable,
+                                )
+                            if (reconciled) {
+                                diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
+                                presentConversationTransient(R.string.toast_invite_sent)
+                                return@track true
+                            }
+                            diagnostic.record(
+                                DmCreationPhase.RECONCILIATION,
+                                DmCreationOutcome.FAILURE,
+                                DmCreationFailure.UNKNOWN,
+                            )
+                        }
+                        presentInviteFailure(throwable, refs)
                     }
                 }
             }
+        }
+    }
+
+    /** Keep error copy independent of native invitation and reconciliation ownership. */
+    private fun presentInviteFailure(
+        throwable: Throwable,
+        refs: List<String>,
+    ): Boolean {
+        val rawMessage = throwable.message.orEmpty()
+        return if (isDuplicateSignatureKeyError(rawMessage)) {
+            // MLS rejected the add commit because the proposed member
+            // already holds a seat (or their signing key collides with
+            // an existing member's). The UI pre-checks membership, but a
+            // race or key collision can still land here — surface plain
+            // language with the resolved name instead of the raw
+            // CreateCommitError(ProposalValidationError(...)) enum (#899).
+            val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
+            val friendly = copy.couldntAddMemberDuplicate(name)
+            recordMutationFailure(
+                R.string.toast_couldnt_add_members,
+                "GROUP_INVITE_DUPLICATE_MEMBER",
+                throwable,
+                AppText.Plain(friendly),
+            )
+            false
+        } else {
+            recordMutationFailure(
+                R.string.toast_couldnt_add_members,
+                "GROUP_INVITE_MEMBER",
+                throwable,
+                inviteFailureDetail(
+                    throwable,
+                    appState::displayName,
+                    if (throwable is MarmotKitException.InvalidKeyPackageEvent) {
+                        refs.singleOrNull()?.let(appState::displayName)
+                    } else {
+                        null
+                    },
+                ),
+            )
+            false
         }
     }
 
@@ -11814,6 +11808,13 @@ class ConversationController(
             else -> true
         }
 
+    /** Only an uncertain first invitation for absent recipients may reconcile by reading membership. */
+    private fun canReconcileInviteReply(
+        nativeInvoked: Boolean,
+        absentBefore: Boolean,
+        failure: Throwable,
+    ): Boolean = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+
     /** Read actual membership after an uncertain reply, without issuing a second invitation. */
     private suspend fun reconcileInitialAdminInvite(
         refs: List<String>,
@@ -11822,7 +11823,7 @@ class ConversationController(
         nativeInvoked: Boolean,
         failure: Throwable,
     ): Boolean {
-        val eligible = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+        val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
         if (!eligible) return false
         val beforeRead = mutationPresentation.groupAuthorityEpoch
         refreshManagementState()

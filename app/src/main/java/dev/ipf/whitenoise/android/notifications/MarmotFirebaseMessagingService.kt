@@ -38,7 +38,12 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
             // syncNativePushRegistrationIfEnabled() so the rotated token reaches
             // the push server.
             PushTokenRotationDispatch.PersistAndScheduleReRegistration -> {
-                PushTokenStore.create(applicationContext).setToken(token)
+                try {
+                    PushTokenStore.create(applicationContext).setToken(token)
+                } catch (_: PushTokenStorageException) {
+                    Log.w(TAG, "token_rotation_deferred")
+                    return
+                }
                 val scheduled = NotificationStreamForegroundService.syncNativePushRegistration(applicationContext)
                 if (!scheduled) {
                     fcmDebug { "Native-push registration sync start rejected; durable retry recorded" }

@@ -46,6 +46,10 @@ import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -53,6 +57,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.atomic.AtomicBoolean
@@ -163,13 +168,12 @@ class GroupMemberIdentitySearchUiTest {
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
         composeRule.waitUntil(5_000) { started.isCompleted }
-        composeRule.runOnIdle {
-            current.value =
-                fixture(groupId = "second") {
-                    secondStarted.complete(Unit)
-                    secondPending.await()
-                }
-        }
+        val second =
+            fixture(groupId = "second") {
+                secondStarted.complete(Unit)
+                secondPending.await()
+            }
+        composeRule.runOnIdle { current.value = second }
         composeRule.onNodeWithTag("chat_info.members_screen").assertDoesNotExist()
         composeRule.onNodeWithTag(SEARCH).assertDoesNotExist()
         assertFalse(first.controller.group.groupIdHex == current.value.controller.group.groupIdHex)
@@ -192,10 +196,8 @@ class GroupMemberIdentitySearchUiTest {
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
         awaitMatch()
-        composeRule.runOnIdle {
-            current.members.remove(MEMBER_HEX)
-            runBlocking { current.controller.retryMembers() }
-        }
+        composeRule.runOnIdle { current.members.remove(MEMBER_HEX) }
+        awaitFixture { current.controller.retryMembers() }
         composeRule.onNodeWithText("No matches").assertExists()
         composeRule.onNodeWithTag("chat_info.member.$MEMBER_HEX").assertDoesNotExist()
     }
@@ -217,7 +219,7 @@ class GroupMemberIdentitySearchUiTest {
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
         composeRule.waitUntil(5_000) { started.isCompleted }
-        composeRule.runOnIdle { runBlocking { current.state.setActiveAccount("account-b") } }
+        awaitFixture { current.state.setActiveAccount("account-b") }
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(OTHER_HEX)
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithTag("chat_info.member.$OTHER_HEX").fetchSemanticsNodes().isNotEmpty()
@@ -360,11 +362,32 @@ class GroupMemberIdentitySearchUiTest {
                     )
                 },
             )
-        runBlocking {
+        awaitFixture {
             controller.retryMembers()
             state.warmProfilePresentationsBlocking(members)
         }
         return Fixture(state, controller, members)
+    }
+
+    private fun <T> awaitFixture(block: suspend CoroutineScope.() -> T): T {
+        val owner = SupervisorJob()
+        val scope = CoroutineScope(owner + Dispatchers.Main.immediate)
+        val task = scope.async(block = block)
+        try {
+            composeRule.waitUntil(5_000) {
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+                task.isCompleted
+            }
+            // The coroutine is complete before awaiting: never block the main looper
+            // while profile materialization is waiting to return to Main.immediate.
+            return runBlocking { task.await() }
+        } finally {
+            owner.cancel()
+            composeRule.waitUntil(5_000) {
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+                owner.isCompleted
+            }
+        }
     }
 
     private fun accounts(): List<AccountSummaryFfi> =

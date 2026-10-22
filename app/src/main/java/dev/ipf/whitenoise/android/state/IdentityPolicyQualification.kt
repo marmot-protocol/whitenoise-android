@@ -13,7 +13,7 @@ internal class IdentityPolicyQualification {
     suspend fun createQualifyAndAccept(
         create: suspend () -> AccountSummaryFfi,
         qualify: suspend (AccountSummaryFfi) -> Unit,
-        accept: (AccountSummaryFfi) -> Unit,
+        accept: suspend (AccountSummaryFfi) -> Unit,
     ): AccountSummaryFfi =
         lock.withLock {
             val account = receipt ?: create().also { receipt = it }

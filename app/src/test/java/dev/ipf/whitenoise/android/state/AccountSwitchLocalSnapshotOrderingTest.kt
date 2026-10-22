@@ -119,11 +119,16 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val source = appStateSource().readText()
-        val prepare = source.kotlinFunctionBody("prepare")
+        val restore = source.kotlinFunctionBody("prepare")
+        val projection = source.kotlinFunctionBody("loadLocalProjection")
         val publish = source.kotlinFunctionBody("publish")
         assertTrue(
             "native projection reads retain their request token",
-            "loadAccountSwitchLocalSnapshot(request.label, generation, plan)" in prepare,
+            "loadAccountSwitchLocalSnapshot(request.label, generation, plan)" in projection,
+        )
+        assertFalse(
+            "native restoration inside the lifetime gate must not hold it across the local projection read",
+            "loadAccountSwitchLocalSnapshot" in restore,
         )
         val cacheClear = publish.indexOf("clearCrossAccountCaches()")
         val stage = publish.indexOf("stageAccountSwitchLocalSnapshot(")

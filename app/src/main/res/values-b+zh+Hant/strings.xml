@@ -2299,6 +2299,9 @@
     <string name="chat_departure_confirm">檢查所選的 %1$d 個聊天。將退出已加入的群組並從此裝置刪除；私聊僅在本機刪除。其他成員保留其副本。刪除前會確認所需的管理員移交。</string>
     <string name="chat_departure_result">%1$d 個已完成 · %2$d 個未完成 · %3$d 個已略過。重試會檢查成員身分，僅繼續未完成的操作。</string>
     <string name="chat_departure_admin_granted">管理員權限已轉移。退出群組尚未完成。</string>
+    <string name="notification_push_storage_unavailable">無法讀取已儲存的推播設定。設定已保留，推播註冊已暫停。請在裝置解鎖後重試。</string>
+    <string name="notification_push_import_pending">部分舊有推播設定無法復原。設定已保留，推播註冊已暫停。請重試以再次檢查。</string>
+    <string name="notification_push_cleanup_unknown">無法確認先前的推播清理是否完成。推播註冊已暫停。重試會再次檢查已儲存的狀態，不會清除或重設。</string>
     <string name="reaction_details_loading">正在載入回應…</string>
     <string name="reaction_details_load_failed">無法載入回應。</string>
     <string name="group_create_remove_and_continue">移除此人並繼續</string>
@@ -2337,4 +2340,10 @@
     </plurals>
     <string name="group_review_add_member">新增成員</string>
     <string name="group_review_invitation_visibility">所有成員皆可見。</string>
+    <string name="search_scope_this_chat">此聊天 · %1$s</string>
+    <string name="search_scope_all_chats">所有聊天</string>
+    <string name="search_scope_other_chats">搜尋其他聊天</string>
+    <string name="search_scope_selected_chats">已選聊天</string>
+    <string name="search_message_content_loading">正在搜尋訊息內容…</string>
+    <string name="search_message_content_failed">無法搜尋訊息內容。</string>
 </resources>

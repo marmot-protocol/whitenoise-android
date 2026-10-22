@@ -4,7 +4,8 @@
 
     <application
         android:name=".DebugWhiteNoiseApplication"
-        tools:replace="android:name">
+        android:memtagMode="sync"
+        tools:replace="android:name,android:memtagMode">
         <!-- Keep device-only Compose fixtures resumed when test hardware is locked. -->
         <activity
             android:name="androidx.activity.ComponentActivity"

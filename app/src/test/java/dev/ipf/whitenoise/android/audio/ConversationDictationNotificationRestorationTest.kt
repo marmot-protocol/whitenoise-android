@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
+import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
@@ -28,6 +29,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -40,6 +42,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 internal class ConversationDictationNotificationRestorationTest : ConversationDictationNotificationTestFixture() {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     /** Expiry as the first channel user must preserve the foreground card's badge-free settings. */
     @Test
     fun expiryCreatesTheSharedBadgeFreeDictationChannel() {

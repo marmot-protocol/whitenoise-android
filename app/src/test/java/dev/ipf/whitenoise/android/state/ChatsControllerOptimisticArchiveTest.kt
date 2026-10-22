@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -25,6 +26,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ChatsControllerOptimisticArchiveTest {
+    /** A partial batch reveals the latest failed row without undoing a successful native commit. */
     @Test
     fun bulkArchiveMovesEveryRowBeforeIoAndRestoresOnlyTheFailedRow() =
         runBlocking {
@@ -64,6 +66,7 @@ class ChatsControllerOptimisticArchiveTest {
             controller.onCleared()
         }
 
+    /** A completion from the previous binding cannot retire the replacement account's overlay. */
     @Test
     @Suppress("LongMethod") // One lifecycle race must retain both suspended mutations in a single scenario.
     fun staleArchiveCompletionCannotCrossABindResetOrClearTheNewIntent() =
@@ -142,6 +145,207 @@ class ChatsControllerOptimisticArchiveTest {
             controller.onCleared()
         }
 
+    /** Cancelling a suspended batch restores uncommitted rows and never starts the next mutation. */
+    @Test
+    fun cancellationReleasesAllOverlaysAndKeepsNewerRowContent() =
+        runBlocking {
+            val startedGroups = mutableListOf<String>()
+            val releaseCommit = CompletableDeferred<Unit>()
+            val controller =
+                ChatsController(
+                    appState = testAppState(),
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    groupArchivedUpdater = { _, groupIdHex, archived ->
+                        startedGroups += groupIdHex
+                        releaseCommit.await()
+                        group(groupIdHex).copy(archived = archived)
+                    },
+                )
+            seed(controller, GROUP_A, GROUP_B)
+            val pending =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(listOf(GROUP_A, GROUP_B), archived = true, notify = false)
+                }
+            assertEquals(2, controller.archivedItems.size)
+            controller.applyChatListRow(row(GROUP_B).copy(hasUnread = true, unreadCount = 3uL, updatedAt = 2uL))
+
+            pending.cancelAndJoin()
+
+            assertEquals(listOf(GROUP_A), startedGroups)
+            assertTrue(controller.archivedItems.isEmpty())
+            assertEquals(setOf(GROUP_A, GROUP_B), controller.items.map { it.id }.toSet())
+            assertEquals(3uL, controller.items.single { it.id == GROUP_B }.unreadCount)
+            controller.onCleared()
+        }
+
+    /** Opposite conversation actions share the batch owner's identity fence within the same binding. */
+    @Test
+    fun olderConversationCompletionDoesNotRetireNewerRestoreIntent() {
+        val controller =
+            ChatsController(
+                appState = testAppState(),
+                initialAccountRef = ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        seed(controller, GROUP_A)
+        val archive = requireNotNull(controller.beginConversationArchiveIntent(GROUP_A, archived = true))
+        val restore = requireNotNull(controller.beginConversationArchiveIntent(GROUP_A, archived = false))
+
+        controller.applyLocalGroupUpdate(group(GROUP_A).copy(archived = true))
+        controller.finishConversationArchiveIntent(GROUP_A, archive)
+        assertEquals(GROUP_A, controller.items.single().id)
+        assertTrue(controller.archivedItems.isEmpty())
+
+        // A failed restore reveals the committed archive, not the old pre-archive row.
+        controller.finishConversationArchiveIntent(GROUP_A, restore)
+        assertTrue(controller.items.isEmpty())
+        assertEquals(GROUP_A, controller.archivedItems.single().id)
+        controller.onCleared()
+    }
+
+    /** A cleared controller ignores an already-started native completion and remains empty. */
+    @Test
+    fun nativeCompletionAfterClearCannotRepopulateTheList() =
+        runBlocking {
+            val releaseCommit = CompletableDeferred<Unit>()
+            val controller =
+                ChatsController(
+                    appState = testAppState(),
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    groupArchivedUpdater = { _, groupIdHex, archived ->
+                        releaseCommit.await()
+                        group(groupIdHex).copy(archived = archived)
+                    },
+                )
+            seed(controller, GROUP_A)
+            val pending =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(GROUP_A, archived = true, notify = false)
+                }
+            controller.onCleared()
+            releaseCommit.complete(Unit)
+
+            assertEquals(false, pending.await())
+            assertTrue(controller.items.isEmpty())
+            assertTrue(controller.archivedItems.isEmpty())
+        }
+
+    /** An older batch cannot overwrite a later restore while it waits for a different group's commit. */
+    @Test
+    fun completedRestoreSupersedesAnUnstartedEntryInAnOlderBatch() =
+        runBlocking {
+            val releaseFirstCommit = CompletableDeferred<Unit>()
+            val writes = mutableListOf<Pair<String, Boolean>>()
+            val controller =
+                ChatsController(
+                    appState = testAppState(),
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    groupArchivedUpdater = { _, groupIdHex, archived ->
+                        writes += groupIdHex to archived
+                        if (groupIdHex == GROUP_A) releaseFirstCommit.await()
+                        group(groupIdHex).copy(archived = archived)
+                    },
+                )
+            seed(controller, GROUP_A, GROUP_B)
+            val olderBatch =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(listOf(GROUP_A, GROUP_B), archived = true, notify = false)
+                }
+
+            assertTrue(controller.setArchived(GROUP_B, archived = false, notify = false))
+            releaseFirstCommit.complete(Unit)
+
+            assertEquals(1, olderBatch.await())
+            assertEquals(listOf(GROUP_A to true, GROUP_B to false), writes)
+            assertEquals(GROUP_B, controller.items.single().id)
+            assertEquals(GROUP_A, controller.archivedItems.single().id)
+            controller.onCleared()
+        }
+
+    /** A batch queued behind another mutation must recheck its binding after the lock becomes available. */
+    @Test
+    fun waitingArchiveCannotStartNativeMutationAfterBindReset() =
+        runBlocking {
+            val appState = testAppState()
+            val releaseLock = CompletableDeferred<Unit>()
+            val writes = mutableListOf<String>()
+            val controller =
+                ChatsController(
+                    appState = appState,
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    groupArchivedUpdater = { _, groupIdHex, archived ->
+                        writes += groupIdHex
+                        group(groupIdHex).copy(archived = archived)
+                    },
+                )
+            seed(controller, GROUP_A)
+            val holder =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.withGroupCommitLock(ACCOUNT_REF, GROUP_A) { releaseLock.await() }
+                }
+            val pending =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(GROUP_A, archived = true, notify = false)
+                }
+            assertEquals(GROUP_A, controller.archivedItems.single().id)
+
+            controller.bind(null)
+            releaseLock.complete(Unit)
+            holder.await()
+
+            assertEquals(false, pending.await())
+            assertTrue(writes.isEmpty())
+            assertTrue(controller.items.isEmpty())
+            assertTrue(controller.archivedItems.isEmpty())
+            controller.onCleared()
+        }
+
+    /** A replacement intent installed during a lock wait must win before either queued write enters MDK. */
+    @Test
+    fun waitingArchiveRechecksIntentIdentityAfterAcquiringTheLock() =
+        runBlocking {
+            val appState = testAppState()
+            val releaseLock = CompletableDeferred<Unit>()
+            val writes = mutableListOf<Boolean>()
+            val controller =
+                ChatsController(
+                    appState = appState,
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    groupArchivedUpdater = { _, groupIdHex, archived ->
+                        writes += archived
+                        group(groupIdHex).copy(archived = archived)
+                    },
+                )
+            seed(controller, GROUP_A)
+            val holder =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.withGroupCommitLock(ACCOUNT_REF, GROUP_A) { releaseLock.await() }
+                }
+            val archive =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(GROUP_A, archived = true, notify = false)
+                }
+            val restore =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(GROUP_A, archived = false, notify = false)
+                }
+            releaseLock.complete(Unit)
+            holder.await()
+
+            assertEquals(false, archive.await())
+            assertTrue(restore.await())
+            assertEquals(listOf(false), writes)
+            assertEquals(GROUP_A, controller.items.single().id)
+            assertTrue(controller.archivedItems.isEmpty())
+            controller.onCleared()
+        }
+
+    /** Seeds the real controller projection without starting profile enrichment for each row. */
     private fun seed(
         controller: ChatsController,
         vararg groupIds: String,
@@ -154,6 +358,7 @@ class ChatsControllerOptimisticArchiveTest {
         controller.setChatListVisible(true)
     }
 
+    /** Supplies an in-memory account shell while archive I/O stays injected by each scenario. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
@@ -173,6 +378,7 @@ class ChatsControllerOptimisticArchiveTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Builds a stable native row whose unread fields can advance while an archive is suspended. */
     private fun row(groupIdHex: String) =
         ChatListRowFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -207,6 +413,7 @@ class ChatsControllerOptimisticArchiveTest {
             disbandRequest = null,
         )
 
+    /** Builds the authoritative group returned by the injected archive adapter. */
     private fun group(
         groupIdHex: String,
         name: String = "",
@@ -254,6 +461,7 @@ class ChatsControllerOptimisticArchiveTest {
         disbandRequest = null,
     )
 
+    /** Rebinds the isolated fixture after exercising the controller's real reset path. */
     private fun restoreTestAccountReference(
         controller: ChatsController,
         accountRef: String,
@@ -265,8 +473,10 @@ class ChatsControllerOptimisticArchiveTest {
     }
 
     private class InMemoryDraftPersistence : DraftPersistence {
+        /** Keeps archive scenarios independent of stored composer drafts. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards writes because no archive scenario changes a composer draft. */
         override fun write(
             key: String,
             value: String?,
