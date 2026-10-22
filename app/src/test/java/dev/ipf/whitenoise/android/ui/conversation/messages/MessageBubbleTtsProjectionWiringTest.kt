@@ -171,7 +171,6 @@ class MessageBubbleTtsProjectionWiringTest {
                     bodyText = editedText,
                     document = editedDocument,
                     mentionDisplayName = null,
-                    isGroupMember = null,
                 )!!
             val passage =
                 TtsPassage(

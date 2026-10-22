@@ -247,7 +247,6 @@ class MessageFullScreenMarkdownScreenshotTest {
                         body = reader.body,
                         bodyMarkdownDocument = reader.document,
                         mentionDisplayName = null,
-                        isGroupMember = null,
                         onNostrProfileTap = null,
                         onCopyMarkdownLink = {},
                         timeText = "11:22",

@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -131,6 +132,9 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
             if (useChatReceivedColor) 0xFF999999L else null,
         )
         val rows = customReplyRows()
+        rows
+            .filter { it.record.direction == "sent" && requireNotNull(it.projected).media.isNotEmpty() }
+            .forEach(::cacheCanonicalOwnFiles)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = mode != AppThemeMode.Light, amoled = mode == AppThemeMode.Amoled) {
                 Column(
@@ -140,9 +144,6 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
                 }
             }
         }
-        rows
-            .filter { it.record.direction == "sent" && requireNotNull(it.projected).media.isNotEmpty() }
-            .forEach(::cacheCanonicalOwnFiles)
         composeRule.onAllNodesWithText("Parent message").assertCountEquals(rows.size)
         composeRule.onNodeWithText("Custom sent text").assertExists()
         composeRule.onNodeWithText("Custom received text").assertExists()
@@ -183,11 +184,13 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
 
     /** Mirrors the successful native handoff for canonical outgoing file rows without network access. */
     private fun cacheCanonicalOwnFiles(item: TimelineMessage) {
-        composeRule.runOnIdle {
+        composeRule.runOnUiThread {
             repeat(requireNotNull(item.projected).media.size) { attachmentIndex ->
-                appState.cacheMediaPlaintext(
-                    mediaCacheKey("personal", item.record.groupIdHex, item.record.messageIdHex, attachmentIndex),
-                    byteArrayOf(1, 2, 3, 4),
+                assertTrue(
+                    appState.cacheMediaPlaintext(
+                        mediaCacheKey("personal", item.record.groupIdHex, item.record.messageIdHex, attachmentIndex),
+                        byteArrayOf(1, 2, 3, 4),
+                    ),
                 )
             }
         }
