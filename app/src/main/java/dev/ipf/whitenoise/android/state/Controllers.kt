@@ -7286,10 +7286,12 @@ class ConversationController(
         } else {
             hasLoadedOlderPages = false
             protectedTimelineMessageIds.clear()
+            // A reconnect's snapshot reads its cards first; a first page has its own hold.
+            val warmedSnapshot = warmLaterPageEventCards(snapshot)
             val streamIds =
                 appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
                     applyTimelinePage(
-                        snapshot,
+                        warmedSnapshot,
                         replaceWindow = true,
                         updatePagination = true,
                     )
@@ -7867,10 +7869,12 @@ class ConversationController(
                     ticket = batch.first().productObservationTicket,
                 )
                 var batchCommitted = false
+                // Cards are read before the apply timing starts, so TIMELINE_APPLY stays the apply alone.
+                val newestPage = warmLaterPageEventCards(newest.page)
                 val streamIdsLaunched =
                     appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
                         applyTimelinePage(
-                            newest.page,
+                            newestPage,
                             replaceWindow = false,
                             updatePagination = true,
                             reconcileNewExtendedRecords = true,
@@ -12563,7 +12567,7 @@ class ConversationController(
         }
         hasLoadedOlderPages = false
         protectedTimelineMessageIds.clear()
-        return applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+        return applyTimelinePage(warmLaterPageEventCards(page), replaceWindow = true, updatePagination = true)
     }
 
     internal suspend fun testRefreshCurrentTimeline(
@@ -12682,7 +12686,8 @@ class ConversationController(
     ): List<String> {
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
-        val applied = installed?.page ?: page
+        // A newer installed window keeps the Markdown parsed for [page]'s cards before this call (#2238).
+        val applied = installed?.page?.withParsedRecords(page.messages) ?: page
         val priorOldestId = timeline.firstOrNull()?.id
         val snapshot = currentWindowApplySnapshot()
         val preparation =
@@ -12892,6 +12897,70 @@ class ConversationController(
                 appState.readCachedPublicEventCards(conversationAccountRef, references)
             }
         }
+    }
+
+    /**
+     * Reads the cached event cards of [page]'s rows that are not on screen yet and may render one, before the page is
+     * applied (#2238), and returns [page] with those rows' Markdown parsed, so the commit installs that one parse and
+     * every card first composes complete. The first page has its own hold and is returned as is, and so is a page with
+     * no such row, at no cost.
+     *
+     * The parse and the cache read ride the binding IO hop, so the caller only suspends. Past
+     * [LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS], or when the read fails, the page is returned with whatever was parsed
+     * and its cards resolve themselves as before. Callers run this before their `TIMELINE_APPLY` timing starts.
+     */
+    internal suspend fun warmLaterPageEventCards(page: TimelinePageFfi): TimelinePageFfi {
+        val candidates =
+            withContext(Dispatchers.Main.immediate) {
+                if (!hasPreparedInitialPresentation) {
+                    emptyList()
+                } else {
+                    page.messages.filter { mayRenderNostrEventCard(it) && it.messageIdHex !in timelineRecords }
+                }
+            }
+        val scope = conversationScope
+        if (candidates.isEmpty() || scope == null) return page
+        val startedAt = SystemClock.elapsedRealtime()
+        // Its own job, so the budget can give up on a binding call that never returns instead of waiting it out.
+        val warm =
+            scope.async {
+                // Never fails the session's scope: a failed parse or read only leaves the cards to resolve themselves.
+                runCatchingCancellable {
+                    hydrateTimelineMarkdown(candidates).also { parsed ->
+                        eventCardSnapshots.warm(parsed) { references ->
+                            appState.readCachedPublicEventCards(conversationAccountRef, references)
+                        }
+                    }
+                }.getOrNull()
+            }
+        var parsed: List<TimelineMessageRecordFfi>? = null
+        try {
+            parsed = withTimeoutOrNull(LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS) { warm.await() }
+        } finally {
+            if (!warm.isCompleted) warm.cancel()
+            recordLaterPageEventCardWarm(SystemClock.elapsedRealtime() - startedAt, candidates.size, parsed != null)
+        }
+        return parsed?.let(page::withParsedRecords) ?: page
+    }
+
+    /**
+     * Records one later-page card read as `op=chat_history_page phase=event_card_page_warm`: its duration, the number
+     * of rows it covered and whether it settled within the budget, never an id, text or reference.
+     */
+    private fun recordLaterPageEventCardWarm(
+        durationMs: Long,
+        rows: Int,
+        settled: Boolean,
+    ) {
+        PerformanceDiagnostics.record(
+            PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE),
+            PerformancePhase.EVENT_CARD_PAGE_WARM,
+            elapsedMs = durationMs.coerceAtLeast(0L),
+            durationMs = durationMs.coerceAtLeast(0L),
+            result = if (settled) PerformanceResult.SUCCESS else PerformanceResult.DROPPED,
+            layer = PerformanceLayer.STORAGE,
+            count = rows,
+        )
     }
 
     /**

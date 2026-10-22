@@ -482,7 +482,11 @@ internal suspend fun ConversationController.reportVisibleMessage(
                 !accountTeardownRequested && timelineSubscription === handle && window.readySubscription === handle
             }
         if (!ownsHandle() || !retainsTimelineRecord(messageIdHex)) return@withLock false
-        val page = withContext(Dispatchers.IO) { handle.setVisibleAnchor(messageIdHex) } ?: return@withLock false
+        val anchored = withContext(Dispatchers.IO) { handle.setVisibleAnchor(messageIdHex) } ?: return@withLock false
+        if (!ownsHandle()) return@withLock false
+        // Inside the lock, like the report itself: the re-centred window's card rows are read before it shows
+        // (#2238), only when it brings ones not on screen, typically 23–36 ms and at most the card budget.
+        val page = warmLaterPageEventCards(anchored)
         if (!ownsHandle()) return@withLock false
         withContext(Dispatchers.Main.immediate) {
             // The native call is IO; installing its page is a main-thread commit.
@@ -496,7 +500,8 @@ internal suspend fun ConversationController.reportVisibleMessage(
 /** Replaces a bounded history window with its newest page, reporting whether the newest edge is ready. */
 suspend fun ConversationController.returnToLatestWindow(): Boolean {
     val subscription = timelineSubscription ?: return false
-    tracedPagingSection(ConversationPagingTraceSection.WINDOW) { subscription.returnToLatest() }?.let { page ->
+    tracedPagingSection(ConversationPagingTraceSection.WINDOW) { subscription.returnToLatest() }?.let { latest ->
+        val page = warmLaterPageEventCards(latest)
         tracedPagingSection(ConversationPagingTraceSection.APPLY) {
             applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
         }

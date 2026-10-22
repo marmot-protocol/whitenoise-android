@@ -68,9 +68,11 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
         targetLoaded = { timelineRecords.containsKey(messageIdHex) },
         jumpIfActive = ::jumpIfSubscriptionActive,
         installPage = { page ->
+            // The jumped-to window shows once its cards are read, so the landing never composes a card Loading.
+            val warmed = warmLaterPageEventCards(page)
             tracedPagingSection(ConversationPagingTraceSection.APPLY) {
                 applyTimelinePage(
-                    page,
+                    warmed,
                     replaceWindow = false,
                     updatePagination = true,
                     reconcileNewExtendedRecords = true,

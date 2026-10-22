@@ -65,6 +65,27 @@ because it exceeded the one-second card budget, after which the page published
 and each card resolved itself. A cold-start value near the budget is the
 encrypted-cache open, not the network.
 
+Every later page — older or newer history, a jump, a return to the latest
+messages, a visible-row report, a refresh or a live window — reads the cached
+cards of its rows that are not on screen yet before it is applied, so it
+publishes once with those cards complete. Nothing is hidden or held: until the
+read settles the transcript simply shows what it showed before, so a far jump
+keeps the previous messages rather than a blank list, and an optimistic send
+stays on screen. The rows' Markdown is parsed once, for both the card read and
+the commit. A page without such rows is applied at once, as before.
+
+`op=chat_history_page phase=event_card_page_warm layer=storage` records one
+such read: `duration_ms` covers the parse and the batched MDK cache read,
+`count` is the number of rows read for, and `result=dropped` means the read did
+not settle within the one-second card budget, or failed, after which the page
+was applied anyway and each card resolved itself. The read runs before the
+`TIMELINE_APPLY` host timing starts, so that timing stays the apply alone, and
+outside the paging lock, except for a visible-row report and the anchor before
+an older page, which already run under it: their read happens only when the
+re-centred window brings card rows not on screen, typically 23 to 36 ms on a
+Pixel 9a and at most the budget. Live windows arriving meanwhile queue behind
+the one being read, as they queue behind any apply.
+
 ### Conversation history pages
 
 `op=chat_history_page` covers one page of history in either direction: older,
