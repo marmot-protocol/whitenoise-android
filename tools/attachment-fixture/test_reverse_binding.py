@@ -148,11 +148,23 @@ class ReverseBindingTest(unittest.TestCase):
                 patch.object(device_runner, "adb_command", side_effect=[error, "PRIVATE-NOT-A-PORT"]) as adb:
             random.return_value.sample.return_value = [45001, 45002, 45003, 45004]
             self.assertEqual(45002, device_runner.bind_reverse_port("chosen-adb", "emulator-5554", 32100, receipt))
-            random.return_value.sample.assert_called_once_with(range(32768, 61000), 4)
+            random.return_value.sample.assert_called_once_with(list(range(32768, 61000)), 4)
             self.assertEqual([("chosen-adb", "emulator-5554", "reverse", "--no-rebind", f"tcp:{p}", "tcp:32100")
                               for p in (45001, 45002)], [c.args for c in adb.call_args_list])
         self.assertEqual({"attempts": 2, "occupied_ports": 1, "status": "admitted"}, receipt)
         self.assertNotIn("PRIVATE", json.dumps(receipt))
+
+    def test_a_second_mapping_never_draws_a_device_port_this_run_already_owns(self):
+        """The relay draw excludes the blob listener, so the run cannot collide with its own mapping."""
+        with patch.object(device_runner.random, "SystemRandom") as random, \
+                patch.object(device_runner, "adb_command", return_value="45002\n"):
+            random.return_value.sample.return_value = [45002, 45003, 45004, 45005]
+            self.assertEqual(45002, device_runner.bind_reverse_port("chosen-adb", "emulator-5554", 32101, {},
+                                                                    reserved=[45001]))
+            population, count = random.return_value.sample.call_args.args
+        self.assertEqual(4, count)
+        self.assertNotIn(45001, population)
+        self.assertEqual(61000 - 32768 - 1, len(population))
 
     def test_timeouts_transport_errors_and_unrecognized_collisions_fail_immediately(self):
         """Only the complete known occupied-socket error permits another admission attempt."""
