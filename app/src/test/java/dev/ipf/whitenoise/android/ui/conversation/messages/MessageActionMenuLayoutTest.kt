@@ -49,6 +49,39 @@ class MessageActionMenuLayoutTest {
         assertEquals(listOf("literalCode"), callbacks)
     }
 
+    @Test
+    fun showLessDispatchesFromTheAccessibleMenu() {
+        val callbacks = mutableListOf<String>()
+        renderMenu(fontScale = 1.3f, layoutDirection = LayoutDirection.Rtl, callbacks = callbacks, showLess = true)
+        composeRule.onNodeWithText("Show less").performScrollTo().assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/message_action_menu_show_less_rtl.png")
+        composeRule.onNodeWithText("Show less").performClick()
+        assertEquals(listOf("showLess"), callbacks)
+    }
+
+    /** Collapse is opt-in and remains beside the other reading actions without removing Copy or Reply. */
+    @Test
+    fun showLessIsPresentOnlyForAnEligibleExpandedBody() {
+        fun actions(eligible: Boolean) =
+            messageActionKinds(
+                canReply = true,
+                canEdit = false,
+                canSelect = false,
+                canSelectText = false,
+                canCopyText = true,
+                canSpeak = false,
+                canForward = false,
+                canSave = false,
+                canShowLess = eligible,
+            )
+        assertTrue(MessageActionKind.ShowLess !in actions(false))
+        assertTrue(MessageActionKind.ShowLess in actions(true))
+        assertTrue(MessageActionKind.CopyText in actions(true))
+        assertTrue(MessageActionKind.Reply in actions(true))
+    }
+
     /** The model emits the prototype's action order, not the capability-argument order. */
     @Test
     fun actionModelPreservesCapabilityOrder() {
@@ -580,6 +613,7 @@ class MessageActionMenuLayoutTest {
         callbacks: MutableList<String> = mutableListOf(),
         canReact: Boolean = false,
         literalCode: Boolean = false,
+        showLess: Boolean = false,
         onDismiss: () -> Unit = {},
         quickReactionEmojis: List<String> = if (canReact) listOf("👍") else emptyList(),
     ) {
@@ -603,6 +637,7 @@ class MessageActionMenuLayoutTest {
                         canSpeakCodeLiterally = literalCode,
                         canSelectText = true,
                         canKeepOnScreen = true,
+                        canShowLess = showLess,
                         canShare = true,
                         canSave = true,
                         quickReactionEmojis = quickReactionEmojis,
@@ -618,6 +653,7 @@ class MessageActionMenuLayoutTest {
                         onSpeak = { callbacks += "speak" },
                         onSpeakCodeLiterally = { callbacks += "literalCode" },
                         onKeepOnScreen = { callbacks += "keepOnScreen" },
+                        onShowLess = { callbacks += "showLess" },
                         onShare = { callbacks += "share" },
                         onSave = { callbacks += "save" },
                         onInfo = { callbacks += "info" },

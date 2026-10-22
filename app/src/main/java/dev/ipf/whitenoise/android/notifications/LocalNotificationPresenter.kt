@@ -1022,7 +1022,7 @@ class LocalNotificationPresenter(
                         }
                     val channelId =
                         withContext(Dispatchers.Default) {
-                            existingCardChannel ?: profileNotificationAuthor(update)?.let { author ->
+                            existingCardChannel ?: profileNotificationSoundAuthor(update)?.let { author ->
                                 val selection = profileNotificationOverrides.get(update.accountRef, author)
                                 if (selection.mode == ProfileNotificationMode.CUSTOM) {
                                     profileNotificationChannels.existing(

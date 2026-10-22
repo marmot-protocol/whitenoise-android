@@ -213,10 +213,9 @@ class ProfileNotificationPresenterTest {
         }
 
     /**
-     * Self messages, reactions, membership events and agent traffic remain outside person-specific notification
-     * policy.
+     * Self messages, reactions, membership events and agent traffic remain outside message-only mute policy.
      */
-    @Test fun exclusionsNeverResolveAProfileOverride() {
+    @Test fun messageMuteExclusionsAreIndependentOfEventSoundEligibility() {
         val normal = update()
         assertEquals(alice, profileNotificationAuthor(normal))
         assertNull(profileNotificationAuthor(normal.copy(isFromSelf = true)))
@@ -233,6 +232,47 @@ class ProfileNotificationPresenterTest {
         )
         assertNull(profileNotificationAuthor(normal.copy(sender = NotificationUserFfi("invalid", null, null))))
     }
+
+    /** Verified actors reuse their selected channel for future invites and role changes, never the target's. */
+    @Test fun actorEventsUseCustomSoundWithoutExtendingMessageMute() =
+        runBlocking {
+            val id = customize(alice)
+            val actorTriggers =
+                listOf(
+                    NotificationTriggerFfi.GROUP_INVITE,
+                    NotificationTriggerFfi.MADE_ADMIN,
+                    NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                    NotificationTriggerFfi.REMOVED_FROM_GROUP,
+                )
+            actorTriggers.forEachIndexed { index, trigger ->
+                val event = update(group = "invited-$index", message = "event-$index").copy(trigger = trigger)
+                assertEquals(alice, profileNotificationSoundAuthor(event))
+                assertNull(profileNotificationAuthor(event))
+                assertTrue(presenter.show(event, shortNpub = { it }))
+                assertEquals(id, card(event).channelId)
+                assertNull(profileNotificationSoundAuthor(event.copy(isFromSelf = true)))
+                assertNull(profileNotificationSoundAuthor(event.copy(sender = NotificationUserFfi("", null, null))))
+                val other = event.copy(sender = NotificationUserFfi(bob, "Bob", null), messageIdHex = "bob-$index")
+                assertTrue(presenter.show(other, shortNpub = { it }))
+                assertNotEquals(id, card(other).channelId)
+                val work = event.copy(accountRef = "work", messageIdHex = "work-$index")
+                assertTrue(presenter.show(work, shortNpub = { it }))
+                assertNotEquals(id, card(work).channelId)
+                assertFalse(presenter.show(event, isPostStillAllowed = { false }, shortNpub = { it }))
+            }
+            ProfileNotificationOverridePreferences(context).set(
+                "personal",
+                alice,
+                ProfileNotificationOverride(ProfileNotificationMode.MUTED),
+            )
+            actorTriggers.forEach { trigger ->
+                val event = update(message = "after-mute-$trigger").copy(trigger = trigger)
+                assertFalse(ProfileNotificationOverridePreferences(context).isMuted(event))
+                assertTrue(presenter.show(event, shortNpub = { it }))
+                assertNotEquals(id, card(event).channelId)
+            }
+            assertEquals(1, manager.notificationChannels.count { it.id.startsWith(ProfileNotificationChannels.PREFIX) })
+        }
 
     /** Creates a real OS channel plus its persisted routing choice for assertions against posted notifications. */
     private fun customize(author: String): String {

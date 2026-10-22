@@ -2198,6 +2198,9 @@ class WhiteNoiseAppState private constructor(
     var fontScale by mutableStateOf(AppFontScale.fromPreference(preferences.getString(FONT_SCALE_KEY, null)))
         private set
 
+    private var durableFontScale = fontScale
+    private var fontScaleSaveRevision = 0L
+
     var appFont by mutableStateOf(AppFont.fromPreference(preferences.getString(APP_FONT_KEY, null)))
         private set
 
@@ -8177,8 +8180,33 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun updateFontScale(scale: AppFontScale) {
+        if (fontScale == scale) return
         fontScale = scale
-        persistHostSetting { putString(FONT_SCALE_KEY, scale.preferenceValue) }
+        val revision = ++fontScaleSaveRevision
+        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
+        mutationsScope.launch {
+            hostPreferenceCommitMutex.withLock {
+                val saved =
+                    withContext(Dispatchers.IO) {
+                        runCatchingCancellable {
+                            val editor = preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue)
+                            var committed = false
+                            completeHostPreferenceCommit(attempt) { editor.commit().also { committed = it } }
+                            committed
+                        }.getOrDefault(false)
+                    }
+                if (saved) {
+                    durableFontScale = scale
+                } else {
+                    // SharedPreferences changes its memory map even when the disk commit fails.
+                    withContext(Dispatchers.IO) {
+                        runCatching { preferences.edit().putString(FONT_SCALE_KEY, durableFontScale.preferenceValue).commit() }
+                    }
+                    if (revision == fontScaleSaveRevision) fontScale = durableFontScale
+                    presentTransient(R.string.font_size_save_failed)
+                }
+            }
+        }
     }
 
     fun updateAppFont(font: AppFont) {

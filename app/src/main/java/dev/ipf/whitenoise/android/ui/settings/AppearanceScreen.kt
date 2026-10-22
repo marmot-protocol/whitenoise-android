@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,6 +15,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppFont
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppThemeMode
+import dev.ipf.whitenoise.android.state.BubbleSide
+import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
@@ -93,17 +96,18 @@ internal fun AppearanceScreen(
         )
     }
     if (fontSizeOpen) {
-        ChoiceDialog(
-            title = stringResource(R.string.font_size),
-            values = AppFontScale.entries,
+        val sampleTheme =
+            BubbleTheme.resolve(
+                appState.themeMode,
+                isSystemInDarkTheme(),
+            )
+        FontSizeDialog(
+            theme = sampleTheme,
+            mineArgb = appState.globalBubbleColorArgb(sampleTheme, BubbleSide.Mine),
+            otherArgb = appState.globalBubbleColorArgb(sampleTheme, BubbleSide.Other),
             selected = appState.fontScale,
-            label = fontLabels::getValue,
-            supportingText = stringResource(R.string.appearance_font_size_help),
+            onSelect = appState::updateFontScale,
             onDismiss = { fontSizeOpen = false },
-            onSelect = {
-                fontSizeOpen = false
-                appState.updateFontScale(it)
-            },
         )
     }
     if (enterOpen) {

@@ -4577,6 +4577,29 @@ internal fun ConversationScreen(
                                         onBack = exitConversation,
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,
+                                        onBeforeBodyCollapse = {
+                                            // Explicit collapse supersedes any deferred viewport correction.
+                                            scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                                            scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), nearBottom = false)
+                                            currentTimelineListIndex(item.record.messageIdHex)?.let { index ->
+                                                // Preserve a visible top edge; a deep offset into a tall body
+                                                // must not survive after that content has been clipped away.
+                                                val visible =
+                                                    listState.layoutInfo.visibleItemsInfo.firstOrNull {
+                                                        it.index == index
+                                                    }
+                                                val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
+                                                scrollCoordinator.settleReadingAt(
+                                                    ConversationScrollAnchor(
+                                                        messageId = item.record.messageIdHex,
+                                                        itemId = item.presentationId,
+                                                        listIndex = index,
+                                                        pixelOffset = offset,
+                                                    ),
+                                                )
+                                                listState.requestScrollToItem(index, offset)
+                                            }
+                                        },
                                         collapseLongMessages = collapseLongMessages,
                                         ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
                                         ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,

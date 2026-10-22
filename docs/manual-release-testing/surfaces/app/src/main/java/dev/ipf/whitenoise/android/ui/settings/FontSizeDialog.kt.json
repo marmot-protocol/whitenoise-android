@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FontSizeDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "fun FontSizeDialog(",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "FontSizeSample",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "fun FontSizeSample(",
+        "test_ids": [
+          "SET-006"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:appearance_font_size_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.appearance_font_size_help",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:font_scale_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.font_scale_default",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:font_size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.font_size",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:font_size_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.font_size_preview",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:font_size_sample_quote",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.font_size_sample_quote",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:font_size_sample_received",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.font_size_sample_received",
+        "test_ids": [
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "setting:font_size_sample_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.font_size_sample_sent",
+        "test_ids": [
+          "SET-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -167,6 +167,14 @@
           "NTF-043",
           "NTF-044"
         ]
+      },
+      {
+        "surface": "Actor-specific sound channel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "profileNotificationSoundAuthor(update)",
+        "test_ids": [
+          "NTF-033"
+        ]
       }
     ]
   },

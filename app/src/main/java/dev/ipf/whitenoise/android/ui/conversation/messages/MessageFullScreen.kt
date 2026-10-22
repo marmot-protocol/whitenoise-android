@@ -84,6 +84,7 @@ internal fun MessageFullScreenView(
     onDismiss: () -> Unit,
     bottomBar: @Composable () -> Unit,
     selectionController: ReaderTextSelectionController? = null,
+    onShowLess: (() -> Unit)? = null,
 ) {
     val selectionKey = remember(body, bodyMarkdownDocument) { Any() }
     val selection = rememberReaderTextSelectionController(selectionKey, selectionController)
@@ -162,6 +163,18 @@ internal fun MessageFullScreenView(
                                     onDismissRequest = { overflowOpen = false },
                                     items =
                                         buildList {
+                                            if (onShowLess != null) {
+                                                add(
+                                                    WhiteNoiseMenuItem(
+                                                        label = stringResource(R.string.show_less),
+                                                        icon = R.drawable.ic_arrow_up,
+                                                        onClick = {
+                                                            selection.reset()
+                                                            onShowLess()
+                                                        },
+                                                    ),
+                                                )
+                                            }
                                             if (canReply) {
                                                 add(
                                                     WhiteNoiseMenuItem(
@@ -250,6 +263,7 @@ internal fun MessageFullScreenBody(
     onNostrProfileTap: ((String) -> Unit)?,
     onCopyMarkdownLink: (String) -> Unit,
     selectionController: ReaderTextSelectionController? = null,
+    onShowLess: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val selectionKey = remember(body, markdownDocument) { Any() }

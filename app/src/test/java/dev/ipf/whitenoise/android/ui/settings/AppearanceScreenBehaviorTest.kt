@@ -61,7 +61,7 @@ class AppearanceScreenBehaviorTest {
                 activeAccountRef = "missing-account",
             )
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
+            WhiteNoiseTheme(darkTheme = false, fontScale = appState.fontScale.factor) {
                 AppearanceScreen(
                     appState = appState,
                     onBack = { backCount++ },
@@ -125,15 +125,21 @@ class AppearanceScreenBehaviorTest {
         composeRule.onNodeWithText("AMOLED").assertIsSelected()
     }
 
-    /** The font size dialog explains the scale, writes the chosen step, closes, and the row shows the new value. */
+    /** Each saved step updates the live sample and stays selected until the picker is dismissed. */
     @Test
-    fun fontSizeSheetWritesScaleAndCloses() {
+    fun fontSizeSheetPreviewsEveryStepUntilDone() {
         composeRule.onNodeWithText("Font size").performClick()
         composeRule.onNodeWithText("Text size adds to your device font-size setting.").assertExists()
-        composeRule.onNodeWithText("Extra large").performClick()
-        composeRule.runOnIdle { assertEquals(AppFontScale.ExtraLarge, appState.fontScale) }
-        composeRule.onNodeWithText("Small").assertDoesNotExist()
-        composeRule.onNodeWithText("Extra large").assertExists()
+        for (scale in AppFontScale.entries) {
+            composeRule.onNodeWithTag("font_size.${scale.name}").performClick()
+            composeRule.runOnIdle { assertEquals(scale, appState.fontScale) }
+            composeRule.onNodeWithTag("font_size.preview").assertExists()
+            composeRule.onNodeWithTag("font_size.${scale.name}").assertIsSelected()
+        }
+        composeRule.onNodeWithTag("font_size.Default").performClick()
+        composeRule.runOnIdle { assertEquals(AppFontScale.Default, appState.fontScale) }
+        composeRule.onNodeWithText("Done").performClick()
+        composeRule.onNodeWithTag("font_size.preview").assertDoesNotExist()
     }
 
     /** The app font dialog writes the chosen family and closes; the system face is the default. */

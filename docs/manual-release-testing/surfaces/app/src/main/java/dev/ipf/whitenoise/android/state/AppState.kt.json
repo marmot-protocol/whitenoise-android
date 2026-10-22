@@ -138,6 +138,14 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "setting:font_size_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.font_size_save_failed",
+        "test_ids": [
+          "SET-006"
+        ]
       }
     ],
     "source_coverage": [

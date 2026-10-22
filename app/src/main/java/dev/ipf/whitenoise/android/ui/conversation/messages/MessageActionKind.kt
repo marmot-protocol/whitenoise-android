@@ -18,6 +18,7 @@ internal enum class MessageActionKind {
     Translate,
     Forward,
     KeepOnScreen,
+    ShowLess,
     Share,
     Save,
     Info,
@@ -50,6 +51,7 @@ internal fun messageActionKinds(
     canTranslate: Boolean = false,
     canForward: Boolean,
     canKeepOnScreen: Boolean = false,
+    canShowLess: Boolean = false,
     canShare: Boolean = false,
     canSave: Boolean,
     canInfo: Boolean = true,
@@ -59,6 +61,7 @@ internal fun messageActionKinds(
         // Keep on screen leads, so in a two-column grid it always lands in the first row where it
         // can be found without reading the whole menu.
         if (canKeepOnScreen) add(MessageActionKind.KeepOnScreen)
+        if (canShowLess) add(MessageActionKind.ShowLess)
         if (canEdit) add(MessageActionKind.Edit)
         if (canSelectText) add(MessageActionKind.SelectText)
         if (canReply) add(MessageActionKind.Reply)
@@ -117,6 +120,7 @@ internal fun messageActionLabel(kind: MessageActionKind): String =
 
 private val messageActionLabelResources =
     mapOf(
+        MessageActionKind.ShowLess to R.string.show_less,
         MessageActionKind.Reply to R.string.reply,
         MessageActionKind.Edit to R.string.edit,
         MessageActionKind.Select to R.string.select,
@@ -139,6 +143,7 @@ internal fun messageActionIconRes(kind: MessageActionKind): Int = messageActionI
 
 private val messageActionIconResources =
     mapOf(
+        MessageActionKind.ShowLess to R.drawable.ic_arrow_up,
         MessageActionKind.Reply to R.drawable.ic_reply,
         MessageActionKind.Edit to R.drawable.ic_edit,
         MessageActionKind.Select to R.drawable.ic_check,
