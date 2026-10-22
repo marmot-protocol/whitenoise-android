@@ -23,7 +23,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -71,8 +70,7 @@ class MarmotKitRecoveryQualificationTest {
     /**
      * A receiver whose runtime is closed while more events accumulate than the relay returns for one query recovers
      * every message once it reopens, because MDK pages backwards past the clamp (MDK #2274). Six senders send 100
-     * messages each, so each sender stays within MLS's 100-message reorder tolerance. A device too slow to send them
-     * within MDK's two-minute replay lookback meets mdk#2381 instead, as the next case does on purpose.
+     * messages each, so each sender stays within MLS's 100-message reorder tolerance.
      */
     @Test
     fun offlineReplayBeyondTheRelayClampRecoversEveryMessage() =
@@ -81,10 +79,9 @@ class MarmotKitRecoveryQualificationTest {
         }
 
     /**
-     * The same replay after the receiver stayed offline longer than MDK's two-minute replay lookback. With a relay
-     * that cannot compare history, the clamped replay is not paged and the oldest messages never arrive.
+     * Replay after more than two minutes offline must page past the relay clamp even without history comparison
+     * (MDK #2381, fixed by #2513). Every plaintext is required; a successful catch-up call alone proves nothing.
      */
-    @Ignore("mdk#2381: catch-up after more than two minutes offline skips events beyond the relay's 500 clamp")
     @Test
     fun offlineReplayAfterTheLookbackRecoversEveryMessage() =
         runBlocking<Unit> {
@@ -106,10 +103,9 @@ class MarmotKitRecoveryQualificationTest {
     }
 
     /**
-     * One sender's messages beyond MLS's 100-message reorder tolerance are lost on catch-up, because the relay's
-     * newest-first results are decrypted newest first. Fails on 0.13.0 and on this snapshot alike.
+     * One sender's 600 messages must all decrypt despite newest-first relay pages and MLS's 100-message reorder
+     * tolerance (MDK #2375, fixed by #2513). Ordering and recovery remain entirely inside the native runtime.
      */
-    @Ignore("mdk#2375: offline catch-up keeps only each sender's newest 100 messages")
     @Test
     fun oneSenderBeyondTheReorderToleranceRecoversEveryMessage() =
         runBlocking<Unit> {
@@ -290,6 +286,34 @@ class MarmotKitRecoveryQualificationTest {
                 listOf(created),
                 recipient.runtime.chatList(recipient.account.label, true).map { it.groupIdHex },
             )
+        }
+
+    /**
+     * Healthy peer traffic survives another locally deleted group and a receiver restart on the shipped binding.
+     * Native quarantine injection and send-before-drain ordering remain covered by MDK's composed #2318 regressions;
+     * this Android check does not pretend that local deletion alone creates a quarantine.
+     */
+    @Test
+    fun healthyAccountReceivesAfterLocalDeletionAndRestart() =
+        runBlocking<Unit> {
+            val group = establishedGroup()
+            val receiver = group.receiver
+            val deleted = receiver.runtime.createGroup(receiver.account.label, "Deleted fixture", emptyList(), null)
+            check(receiver.runtime.deleteGroupLocal(receiver.account.label, deleted))
+            repeat(2) { pass ->
+                val active = if (pass == 0) receiver else reopen(receiver)
+                val incoming = "healthy-incoming-$pass"
+                group.sender.runtime.sendText(group.sender.account.label, group.id, incoming)
+                assertEquals(setOf(incoming), awaitTexts(active, group.id, setOf(incoming), INVITE_TIMEOUT_MILLIS))
+                val outgoing = "healthy-outgoing-$pass"
+                active.runtime.sendText(active.account.label, group.id, outgoing)
+                assertEquals(
+                    setOf(outgoing),
+                    awaitTexts(group.sender, group.id, setOf(outgoing), INVITE_TIMEOUT_MILLIS),
+                )
+                assertTrue(active.runtime.chatList(active.account.label, true).none { it.groupIdHex == deleted })
+                close(active)
+            }
         }
 
     /** An optional instrumentation argument, so a debugging run can use smaller counts and waits. */
