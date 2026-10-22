@@ -70,13 +70,12 @@ internal fun rememberGroupAvatarPresentation(
     val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef)
     if (durableAvatar != null) {
         val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
-        val seededImage = ownedSeed?.durableImageFor(durableKey)
         // Missing/invalidated assets must not revive a legacy bitmap or launch a second acquisition.
         return appState.durableGroupAvatarPresentation(
             group,
             durableAvatar,
             accountRef,
-            durableImage ?: seededImage,
+            durableImage ?: ownedSeed?.durableImageFor(durableKey),
             durableAvatarIsPersonPicture,
         )
     }
@@ -102,7 +101,7 @@ internal fun rememberGroupAvatarPresentation(
                 GroupAvatarAnimation(
                     "${appState.runtimeGeneration}|${AvatarImageLoader.currentCacheLifetime()}|" +
                         "$accountRef|${group.groupIdHex}|${legacyUrl ?: encryptedKey}",
-                    reader,
+                    appState.legacyGroupAnimationReader(accountRef, legacyUrl, reader),
                 )
             },
     )

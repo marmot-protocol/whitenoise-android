@@ -74,7 +74,10 @@ internal class AccountWideForwardTargets(
     }
 
     /** Complete transient list projection; retained native rows override this one-shot read. */
-    fun chatListItems(retained: List<ChatListItem>): List<ChatListItem> {
+    fun chatListItems(
+        retained: List<ChatListItem>,
+        draftedAtSeconds: (ChatListItem) -> ULong? = { null },
+    ): List<ChatListItem> {
         if (!isCurrent) return emptyList()
         val retainedIds = retained.mapTo(hashSetOf()) { it.foldedId }
         val accountId = controller.boundAccountIdHex()
@@ -83,6 +86,7 @@ internal class AccountWideForwardTargets(
                 presented
                     .filterNot { it.row.groupIdHex.lowercase(Locale.ROOT) in retainedIds }
                     .map { controller.projectPresentedRow(it, accountId) },
+            draftedAtSeconds,
         )
     }
 

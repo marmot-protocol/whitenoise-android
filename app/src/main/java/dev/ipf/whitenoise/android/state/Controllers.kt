@@ -11855,11 +11855,11 @@ class ConversationController(
         val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
         if (!eligible) return false
         val beforeRead = mutationPresentation.groupAuthorityEpoch
-        refreshManagementState()
+        val applied = refreshManagementState()
         val observedMembers =
             membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
         val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
-        return mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
+        return applied && mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
     }
 
     /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */
@@ -11867,13 +11867,14 @@ class ConversationController(
         account: String,
         details: GroupDetailsFfi,
         management: GroupManagementStateFfi,
-    ) {
+    ): Boolean =
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-            if (applyMutationDetails(account, details)) {
+            val applied = applyMutationDetails(account, details)
+            if (applied) {
                 managementState = management.takeIf { group == details.group }
             }
+            applied && managementState != null
         }
-    }
 
     /** Removes [member] from the group, asking first if MDK holds the change back. True once they are gone. */
     suspend fun removeMember(
@@ -11951,8 +11952,8 @@ class ConversationController(
     ): Boolean {
         if (!refresh) return true
         val epoch = mutationPresentation.groupAuthorityEpoch
-        refreshManagementState()
-        return mutationPresentation.groupAuthorityEpoch != epoch && ownsPresentation()
+        val applied = refreshManagementState()
+        return applied && mutationPresentation.groupAuthorityEpoch != epoch && ownsPresentation()
     }
 
     /** Promotes or demotes [member], asking first if MDK holds the change back. True once committed. */
@@ -12074,8 +12075,9 @@ class ConversationController(
     private val managementStateLifetime = StalenessGuard()
 
     /** Details and capabilities share one native frontier; later group updates supersede this read. */
-    suspend fun refreshManagementState() {
-        val account = conversationAccountRef ?: return
+    suspend fun refreshManagementState(): Boolean {
+        val account = conversationAccountRef ?: return false
+        var applied = false
         val requestToken = managementStateLifetime.advance()
         val authorityEpoch = mutationPresentation.groupAuthorityEpoch
         val rosterGeneration = memberRosterRefreshGeneration.capture()
@@ -12097,11 +12099,12 @@ class ConversationController(
                         !refreshed.managementState.myAccountIdHex.equals(conversationAccountIdHex, ignoreCase = true) ||
                         !matchesConversation(account, groupId)
                 if (staleRead || changedOwner || wrongTarget) return@runIfCurrent
-                applyManagementSnapshot(account, refreshed.details, refreshed.managementState)
+                applied = applyManagementSnapshot(account, refreshed.details, refreshed.managementState)
             }
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMConversation", "management state refresh failed", it)
         }
+        return applied
     }
 
     /** Install and require the lifecycle component in one admin commit. */

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">下拉以顯示未讀聊天</string>
+    <string name="pull_unread_only">僅未讀</string>
+    <string name="pull_unread_show_all">顯示全部</string>
+    <string name="pull_unread_retry">重新載入未讀聊天</string>
+    <string name="pull_unread_load_failed">無法載入未讀聊天，請重試。</string>
+    <string name="pull_unread_hint">下拉以顯示未讀聊天</string>
+    <string name="pull_unread_release">放開以顯示未讀聊天</string>
+</resources>

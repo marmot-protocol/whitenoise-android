@@ -41,12 +41,11 @@ internal fun ConversationController.canRemoveProfile(person: String): Boolean {
 }
 
 /** Transient presentation only; every mounted visit permanently owns its callbacks and controllers. */
-private class MembershipVisitState(
+internal class MembershipVisitState(
     val owner: PersonProfileOwner,
 ) {
     var controllers by mutableStateOf<Map<String, ConversationController>>(emptyMap())
     var retry by mutableIntStateOf(0)
-    var loading by mutableStateOf(true)
     var busy by mutableStateOf(false)
     var confirmId by mutableStateOf<String?>(null)
 
@@ -88,7 +87,7 @@ internal fun PersonGroupsMembershipContent(
     val labelTemplate = stringResource(R.string.shared_group_remove_person)
     PersonGroupsInCommonContent(
         rows = rows,
-        unresolved = unresolved || state.loading || state.controllers.size < groups.size,
+        unresolved = unresolved,
         onBack = { state.owner.leave(onBack) },
         onOpen = { id -> if (state.owner.canAct()) onOpen(id) },
         onAdd = { state.owner.leave(onAdd) },
@@ -139,7 +138,6 @@ private fun MembershipControllersEffect(
     LaunchedEffect(state, groups.map { it.group }, state.retry) {
         state.confirmId = null
         state.controllers = emptyMap()
-        state.loading = true
         val loaded = mutableMapOf<String, ConversationController>()
         try {
             if (account != null && person != null && state.owner.canAct()) {
@@ -150,7 +148,6 @@ private fun MembershipControllersEffect(
                 }
                 if (state.owner.canAct()) state.controllers = loaded
             }
-            state.loading = false
             awaitCancellation()
         } finally {
             loaded.values.forEach { it.onCleared() }
@@ -259,7 +256,7 @@ private suspend fun performMembershipRemoval(
 }
 
 @Suppress("LongParameterList")
-private suspend fun completeMembershipRemoval(
+internal suspend fun completeMembershipRemoval(
     appState: WhiteNoiseAppState,
     state: MembershipVisitState,
     removed: Boolean,
@@ -268,7 +265,7 @@ private suspend fun completeMembershipRemoval(
     onFeedback: (ToastMessage?) -> Unit,
     onRetry: () -> Unit,
 ) {
-    if (!state.owner.canAct()) return
+    // The parent profile owns its account-wide refresh even after this child visit has retired.
     if (removed) onMembershipChanged()
     if (state.owner.canAct()) {
         val feedback =

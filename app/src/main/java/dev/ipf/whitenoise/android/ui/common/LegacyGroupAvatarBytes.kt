@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GROUP_AVATAR_MAX_PAYLOAD_BYTES
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /**
  * A bounded-list miss proves neither selection nor deletion. Read MDK's current snapshot in that case,
@@ -30,4 +32,32 @@ internal suspend fun readLegacyGroupAvatarBytes(
     }
     val bytes = if (sourceIsCurrent()) readBytes() else null
     return bytes?.takeIf { it.size <= GROUP_AVATAR_MAX_PAYLOAD_BYTES && sourceIsCurrent() }
+}
+
+/**
+ * URL thumbnail acquisition belongs to the ordinary first-frame loader. Re-entering a static, missing
+ * or source-evicted avatar keeps its warm pixels instead of starting a second media fetch. The legacy
+ * encrypted path retains its authoritative reader; full viewers keep their separate original reader.
+ */
+internal fun WhiteNoiseAppState.legacyGroupAnimationReader(
+    accountRef: String?,
+    legacyUrl: String?,
+    encryptedReader: suspend () -> ByteArray?,
+): suspend () -> ByteArray? {
+    val owner = captureHostPerformanceRuntimeOwner()
+    val generation = runtimeGeneration
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val ownsSource = {
+        val sameAccount = accountRef != null && activeAccountRef == accountRef
+        val sameRuntime = runtimeGeneration == generation && owner?.let { ownsHostPerformanceRuntimeOwner(it) } == true
+        sameAccount && sameRuntime && AvatarImageLoader.currentCacheLifetime() == lifetime
+    }
+    return {
+        if (ownsSource()) {
+            val bytes = if (legacyUrl == null) encryptedReader() else AvatarImageLoader.peekAnimatedSource(legacyUrl)
+            bytes?.takeIf { ownsSource() }
+        } else {
+            null
+        }
+    }
 }

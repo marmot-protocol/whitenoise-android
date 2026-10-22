@@ -231,6 +231,42 @@ class ChatsScreenFolderSelectionRecompositionTest {
         composeRule.runOnIdle { reread.complete(emptyList()) }
     }
 
+    @Test fun unreadRefreshKeepsUsefulRowsMountedUntilReplacementIsReady() {
+        val appState = testAppState()
+        val replacement = CompletableDeferred<List<dev.ipf.marmotkit.PresentedChatRowFfi>>()
+        val id = "d1".repeat(32)
+        val native = presentedRow(id).let { it.copy(row = it.row.copy(manuallyMarkedUnread = true)) }
+        var reads = 0
+        appState.liveSubscriptionOverrides.chatList =
+            ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> error("not used") },
+                openChats = { _, _ -> error("not used") },
+                presentedChatList = { _, _ ->
+                    reads++
+                    if (reads == 1) listOf(native) else replacement.await()
+                },
+            )
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        val retained = chatItem(id).let { it.copy(projection = checkNotNull(it.projection).copy(manuallyMarkedUnread = true)) }
+        setControllerItems(controller, listOf(retained))
+        composeRule.setContent {
+            WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
+        }
+        composeRule.onNodeWithTag("chats.unread_filter").performClick()
+        composeRule.waitUntil { reads == 1 }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("chat.row.$id").assertExists()
+        composeRule.runOnIdle { controller.applyChatListRow(native.row.copy(activitySortAt = 10uL)) }
+        composeRule.waitUntil { reads >= 2 }
+        composeRule.onNodeWithTag("chat.row.$id").assertExists()
+        composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
+        composeRule.onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
+        composeRule.runOnIdle { replacement.complete(listOf(native)) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+        controller.onCleared()
+    }
+
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,

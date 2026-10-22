@@ -31,7 +31,7 @@ class GroupConversationSnapshotApplicationTest {
                     expected
                 }
             try {
-                controller.refreshManagementState()
+                assertTrue(controller.refreshManagementState())
                 assertEquals(1, calls)
                 assertEquals("Updated", controller.group.name)
                 assertEquals(emptyList<String>(), controller.group.admins)
@@ -109,7 +109,7 @@ class GroupConversationSnapshotApplicationTest {
                 val first = async(start = CoroutineStart.UNDISPATCHED) { controller.refreshManagementState() }
                 assertTrue(controller.updateGroupProfile("Just committed", "Updated description"))
                 reply.complete(snapshot("Old name", admin = false))
-                first.await()
+                org.junit.Assert.assertFalse(first.await())
                 assertEquals("Just committed", controller.group.name)
                 assertEquals("Updated description", controller.group.description)
                 assertNull(controller.managementState)
@@ -236,6 +236,54 @@ class GroupConversationSnapshotApplicationTest {
                 assertEquals(2, calls)
                 org.junit.Assert.assertNotNull(controller.lastMutationError)
                 assertTrue(controller.members.any { it.memberIdHex == peer.memberIdHex })
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** A competing accepted snapshot must not credit this removal's rejected authority read. */
+    @Test
+    fun supersededRemovalReadCannotBorrowAnotherSnapshotsAuthorityEpoch() =
+        runTest {
+            var calls = 0
+            val initial = snapshot("Before", admin = true)
+            val peer =
+                initial.details.members.single().copy(
+                    memberIdHex = "cc".repeat(32),
+                    account = null,
+                    local = false,
+                    isAdmin = false,
+                    isSelf = false,
+                )
+            initial.details.members = initial.details.members + peer
+            initial.details.mlsState.memberCount = 2u
+            val newer = snapshot("Newer", admin = true)
+            newer.details.members = initial.details.members
+            newer.details.mlsState.memberCount = 2u
+            lateinit var controller: ConversationController
+            controller =
+                controller {
+                    when (calls++) {
+                        1 -> {
+                            assertTrue(controller.refreshManagementState())
+                            initial
+                        }
+                        2 -> newer
+                        else -> initial
+                    }
+                }
+            try {
+                assertTrue(controller.refreshManagementState())
+                org.junit.Assert.assertFalse(
+                    controller.removeMember(
+                        controller.members.single { it.memberIdHex == peer.memberIdHex },
+                        refreshAuthorityBeforeCommit = true,
+                    ),
+                )
+                assertEquals(3, calls)
+                assertEquals("Newer", controller.group.name)
+                assertTrue(controller.members.any { it.memberIdHex == peer.memberIdHex })
+                assertTrue(checkNotNull(controller.lastMutationError).report.contains("error=STALE_STATE"))
             } finally {
                 controller.onCleared()
             }

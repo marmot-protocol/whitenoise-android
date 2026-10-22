@@ -523,6 +523,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedGroupAvatar.kt",
+      "symbol": "AnimatedGroupAvatarOverlay",
+      "bindings": [],
+      "remaining": "Add an exact-source runtime flow entering a real group thumbnail and directly asserting its decoded animation, then its off-screen/background/reduced-motion resource release. Existing JVM budget/source-ownership regressions and GRP-035 document coverage, but do not grant runtime screen execution credit."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
       "symbol": "AnimatedProfileAvatarOverlay",
       "bindings": [
@@ -2732,6 +2738,18 @@
           "visible_on_entry": true
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+      "symbol": "PersonGroupsInCommonContent",
+      "bindings": [],
+      "remaining": "Direct Maestro entry, row navigation, authorized removal overflow, unresolved retry and RTL/large-text assertions are pending; no Maestro execution credit. PersonGroupsInCommonContentTest directly checks navigation versus add, retry, removal target and unauthorized controls on the JVM. ACC-022 maintains the physical-device guide; its execution is not established here."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+      "symbol": "MembershipRemovalConfirmation",
+      "bindings": [],
+      "remaining": "Direct Maestro modal entry, exact person/group/acting-account confirmation, cancel, disabled-busy and stale-owner assertions are pending; no Maestro execution credit. PersonGroupsMembershipLifetimeTest checks disposed visit callbacks on the JVM, not this confirmation modal. ACC-022 maintains confirmation and authority-change physical checks; execution is not established here."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileFeedbackDialog.kt",

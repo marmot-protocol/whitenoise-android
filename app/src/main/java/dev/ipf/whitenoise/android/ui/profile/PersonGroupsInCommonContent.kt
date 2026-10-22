@@ -143,7 +143,10 @@ internal fun PersonGroupsInCommonContent(
                                                     onDismissRequest = { expanded = false },
                                                     scrollState = menuScrollState,
                                                     modifier =
-                                                        Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+                                                        Modifier.scrollEdgeFade(
+                                                            menuScrollState,
+                                                            stableRenderTarget = true,
+                                                        ),
                                                 ) {
                                                     DropdownMenuItem(
                                                         text = { Text(removeLabel(group)) },

@@ -276,7 +276,7 @@ internal fun ChatsScreen(
     var unreadLoadedFolderState by remember(controller, selectedFolderId) { mutableStateOf(folderStoreState) }
     val unreadRevision = controller.forwardTargetsRevision
     LaunchedEffect(controller, unreadOnly, unreadRevision, unreadRetry, folderStoreState) {
-        unreadSnapshot = null
+        if (!unreadOnly) unreadSnapshot = null
         unreadReadFailed = false
         if (unreadOnly) {
             when (val read = controller.readAccountWideForwardTargets()) {
@@ -312,10 +312,34 @@ internal fun ChatsScreen(
         unreadSnapshot?.takeIf {
             unreadLoadedRevision == unreadRevision && unreadLoadedFolderState == folderStoreState && it.isCurrent
         }
-    val completeUnreadItems =
-        if (unreadOnly) currentUnreadSnapshot?.chatListItems(controller.items + controller.archivedItems) else null
-    val folderActiveItems = completeUnreadItems?.filterNot { it.group.archived } ?: controller.items
-    val folderArchivedItems = completeUnreadItems?.filter { it.group.archived } ?: controller.archivedItems
+    // A row revision invalidates completeness, while the same scope may keep useful rows during refresh.
+    val displayUnreadSnapshot = unreadSnapshot?.takeIf { unreadLoadedFolderState == folderStoreState && it.isCurrent }
+    val unreadItems =
+        remember(
+            unreadOnly,
+            displayUnreadSnapshot,
+            controller.items,
+            controller.archivedItems,
+            unreadRevision,
+        ) {
+            if (unreadOnly) {
+                displayUnreadSnapshot?.chatListItems(controller.items + controller.archivedItems) { item ->
+                    controller.boundAccountRef?.let { account ->
+                        appState.draftStore.draftedAtSecondsFor(account, item.group.groupIdHex)
+                    }
+                }
+            } else {
+                null
+            }
+        }
+    val folderActiveItems =
+        remember(unreadItems, controller.items) {
+            unreadItems?.filterNot { it.group.archived } ?: controller.items
+        }
+    val folderArchivedItems =
+        remember(unreadItems, controller.archivedItems) {
+            unreadItems?.filter { it.group.archived } ?: controller.archivedItems
+        }
     val searchFolderContext =
         rememberSearchFolderContext(
             appState,
@@ -1912,6 +1936,9 @@ internal fun ChatsScreen(
                             ),
                         )
                     }
+                    if (unreadOnly && currentUnreadSnapshot == null && !unreadReadFailed && displayUnreadSnapshot != null) {
+                        CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
+                    }
                     if (unreadReadFailed && unreadOnly) {
                         TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
                     }
@@ -2018,12 +2045,14 @@ internal fun ChatsScreen(
                                 searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
                                     .rememberLazyGridState(),
                         )
-                    unreadOnly && unreadReadFailed ->
+                    unreadOnly && unreadReadFailed && (displayUnreadSnapshot == null || visibleItems.isEmpty()) ->
                         Column(Modifier.fillMaxSize().padding(16.dp)) {
                             Text(stringResource(R.string.pull_unread_load_failed))
                             TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
                         }
-                    unreadOnly && currentUnreadSnapshot == null -> LoadingScreen()
+                    unreadOnly &&
+                        currentUnreadSnapshot == null &&
+                        (displayUnreadSnapshot == null || visibleItems.isEmpty()) -> LoadingScreen()
                     controller.isLoading && sourceList.isEmpty() -> {
                         val slowCopy = stringResource(R.string.chat_list_startup_slow)
                         LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })

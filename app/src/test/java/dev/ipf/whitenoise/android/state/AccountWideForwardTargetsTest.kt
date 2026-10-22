@@ -61,6 +61,23 @@ class AccountWideForwardTargetsTest {
             assertTrue(all.single { it.group.groupIdHex == RETAINED }.effectiveHasUnread(ACCOUNT_HEX))
         }
 
+    @Test
+    fun fullChatListKeepsDraftRecencyAcrossRetainedAndOffWindowRows() =
+        runBlocking {
+            val controller =
+                controllerWithAccountWideRead { _, _ ->
+                    listOf(presentedRow(BEYOND).let { it.copy(row = it.row.copy(activitySortAt = 10uL)) })
+                }
+            val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+            val retained = chatListItemFromProjection(chatRow(RETAINED).copy(activitySortAt = 5uL))
+            val result =
+                snapshot.chatListItems(listOf(retained)) { item ->
+                    if (item.id == RETAINED) 20uL else null
+                }
+            assertEquals(listOf(RETAINED, BEYOND), result.map { it.id })
+            assertSame(retained, result.first())
+        }
+
     /** A read that outlives its account binding is rejected instead of being offered under the next account. */
     @Test
     fun readFinishingAfterAccountTeardownIsRejected() =
