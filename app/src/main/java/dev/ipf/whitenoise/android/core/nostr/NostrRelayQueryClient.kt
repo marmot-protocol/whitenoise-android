@@ -268,6 +268,7 @@ internal class NostrRelayQueryClient(
         val sharedDefaultHttpClient: OkHttpClient by lazy {
             OkHttpClient
                 .Builder()
+                .limitNostrRelayMessages()
                 .dns(PublicRelayDns())
                 .followRedirects(false)
                 .followSslRedirects(false)
