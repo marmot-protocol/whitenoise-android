@@ -13246,11 +13246,11 @@ class WhiteNoiseAppState private constructor(
             // A failed open is retried with the capped backoff for as long as the listener runs: muted chats and
             // notifications-off accounts get no notification update, so this loop is their only receipt source.
             if (subscription != null) {
-                // Each open requests cleanup for cards left while the process or stream was down. It shares
-                // read-state workers: a newer open marks a blocked pass dirty and retains its latest follow-up.
-                runCatchingCancellable { requestActiveNotificationCardReconciliation(readReconciliations) }
-                    .onFailure { appStateDebug(it) { "notification reconcile failed" } }
                 try {
+                    // Each open requests cleanup for cards left while the process or stream was down. It shares
+                    // read-state workers: a newer open marks a blocked pass dirty and retains its latest follow-up.
+                    runCatchingCancellable { requestActiveNotificationCardReconciliation(readReconciliations) }
+                        .onFailure { appStateDebug(it) { "notification reconcile failed" } }
                     runCatchingCancellable {
                         var event = subscription.next()
                         while (event != null) {

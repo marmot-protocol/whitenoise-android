@@ -244,6 +244,9 @@ internal class NotificationBootstrapTestFixture(
         java.util.concurrent.atomic
             .AtomicInteger()
 
+    /** Opened runtime event subscriptions whose explicit disposal has completed. */
+    val destroyedEventSubscriptions = AtomicInteger(0)
+
     /** Whether the first runtime event subscription was opened before the runtime started. */
     @Volatile
     var firstEventsSubscriptionBeforeStart: Boolean? = null
@@ -380,7 +383,10 @@ internal class NotificationBootstrapTestFixture(
                     if (eventOpenFailures.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0) {
                         error("fixture event stream unavailable")
                     }
-                    allocateWithoutConstructor(FixtureEventsSubscription::class.java).apply { events = runtimeEvents }
+                    allocateWithoutConstructor(FixtureEventsSubscription::class.java).apply {
+                        events = runtimeEvents
+                        onDestroy = { destroyedEventSubscriptions.incrementAndGet() }
+                    }
                 }
                 "chatNotificationSettings" -> {
                     val accountRef = arguments?.get(0) as String
@@ -816,12 +822,13 @@ internal class NotificationBootstrapTestFixture(
      */
     private class FixtureEventsSubscription : EventsSubscription(NoPointer) {
         lateinit var events: Channel<MarmotEventFfi?>
+        lateinit var onDestroy: () -> Unit
 
         /** Waits for the next emitted runtime event. */
         override suspend fun next(): MarmotEventFfi? = events.receive()
 
-        /** Holds no native handle. */
-        override fun destroy() = Unit
+        /** Records explicit disposal without holding a native handle. */
+        override fun destroy() = onDestroy()
 
         /** Holds no native handle. */
         override fun close() = Unit
@@ -1012,6 +1019,9 @@ internal class NotificationBootstrapTestFixture(
             }
         }
     }
+
+    /** Runs only the receipt loop so lifecycle tests can cancel its actual owning job directly. */
+    suspend fun runReceiptLoop() = appState.runMutedChatReceiptLoop(marmot)
 
     /** Waits until the notification listener has opened the runtime event stream. */
     suspend fun awaitRuntimeEventSubscription() {
