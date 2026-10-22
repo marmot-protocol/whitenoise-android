@@ -237,7 +237,7 @@ internal class NotificationBootstrapTestFixture(
     val listMediaCalls = AtomicInteger(0)
 
     /** Runtime events the fixture's firehose delivers, in order, to every subscriber. */
-    private val runtimeEvents = Channel<MarmotEventFfi>(Channel.UNLIMITED)
+    private val runtimeEvents = Channel<MarmotEventFfi?>(Channel.UNLIMITED)
 
     /** How many runtime event subscriptions the app opened. */
     val eventsSubscriptions =
@@ -257,6 +257,11 @@ internal class NotificationBootstrapTestFixture(
     /** Emits one runtime event on the firehose, as MDK does for every delivered message. */
     fun emitRuntimeEvent(event: MarmotEventFfi) {
         check(runtimeEvents.trySend(event).isSuccess)
+    }
+
+    /** Ends the current subscription normally; the receipt loop must open a new stream. */
+    fun endRuntimeEventStream() {
+        check(runtimeEvents.trySend(null).isSuccess)
     }
 
     /** How many chat-list row reads the app made, such as the notification read-state check. */
@@ -810,7 +815,7 @@ internal class NotificationBootstrapTestFixture(
      * its constructor, like the other fakes here, because the UniFFI base registers a cleaner the JVM cannot open.
      */
     private class FixtureEventsSubscription : EventsSubscription(NoPointer) {
-        lateinit var events: Channel<MarmotEventFfi>
+        lateinit var events: Channel<MarmotEventFfi?>
 
         /** Waits for the next emitted runtime event. */
         override suspend fun next(): MarmotEventFfi? = events.receive()

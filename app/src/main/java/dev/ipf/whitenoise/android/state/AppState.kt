@@ -12594,13 +12594,15 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Reconciles each conversation with an active card against MDK's bounded state (#3323, #2065), on every runtime
-     * event-stream open and whenever a conversation's read marker moves.
+     * Requests cleanup for each shown conversation on stream open (#3323, #2065). Opens and read-state events
+     * share the receipt loop's workers, so reconnecting never cancels or duplicates an unfinished native read.
      */
-    internal suspend fun reconcileActiveNotificationCards(marmot: MarmotInterface? = null) {
+    private suspend fun requestActiveNotificationCardReconciliation(
+        readReconciliations: NotificationReadReconciliationCoordinator,
+    ) {
         val cards = withContext(Dispatchers.Default) { localNotificationPresenter.activeConversationCards() }
-        cards.groupBy { it.accountRef to it.groupIdHex }.forEach { (scope, scopeCards) ->
-            reconcileConversationCards(scope.first, scope.second, scopeCards, marmot)
+        cards.map { it.accountRef to it.groupIdHex.lowercase() }.distinct().forEach { (account, group) ->
+            readReconciliations.request(account, group)
         }
     }
 
@@ -13226,7 +13228,6 @@ class WhiteNoiseAppState private constructor(
     ) = supervisorScope {
         var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
         var preopened = initial
-        var openReconciliation: Job? = null
         val readReconciliations =
             NotificationReadReconciliationCoordinator(
                 scope = this,
@@ -13245,15 +13246,10 @@ class WhiteNoiseAppState private constructor(
             // A failed open is retried with the capped backoff for as long as the listener runs: muted chats and
             // notifications-off accounts get no notification update, so this loop is their only receipt source.
             if (subscription != null) {
-                // Each open first reconciles the cards already in the tray, so a deletion or read that happened
-                // while this process was dead or the stream was down is honoured too (#3323, #2065).
-                // A newer open supersedes an unfinished pass, so a flapping stream never stacks reconciliations.
-                openReconciliation?.cancel()
-                openReconciliation =
-                    launch {
-                        runCatchingCancellable { reconcileActiveNotificationCards(marmot) }
-                            .onFailure { appStateDebug(it) { "notification reconcile failed" } }
-                    }
+                // Each open requests cleanup for cards left while the process or stream was down. It shares
+                // read-state workers: a newer open marks a blocked pass dirty and retains its latest follow-up.
+                runCatchingCancellable { requestActiveNotificationCardReconciliation(readReconciliations) }
+                    .onFailure { appStateDebug(it) { "notification reconcile failed" } }
                 try {
                     runCatchingCancellable {
                         var event = subscription.next()

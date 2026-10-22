@@ -10,8 +10,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Coalesces read-state card cleanup within its receipt-loop scope. A conversation has one worker even while a
- * synchronous native read is blocked. New requests mark that worker dirty rather than cancelling its binding and
+ * Coalesces stream-open and read-state card cleanup within its receipt-loop scope. A conversation has one worker
+ * even while a synchronous native read is blocked. New requests mark it dirty rather than cancelling its binding and
  * starting another. It reads the latest state again, then follows up once after the latest pass has stayed quiet.
  * Idle and cancelled workers release their registrations; no notification or native state is cached here.
  */

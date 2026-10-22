@@ -397,7 +397,7 @@
       {
         "surface": "Restart reconciliation of deleted or read message cards",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "fun reconcileActiveNotificationCards(",
+        "anchor": "fun requestActiveNotificationCardReconciliation(",
         "test_ids": [
           "NTF-043",
           "NTF-044"

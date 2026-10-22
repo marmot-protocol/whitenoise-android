@@ -354,6 +354,61 @@ class NotificationContentRetractionTest {
             )
         }
 
+    /** Reopening the actual stream cannot multiply a blocked binding, and its latest request still removes the card. */
+    @Test
+    fun repeatedStreamOpensShareTheReadStateWorker() =
+        runBlocking {
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val reads = AtomicInteger(0)
+            val read = AtomicBoolean(false)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = MESSAGE_ID,
+                    emitStartupNotification = false,
+                    onChatListRow = { _, _ ->
+                        val wasRead = read.get()
+                        reads.incrementAndGet()
+                        entered.countDown()
+                        check(release.await(30, TimeUnit.SECONDS))
+                        readRow(marker = MESSAGE_ID).takeIf { wasRead }
+                    },
+                    onTimelineMessages = { _, _ -> TimelinePageFfi(listOf(record(MESSAGE_ID, 12uL)), false, false) },
+                )
+            try {
+                assertTrue(LocalNotificationPresenter(context).show(fixture.update, shortNpub = { "sender" }))
+                fixture.bootstrap()
+                awaitLatch(entered)
+                repeat(3) {
+                    val opens = fixture.eventsSubscriptions.get()
+                    // A real event resets reconnect backoff and shares the same reconciliation worker.
+                    fixture.emitRuntimeEvent(readStateChanged())
+                    fixture.endRuntimeEventStream()
+                    withTimeout(10_000L) {
+                        while (fixture.eventsSubscriptions.get() <= opens) {
+                            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                            delay(1L)
+                        }
+                    }
+                }
+                assertTrue(
+                    "the existing card stays visible while native state is unreadable",
+                    pumpFor(NO_POST_WINDOW_MS),
+                )
+                assertEquals("reopens and read changes must share one unfinished binding", 1, reads.get())
+                assertEquals("all assertions precede native release", 1L, release.count)
+                read.set(true)
+                release.countDown()
+                awaitCardGone()
+                assertEquals("the dirty worker must read again after the stale snapshot", 2, reads.get())
+            } finally {
+                release.countDown()
+                fixture.close()
+            }
+        }
+
     /**
      * A read MDK reports while a card is shown removes it silently (#2065). The card was left by an earlier process,
      * so only the read-state change can reconcile it.
