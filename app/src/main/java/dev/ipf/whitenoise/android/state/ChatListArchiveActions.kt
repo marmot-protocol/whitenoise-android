@@ -99,7 +99,9 @@ internal class ChatListArchiveActions(
     ): Boolean = isCurrent(intent.bindEpoch) && intentsByGroup[groupIdHex.lowercase()] === intent
 
     /** Applies the temporary archive flag without changing the authoritative row. */
-    fun projectRow(row: ChatListRowFfi): ChatListRowFfi = intentsByGroup[row.groupIdHex.lowercase()]?.let { row.copy(archived = it.archived) } ?: row
+    fun projectRow(row: ChatListRowFfi): ChatListRowFfi = intentsByGroup[row.groupIdHex.lowercase()]?.let {
+        row.copy(archived = it.archived)
+    } ?: row
 
     /** Keeps the projected group flag consistent with its row while an action is pending. */
     fun projectGroup(
