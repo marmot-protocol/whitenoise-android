@@ -39,8 +39,8 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
-        "surface": "Delayed pause focus callback preserves the pending automatic resume edge",
-        "anchor": "if (focused == expected) expectedAutomaticFocus = null",
+        "surface": "Captured automatic focus expectation preserves the pending resume edge",
+        "anchor": "return expected == null",
         "test_ids": [
           "CON-033"
         ]

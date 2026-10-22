@@ -978,11 +978,17 @@ class ConversationDictationControllerTest {
     fun focusInterruptionRespectsUnavailableOriginalTargetAndConcurrentDraft() {
         for (available in listOf(false, true)) {
             var targetAvailable = true
+            var sends = 0
             val f =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetAvailable = { targetAvailable },
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
                 )
+            f.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other draft")
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.listener.onResult("accepted")
             f.scheduler.runDelay(500L)
@@ -990,6 +996,15 @@ class ConversationDictationControllerTest {
             targetAvailable = available
             f.controller.interruptForAudioFocusLoss()
             assertEquals(if (available) "New draft accepted" else "New draft", f.drafts.getValue(key()).text)
+            assertEquals("Other draft", f.drafts.getValue(OTHER_ACCOUNT to OTHER_GROUP).text)
+            assertEquals(0, sends)
+            if (!available) {
+                val failed = f.controller.state as ConversationDictationState.Failed
+                assertEquals(ConversationDictationFailure.Interrupted, failed.cause ?: failed.reason)
+                assertEquals("accepted", failed.retainedTranscript)
+                assertEquals(ACCOUNT, failed.target.accountRef)
+                assertEquals(GROUP, failed.target.groupIdHex)
+            }
         }
     }
 

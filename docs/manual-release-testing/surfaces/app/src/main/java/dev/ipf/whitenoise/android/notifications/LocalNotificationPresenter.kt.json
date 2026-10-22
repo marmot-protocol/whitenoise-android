@@ -158,6 +158,15 @@
         "test_ids": [
           "STB-005"
         ]
+      },
+      {
+        "surface": "Silent per-entry card retraction after deletion, hide or read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "fun reconcileConversationContent(",
+        "test_ids": [
+          "NTF-043",
+          "NTF-044"
+        ]
       }
     ]
   },

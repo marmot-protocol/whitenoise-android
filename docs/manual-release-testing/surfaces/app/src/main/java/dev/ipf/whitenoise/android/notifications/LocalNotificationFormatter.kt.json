@@ -21,6 +21,17 @@
           "NTF-030"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Active conversation card identity for reconciliation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "fun conversationScopeOfCard(",
+        "test_ids": [
+          "NTF-043",
+          "NTF-044"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

@@ -54,9 +54,8 @@ internal class ConversationForegroundFocusIntent {
             // Keep that edge armed until it is observed; Back/typing/navigation retire their
             // restore tokens directly, independently of these automatic focus callbacks.
             if (focused == expected) expectedAutomaticFocus = null
-            return false
         }
-        return true
+        return expected == null
     }
 }
 

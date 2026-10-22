@@ -3300,7 +3300,12 @@ internal class ConversationDictationController internal constructor(
             ) {
                 ConversationDictationCompletionOwner.PasteResult.Accepted -> complete(target)
                 ConversationDictationCompletionOwner.PasteResult.Retained ->
-                    fail(sessionId, target, ConversationDictationFailure.Unknown, retainedTranscript = transcript)
+                    fail(
+                        sessionId,
+                        target,
+                        failureCause ?: ConversationDictationFailure.Unknown,
+                        retainedTranscript = transcript,
+                    )
                 ConversationDictationCompletionOwner.PasteResult.Abandoned -> Unit
             }
         }
