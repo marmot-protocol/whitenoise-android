@@ -24,6 +24,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.abs
 
 internal class VoicePlaybackRequestSerializer {
     private val mutex = Mutex()
@@ -42,6 +43,10 @@ object VoicePlaybackController {
     private const val TAG = "VoicePlaybackController"
     private const val TICK_INTERVAL_MS = 60L
     private const val DUCK_VOLUME = 0.2f
+
+    // Audio codecs can land a little before the requested position; a completion
+    // this close to the latest target means that target has been reached.
+    private const val SEEK_SETTLE_TOLERANCE_MS = 500
 
     // Cap on cached per-clip durations. Each entry is a boxed Int keyed by an
     // absolute file path; without a bound the map held one entry per distinct
@@ -332,9 +337,7 @@ object VoicePlaybackController {
                 }
             }
         }
-        mp.setOnSeekCompleteListener { p ->
-            scope.launch { if (pendingSeek?.player === p) pendingSeek = null }
-        }
+        mp.setOnSeekCompleteListener { p -> scope.launch { settlePendingSeek(p) } }
         mp.setOnErrorListener { p, what, extra ->
             scope.launch {
                 Log.w(TAG, "MediaPlayer error what=$what extra=$extra")
@@ -720,6 +723,16 @@ object VoicePlaybackController {
                     delay(TICK_INTERVAL_MS)
                 }
             }
+    }
+
+    /**
+     * Clears the pending relative-seek target once [completed] has actually reached it. Seek completions do not say
+     * which request finished, so an earlier queued seek completing must not discard a later target still in flight.
+     */
+    private fun settlePendingSeek(completed: MediaPlayer) {
+        val pending = pendingSeek?.takeIf { it.player === completed } ?: return
+        val position = runCatching { completed.currentPosition }.getOrNull()
+        if (position == null || abs(position - pending.targetMs) <= SEEK_SETTLE_TOLERANCE_MS) pendingSeek = null
     }
 
     /** The target of a seek [player] accepted but has not yet reported complete. */

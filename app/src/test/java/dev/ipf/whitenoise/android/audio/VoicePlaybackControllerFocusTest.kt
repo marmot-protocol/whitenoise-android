@@ -159,6 +159,28 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(player.positionMs + 200, VoicePlaybackController.state.value.positionMs)
     }
 
+    /** An earlier queued seek completing keeps the later target, so a third quick tap still advances once more. */
+    @Test fun earlierSeekCompletionKeepsTheLaterPendingTarget() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 5_000))
+        player.durationMs = 5_000
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        player.positionMs = 1_123
+        settlePendingSeek(player)
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        assertEquals(3_123, player.seekedToMs)
+
+        player.positionMs = 3_123
+        settlePendingSeek(player)
+        player.positionMs = 3_500
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        assertEquals(4_500, player.seekedToMs)
+    }
+
     /** A seek the codec rejects reports failure and leaves the published playhead where it was. */
     @Test fun rejectedShellSeekReportsFailureAndKeepsThePlayhead() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
@@ -566,6 +588,14 @@ class VoicePlaybackControllerFocusTest {
         return method.invoke(VoicePlaybackController, mediaPlayer) as Boolean
     }
 
+    /** Delivers a seek completion through the controller's actual private settle path. */
+    private fun settlePendingSeek(mediaPlayer: MediaPlayer) {
+        val method =
+            VoicePlaybackController::class.java.getDeclaredMethod("settlePendingSeek", MediaPlayer::class.java)
+        method.isAccessible = true
+        method.invoke(VoicePlaybackController, mediaPlayer)
+    }
+
     /** Delivers a focus event through the controller's actual private callback. */
     private fun handleAudioFocusChange(change: Int) {
         val method = VoicePlaybackController::class.java.getDeclaredMethod("handleAudioFocusChange", Integer.TYPE)
@@ -661,7 +691,7 @@ class VoicePlaybackControllerFocusTest {
         var leftVolume = 1f
         var rightVolume = 1f
         var startCount = 0
-        val positionMs = 123
+        var positionMs = 123
         var durationMs = 456
         var failDurationQuery = false
 
