@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -32,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -131,6 +133,9 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
             if (useChatReceivedColor) 0xFF999999L else null,
         )
         val rows = customReplyRows()
+        rows
+            .filter { it.record.direction == "sent" && requireNotNull(it.projected).media.isNotEmpty() }
+            .forEach(::cacheCanonicalOwnFiles)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = mode != AppThemeMode.Light, amoled = mode == AppThemeMode.Amoled) {
                 Column(
@@ -140,14 +145,19 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
                 }
             }
         }
-        rows
-            .filter { it.record.direction == "sent" && requireNotNull(it.projected).media.isNotEmpty() }
-            .forEach(::cacheCanonicalOwnFiles)
         composeRule.onAllNodesWithText("Parent message").assertCountEquals(rows.size)
         composeRule.onNodeWithText("Custom sent text").assertExists()
         composeRule.onNodeWithText("Custom received text").assertExists()
         composeRule.onNodeWithText("Custom sent caption").assertExists()
         composeRule.onNodeWithText("Custom received caption").assertExists()
+        // Received cards resolve their disk-cache misses off-main before exposing their download controls.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule
+                .onAllNodesWithContentDescription("Tap to download", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .size == 2
+        }
+        composeRule.onAllNodesWithContentDescription("PDF document", useUnmergedTree = true).assertCountEquals(2)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_custom_reply_surfaces_$name.png")
     }
 
@@ -181,13 +191,16 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
             )
         }
 
-    /** Mirrors the successful native handoff for canonical outgoing file rows without network access. */
+    /** Retains own-file bytes before composition, matching the native handoff before canonical projection. */
     private fun cacheCanonicalOwnFiles(item: TimelineMessage) {
         composeRule.runOnIdle {
             repeat(requireNotNull(item.projected).media.size) { attachmentIndex ->
-                appState.cacheMediaPlaintext(
-                    mediaCacheKey("personal", item.record.groupIdHex, item.record.messageIdHex, attachmentIndex),
-                    byteArrayOf(1, 2, 3, 4),
+                assertTrue(
+                    "canonical own file must be retained before projection",
+                    appState.cacheMediaPlaintext(
+                        mediaCacheKey("personal", item.record.groupIdHex, item.record.messageIdHex, attachmentIndex),
+                        byteArrayOf(1, 2, 3, 4),
+                    ),
                 )
             }
         }
