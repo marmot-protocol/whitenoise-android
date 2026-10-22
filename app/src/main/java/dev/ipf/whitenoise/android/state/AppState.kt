@@ -233,13 +233,13 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.net.IDN
 import java.net.InetAddress
 import java.net.URI
 import java.util.Collections
 import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -13441,9 +13441,8 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         preview: String?,
     ): String? {
-        return preview.takeUnless {
-            LocalNotificationFormatter.isReaction(update) && update.reactedToPreview.isNullOrBlank()
-        }
+        val quoteUnavailable = LocalNotificationFormatter.isReaction(update) && update.reactedToPreview.isNullOrBlank()
+        return preview.takeUnless { quoteUnavailable }
     }
 
     /** Drops only an unverified quote; unrelated removals must not discard the reaction itself. */

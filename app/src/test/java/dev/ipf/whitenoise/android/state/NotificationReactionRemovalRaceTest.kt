@@ -247,7 +247,8 @@ class NotificationReactionRemovalRaceTest {
 
     /** Positive control proving the recorder intercepted the known initial payload before the race starts. */
     private fun recordedReactionHasQuote(): Boolean {
-        return ReactionWriteRecordingNotificationManager.writes.any {
+        val recorded = ReactionWriteRecordingNotificationManager.writes
+        return recorded.any {
             it.tag == reactionKey.tag && it.id == reactionKey.id &&
                 allText(it.notification.extras).any { text -> SECRET in text }
         }
