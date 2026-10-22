@@ -31,6 +31,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -145,20 +146,44 @@ internal val ProfileImageDraftsSaver =
         restore = { ProfileImageDrafts(it[0], it[1], it[2], it[3]) },
     )
 
-/** A remounted editor rebases saved authored edits onto its current native image baseline. */
+/**
+ * A remounted editor presents its saved authored edits rebased onto the current native image baseline.
+ *
+ * The rebase is derived on every read rather than written back during composition, so composing never mutates the
+ * state it reads. Rebasing is idempotent, so a caller that writes a presented value back stores the same drafts.
+ */
 @Composable
 internal fun rememberProfileImageDrafts(
     accountId: String?,
     nativePicture: String?,
     nativeBanner: String?,
-): androidx.compose.runtime.MutableState<ProfileImageDrafts> {
-    val state =
+): MutableState<ProfileImageDrafts> {
+    val saved =
         rememberSaveable(accountId, stateSaver = ProfileImageDraftsSaver) {
             mutableStateOf(ProfileImageDrafts(nativePicture.orEmpty(), nativeBanner.orEmpty()))
         }
-    return remember(accountId, nativePicture, nativeBanner) {
-        state.apply { value = value.rebased(nativePicture, nativeBanner) }
+    return remember(saved, nativePicture, nativeBanner) {
+        RebasedProfileImageDrafts(saved, nativePicture, nativeBanner)
     }
+}
+
+/** Reads [saved] rebased onto the native images, and writes straight through to it. */
+private class RebasedProfileImageDrafts(
+    private val saved: MutableState<ProfileImageDrafts>,
+    private val nativePicture: String?,
+    private val nativeBanner: String?,
+) : MutableState<ProfileImageDrafts> {
+    override var value: ProfileImageDrafts
+        get() = saved.value.rebased(nativePicture, nativeBanner)
+        set(drafts) {
+            saved.value = drafts
+        }
+
+    /** The presented drafts, for destructuring. */
+    override fun component1(): ProfileImageDrafts = value
+
+    /** A setter that writes through to the saved drafts, for destructuring. */
+    override fun component2(): (ProfileImageDrafts) -> Unit = { value = it }
 }
 
 internal const val PROFILE_BANNER_CONTROL_TAG = "profile_banner_control"
