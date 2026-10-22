@@ -26,6 +26,8 @@ gradle.beforeProject { project ->
                 instrumented.java.setIncludes(traceSources)
                 instrumented.kotlin.setIncludes(traceSources)
                 def benchmark = android.buildTypes.getByName('benchmarkRelease')
+                // The runner shares Trace with the minified app under test.
+                benchmark.proguardFiles(project.rootProject.file('scripts/hosted-startup-trace.pro'))
                 if (benchmark.debuggable || !benchmark.minifyEnabled || !benchmark.shrinkResources) {
                     throw new GradleException(
                         'Startup timing requires the nondebuggable minified benchmarkRelease variant')
