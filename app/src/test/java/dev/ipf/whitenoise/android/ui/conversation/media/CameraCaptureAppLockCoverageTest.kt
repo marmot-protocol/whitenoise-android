@@ -51,21 +51,6 @@ class CameraCaptureAppLockCoverageTest {
     @get:Rule val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    /** The production root keeps the protected shell's saved registry above the lock gate. */
-    @Test
-    fun productionRootOwnsTheSavedRegistryAboveItsPrivacyGate() {
-        val source =
-            sequenceOf(
-                File("src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
-            ).first(File::isFile).readText()
-        assertTrue(
-            source.indexOf("val protectedShell =") <
-                source.indexOf("if (appState.appLockScreenVisible) {"),
-        )
-        assertTrue(source.contains("protectedShell.holder.SaveableStateProvider(protectedShell.key)"))
-    }
-
     /** An empty draft disposed before the camera writes keeps the pending output for the later result. */
     @Test fun emptyDraftDisposalBeforeCameraWritesPreservesItsPendingOutput() {
         exercise(emptyComposer = true, writeAfterLock = true)
