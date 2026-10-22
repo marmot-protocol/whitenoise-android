@@ -128,6 +128,82 @@ class LocalNotificationEnrichmentRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /**
+     * A deletion queued behind an in-flight avatar enrichment write removes the card once that write lands, while a
+     * second account's card for the same conversation survives (#3323).
+     */
+    @Suppress("LongMethod") // The complete latch ordering is the regression contract for this race.
+    @Test
+    fun deletionOwnsAvatarEnrichmentThatLandsWhileItWaits() {
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT, GROUP)
+        val enrichmentReadyToWrite = CountDownLatch(1)
+        val allowEnrichmentWrite = CountDownLatch(1)
+        val enrichmentFinished = CountDownLatch(1)
+        val deletionAwaitingLock = CountDownLatch(1)
+        val deletionFinished = CountDownLatch(1)
+        val postCount = AtomicInteger()
+        val presenter =
+            LocalNotificationPresenter(
+                context = context,
+                groupReconciliation = {},
+                notificationPoster = { _, tag, id, notification ->
+                    if (tag == conversation.tag && postCount.incrementAndGet() == 2) {
+                        enrichmentReadyToWrite.countDown()
+                        check(allowEnrichmentWrite.await(5, TimeUnit.SECONDS))
+                    }
+                    manager.notify(tag, id, notification)
+                },
+                avatarBitmapResolver = { Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888) },
+                enrichmentLauncher = { block ->
+                    Thread {
+                        try {
+                            runBlocking { block() }
+                        } finally {
+                            enrichmentFinished.countDown()
+                        }
+                    }.start()
+                },
+                dismissalRetryDelay = {},
+            )
+        val other = LocalNotificationFormatter.conversationDismissalKey(OTHER_ACCOUNT, GROUP)
+        val otherUpdate = messageUpdate().copy(accountRef = OTHER_ACCOUNT)
+        assertTrue(runBlocking { presenter.show(otherUpdate, shortNpub = { "n" }) })
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                /** Signals when the deletion is queued behind the in-flight enrichment write. */
+                override fun onAwaitingLock(
+                    op: ConversationCardOp,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (op == ConversationCardOp.DISMISS_CANCEL && notificationTag == conversation.tag) {
+                        deletionAwaitingLock.countDown()
+                    }
+                }
+            }
+
+        assertTrue(
+            runBlocking {
+                presenter.show(messageUpdate(), senderAvatarUrl = "https://example.com/alice.png", shortNpub = { "n" })
+            },
+        )
+        assertTrue(enrichmentReadyToWrite.await(5, TimeUnit.SECONDS))
+        Thread {
+            try {
+                presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "msg-a" }
+            } finally {
+                deletionFinished.countDown()
+            }
+        }.start()
+        assertTrue(deletionAwaitingLock.await(5, TimeUnit.SECONDS))
+        allowEnrichmentWrite.countDown()
+        assertTrue(enrichmentFinished.await(5, TimeUnit.SECONDS))
+        assertTrue(deletionFinished.await(5, TimeUnit.SECONDS))
+
+        assertTrue(manager.activeNotifications.none { it.tag == conversation.tag && it.id == conversation.id })
+        assertTrue(manager.activeNotifications.any { it.tag == other.tag && it.id == other.id })
+    }
+
     /** Builds one message whose avatar URL forces the detached enrichment lane. */
     private fun messageUpdate() =
         NotificationUpdateFfi(
@@ -163,6 +239,7 @@ class LocalNotificationEnrichmentRaceTest {
 
     private companion object {
         const val ACCOUNT = "account-a"
+        const val OTHER_ACCOUNT = "account-b"
         const val GROUP = "group-a"
         const val SENDER = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }

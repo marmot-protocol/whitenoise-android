@@ -60,6 +60,7 @@ import dev.ipf.marmotkit.PushRegistrationSyncResultFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
@@ -165,6 +166,9 @@ internal class NotificationBootstrapTestFixture(
     private val markdownDocumentFactory: ((String?) -> MarkdownDocumentFfi)? = null,
     private val profileRefreshRequest: (suspend (String) -> Unit)? = null,
     private val timelinePage: TimelinePageFfi? = null,
+    // Per-call timeline and read-state hooks for deletion and read-gate scenarios (#3323, #2065).
+    private val onTimelineMessages: ((accountRef: String, groupIdHex: String) -> TimelinePageFfi?)? = null,
+    private val onChatListRow: ((accountRef: String, groupIdHex: String) -> ChatListRowFfi?)? = null,
     private val messageRecords: List<AppMessageRecordFfi> = emptyList(),
     // Newest-first attachment history the receipt scheduler pages through (#3308).
     private val attachmentHistory: List<AttachmentEntryFfi> = emptyList(),
@@ -233,12 +237,15 @@ internal class NotificationBootstrapTestFixture(
     val listMediaCalls = AtomicInteger(0)
 
     /** Runtime events the fixture's firehose delivers, in order, to every subscriber. */
-    private val runtimeEvents = Channel<MarmotEventFfi>(Channel.UNLIMITED)
+    private val runtimeEvents = Channel<MarmotEventFfi?>(Channel.UNLIMITED)
 
     /** How many runtime event subscriptions the app opened. */
     val eventsSubscriptions =
         java.util.concurrent.atomic
             .AtomicInteger()
+
+    /** Opened runtime event subscriptions whose explicit disposal has completed. */
+    val destroyedEventSubscriptions = AtomicInteger(0)
 
     /** Whether the first runtime event subscription was opened before the runtime started. */
     @Volatile
@@ -254,6 +261,14 @@ internal class NotificationBootstrapTestFixture(
     fun emitRuntimeEvent(event: MarmotEventFfi) {
         check(runtimeEvents.trySend(event).isSuccess)
     }
+
+    /** Ends the current subscription normally; the receipt loop must open a new stream. */
+    fun endRuntimeEventStream() {
+        check(runtimeEvents.trySend(null).isSuccess)
+    }
+
+    /** How many chat-list row reads the app made, such as the notification read-state check. */
+    val chatListRowCalls = AtomicInteger(0)
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -368,7 +383,10 @@ internal class NotificationBootstrapTestFixture(
                     if (eventOpenFailures.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0) {
                         error("fixture event stream unavailable")
                     }
-                    allocateWithoutConstructor(FixtureEventsSubscription::class.java).apply { events = runtimeEvents }
+                    allocateWithoutConstructor(FixtureEventsSubscription::class.java).apply {
+                        events = runtimeEvents
+                        onDestroy = { destroyedEventSubscriptions.incrementAndGet() }
+                    }
                 }
                 "chatNotificationSettings" -> {
                     val accountRef = arguments?.get(0) as String
@@ -557,7 +575,9 @@ internal class NotificationBootstrapTestFixture(
                 "requestAvatarAssets" -> emptyList<AvatarAssetFfi>()
                 "timelineMessages" -> {
                     notificationTimelineCalls.incrementAndGet()
-                    timelinePage
+                    val query = arguments?.get(1) as TimelineMessageQueryFfi
+                    onTimelineMessages?.invoke(arguments[0] as String, query.groupIdHex.orEmpty())
+                        ?: timelinePage
                         // An exhausted, empty page: recovery probes conclude
                         // NotCommitted deterministically instead of erroring.
                         ?: TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
@@ -622,6 +642,10 @@ internal class NotificationBootstrapTestFixture(
                     signInFailure?.let { throw it }
                     onSignInAccount?.invoke(accountRef)
                     accounts.first { it.label == accountRef }
+                }
+                "chatListRow" -> {
+                    chatListRowCalls.incrementAndGet()
+                    onChatListRow?.invoke(arguments?.get(0) as String, arguments[1] as String)
                 }
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -797,13 +821,14 @@ internal class NotificationBootstrapTestFixture(
      * its constructor, like the other fakes here, because the UniFFI base registers a cleaner the JVM cannot open.
      */
     private class FixtureEventsSubscription : EventsSubscription(NoPointer) {
-        lateinit var events: Channel<MarmotEventFfi>
+        lateinit var events: Channel<MarmotEventFfi?>
+        lateinit var onDestroy: () -> Unit
 
         /** Waits for the next emitted runtime event. */
         override suspend fun next(): MarmotEventFfi? = events.receive()
 
-        /** Holds no native handle. */
-        override fun destroy() = Unit
+        /** Records explicit disposal without holding a native handle. */
+        override fun destroy() = onDestroy()
 
         /** Holds no native handle. */
         override fun close() = Unit
@@ -989,6 +1014,19 @@ internal class NotificationBootstrapTestFixture(
     suspend fun awaitSenderDisplayNameCalls(expected: Int) {
         withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (senderDisplayNameCalls.get() < expected) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Runs only the receipt loop so lifecycle tests can cancel its actual owning job directly. */
+    suspend fun runReceiptLoop() = appState.runMutedChatReceiptLoop(marmot)
+
+    /** Waits until the notification listener has opened the runtime event stream. */
+    suspend fun awaitRuntimeEventSubscription() {
+        withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
+            while (eventsSubscriptions.get() == 0) {
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                 delay(1L)
             }
