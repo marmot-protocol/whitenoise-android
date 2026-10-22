@@ -22,8 +22,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -693,30 +695,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     modifier = bodyMeasurementModifier,
                 ) {
                     traceConversationUiSection(ConversationUiTrace.TEXT) {
-                        val mentionMemberSnapshot =
-                            remember(record.messageIdHex, controller.membersLoaded) {
-                                if (controller.membersLoaded) controller.members else null
-                            }
-                        val mentionMembershipResolver =
-                            remember(appState, mentionMemberSnapshot) {
-                                mentionMemberSnapshot?.let { members ->
-                                    { bech32: String -> appState.isRosterMember(bech32, members) }
-                                }
-                            }
                         MarkdownMessageBody(
                             checkNotNull(markdownDocument),
                             mentionDisplayName =
                                 remember(appState, ttsMentionPresentation) {
                                     ttsMentionPresentation?.let { snapshot -> snapshot::displayName }
                                         ?: { bech32: String -> appState.mentionDisplayName(bech32) }
-                                },
-                            isGroupMember =
-                                remember(ttsMentionPresentation, mentionMembershipResolver) {
-                                    if (ttsMentionPresentation != null) {
-                                        ttsMentionPresentation.membershipResolver()
-                                    } else {
-                                        mentionMembershipResolver
-                                    }
                                 },
                             useDecorativeBackgrounds = !customBubbleColorActive,
                             onNostrProfileTap =
@@ -796,6 +780,10 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 )
             }
         }
+        // Selection also replaces the collapsed-body parent; preserve the source leaf across both moves.
+        val latestMessageTextBody by rememberUpdatedState(messageTextBody)
+        val movableMessageTextBody =
+            remember(controller, record.messageIdHex, bodyText) { movableContentOf { latestMessageTextBody() } }
         val eventCards: @Composable () -> Unit = {
             if (eventCardResolver != null && eventReferences.isNotEmpty()) {
                 NostrEventCards(
@@ -811,7 +799,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
         }
         val selectableMessageBody: @Composable () -> Unit = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (showMessageTextBody) selectionWrapper(messageTextBody)
+                if (showMessageTextBody) selectionWrapper(movableMessageTextBody)
                 eventCards()
             }
         }
@@ -866,7 +854,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     modifier = Modifier.fillMaxWidth(),
                     lastLineWidth = lastLineWidth,
                 ) {
-                    selectionWrapper(messageTextBody)
+                    selectionWrapper(movableMessageTextBody)
                 }
                 eventCards()
                 Box(

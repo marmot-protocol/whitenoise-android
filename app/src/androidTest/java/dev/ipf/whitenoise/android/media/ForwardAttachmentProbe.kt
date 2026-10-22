@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.MessageAttachments
@@ -134,6 +135,7 @@ internal object ForwardAttachmentProbe {
                 root.absolutePath,
                 relays,
                 MarmotOptions(
+                    deployment = marmotDeploymentWhiteNoise(),
                     relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
                     attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
                 ),

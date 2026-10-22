@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/res/values-it/strings.xml",
+  "legacy_sha256": "d9a736a85f38b66aa4bde6d490857f87b212e8b41f60792515489aefd9dad331",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Italian count-neutral stopped-delete guidance",
+        "source": "app/src/main/res/values-it/strings.xml",
+        "anchor": "name=\"chat_list_delete_stopped_detail\"",
+        "test_ids": [
+          "CHL-024"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Claude Code first-installation prompt, approval boundaries and phone setup guidance",
+        "source": "app/src/main/res/values-it/strings.xml",
+        "anchor": "name=\"agent_connector_claude_prompt\"",
+        "test_ids": [
+          "SET-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

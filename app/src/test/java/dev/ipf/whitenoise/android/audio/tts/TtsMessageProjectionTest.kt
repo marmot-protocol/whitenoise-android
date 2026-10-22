@@ -18,6 +18,7 @@ import org.junit.Test
 import java.util.Locale
 
 class TtsMessageProjectionTest {
+    /** Playback freezes display names independently of later profile changes, sources and sessions. */
     @Test
     fun activePresentationSurvivesProfileChangesButRejectsDifferentSourcesAndSessions() =
         runBlocking {
@@ -29,9 +30,9 @@ class TtsMessageProjectionTest {
                 )
             val record = message("Hello nostr:$key", contentTokens = doc)
             var name = "Alice"
-            var member = true
 
-            suspend fun entry() = namedEntry(record, name, member)
+            /** Projects the live callbacks so repeated calls can exercise account-scoped presentation changes. */
+            suspend fun entry() = namedEntry(record, name)
 
             val original = entry()
             val controller = TtsController(audioFocus = FakeSessionFocus(), maxChunkLength = 4_000)
@@ -39,11 +40,9 @@ class TtsMessageProjectionTest {
             assertTrue(controller.speak(listOf(original), Locale.US))
             val session = controller.state.value.sessionId
             name = "A different display name"
-            member = false
             val changed = entry()
             assertFalse(original.projectionId == changed.projectionId)
             assertEquals("Alice", original.mentionPresentation?.displayName(key))
-            assertEquals(true, original.mentionPresentation?.membershipResolver()?.invoke(key))
             assertSame(
                 original,
                 controller.presentationEntryFor(session, record.messageIdHex, original.projectionId, record.plaintext),
@@ -329,17 +328,16 @@ class TtsMessageProjectionTest {
         blankLinesBefore = byteArrayOf(),
     )
 
+    /** Freezes the supplied name while requiring the stored native document to remain authoritative. */
     private suspend fun namedEntry(
         record: AppMessageRecordFfi,
         name: String,
-        member: Boolean,
     ) = projectTtsSpeakableEntry(
         record,
         null,
         "Sender",
         { error("stored tokens should win") },
         { name },
-        { member },
     )!!
 
     private fun message(

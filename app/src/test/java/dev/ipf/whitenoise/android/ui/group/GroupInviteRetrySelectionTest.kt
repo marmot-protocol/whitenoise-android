@@ -23,6 +23,7 @@ import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestDraftPersistence
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -31,6 +32,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineMemberSnapshot
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.groupConversationSnapshotFixture
+import dev.ipf.whitenoise.android.ui.chats.newchat.REVIEW_FIRST_MEMBER_HEX
+import dev.ipf.whitenoise.android.ui.chats.newchat.REVIEW_FIRST_MEMBER_NPUB
 import dev.ipf.whitenoise.android.ui.chats.newchat.SELECTED_MEMBERS_CONFIRM_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -54,7 +57,7 @@ class GroupInviteRetrySelectionTest {
         val fixture = Fixture()
         val peerName =
             dev.ipf.whitenoise.android.core.IdentityFormatter
-                .short(fixture.state.npubForDisplay(PEER), prefix = 10, suffix = 8)
+                .short(REVIEW_FIRST_MEMBER_NPUB, prefix = 10, suffix = 8)
         val controller = fixture.controller
         val reply = fixture.reply
         val calls = fixture.calls
@@ -68,12 +71,17 @@ class GroupInviteRetrySelectionTest {
             val adminLabel = context.getString(R.string.admin)
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
             composeRule.waitUntil { calls.size == 1 }
-            composeRule.onNodeWithContentDescription("$adminLabel, $peerName").assertIsNotEnabled()
-            composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsNotEnabled()
+            composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.review_selected_members))
+                .assertIsNotEnabled()
 
             composeRule.runOnIdle { reply.complete(Unit) }
             composeRule.waitUntil { !controller.mutationInFlight }
-            composeRule.onNodeWithContentDescription("$adminLabel, $peerName").assertIsDisplayed()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.review_selected_members))
+                .performClick()
+            composeRule.onNodeWithContentDescription("$adminLabel, $peerName").performScrollTo().assertIsOn()
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
             composeRule.waitUntil { calls.size == 2 && !controller.mutationInFlight }
             assertEquals(List(2) { listOf(PEER) to listOf(PEER) }, calls)
@@ -89,7 +97,7 @@ class GroupInviteRetrySelectionTest {
         val fixture = Fixture(succeed = true)
         val peerName =
             dev.ipf.whitenoise.android.core.IdentityFormatter
-                .short(fixture.state.npubForDisplay(PEER), prefix = 10, suffix = 8)
+                .short(REVIEW_FIRST_MEMBER_NPUB, prefix = 10, suffix = 8)
         val restoration = StateRestorationTester(composeRule)
         try {
             restoration.setContent {
@@ -126,8 +134,14 @@ class GroupInviteRetrySelectionTest {
         composeRule
             .onAllNodes(hasText("Retry peer") and hasAnyAncestor(hasTestTag("group.members.review.dialog")))
             .assertCountEquals(0)
+        val rawPeerName =
+            dev.ipf.whitenoise.android.core.IdentityFormatter
+                .short(PEER, prefix = 10, suffix = 8)
+        composeRule
+            .onAllNodes(hasText(rawPeerName) and hasAnyAncestor(hasTestTag("group.members.review.dialog")))
+            .assertCountEquals(0)
         val adminLabel = context.getString(R.string.admin)
-        composeRule.onNodeWithContentDescription("$adminLabel, $publicPeerName").performClick()
+        composeRule.onNodeWithContentDescription("$adminLabel, $publicPeerName").performScrollTo().performClick()
         composeRule.onNodeWithContentDescription("$adminLabel, $publicPeerName").assertIsOn()
     }
 
@@ -192,12 +206,15 @@ class GroupInviteRetrySelectionTest {
             )
 
         init {
+            val field = WhiteNoiseAppState::class.java.getDeclaredField("npubs")
+            field.isAccessible = true
+            (field.get(state) as BoundedNpubCache).put(PEER, REVIEW_FIRST_MEMBER_NPUB)
             state.setContactNickname(PEER, "Retry peer")
         }
     }
 
     private companion object {
         val context: Context = ApplicationProvider.getApplicationContext()
-        val PEER = "cc".repeat(32)
+        const val PEER = REVIEW_FIRST_MEMBER_HEX
     }
 }

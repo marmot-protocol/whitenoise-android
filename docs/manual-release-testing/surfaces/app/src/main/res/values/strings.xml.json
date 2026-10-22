@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/res/values/strings.xml",
+  "legacy_sha256": "735199cdc991c126549b54f4a54706c9173a392e00ed22afe6665974a79d9c0f",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Draft save failure notice",
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"toast_draft_save_failed\"",
+        "test_ids": [
+          "ACC-013",
+          "NTF-032"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"setup_approved_repair_pending\"",
+        "test_ids": [
+          "ONB-017",
+          "ONB-020"
+        ]
+      },
+      {
+        "surface": "User-facing copy audit: strings rewritten for plain, non-protocol wording across onboarding, profile, groups, media, dictation and diagnostics",
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"dictation_send_safety_note\"",
+        "test_ids": [
+          "ONB-003",
+          "ONB-008",
+          "ONB-024",
+          "FLD-002",
+          "SET-009",
+          "ACC-007",
+          "ACC-013",
+          "ACC-014",
+          "PRO-001",
+          "GRP-009",
+          "GRP-017",
+          "GRP-021",
+          "MED-005",
+          "MED-006",
+          "DIC-001",
+          "DIC-002",
+          "SET-016",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "Claude Code first-installation prompt, approval boundaries and phone setup guidance",
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"agent_connector_claude_prompt\"",
+        "test_ids": [
+          "SET-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

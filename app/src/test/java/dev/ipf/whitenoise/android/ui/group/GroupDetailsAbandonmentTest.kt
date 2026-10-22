@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.app.Application
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -25,6 +27,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -57,6 +60,38 @@ class GroupDetailsAbandonmentTest {
     /** A group's failed handover-and-leave shows the reset notice on the main screen, which opens the review. */
     @Test
     fun failedGroupLeaveOnTheMainScreenOffersReset() = assertFailedLeaveOffersAbandonment(isDm = false)
+
+    /** A retained reset callback cannot report an attempt against a replacement runtime. */
+    @Test
+    fun staleResetReviewStaysUnattemptedAndDisablesMutationControls() {
+        val (state, controller) = render(isDm = false)
+        composeRule.runOnIdle {
+            controller.recordMutationFailure(
+                R.string.toast_couldnt_add_members,
+                "PRIOR_FAILURE",
+                IllegalStateException("Prior unrelated failure"),
+            )
+        }
+        val priorError = controller.lastMutationError
+        composeRule.onNodeWithTag("chat_info.reset").performScrollTo().performClick()
+        val retained =
+            composeRule
+                .onNodeWithTag("group.abandon.confirm")
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        composeRule.runOnIdle {
+            state.advanceLocalDeleteTestRuntime()
+            retained()
+        }
+        composeRule.waitForIdle()
+        assertFalse(controller.mutationInFlight)
+        assertEquals(priorError, controller.lastMutationError)
+        composeRule.onNodeWithTag("group.abandon.error").assertDoesNotExist()
+        composeRule.onNodeWithTag("group.abandon.confirm").assertIsNotEnabled()
+        composeRule.onNodeWithTag("group.abandon.cancel").performClick()
+        composeRule.onNodeWithTag("chat_info.reset").performScrollTo().assertIsNotEnabled()
+    }
 
     /** A direct chat's details list the Abandon chat on this device row in the light theme. */
     @Test
@@ -121,7 +156,7 @@ class GroupDetailsAbandonmentTest {
             .performScrollTo()
             .performClick()
         composeRule.waitUntil(WAIT_MS) { composeRule.onAllNodes(isDialog()).fetchSemanticsNodes().isNotEmpty() }
-        composeRule.onNodeWithText(app.getString(R.string.leave)).performClick()
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
         composeRule.waitUntil(WAIT_MS) {
             composeRule.onAllNodes(hasTestTag(NOTICE_TAG)).fetchSemanticsNodes().isNotEmpty()
         }
@@ -148,7 +183,7 @@ class GroupDetailsAbandonmentTest {
     private fun render(
         isDm: Boolean,
         disbanded: Boolean = false,
-    ) {
+    ): Pair<WhiteNoiseAppState, ConversationController> {
         val appState =
             WhiteNoiseAppState(
                 context = app,
@@ -177,6 +212,7 @@ class GroupDetailsAbandonmentTest {
             }
         }
         composeRule.waitForIdle()
+        return appState to controller
     }
 
     /** A chat whose only admin is this account, where a direct chat has no name. */

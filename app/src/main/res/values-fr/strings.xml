@@ -814,6 +814,7 @@
     <string name="toast_profile_published_detail">Votre profil est maintenant sur %1$d relais.</string>
     <string name="toast_couldnt_publish_profile">Impossible de publier le profil</string>
     <string name="toast_send_failed">Échec de l’envoi</string>
+    <string name="toast_send_storage_full">Espace de stockage insuffisant pour envoyer. Libérez de l’espace et réessayez.</string>
     <string name="toast_send_connection_failed">Impossible de joindre le relais. Vérifiez votre connexion et réessayez.</string>
     <string name="toast_send_queue_full">Trop de messages attendent d\'être envoyés dans cette discussion, le vôtre n\'a pas été envoyé. Réessayez une fois le retard rattrapé.</string>
     <string name="toast_send_chat_changed">La conversation a changé pendant l\'envoi, votre message n\'a donc pas été envoyé. Réessayez.</string>
@@ -1776,8 +1777,8 @@
     <string name="developer_tools_already_enabled">Les outils de développement sont déjà activés</string>
     <string name="appearance_outline_colors_fixed">AMOLED utilise du blanc fixe pour les boutons d’action. Les contours des bulles sont personnalisables dans Couleurs des bulles.</string>
     <string name="appearance_theme">Thème</string>
-    <string name="appearance_theme_help">Par défaut, le système suit votre appareil. Clair et Sombre conservent l\'apparence choisie. AMOLED utilise un fond noir avec des contours blancs.</string>
-    <string name="appearance_amoled_detail">Noir pur avec des contours blancs nets.</string>
+    <string name="appearance_theme_help">Le mode système suit votre appareil. Clair et Sombre conservent l\'apparence choisie. AMOLED conserve des fonds noirs, des contours de bulles personnalisables et des boutons d\'action blancs.</string>
+    <string name="appearance_amoled_detail">Fonds noirs avec des contours de bulles personnalisables.</string>
     <string name="appearance_font_size_help">La taille du texte s\'ajoute au réglage de taille de police de votre appareil.</string>
     <string name="appearance_enter_help">Maj+Entrée insère toujours une nouvelle ligne sur un clavier physique.</string>
     <string name="appearance_font_system">Système</string>
@@ -2261,7 +2262,7 @@
     <string name="profile_readiness_recommended">Recommandé</string>
     <string name="profile_readiness_field_optional">Facultatif</string>
     <string name="agent_connector_claude_subtitle">Agent de programmation Claude Code CLI</string>
-    <string name="agent_connector_claude_prompt">Ceci est une invite d’installation pour connecter cette configuration Claude Code à White Noise via Marmot. Lisez le guide officiel du harness Claude Code à l’adresse https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md et le guide permanent du connecteur à l’adresse https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Expliquez-moi comment le connecteur fonctionne et ce que l’installation va modifier. Confirmez les prérequis : la CLI Claude Code est installée, authentifiée et disponible dans PATH, et cette machine utilise le même ensemble de relais publics que mon téléphone. Proposez ensuite les étapes d’installation pour ma npub publique : %1$s, et demandez mon approbation avant d’apporter la moindre modification. Une fois mon approbation donnée, utilisez le flux de release install-claude-marmot.sh vérifié par somme de contrôle, initialisez wn-agent pour cette npub avec le welcomer autorisé et vérifiez wn-claude --version. Répondez ensuite avec la npub de votre agent et demandez-moi de l’inviter depuis White Noise puis d’envoyer un message de test depuis cette npub autorisée via les relais configurés. Ne déclarez pas la configuration terminée tant que wn-claude n’a pas répondu via White Noise ; si cet aller-retour ne peut pas être vérifié automatiquement, indiquez clairement qu’une vérification sur l’appareil est requise.</string>
+    <string name="agent_connector_claude_prompt">Ceci est une invite d’installation pour connecter cette configuration Claude Code à White Noise via Marmot. Collez ceci dans Claude Code, dans un terminal sur l’ordinateur où fonctionnera l’agent. L’application mobile Claude et ses sessions cloud ne peuvent pas y installer le connecteur. Lisez le guide officiel du harness Claude Code à l’adresse https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md et le guide permanent du connecteur à l’adresse https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Expliquez-moi comment le connecteur fonctionne et ce que l’installation va modifier. Confirmez les prérequis : la CLI Claude Code est installée, authentifiée et disponible dans PATH. Si nécessaire, utilisez https://code.claude.com/docs/en/setup pour expliquer les étapes d’installation, de PATH ou de connexion et demandez mon approbation avant toute modification de l’ordinateur, y compris l’installation de Claude Code ou les changements de PATH ou de connexion. Demandez-moi de vérifier sur le téléphone que sa liste de relais publics contient wss://relay.eu.whitenoise.chat et wss://relay.us.whitenoise.chat ; ne prétendez pas vérifier ses réglages depuis cet ordinateur. Proposez ensuite les étapes d’installation pour ma npub publique : %1$s, et demandez mon approbation avant d’apporter la moindre modification. Une fois mon approbation donnée, utilisez le flux de release install-claude-marmot.sh vérifié par somme de contrôle, initialisez wn-agent avec cette npub comme seul welcomer autorisé et vérifiez wn-claude --version. Expliquez que le script téléchargé se lance avec bash install-claude-marmot.sh plutôt que par double-clic. Répondez ensuite avec la npub de votre agent et demandez-moi de l’inviter depuis White Noise. Mon premier message dans le groupe invité doit sélectionner un dossier existant relatif au dossier personnel de l’ordinateur de l’agent : /Claude sélectionne $HOME/Claude, pas /Users/me/Claude. Demandez-moi ensuite d’envoyer un message de test depuis cette npub autorisée via les relais configurés. Ne déclarez pas la configuration terminée tant que wn-claude n’a pas répondu via White Noise ; si cet aller-retour ne peut pas être vérifié automatiquement, indiquez clairement qu’une vérification sur l’appareil est requise.</string>
     <string name="ai_agents_project_groups_tip">Utilise un groupe distinct pour chaque projet et commence par son emplacement et son contexte. Les commandes de session varient selon le connecteur ; consulte son guide avant de reprendre une session ou de créer une branche.</string>
     <string name="nostr_event_view_image">Afficher l’image</string>
     <string name="nostr_event_image_failed">Impossible de charger cette image. Réessayez.</string>
@@ -2356,4 +2357,18 @@
     <string name="group_change_invite_anyway">Inviter quand même</string>
     <string name="starting_as">Démarrer en tant que</string>
     <string name="starting_as_account">Démarrer en tant que %1$s</string>
+    <string name="group_action_acting_account">Compte utilisé</string>
+    <string name="group_action_local_nickname">Surnom local : %1$s</string>
+    <string name="group_action_public_key_hex">Clé publique (hexadécimal)</string>
+    <string name="group_action_account_label">Libellé local du compte : %1$s</string>
+    <string name="group_action_revoke_explanation">Cette action retire les droits d’administration. La personne reste membre.</string>
+    <string name="group_action_add_members">Ajouter des membres</string>
+    <string name="group_action_transfer_and_leave">Transférer l’administration et quitter</string>
+    <string name="group_action_step_down_and_leave">Renoncer à l’administration et quitter</string>
+    <plurals name="group_action_groups_count">
+        <item quantity="one">%1$d groupe</item>
+        <item quantity="other">%1$d groupes</item>
+    </plurals>
+    <string name="group_review_add_member">Ajouter un membre</string>
+    <string name="group_review_invitation_visibility">Visible par tous les membres.</string>
 </resources>

@@ -45,7 +45,8 @@
         "anchor": "fun GroupDetailsResetControl(",
         "test_ids": [
           "GRP-021",
-          "GRP-033"
+          "GRP-033",
+          "GRP-034"
         ]
       },
       {
@@ -54,7 +55,8 @@
         "anchor": "fun GroupAbandonmentDialog(",
         "test_ids": [
           "GRP-033",
-          "CHL-026"
+          "CHL-026",
+          "GRP-034"
         ]
       },
       {
@@ -62,7 +64,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
         "anchor": "fun GroupAbandonmentBody(",
         "test_ids": [
-          "GRP-033"
+          "GRP-033",
+          "GRP-034"
         ]
       },
       {
@@ -218,7 +221,8 @@
         "anchor": "fun GroupAbandonmentReviewDialog(",
         "test_ids": [
           "GRP-033",
-          "CHL-026"
+          "CHL-026",
+          "GRP-034"
         ]
       },
       {

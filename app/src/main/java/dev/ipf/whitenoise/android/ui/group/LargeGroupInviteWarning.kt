@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.WarningAmber
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -122,6 +124,7 @@ internal fun LargeGroupInviteWarningBanner(modifier: Modifier = Modifier) {
 internal fun LargeGroupInviteConfirmationDialog(
     onContinue: () -> Unit,
     onDismiss: () -> Unit,
+    identity: (@Composable () -> Unit)? = null,
 ) {
     AlertDialog(
         modifier = Modifier.testTag(LARGE_GROUP_INVITE_CONFIRMATION_TAG),
@@ -134,14 +137,17 @@ internal fun LargeGroupInviteConfirmationDialog(
             )
         },
         text = {
-            Text(
-                text = stringResource(R.string.large_group_invite_confirm_message),
-                style = LocalTextStyle.current.copy(textDirection = TextDirection.ContentOrLtr),
-            )
+            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
+                Text(
+                    text = stringResource(R.string.large_group_invite_confirm_message),
+                    style = LocalTextStyle.current.copy(textDirection = TextDirection.ContentOrLtr),
+                )
+                identity?.invoke()
+            }
         },
         confirmButton = {
             TextButton(onClick = onContinue) {
-                Text(stringResource(R.string.group_continue))
+                Text(stringResource(R.string.group_action_add_members))
             }
         },
         dismissButton = {

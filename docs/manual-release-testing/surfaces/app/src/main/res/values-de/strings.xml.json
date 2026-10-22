@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/res/values-de/strings.xml",
+  "legacy_sha256": "aa9e271d8cb7c9e893bde03ae864b44c298f1258e14da1849fd72f10f6d33afb",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "German local-delete retry action wording",
+        "source": "app/src/main/res/values-de/strings.xml",
+        "anchor": "name=\"local_delete_retry_detail\"",
+        "test_ids": [
+          "CHL-024"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Claude Code first-installation prompt, approval boundaries and phone setup guidance",
+        "source": "app/src/main/res/values-de/strings.xml",
+        "anchor": "name=\"agent_connector_claude_prompt\"",
+        "test_ids": [
+          "SET-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -108,6 +108,14 @@
           "MSG-004",
           "MSG-009"
         ]
+      },
+      {
+        "surface": "Code path layout and selection lifetime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "fun MessageFullScreenBody(",
+        "test_ids": [
+          "RDR-006"
+        ]
       }
     ]
   },

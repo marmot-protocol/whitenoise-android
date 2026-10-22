@@ -1,0 +1,45 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+  "legacy_sha256": "b213f0f717c1e206f17670a3bf7e5052284cc644572c0a3e71ed244a0f577235",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: ReplyPreviewCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ReplyPreviewCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "fun ReplyPreviewCard(",
+        "test_ids": [
+          "MSG-006",
+          "CON-012"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.cancel_reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.cancel_reply",
+        "test_ids": [
+          "CON-012",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "Bounded Compose measurement and preview safety",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "replyFallbackPreviewText(",
+        "test_ids": [
+          "MSG-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

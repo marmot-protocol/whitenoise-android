@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.delay
@@ -501,6 +502,10 @@ class MarmotKitRecoveryQualificationTest {
         const val DUPLICATE_SETTLE_MILLIS = 3_000L
         const val POLL_MILLIS = 250L
         const val NANOS_PER_MILLI = 1_000_000L
-        val OPTIONS = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
+        val OPTIONS =
+            MarmotOptions(
+                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                deployment = marmotDeploymentWhiteNoise(),
+            )
     }
 }

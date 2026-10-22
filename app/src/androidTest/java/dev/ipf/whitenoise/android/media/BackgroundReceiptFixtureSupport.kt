@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
 import android.content.Context
-import android.os.SystemClock
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import androidx.work.WorkInfo
@@ -14,7 +13,6 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
-import dev.ipf.whitenoise.android.state.AttachmentDownloadWorker
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
@@ -27,11 +25,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 private const val LEDGER_TIMEOUT_MILLIS = 30_000L
 private const val NETWORK_CHANGE_TIMEOUT_MILLIS = 30_000L
@@ -136,91 +131,6 @@ internal object BackgroundReceiptFixtureSupport {
             }
             assertFalse("automatic work became interactive", intents.isInteractive(request))
         }
-    }
-
-    /** Reads diagnostic facts with a bounded wait; scheduler query failure never changes the verdict. */
-    fun reportCurrentWorkSnapshot(
-        context: Context,
-        request: AttachmentTransferRequest,
-        phase: String,
-        beforeBind: List<WorkInfo>,
-        stoppedAtMillis: Long,
-        observedAtElapsedMillis: Long,
-    ) {
-        var unavailable: String? = null
-        val infos =
-            try {
-                WorkManager
-                    .getInstance(context)
-                    .getWorkInfosForUniqueWork(attachmentDownloadWorkName(request))
-                    .get(500L, TimeUnit.MILLISECONDS)
-            } catch (interrupted: InterruptedException) {
-                Thread.currentThread().interrupt()
-                unavailable = "interrupted"
-                null
-            } catch (timeout: TimeoutException) {
-                unavailable = "query_timeout"
-                null
-            } catch (cancelled: java.util.concurrent.CancellationException) {
-                throw cancelled
-            } catch (failed: Exception) {
-                unavailable = "query_failed"
-                null
-            }
-        reportWorkSnapshot(
-            phase,
-            infos.orEmpty(),
-            beforeBind,
-            stoppedAtMillis,
-            observedAtElapsedMillis,
-            unavailable,
-        )
-    }
-
-    /** Fixture-local work facts only: UUIDs are compared internally, never serialized. */
-    fun reportWorkSnapshot(
-        phase: String,
-        infos: List<WorkInfo>,
-        beforeBind: List<WorkInfo>,
-        stoppedAtMillis: Long,
-        observedAtElapsedMillis: Long,
-        unavailable: String? = null,
-    ) {
-        val nowMillis = System.currentTimeMillis()
-        val initialBackoffMargin =
-            stoppedAtMillis + AttachmentDownloadWorker.BACKOFF_SECONDS * 1_000L - nowMillis
-        ControlledAttachmentProbe.report(
-            JSONObject()
-                .put("phase", phase)
-                .put("fixture_ordinal", 0)
-                .put("observed_elapsed_ms", SystemClock.elapsedRealtime() - observedAtElapsedMillis)
-                .put("stopped_elapsed_ms", nowMillis - stoppedAtMillis)
-                .put("initial_backoff_margin_ms", initialBackoffMargin)
-                .put("work_available", unavailable == null)
-                .put("unavailable", unavailable ?: JSONObject.NULL)
-                .put(
-                    "work",
-                    JSONArray(
-                        infos.mapIndexed { index, info ->
-                            val nextEligibleInMillis =
-                                if (info.nextScheduleTimeMillis == Long.MAX_VALUE) {
-                                    JSONObject.NULL
-                                } else {
-                                    info.nextScheduleTimeMillis - nowMillis
-                                }
-                            JSONObject()
-                                .put("work_ordinal", index)
-                                .put("same_work", beforeBind.any { it.id == info.id })
-                                .put("state", info.state.name)
-                                .put("run_attempt_count", info.runAttemptCount)
-                                .put("stop_reason", info.stopReason)
-                                .put("generation", info.generation)
-                                .put("next_schedule_time_ms", info.nextScheduleTimeMillis)
-                                .put("next_eligible_in_ms", nextEligibleInMillis)
-                        },
-                    ),
-                ),
-        )
     }
 
     /** Records closed facts about a stalled album: native and WorkManager states, policy and approval only. */

@@ -64,13 +64,11 @@ internal fun messageSpeakableProjection(
     bodyText: String,
     document: MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)?,
-    isGroupMember: ((String) -> Boolean)?,
 ): SpeakableTextProjection? =
     speakableProjectionFromDocument(
         source = bodyText,
         document = document,
         mentionDisplayName = mentionDisplayName,
-        isGroupMember = isGroupMember,
     )
 
 internal fun effectiveTtsHighlightPassage(

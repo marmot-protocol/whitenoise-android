@@ -157,8 +157,8 @@ internal fun GroupDetailsConfirmation(
             is GroupDetailsConfirmationState.StepDown -> R.string.step_down_as_admin
             is GroupDetailsConfirmationState.Leave,
             is GroupDetailsConfirmationState.LeaveSoleMember,
-            is GroupDetailsConfirmationState.TransferThenLeave,
             -> R.string.leave
+            is GroupDetailsConfirmationState.TransferThenLeave -> R.string.group_action_transfer_and_leave
         }
     ConfirmDialog(
         title = title,
