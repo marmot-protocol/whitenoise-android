@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import dev.ipf.whitenoise.android.core.NostrEventReference
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -80,16 +79,15 @@ class NostrEventExpansionTest {
         return event(30023, "Body", tags, createdAt).toCardModel()
     }
 
+    /** An event MDK rejects, for example for a bad signature, settles as Invalid and never opens the reader. */
     @Test
     fun anInvalidSignatureNeverOpensTheFullscreenReader() =
         runTest {
             val resolver =
                 NostrEventCardResolver(
                     parentScope = this,
-                    relayProvider = { listOf("wss://relay.example") },
-                    fetchEvents = { _, _ -> listOf(event(1, "Signed note")) },
-                    verifyEvent = { false },
-                    verificationDispatcher = UnconfinedTestDispatcher(testScheduler),
+                    readCached = { references -> references.map { null } },
+                    refresh = { NostrEventCardState.Invalid },
                 )
             val constrained =
                 NostrEventReference.Event(

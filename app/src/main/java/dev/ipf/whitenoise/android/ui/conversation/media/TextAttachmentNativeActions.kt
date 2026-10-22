@@ -90,7 +90,7 @@ internal fun rememberTextAttachmentNativeActions(
     mine: Boolean,
 ): TextAttachmentNativeActions {
     val context = LocalContext.current
-    val fallback = rememberDocumentSaveFallback()
+    val fallback = rememberDocumentSaveFallback(appState, controller.group.groupIdHex)
     val shareTitle = stringResource(R.string.shared_media_share)
     val actions =
         remember(controller, messageIdHex, attachmentIndex, reference, mine, fallback, shareTitle) {

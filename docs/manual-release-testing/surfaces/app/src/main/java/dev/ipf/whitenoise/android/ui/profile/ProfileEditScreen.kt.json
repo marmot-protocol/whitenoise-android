@@ -1,0 +1,275 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+  "legacy_sha256": "c80d487395b4e336f8abe846d6f759f25ec52874934402f1511c2fa63b3216b8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ProfileBannerControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "fun ProfileBannerControl(",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "ProfileEditScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "fun ProfileEditScreen(",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002",
+          "PRO-007"
+        ]
+      },
+      {
+        "surface": "ProfileHeroHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "fun ProfileHeroHeader(",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002",
+          "PRO-006",
+          "PRO-007"
+        ]
+      },
+      {
+        "surface": "ProfileSaveButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "fun ProfileSaveButton(",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_apply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_apply",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_choose_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_choose_photo",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_edit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_edit",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_invalid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_invalid",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_placeholder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_placeholder",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_remove",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_sheet_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_sheet_title",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_uploading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_uploading",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_banner_url_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_banner_url_label",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_lightning_no_network",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_lightning_no_network",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_lightning_unresolved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_lightning_unresolved",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_picture_edit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_picture_edit",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_picture_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_picture_hint",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_picture_invalid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_picture_invalid",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_picture_sheet_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_picture_sheet_title",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:profile_view_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.profile_view_picture",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_load_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.toast_couldnt_load_profile",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_prepare_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.toast_couldnt_prepare_image",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_upload_profile_banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.toast_couldnt_upload_profile_banner",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_upload_profile_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.toast_couldnt_upload_profile_image",
+        "test_ids": [
+          "PRO-001",
+          "PRO-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Accepted avatar crop preparation interruption across authentication; no automatic upload retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "    fun uploadProfileDraft(",
+        "test_ids": [
+          "STB-001"
+        ]
+      },
+      {
+        "surface": "Avatar preparation interruption notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+        "anchor": "R.string.avatar_preparation_interrupted",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

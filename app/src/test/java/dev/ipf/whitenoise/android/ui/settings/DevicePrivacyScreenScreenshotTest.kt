@@ -275,7 +275,7 @@ class DevicePrivacyScreenScreenshotTest {
                         .Density(1f, fontScale),
             ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
-                    UsageDiagnosticsPrompt(appState, onDone = {})
+                    UsageDiagnosticsPrompt(appState, onCloseStarted = {}, onDone = {})
                 }
             }
         }
@@ -311,10 +311,10 @@ class DevicePrivacyScreenScreenshotTest {
     fun closingSavesDeclineWithLogsOff() {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
         runBlocking { state.refreshSecurityPrivacySettings() }
-        var dismissed = false
+        val owner = StartupDiagnosticsCloseState()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                UsageDiagnosticsPrompt(state) { dismissed = true }
+                StartupUsageDiagnosticsPrompt(state, owner)
             }
         }
         composeRule.onNodeWithContentDescription("Close").performClick()
@@ -322,7 +322,9 @@ class DevicePrivacyScreenScreenshotTest {
             org.robolectric.Shadows
                 .shadowOf(android.os.Looper.getMainLooper())
                 .idle()
-            dismissed
+            owner.prompt == StartupDiagnosticsPromptState.CLOSED &&
+                !state.diagnostics.busy &&
+                state.usageDiagnosticsSettings?.decision == UsageDiagnosticsDecisionFfi.DECLINED
         }
         assertEquals(UsageDiagnosticsDecisionFfi.DECLINED, state.usageDiagnosticsSettings?.decision)
         assertFalse(state.auditLogSettings?.enabled ?: true)
@@ -333,10 +335,10 @@ class DevicePrivacyScreenScreenshotTest {
     fun acceptanceEnablesDiagnosticsWithIndependentLogsOff() {
         val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
         runBlocking { state.refreshSecurityPrivacySettings() }
-        var dismissed = false
+        val owner = StartupDiagnosticsCloseState()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                UsageDiagnosticsPrompt(state) { dismissed = true }
+                StartupUsageDiagnosticsPrompt(state, owner)
             }
         }
         composeRule.onAllNodes(isToggleable())[0].performClick()
@@ -351,7 +353,7 @@ class DevicePrivacyScreenScreenshotTest {
             org.robolectric.Shadows
                 .shadowOf(android.os.Looper.getMainLooper())
                 .idle()
-            dismissed
+            owner.prompt == StartupDiagnosticsPromptState.CLOSED && !state.diagnostics.busy
         }
         assertEquals(UsageDiagnosticsDecisionFfi.GRANTED, state.usageDiagnosticsSettings?.decision)
         assertEquals(DiagnosticsExporterStatusFfi.READY, state.usageDiagnosticsStatus?.telemetry)
@@ -371,7 +373,7 @@ class DevicePrivacyScreenScreenshotTest {
             }
         runBlocking { state.refreshSecurityPrivacySettings() }
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) { UsageDiagnosticsPrompt(state, onDone = {}) }
+            WhiteNoiseTheme(darkTheme = false) { UsageDiagnosticsPrompt(state, onCloseStarted = {}, onDone = {}) }
         }
         val initialBounds = promptContentBounds()
         for ((index, enabled) in listOf(0 to true, 0 to false, 1 to true, 1 to false)) {

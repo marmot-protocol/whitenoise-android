@@ -66,7 +66,7 @@ class GroupAvatarDestinationRefusalScreenshotTest {
             GroupAvatarUploadFailure(
                 GroupAvatarUploadStage.Upload,
                 3L,
-                MarmotKitException.InvalidMediaReference("https://private.invalid/?auth=secret"),
+                MarmotKitException.InvalidMediaReference("unsafe Blossom URL: https://private.invalid/?auth=secret"),
             )
         val message =
             context.getString(R.string.toast_couldnt_upload_group_image) + "\n" +

@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class GroupImageFailureDetailTest {
+    /** An SVG rejected at preparation keeps its format-specific copy even inside an upload failure. */
     @Test
     fun rejectedSvgHasFormatSpecificCopyEvenWhenUploadStageWrapsIt() {
         assertEquals(
@@ -22,6 +23,7 @@ class GroupImageFailureDetailTest {
         )
     }
 
+    /** A refused upload destination explains the restriction, never the photo, with no private detail. */
     @Test
     fun uploadDestinationRefusalHasFixedRestrictionCopy() {
         assertEquals(
@@ -30,25 +32,38 @@ class GroupImageFailureDetailTest {
                 GroupAvatarUploadFailure(
                     GroupAvatarUploadStage.Upload,
                     3L,
-                    MarmotKitException.InvalidMediaReference("https://private.invalid/?auth=secret"),
+                    MarmotKitException.InvalidMediaReference(
+                        "unsafe Blossom URL: https://private.invalid/?auth=secret",
+                    ),
                 ),
             ),
         )
     }
 
+    /** A media-reference error outside the upload stage keeps the generic retry copy. */
     @Test
     fun mediaReferenceErrorsOutsideUploadKeepExistingCopy() {
         GroupAvatarUploadStage.entries.filter { it != GroupAvatarUploadStage.Upload }.forEach { stage ->
             assertEquals(
                 AppText.Resource(R.string.error_try_again),
                 groupImageFailureDetail(
-                    GroupAvatarUploadFailure(stage, 3L, MarmotKitException.InvalidMediaReference("private detail")),
+                    GroupAvatarUploadFailure(
+                        stage,
+                        3L,
+                        MarmotKitException.InvalidMediaReference(
+                            "private detail",
+                        ),
+                    ),
                 ),
             )
         }
         assertEquals(
             AppText.Resource(R.string.error_try_again),
-            groupImageFailureDetail(MarmotKitException.InvalidMediaReference("private detail")),
+            groupImageFailureDetail(
+                MarmotKitException.InvalidMediaReference(
+                    "private detail",
+                ),
+            ),
         )
         assertEquals(
             AppText.Resource(R.string.error_try_again),
@@ -58,6 +73,44 @@ class GroupImageFailureDetailTest {
         )
     }
 
+    /**
+     * A descriptor/integrity failure is MDK `BlobStore`, which crosses the FFI as `Runtime` at the pinned
+     * MarmotKit, so it keeps generic copy rather than the destination-restriction explanation.
+     */
+    @Test
+    fun uploadIntegrityFailureIsNotReportedAsUnsafeDestination() {
+        assertEquals(
+            AppText.Resource(R.string.error_try_again),
+            groupImageFailureDetail(
+                GroupAvatarUploadFailure(
+                    GroupAvatarUploadStage.Upload,
+                    3L,
+                    MarmotKitException.Runtime(
+                        "upload descriptor hash mismatch",
+                    ),
+                ),
+            ),
+        )
+    }
+
+    /** The refusal copy follows the error type alone, so a reworded MDK detail cannot hide it (#2899). */
+    @Test
+    fun uploadDestinationRefusalDoesNotDependOnDetailWording() {
+        listOf("", "reworded destination policy rejection").forEach { detail ->
+            assertEquals(
+                AppText.Resource(R.string.group_image_destination_refused_detail),
+                groupImageFailureDetail(
+                    GroupAvatarUploadFailure(
+                        GroupAvatarUploadStage.Upload,
+                        3L,
+                        MarmotKitException.InvalidMediaReference(detail),
+                    ),
+                ),
+            )
+        }
+    }
+
+    /** Unrelated failures keep the generic retry copy. */
     @Test
     fun otherFailuresKeepExistingCopy() {
         assertEquals(

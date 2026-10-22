@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaIo.kt",
+  "legacy_sha256": "46a71b1f442e73a3378570dad1d39186e371e143275e37f6adde54d937e6fe33",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Explicit APK MIME still requires package archive validation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaIo.kt",
+        "anchor": "normalizedMime == ANDROID_PACKAGE_MIME ->",
+        "test_ids": [
+          "MED-018"
+        ]
+      },
+      {
+        "surface": "Pending camera output survives empty draft cleanup across authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaIo.kt",
+        "anchor": "AttachmentPlaintextCache.clearUnheldFiles",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

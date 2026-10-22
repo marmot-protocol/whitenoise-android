@@ -125,7 +125,10 @@ private fun ResolvedNostrEventCard(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-    val flow = remember(resolver, occurrence.reference.stableId) { resolver.state(occurrence.reference) }
+    val flow =
+        remember(resolver, occurrence.reference.stableId) {
+            resolver.state(occurrence.reference, occurrence.authoredReference)
+        }
     val state by flow.collectAsState()
     val presentedState = rememberNostrEventPreviewState(state, mentionDisplayName, parseMarkdown)
     val authoredReference = occurrence.authoredReference
@@ -134,7 +137,7 @@ private fun ResolvedNostrEventCard(
         authorDisplayName = authorDisplayName,
         referenceLabel = compactEventReference(authoredReference),
         contentColor = contentColor,
-        onRetry = { resolver.retry(occurrence.reference, flow) },
+        onRetry = { resolver.retry(occurrence.reference, flow, occurrence.authoredReference) },
         onCopy = {
             scope.launch {
                 clipboard.setClipEntry(
