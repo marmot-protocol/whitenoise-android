@@ -97,7 +97,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
@@ -1669,21 +1668,26 @@ internal fun MainShell(
         if (!controller.group.groupIdHex.equals(request.item.group.groupIdHex, ignoreCase = true)) {
             return@LaunchedEffect
         }
-        withTimeoutOrNull(CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS) {
-            snapshotFlow {
-                preparedConversationCanOpen(
-                    hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
-                    hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
-                    hasLoadError = controller.error != null,
-                    terminalConversationUnavailable = controller.terminalConversationUnavailable,
-                )
-            }.filter { it }
-                .first()
-        }
+        awaitPreparedConversationOpen(
+            awaitReady = {
+                snapshotFlow {
+                    preparedConversationCanOpen(
+                        hasPublishedAuthoritativeTimeline = controller.hasPublishedAuthoritativeTimeline,
+                        hasPreparedInitialPresentation = controller.hasPreparedInitialPresentation,
+                        hasLoadError = controller.error != null,
+                        terminalConversationUnavailable = controller.terminalConversationUnavailable,
+                    )
+                }.filter { it }
+                    .first()
+            },
+            holdingForEventCards = { controller.isHoldingInitialPageForEventCards },
+        )
         // A normal cached open reaches the ready state before this deadline and
-        // keeps its spinner-free transition. A stuck local read must not make a
-        // tap look ignored indefinitely; after the bound, the destination owns
-        // the existing loading/error surfaces while the same controller continues.
+        // keeps its spinner-free transition. A first page held for its event
+        // cards may extend the wait by the card budget, never more. A stuck local
+        // read must not make a tap look ignored indefinitely; after the bound,
+        // the destination owns the existing loading/error surfaces while the
+        // same controller continues.
         selectedChatOpenContext = ConversationOpenContext(focusMessageId = request.focusMessageId)
         selectedChatJustCreated = request.justCreated
         selectedChatOpenedAsDmHint = request.justCreated

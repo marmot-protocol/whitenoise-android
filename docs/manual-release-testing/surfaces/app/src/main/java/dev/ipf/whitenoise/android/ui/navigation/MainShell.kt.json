@@ -111,6 +111,14 @@
           "CHL-017"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"
+      },
+      {
+        "surface": "Chat-list open of a conversation whose first page waits for its event cards",
+        "anchor": "holdingForEventCards = { controller.isHoldingInitialPageForEventCards }",
+        "test_ids": [
+          "STB-002"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"
       }
     ]
   },

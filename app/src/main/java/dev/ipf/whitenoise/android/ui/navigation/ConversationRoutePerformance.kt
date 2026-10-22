@@ -14,10 +14,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.state.INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** True only when the route transition has landed and its destination is ready. */
 internal fun conversationRouteSettled(
@@ -100,6 +102,24 @@ internal fun ConversationControllerReleasedPerformanceMarker(controllerReleased:
             .performanceTestTag(PerformanceTestTags.CONVERSATION_CONTROLLER_RELEASED),
     )
 }
+
+/**
+ * Waits for a chat-list tap's conversation to be ready to show, and returns whether it became ready.
+ *
+ * An ordinary open waits at most [CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS], as before. When that passes while the
+ * conversation holds its first page for event cards (#2238), it waits up to the card budget more, since the hold ends
+ * within that budget of the page and the route then opens with the cards complete. Both waits are bounded, so a tap
+ * never looks ignored for longer than their sum.
+ */
+internal suspend fun awaitPreparedConversationOpen(
+    awaitReady: suspend () -> Unit,
+    holdingForEventCards: () -> Boolean,
+): Boolean =
+    withTimeoutOrNull(CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS) { awaitReady() } != null ||
+        (
+            holdingForEventCards() &&
+                withTimeoutOrNull(INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS) { awaitReady() } != null
+        )
 
 internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = 200
 internal const val CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS = 300L
