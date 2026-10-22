@@ -13446,9 +13446,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Drops every later opaque reaction quote in this chat for this process lifetime after an observed removal
-     * (#3323). Persisted hides alone do not extend that suppression after restart. A new target cannot be verified
-     * after restart/eviction until MDK #2366 supplies its identity; the reaction itself still posts.
+     * Drops opaque reaction quotes while a removal for this chat remains in the bounded process guard (#3323).
+     * Already-queued quotes retain the account-version fence across identity eviction. Persisted hides alone do
+     * not suppress quotes after restart; new targets after eviction/restart await MDK #2366. Reactions still post.
      */
     private fun withoutUnverifiableReactionQuote(update: NotificationUpdateFfi): NotificationUpdateFfi {
         val removed = notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)

@@ -752,7 +752,8 @@ class NotificationContentRetractionTest {
                     manager()
                         .activeNotifications
                         .first { it.tag == reactionKey.tag && it.id == reactionKey.id }
-                assertTrue(card.notification.extras.toString().contains("valid new quote"))
+                val extrasText = card.notification.extras.toString()
+                assertTrue(extrasText.contains("valid new quote"))
             } finally {
                 fixture.close()
                 assertTrue(MessageHidePreferences.writeHiddenMessageIdsByKey(preferences, key, previous))
