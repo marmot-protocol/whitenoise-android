@@ -5885,8 +5885,24 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
       "symbol": "FontSizeDialog",
-      "bindings": [],
-      "remaining": "Font-size preview dialog needs a directly asserted modal entry and live Small/Default/Large/Extra large selection journey, persistence and cancellation, large-font/RTL/AMOLED layout, lifecycle and accessibility qualification. Source screenshot and host tests alone do not establish executed Maestro coverage."
+      "bindings": [
+        {
+          "case": "preferences-font-cancel",
+          "entry_assertion": {
+            "id": "font_size.preview"
+          },
+          "opened_by": {
+            "tapOn": {
+              "text": "Font size"
+            }
+          },
+          "selector": {
+            "text": "Extra large"
+          },
+          "scope": "Existing runtime preferences fixture enters the real FontSizeDialog, asserts its inert preview and Extra large option, then dismisses without changing Default. Source registration only; actual Maestro execution remains separately required."
+        }
+      ],
+      "remaining": "Live all-four selection, persistence/failure recovery, font/RTL/AMOLED layout, lifecycle and accessibility qualification remain required. A registered direct assertion is not executed Maestro or physical proof."
     }
   ]
 }

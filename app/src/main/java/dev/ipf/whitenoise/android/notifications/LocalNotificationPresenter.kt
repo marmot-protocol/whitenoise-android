@@ -1006,15 +1006,18 @@ class LocalNotificationPresenter(
                         val categoryBlocked =
                             withContext(Dispatchers.IO) {
                                 val categorySettings =
-                                    conversationNotificationRouting
-                                        .settings(
-                                            NotificationConversationDescriptor(
-                                                conversationShortcutId(update.accountRef, update.groupIdHex),
-                                                update.isDm,
-                                                conversationTitleOverride,
-                                                ConversationVibrationPattern.SYSTEM_DEFAULT,
-                                            ),
-                                        ).filter { it.channel == category } +
+                                    conversationShortcutId(update.accountRef, update.groupIdHex)
+                                        ?.let { shortcutId ->
+                                            conversationNotificationRouting
+                                                .settings(
+                                                    NotificationConversationDescriptor(
+                                                        shortcutId,
+                                                        update.isDm,
+                                                        conversationTitleOverride,
+                                                        ConversationVibrationPattern.SYSTEM_DEFAULT,
+                                                    ),
+                                                ).filter { it.channel == category }
+                                        }.orEmpty() +
                                         ConversationNotificationCategorySetting(
                                             category,
                                             ConversationNotificationScope.USE_GLOBAL_DEFAULT,
@@ -1229,7 +1232,10 @@ class LocalNotificationPresenter(
                                                 // Reaction choices ride on Reply's RemoteInput so SystemUI
                                                 // can render them inline.
                                                 NotificationActionKind.REACT -> Unit
-                                                NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+                                                NotificationActionKind.MARK_READ ->
+                                                    builder.addAction(
+                                                        markReadNotificationAction(actionTarget),
+                                                    )
                                             }
                                         }
                                     }
@@ -1619,7 +1625,9 @@ class LocalNotificationPresenter(
                     }
                     notificationDebug {
                         // Never log the title/body — they carry sender / group names (PII).
-                        "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
+                        "posted tag=${notificationContent.notificationTag.take(
+                            16,
+                        )} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
                     }
                     true
                 }
