@@ -127,8 +127,20 @@ unzip -p /tmp/marmotkit-android.zip '<archive-root>/manifest.json'
 ```
 
 Confirm that the manifest's release identifier, tag, `source_sha`, workspace
-version, Android API, features, and expected files match the release being
-reviewed. Never pin a mutable branch asset or an archive built locally.
+version, Android API and expected files match the release being reviewed. If the
+manifest enumerates features, require an exact match with the lock selection.
+
+When feature enumeration is absent, stop the pin update until equivalent
+builder-side provenance is retained: the successful publishing run must resolve
+the same immutable source and builder commits as the archive, and its Android
+build logs must show the effective feature inputs for every ABI. Inspect the
+workflow and build script at that exact builder commit, including any step-level
+overrides, and trace those inputs to the native Cargo feature flags. Retain the
+run, source links, relevant log excerpts and verified asset digest together.
+Missing or contradictory evidence blocks adoption; the previous lock value alone
+is insufficient. Record this as builder-verified selection while leaving the
+manifest's absent feature field explicitly unverified. Never pin a mutable
+branch asset or an archive built locally.
 
 ## 2. Update the reviewed lock
 

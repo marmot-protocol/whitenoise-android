@@ -20,8 +20,14 @@ release. Phone testing remains paused.
 - Manifest feature enumeration is absent and remains **unverified by the
   manifest**. Exact-source publishing inputs select `OTLP_EXPORT=1` and
   `PRODUCT_ANALYTICS_EXPORT=1`; `kotlin-bindings.sh` maps these to the unchanged
-  `otlp-export,product-analytics-export` lock selection. This is separate builder
-  evidence, not an invented manifest field.
+  `otlp-export,product-analytics-export` lock selection. The successful release
+  [publishing run](https://github.com/marmot-protocol/mdk/actions/runs/39968967320)
+  records both inputs as `1` during every ABI's native build, with the same source
+  and builder commit. Retained logs and the exact-source
+  [workflow](https://github.com/marmot-protocol/mdk/blob/3fb4b4759ac676b0c21c4c3527074866c9fa4c89/.github/workflows/bindings.yaml)
+  and [build script](https://github.com/marmot-protocol/mdk/blob/3fb4b4759ac676b0c21c4c3527074866c9fa4c89/crates/marmot-uniffi/kotlin-bindings.sh)
+  trace these inputs to native Cargo flags with no per-ABI override. This verifies
+  the builder selection, not an invented manifest field.
 
 The inspected Android master baseline is
 `dc4cce3574392bd1fb1dc28d57061eadaa59909b`, pinning October 23 source
@@ -72,8 +78,13 @@ rewrite migration rows, clear data or downgrade to make qualification pass.
 
 Exact-source upstream [CI 39963766580](https://github.com/marmot-protocol/mdk/actions/runs/39963766580)
 passed the full merge-group matrix. The release [bindings build](https://github.com/marmot-protocol/mdk/actions/runs/39968967320)
-also passed. Retain Android results separately; publication alone is not Android
-runtime evidence.
+also passed. Retained logs show `raw_marker_forces_recovery`,
+`raw_rekey_wal_crash_recovers`, `raw_rekey_and_downgrade`,
+`external_raw_rekey_recovers`, `failed_rekey_keeps_recovery`, migration 0116's
+`existing_rows_keep_their_meaning` and `contextual_timeout_roles` actually passing.
+The upstream downgrade test uses synthetic native data; this adoption does no
+Android downgrade. Retain Android results separately; publication alone is not
+Android runtime evidence.
 
 Required Android checks run through hosted CI: API staging, core compilation,
 unit/golden/coverage/lint suites, packaged native smoke, production/staging ART

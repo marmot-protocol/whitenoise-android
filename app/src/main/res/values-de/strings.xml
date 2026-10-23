@@ -2442,4 +2442,21 @@
     <string name="search_message_content_failed">Nachrichteninhalte konnten nicht durchsucht werden.</string>
     <string name="document_save_interrupted">Die Authentifizierung hat diesen Speichervorgang unterbrochen. Wähle erneut „Speichern“, um einen Zielort auszuwählen.</string>
     <string name="avatar_preparation_interrupted">Die Bildänderung wurde unterbrochen. Prüfe das aktuelle Bild, bevor du es erneut auswählst.</string>
+    <string name="setup_finding_inspection_completed">Prüfung abgeschlossen. Dies allein bestätigt nicht, dass das Relay Schreibzugriffe unterstützt.</string>
+    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
+    <string name="setup_finding_context_unknown">Quelle nicht angegeben</string>
+    <string name="setup_finding_context_discovery">Datensatzsuche</string>
+    <string name="setup_finding_context_declaration">Veröffentlichte Deklaration</string>
+    <string name="setup_finding_context_route">Deklariertes Relay</string>
+    <string name="setup_finding_context_approval">Freigabe der Reparatur</string>
+    <string name="setup_finding_context_publication">Veröffentlichung der Reparatur</string>
+    <string name="setup_finding_purpose_unknown">Prüfung nicht angegeben</string>
+    <string name="setup_finding_purpose_lookup">Datensatzabfrage</string>
+    <string name="setup_finding_purpose_validation">Prüfung der Deklaration</string>
+    <string name="setup_finding_purpose_directory">Verzeichnisabfrage</string>
+    <string name="setup_finding_purpose_freshness">Aktualität der Quelle</string>
+    <string name="setup_finding_purpose_publication">Veröffentlichung des Ereignisses</string>
+    <string name="setup_finding_outcome_unknown">Ergebnis unbekannt</string>
+    <string name="setup_finding_outcome_success">Prüfung erfolgreich</string>
+    <string name="setup_finding_outcome_failure">Prüfung fehlgeschlagen</string>
 </resources>

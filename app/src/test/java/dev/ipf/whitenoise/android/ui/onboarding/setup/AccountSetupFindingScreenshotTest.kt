@@ -93,7 +93,9 @@ class AccountSetupFindingScreenshotTest {
         composeRule.onAllNodesWithText(endpoint).assertCountEquals(3)
         composeRule.onNodeWithText("Declared relay · Directory query · Check succeeded").assertExists()
         composeRule.onNodeWithText("Repair publication · Event publication · Result unknown").assertExists()
-        composeRule.onNodeWithText("Inspection completed. This alone does not confirm relay write support.").assertExists()
+        composeRule
+            .onNodeWithText("Inspection completed. This alone does not confirm relay write support.")
+            .assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_finding_$name.png")
     }
 }

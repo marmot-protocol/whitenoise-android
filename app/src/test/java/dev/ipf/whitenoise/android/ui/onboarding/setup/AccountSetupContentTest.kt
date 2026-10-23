@@ -20,7 +20,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
+import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
+import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
+import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
+import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -434,6 +440,64 @@ class AccountSetupContentTest {
                 "Couldn’t check for other devices.",
             ).performScrollTo()
             .assertIsDisplayed()
+    }
+
+    /** The inline Remove shortcut cannot suppress the provenance of the finding that offered it. */
+    @Test fun directRemovalRetainsNativeFindingEvidence() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.EDIT_RELAYS))
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(
+                setupFinding(
+                    OnboardingIssueFfi.RETIRED_RELAY,
+                    "wss://retired.example",
+                    actions = listOf(OnboardingActionFfi.EDIT_RELAYS),
+                    context = OnboardingFindingContextFfi.PUBLISHED_DECLARATION,
+                    purpose = OnboardingCheckPurposeFfi.DECLARATION_VALIDATION,
+                ),
+                setupFinding(
+                    OnboardingIssueFfi.RETIRED_RELAY,
+                    "wss://retired.example",
+                    context = OnboardingFindingContextFfi.DECLARED_ROUTE,
+                    purpose = OnboardingCheckPurposeFfi.DIRECTORY_QUERY,
+                ),
+            )
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithTag("setup-remove-relay").assertExists()
+        composeRule.onNodeWithText("Published declaration · Declaration validation · Result unknown").assertExists()
+        composeRule.onNodeWithText("Declared relay · Directory query · Result unknown").assertExists()
+    }
+
+    /** The proposal's endpoint row keeps its check purpose before the user approves any publication. */
+    @Test fun relayRepairRetainsNativeFindingEvidence() {
+        val snapshot = relayPreviewSnapshot()
+        val repair = snapshot.proposal!!.relayRepair!!
+        val tag = repair.beforeTags.single()
+        val endpoint = tag.endpoint
+        repair.mode = OnboardingRelayRepairModeFfi.REMOVAL_ONLY
+        repair.afterTags = emptyList()
+        repair.changes =
+            listOf(
+                OnboardingRelayTagChangeFfi(
+                    OnboardingRelayTagDispositionFfi.REMOVED,
+                    0uL,
+                    null,
+                    tag.fields,
+                    endpoint,
+                    tag.role,
+                    OnboardingRelayCapabilityFfi.READ_AND_WRITE,
+                ),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(
+                setupFinding(
+                    OnboardingIssueFfi.TIMED_OUT,
+                    endpoint,
+                    context = OnboardingFindingContextFfi.REPAIR_APPROVAL,
+                    purpose = OnboardingCheckPurposeFfi.SOURCE_FRESHNESS,
+                ),
+            )
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithText("Repair approval · Source freshness · Result unknown").assertExists()
     }
 
     /** Missing finding grants retain the full native step actions without offering an inline shortcut. */

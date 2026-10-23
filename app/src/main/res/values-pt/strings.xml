@@ -2425,4 +2425,21 @@
     <string name="search_message_content_failed">Não foi possível pesquisar o conteúdo das mensagens.</string>
     <string name="document_save_interrupted">A autenticação interrompeu este salvamento. Escolha Salvar novamente para selecionar um destino.</string>
     <string name="avatar_preparation_interrupted">A atualização da imagem foi interrompida. Confira a imagem atual antes de selecioná-la novamente.</string>
+    <string name="setup_finding_inspection_completed">Inspeção concluída. Isto, por si só, não confirma que o relay aceita escrita.</string>
+    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
+    <string name="setup_finding_context_unknown">Origem não especificada</string>
+    <string name="setup_finding_context_discovery">Descoberta de registos</string>
+    <string name="setup_finding_context_declaration">Declaração publicada</string>
+    <string name="setup_finding_context_route">Relay declarado</string>
+    <string name="setup_finding_context_approval">Aprovação da reparação</string>
+    <string name="setup_finding_context_publication">Publicação da reparação</string>
+    <string name="setup_finding_purpose_unknown">Verificação não especificada</string>
+    <string name="setup_finding_purpose_lookup">Pesquisa de registos</string>
+    <string name="setup_finding_purpose_validation">Validação da declaração</string>
+    <string name="setup_finding_purpose_directory">Consulta do diretório</string>
+    <string name="setup_finding_purpose_freshness">Atualidade da origem</string>
+    <string name="setup_finding_purpose_publication">Publicação do evento</string>
+    <string name="setup_finding_outcome_unknown">Resultado desconhecido</string>
+    <string name="setup_finding_outcome_success">Verificação concluída com sucesso</string>
+    <string name="setup_finding_outcome_failure">Falha na verificação</string>
 </resources>

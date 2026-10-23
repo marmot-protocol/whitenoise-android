@@ -182,6 +182,14 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "surface": "Repair review preserves separate check provenance",
+        "anchor": "SetupFindingEvidence(it)",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   },
