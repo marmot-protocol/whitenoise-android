@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_MENU_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -83,101 +84,128 @@ class ConversationDragSelectionPopupAndroidTest {
         var held = false
         var last = Offset.Zero
         var downTime = 0L
+        val originalAutoAdvance = composeRule.mainClock.autoAdvance
         lateinit var hostView: View
-        val bodyResult = runCatching {
-            composeRule.runOnUiThread {
-                val previousCallback = composeRule.activity.window.callback
-                originalCallback = previousCallback
-                composeRule.activity.window.callback =
-                    object : Window.Callback by previousCallback {
-                        override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-                            rawActions += event.actionMasked
-                            return previousCallback.dispatchTouchEvent(event)
+        val bodyResult =
+            runCatching {
+                composeRule.runOnUiThread {
+                    val previousCallback = composeRule.activity.window.callback
+                    originalCallback = previousCallback
+                    composeRule.activity.window.callback =
+                        object : Window.Callback by previousCallback {
+                            override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+                                rawActions += event.actionMasked
+                                return previousCallback.dispatchTouchEvent(event)
+                            }
                         }
-                    }
-                runBlocking {
-                    controller.applyTimelinePage(
-                        page = timelinePage(*records.toTypedArray()),
-                        replaceWindow = true,
-                        updatePagination = true,
-                    )
-                }
-                controller.markAuthoritativeTimelinePublishedForTest()
-            }
-            composeRule.setContent {
-                hostView = LocalView.current
-                WhiteNoiseTheme {
-                    Box(Modifier.fillMaxSize().testTag("android-range-host")) {
-                        ConversationScreen(
-                            appState = appState,
-                            chat = ChatListItem(group, null, null, 1, memberSnapshot = members),
-                            controller = controller,
-                            onBack = {},
-                            surfaceState = surface,
+                    runBlocking {
+                        controller.applyTimelinePage(
+                            page = timelinePage(*records.toTypedArray()),
+                            replaceWindow = true,
+                            updatePagination = true,
                         )
                     }
+                    controller.markAuthoritativeTimelinePublishedForTest()
                 }
-            }
-            composeRule.waitForIdle()
-            composeRule.onNode(hasSetTextAction()).assertIsDisplayed()
-            val rootScreenOrigin = IntArray(2)
-            composeRule.runOnIdle { hostView.getLocationOnScreen(rootScreenOrigin) }
-            fun screenPoint(id: String): Offset =
-                composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot.center +
-                    Offset(rootScreenOrigin[0].toFloat(), rootScreenOrigin[1].toFloat())
-            val anchor = records.last().messageIdHex
-            val endpoint = records[records.lastIndex - 1].messageIdHex
-            last = screenPoint(anchor)
-            val adjacent = screenPoint(endpoint)
-            downTime = SystemClock.uptimeMillis()
-            inject(downTime, MotionEvent.ACTION_DOWN, last)
-            held = true
-            composeRule.mainClock.advanceTimeBy(1_000L)
-            SystemClock.sleep(1_000L)
-            composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertIsDisplayed()
-            saveScreenshot("held-menu")
-            last = adjacent
-            inject(downTime, MotionEvent.ACTION_MOVE, last)
-            try {
-                composeRule.waitUntil(timeoutMillis = 3_000L) { surface.selectedMessages.size == 2 }
-            } catch (failure: ComposeTimeoutException) {
+                composeRule.setContent {
+                    hostView = LocalView.current
+                    WhiteNoiseTheme {
+                        Box(Modifier.fillMaxSize().testTag("android-range-host")) {
+                            ConversationScreen(
+                                appState = appState,
+                                chat = ChatListItem(group, null, null, 1, memberSnapshot = members),
+                                controller = controller,
+                                onBack = {},
+                                surfaceState = surface,
+                                restoredScrollSnapshot =
+                                    ConversationScrollSnapshot(
+                                        firstVisibleItemIndex = 0,
+                                        firstVisibleItemScrollOffset = 0,
+                                        anchorItemId = "msg:${records.last().messageIdHex}",
+                                        anchorMessageIdHex = records.last().messageIdHex,
+                                    ),
+                            )
+                        }
+                    }
+                }
+                composeRule.waitForIdle()
+                composeRule.onNode(hasSetTextAction()).assertIsDisplayed()
+                composeRule.onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE).assertIsDisplayed()
+                composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
+                val rootScreenOrigin = IntArray(2)
+                composeRule.runOnIdle { hostView.getLocationOnScreen(rootScreenOrigin) }
+
+                /** Maps the current real Compose root into Android's screen-space touch coordinates. */
+                fun screenPoint(id: String): Offset {
+                    val bounds =
+                        composeRule
+                            .onNodeWithTag(messageBubbleRowTestTag(id))
+                            .fetchSemanticsNode()
+                            .boundsInRoot
+                    return bounds.center + Offset(rootScreenOrigin[0].toFloat(), rootScreenOrigin[1].toFloat())
+                }
+
+                val anchor = records.last().messageIdHex
+                val endpoint = records[records.lastIndex - 1].messageIdHex
+                composeRule.onNodeWithTag(messageBubbleRowTestTag(anchor)).assertIsDisplayed()
+                composeRule.onNodeWithTag(messageBubbleRowTestTag(endpoint)).assertIsDisplayed()
+                saveScreenshot("ready-transcript")
+                last = screenPoint(anchor)
+                val adjacent = screenPoint(endpoint)
+                downTime = SystemClock.uptimeMillis()
+                inject(downTime, MotionEvent.ACTION_DOWN, last)
+                held = true
+                composeRule.mainClock.advanceTimeBy(1_000L)
+                SystemClock.sleep(1_000L)
+                composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertIsDisplayed()
+                saveScreenshot("held-menu")
+                composeRule.mainClock.autoAdvance = false
+                last = adjacent
+                inject(downTime, MotionEvent.ACTION_MOVE, last)
+                try {
+                    composeRule.waitUntil(timeoutMillis = 3_000L) { surface.selectedMessages.size == 2 }
+                } catch (failure: ComposeTimeoutException) {
+                    throw AssertionError("raw actions=$rawActions; applied selection sizes=$selectionSizes", failure)
+                }
+                // Keep the finger held across popup disposal and the selection-layout frames.
+                composeRule.mainClock.advanceTimeBy(150L)
+                SystemClock.sleep(150L)
+                composeRule.waitForIdle()
+                composeRule.runOnIdle {
+                    assertEquals(
+                        "raw actions=$rawActions; applied selection sizes=$selectionSizes",
+                        setOf(anchor, endpoint),
+                        surface.selectedMessages.keys.toSet(),
+                    )
+                }
+                composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertDoesNotExist()
+                val resources = composeRule.activity.resources
+                composeRule
+                    .onNodeWithText(resources.getString(R.string.conversation_select_messages))
+                    .assertIsDisplayed()
+                    .assert(
+                        SemanticsMatcher.expectValue(
+                            SemanticsProperties.StateDescription,
+                            resources.getQuantityString(R.plurals.message_selected_count, 2, 2),
+                        ),
+                    )
+                composeRule.onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE).assertIsDisplayed()
+                composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
+                saveScreenshot("selected-before-up")
+                inject(downTime, MotionEvent.ACTION_UP, last)
+                held = false
+                composeRule.mainClock.autoAdvance = originalAutoAdvance
+                composeRule.waitForIdle()
+                composeRule.runOnIdle { assertEquals(setOf(anchor, endpoint), surface.selectedMessages.keys.toSet()) }
+            }.recoverCatching { failure ->
+                runCatching { saveScreenshot("failure") }.exceptionOrNull()?.let(failure::addSuppressed)
                 throw AssertionError("raw actions=$rawActions; applied selection sizes=$selectionSizes", failure)
             }
-            // Keep the finger held across popup disposal and the selection-layout frames.
-            composeRule.mainClock.advanceTimeBy(150L)
-            SystemClock.sleep(150L)
-            composeRule.waitForIdle()
-            composeRule.runOnIdle {
-                assertEquals(
-                    "raw actions=$rawActions; applied selection sizes=$selectionSizes",
-                    setOf(anchor, endpoint),
-                    surface.selectedMessages.keys.toSet(),
-                )
-            }
-            composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertDoesNotExist()
-            val resources = composeRule.activity.resources
-            composeRule
-                .onNodeWithText(resources.getString(R.string.conversation_select_messages))
-                .assertIsDisplayed()
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        resources.getQuantityString(R.plurals.message_selected_count, 2, 2),
-                    ),
-                )
-            saveScreenshot("selected-before-up")
-            inject(downTime, MotionEvent.ACTION_UP, last)
-            held = false
-            composeRule.waitForIdle()
-            composeRule.runOnIdle { assertEquals(setOf(anchor, endpoint), surface.selectedMessages.keys.toSet()) }
-        }.recoverCatching { failure ->
-            runCatching { saveScreenshot("failure") }.exceptionOrNull()?.let(failure::addSuppressed)
-            throw AssertionError("raw actions=$rawActions; applied selection sizes=$selectionSizes", failure)
-        }
         // Attempt every owner cleanup, preserving the original failure and suppressing cleanup failures onto it.
         val cleanupResults =
             listOf(
                 runCatching { if (held) inject(downTime, MotionEvent.ACTION_CANCEL, last) },
+                runCatching { composeRule.mainClock.autoAdvance = originalAutoAdvance },
                 runCatching { retireController(controller, originalCallback) },
                 runCatching { selectionObserver.dispose() },
             )

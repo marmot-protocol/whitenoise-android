@@ -299,6 +299,10 @@ class MaestroWorkflowTest(unittest.TestCase):
             for name in ('attachment-fixture', 'maestro-pilot', 'mdk-qualification', 'mdk-signed-preview'):
                 self.assertFalse(self.enabled(name, 'workflow_dispatch', selected, range_selection=True))
         self.assertIn("inputs.range_selection_only && 'range-selection'", self.workflow)
+        instrumented = self.job('instrumented')
+        self.assertIn('inputs.range_selection_only && inputs.range_selection_api ||', instrumented)
+        self.assertIn("inputs.range_selection_only && inputs.range_selection_api == '37.0'", instrumented)
+        self.assertIn('./scripts/stabilize-android17-emulator.sh', instrumented)
 
     def test_mdk_qualification_excludes_ordinary_instrumentation(self):
         """The opt-in upgrade runner must not race another test job over its fixture or run unrelated suites."""
