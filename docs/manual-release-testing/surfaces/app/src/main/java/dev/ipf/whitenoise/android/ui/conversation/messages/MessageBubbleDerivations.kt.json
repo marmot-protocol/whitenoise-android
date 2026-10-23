@@ -9,7 +9,8 @@
         "anchor": "internal fun messageBubbleDisplayedBody(",
         "test_ids": [
           "MSG-007",
-          "MSG-008"
+          "MSG-008",
+          "MED-021"
         ]
       },
       {
