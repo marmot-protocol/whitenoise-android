@@ -385,7 +385,7 @@ class RelayUrlsTest {
         )
     }
 
-    /** A valid v3 onion host is an onion relay over ws or wss, never an insecure-transport warning. */
+    /** An onion host is an onion relay over ws or wss, never an insecure-transport warning. */
     @Test
     fun validOnionHostIsClassifiedAsNeedingTorNotInsecure() {
         listOf(
