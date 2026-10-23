@@ -26,8 +26,12 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
+import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
+import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
@@ -36,6 +40,46 @@ import dev.ipf.whitenoise.android.ui.icons.outlined.AccountCircle
 import dev.ipf.whitenoise.android.ui.icons.outlined.Security
 import dev.ipf.whitenoise.android.ui.icons.outlined.Smartphone
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+
+/** Titles are tied to the current native state, never to an invented setup policy. */
+@Composable
+internal fun SetupDecisionHeading(state: AccountSetupState) {
+    val step = state.currentStep ?: return
+    val proposal = state.snapshot?.proposal?.takeIf { it.step == step.step }
+    val title = setupPendingHeadingTitle(state, step, proposal) ?: setupDefaultHeadingTitle(step, proposal)
+    Text(stringResource(title), style = MaterialTheme.typography.titleLarge)
+}
+
+private fun setupPendingHeadingTitle(
+    state: AccountSetupState,
+    step: OnboardingStepStateFfi,
+    proposal: OnboardingRepairProposalFfi?,
+): Int? =
+    when {
+        state.snapshot?.cancellationPending == true -> R.string.setup_cancel_pending_title
+        proposal != null &&
+            proposal.relayRepair?.mode != OnboardingRelayRepairModeFfi.MANUAL_REVIEW &&
+            OnboardingActionFfi.APPROVE_REPAIR !in step.actions -> R.string.setup_approved_pending_title
+        step.status == dev.ipf.marmotkit.OnboardingStatusFfi.WAITING_FOR_SIGNER -> R.string.setup_signer_title
+        proposal?.profile != null && OnboardingActionFfi.APPROVE_REPAIR in step.actions ->
+            R.string.setup_profile_review_title
+        proposal?.relayRepair != null && OnboardingActionFfi.APPROVE_REPAIR in step.actions ->
+            R.string.setup_relay_review_title
+        else -> null
+    }
+
+private fun setupDefaultHeadingTitle(
+    step: OnboardingStepStateFfi,
+    proposal: OnboardingRepairProposalFfi?,
+): Int =
+    when {
+        step.step == OnboardingStepFfi.PROFILE &&
+            proposal == null &&
+            OnboardingActionFfi.CONTINUE_WITHOUT in step.actions -> R.string.setup_profile_optional_title
+        step.findings.any { it.issue == OnboardingIssueFfi.RETIRED_RELAY } -> R.string.setup_relay_retired_title
+        step.step == OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_one_phone_per_account
+        else -> setupStepTitle(step.step)
+    }
 
 /** A snapshot-only stage count with TalkBack language in stages rather than percentages. */
 @Composable

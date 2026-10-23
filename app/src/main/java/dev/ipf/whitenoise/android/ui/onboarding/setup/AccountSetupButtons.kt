@@ -18,7 +18,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -103,54 +102,6 @@ private fun SetupResetRelayAction(
         modifier = Modifier.fillMaxWidth().testTag("setup-reset-relays"),
         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
     ) { Text(stringResource(R.string.setup_reset_relays)) }
-}
-
-/** Pure projection of the current native grant, including the focused exact Remove choice. */
-private data class SetupActionPlan(
-    val primary: OnboardingActionFfi?,
-    val secondary: OnboardingActionFfi?,
-    val directRemove: Boolean,
-)
-
-private fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): SetupActionPlan {
-    val snapshot = checkNotNull(snapshot)
-    val step = checkNotNull(currentStep)
-    val directRemove = directRemoveAvailable(offered)
-    val primary =
-        when {
-            snapshot.cancellationPending -> offered.firstOrNull()
-            OnboardingActionFfi.APPROVE_REPAIR in offered -> OnboardingActionFfi.APPROVE_REPAIR
-            step.step == OnboardingStepFfi.PROFILE && OnboardingActionFfi.CONTINUE_WITHOUT in offered ->
-                OnboardingActionFfi.CONTINUE_WITHOUT
-            step.step == OnboardingStepFfi.SINGLE_DEVICE && OnboardingActionFfi.CONTINUE_ANYWAY in offered ->
-                OnboardingActionFfi.CONTINUE_ANYWAY
-            OnboardingActionFfi.RECONNECT_SIGNER in offered -> OnboardingActionFfi.RECONNECT_SIGNER
-            directRemove -> null
-            OnboardingActionFfi.USE_RECOMMENDED_RELAYS in offered -> OnboardingActionFfi.USE_RECOMMENDED_RELAYS
-            OnboardingActionFfi.RETRY in offered -> OnboardingActionFfi.RETRY
-            else -> offered.firstOrNull()
-        }
-    val secondary =
-        if (directRemove) {
-            OnboardingActionFfi.EDIT_RELAYS
-        } else {
-            offered.firstOrNull {
-                it != primary && it != OnboardingActionFfi.CANCEL_ONBOARDING && it != OnboardingActionFfi.RETRY
-            }
-        }
-    return SetupActionPlan(primary, secondary, directRemove)
-}
-
-private fun AccountSetupState.directRemoveAvailable(offered: List<OnboardingActionFfi>): Boolean {
-    val step = currentStep ?: return false
-    return step.step in relaySetupSteps &&
-        snapshot?.proposal == null &&
-        OnboardingActionFfi.EDIT_RELAYS in offered &&
-        step.findings
-            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
-            .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
-            .distinct()
-            .size == 1
 }
 
 /** Dispatches only currently offered actions and proposal revision for approval. */

@@ -174,58 +174,13 @@ internal class AccountSetupController(
         val request = SetupRequest(revision, step, action, recoveryEpoch = recoveryEpoch)
         if (!mutableState.canAct(request, account, isCurrent())) return
         if (endpoint == null) {
-            loadEditor(request)
+            operate { client.loadSetupEditor(request, mutableState, account, isCurrent, ::accept) }
         } else {
-            prepareRelayRemoval(request, endpoint)
-        }
-    }
-
-    private fun prepareRelayRemoval(
-        request: SetupRequest,
-        endpoint: String,
-    ) {
-        val displayed = mutableState.value.snapshot ?: return
-        val selected = mutableState.value.currentStep
-        val validTarget = request.action == OnboardingActionFfi.EDIT_RELAYS && endpoint.isNotBlank()
-        val matchingStep = selected?.step == request.step
-        val matchingFinding =
-            selected?.findings?.any {
-                it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
-            } == true
-        if (!validTarget || !matchingStep || !matchingFinding) return
-        operate {
-            AccountSetupRelayRemoval(client, account, isCurrent, mutableState, ::accept)
-                .prepare(request, displayed, endpoint)
-        }
-    }
-
-    private fun loadEditor(request: SetupRequest) {
-        operate {
-            val latest = client.snapshot()
-            if (latest == null || !latest.matchesDecision(account, request)) {
-                latest?.let(::accept)
-                mutableState.value = mutableState.value.copy(staleDecision = true)
-            } else if (request.action == OnboardingActionFfi.EDIT_RELAYS) {
-                val discarded =
-                    client.installRelayPreview(request.step) { preview ->
-                        val editor = preview.relayEditor(request)
-                        val matchesLoad = preview.matchesRelayEditorLoad(account, request, mutableState.value.snapshot)
-                        if (!isCurrent() || !matchesLoad) {
-                            false
-                        } else {
-                            accept(preview)
-                            mutableState.value = mutableState.value.copy(editor = editor)
-                            true
-                        }
-                    }
-                discarded?.let(::accept)
-            } else {
-                val existing = mutableState.value.editor
-                val profile = if (request.action == OnboardingActionFfi.EDIT_PROFILE) client.profile() else null
-                val currentRevision = mutableState.value.snapshot?.revision == request.revision
-                val currentEpoch = mutableState.value.snapshot?.recoveryEpoch == request.recoveryEpoch
-                if (isCurrent() && currentRevision && currentEpoch) {
-                    mutableState.value = mutableState.value.copy(editor = existing.forRequest(request, profile))
+            val displayed = mutableState.value.snapshot
+            if (displayed != null && mutableState.value.matchesRenderedRelayRemoval(request, endpoint)) {
+                operate {
+                    AccountSetupRelayRemoval(client, account, isCurrent, mutableState, ::accept)
+                        .prepare(request, displayed, endpoint)
                 }
             }
         }
@@ -384,6 +339,58 @@ internal fun SetupEditor.request(): SetupRequest {
                 about = if (editor.aboutEdited) editor.about.trim() else profile.about,
             ),
     )
+}
+
+/** Exact rendered grant and finding stay bound to the selected retired endpoint. */
+private fun AccountSetupState.matchesRenderedRelayRemoval(
+    request: SetupRequest,
+    endpoint: String,
+): Boolean {
+    val selected = currentStep ?: return false
+    val validTarget = request.action == OnboardingActionFfi.EDIT_RELAYS && endpoint.isNotBlank()
+    val matchingStep = selected.step == request.step
+    val matchingFinding =
+        selected.findings.any {
+            it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
+        }
+    return validTarget && matchingStep && matchingFinding
+}
+
+/** Keeps a long-lived editor request inside the controller's serialized operation without adding controller state. */
+private suspend fun AccountSetupClient.loadSetupEditor(
+    request: SetupRequest,
+    state: MutableStateFlow<AccountSetupState>,
+    account: String,
+    isCurrent: () -> Boolean,
+    accept: (OnboardingSnapshotFfi) -> Unit,
+) {
+    val latest = snapshot()
+    if (latest == null || !latest.matchesDecision(account, request)) {
+        latest?.let(accept)
+        state.value = state.value.copy(staleDecision = true)
+    } else if (request.action == OnboardingActionFfi.EDIT_RELAYS) {
+        val discarded =
+            installRelayPreview(request.step) { preview ->
+                val editor = preview.relayEditor(request)
+                val matchesLoad = preview.matchesRelayEditorLoad(account, request, state.value.snapshot)
+                if (!isCurrent() || !matchesLoad) {
+                    false
+                } else {
+                    accept(preview)
+                    state.value = state.value.copy(editor = editor)
+                    true
+                }
+            }
+        discarded?.let(accept)
+    } else {
+        val existing = state.value.editor
+        val profile = if (request.action == OnboardingActionFfi.EDIT_PROFILE) profile() else null
+        val currentRevision = state.value.snapshot?.revision == request.revision
+        val currentEpoch = state.value.snapshot?.recoveryEpoch == request.recoveryEpoch
+        if (isCurrent() && currentRevision && currentEpoch) {
+            state.value = state.value.copy(editor = existing.forRequest(request, profile))
+        }
+    }
 }
 
 /** Checks the rendered native decision before entering the controller's single-flight operation. */

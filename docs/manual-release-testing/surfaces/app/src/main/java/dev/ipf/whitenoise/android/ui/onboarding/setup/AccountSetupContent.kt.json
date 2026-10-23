@@ -199,22 +199,6 @@
         ]
       },
       {
-        "surface": "R.string.setup_approved_pending_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_approved_pending_title",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_cancel_pending_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_cancel_pending_title",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_one_phone_per_account",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_one_phone_per_account",
@@ -223,33 +207,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_profile_optional_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_profile_optional_title",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_relay_publication_scope",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_relay_publication_scope",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_relay_retired_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_relay_retired_title",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_relay_review_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_relay_review_title",
         "test_ids": [
           "ONB-017"
         ]
@@ -271,14 +231,6 @@
         ]
       },
       {
-        "surface": "R.string.setup_signer_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_signer_title",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.onboarding_details_collapsed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.onboarding_details_collapsed",
@@ -290,14 +242,6 @@
         "surface": "R.string.onboarding_details_expanded",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.onboarding_details_expanded",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_profile_review_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_profile_review_title",
         "test_ids": [
           "ONB-017"
         ]
@@ -435,14 +379,6 @@
         "anchor": "EmojiLabel(",
         "test_ids": [
           "MSG-037"
-        ]
-      },
-      {
-        "surface": "SetupDecisionHeading",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "fun SetupDecisionHeading(",
-        "test_ids": [
-          "ONB-017"
         ]
       },
       {
