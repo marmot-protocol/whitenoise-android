@@ -24,6 +24,27 @@ class NostrEventCardTriggerTest {
         ).forEach { text -> assertTrue("must match: $text", mayNameNostrEventCard(text)) }
     }
 
+    /**
+     * A link destination with Markdown backslash escapes renders a card, since MDK unescapes it before reading the
+     * NIP-19 segment, so the check matches it as MDK reads it.
+     */
+    @Test
+    fun escapedLinkDestinationsMatch() {
+        listOf(
+            "[post](https\\://njump.me/$note)",
+            "[post](https:\\/\\/njump.me\\/$note)",
+            "[post](<https\\://njump.me/$note>)",
+            "[post](https://njump.me/e\\/$note)",
+        ).forEach { text -> assertTrue("must match: $text", mayNameNostrEventCard(text)) }
+    }
+
+    /** An escaped `nostr\:` colon stays literal in MDK, so it renders no card and does not match. */
+    @Test
+    fun escapedNostrUriDoesNotMatch() {
+        assertFalse(mayNameNostrEventCard("nostr\\:$note"))
+        assertFalse("an escape is not a scheme", mayNameNostrEventCard("https\\:njump.me $note"))
+    }
+
     /** Prose, bare tokens and scheme-less links never render a card, so they hold nothing. */
     @Test
     fun lookalikesThatRenderNoCardDoNotMatch() {

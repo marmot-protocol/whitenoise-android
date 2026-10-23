@@ -24,11 +24,39 @@ internal fun nostrEventReferences(document: MarkdownDocumentFfi): List<NostrEven
  * and cache read a card needs: a `nostr:note1…`, `nostr:nevent1…` or `nostr:naddr1…` URI, which MDK's Markdown parser
  * recognizes only lowercase and between word boundaries, or an HTTP(S) link carrying such a NIP-19 segment. A bare
  * `note1…` token, a word such as "footnote1" and a scheme-less `njump.me/note1…` never render a card, so they do not
- * match. It may still match text whose bech32 does not decode, or a `nostr:` URI inside a code span.
+ * match. A link destination is matched as MDK reads it, with its Markdown backslash escapes removed, so
+ * `[post](https\://njump.me/note1…)` matches too. It may still match text whose bech32 does not decode, or a `nostr:`
+ * URI inside a code span.
  */
 internal fun mayNameNostrEventCardReference(text: String): Boolean =
     EVENT_ENTITY_PREFIX.containsMatchIn(text) &&
-        (NOSTR_EVENT_URI.containsMatchIn(text) || HTTP_EVENT_LINK.containsMatchIn(text))
+        (NOSTR_EVENT_URI.containsMatchIn(text) || HTTP_EVENT_LINK.containsMatchIn(text.withoutMarkdownEscapes()))
+
+/**
+ * [this] with every backslash that escapes an ASCII punctuation character removed, as CommonMark, and MDK's
+ * `parse_link_destination`, unescape a link destination. A `nostr:` URI is not unescaped: MDK reads it from the raw
+ * text, where an escaped colon is literal. Returns [this] when it has no backslash.
+ */
+private fun String.withoutMarkdownEscapes(): String {
+    if ('\\' !in this) return this
+    return buildString(length) {
+        var index = 0
+        while (index < this@withoutMarkdownEscapes.length) {
+            val char = this@withoutMarkdownEscapes[index]
+            val next = this@withoutMarkdownEscapes.getOrNull(index + 1)
+            if (char == '\\' && next != null && next in ASCII_PUNCTUATION) {
+                append(next)
+                index += 2
+            } else {
+                append(char)
+                index += 1
+            }
+        }
+    }
+}
+
+/** CommonMark's escapable characters: every ASCII punctuation character. */
+private const val ASCII_PUNCTUATION = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 
 /**
  * True only when every non-whitespace token in the authored message is one of
