@@ -1695,8 +1695,8 @@ class ConversationFileBackedMediaSendTest {
         }
 
     /**
-     * A draft photo after a large video uploads from a file too, so its three disk copies must fit beside
-     * the copies still owed to the video. When they do not, the photo is left out with the storage notice
+     * A draft photo after a large video uploads from a file too, so its two disk copies must fit beside
+     * the staged copy still owed to the video. When they do not, the photo is left out with the storage notice
      * and the video still sends, instead of the whole album failing during upload.
      */
     @Test
@@ -1715,8 +1715,8 @@ class ConversationFileBackedMediaSendTest {
                 }
             val roomyLimits =
                 FileBackedSendLimits(perFileBytes = ALBUM_VIDEO_BYTES, batchCiphertextBytes = 4 * ALBUM_VIDEO_BYTES)
-            // The video's three copies fit with less to spare than the photo's three copies need.
-            val initialFree = SEND_RESERVE_BYTES + 3 * ALBUM_VIDEO_BYTES + DRAFT_PHOTO_BYTES
+            // The video's two copies fit with less to spare than the photo's two copies need.
+            val initialFree = SEND_RESERVE_BYTES + 2 * ALBUM_VIDEO_BYTES + DRAFT_PHOTO_BYTES
             val stagingDirectory = uploadSourcesDirectory(state.appContext.cacheDir)
             val alreadyStaged = stagedBytes(stagingDirectory)
             val usableSpace: (java.io.File) -> Long = { initialFree - (stagedBytes(stagingDirectory) - alreadyStaged) }
@@ -1767,9 +1767,9 @@ class ConversationFileBackedMediaSendTest {
                     uploaded.complete(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
-            // After the video lands there is room for the document's three copies alone, but not for its
-            // snapshot beside the video's larger upload: 40 + 96 MiB are needed and 1 byte less is free.
-            val initialFree = SEND_RESERVE_BYTES + 3 * LARGER_VIDEO_BYTES + SCRIPTED_DECLARED_BYTES - 1L
+            // After the video lands there is room for the document's two copies alone, but not for its
+            // snapshot beside the video's larger upload: 40 + 48 MiB are needed and 1 byte less is free.
+            val initialFree = SEND_RESERVE_BYTES + 2 * LARGER_VIDEO_BYTES + SCRIPTED_DECLARED_BYTES - 1L
             val stagingDirectory = uploadSourcesDirectory(state.appContext.cacheDir)
             val alreadyStaged = stagedBytes(stagingDirectory)
             val usableSpace: (java.io.File) -> Long = { initialFree - (stagedBytes(stagingDirectory) - alreadyStaged) }
