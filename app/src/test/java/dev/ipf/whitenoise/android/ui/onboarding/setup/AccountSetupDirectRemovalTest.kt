@@ -152,6 +152,62 @@ class AccountSetupDirectRemovalTest {
             controller.close()
         }
 
+    /** Delayed native responses cannot reopen removal review after ownership, account, epoch, or revision changes. */
+    @Test fun lateProposalResponseKeepsTheNewerOwnedDecision() =
+        runTest {
+            for (case in listOf("newer revision", "new recovery", "other proposal", "other account", "replaced owner")) {
+                val preview = removablePreview().copy(recoveryEpoch = "initial")
+                val review = preview.copy(revision = 5uL, proposal = preview.proposal!!.copy(revision = 5uL))
+                val response =
+                    if (case == "other account") review.copy(accountIdHex = "cd".repeat(32)) else review
+                val wait = CompletableDeferred<Unit>()
+                val client = removalClient(preview, response)
+                client.current = retiredDecision().copy(recoveryEpoch = "initial")
+                client.executeResult = { request ->
+                    val result =
+                        when (request.action) {
+                            OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> preview.also { client.hold = wait }
+                            OnboardingActionFfi.EDIT_RELAYS -> response
+                            else -> client.current
+                        }
+                    if (client.current.revision <= result.revision) client.current = result
+                    result
+                }
+                var ownerCurrent = true
+                val controller =
+                    AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { ownerCurrent }, {}, {})
+                controller.reconnect()
+                runCurrent()
+                controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED, "initial")
+                runCurrent()
+                assertEquals(OnboardingActionFfi.EDIT_RELAYS, client.requests.last().action)
+
+                val newer =
+                    when (case) {
+                        "newer revision" -> retiredDecision().copy(revision = 6uL, recoveryEpoch = "initial")
+                        "new recovery" -> retiredDecision().copy(revision = 4uL, recoveryEpoch = "next")
+                        "other proposal" ->
+                            preview.copy(proposal = preview.proposal!!.copy(step = OnboardingStepFfi.INBOX_RELAYS))
+                        else -> null
+                    }
+                if (newer != null) {
+                    client.current = newer
+                    client.updates.send(newer)
+                    runCurrent()
+                    assertEquals(newer, controller.state.value.snapshot)
+                }
+                if (case == "replaced owner") ownerCurrent = false
+                wait.complete(Unit)
+                runCurrent()
+
+                assertFalse("$case entered removal review", controller.state.value.removalReview)
+                assertEquals(newer ?: preview, controller.state.value.snapshot)
+                if (ownerCurrent) assertTrue("$case was not marked stale", controller.state.value.staleDecision)
+                assertFalse(client.requests.any { it.action == OnboardingActionFfi.APPROVE_REPAIR })
+                controller.close()
+            }
+        }
+
     @Test fun ownerInvalidatedAtSecondNativeReadNeverSubmitsProposal() =
         runTest {
             val preview = removablePreview()

@@ -1,12 +1,26 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairFfi
 import dev.ipf.marmotkit.OnboardingRelayTagRoleFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 
 internal val relaySetupSteps = setOf(OnboardingStepFfi.RELAYS, OnboardingStepFfi.INBOX_RELAYS)
 internal val relaySetupActions = setOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+
+/** One offered retired endpoint can be removed directly only before any native proposal exists. */
+internal fun AccountSetupState.directRemovalEndpoint(): String? {
+    val step = currentStep ?: return null
+    if (step.step !in relaySetupSteps || snapshot?.proposal != null || OnboardingActionFfi.EDIT_RELAYS !in step.actions) {
+        return null
+    }
+    return step.findings
+        .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
+        .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
+        .distinct()
+        .singleOrNull()
+}
 
 /** Projects exact native endpoint strings; no endpoint classification or route selection happens here. */
 internal fun SetupEditor.withRelayDeclaration(repair: OnboardingRelayRepairFfi): SetupEditor {

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 
 /** Pure projection of the current native grant, including the focused exact Remove choice. */
@@ -47,14 +46,5 @@ private fun fallbackAction(offered: List<OnboardingActionFfi>): OnboardingAction
         else -> offered.firstOrNull()
     }
 
-private fun AccountSetupState.directRemoveAvailable(offered: List<OnboardingActionFfi>): Boolean {
-    val step = currentStep ?: return false
-    return step.step in relaySetupSteps &&
-        snapshot?.proposal == null &&
-        OnboardingActionFfi.EDIT_RELAYS in offered &&
-        step.findings
-            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
-            .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
-            .distinct()
-            .size == 1
-}
+private fun AccountSetupState.directRemoveAvailable(offered: List<OnboardingActionFfi>): Boolean =
+    OnboardingActionFfi.EDIT_RELAYS in offered && directRemovalEndpoint() != null

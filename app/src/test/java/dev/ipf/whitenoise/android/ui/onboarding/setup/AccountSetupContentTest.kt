@@ -449,6 +449,20 @@ class AccountSetupContentTest {
         assertTrue(actions.isEmpty())
     }
 
+    /** A proposal for another step cannot hide a retired finding when direct Remove is unavailable. */
+    @Test fun pendingOtherStepKeepsRetiredFindingVisible() {
+        val snapshot =
+            setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.EDIT_RELAYS)).copy(
+                proposal = relayPreviewSnapshot().proposal!!.copy(step = OnboardingStepFfi.PROFILE),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"))
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithText("This relay is retired.").assertIsDisplayed()
+        composeRule.onNodeWithText("wss://retired.example").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-remove-relay").assertDoesNotExist()
+    }
+
     /** A real device-check failure keeps an explained, working retry and a non-destructive exit. */
     @Test fun failedDeviceCheckRetainsRetryAndLater() {
         val snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.RETRY))

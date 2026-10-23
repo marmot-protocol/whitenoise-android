@@ -80,11 +80,33 @@ internal class AccountSetupRelayRemoval(
                 abandon(preview, fresh)
             } else {
                 client.execute(staged.request())?.let { proposal ->
-                    accept(proposal)
-                    state.value = state.value.copy(editor = null, relayRemovalIssue = null, removalReview = true)
+                    val current = state.value.snapshot
+                    val responseOwned = ownsReturnedProposal(proposal, current, preview, staged)
+                    if (responseOwned) {
+                        accept(proposal)
+                        state.value = state.value.copy(editor = null, relayRemovalIssue = null, removalReview = true)
+                    } else if (isCurrent()) {
+                        state.value = state.value.copy(editor = null, staleDecision = true)
+                    }
                 }
             }
         }
+    }
+
+    /** A late command response cannot replace a newer decision, another account, or another recovery attempt. */
+    private fun ownsReturnedProposal(
+        proposal: OnboardingSnapshotFfi,
+        current: OnboardingSnapshotFfi?,
+        preview: OnboardingSnapshotFfi,
+        staged: SetupEditor,
+    ): Boolean {
+        if (!isCurrent() || current == null) return false
+        val accountOwned = current.accountIdHex == account && proposal.accountIdHex == account
+        val attemptCurrent =
+            proposal.recoveryEpoch == staged.recoveryEpoch && proposal.recoveryEpoch == current.recoveryEpoch
+        val decisionCurrent =
+            proposal.revision >= current.revision && (preview.isCurrentRelayPreview(current) || proposal == current)
+        return accountOwned && attemptCurrent && decisionCurrent
     }
 
     /** Discards only the still-owned preview; a newer checkpoint wins. */

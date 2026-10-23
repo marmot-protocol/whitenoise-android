@@ -227,30 +227,18 @@ private fun SetupDirectRelayRemoval(
 ) {
     val snapshot = state.snapshot ?: return
     val step = state.currentStep ?: return
-    if (step.step in relaySetupSteps &&
-        snapshot.proposal == null &&
-        OnboardingActionFfi.EDIT_RELAYS in step.actions
+    val endpoint = state.directRemovalEndpoint() ?: return
+    val revision = snapshot.revision
+    val recoveryEpoch = snapshot.recoveryEpoch
+    Text(endpoint, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
+    WhiteNoiseButton(
+        onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) },
+        enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision,
+        modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay"),
     ) {
-        val retired =
-            step.findings
-                .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
-                .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
-                .distinct()
-        if (retired.size == 1) {
-            val endpoint = retired.single()
-            val revision = snapshot.revision
-            val recoveryEpoch = snapshot.recoveryEpoch
-            Text(endpoint, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
-            WhiteNoiseButton(
-                onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) },
-                enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision,
-                modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay"),
-            ) {
-                Icon(painterResource(R.drawable.ic_delete), null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.setup_remove_relay))
-            }
-        }
+        Icon(painterResource(R.drawable.ic_delete), null)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.setup_remove_relay))
     }
 }
 
@@ -314,21 +302,15 @@ private fun SetupStepFindings(
     step: OnboardingStepStateFfi,
 ) {
     if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
-    val retiredEndpoint =
-        step.findings
-            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
-            .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
-            .distinct()
-            .singleOrNull()
-    val directRemovalOffered = OnboardingActionFfi.EDIT_RELAYS in step.actions && retiredEndpoint != null
+    val directRemovalEndpoint = state.directRemovalEndpoint()
     step.findings
         .distinct()
         .filterNot { finding ->
             val routineDeviceNotice = step.step == OnboardingStepFfi.SINGLE_DEVICE && state.routineDeviceNotice
             val directRemovalFinding =
-                directRemovalOffered &&
+                directRemovalEndpoint != null &&
                     finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
-                    finding.endpoint == retiredEndpoint
+                    finding.endpoint == directRemovalEndpoint
             routineDeviceNotice || directRemovalFinding
         }.forEach { SetupFindingContent(it) }
 }
