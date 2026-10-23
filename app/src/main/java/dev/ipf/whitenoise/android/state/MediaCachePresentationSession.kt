@@ -36,13 +36,16 @@ internal suspend fun ConversationController.cachedAttachmentPlaintext(
 ): ByteArray? {
     val account = boundAccountRef ?: return null
     val key = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
-    // Every path honours [maxBytes]: an over-budget small entry falls through to the bounded lease, which rejects it
-    // from its declared size before copying anything.
+    // Every path honours [maxBytes]: an over-budget entry is rejected from its indexed size before anything is
+    // decrypted, and the bounded lease still refuses a source that turns out larger than declared.
     return withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(key) }
         ?.also { bytes ->
             if (bytes.size > maxBytes) throw AttachmentTooLargeToPresentException(maxBytes, bytes.size.toLong())
         }
         ?: withContext(Dispatchers.IO) {
+            appState.diskMediaCache.plaintextSizeOf(key)?.let { size ->
+                if (size > maxBytes) throw AttachmentTooLargeToPresentException(maxBytes, size)
+            }
             appState.diskMediaCache.getIfSmall(key, maxBytes)
                 ?: appState.diskMediaCache
                     .materialize(key) { ensureActive() }

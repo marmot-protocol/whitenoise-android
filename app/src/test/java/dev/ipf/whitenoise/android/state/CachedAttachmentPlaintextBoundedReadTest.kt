@@ -146,6 +146,33 @@ class CachedAttachmentPlaintextBoundedReadTest {
             assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
         }
 
+    /**
+     * An over-budget entry is rejected from its indexed size without decrypting anything. The ciphertext is
+     * corrupted first, so any read that decrypted the entry would fail authentication instead of reporting the size.
+     */
+    @Test
+    fun anOverBudgetEntryIsRejectedWithoutDecryptingIt() =
+        runTest(dispatcher) {
+            fixture.state.diskMediaCache.put(request(0).cacheKey(), ByteArray(LARGE_ENTRY_BYTES) { it.toByte() })
+            File(cacheRoot, "encrypted")
+                .listFiles()
+                .orEmpty()
+                .filter { it.isFile && "lease" !in it.name && it.length() > 0 }
+                .forEach { entry -> entry.writeBytes(ByteArray(entry.length().toInt()) { 0x5A }) }
+
+            val failure =
+                runCatching {
+                    localAttachmentBytes(controller, request(0).messageIdHex, 0, mine = false, maxBytes = BUDGET_BYTES)
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(LARGE_ENTRY_BYTES.toLong(), (failure as AttachmentTooLargeToPresentException).declaredBytes)
+            assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
+        }
+
     /** An entry small enough for L1 is still read directly. */
     @Test
     fun aSmallDiskEntryIsReadDirectly() =
