@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
 import dev.ipf.whitenoise.android.core.nostr.NostrRelayQueryClient
 import dev.ipf.whitenoise.android.core.nostr.NostrRelayTimeoutException
+import dev.ipf.whitenoise.android.core.nostr.limitNostrRelayMessages
 import kotlinx.coroutines.CancellationException
 import okhttp3.OkHttpClient
 import okhttp3.WebSocket
@@ -89,9 +90,11 @@ class ZapstoreReleaseClient internal constructor(
         // the newest is chosen by CalVer, so relay ordering does not matter.
         private const val RELEASE_QUERY_LIMIT = 50
 
-        private fun defaultHttpClient(): OkHttpClient =
+        /** Build the guarded transport used by production release discovery. */
+        internal fun defaultHttpClient(): OkHttpClient =
             OkHttpClient
                 .Builder()
+                .limitNostrRelayMessages()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .build()

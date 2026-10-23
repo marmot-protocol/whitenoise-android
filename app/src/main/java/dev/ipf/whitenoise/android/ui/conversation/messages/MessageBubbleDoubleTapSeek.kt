@@ -58,7 +58,7 @@ internal class TtsLinkTapCoordinator(
 /**
  * Observes unconsumed taps after child controls have had their turn. This keeps
  * links, mentions, media controls, scrolling, and reply swipes authoritative;
- * only two ordinary text taps close enough in time and space become a seek.
+ * only two ordinary text taps close enough in time and space become a seek, or an edit of your own message (#3388).
  */
 @Composable
 @Suppress("ComplexCondition", "CyclomaticComplexMethod", "LongMethod")

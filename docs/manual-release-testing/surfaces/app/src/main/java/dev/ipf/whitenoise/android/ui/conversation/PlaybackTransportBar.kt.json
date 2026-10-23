@@ -54,6 +54,22 @@
         ]
       },
       {
+        "surface": "R.string.video_seek_back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.video_seek_back",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "R.string.video_seek_forward",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.video_seek_forward",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
         "surface": "R.string.voice_message_pause",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
         "anchor": "R.string.voice_message_pause",
@@ -65,6 +81,14 @@
         "surface": "R.string.voice_message_play",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
         "anchor": "R.string.voice_message_play",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_speed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.voice_message_speed",
         "test_ids": [
           "MED-028"
         ]
