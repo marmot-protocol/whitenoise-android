@@ -310,7 +310,15 @@
     <string name="mls_group_id">ID du groupe MLS</string>
     <string name="nostr_group_id">ID du groupe Nostr</string>
     <string name="group_relays">Relais du groupe</string>
-    <string name="group_relays_description">Relais utilisés pour échanger les messages de ce groupe.</string>
+    <string name="chat_relays">Relais de la discussion</string>
+    <string name="group_relays_intro">Ces relais Nostr sont configurés pour cette discussion. Ils acheminent ses messages chiffrés vers tous les membres.</string>
+    <string name="group_relays_configured">Relais configurés</string>
+    <string name="group_relays_configuration_only">Voici l’itinéraire configuré de la discussion. Il n’indique pas si chaque relais est connecté en ce moment.</string>
+    <string name="group_relays_empty">Aucun relais n’est configuré pour cette discussion.</string>
+    <string name="group_relays_admin_control_title">Les administrateurs contrôlent ces relais</string>
+    <string name="group_relays_admin_detail">Les modifier déplacerait cette discussion pour tous les membres. La modification des relais du groupe n’est pas encore disponible dans White Noise.</string>
+    <string name="group_relays_member_detail">Seuls les administrateurs peuvent changer les relais utilisés par cette discussion. Vous pouvez les consulter et les copier ici.</string>
+    <string name="group_relay_copy">Copier l’URL du relais %1$d</string>
     <string name="relay_number">Relais %1$d</string>
     <string name="group_id">ID du Groupe</string>
     <string name="relays">Relais réseau</string>
@@ -641,7 +649,6 @@
     <string name="toast_encrypted_backup_created">Sauvegarde chiffrée créée</string>
     <string name="toast_couldnt_create_encrypted_backup">Impossible de créer la sauvegarde chiffrée</string>
     <string name="copy">Copier</string>
-    <string name="no_relays">Aucun relais configuré</string>
     <string name="remove_relay">Supprimer le relais</string>
     <string name="add_relay">Ajouter un relais</string>
     <string name="relay_lists_section">Listes de relais</string>

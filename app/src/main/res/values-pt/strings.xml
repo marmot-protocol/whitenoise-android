@@ -310,7 +310,15 @@
     <string name="mls_group_id">ID do grupo MLS</string>
     <string name="nostr_group_id">ID do grupo Nostr</string>
     <string name="group_relays">Relays do grupo</string>
-    <string name="group_relays_description">Relays usados para trocar mensagens neste grupo.</string>
+    <string name="chat_relays">Relays da conversa</string>
+    <string name="group_relays_intro">Estes relays Nostr estão configurados para esta conversa. Eles levam as mensagens criptografadas dela a todos os membros.</string>
+    <string name="group_relays_configured">Relays configurados</string>
+    <string name="group_relays_configuration_only">Esta é a rota configurada da conversa. Ela não mostra se cada relay está conectado agora.</string>
+    <string name="group_relays_empty">Nenhum relay está configurado para esta conversa.</string>
+    <string name="group_relays_admin_control_title">Os administradores controlam estes relays</string>
+    <string name="group_relays_admin_detail">Alterá-los mudaria esta conversa para todos os membros. A edição dos relays do grupo ainda não está disponível no White Noise.</string>
+    <string name="group_relays_member_detail">Só os administradores podem alterar os relays que esta conversa usa. Aqui você pode vê-los e copiá-los.</string>
+    <string name="group_relay_copy">Copiar a URL do relay %1$d</string>
     <string name="relay_number">Retransmissor %1$d</string>
     <string name="group_id">ID do Grupo</string>
     <string name="relays">Relays de rede</string>
@@ -641,7 +649,6 @@
     <string name="toast_encrypted_backup_created">Backup criptografado criado</string>
     <string name="toast_couldnt_create_encrypted_backup">Não foi possível criar o backup criptografado</string>
     <string name="copy">Copiar</string>
-    <string name="no_relays">Nenhum relay configurado</string>
     <string name="remove_relay">Remover Relay?</string>
     <string name="add_relay">Adicionar Relay</string>
     <string name="relay_lists_section">Listas de relays</string>

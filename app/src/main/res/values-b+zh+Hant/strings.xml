@@ -299,7 +299,15 @@
     <string name="mls_group_id">MLS 群組 ID</string>
     <string name="nostr_group_id">Nostr 群組 ID</string>
     <string name="group_relays">群組中繼站</string>
-    <string name="group_relays_description">用於交換此群組訊息的中繼站。</string>
+    <string name="chat_relays">聊天中繼站</string>
+    <string name="group_relays_intro">這些 Nostr 中繼站已為此聊天設定，負責將其加密訊息傳送給每位成員。</string>
+    <string name="group_relays_configured">已設定的中繼站</string>
+    <string name="group_relays_configuration_only">這是此聊天的已設定路由，不代表每個中繼站目前是否已連線。</string>
+    <string name="group_relays_empty">此聊天未設定任何中繼站。</string>
+    <string name="group_relays_admin_control_title">這些中繼站由管理員控制</string>
+    <string name="group_relays_admin_detail">變更它們會為所有成員遷移此聊天。White Noise 尚不支援編輯群組中繼站。</string>
+    <string name="group_relays_member_detail">只有管理員可以變更此聊天使用的中繼站。你可以在這裡查看和複製它們。</string>
+    <string name="group_relay_copy">複製中繼站 %1$d 的 URL</string>
     <string name="relay_number">中繼站 %1$d</string>
     <string name="group_id">群組 ID</string>
     <string name="relays">網路中繼站</string>
@@ -627,7 +635,6 @@
     <string name="toast_encrypted_backup_created">已建立加密備份</string>
     <string name="toast_couldnt_create_encrypted_backup">無法建立加密備份</string>
     <string name="copy">複製</string>
-    <string name="no_relays">尚未設定中繼站</string>
     <string name="remove_relay">移除中繼站</string>
     <string name="add_relay">新增中繼站</string>
     <string name="relay_lists_section">中繼列表</string>

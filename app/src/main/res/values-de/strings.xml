@@ -310,7 +310,15 @@
     <string name="mls_group_id">MLS-Gruppen-ID</string>
     <string name="nostr_group_id">Nostr-Gruppen-ID</string>
     <string name="group_relays">Gruppen-Relays</string>
-    <string name="group_relays_description">Relays, die zum Austausch von Nachrichten für diese Gruppe verwendet werden.</string>
+    <string name="chat_relays">Chat-Relays</string>
+    <string name="group_relays_intro">Diese Nostr-Relays sind für diesen Chat konfiguriert. Sie übertragen seine verschlüsselten Nachrichten an alle Mitglieder.</string>
+    <string name="group_relays_configured">Konfigurierte Relays</string>
+    <string name="group_relays_configuration_only">Das ist die konfigurierte Route des Chats. Sie zeigt nicht, ob jedes Relay gerade verbunden ist.</string>
+    <string name="group_relays_empty">Für diesen Chat sind keine Relays konfiguriert.</string>
+    <string name="group_relays_admin_control_title">Admins verwalten diese Relays</string>
+    <string name="group_relays_admin_detail">Eine Änderung würde diesen Chat für alle Mitglieder verlegen. Gruppen-Relays lassen sich in White Noise noch nicht bearbeiten.</string>
+    <string name="group_relays_member_detail">Nur Admins können die Relays dieses Chats ändern. Hier kannst du sie ansehen und kopieren.</string>
+    <string name="group_relay_copy">URL von Relay %1$d kopieren</string>
     <string name="relay_number">Relay-Server %1$d</string>
     <string name="group_id">Gruppen-ID</string>
     <string name="relays">Netzwerk-Relays</string>
@@ -641,7 +649,6 @@
     <string name="toast_encrypted_backup_created">Verschlüsseltes Backup erstellt</string>
     <string name="toast_couldnt_create_encrypted_backup">Verschlüsseltes Backup konnte nicht erstellt werden</string>
     <string name="copy">Kopieren</string>
-    <string name="no_relays">Keine Relays konfiguriert</string>
     <string name="remove_relay">Relay entfernen?</string>
     <string name="add_relay">Relay hinzufügen</string>
     <string name="relay_lists_section">Relay-Listen</string>
