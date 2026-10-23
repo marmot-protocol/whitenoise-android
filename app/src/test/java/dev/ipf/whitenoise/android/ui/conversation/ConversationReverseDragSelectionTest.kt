@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -52,6 +53,7 @@ internal class ConversationReverseDragSelectionTest {
     private var viewportBounds = Rect.Zero
     private var lastPointer = Offset.Zero
     private lateinit var edgeEvidence: EdgeEvidence
+    private lateinit var edgeController: ConversationController
 
     /** A stationary top-edge hold must leave index zero and select newly revealed older rows. */
     @Test
@@ -62,7 +64,7 @@ internal class ConversationReverseDragSelectionTest {
             holdAtEdge(anchor, top = true)
             val older = evidence.latest()
             assertTrue("top must reveal older rows", older.anchor.listIndex > initial.anchor.listIndex)
-            assertSelectionAtPointer(surface, evidence, ids, anchor)
+            assertSelectionAtPointer(surface, ids, anchor)
             releaseDrag()
             assertRange(surface, ids, anchor)
             composeRule
@@ -85,7 +87,7 @@ internal class ConversationReverseDragSelectionTest {
                     .let { it[it.size / 2] }
             holdAtEdge(anchor, top = false)
             assertTrue("bottom must reveal newer rows", evidence.latest().anchor.listIndex < initial.anchor.listIndex)
-            assertSelectionAtPointer(surface, evidence, ids, anchor)
+            assertSelectionAtPointer(surface, ids, anchor)
             val newerSelected = surface.selectedMessages.keys.toSet() - anchor
             assertTrue("bottom hold must select newer rows", newerSelected.isNotEmpty())
             moveToEdge(top = true)
@@ -94,9 +96,12 @@ internal class ConversationReverseDragSelectionTest {
                 "reversal must cross the anchor toward older rows",
                 evidence.latest().anchor.listIndex > initial.anchor.listIndex,
             )
-            assertSelectionAtPointer(surface, evidence, ids, anchor)
+            assertSelectionAtPointer(surface, ids, anchor)
             releaseDrag()
             assertRange(surface, ids, anchor)
+            composeRule
+                .onNodeWithTag("reverse-drag-conversation-host")
+                .captureRoboImage("src/test/snapshots/conversation_reversed_edge_drag_selection.png")
             assertTrue(
                 "the previous side of the anchor must be deselected",
                 newerSelected.intersect(surface.selectedMessages.keys).isEmpty(),
@@ -125,6 +130,56 @@ internal class ConversationReverseDragSelectionTest {
             composeRule.waitForIdle()
             assertEquals(released, evidence.latest().anchor)
             assertEquals(selected, surface.selectedMessages.keys.toSet())
+            composeRule
+                .onNodeWithTag("reverse-drag-conversation-host")
+                .captureRoboImage("src/test/snapshots/conversation_tail_edge_drag_selection.png")
+        }
+    }
+
+    /** Loaded older rows join a stationary edge range, and removing its anchor cancels the frame loop. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h420dp-mdpi")
+    fun olderPageWhileHeldExtendsTheRangeAndAnchorRemovalStopsScrolling() {
+        withScrollableConversation { surface, evidence, ids ->
+            val controller = edgeController
+            val anchor = ids.last()
+            holdAtEdge(anchor, top = true, frames = 250)
+            assertTrue(!evidence.latest().canScrollForward)
+            val older = timelineRecord("ab".repeat(32), 0uL, "Newly loaded older message")
+            val initialRecords =
+                ids.mapIndexed { index, id -> timelineRecord(id, (index + 1).toULong(), "edge message ${index + 1}") }
+            composeRule.runOnUiThread {
+                runBlocking {
+                    controller.applyTimelinePage(
+                        timelinePage(older, *initialRecords.toTypedArray()),
+                        replaceWindow = false,
+                        updatePagination = true,
+                    )
+                }
+            }
+            advanceFrames(30)
+            assertTrue(controller.timeline.any { it.record.messageIdHex == older.messageIdHex })
+            assertTrue("stationary pointer must include loaded history", older.messageIdHex in surface.selectedMessages)
+            assertSelectionAtPointer(surface, listOf(older.messageIdHex) + ids, anchor)
+            composeRule
+                .onNodeWithTag("reverse-drag-conversation-host")
+                .captureRoboImage("src/test/snapshots/conversation_loaded_edge_drag_selection.png")
+            composeRule.runOnUiThread {
+                runBlocking {
+                    controller.applyTimelinePage(
+                        timelinePage(older, *initialRecords.filterNot { it.messageIdHex == anchor }.toTypedArray()),
+                        replaceWindow = true,
+                        updatePagination = true,
+                    )
+                }
+            }
+            advanceFrames(5)
+            assertTrue("removing the active anchor must retire selection", surface.selectedMessages.isEmpty())
+            val retired = evidence.latest().anchor
+            advanceFrames(30)
+            assertEquals(retired, evidence.latest().anchor)
+            releaseDrag()
+            assertTrue(surface.selectedMessages.isEmpty())
         }
     }
 
@@ -153,8 +208,18 @@ internal class ConversationReverseDragSelectionTest {
                 initialGroup = group,
                 initialMemberSnapshot = members,
                 groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                groupRecoveryStatusReader = { _, groupId ->
+                    GroupRecoveryStatusFfi(
+                        groupIdHex = groupId,
+                        automaticRecoveryFailed = false,
+                        pendingReinvites = 0u,
+                        failedReinvites = 0u,
+                        rejoinInvitations = emptyList(),
+                    )
+                },
                 startOnConstruction = true,
             )
+        edgeController = controller
         val surface = ConversationSurfaceState()
         val evidence = EdgeEvidence()
         edgeEvidence = evidence
@@ -233,7 +298,10 @@ internal class ConversationReverseDragSelectionTest {
 
     /** Advances real Compose frame callbacks without another pointer move. */
     private fun advanceFrames(count: Int) {
-        repeat(count) { composeRule.mainClock.advanceTimeByFrame() }
+        repeat(count) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+        }
     }
 
     /** Releases the original pointer and allows normal idle synchronization again. */
@@ -244,13 +312,8 @@ internal class ConversationReverseDragSelectionTest {
     }
 
     /** Resolves the endpoint from physical row bounds, independently of the production reversed-offset helper. */
-    private fun assertSelectionAtPointer(
-        surface: ConversationSurfaceState,
-        evidence: EdgeEvidence,
-        ids: List<String>,
-        anchor: String,
-    ) {
-        val rows = evidence.latest().visibleItems.map { it.key.removePrefix("msg:") }.filter(ids::contains)
+    private fun assertSelectionAtPointer(surface: ConversationSurfaceState, ids: List<String>, anchor: String) {
+        val rows = edgeEvidence.latest().visibleItems.map { it.key.removePrefix("msg:") }.filter(ids::contains)
         val endpoint = rows.minBy { id ->
             val bounds = composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
             when {
