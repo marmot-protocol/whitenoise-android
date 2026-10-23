@@ -361,8 +361,9 @@ internal class ConversationReverseDragSelectionTest {
     }
 
     /** Resolves the production list, whose semantics expose its real scroll position and bounds. */
-    private fun transcript(): SemanticsNodeInteraction = composeRule
-        .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE, useUnmergedTree = true)
+    private fun transcript(): SemanticsNodeInteraction =
+        composeRule
+            .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE, useUnmergedTree = true)
 
     /** Records actual post-layout positions without adding a production scroll-control seam. */
     private class EdgeEvidence : ConversationScrollEvidenceSink {
