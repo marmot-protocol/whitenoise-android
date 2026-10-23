@@ -11,8 +11,8 @@ baseline=$(git rev-parse origin/master)
 printf '%s\n' "$baseline" > "$reports/baseline-source.txt"
 git show "$baseline:app/src/main/marmotkit/MARMOT_VERSION" > "$reports/baseline-MARMOT_VERSION"
 cp app/src/main/marmotkit/MARMOT_VERSION "$reports/candidate-MARMOT_VERSION"
-# This adapter is reviewed specifically for the published 0.13 baseline, not arbitrary older readers.
-grep -qx 'mdk-sha=88d1683e13a1dd60ba102d06c7b5a8acb3635590' "$reports/baseline-MARMOT_VERSION"
+# Fail closed if master has moved to a runtime outside this reviewed upgrade pair.
+grep -qx 'mdk-sha=77f22e35499a42bc96402ce19b79ceed57ffbcc3' "$reports/baseline-MARMOT_VERSION"
 git worktree add --detach "$RUNNER_TEMP/mdk-baseline" "$baseline"
 python3 scripts/stage_mdk_baseline_fixture.py "$RUNNER_TEMP/mdk-baseline"
 for role in baseline candidate; do

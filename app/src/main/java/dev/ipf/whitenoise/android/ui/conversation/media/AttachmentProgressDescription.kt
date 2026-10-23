@@ -24,6 +24,7 @@ internal fun nativeProgressDescription(
             setOf(
                 AttachmentTransferStateFfi.UNAVAILABLE,
                 AttachmentTransferStateFfi.REMOVED,
+                AttachmentTransferStateFfi.CLEANED_BY_SETTING,
                 AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
                 AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
             ) -> stringResource(R.string.media_attachment_unavailable)

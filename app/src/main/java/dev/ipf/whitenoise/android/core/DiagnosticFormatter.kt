@@ -239,6 +239,7 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.MemberNotInGroup ||
                 marmotError is MarmotKitException.SecretNotFound -> "NOT_FOUND"
             marmotError is MarmotKitException.StorageFull -> "STORAGE_FULL"
+            marmotError is MarmotKitException.FollowListTooLarge -> "FOLLOW_LIST_TOO_LARGE"
             marmotError is MarmotKitException.AccountWorkerBusy ||
                 marmotError is MarmotKitException.RuntimeBusy ||
                 marmotError is MarmotKitException.AccountSessionBusy ||

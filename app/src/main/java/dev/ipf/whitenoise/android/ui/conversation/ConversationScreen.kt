@@ -1270,7 +1270,7 @@ internal fun ConversationScreen(
     }
     viewportEvidenceEffect()
 
-    /** Extends the drag selection to the row under the pointer; true when the endpoint changed. */
+    /** Resolves the live range without rewriting unchanged selection keys; true while a nonempty range is active. */
     @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
     fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
         val anchorId = dragAnchorTimelineId ?: return false
@@ -1302,13 +1302,12 @@ internal fun ConversationScreen(
                 anchorId = anchorId,
                 endpointId = endpointId,
             )
+        val nextSelections = nextTimelineIds.mapNotNull(timelineSelectionById::get)
+        val nextMessageIds = nextSelections.mapTo(linkedSetOf()) { it.action.messageId }
+        if (nextMessageIds == selectedMessages.keys) return nextMessageIds.isNotEmpty()
         selectedMessages.clear()
-        nextTimelineIds.forEach { timelineId ->
-            timelineSelectionById[timelineId]?.let { selection ->
-                selectedMessages[selection.action.messageId] = selection
-            }
-        }
-        return true
+        nextSelections.forEach { selection -> selectedMessages[selection.action.messageId] = selection }
+        return nextMessageIds.isNotEmpty()
     }
 
     /** Ends a message drag, optionally clearing the selection, and settles reading at the current anchor. */
@@ -1320,7 +1319,18 @@ internal fun ConversationScreen(
         if (hadActiveDrag) scrollCoordinator.settleReadingAt(currentScrollAnchor())
     }
 
-    /** Ends a drag selection whose anchor row left the timeline and auto-scrolls while a drag is active. */
+    // Local function references compare equal despite changed captures. A lambda lets the frame loop
+    // observe the current timeline and action eligibility even while the pointer stays stationary.
+    val currentMessageDragSelectionUpdater by rememberUpdatedState<(Float) -> Boolean> { pointerWindowY ->
+        updateMessageDragSelection(pointerWindowY)
+    }
+
+    /**
+     * Ends a drag whose anchor left the timeline and scrolls while its pointer is held at an edge.
+     * The shared delta uses physical top/bottom signs for a normal list. This transcript is reversed:
+     * positive logical scroll reveals older rows at the physical top, so only this caller negates it.
+     * Resolve the stationary pointer again after the native list has consumed the scroll.
+     */
     @Composable
     fun messageDragSelectionEffects() {
         LaunchedEffect(orderedTimelineIds, selectableTimelineIds) {
@@ -1344,8 +1354,8 @@ internal fun ConversationScreen(
                         maxStep = dragMaxScrollStepPx,
                     )
                 if (scrollDelta != 0f) {
-                    listState.scrollBy(scrollDelta)
-                    updateMessageDragSelection(pointerWindowY)
+                    listState.scrollBy(-scrollDelta)
+                    currentMessageDragSelectionUpdater(pointerWindowY)
                 }
             }
         }
@@ -4524,6 +4534,7 @@ internal fun ConversationScreen(
                                                     appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
                                             )
                                             scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                                            controller.onOlderPagingGestureStarted()
                                             dragAnchorTimelineId = item.presentationId
                                             dragPointerWindowY = pointerWindowY
                                         },

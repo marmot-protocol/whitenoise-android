@@ -14,6 +14,12 @@ import java.io.File
 private val savedUpgradePolicies = mutableMapOf<String, AttachmentDownloadPolicyFfi>()
 private var initialLegacyBytes = 0uL
 
+/** Selects the reviewed file-store baseline, whose completed attachments already live outside SQL. */
+internal fun fileStoreBaseline(): Boolean =
+    InstrumentationRegistry
+        .getArguments()
+        .getString("fileStoreBaseline") == "true"
+
 /** Waits for an external, byte-pinned native hook; only the hosted emulator may release this barrier. */
 internal suspend fun runUpgradeFault(
     runtime: Marmot,
@@ -66,7 +72,11 @@ internal suspend fun verifyUpgradeStorage(
     pendingLegacyBytes: ULong = 0uL,
     readWhilePaused: suspend () -> Unit = {},
 ) {
-    if (phase == "seed") return
+    val fileBaseline = fileStoreBaseline()
+    if (fileBaseline || phase == "seed") {
+        if (fileBaseline) verifyFileStoreUpgrade(runtime, phase, beforeStart)
+        return
+    }
     val accounts = runtime.listAccounts().map { it.label }
     if (phase == "upgrade" && beforeStart) {
         initialLegacyBytes = accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes }
@@ -107,6 +117,42 @@ internal suspend fun verifyUpgradeStorage(
         awaitUpgradeStorage(runtime, accounts, pendingLegacyBytes)
     } finally {
         reportUpgradeStorage(runtime, accounts, phase, "completion-observation")
+    }
+    reportUpgradeStorage(runtime, accounts, phase, "complete")
+}
+
+/** Records the baseline's pending-body balance and requires settled, retained storage after the new migrations. */
+private suspend fun verifyFileStoreUpgrade(
+    runtime: Marmot,
+    phase: String,
+    beforeStart: Boolean,
+) {
+    if (phase == "seed" && beforeStart) return
+    val accounts = runtime.listAccounts().map { it.label }
+    check(accounts.size == 2)
+    reportUpgradeStorage(runtime, accounts, phase, if (beforeStart) "before-start" else "settlement")
+    if (beforeStart) return
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    val receipt = File(context.filesDir, "upgrade-fixture.json")
+    val value = JSONObject(receipt.readText())
+    if (phase == "seed") {
+        withTimeout(120_000L) {
+            while (accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes } > 1024uL) delay(250L)
+        }
+        val legacy = accounts.sumOf { runtime.attachmentStorageUsage(it).legacyBytes }
+        check(legacy == 0uL || legacy == 1024uL) { "Unexpected baseline pending-body balance" }
+        value.put("baselinePendingLegacyBytes", legacy.toString())
+        receipt.writeText(value.toString())
+    }
+    val expected =
+        if (phase in setOf("promoted", "promoted-cold")) {
+            0uL
+        } else {
+            value.getString("baselinePendingLegacyBytes").toULong()
+        }
+    awaitUpgradeStorage(runtime, accounts, expected)
+    check(accounts.all { runtime.attachmentStorageUsage(it).mediaBytes >= 16uL * 1024uL * 1024uL }) {
+        "Each account must retain the original completed 16 MiB attachment in the media store"
     }
     reportUpgradeStorage(runtime, accounts, phase, "complete")
 }

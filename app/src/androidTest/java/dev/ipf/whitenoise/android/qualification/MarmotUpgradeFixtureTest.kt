@@ -71,6 +71,7 @@ class MarmotUpgradeFixtureTest {
                     runtime.start()
                     if (phase == "seed") {
                         seed(runtime, relay, requireNotNull(arguments.getString("blobPort")), receipt)
+                        if (fileStoreBaseline()) verifyUpgradeStorage(runtime, phase, beforeStart = false)
                     } else if (phase in setOf("corrupt", "lost")) {
                         recoverDamagedMedia(runtime, root, receipt)
                     } else {
@@ -92,7 +93,7 @@ class MarmotUpgradeFixtureTest {
                         } else if (phase == "promoted-cold") {
                             verifyPendingUpload(runtime, receipt, phase)
                         }
-                        if (phase == "upgrade") {
+                        if (phase == "upgrade" && !fileStoreBaseline()) {
                             awaitUpgradeCompaction(root, receipt)
                             verifyUpgradeStorage(
                                 runtime,
@@ -107,8 +108,18 @@ class MarmotUpgradeFixtureTest {
             } finally {
                 runtime.shutdownAndClose()
             }
-            recordUpgradeDatabase(root, receipt, phase)
+            recordClosedStorage(root, receipt, phase)
         }
+
+    /** Records database and baseline salt evidence only after the native runtime has fully closed. */
+    private fun recordClosedStorage(
+        root: File,
+        receipt: File,
+        phase: String,
+    ) {
+        recordUpgradeDatabase(root, receipt, phase)
+        if (phase == "seed" && fileStoreBaseline()) recordUpgradeSalts(root, receipt)
+    }
 
     /** Native create/send/download calls produce both local upload bodies and a received retained attachment. */
     @Suppress("LongMethod") // One baseline transaction sequence owns the generated account and both upload states.
@@ -140,6 +151,18 @@ class MarmotUpgradeFixtureTest {
         while (runtime.attachmentLocalAssets(receiver.label, group, listOf(target)).single().reference == null) {
             delay(100L)
         }
+        val initial =
+            JSONObject()
+                .put("accounts", JSONArray(runtime.listAccounts().map { it.accountIdHex }.sorted()))
+                .put("sender", sender.label)
+                .put("receiver", receiver.label)
+                .put("group", group)
+                .put("seedPid", Process.myPid())
+                .put("originalMessage", requireNotNull(upload.sent).messageIds.single())
+        receipt.writeText(initial.toString())
+        // Avatar metadata advances the group epoch; finish it before preparing epoch-bound unsent media.
+        if (fileStoreBaseline()) seedUpgradeAvatar(runtime, receipt)
+        if (fileStoreBaseline()) seedUpgradeRemoval(runtime, receipt, blobPort)
         // Keep an uploaded-but-unsent outgoing record across 0113 as well as the published attachment.
         val pending =
             runtime.uploadMedia(
@@ -154,13 +177,7 @@ class MarmotUpgradeFixtureTest {
             )
         val reference = pending.attachments.single().reference
         val value =
-            JSONObject()
-                .put("accounts", JSONArray(runtime.listAccounts().map { it.accountIdHex }.sorted()))
-                .put("sender", sender.label)
-                .put("receiver", receiver.label)
-                .put("group", group)
-                .put("seedPid", Process.myPid())
-                .put("originalMessage", requireNotNull(upload.sent).messageIds.single())
+            JSONObject(receipt.readText())
                 .put("pendingReference", reference.upgradeReceipt())
         receipt.writeText(value.toString())
         verifyHistory(runtime, value)
@@ -180,6 +197,8 @@ class MarmotUpgradeFixtureTest {
         if (phase == "promoted-cold") assertNotEquals(value.getInt("promotePid"), Process.myPid())
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
+        if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
+        if (fileStoreBaseline()) verifyUpgradeRemoval(runtime, value)
         value.put("${phase}Pid", Process.myPid())
         receipt.writeText(value.toString())
     }
@@ -262,6 +281,7 @@ class MarmotUpgradeFixtureTest {
         awaitUpgradeMediaCleanup(root, receipt)
         verifyRetained(runtime, value)
         verifyHistory(runtime, value)
+        if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
     }
 
     /** Promotes the baseline upload without uploading it again, then verifies its distinct retained plaintext. */
