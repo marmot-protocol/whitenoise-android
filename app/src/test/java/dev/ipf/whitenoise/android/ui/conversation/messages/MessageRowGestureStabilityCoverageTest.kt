@@ -25,7 +25,8 @@ class MessageRowGestureStabilityCoverageTest {
             val declaration = declaration(source(path), "Modifier.$function")
             assertFalse(
                 "$function must not return an unmodified chain when disabled",
-                declaration.lines().any { it.trim() == "this" },
+                declaration.lines().any { it.trim() == "this" } ||
+                    Regex("""\breturn(@\w+)?\s+this\b""").containsMatchIn(declaration),
             )
             assertTrue("$function must always install pointerInput", declaration.contains("pointerInput("))
         }
@@ -37,7 +38,7 @@ class MessageRowGestureStabilityCoverageTest {
         val bubble = source("ui/conversation/messages/MessageBubble.kt")
         assertFalse(
             "the long-press detector must not be an optional modifier",
-            Regex("""else\s*\{\s*Modifier\.longPressOrVerticalDrag\(""").containsMatchIn(bubble),
+            Regex("""(else|\bif\s*\([^)]*\))\s*\{?\s*Modifier\.longPressOrVerticalDrag\(""").containsMatchIn(bubble),
         )
         assertTrue(
             Regex("""Modifier\.longPressOrVerticalDrag\(\s*enabled\s*=""").containsMatchIn(bubble),
