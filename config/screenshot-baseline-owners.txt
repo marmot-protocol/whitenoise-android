@@ -9,6 +9,8 @@
 
 *ScreenshotTest
 
+*.ConversationReverseDragSelectionTest.topEdgeHoldFromNewestRevealsOlderRowsAndExtendsSelection
+
 *.MessageBubbleTextSelectionSpeakTest.codePathNativeSelectionKeepsScrolledFilename
 *.MessageBubbleTextSelectionSpeakTest.swipeOnFittingCodeBlockBeginsReply
 *.MessageBubbleTextSelectionSpeakTest.swipeOnFittingMathBlockBeginsReply
