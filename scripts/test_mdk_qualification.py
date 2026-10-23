@@ -680,5 +680,39 @@ class EmulatorProcessEvidenceTest(unittest.TestCase):
                 observer.install()
 
 
+class BaselineStagingTest(unittest.TestCase):
+    """Fixture overlays admit only the explicitly reviewed published nightly, never an arbitrary runtime."""
+
+    def test_reviewed_nightly_copies_only_shared_fixture(self):
+        """The overlay is test-only and preserves the baseline production implementation and native lock."""
+        from scripts import stage_mdk_baseline_fixture as staging
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
+            pin.parent.mkdir(parents=True)
+            pin.write_text('mdk-sha=d274dd228a3ac8d624073d8f5835e06c7cd7b30d\n')
+            original = pin.read_bytes()
+            with patch.object(staging.shutil, 'copytree') as copy:
+                staging.stage(destination)
+            relative = Path('app/src/androidTest/java/dev/ipf/whitenoise/android/qualification')
+            copy.assert_called_once_with(relative, destination / relative, dirs_exist_ok=True)
+            self.assertEqual(pin.read_bytes(), original)
+
+    def test_other_native_revisions_cannot_seed_the_reviewed_pair(self):
+        """The former nightly, candidate itself and a partial SHA all fail before any source overlay."""
+        from scripts import stage_mdk_baseline_fixture as staging
+        for source in ('77f22e35499a42bc96402ce19b79ceed57ffbcc3',
+                       '3fb4b4759ac676b0c21c4c3527074866c9fa4c89', 'd274dd22'):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as directory:
+                destination = Path(directory)
+                pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
+                pin.parent.mkdir(parents=True)
+                pin.write_text(f'mdk-sha={source}\n')
+                with patch.object(staging.shutil, 'copytree') as copy:
+                    with self.assertRaisesRegex(ValueError, 'Unreviewed baseline runtime'):
+                        staging.stage(destination)
+                    copy.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

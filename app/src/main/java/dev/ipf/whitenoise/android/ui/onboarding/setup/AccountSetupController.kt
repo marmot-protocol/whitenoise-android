@@ -351,7 +351,8 @@ private fun AccountSetupState.matchesRenderedRelayRemoval(
     val matchingStep = selected.step == request.step
     val matchingFinding =
         selected.findings.any {
-            it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
+            it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint &&
+                OnboardingActionFfi.EDIT_RELAYS in it.actions
         }
     return validTarget && matchingStep && matchingFinding
 }

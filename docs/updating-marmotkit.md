@@ -5,11 +5,11 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [23 October 2026 nightly evaluation](marmotkit-nightly-20261023.md) records the
-current artifact, API compatibility and required rekey/migration qualification.
-The [22 October evaluation](marmotkit-nightly-20261022.md) remains historical
-evidence for its exact revision. Both are testing-only with 30-day retention;
-neither authorizes production adoption.
+The [official 0.14.0 adoption](marmotkit-0.14.0.md) records the current artifact,
+API compatibility and retained-data qualification. The
+[23 October nightly](marmotkit-nightly-20261023.md) and
+[22 October nightly](marmotkit-nightly-20261022.md) remain historical, testing-only
+evidence bound to their exact revisions and 30-day artifact retention.
 
 ## Markdown timestamps
 
@@ -63,7 +63,7 @@ execute: no ignored recovery case can satisfy adoption.
 
 The populated campaign builds current master and the candidate with one disposable
 signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed October 22 source `77f22e35`. Dispatch once on the
+longer pins the reviewed October 23 source `d274dd22`. Dispatch once on the
 candidate branch and reuse a matching active run:
 
 ```bash
@@ -99,7 +99,7 @@ preview only for a concrete handoff/debugging need, then separately qualify the
 exact signed APK under [CI policy](ci-request-policy.md). Never use a physical
 installation, clear data, downgrade or rewrite migration records for this campaign.
 
-For the October 23 pair, migration 0116 adds retention metadata and a separate
+For the historical October 22-to-23 pair, migration 0116 adds retention metadata and a separate
 versioned SQLCipher rekey changes the database key presentation. The shared
 baseline fixture also seeds an explicitly removed disposable attachment and
 records private salt digests. Candidate-only `MarmotKeyMigrationQualificationTest`
@@ -108,8 +108,10 @@ migration markers after upgrade and cold restart. Its source stays outside the
 baseline fixture overlay because the previous bindings lack the new getter.
 Retain passing exact-source MDK interrupted-rekey, failed-rekey, WAL process-death
 and external-signer recovery results separately from these Android observations.
-Physical app-performance evidence and upstream security release sign-off remain
-separate from testing-only qualification; phone testing is paused.
+The official 0.14.0 pair starts after that schema/key transition; the same
+assertions now prove retained-data reopening, not a fresh rekey. No new storage
+migration is introduced relative to the October 23 nightly. Physical app-performance
+evidence remains separate from hosted qualification; phone testing is paused.
 
 ## 1. Select and inspect the release
 

@@ -2590,4 +2590,21 @@
     <string name="search_message_content_loading">Searching message content…</string>
     <string name="search_message_content_failed">Couldn’t search message content.</string>
     <string name="avatar_preparation_interrupted">The image update was interrupted. Check the current image before selecting it again.</string>
+    <string name="setup_finding_inspection_completed">Inspection completed. This alone does not confirm relay write support.</string>
+    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
+    <string name="setup_finding_context_unknown">Unspecified source</string>
+    <string name="setup_finding_context_discovery">Record discovery</string>
+    <string name="setup_finding_context_declaration">Published declaration</string>
+    <string name="setup_finding_context_route">Declared relay</string>
+    <string name="setup_finding_context_approval">Repair approval</string>
+    <string name="setup_finding_context_publication">Repair publication</string>
+    <string name="setup_finding_purpose_unknown">Unspecified check</string>
+    <string name="setup_finding_purpose_lookup">Record lookup</string>
+    <string name="setup_finding_purpose_validation">Declaration validation</string>
+    <string name="setup_finding_purpose_directory">Directory query</string>
+    <string name="setup_finding_purpose_freshness">Source freshness</string>
+    <string name="setup_finding_purpose_publication">Event publication</string>
+    <string name="setup_finding_outcome_unknown">Result unknown</string>
+    <string name="setup_finding_outcome_success">Check succeeded</string>
+    <string name="setup_finding_outcome_failure">Check failed</string>
 </resources>
