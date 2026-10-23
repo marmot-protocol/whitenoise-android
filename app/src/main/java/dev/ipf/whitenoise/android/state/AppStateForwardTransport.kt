@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
@@ -13,16 +14,24 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadSnapshotBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+
+/** Bound on the best-effort convergence nudge after a forwarded message is admitted. */
+private const val FORWARD_CONVERGENCE_NUDGE_MILLIS = 10_000L
 
 /**
  * Builds the production [ForwardTransport] for one forwarding operation with
  * explicit account ownership. Source attachment lookup and plaintext
  * materialization run only under [sourceAccount]; destination upload, commit
- * locking, token-bound publish, its recovery, and retries run only under
+ * locking, token-bound publish with its engine handoff, and retries run only under
  * [account]. Neither boundary ever re-reads the live active account: each
  * revalidates that its own bound owner is still a signed-in signing account,
  * so removal or sign-out of either owner stops the operation without falling
@@ -47,6 +56,11 @@ internal fun WhiteNoiseAppState.forwardTransport(
 
     // Disk this forward's concurrent destination uploads hold for staged copies, so they never count on the same space.
     val diskClaims = StagedDiskClaims()
+
+    // Native calls a publish deadline may stop waiting for. They finish on their own after the wait ends, and MDK's
+    // client token keeps a late admission from becoming a second message. The blocking call itself still runs on
+    // marmotIo's dispatcher; this scope only owns the detached wait, so it starts undispatched.
+    val nativeCalls = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     return object : ForwardTransport {
         /** Resolves and decrypts one attachment strictly through the source account. */
@@ -192,10 +206,10 @@ internal fun WhiteNoiseAppState.forwardTransport(
             }
 
         /**
-         * Admits each message under its stable client token while holding the destination commit lock. Admission
-         * returns once MDK durably owns the message, before relay publication, and each one is bounded by
-         * [FORWARD_PUBLISH_ADMISSION_MILLIS]. A retry probes the token first, so an earlier admission is counted
-         * rather than repeated (#2556).
+         * Publishes each message under its stable client token while holding the destination commit lock, and counts
+         * it as sent only once MDK's engine owns it. A retry re-checks the token first, so an earlier admission is
+         * waited on rather than repeated, and the whole of each message is bounded by
+         * [FORWARD_PUBLISH_ADMISSION_MILLIS] (#2556).
          */
         override suspend fun publishBatch(
             targetGroupIdHex: String,
@@ -219,53 +233,81 @@ internal fun WhiteNoiseAppState.forwardTransport(
                     if (message is PreparedForwardMessage.Media) {
                         check(references.isNotEmpty()) { "missing destination media references" }
                     }
-                    val token = clientTokenFor(messageIndex)
-                    diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
-                        admitForwardPublish(
-                            messageIndex = messageIndex,
-                            token = token,
-                            probe = { marmotIo { localSendStatus(account, targetGroupIdHex, token) } },
-                            beforeAdmit = ::requireDestinationAccount,
-                            admit = {
-                                marmotIo {
-                                    when (message) {
-                                        is PreparedForwardMessage.Text ->
-                                            sendTextWithClientToken(account, targetGroupIdHex, message.text, token)
-                                        is PreparedForwardMessage.Media ->
-                                            sendPreparedMediaWithClientToken(
-                                                account,
-                                                targetGroupIdHex,
-                                                references,
-                                                message.caption,
-                                                token,
-                                                null,
-                                            )
-                                    }
-                                }
-                            },
-                        )
-                    }
+                    publishOne(targetGroupIdHex, messageIndex, message, references, clientTokenFor(messageIndex))
                     requireDestinationAccount()
                     onMessagePublished(messageIndex)
                 }
             }
         }
 
-        /** Resolves an uncertain token-bound publish from MDK's local status, without resubmitting anything. */
-        override suspend fun recoverPendingPublish(
+        /**
+         * Admits one message and waits for the engine to own it. Every status read, the admission and the
+         * convergence nudge run detached, so the deadline can stop waiting while a blocking native call is still
+         * running. The publish span covers admission and engine handoff, with admission timed on its own.
+         */
+        private suspend fun publishOne(
             targetGroupIdHex: String,
+            messageIndex: Int,
             message: PreparedForwardMessage,
-            uploadedReferences: List<MediaAttachmentReferenceFfi>,
-            evidence: ForwardPublishRecoveryEvidence,
-        ): ForwardPublishRecoveryResult {
-            requireDestinationAccount()
-            val recovered =
-                recoverForwardPublishByToken(evidence) { token ->
-                    marmotIo { localSendStatus(account, targetGroupIdHex, token) }
-                }
-            requireDestinationAccount()
-            return recovered
+            references: List<MediaAttachmentReferenceFfi>,
+            token: String,
+        ) {
+            val admissionStartedAtMs = diagnostics?.startSpan()
+            diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
+                admitForwardPublish(
+                    messageIndex = messageIndex,
+                    token = token,
+                    probe = { detachedNative { localSendStatus(account, targetGroupIdHex, token) } },
+                    beforeAdmit = ::requireDestinationAccount,
+                    admit = {
+                        detachedNative {
+                            when (message) {
+                                is PreparedForwardMessage.Text ->
+                                    sendTextWithClientToken(account, targetGroupIdHex, message.text, token)
+                                is PreparedForwardMessage.Media ->
+                                    sendPreparedMediaWithClientToken(
+                                        account,
+                                        targetGroupIdHex,
+                                        references,
+                                        message.caption,
+                                        token,
+                                        null,
+                                    )
+                            }
+                        }
+                    },
+                    onAdmitted = {
+                        if (admissionStartedAtMs != null) diagnostics?.admissionAccepted(admissionStartedAtMs)
+                        nudgeConvergence(targetGroupIdHex)
+                    },
+                )
+            }
         }
+
+        /**
+         * Gives a newly admitted message the same best-effort convergence nudge the composer gives an accepted-pending
+         * send. It is bounded on its own and never fails the forward; the engine still owns delivery.
+         */
+        @Suppress("TooGenericExceptionCaught")
+        private suspend fun nudgeConvergence(targetGroupIdHex: String) {
+            try {
+                diagnostics.span(ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn) {
+                    withTimeoutOrNull(FORWARD_CONVERGENCE_NUDGE_MILLIS) {
+                        detachedNative { retryGroupConvergence(account, targetGroupIdHex) }
+                    }
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // Best effort only: the account worker publishes the admitted message either way.
+            }
+        }
+
+        /** Runs [block] on the native dispatcher outside this coroutine, so cancelling the wait never blocks on it. */
+        private suspend fun <T> detachedNative(block: suspend MarmotInterface.() -> T): T =
+            nativeCalls
+                .async { marmotIo(block) }
+                .await()
     }
 }
 

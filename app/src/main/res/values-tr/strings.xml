@@ -446,7 +446,7 @@
     <string name="forward_uploading_slow">Yükleme normalden uzun sürüyor</string>
     <string name="forward_sending_slow">Gönderme normalden uzun sürüyor. Artık iptal edilemez ve iki kez gönderilmeyecek.</string>
     <string name="forward_failed_upload_timeout">Yükleme başlamadı. Yeniden deneyin veya iletmeyi durdurmak için kapatın.</string>
-    <string name="forward_failed_publish_timeout">Gönderme tamamlanmadı. Yeniden deneyin veya iletmeyi durdurmak için kapatın. Yeniden denemek iki kez göndermez.</string>
+    <string name="forward_failed_publish_timeout">Gönderme henüz bitmedi ve yine de tamamlanabilir. Yeniden denemek, iki kez göndermeden durumu kontrol eder.</string>
     <string name="forward_failed_publish">Mesajlar gönderilemedi</string>
     <string name="forward_payload_too_large">Bu ekler birlikte iletilemeyecek kadar büyük</string>
     <string name="forward_failed_expired">Ek iletilemeden önce süresi doldu</string>

@@ -54,10 +54,16 @@ internal enum class ForwardFailureStage {
     Publish,
 
     /**
-     * A message did not reach durable local admission in time. Retry reuses its client token, so it is never sent
-     * twice, but like the other timeouts it is the user's choice, never automatic (#2556).
+     * A message was not owned by MDK's engine in time. It may still be sent; Retry re-checks the same client token,
+     * so it is never sent twice, but like the other timeouts it is the user's choice, never automatic (#2556).
      */
     PublishTimeout,
+
+    /**
+     * MDK rejected a message at admission or while it was queued. Retry admits it under a fresh token, only when the
+     * user asks, so automatic retries never stack rejected messages in the destination.
+     */
+    PublishRejected,
     PayloadTooLarge,
     Expired,
     SessionChanged,
@@ -107,7 +113,8 @@ internal data class ForwardOperationSnapshot(
                 targets.none { target ->
                     target.failureStage == ForwardFailureStage.PreparationTimeout ||
                         target.failureStage == ForwardFailureStage.UploadTimeout ||
-                        target.failureStage == ForwardFailureStage.PublishTimeout
+                        target.failureStage == ForwardFailureStage.PublishTimeout ||
+                        target.failureStage == ForwardFailureStage.PublishRejected
                 }
     val canCancel: Boolean
         get() =
@@ -182,14 +189,6 @@ internal interface ForwardTransport {
         onBeforeMessagePublished: (messageIndex: Int) -> Unit,
         onMessagePublished: (messageIndex: Int) -> Unit,
     )
-
-    /** Resolve an ambiguous publish without minting a duplicate event. */
-    suspend fun recoverPendingPublish(
-        targetGroupIdHex: String,
-        message: PreparedForwardMessage,
-        uploadedReferences: List<MediaAttachmentReferenceFfi>,
-        evidence: ForwardPublishRecoveryEvidence,
-    ): ForwardPublishRecoveryResult
 }
 
 /** Keeps transport cleanup failures from masking cancellation or the actionable timeout state. */
@@ -234,36 +233,6 @@ internal class ForwardAttachmentExpiredException : IllegalStateException("forwar
 internal class ForwardSessionInvalidatedException : IllegalStateException("forward session account changed")
 
 internal class ForwardPreparationTimeoutException : IllegalStateException("forward attachment preparation timed out")
-
-/**
- * What a session keeps about an uncertain publish so a retry can resolve it first. A token-bound publish carries its
- * [clientToken], which MDK resolves on its own; the timeline fields describe publishes made without one.
- */
-internal data class ForwardPublishRecoveryEvidence(
-    val messageIndex: Int,
-    val knownMessageIdsBefore: Set<String>,
-    val pendingMessageIdHex: String?,
-    val clientToken: String? = null,
-)
-
-internal enum class ForwardPublishRecoveryResult {
-    Published,
-    NotCommitted,
-    Unavailable,
-}
-
-internal class ForwardPublishUncertainException(
-    val evidence: ForwardPublishRecoveryEvidence,
-    cause: Throwable,
-) : IllegalStateException("forward publish result is uncertain", cause)
-
-internal class ForwardPublishNotCommittedException(
-    cause: Throwable,
-) : IllegalStateException("forward publish failed before a local commit", cause)
-
-private const val FORWARD_PUBLISH_RECOVERY_UNAVAILABLE = "forward pending publish could not be recovered"
-
-internal class ForwardPublishRecoveryUnavailableException : IllegalStateException(FORWARD_PUBLISH_RECOVERY_UNAVAILABLE)
 
 private class ForwardMaterializationAccounting(
     private val retainedPlaintextBuffers: MutableList<ByteArray>,
@@ -372,7 +341,6 @@ internal class ForwardSession(
     private val retainedPlaintextBuffers = mutableListOf<ByteArray>()
     private val uploadedReferencesByTarget = mutableMapOf<String, MutableMap<Int, List<MediaAttachmentReferenceFfi>>>()
     private val publishedMessageCountByTarget = normalizedTargets.associateWithTo(mutableMapOf()) { 0 }
-    private val uncertainPublishByTarget = mutableMapOf<String, ForwardPublishRecoveryEvidence>()
 
     private val publishTokens = ForwardPublishTokens()
     private var activeJob: Job? = null
@@ -605,26 +573,6 @@ internal class ForwardSession(
                 markSlow = { markForwardTargetSlow(_state, targetGroupIdHex, ForwardTargetPhase.Sending) },
                 progress = { forwardTarget(_state, targetGroupIdHex)?.sentMessages },
             ) {
-                uncertainPublishByTarget[targetGroupIdHex]?.let { evidence ->
-                    val message = prepared[evidence.messageIndex]
-                    val recovery =
-                        transport.recoverPendingPublish(
-                            targetGroupIdHex = targetGroupIdHex,
-                            message = message,
-                            uploadedReferences = targetReferences[evidence.messageIndex].orEmpty(),
-                            evidence = evidence,
-                        )
-                    when (recovery) {
-                        ForwardPublishRecoveryResult.Published -> {
-                            val recoveredCount = evidence.messageIndex + 1
-                            publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
-                            uncertainPublishByTarget.remove(targetGroupIdHex)
-                            updateForwardTarget(_state, targetGroupIdHex) { it.advancedTo(sent = recoveredCount) }
-                        }
-                        ForwardPublishRecoveryResult.NotCommitted -> uncertainPublishByTarget.remove(targetGroupIdHex)
-                        ForwardPublishRecoveryResult.Unavailable -> throw ForwardPublishRecoveryUnavailableException()
-                    }
-                }
                 transport.publishBatch(
                     targetGroupIdHex = targetGroupIdHex,
                     messages = prepared,
@@ -653,13 +601,9 @@ internal class ForwardSession(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Exception) {
-            if (failure is ForwardPublishUncertainException) {
-                uncertainPublishByTarget[targetGroupIdHex] = failure.evidence
-            }
-            // A rejected admission spent its token, so the next deliberate retry needs a fresh one.
+            // A rejected admission spent its token, so the user's next Retry needs a fresh one.
             if (failure is ForwardPublishRejectedException) {
                 publishTokens.forget(targetGroupIdHex, failure.messageIndex)
-                uncertainPublishByTarget.remove(targetGroupIdHex)
             }
             failureStage = targetFailureStage(failureStage, failure)
             onFailure(targetGroupIdHex, failureStage, failure)
@@ -690,10 +634,10 @@ internal class ForwardSession(
 
     /** Clears sensitive plaintext and atomically marks unfinished destinations failed or cancelled. */
     private fun failMaterialization(stage: ForwardFailureStage): Boolean {
-        // A retry may be re-materializing source bytes for an earlier ambiguous
-        // publish. Preserve destination references and recovery evidence across
-        // another transient materialization failure so a later retry cannot
-        // duplicate that uncertain message.
+        // A retry may be re-materializing source bytes for a message that already
+        // reached MDK. Preserve destination references and client tokens across
+        // another transient materialization failure so a later retry re-checks
+        // that token instead of sending the message again.
         _state.update { snapshot ->
             if (snapshot.phase == ForwardOperationPhase.Cancelling) {
                 snapshot.asCancelled()
@@ -724,13 +668,17 @@ internal class ForwardSession(
         return !cancelled
     }
 
+    /**
+     * Zeroes retained plaintext, and when [clearRetryState] the session can no longer retry, so its destination
+     * references and client tokens are dropped too. Tokens survive every retryable failure, so a later Retry re-checks
+     * the same token rather than minting a second message.
+     */
     private fun clearSessionState(clearRetryState: Boolean) {
         retainedPlaintextBuffers.forEach { it.fill(0) }
         retainedPlaintextBuffers.clear()
         preparedMessages = null
         if (clearRetryState) {
             uploadedReferencesByTarget.clear()
-            uncertainPublishByTarget.clear()
             publishTokens.clear()
         }
     }
@@ -863,6 +811,7 @@ private fun targetFailureStage(
     when (failure) {
         is ForwardUploadStalledException -> ForwardFailureStage.UploadTimeout
         is ForwardPublishTimeoutException -> ForwardFailureStage.PublishTimeout
+        is ForwardPublishRejectedException -> ForwardFailureStage.PublishRejected
         is ForwardAttachmentExpiredException -> ForwardFailureStage.Expired
         is ForwardSessionInvalidatedException -> ForwardFailureStage.SessionChanged
         else -> reached

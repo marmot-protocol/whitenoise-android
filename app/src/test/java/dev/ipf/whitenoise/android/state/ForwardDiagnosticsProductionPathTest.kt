@@ -8,12 +8,16 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
+import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaDownloadResultFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
+import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
+import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -51,6 +55,7 @@ import kotlin.coroutines.Continuation
 class ForwardDiagnosticsProductionPathTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val messageIdCounter = AtomicInteger(0)
+    private val admittedTokens = java.util.concurrent.ConcurrentLinkedQueue<String>()
     private var fixtureState: WhiteNoiseAppState? = null
 
     /** Bind this sandbox's Looper instead of reusing a dispatcher created by a different SDK sandbox. */
@@ -86,12 +91,23 @@ class ForwardDiagnosticsProductionPathTest {
                             ),
                         sent = null,
                     )
-                "localSendStatus" -> null
-                "sendTextWithClientToken", "sendPreparedMediaWithClientToken" ->
+                // The engine takes every admitted message at once in this fixture.
+                "localSendStatus" -> if (arguments!![2] in admittedTokens) LocalSendStatusFfi.EngineOwned else null
+                "sendTextWithClientToken", "sendPreparedMediaWithClientToken" -> {
+                    // The client token is the fourth text argument and the fifth media argument.
+                    val token = arguments!![if (method.name == "sendTextWithClientToken") 3 else 4] as String
+                    admittedTokens += token
                     LocalSendAcceptanceFfi(
-                        // The client token is the fourth text argument and the fifth media argument.
-                        clientToken = arguments!![if (method.name == "sendTextWithClientToken") 3 else 4] as String,
+                        clientToken = token,
                         messageIdHex = "media-id-${messageIdCounter.incrementAndGet()}",
+                    )
+                }
+                "retryGroupConvergence" ->
+                    SendSummaryFfi(
+                        published = 0u,
+                        messageIds = emptyList(),
+                        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
                     )
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "ForwardDiagnosticsMarmotFake"
@@ -154,6 +170,9 @@ class ForwardDiagnosticsProductionPathTest {
                 "media_upload_start",
                 "media_upload_return",
                 "media_publish_start",
+                "durable_accepted",
+                "convergence_start",
+                "convergence_return",
                 "media_publish_return",
                 "forward_complete",
             ),

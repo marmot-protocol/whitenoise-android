@@ -7,27 +7,33 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ForwardPublishAdmissionTest {
     /**
-     * Stands in for MDK's token ledger: admitting a token it already owns returns the same identity without a second
-     * message, which is the property a forward retry relies on.
+     * Stands in for MDK's token ledger. Admitting a token it already holds returns the same identity without a second
+     * message, a new admission is Queued until the engine takes it, and the test moves tokens between states the way
+     * the account worker does, including an admission that lands only after its caller stopped waiting.
      */
     private class FakeTokenLedger {
         val statuses = mutableMapOf<String, LocalSendStatusFfi>()
         val messages = mutableListOf<String>()
+        var admissions = 0
 
         /** Reads a token's local status. */
         fun probe(token: String): LocalSendStatusFfi? = statuses[token]
 
-        /** Admits [token] once; a repeated admission returns the existing identity and adds nothing. */
+        /** Admits [token] once into Queued; a repeated admission returns the existing identity and adds nothing. */
         fun admit(token: String): LocalSendAcceptanceFfi {
+            admissions += 1
             if (statuses[token] == null) {
                 messages += token
                 statuses[token] = LocalSendStatusFfi.Queued
@@ -36,39 +42,91 @@ class ForwardPublishAdmissionTest {
         }
     }
 
-    /** Runs one admission of message 0 under [token] against [ledger], with an optional gate before admitting. */
-    private suspend fun admitOnce(
+    /** Publishes message 0 under [TOKEN] against [ledger], optionally stalling the admission call itself. */
+    private suspend fun publish(
         ledger: FakeTokenLedger,
-        token: String = TOKEN,
-        gate: CompletableDeferred<Unit>? = null,
+        stallAdmission: Boolean = false,
         admitFailure: Exception? = null,
+        onAdmitted: suspend () -> Unit = {},
     ) = admitForwardPublish(
         messageIndex = 0,
-        token = token,
-        probe = { ledger.probe(token) },
+        token = TOKEN,
+        probe = { ledger.probe(TOKEN) },
         admit = {
-            gate?.await()
+            if (stallAdmission) awaitCancellation()
             admitFailure?.let { throw it }
-            ledger.admit(token)
+            ledger.admit(TOKEN)
         },
-        admissionTimeoutMillis = TIMEOUT_MILLIS,
+        onAdmitted = onAdmitted,
+        deadlineMillis = DEADLINE_MILLIS,
+        pollMillis = POLL_MILLIS,
     )
 
-    /** An admission still waiting at the deadline fails as a publish timeout instead of spinning for minutes. */
+    /** A queued admission is not sent yet: the call returns only once the engine owns it. */
     @Test
-    fun aStalledAdmissionTimesOut() =
+    fun aQueuedAdmissionCompletesOnlyWhenTheEngineOwnsIt() =
+        runTest {
+            val ledger = FakeTokenLedger()
+            launch {
+                delay(HANDOFF_MILLIS)
+                ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+            }
+
+            publish(ledger)
+
+            assertTrue("returned before the engine owned it", currentTime >= HANDOFF_MILLIS)
+            assertEquals(listOf(TOKEN), ledger.messages)
+        }
+
+    /** A message still queued at the deadline fails as a publish timeout instead of counting as sent. */
+    @Test
+    fun aMessageStillQueuedAtTheDeadlineTimesOut() =
         runTest {
             val ledger = FakeTokenLedger()
 
-            val failure = runCatching { admitOnce(ledger, gate = CompletableDeferred()) }.exceptionOrNull()
+            val failure = runCatching { publish(ledger) }.exceptionOrNull()
 
             assertTrue("expected a publish timeout, got $failure", failure is ForwardPublishTimeoutException)
-            assertTrue(ledger.messages.isEmpty())
+            assertEquals(listOf(TOKEN), ledger.messages)
         }
 
-    /** A retry finds the earlier admission already owned in any state and never admits it again. */
+    /** A message the account worker rejects after queuing it surfaces as a rejection, never as sent. */
     @Test
-    fun aRetryOfAnOwnedTokenNeverAdmitsAgain() =
+    fun aMessageRejectedWhileQueuedIsReported() =
+        runTest {
+            val ledger = FakeTokenLedger()
+            launch {
+                delay(HANDOFF_MILLIS)
+                ledger.statuses[TOKEN] = LocalSendStatusFfi.Rejected
+            }
+
+            val failure = runCatching { publish(ledger) }.exceptionOrNull()
+
+            assertTrue("expected rejected, got $failure", failure is ForwardPublishRejectedException)
+        }
+
+    /**
+     * An admission call stalls past the deadline and lands afterwards, as MDK finishes it in the background. The retry
+     * finds the token owned and never admits it again, so the message exists once.
+     */
+    @Test
+    fun aLateAdmissionIsCountedByTheRetryWithoutAdmittingAgain() =
+        runTest {
+            val ledger = FakeTokenLedger()
+            val stalled = runCatching { publish(ledger, stallAdmission = true) }.exceptionOrNull()
+            assertTrue("expected a publish timeout, got $stalled", stalled is ForwardPublishTimeoutException)
+
+            ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+            ledger.messages += TOKEN
+            publish(ledger)
+
+            assertEquals(0, ledger.admissions)
+            assertEquals(listOf(TOKEN), ledger.messages)
+        }
+
+    /** An owned token, queued or handed off, is waited on or counted and never admitted again. */
+    @Test
+    fun anOwnedTokenIsNeverAdmittedAgain() =
         runTest {
             val completed =
                 LocalSendStatusFfi.Completed(
@@ -79,42 +137,54 @@ class ForwardPublishAdmissionTest {
                         SendMaintenanceDispositionFfi.READY,
                     ),
                 )
-            listOf(LocalSendStatusFfi.Queued, LocalSendStatusFfi.EngineOwned, completed).forEach { status ->
+            listOf(LocalSendStatusFfi.EngineOwned, completed).forEach { status ->
                 val ledger = FakeTokenLedger().apply { statuses[TOKEN] = status }
-                var admissions = 0
-
-                admitForwardPublish(
-                    messageIndex = 0,
-                    token = TOKEN,
-                    probe = { ledger.probe(TOKEN) },
-                    admit = {
-                        admissions += 1
-                        ledger.admit(TOKEN)
-                    },
-                )
-
-                assertEquals("status $status must not be admitted again", 0, admissions)
+                publish(ledger)
+                assertEquals("status $status must not be admitted again", 0, ledger.admissions)
             }
+            val queued = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.Queued }
+            launch {
+                delay(HANDOFF_MILLIS)
+                queued.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+            }
+            publish(queued)
+            assertEquals(0, queued.admissions)
         }
 
-    /** After a timeout with nothing owned, the retry admits under the same token and the message exists once. */
+    /** A token MDK already rejected is reported for replacement and never admitted again. */
     @Test
-    fun aRetryWithNoOwnershipAdmitsTheSameTokenOnce() =
+    fun aRejectedTokenIsReportedAndNotAdmitted() =
         runTest {
-            val ledger = FakeTokenLedger()
-            runCatching { admitOnce(ledger, gate = CompletableDeferred()) }
+            val ledger = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.Rejected }
 
-            admitOnce(ledger)
-            admitOnce(ledger)
+            val failure = runCatching { publish(ledger) }.exceptionOrNull()
 
-            assertEquals(listOf(TOKEN), ledger.messages)
+            assertTrue("expected rejected, got $failure", failure is ForwardPublishRejectedException)
+            assertEquals(0, ledger.admissions)
         }
 
-    /** An admission that failed but still landed is counted as published from its status. */
+    /** A failed admission that stored nothing is not committed, so the same token may be admitted again later. */
     @Test
-    fun aFailedAdmissionThatLandedCountsAsPublished() =
+    fun aFailedAdmissionWithoutOwnershipIsNotCommitted() =
         runTest {
             val ledger = FakeTokenLedger()
+
+            val failure =
+                runCatching { publish(ledger, admitFailure = IllegalStateException("engine busy")) }
+                    .exceptionOrNull()
+
+            assertTrue("expected not committed, got $failure", failure is ForwardPublishNotCommittedException)
+        }
+
+    /** An admission that failed after it was stored continues to the handoff wait instead of failing. */
+    @Test
+    fun aFailedAdmissionThatWasStoredStillWaitsForTheEngine() =
+        runTest {
+            val ledger = FakeTokenLedger()
+            launch {
+                delay(HANDOFF_MILLIS)
+                ledger.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+            }
 
             admitForwardPublish(
                 messageIndex = 0,
@@ -124,86 +194,55 @@ class ForwardPublishAdmissionTest {
                     ledger.admit(TOKEN)
                     throw IllegalStateException("response lost")
                 },
+                deadlineMillis = DEADLINE_MILLIS,
+                pollMillis = POLL_MILLIS,
             )
 
             assertEquals(listOf(TOKEN), ledger.messages)
         }
 
-    /** A failed admission with no ownership is not committed, so the same token may be admitted again. */
+    /** A status read that never returns is still bounded by the deadline. */
     @Test
-    fun aFailedAdmissionWithoutOwnershipIsNotCommitted() =
+    fun aStuckStatusReadIsBoundedByTheDeadline() =
         runTest {
-            val ledger = FakeTokenLedger()
-
-            val failure =
-                runCatching { admitOnce(ledger, admitFailure = IllegalStateException("engine busy")) }
-                    .exceptionOrNull()
-
-            assertTrue("expected not committed, got $failure", failure is ForwardPublishNotCommittedException)
-        }
-
-    /** A failed admission whose status cannot be read stays uncertain and carries the token as its evidence. */
-    @Test
-    fun aFailedAdmissionWithAnUnreadableStatusIsUncertainWithItsToken() =
-        runTest {
-            val ledger = FakeTokenLedger()
-            var probes = 0
-
             val failure =
                 runCatching {
                     admitForwardPublish(
-                        messageIndex = 3,
+                        messageIndex = 0,
                         token = TOKEN,
-                        probe = {
-                            probes += 1
-                            if (probes > 1) throw IllegalStateException("status unavailable")
-                            null
-                        },
-                        admit = { throw IllegalStateException("engine busy") },
+                        probe = { CompletableDeferred<LocalSendStatusFfi?>().await() },
+                        admit = { error("must not admit while the status read is stuck") },
+                        deadlineMillis = DEADLINE_MILLIS,
+                        pollMillis = POLL_MILLIS,
                     )
                 }.exceptionOrNull()
 
-            if (failure !is ForwardPublishUncertainException) fail("expected uncertain, got $failure")
-            val evidence = (failure as ForwardPublishUncertainException).evidence
-            assertEquals(3, evidence.messageIndex)
-            assertEquals(TOKEN, evidence.clientToken)
+            assertTrue("expected a publish timeout, got $failure", failure is ForwardPublishTimeoutException)
+            assertEquals(DEADLINE_MILLIS, currentTime)
         }
 
-    /** A token MDK rejected is reported for replacement and never admitted again. */
+    /** The convergence nudge runs once after a new admission and never for a token MDK already owned. */
     @Test
-    fun aRejectedTokenIsReportedAndNotAdmitted() =
+    fun theConvergenceNudgeFollowsOnlyANewAdmission() =
         runTest {
-            val ledger = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.Rejected }
+            var nudges = 0
+            val fresh = FakeTokenLedger()
+            launch {
+                delay(HANDOFF_MILLIS)
+                fresh.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
+            }
+            publish(fresh, onAdmitted = { nudges += 1 })
+            assertEquals(1, nudges)
 
-            val failure = runCatching { admitOnce(ledger) }.exceptionOrNull()
-
-            assertTrue("expected rejected, got $failure", failure is ForwardPublishRejectedException)
-            assertTrue(ledger.messages.isEmpty())
-        }
-
-    /** Token recovery maps ownership to published, absence to not committed and an unreadable status to unavailable. */
-    @Test
-    fun tokenRecoveryResolvesFromStatusAlone() =
-        runTest {
-            val evidence = ForwardPublishRecoveryEvidence(0, emptySet(), null, clientToken = TOKEN)
-
-            assertEquals(
-                ForwardPublishRecoveryResult.Published,
-                recoverForwardPublishByToken(evidence) { LocalSendStatusFfi.EngineOwned },
-            )
-            assertEquals(ForwardPublishRecoveryResult.NotCommitted, recoverForwardPublishByToken(evidence) { null })
-            assertEquals(
-                ForwardPublishRecoveryResult.Unavailable,
-                recoverForwardPublishByToken(evidence) { throw IllegalStateException("status unavailable") },
-            )
-            assertEquals(
-                ForwardPublishRecoveryResult.Unavailable,
-                recoverForwardPublishByToken(evidence.copy(clientToken = null)) { LocalSendStatusFfi.Queued },
-            )
+            val owned = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.EngineOwned }
+            publish(owned, onAdmitted = { nudges += 1 })
+            assertEquals(1, nudges)
         }
 
     private companion object {
         const val TOKEN = "opaque-token"
-        const val TIMEOUT_MILLIS = 1_000L
+        const val DEADLINE_MILLIS = 5_000L
+        const val POLL_MILLIS = 100L
+        const val HANDOFF_MILLIS = 1_000L
     }
 }

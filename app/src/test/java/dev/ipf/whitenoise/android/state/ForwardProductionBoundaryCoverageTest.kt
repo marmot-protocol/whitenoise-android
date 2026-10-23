@@ -138,8 +138,9 @@ class ForwardProductionBoundaryCoverageTest {
     }
 
     /**
-     * Destination publishes are admitted by client token (#2556): a retry probes MDK's local status for the same
-     * token first and an uncertain publish resolves from that status, so no path can mint a second message.
+     * Destination publishes are admitted by client token (#2556) and count as sent only once MDK's engine owns them:
+     * a retry probes the same token first, every native call is detached so the deadline bounds it, and a new
+     * admission gets the composer's convergence nudge.
      */
     @Test
     fun publishIsTokenBoundAndTheAppScopeOwnsCompletion() {
@@ -149,12 +150,16 @@ class ForwardProductionBoundaryCoverageTest {
         val owner = ownerSource.functionBody("monitor")
         val retry = ownerSource.functionBody("retryAutomatically")
 
-        assertTrue("val token = clientTokenFor(messageIndex)" in body)
+        assertTrue("clientTokenFor(messageIndex)" in body)
         assertTrue("admitForwardPublish(" in body)
-        assertTrue("localSendStatus(account, targetGroupIdHex, token)" in body)
+        assertTrue("detachedNative { localSendStatus(account, targetGroupIdHex, token) }" in body)
         assertTrue("sendTextWithClientToken(account, targetGroupIdHex, message.text, token)" in body)
         assertTrue("sendPreparedMediaWithClientToken(" in body)
-        assertTrue("recoverForwardPublishByToken(evidence)" in body)
+        assertTrue("beforeAdmit = ::requireDestinationAccount" in body)
+        assertTrue("detachedNative { retryGroupConvergence(account, targetGroupIdHex) }" in body)
+        assertTrue(".async { marmotIo(block) }" in body)
+        assertTrue("CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)" in body)
+        assertFalse("recoverPendingPublish" in body)
         assertFalse("sendText(account" in body)
         assertFalse("sendMediaAttachments(" in body)
         assertTrue("forwardOperationOwner.start(session)" in start)
@@ -180,6 +185,8 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn" in body)
         assertTrue("diagnostics?.commitLockAcquired(lockRequestedAtMs)" in body)
         assertTrue("ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn" in body)
+        assertTrue("diagnostics?.admissionAccepted(admissionStartedAtMs)" in body)
+        assertTrue("ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn" in body)
         assertTrue("diagnostics?.sourceLookup(" in isolated)
         assertTrue("hit = cached != null || retained != null" in isolated)
         assertTrue("native = retained != null" in isolated)

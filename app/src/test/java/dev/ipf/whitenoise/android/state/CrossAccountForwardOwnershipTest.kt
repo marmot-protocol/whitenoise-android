@@ -6,12 +6,16 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
+import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaDownloadResultFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
+import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
+import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -46,6 +50,7 @@ class CrossAccountForwardOwnershipTest {
     )
 
     private val calls = ConcurrentLinkedQueue<RecordedCall>()
+    private val admittedTokens = ConcurrentLinkedQueue<String>()
     private val messageIdCounter = AtomicInteger(0)
     private var statusGate: CountDownLatch? = null
     private var onStatusEntered: (() -> Unit)? = null
@@ -62,6 +67,7 @@ class CrossAccountForwardOwnershipTest {
             when (method.name) {
                 "sendTextWithClientToken" -> {
                     calls += RecordedCall("sendTextWithClientToken", arguments!![0] as String)
+                    admittedTokens += arguments[3] as String
                     LocalSendAcceptanceFfi(
                         clientToken = arguments[3] as String,
                         messageIdHex = "id-${messageIdCounter.incrementAndGet()}",
@@ -71,7 +77,17 @@ class CrossAccountForwardOwnershipTest {
                     calls += RecordedCall("localSendStatus", arguments!![0] as String)
                     onStatusEntered?.invoke()
                     statusGate?.await()
-                    null
+                    // The engine takes every admitted message at once in this fixture.
+                    if (arguments[2] in admittedTokens) LocalSendStatusFfi.EngineOwned else null
+                }
+                "retryGroupConvergence" -> {
+                    calls += RecordedCall("retryGroupConvergence", arguments!![0] as String)
+                    SendSummaryFfi(
+                        published = 0u,
+                        messageIds = emptyList(),
+                        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                    )
                 }
                 "timelineMessages" -> {
                     calls += RecordedCall("timelineMessages", arguments!![0] as String)
@@ -104,6 +120,7 @@ class CrossAccountForwardOwnershipTest {
                 }
                 "sendPreparedMediaWithClientToken" -> {
                     calls += RecordedCall("sendPreparedMediaWithClientToken", arguments!![0] as String)
+                    admittedTokens += arguments[4] as String
                     LocalSendAcceptanceFfi(
                         clientToken = arguments[4] as String,
                         messageIdHex = "media-id-${messageIdCounter.incrementAndGet()}",

@@ -189,9 +189,10 @@ class ForwardMediaReferenceFfiIntegrationTest {
         }
 
     /**
-     * A small text/plain forward through MDK's token admission (#2556): the source is materialized twice, its first and
-     * then its already retained read, the destination gets fresh references, and admitting the same client token again
-     * returns the same message instead of publishing a second one.
+     * The native half of a small text/plain forward through MDK's token admission (#2556), driven directly against the
+     * bindings: the source is read back twice in one runtime (this does not prove either read was uncached), the
+     * destination gets fresh references, and admitting the same client token again returns the same message, which
+     * keeps the caption, file name, MIME type and bytes and exists exactly once.
      */
     @Test
     @Suppress("LongMethod") // Keep the end-to-end native boundary in one auditable sequence.
@@ -301,7 +302,11 @@ class ForwardMediaReferenceFfiIntegrationTest {
                             .filter { record -> record.plaintext == FORWARD_CAPTION }
                     assertEquals("The forward must exist exactly once", 1, forwarded.size)
                     val opened = marmot.downloadMedia(account.label, destinationGroup, destinationReferences.single())
+                    assertEquals(fixture.fileName, opened.fileName)
                     assertEquals(fixture.mediaType, opened.mediaType)
+                    val projected = MessageAttachments.acceptedReferences(forwarded.single().media)
+                    assertEquals(listOf(fixture.fileName), projected.map { it.fileName })
+                    assertEquals(listOf(fixture.mediaType), projected.map { it.mediaType })
                     assertArrayEquals(fixture.plaintext, opened.plaintext)
                 }
             } finally {
