@@ -2671,6 +2671,7 @@ internal fun MessageBubble(
                     // reactions, system copy).
                     canShowLess =
                         record.kind == 9uL &&
+                            item.status != MessageStatus.Failed &&
                             !deleted &&
                             !persistedFailure &&
                             !collapsible &&
@@ -2988,7 +2989,11 @@ internal fun MessageBubble(
                             }
                         },
                         onShowLess =
-                            if (ttsBodyExpanded || !surfaces.bodyExceedsCollapseLimit) {
+                            if (
+                                item.status == MessageStatus.Failed ||
+                                ttsBodyExpanded ||
+                                !surfaces.bodyExceedsCollapseLimit
+                            ) {
                                 null
                             } else {
                                 {

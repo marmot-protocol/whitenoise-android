@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
@@ -28,6 +29,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -120,6 +122,28 @@ class ComposerPersistentPasteButtonTest {
             assertEquals(0, shows)
         }
         composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
+    }
+
+    /** Both taps read the accepted owner value even when Compose has not consumed the first edit. */
+    @Test fun twoPasteActionsBeforeRecompositionAppendToTheLiveDraft() {
+        clip("clipboard")
+        render()
+        val pasteAction =
+            requireNotNull(
+                composeRule
+                    .onNodeWithTag("composer.paste")
+                    .fetchSemanticsNode()
+                    .config[SemanticsActions.OnClick]
+                    .action,
+            )
+        composeRule.runOnIdle {
+            assertTrue(pasteAction())
+            assertTrue(pasteAction())
+            assertEquals(TextFieldValue("clipboardclipboard", TextRange(18)), state.valueState.value)
+            assertEquals(0, focusGains)
+            assertEquals(0, shows)
+            assertEquals(0, hides)
+        }
     }
 
     @Test fun typingPasteReplacesOnlySelectionAndPreservesFocus() {

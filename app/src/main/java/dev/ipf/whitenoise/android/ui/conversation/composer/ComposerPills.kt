@@ -613,7 +613,7 @@ internal fun ComposerPill(
                 val pastedText =
                     if (clip.description.hasMimeType("text/*")) clip.plainText(context) else null
                 if (!pastedText.isNullOrEmpty()) {
-                    val value = latestTextFieldValue
+                    val value = latestReadAcceptedValue()
                     val start = value.selection.min.coerceIn(0, value.text.length)
                     val end = value.selection.max.coerceIn(start, value.text.length)
                     latestOnValueChange(

@@ -25,6 +25,7 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Presenter integration verifies actual posted channel IDs and People metadata, not a duplicate routing function. */
 @RunWith(RobolectricTestRunner::class)
@@ -198,6 +199,86 @@ class ProfileNotificationPresenterTest {
                 assertEquals(0, manager.activeNotifications.size)
             } finally {
                 ConversationCardPostSynchronizer.testHook = null
+            }
+        }
+
+    /** Category and group changes after channel selection still win at the final platform write. */
+    @Test
+    fun actorCategoryDisabledAtFinalWriteCannotUseTheProfileChannel() =
+        runBlocking {
+            for (trigger in listOf(
+                NotificationTriggerFfi.GROUP_INVITE,
+                NotificationTriggerFfi.MADE_ADMIN,
+                NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                NotificationTriggerFfi.REMOVED_FROM_GROUP,
+            )) {
+                for (blockGroup in listOf(false, true)) {
+                    org.robolectric.shadows.ShadowNotificationManager
+                        .reset()
+                    setUp()
+                    val profileId = customize(alice)
+                    val event = update(group = "final-$trigger-$blockGroup").copy(trigger = trigger)
+                    val category = NotificationChannelSpec.forUpdate(event)
+                    val channel = requireNotNull(manager.getNotificationChannel(category.id))
+                    val groupId = requireNotNull(channel.group)
+                    val importance = channel.importance
+                    assertTrue(importance > NotificationManager.IMPORTANCE_NONE)
+                    assertFalse(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
+                    val reachedFinalWrite = AtomicBoolean(false)
+                    ConversationCardPostSynchronizer.testHook =
+                        object : ConversationCardTestHook {
+                            override fun onBarrier(
+                                op: ConversationCardOp,
+                                barrier: ConversationCardBarrier,
+                                notificationTag: String,
+                                notificationId: Int,
+                            ) {
+                                if (op != ConversationCardOp.SHOW_NOTIFY ||
+                                    barrier != ConversationCardBarrier.BEFORE_WRITE
+                                ) {
+                                    return
+                                }
+                                ConversationCardPostSynchronizer.testHook = null
+                                reachedFinalWrite.set(true)
+                                if (blockGroup) {
+                                    val group = requireNotNull(manager.getNotificationChannelGroup(groupId))
+                                    ReflectionHelpers.callInstanceMethod<Void>(
+                                        group,
+                                        "setBlocked",
+                                        ClassParameter.from(Boolean::class.javaPrimitiveType!!, true),
+                                    )
+                                    manager.createNotificationChannelGroup(group)
+                                    assertTrue(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
+                                    assertEquals(
+                                        importance,
+                                        requireNotNull(manager.getNotificationChannel(category.id)).importance,
+                                    )
+                                } else {
+                                    channel.importance = NotificationManager.IMPORTANCE_NONE
+                                    manager.createNotificationChannel(channel)
+                                    assertEquals(
+                                        NotificationManager.IMPORTANCE_NONE,
+                                        requireNotNull(manager.getNotificationChannel(category.id)).importance,
+                                    )
+                                    assertFalse(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
+                                }
+                            }
+                        }
+                    try {
+                        assertFalse(presenter.show(event, shortNpub = { it }))
+                        assertTrue(reachedFinalWrite.get())
+                        assertEquals(0, manager.activeNotifications.size)
+                    } finally {
+                        ConversationCardPostSynchronizer.testHook = null
+                    }
+                    // A fresh framework fixture proves the test has not merely poisoned later category state.
+                    org.robolectric.shadows.ShadowNotificationManager
+                        .reset()
+                    setUp()
+                    customize(alice)
+                    assertTrue(presenter.show(event.copy(messageIdHex = "healthy"), shortNpub = { it }))
+                    assertEquals(profileId, card(event).channelId)
+                }
             }
         }
 

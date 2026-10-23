@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -51,6 +52,58 @@ class MessageShowLessBehaviorTest {
         composeRule.runOnIdle {
             surface = surface.copy(item = item.copy(record = item.record.copy(plaintext = "Short edit")))
         }
+        composeRule.onNodeWithContentDescription("Message actions").performClick()
+        composeRule.onNodeWithText("Show less").assertDoesNotExist()
+    }
+
+    @Test
+    fun failedRowWithoutFailureProjectionDoesNotOfferShowLess() {
+        val fixture =
+            swipeTestSurface(ApplicationProvider.getApplicationContext(), reacted = false, mine = true, media = false)
+        val longBody = (1..90).joinToString("\n") { "Failed message line $it" }
+        val item =
+            fixture.item.copy(
+                record = fixture.item.record.copy(plaintext = longBody),
+                status = MessageStatus.Failed,
+                projected = null,
+            )
+        composeRule.setContent {
+            SwipeTestBubbleHost(
+                surface = fixture.copy(item = item),
+                collapseLongMessages = false,
+                isActionMenuOpen = true,
+            )
+        }
+        composeRule.onNodeWithText("Show less").assertDoesNotExist()
+    }
+
+    @Test
+    fun openReaderStopsOfferingShowLessWhenTheRowBecomesFailed() {
+        val fixture =
+            swipeTestSurface(ApplicationProvider.getApplicationContext(), reacted = false, mine = true, media = false)
+        val longBody = (1..90).joinToString("\n") { "Message line $it" }
+        var surface by mutableStateOf(
+            fixture.copy(
+                item =
+                    fixture.item.copy(
+                        record = fixture.item.record.copy(plaintext = longBody),
+                        status = MessageStatus.Sent,
+                        projected = null,
+                    ),
+            ),
+        )
+        var menuOpen by mutableStateOf(true)
+        composeRule.setContent {
+            SwipeTestBubbleHost(
+                surface = surface,
+                collapseLongMessages = false,
+                isActionMenuOpen = menuOpen,
+                onActionMenuOpenChange = { menuOpen = it },
+            )
+        }
+        composeRule.onNodeWithText("Show less").performClick()
+        composeRule.onNodeWithText("Read more", ignoreCase = true).performClick()
+        composeRule.runOnIdle { surface = surface.copy(item = surface.item.copy(status = MessageStatus.Failed)) }
         composeRule.onNodeWithContentDescription("Message actions").performClick()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
     }

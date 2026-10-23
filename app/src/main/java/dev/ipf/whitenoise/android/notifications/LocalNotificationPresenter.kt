@@ -1004,36 +1004,40 @@ class LocalNotificationPresenter(
                         }
                     if (replacementHasChanged) return@withRegisteredShow false
                     val category = NotificationChannelSpec.forUpdate(update)
-                    if (
+                    // Re-read category policy at the final platform write as well as before channel selection.
+                    // A custom person channel must not outlive category/group disablement while pacing waits.
+                    val usesActorCategory =
                         update.trigger != NotificationTriggerFfi.NEW_MESSAGE &&
-                        profileNotificationSoundAuthor(update) != null
-                    ) {
-                        // A person sound changes the alert, never the category or chat suppression policy.
-                        // settings() only reads existing routing; no channel is materialized by this check.
-                        val categoryBlocked =
-                            withContext(Dispatchers.IO) {
-                                val categorySettings =
-                                    conversationShortcutId(update.accountRef, update.groupIdHex)
-                                        ?.let { shortcutId ->
-                                            conversationNotificationRouting
-                                                .settings(
-                                                    NotificationConversationDescriptor(
-                                                        shortcutId,
-                                                        update.isDm,
-                                                        conversationTitleOverride,
-                                                        ConversationVibrationPattern.SYSTEM_DEFAULT,
-                                                    ),
-                                                ).filter { it.channel == category }
-                                        }.orEmpty() +
-                                        ConversationNotificationCategorySetting(
-                                            category,
-                                            ConversationNotificationScope.USE_GLOBAL_DEFAULT,
-                                            false,
-                                            AndroidNotificationSettingsTarget.Global(category),
-                                        )
-                                category in androidBlockedConversationCategories(context, categorySettings)
-                            }
-                        if (categoryBlocked) return@withRegisteredShow false
+                            profileNotificationSoundAuthor(update) != null
+                    val categoryAllowsPost = {
+                        if (!usesActorCategory) {
+                            true
+                        } else {
+                            // settings() only reads existing routing; it never materializes a channel.
+                            val categorySettings =
+                                conversationShortcutId(update.accountRef, update.groupIdHex)
+                                    ?.let { shortcutId ->
+                                        conversationNotificationRouting
+                                            .settings(
+                                                NotificationConversationDescriptor(
+                                                    shortcutId,
+                                                    update.isDm,
+                                                    conversationTitleOverride,
+                                                    ConversationVibrationPattern.SYSTEM_DEFAULT,
+                                                ),
+                                            ).filter { it.channel == category }
+                                    }.orEmpty() +
+                                    ConversationNotificationCategorySetting(
+                                        category,
+                                        ConversationNotificationScope.USE_GLOBAL_DEFAULT,
+                                        false,
+                                        AndroidNotificationSettingsTarget.Global(category),
+                                    )
+                            category !in androidBlockedConversationCategories(context, categorySettings)
+                        }
+                    }
+                    if (usesActorCategory && !withContext(Dispatchers.IO) { categoryAllowsPost() }) {
+                        return@withRegisteredShow false
                     }
                     // Ordinary messages keep their required People/conversation child.
                     // Other event types inherit the stable global channel until this
@@ -1422,7 +1426,8 @@ class LocalNotificationPresenter(
                                                 mustBeLive = rewriteGeneration != null,
                                                 hiddenShortcut = hiddenShortcut,
                                                 finalPostAllowed = {
-                                                    profileAllowsPost() &&
+                                                    categoryAllowsPost() &&
+                                                        profileAllowsPost() &&
                                                         showGenerationAllowsPost() &&
                                                         rewriteLease?.dismissed?.get() != true
                                                 },
@@ -1475,7 +1480,8 @@ class LocalNotificationPresenter(
                                                         mustBeLive = rewriteGeneration != null,
                                                         hiddenShortcut = hiddenShortcut,
                                                         finalPostAllowed = {
-                                                            profileAllowsPost() &&
+                                                            categoryAllowsPost() &&
+                                                                profileAllowsPost() &&
                                                                 showGenerationAllowsPost() &&
                                                                 rewriteLease?.dismissed?.get() != true
                                                         },
@@ -1547,7 +1553,8 @@ class LocalNotificationPresenter(
                                                 mustBeLive = rewriteGeneration != null,
                                                 hiddenShortcut = hiddenShortcut,
                                                 finalPostAllowed = {
-                                                    profileAllowsPost() &&
+                                                    categoryAllowsPost() &&
+                                                        profileAllowsPost() &&
                                                         showGenerationAllowsPost() &&
                                                         rewriteLease?.dismissed?.get() != true
                                                 },
@@ -1580,7 +1587,8 @@ class LocalNotificationPresenter(
                                                     mustBeLive = false,
                                                     hiddenShortcut = hiddenShortcut,
                                                     finalPostAllowed = {
-                                                        profileAllowsPost() &&
+                                                        categoryAllowsPost() &&
+                                                            profileAllowsPost() &&
                                                             showGenerationAllowsPost() &&
                                                             rewriteLease?.dismissed?.get() != true
                                                     },
