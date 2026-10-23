@@ -40,7 +40,7 @@ class NotificationFirstPostContentWiringTest {
                 "conversationTitleOverride = firstPost.content?.conversationTitle",
                 "senderNameOverride = firstPost.content?.senderName",
                 "previewTextOverride = firstPost.content?.previewText",
-                "reactedToPreviewOverride = firstPost.content?.reactedToPreview",
+                "reactedToPreviewOverride = verifiedReactionPreview(candidate, firstPost.content?.reactedToPreview)",
                 "recipientAccountSubtext = firstPost.content?.recipientAccountSubtext",
             ).all(show::contains),
         )
@@ -67,7 +67,7 @@ class NotificationFirstPostContentWiringTest {
                 .substringAfter("private suspend fun postNotificationContentCorrection")
                 .substringBefore("/**")
         val firstResolve =
-            enrichment.indexOf("notificationContentResolution.firstPost.resolve(update, localOnly = false)")
+            enrichment.indexOf("notificationContentResolution.firstPost.resolve(candidate, localOnly = false)")
 
         assertTrue("late text must resolve before routing correction work", firstResolve >= 0)
         assertTrue(
@@ -89,7 +89,7 @@ class NotificationFirstPostContentWiringTest {
         assertTrue(
             "the post-deadline content resolver must run even after a fast local first draw",
             "firstPost.content ?:" !in enrichment &&
-                "notificationContentResolution.firstPost.resolve(update, localOnly = false)" in enrichment,
+                "notificationContentResolution.firstPost.resolve(candidate, localOnly = false)" in enrichment,
         )
         assertTrue(
             "avatar lookup must remain behind the content-routing decision",
@@ -168,7 +168,7 @@ class NotificationFirstPostContentWiringTest {
                 .substringBefore("private suspend fun showRedactedNotificationUpdate")
         val latePost = source.functionBody("postNotificationLateCorrection")
         for (post in listOf(firstPost, latePost)) {
-            assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(update.isDm)" in post)
+            assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm)" in post)
             assertTrue("senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap" in post)
         }
         assertTrue("postNotificationAvatarCorrection" !in source)

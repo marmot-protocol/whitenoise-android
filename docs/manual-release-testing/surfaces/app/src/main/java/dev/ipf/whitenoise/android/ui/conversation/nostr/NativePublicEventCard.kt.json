@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NativePublicEventCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Native public event projection maps verified events and cached author metadata off the UI thread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NativePublicEventCard.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.readCachedPublicEventCards(",
+        "test_ids": [
+          "STB-002"
+        ]
+      },
+      {
+        "surface": "Event-card author profile refreshes are throttled per author",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NativePublicEventCard.kt",
+        "anchor": "internal class PublicEventAuthorRefreshThrottle(",
+        "test_ids": [
+          "STB-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

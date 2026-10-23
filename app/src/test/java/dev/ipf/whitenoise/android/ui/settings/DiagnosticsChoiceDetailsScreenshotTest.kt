@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.app.Application
+import android.os.Looper
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -24,10 +26,12 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -95,6 +99,51 @@ class DiagnosticsChoiceDetailsScreenshotTest {
         assertEquals(0, changes)
     }
 
+    /** A failed startup close shows Retry beside an enabled close, in the light theme. */
+    @Test
+    fun failedStartupCloseLight() = captureCloseFailure(dark = false)
+
+    /** A failed startup close shows Retry beside an enabled close, in the dark theme. */
+    @Test
+    fun failedStartupCloseDark() = captureCloseFailure(dark = true)
+
+    /** A failed startup close keeps Retry and the enabled close reachable at large RTL text. */
+    @Test
+    @Config(qualifiers = "ar-w360dp-h780dp-mdpi")
+    fun failedStartupCloseLargeRtl() = captureCloseFailure(dark = true, fontScale = 1.3f, suffix = "large_rtl")
+
+    /** Captures the production startup owner after its real decline callback rejects persistence. */
+    private fun captureCloseFailure(
+        dark: Boolean,
+        fontScale: Float = 1f,
+        suffix: String = if (dark) "dark" else "light",
+    ) {
+        val state =
+            privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, beforeSave = {
+                error("Rejected diagnostics decline")
+            })
+        val owner = StartupDiagnosticsCloseState()
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
+                StartupUsageDiagnosticsPrompt(state, owner)
+            }
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            owner.prompt == StartupDiagnosticsPromptState.CLOSE_ERROR
+        }
+        composeRule.onNodeWithText(context.getString(R.string.retry)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.usage_diagnostics_error)).assertIsDisplayed()
+        // A failed close can be left unsaved (#2820), so the close glyph is enabled rather than a trap.
+        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).assertIsEnabled()
+        assertFalse(state.isUsageDiagnosticsGranted())
+        assertNull(state.diagnostics.observations.ticket())
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/diagnostics_close_failure_$suffix.png")
+    }
+
     private fun captureDetails(
         logs: Boolean,
         dark: Boolean,
@@ -109,7 +158,7 @@ class DiagnosticsChoiceDetailsScreenshotTest {
         val text = if (logs) logsDisclosure else usageDisclosure
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
-                UsageDiagnosticsPrompt(state, onDone = {})
+                UsageDiagnosticsPrompt(state, onCloseStarted = {}, onDone = {})
             }
         }
         composeRule.onNodeWithText(usageDisclosure).assertDoesNotExist()

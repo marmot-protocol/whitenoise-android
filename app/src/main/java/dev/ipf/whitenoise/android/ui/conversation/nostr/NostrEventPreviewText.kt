@@ -8,17 +8,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-
-private data class NostrPreviewDocument(
-    val document: MarkdownDocumentFfi?,
-    val media: NostrEventMediaCandidates,
-)
 
 /** Resolves profile names without briefly displaying stale or raw mention text. */
 @Composable
@@ -28,25 +20,19 @@ internal fun rememberNostrEventPreviewState(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ): NostrEventCardState {
-    val card = (state as? NostrEventCardState.Loaded)?.card
-    var prepared by remember(card?.eventIdHex, card?.summary, card?.readerBody) {
-        mutableStateOf<NostrPreviewDocument?>(null)
+    val loadedState = state as? NostrEventCardState.Loaded
+    val card = loadedState?.card
+    // A read that already prepared this card's text is used on the first frame, with no second parse.
+    val carried = loadedState?.preview?.takeIf { card != null && it.describes(card) }
+    var parsed by remember(card?.eventIdHex, card?.summary, card?.readerBody) {
+        mutableStateOf<NostrEventPreparedPreview?>(null)
     }
-    LaunchedEffect(card?.eventIdHex, card?.summary, card?.readerBody) {
+    LaunchedEffect(card?.eventIdHex, card?.summary, card?.readerBody, carried == null) {
         val loaded = card ?: return@LaunchedEffect
-        prepared =
-            withContext(dispatcher) {
-                val document = parsePreviewDocument(loaded.summary, parseMarkdown)
-                val body = boundedNostrImageBody(loaded.readerBody)
-                val bodyDocument =
-                    if (body == loaded.summary) {
-                        document
-                    } else {
-                        bodyImageParsePermits.withPermit { parsePreviewDocument(body, parseMarkdown) }
-                    }
-                NostrPreviewDocument(document, nostrEventMediaCandidates(emptyList(), emptyList(), bodyDocument))
-            }
+        if (carried != null) return@LaunchedEffect
+        parsed = withContext(dispatcher) { prepareNostrEventPreview(loaded, parseMarkdown) }
     }
+    val prepared = carried ?: parsed
     val document = prepared?.document
     val media =
         remember(card?.imageUrls, card?.mediaUrl, prepared?.media) {
@@ -86,19 +72,3 @@ internal fun rememberNostrEventPreviewState(
 }
 
 private const val PREVIEW_TEXT_BUDGET = 420
-
-private suspend fun parsePreviewDocument(
-    text: String?,
-    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
-): MarkdownDocumentFfi? =
-    text?.takeIf(String::isNotBlank)?.let {
-        try {
-            parseMarkdown(it)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-private val bodyImageParsePermits = Semaphore(2)

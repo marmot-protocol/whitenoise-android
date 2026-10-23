@@ -150,6 +150,23 @@
           "NTF-035",
           "NTF-036"
         ]
+      },
+      {
+        "surface": "external media continuity and per-channel alert policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun show(",
+        "test_ids": [
+          "STB-005"
+        ]
+      },
+      {
+        "surface": "Silent per-entry card retraction after deletion, hide or read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "fun reconcileConversationContent(",
+        "test_ids": [
+          "NTF-043",
+          "NTF-044"
+        ]
       }
     ]
   },

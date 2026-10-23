@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventPreviewText.kt",
+  "legacy_sha256": "7d4f4a687b8e46d68adc3b965b0a94fc37c7266661b32608603fda6f90e054f4",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Card body images from a prepared or freshly parsed preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventPreviewText.kt",
+        "anchor": "prepared?.media?.imageUrls.orEmpty()",
+        "test_ids": [
+          "RDR-004",
+          "RDR-005"
+        ]
+      },
+      {
+        "surface": "Restored event cards use preview text prepared before their first frame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventPreviewText.kt",
+        "anchor": "val carried = loadedState?.preview?.takeIf",
+        "test_ids": [
+          "STB-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -327,13 +327,20 @@ class NotificationNetworkReconnectCoverageTest {
             appState
                 .substringAfter("private fun isNotificationGenerationPostAllowed")
                 .substringBefore("/**")
+        val capturedEnrichmentGate =
+            Regex(
+                """private fun isNotificationEnrichmentAllowed\(\s*update: NotificationUpdateFfi,\s*""" +
+                    """firstPost: NotificationFirstPost,\s*\): Boolean =([\s\S]*?)\n\s*/\*\*""",
+            ).find(appState)?.groupValues?.get(1).orEmpty()
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
-            "isNotificationEnrichmentAllowed(update, firstPost)" in enrichment &&
-                "isNotificationEnrichmentAllowed(" in latePost &&
-                "firstPost.epoch" in latePost &&
-                "firstPost.accountCacheEpoch" in latePost &&
-                "firstPost.engineMuted" in latePost &&
+            "isNotificationEnrichmentAllowed(candidate, firstPost)" in enrichment &&
+                "isNotificationEnrichmentAllowed(candidate, firstPost)" in latePost &&
+                "isQueuedReactionQuoteCurrent(update, firstPost)" in capturedEnrichmentGate &&
+                "isNotificationEnrichmentAllowed(" in capturedEnrichmentGate &&
+                "firstPost.epoch" in capturedEnrichmentGate &&
+                "firstPost.accountCacheEpoch" in capturedEnrichmentGate &&
+                "firstPost.engineMuted" in capturedEnrichmentGate &&
                 "isNotificationGenerationPostAllowed(" in notificationGates &&
                 "!networkNotificationRecoverySuppressed" in notificationGates,
         )

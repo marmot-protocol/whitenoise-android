@@ -73,6 +73,10 @@ object LocalNotificationFormatter {
     // id so a card updated by a newer message survives.
     const val EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX = "dev.ipf.whitenoise.android.notify.conversation_card_message_id_hex"
 
+    // The message id of one retained history entry, stamped into that MessagingStyle message's own extras so a
+    // deleted, hidden or read entry can be dropped from the card by identity rather than by text (#3323).
+    const val EXTRA_ENTRY_MESSAGE_ID_HEX = "dev.ipf.whitenoise.android.notify.entry_message_id_hex"
+
     fun conversationDismissalKey(
         accountRef: String,
         groupIdHex: String,
@@ -120,6 +124,34 @@ object LocalNotificationFormatter {
             tag = GROUP_MEMBERSHIP_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
             id = GROUP_MEMBERSHIP_NOTIFICATION_ID,
         )
+
+    /**
+     * The `(accountRef, groupIdHex)` a deterministic conversation card belongs to, read back from its tag and id.
+     * Opaque invite tags and every other card yield null.
+     */
+    fun conversationScopeOfCard(
+        tag: String?,
+        id: Int,
+    ): Pair<String, String>? {
+        val prefix =
+            when (id) {
+                MESSAGE_NOTIFICATION_ID -> ""
+                REACTION_NOTIFICATION_ID -> REACTION_TAG_PREFIX
+                MENTION_NOTIFICATION_ID -> MENTION_TAG_PREFIX
+                AGENT_ACTIVITY_NOTIFICATION_ID -> AGENT_ACTIVITY_TAG_PREFIX
+                GROUP_MEMBERSHIP_NOTIFICATION_ID -> GROUP_MEMBERSHIP_TAG_PREFIX
+                else -> null
+            }
+        val base =
+            tag
+                ?.takeIf { prefix != null && it.isNotBlank() && it.startsWith(prefix) }
+                ?.removePrefix(prefix.orEmpty())
+        val separator = base?.lastIndexOf('|') ?: -1
+        val accountRef = base?.substring(0, separator.coerceAtLeast(0)).orEmpty()
+        val groupIdHex = base?.substring(separator + 1).orEmpty()
+        val isScope = separator > 0 && groupIdHex.isNotEmpty() && groupIdHex.all { it.isDigit() || it in 'a'..'f' }
+        return if (isScope) accountRef to groupIdHex else null
+    }
 
     /** True only for deterministic cards owned by [accountRef]; opaque invite tags intentionally fail closed. */
     fun deterministicTagBelongsToAccount(

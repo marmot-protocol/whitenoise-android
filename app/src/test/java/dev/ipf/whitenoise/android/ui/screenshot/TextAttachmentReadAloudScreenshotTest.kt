@@ -259,10 +259,8 @@ class TextAttachmentReadAloudScreenshotTest {
                 onDismiss = { showReader = false },
                 onRetry = {},
                 onCopy = {},
-                onReadAloud = {},
+                onReadAloud = { harness.speakEntries(listOf(entry)) },
                 onOpenExternal = {},
-                isReading = speechOwner.ownsAttachment(state, "message", 0),
-                onReadFromTop = { harness.speakEntries(listOf(entry)) },
                 playback =
                     speechOwner.playback(entry, state) { hit ->
                         runBlocking {

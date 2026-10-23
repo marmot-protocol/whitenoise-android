@@ -37,7 +37,8 @@
         "anchor": "fun IndependentAuditLogChoice(",
         "test_ids": [
           "SEC-012",
-          "SEC-013"
+          "SEC-013",
+          "STB-004"
         ]
       },
       {
@@ -48,7 +49,8 @@
           "SEC-007",
           "SEC-011",
           "SEC-012",
-          "SEC-013"
+          "SEC-013",
+          "STB-004"
         ]
       },
       {
@@ -81,7 +83,8 @@
           "SEC-007",
           "SEC-011",
           "SEC-012",
-          "SEC-013"
+          "SEC-013",
+          "STB-004"
         ]
       },
       {
@@ -90,6 +93,14 @@
         "anchor": "fun AuditUploadConsentContent(",
         "test_ids": [
           "PRO-004"
+        ]
+      },
+      {
+        "surface": "DiagnosticsCloseFailure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "fun DiagnosticsCloseFailure(",
+        "test_ids": [
+          "STB-004"
         ]
       }
     ],

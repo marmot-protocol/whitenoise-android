@@ -2380,4 +2380,6 @@
     <string name="search_scope_selected_chats">Chat selezionate</string>
     <string name="search_message_content_loading">Ricerca nel contenuto dei messaggi…</string>
     <string name="search_message_content_failed">Impossibile cercare nel contenuto dei messaggi.</string>
+    <string name="document_save_interrupted">L’autenticazione ha interrotto il salvataggio. Scegli di nuovo Salva per selezionare una destinazione.</string>
+    <string name="avatar_preparation_interrupted">L’aggiornamento dell’immagine è stato interrotto. Controlla l’immagine attuale prima di selezionarla di nuovo.</string>
 </resources>

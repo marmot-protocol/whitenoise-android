@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-emoji-wrapper-staged-dismiss
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: "Name this emoji"
+- assertVisible:
+    text: Cancel
+- assertVisible:
+    text: Save
+    enabled: true
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

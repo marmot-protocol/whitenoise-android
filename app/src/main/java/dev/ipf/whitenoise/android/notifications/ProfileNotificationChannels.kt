@@ -68,8 +68,9 @@ internal class ProfileNotificationChannels(
                         lockscreenVisibility = source.lockscreenVisibility
                         if (source.canBypassDnd()) runCatching { setBypassDnd(true) }
                         if (pattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
-                            enableVibration(parent.shouldVibrate())
+                            // Pattern first: a null pattern would otherwise switch vibration off.
                             vibrationPattern = parent.vibrationPattern
+                            enableVibration(parent.shouldVibrate())
                         } else {
                             applyConversationVibration(this, pattern)
                         }

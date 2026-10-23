@@ -2346,4 +2346,6 @@
     <string name="search_scope_selected_chats">已選聊天</string>
     <string name="search_message_content_loading">正在搜尋訊息內容…</string>
     <string name="search_message_content_failed">無法搜尋訊息內容。</string>
+    <string name="document_save_interrupted">身分驗證中斷了此次儲存。請再次選擇「儲存」以選擇目的地。</string>
+    <string name="avatar_preparation_interrupted">圖片更新已中斷。請先檢查目前的圖片，再重新選擇。</string>
 </resources>

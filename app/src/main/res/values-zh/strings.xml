@@ -2345,4 +2345,6 @@
     <string name="search_scope_selected_chats">已选聊天</string>
     <string name="search_message_content_loading">正在搜索消息内容…</string>
     <string name="search_message_content_failed">无法搜索消息内容。</string>
+    <string name="document_save_interrupted">身份验证中断了此次保存。请再次选择“保存”以选择目标位置。</string>
+    <string name="avatar_preparation_interrupted">图片更新已中断。请先检查当前图片，再重新选择。</string>
 </resources>

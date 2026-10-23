@@ -26,6 +26,8 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -251,12 +253,18 @@ internal fun timelineRecord(
         retentionExpiresAt = null,
     )
 
-/** Builds an isolated live-subscription state with explicit conversation-account ownership. */
+/**
+ * Builds an isolated live-subscription state with explicit conversation-account ownership. A test that answers native
+ * calls passes its [marmotRuntime], and may give them a private [marmotIoDispatcher] so work other tests left blocked
+ * on the shared IO pool cannot starve them.
+ */
 internal fun conversationTimelineTestAppState(
     liveSubscriptions: ConversationLiveSubscriptions,
     recoveryDiagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
     accountRef: String = ConversationTimelineTestIds.ACCOUNT_REF,
     additionalAccounts: List<AccountSummaryFfi> = emptyList(),
+    marmotRuntime: AppMarmotRuntime? = null,
+    marmotIoDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext<Context>(),
@@ -276,6 +284,8 @@ internal fun conversationTimelineTestAppState(
                 ),
             ) + additionalAccounts,
         activeAccountRef = accountRef,
+        initialMarmotRuntime = marmotRuntime,
+        marmotIoDispatcher = marmotIoDispatcher,
         notificationNetworkRecoveryDiagnostics = recoveryDiagnostics,
     ).also { state ->
         state.liveSubscriptionOverrides.conversation = liveSubscriptions

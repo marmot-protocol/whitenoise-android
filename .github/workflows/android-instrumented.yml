@@ -826,10 +826,6 @@ jobs:
         run: python3 -m unittest scripts.test_mdk_qualification scripts.test_maestro_apk
       - name: Build baseline and candidate with one disposable signer
         run: ./scripts/build-mdk-qualification.sh
-      - name: Prepare pinned emulator-only native fault injector
-        run: |
-          python3 -m pip install --require-hashes -r scripts/mdk-fault-requirements.txt
-          python3 scripts/prepare_mdk_faults.py
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

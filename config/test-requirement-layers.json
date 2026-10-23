@@ -191,6 +191,15 @@
         "physical-human"
       ],
       "prerequisites": "Real fitting and overflowing lists, grids, menus, sheets and forms at both edges; verify light/dark/AMOLED, RTL, large text, TalkBack reachability and actual IME show/hide without moving fixed controls. Screenshot and geometry tests do not certify physical keyboard/accessibility behavior."
+    },
+    "STB": {
+      "layers": [
+        "core-ci",
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Exact signed candidate and populated prior-build fixtures; exercise authentication with real camera, picker and document destinations, native retained public-event projections, controlled safe/unsafe avatar upload destinations, and saved granted/declined diagnostics receipts across in-place upgrades. Use real DM/group/mention and conversation channels with representative external music/speech players on API 34\u201336 and a non-Pixel OEM or GrapheneOS device. Verify per-channel sound, vibration, DND and routing independently; record upload, upgrade and audible-overlay results separately from source and screenshot evidence. Keep unresolved outcomes pending."
     }
   }
 }
