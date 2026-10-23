@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.pollCopyText
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -44,6 +45,8 @@ internal fun messageBubbleDisplayedBody(
         // markdown when record.contentTokens is populated, but
         // for kind-9 edits the body is the latest version verbatim.
         editState != null && item.record.kind == CHAT_MESSAGE_KIND -> editState.latestText
+        // Rich cards consume valid envelopes; rejected ones still need their URL for Markdown fallback.
+        item.record.kind == CHAT_MESSAGE_KIND && RemoteGiphyMedia.isEnvelopeText(item.record.plaintext) -> item.record.plaintext
         item.projected != null ->
             TimelineProjector.displayBody(
                 item.projected,
