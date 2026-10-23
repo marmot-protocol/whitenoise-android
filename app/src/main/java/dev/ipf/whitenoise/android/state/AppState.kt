@@ -8426,9 +8426,15 @@ class WhiteNoiseAppState private constructor(
     fun setConversationMuted(
         groupIdHex: String,
         muted: Boolean,
+        onCommitted: () -> Unit = {},
+        isCurrent: () -> Boolean = { true },
     ) {
         val accountRef = activeAccountRef ?: return
-        if (muted) submitMuteCommand(accountRef, groupIdHex, null) else submitUnmuteCommand(accountRef, groupIdHex)
+        if (muted) {
+            submitMuteCommand(accountRef, groupIdHex, null, onCommitted, isCurrent)
+        } else {
+            submitUnmuteCommand(accountRef, groupIdHex, onCommitted, isCurrent)
+        }
     }
 
     /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
@@ -8455,30 +8461,64 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         groupIdHex: String,
         mutedUntilMs: Long?,
+        onCommitted: () -> Unit = {},
+        isCurrent: () -> Boolean = { true },
     ) {
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        val runtime = runtimeGeneration
         pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
         mutationsScope.launch {
-            chatMuteRepository
-                .setMuted(accountRef, groupIdHex, mutedUntilMs)
-                .onSuccess { if (activeAccountRef == accountRef) authoritativeMuteOverrides[key] = it }
-                .onFailure { presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it) }
-            finishMuteCommand(key)
+            try {
+                val ownsSession = activeAccountRef == accountRef && runtimeGeneration == runtime
+                if (!ownsSession || !isCurrent()) return@launch
+                chatMuteRepository
+                    .setMuted(accountRef, groupIdHex, mutedUntilMs) {
+                        activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
+                    }.onSuccess {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                            authoritativeMuteOverrides[key] = it
+                            onCommitted()
+                        }
+                    }.onFailure {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                            presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it)
+                        }
+                    }
+            } finally {
+                finishMuteCommand(key)
+            }
         }
     }
 
     private fun submitUnmuteCommand(
         accountRef: String,
         groupIdHex: String,
+        onCommitted: () -> Unit = {},
+        isCurrent: () -> Boolean = { true },
     ) {
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        val runtime = runtimeGeneration
         pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
         mutationsScope.launch {
-            chatMuteRepository
-                .clearMuted(accountRef, groupIdHex)
-                .onSuccess { if (activeAccountRef == accountRef) authoritativeMuteOverrides[key] = it }
-                .onFailure { presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it) }
-            finishMuteCommand(key)
+            try {
+                val ownsSession = activeAccountRef == accountRef && runtimeGeneration == runtime
+                if (!ownsSession || !isCurrent()) return@launch
+                chatMuteRepository
+                    .clearMuted(accountRef, groupIdHex) {
+                        activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
+                    }.onSuccess {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                            authoritativeMuteOverrides[key] = it
+                            onCommitted()
+                        }
+                    }.onFailure {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                            presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it)
+                        }
+                    }
+            } finally {
+                finishMuteCommand(key)
+            }
         }
     }
 

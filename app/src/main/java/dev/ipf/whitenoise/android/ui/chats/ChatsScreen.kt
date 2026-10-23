@@ -91,6 +91,7 @@ import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
+import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.FolderField
@@ -142,6 +143,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
 /** Keeps TTS transport and account notices visible above every chat-list state. */
@@ -925,20 +927,37 @@ internal fun ChatsScreen(
             item.engineMuted()
         } ?: false
 
+    val actionScope =
+        remember(
+            controller,
+            appState.activeAccountRef,
+            appState.runtimeGeneration,
+            selectedFolderId,
+            showArchived,
+            searchOpen,
+            trimmedQuery,
+            unreadOnly,
+        ) { AtomicBoolean(true) }
+    DisposableEffect(actionScope) {
+        onDispose { actionScope.set(false) }
+    }
+
     fun archiveChats(
         items: List<ChatListItem>,
         archive: Boolean,
     ) {
         if (items.isEmpty()) return
+        val owner = controller.captureChatListActionOwner { actionScope.get() } ?: return
         clearSelection()
         appState.launchMutation {
             val succeeded =
-                controller.setArchived(
+                controller.setArchivedForOwner(
                     groupIds = items.map { it.group.groupIdHex },
                     archived = archive,
                     notify = false,
+                    owner = owner,
                 )
-            if (succeeded > 0) {
+            if (succeeded > 0 && controller.chatListActionIsCurrent(owner)) {
                 val pluralRes =
                     if (archive) {
                         R.plurals.toast_chat_list_chats_archived
@@ -960,22 +979,46 @@ internal fun ChatsScreen(
     fun markChatRead(
         item: ChatListItem,
         unread: Boolean,
+        resolvedOwner: ChatListActionOwner? = null,
     ) {
+        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
         clearSelection()
         appState.launchMutation {
-            if (unread) controller.markUnread(item) else controller.markAllRead(item)
+            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
+            val allowed =
+                if (unread) current?.actions?.canMarkUnread != false else current?.actions?.canMarkRead != false
+            if (current != null && allowed) {
+                if (unread) controller.markUnread(current, owner) else controller.markAllRead(current, owner)
+            }
         }
     }
 
     fun toggleChatMute(
         item: ChatListItem,
         muted: Boolean,
+        resolvedOwner: ChatListActionOwner? = null,
     ) {
+        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
         clearSelection()
-        appState.setConversationMuted(item.group.groupIdHex, !muted)
+        appState.launchMutation {
+            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
+            val allowed = if (muted) current?.actions?.canUnmute != false else current?.actions?.canMute != false
+            if (current != null && allowed && controller.chatListActionIsCurrent(owner)) {
+                appState.setConversationMuted(
+                    current.group.groupIdHex,
+                    !muted,
+                    onCommitted = { controller.refreshChatListActionProjection(owner) },
+                    isCurrent = { controller.chatListActionIsCurrent(owner) },
+                )
+            }
+        }
     }
 
-    fun toggleChatPin(item: ChatListItem) {
+    fun toggleChatPin(
+        item: ChatListItem,
+        resolvedOwner: ChatListActionOwner? = null,
+    ) {
+        val owner = resolvedOwner ?: controller.captureChatListActionOwner { actionScope.get() } ?: return
         if (item.group.archived) return
         val nextPinned = !item.pinned()
         val headDemotion =
@@ -997,7 +1040,10 @@ internal fun ChatsScreen(
         }
         clearSelection()
         appState.launchMutation {
-            val succeeded = controller.setPinned(item, nextPinned)
+            val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
+            val allowed = if (nextPinned) current?.actions?.canPin != false else current?.actions?.canUnpin != false
+            val eligible = current != null && !current.group.archived && allowed
+            val succeeded = eligible && current != null && controller.setPinned(current, nextPinned, owner)
             if (!succeeded && pendingHeadDemotion == headDemotion) {
                 pendingHeadDemotion = null
             }
@@ -1528,6 +1574,10 @@ internal fun ChatsScreen(
                         !selectionMode &&
                         dragAnchorChatId == null &&
                         actionSheetChatId == null
+                val latestSwipeAdmission by rememberUpdatedState<() -> Boolean> {
+                    val visible = rowId in visibleChatIds && item.group.groupIdHex !in leavingAndDeleting
+                    menuActionsCurrent() && swipeEnabled && visible && appState.swipePreferences.state == swipeSettings
+                }
                 ChatSwipeActions(
                     owner = listOf(controller, rowId, menuAccount, menuRuntime, item.actions, item.projection),
                     settings = swipeSettings,
@@ -1539,24 +1589,37 @@ internal fun ChatsScreen(
                     isMuted = item.engineMuted(),
                     isPinned = item.pinned(),
                     onCommit = { action ->
-                        val current = controller.chatItemForGroup(item.group.groupIdHex)
-                        val gestureCurrent =
-                            menuActionsCurrent() && !selectionMode && appState.swipePreferences.state == swipeSettings
-                        val targetVisible =
-                            rowId in visibleChatIds && current?.group?.groupIdHex !in leavingAndDeleting
-                        if (current != null && gestureCurrent && targetVisible) {
-                            if (!chatSwipeAllowed(action, current, appState.activeAccount?.accountIdHex)) {
-                                return@ChatSwipeActions
+                        val owner =
+                            controller.captureChatListActionOwner {
+                                actionScope.get() && latestSwipeAdmission()
                             }
-                            when (action) {
-                                SwipeAction.ReadUnread ->
-                                    markChatRead(
-                                        current,
-                                        unread = !current.effectiveHasUnread(appState.activeAccount?.accountIdHex),
-                                    )
-                                SwipeAction.MuteUnmute -> toggleChatMute(current, current.engineMuted())
-                                SwipeAction.PinUnpin -> toggleChatPin(current)
-                                else -> Unit
+                        if (owner != null && menuActionsCurrent()) {
+                            appState.launchMutation {
+                                val current = controller.resolveChatListActionItem(item.group.groupIdHex, owner)
+                                val gestureCurrent =
+                                    menuActionsCurrent() &&
+                                        !selectionMode &&
+                                        appState.swipePreferences.state == swipeSettings
+                                val targetVisible =
+                                    rowId in visibleChatIds && item.group.groupIdHex !in leavingAndDeleting
+                                val admitted = current != null && gestureCurrent && targetVisible
+                                if (admitted &&
+                                    current != null &&
+                                    chatSwipeAllowed(action, current, appState.activeAccount?.accountIdHex)
+                                ) {
+                                    val markUnread = !current.effectiveHasUnread(appState.activeAccount?.accountIdHex)
+                                    when (action) {
+                                        SwipeAction.ReadUnread ->
+                                            markChatRead(
+                                                current,
+                                                unread = markUnread,
+                                                resolvedOwner = owner,
+                                            )
+                                        SwipeAction.MuteUnmute -> toggleChatMute(current, current.engineMuted(), owner)
+                                        SwipeAction.PinUnpin -> toggleChatPin(current, owner)
+                                        else -> Unit
+                                    }
+                                }
                             }
                         }
                     },

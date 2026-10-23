@@ -4578,8 +4578,27 @@ class ChatsController private constructor(
         archived: Boolean,
         notify: Boolean = true,
     ): Int {
-        val account = accountRef ?: return 0
-        return archiveActions.setArchived(account, bindEpoch, groupIds, archived, notify)
+        val owner = captureChatListActionOwner() ?: return 0
+        return setArchivedForOwner(groupIds, archived, notify, owner)
+    }
+
+    internal suspend fun setArchivedForOwner(
+        groupIds: Collection<String>,
+        archived: Boolean,
+        notify: Boolean,
+        owner: ChatListActionOwner,
+    ): Int {
+        if (!chatListActionIsCurrent(owner)) return 0
+        val rows =
+            groupIds.distinctBy(String::lowercase).mapNotNull { id ->
+                chatRowsByGroup[chatRowKey(id)] ?: resolveChatListActionRow(id, owner)
+                    ?.takeIf {
+                        if (archived) it.actions.canArchive else it.actions.canRestore
+                    }?.row
+            }
+        if (!chatListActionIsCurrent(owner)) return 0
+        val resolved = ResolvedArchiveRows(rows) { chatListActionIsCurrent(owner) }
+        return archiveActions.setArchivedRows(owner.accountRef, owner.bindEpoch, resolved, archived, notify)
     }
 
     /** Admits only the current intent under the group lock; native work already started keeps its completion path. */
@@ -4592,7 +4611,7 @@ class ChatsController private constructor(
         appState.withGroupCommitLock(account, groupIdHex) {
             if (!archiveActions.ownsIntent(groupIdHex, intent)) return@withGroupCommitLock false
             val updated = groupArchivedUpdater(account, groupIdHex, archived)
-            if (isActiveBindEpoch(intent.bindEpoch)) {
+            if (archiveActions.ownsIntent(groupIdHex, intent)) {
                 applyLocalGroupUpdate(updated)
                 true
             } else {
@@ -5123,6 +5142,70 @@ class ChatsController private constructor(
         recompute()
     }
 
+    internal fun captureChatListActionOwner(presentationIsCurrent: () -> Boolean = { true }): ChatListActionOwner? =
+        accountRef?.let {
+            ChatListActionOwner(
+                accountRef = it,
+                bindEpoch = bindEpoch,
+                runtimeGeneration = appState.runtimeGeneration,
+                activeAccountRef = appState.activeAccountRef,
+                presentationIsCurrent = presentationIsCurrent,
+            )
+        }
+
+    internal fun chatListActionIsCurrent(owner: ChatListActionOwner): Boolean {
+        val ownsBoundReference =
+            boundAccountRef == owner.accountRef || (owner.activeAccountRef == null && boundAccountRef == null)
+        val ownsBinding =
+            accountRef == owner.accountRef && ownsBoundReference && isActiveBindEpoch(owner.bindEpoch)
+        val ownsSession =
+            appState.runtimeGeneration == owner.runtimeGeneration &&
+                appState.activeAccountRef == owner.activeAccountRef
+        val selectedOrLegacy = owner.activeAccountRef == null || owner.activeAccountRef == owner.accountRef
+        val available = !appState.signOutInProgress && !appState.wipeInProgress
+        val eligibleOwner = ownsBinding && ownsSession
+        val eligibleSession = selectedOrLegacy && available
+        return eligibleOwner && eligibleSession && owner.presentationIsCurrent()
+    }
+
+    /** Resolves a displayed full-list row without materializing it into the bounded controller window. */
+    internal suspend fun resolveChatListActionItem(
+        groupIdHex: String,
+        owner: ChatListActionOwner,
+    ): ChatListItem? {
+        if (!chatListActionIsCurrent(owner)) return null
+        chatItemForGroup(groupIdHex)?.let { return it }
+        return resolveChatListActionRow(groupIdHex, owner)?.let {
+            projectPresentedRow(it, appState.activeAccount?.accountIdHex)
+        }
+    }
+
+    private suspend fun resolveChatListActionRow(
+        groupIdHex: String,
+        owner: ChatListActionOwner,
+    ): PresentedChatRowFfi? {
+        if (!chatListActionIsCurrent(owner) || owner.activeAccountRef != owner.accountRef) return null
+        val revision = materializedGroupsRevision
+        val lookup = liveSubscriptions.presentedRowByGroup ?: return null
+        val rows =
+            runCatchingCancellable {
+                readAfterRemovals { listOfNotNull(lookup(owner.accountRef, groupIdHex)) }
+            }.getOrNull()
+        return rows?.singleOrNull()?.takeIf {
+            chatListActionIsCurrent(owner) &&
+                materializedGroupsRevision == revision &&
+                it.row.groupIdHex.equals(groupIdHex, ignoreCase = true)
+        }
+    }
+
+    internal fun refreshChatListActionProjection(owner: ChatListActionOwner) {
+        if (chatListActionIsCurrent(owner)) scheduleRecompute()
+    }
+
+    private fun applyChatListActionRow(row: ChatListRowFfi?) {
+        if (row != null && containsGroup(row.groupIdHex)) applyChatListRow(row) else scheduleRecompute()
+    }
+
     /**
      * Mark the chat's unread count to zero by advancing the read pointer to
      * its latest projected message. Without a known message id, the explicit
@@ -5131,8 +5214,12 @@ class ChatsController private constructor(
      * action — the per-conversation scroll-driven path remains the
      * normal mechanism while a chat is open.
      */
-    suspend fun markAllRead(item: ChatListItem): Boolean {
-        val account = accountRef ?: return false
+    internal suspend fun markAllRead(
+        item: ChatListItem,
+        owner: ChatListActionOwner? = captureChatListActionOwner(),
+    ): Boolean {
+        if (owner == null || !chatListActionIsCurrent(owner)) return false
+        val account = owner.accountRef
         val lastId =
             item.projection
                 ?.lastMessage
@@ -5142,13 +5229,15 @@ class ChatsController private constructor(
         return runCatchingCancellable {
             val row =
                 appState.marmotIo {
+                    if (!chatListActionIsCurrent(owner)) return@marmotIo null
                     if (lastId != null) {
                         markTimelineMessageRead(account, item.group.groupIdHex, lastId)
                     } else {
                         setChatManuallyUnread(account, item.group.groupIdHex, false)
                     }
                 }
-            row?.let(::applyChatListRow)
+            if (!chatListActionIsCurrent(owner)) return@runCatchingCancellable false
+            applyChatListActionRow(row)
             appState.dismissConversationNotifications(account, item.group.groupIdHex)
             true
         }.onFailure {
@@ -5163,13 +5252,24 @@ class ChatsController private constructor(
     }
 
     /** Flag the chat unread until it is next read; the engine owns the clear. */
-    suspend fun markUnread(item: ChatListItem): Boolean {
-        // A left/removed/leave-pending chat offers no unread affordances.
-        val account =
-            accountRef?.takeUnless { item.removedFromGroup(appState.activeAccount?.accountIdHex) } ?: return false
+    internal suspend fun markUnread(
+        item: ChatListItem,
+        owner: ChatListActionOwner? = captureChatListActionOwner(),
+    ): Boolean {
+        if (owner == null || !chatListActionIsCurrent(owner)) return false
+        if (item.removedFromGroup(appState.activeAccount?.accountIdHex)) return false
+        val account = owner.accountRef
         return runCatchingCancellable {
-            val row = appState.marmotIo { setChatManuallyUnread(account, item.group.groupIdHex, true) }
-            row?.let(::applyChatListRow)
+            val row =
+                appState.marmotIo {
+                    if (chatListActionIsCurrent(owner)) {
+                        setChatManuallyUnread(account, item.group.groupIdHex, true)
+                    } else {
+                        null
+                    }
+                }
+            if (!chatListActionIsCurrent(owner)) return@runCatchingCancellable false
+            applyChatListActionRow(row)
             true
         }.onFailure {
             // Same quiet posture as markAllRead: log-only, no toast.
@@ -5178,14 +5278,24 @@ class ChatsController private constructor(
     }
 
     /** Pin or unpin one chat; newly pinned chats enter at the top of the pinned block. */
-    suspend fun setPinned(
+    internal suspend fun setPinned(
         item: ChatListItem,
         pinned: Boolean,
+        owner: ChatListActionOwner? = captureChatListActionOwner(),
     ): Boolean {
-        val account = accountRef ?: return false
+        if (owner == null || !chatListActionIsCurrent(owner)) return false
         return runCatchingCancellable {
-            val state = appState.marmotIo { setChatPinned(account, item.group.groupIdHex, pinned) }
+            val state =
+                appState.marmotIo {
+                    if (chatListActionIsCurrent(owner)) {
+                        setChatPinned(owner.accountRef, item.group.groupIdHex, pinned)
+                    } else {
+                        null
+                    }
+                }
+            if (state == null || !chatListActionIsCurrent(owner)) return@runCatchingCancellable false
             applyPinState(state)
+            scheduleRecompute()
             true
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinned failed", it)
