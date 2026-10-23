@@ -155,24 +155,14 @@ class AccountSetupDirectRemovalTest {
     /** Delayed native responses cannot reopen removal review after ownership, account, epoch, or revision changes. */
     @Test fun lateProposalResponseKeepsTheNewerOwnedDecision() =
         runTest {
-            for (case in listOf("newer revision", "new recovery", "other proposal", "other account", "replaced owner")) {
+            val cases = listOf("newer revision", "new recovery", "other proposal", "other account", "replaced owner")
+            for (case in cases) {
                 val preview = removablePreview().copy(recoveryEpoch = "initial")
                 val review = preview.copy(revision = 5uL, proposal = preview.proposal!!.copy(revision = 5uL))
                 val response =
                     if (case == "other account") review.copy(accountIdHex = "cd".repeat(32)) else review
                 val wait = CompletableDeferred<Unit>()
-                val client = removalClient(preview, response)
-                client.current = retiredDecision().copy(recoveryEpoch = "initial")
-                client.executeResult = { request ->
-                    val result =
-                        when (request.action) {
-                            OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> preview.also { client.hold = wait }
-                            OnboardingActionFfi.EDIT_RELAYS -> response
-                            else -> client.current
-                        }
-                    if (client.current.revision <= result.revision) client.current = result
-                    result
-                }
+                val client = delayedRemovalClient(preview, response, wait)
                 var ownerCurrent = true
                 val controller =
                     AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { ownerCurrent }, {}, {})
@@ -242,6 +232,26 @@ class AccountSetupDirectRemovalTest {
             runCurrent()
             assertTrue(client.requests.isEmpty())
             controller.close()
+        }
+
+    /** Holds only the proposal response; preview creation has already completed before this gate. */
+    private fun delayedRemovalClient(
+        preview: OnboardingSnapshotFfi,
+        response: OnboardingSnapshotFfi,
+        wait: CompletableDeferred<Unit>,
+    ): FakeSetupClient =
+        removalClient(preview, response).apply {
+            current = retiredDecision().copy(recoveryEpoch = "initial")
+            executeResult = { request ->
+                val result =
+                    when (request.action) {
+                        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> preview.also { hold = wait }
+                        OnboardingActionFfi.EDIT_RELAYS -> response
+                        else -> current
+                    }
+                if (current.revision <= result.revision) current = result
+                result
+            }
         }
 
     private fun removalClient(

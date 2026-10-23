@@ -12,14 +12,18 @@ internal val relaySetupActions = setOf(OnboardingActionFfi.USE_RECOMMENDED_RELAY
 /** One offered retired endpoint can be removed directly only before any native proposal exists. */
 internal fun AccountSetupState.directRemovalEndpoint(): String? {
     val step = currentStep ?: return null
-    if (step.step !in relaySetupSteps || snapshot?.proposal != null || OnboardingActionFfi.EDIT_RELAYS !in step.actions) {
-        return null
+    return if (step.step in relaySetupSteps &&
+        snapshot?.proposal == null &&
+        OnboardingActionFfi.EDIT_RELAYS in step.actions
+    ) {
+        step.findings
+            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
+            .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
+            .distinct()
+            .singleOrNull()
+    } else {
+        null
     }
-    return step.findings
-        .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
-        .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
-        .distinct()
-        .singleOrNull()
 }
 
 /** Projects exact native endpoint strings; no endpoint classification or route selection happens here. */

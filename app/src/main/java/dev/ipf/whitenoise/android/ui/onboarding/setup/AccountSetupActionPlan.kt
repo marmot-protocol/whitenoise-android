@@ -4,13 +4,13 @@ import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 
 /** Pure projection of the current native grant, including the focused exact Remove choice. */
-internal data class SetupActionPlan(
+internal data class AccountSetupActionPlan(
     val primary: OnboardingActionFfi?,
     val secondary: OnboardingActionFfi?,
     val directRemove: Boolean,
 )
 
-internal fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): SetupActionPlan {
+internal fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): AccountSetupActionPlan {
     val directRemove = directRemoveAvailable(offered)
     val primary = preferredAction(offered) ?: if (directRemove) null else fallbackAction(offered)
     val secondary =
@@ -21,7 +21,7 @@ internal fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): S
                 it != primary && it != OnboardingActionFfi.CANCEL_ONBOARDING && it != OnboardingActionFfi.RETRY
             }
         }
-    return SetupActionPlan(primary, secondary, directRemove)
+    return AccountSetupActionPlan(primary, secondary, directRemove)
 }
 
 private fun AccountSetupState.preferredAction(offered: List<OnboardingActionFfi>): OnboardingActionFfi? {

@@ -225,9 +225,10 @@ private fun SetupDirectRelayRemoval(
     state: AccountSetupState,
     onRemoveRelay: (OnboardingStepFfi, String, ULong, String?) -> Unit,
 ) {
-    val snapshot = state.snapshot ?: return
-    val step = state.currentStep ?: return
-    val endpoint = state.directRemovalEndpoint() ?: return
+    val snapshot = state.snapshot
+    val step = state.currentStep
+    val endpoint = state.directRemovalEndpoint()
+    if (snapshot == null || step == null || endpoint == null) return
     val revision = snapshot.revision
     val recoveryEpoch = snapshot.recoveryEpoch
     Text(endpoint, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
