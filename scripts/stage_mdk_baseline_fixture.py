@@ -1,45 +1,20 @@
-"""Copy only the test harness into current master; never backport application or generated binding changes."""
+"""Stage only the shared test fixture on the reviewed current-master runtime."""
 
 from pathlib import Path
 import shutil
 import sys
 
 
+BASELINE = '77f22e35499a42bc96402ce19b79ceed57ffbcc3'
+
+
 def stage(destination):
-    """Fail closed unless the two reviewed constructor differences are the complete baseline adapter."""
+    """Copy test sources only after confirming the published baseline; production code and bindings stay intact."""
+    pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
+    if f'mdk-sha={BASELINE}' not in pin.read_text().splitlines():
+        raise ValueError('Unreviewed baseline runtime')
     relative = Path('app/src/androidTest/java/dev/ipf/whitenoise/android/qualification')
-    target = destination / relative
-    if target.exists():
-        raise ValueError('Baseline unexpectedly already has this fixture')
-    shutil.copytree(relative, target)
-    factory = target / 'UpgradeFixtureRuntime.kt'
-    source = factory.read_text()
-    for line in ('import dev.ipf.marmotkit.marmotDeploymentWhiteNoise\n',
-                 '            deployment = marmotDeploymentWhiteNoise(),\n'):
-        if source.count(line) != 1:
-            raise ValueError('Unreviewed baseline constructor adapter')
-        source = source.replace(line, '')
-    factory.write_text(source)
-    (target / 'UpgradeStorageMigration.kt').write_text('''package dev.ipf.whitenoise.android.qualification
-
-import dev.ipf.marmotkit.Marmot
-import java.io.File
-
-/** Fault phases are candidate-only and must never execute against the baseline artifact. */
-@Suppress("UNUSED_PARAMETER")
-internal suspend fun runUpgradeFault(runtime: Marmot, phase: String, receipt: File): Unit =
-    error("Native faults require the candidate runtime")
-
-/** The old published API has no storage-usage endpoint; only the candidate measures background migration. */
-@Suppress("UNUSED_PARAMETER")
-internal suspend fun verifyUpgradeStorage(
-    runtime: Marmot,
-    phase: String,
-    beforeStart: Boolean,
-    pendingLegacyBytes: ULong = 0uL,
-    readWhilePaused: suspend () -> Unit = {},
-) = Unit
-''')
+    shutil.copytree(relative, destination / relative, dirs_exist_ok=True)
 
 
 if __name__ == '__main__':

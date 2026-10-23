@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.SystemClock
 import android.util.Log
 import android.util.LruCache
 import dev.ipf.whitenoise.android.state.StalenessGuard
@@ -24,6 +25,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.abs
 
 internal class VoicePlaybackRequestSerializer {
     private val mutex = Mutex()
@@ -42,6 +44,15 @@ object VoicePlaybackController {
     private const val TAG = "VoicePlaybackController"
     private const val TICK_INTERVAL_MS = 60L
     private const val DUCK_VOLUME = 0.2f
+
+    // Audio codecs can land a little before the requested position; a completion
+    // this close to the latest target means that target has been reached.
+    private const val SEEK_SETTLE_TOLERANCE_MS = 500
+
+    // A pending target only bridges a quick burst of taps. Past this window the
+    // player's own position is authoritative again, so a completion that was
+    // missed or landed off target cannot steer later seeks for the rest of a clip.
+    private const val PENDING_SEEK_WINDOW_MS = 1_000L
 
     // Cap on cached per-clip durations. Each entry is a boxed Int keyed by an
     // absolute file path; without a bound the map held one entry per distinct
@@ -108,6 +119,11 @@ object VoicePlaybackController {
     private var currentOwnerKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
+
+    // MediaPlayer seeks complete asynchronously, so currentPosition can still
+    // report the old playhead. Relative banner seeks build on the last
+    // requested target until this player confirms it.
+    private var pendingSeek: PendingSeek? = null
     private val playbackRequests = StalenessGuard()
 
     // play() suspends while MediaPlayer prepares on IO; serialize callers so
@@ -327,6 +343,7 @@ object VoicePlaybackController {
                 }
             }
         }
+        mp.setOnSeekCompleteListener { p -> scope.launch { settlePendingSeek(p) } }
         mp.setOnErrorListener { p, what, extra ->
             scope.launch {
                 Log.w(TAG, "MediaPlayer error what=$what extra=$extra")
@@ -534,6 +551,34 @@ object VoicePlaybackController {
         if (_state.value.sessionId == sessionId) stop()
     }
 
+    /**
+     * Moves the displayed session's playhead by [deltaMs], clamped to the clip, keeping its play or pause intent. A
+     * stale strip whose session was replaced cannot seek the newer clip. False when nothing was seeked.
+     */
+    fun seekSessionBy(
+        sessionId: Long,
+        deltaMs: Int,
+    ): Boolean {
+        val current = _state.value
+        val active = player?.takeIf { sessionId == current.sessionId && current.ready }
+        val key = currentKey
+        if (active == null || key == null) return false
+        val now = SystemClock.uptimeMillis()
+        val position =
+            pendingSeek
+                ?.takeIf { it.player === active && now - it.requestedAtMs <= PENDING_SEEK_WINDOW_MS }
+                ?.targetMs
+                ?: runCatching { active.currentPosition }.getOrDefault(current.positionMs)
+        return seekTo(key, position + deltaMs)
+    }
+
+    /** Advances the shared voice speed only while [sessionId] is still the displayed session; null when stale. */
+    fun cycleSessionSpeed(sessionId: Long): Float? {
+        val current = _state.value
+        if (sessionId != current.sessionId || !current.ready || player == null) return null
+        return cycleSpeed()
+    }
+
     /** Pause the active player (no-op if nothing is active). */
     fun pause() {
         nextPlaybackGeneration()
@@ -617,27 +662,31 @@ object VoicePlaybackController {
         }
     }
 
-    /** Seek the active player to [positionMs] (clamped to duration). */
+    /** Seek the active player to [positionMs] (clamped to duration); false when nothing was seeked. */
     fun seekTo(
         key: String,
         positionMs: Int,
-    ) {
+    ): Boolean {
         nextPlaybackGeneration()
-        val mp = player ?: return
-        if (currentKey != key) return
+        val mp = player?.takeIf { currentKey == key } ?: return false
         // Read mp.duration once, inside a guard: if the player has been driven
         // into the Error state but not yet nulled (OnError/OnCompletion post
         // releasePlayerInternal() to Main, leaving a window where player != null
         // and the player is in Error), getDuration() throws IllegalStateException.
-        // Fall back to the last known duration so a seek can never crash the UI.
-        val duration = runCatching { mp.duration }.getOrDefault(_state.value.durationMs)
+        // Fall back to the last known duration so a seek can never crash the UI,
+        // and likewise when a ready codec reports a non-positive duration. With
+        // no known length there is no bound to clamp to, so the seek is skipped
+        // rather than restarting the clip from zero.
+        val duration =
+            runCatching { mp.duration }.getOrNull()?.takeIf { it > 0 } ?: _state.value.durationMs
+        // A player in an invalid state rejects the seek; only an accepted seek moves the published playhead.
         val clamped = positionMs.coerceIn(0, duration.coerceAtLeast(0))
-        runCatching { mp.seekTo(clamped) }
-        _state.value =
-            _state.value.copy(
-                positionMs = clamped,
-                durationMs = if (duration > 0) duration else _state.value.durationMs,
-            )
+        val seeked = duration > 0 && runCatching { mp.seekTo(clamped) }.isSuccess
+        if (seeked) {
+            pendingSeek = PendingSeek(mp, clamped, SystemClock.uptimeMillis())
+            _state.value = _state.value.copy(positionMs = clamped, durationMs = duration)
+        }
+        return seeked
     }
 
     /** Stop and release the active player. */
@@ -658,6 +707,7 @@ object VoicePlaybackController {
             runCatching { mp.release() }
         }
         player = null
+        pendingSeek = null
         currentKey = null
         currentOwnerKey = null
         abandonFocus()
@@ -683,6 +733,23 @@ object VoicePlaybackController {
                 }
             }
     }
+
+    /**
+     * Clears the pending relative-seek target once [completed] has actually reached it. Seek completions do not say
+     * which request finished, so an earlier queued seek completing must not discard a later target still in flight.
+     */
+    private fun settlePendingSeek(completed: MediaPlayer) {
+        val pending = pendingSeek?.takeIf { it.player === completed } ?: return
+        val position = runCatching { completed.currentPosition }.getOrNull()
+        if (position == null || abs(position - pending.targetMs) <= SEEK_SETTLE_TOLERANCE_MS) pendingSeek = null
+    }
+
+    /** The target of a seek [player] accepted at [requestedAtMs] but has not yet reported complete. */
+    private class PendingSeek(
+        val player: MediaPlayer,
+        val targetMs: Int,
+        val requestedAtMs: Long,
+    )
 
     private fun stopTicker() {
         tickerJob?.cancel()

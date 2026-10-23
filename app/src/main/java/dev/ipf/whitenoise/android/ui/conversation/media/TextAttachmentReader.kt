@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,8 +49,6 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -163,7 +160,6 @@ internal fun TextAttachmentReaderDialog(
         remember(actions, appState) {
             TextAttachmentSpeechOwner(appState.ttsController, actions::isCurrent, appState::ownsCurrentAccountSpeech)
         }
-    val isReading = speechOwner.ownsAttachment(speechState, messageIdHex, attachmentIndex)
     LaunchedEffect(actions, state) {
         val preview = (state as? TextAttachmentReaderState.Ready)?.preview ?: return@LaunchedEffect
         val prepared =
@@ -238,19 +234,10 @@ internal fun TextAttachmentReaderDialog(
                     appState.present(R.string.copied)
                 }
             },
-            onReadAloud = { preview ->
-                if (actions.isCurrent() && !speechRequested) {
-                    if (speechOwner.ownsAttachment(appState.ttsController.state.value, messageIdHex, attachmentIndex)) {
-                        appState.stopSpeaking()
-                    } else {
-                        start(preview)
-                    }
-                }
-            },
+            onReadAloud = { preview -> start(preview) },
             onSave = { scope.launch { actions.save() } },
             onShare = { scope.launch { actions.share() } },
             shareBusy = actions.sharing,
-            isReading = isReading,
             readAloudBusy = speechRequested,
             onOpenExternal = { scope.launch { onOpenExternal() } },
             mentionDisplayName = appState::mentionDisplayName,
@@ -261,12 +248,14 @@ internal fun TextAttachmentReaderDialog(
                 }
             },
             playback = playback,
-            onReadFromTop = { preview -> start(preview) },
         )
     }
 }
 
-/** Reader screen: metadata, body and native actions. */
+/**
+ * Reader screen: metadata, body and native actions. Copy, Share and read-aloud sit in the top bar (#3385), so the
+ * bottom bar only hosts active playback transport and the document keeps the rest of the height.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongParameterList", "LongMethod")
@@ -281,14 +270,12 @@ internal fun TextAttachmentReaderScreen(
     onSave: () -> Unit = {},
     onShare: () -> Unit = {},
     shareBusy: Boolean = false,
-    isReading: Boolean = false,
     readAloudBusy: Boolean = false,
     modifier: Modifier = Modifier,
     mentionDisplayName: ((String) -> String?)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
     transport: @Composable () -> Unit = {},
     playback: TextAttachmentPlayback? = null,
-    onReadFromTop: (TextAttachmentPreview) -> Unit = onReadAloud,
 ) {
     val selection = rememberTextAttachmentSelectionController(candidate, state)
     val preview = (state as? TextAttachmentReaderState.Ready)?.preview
@@ -310,23 +297,18 @@ internal fun TextAttachmentReaderScreen(
                     onSave = onSave,
                     onShare = onShare,
                     shareBusy = shareBusy,
-                    onReadFromTop = { preview?.let(onReadFromTop) },
+                    onCopy = { preview?.let { onCopy(selection.selectedText(it.text)) } },
+                    canCopy = preview?.text?.isNotEmpty() == true,
+                    // A selection reads just that range, otherwise reading starts from the top of the document.
+                    onReadAloud = {
+                        preview?.let { onReadAloud(textAttachmentSelectedPreview(it, selection.selectedText(it.text))) }
+                    },
                     canRead = !readAloudBusy && preview?.text?.isNotBlank() == true,
                 )
                 TopNoticeSlot()
             }
         },
-        bottomBar = {
-            TextAttachmentReaderBottomBar(
-                preview = preview,
-                selection = selection,
-                onCopy = onCopy,
-                onReadAloud = onReadAloud,
-                isReading = isReading,
-                busy = readAloudBusy,
-                transport = transport,
-            )
-        },
+        bottomBar = { TextAttachmentReaderBottomBar(transport = transport) },
     ) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding).then(speech.viewportModifier)) {
             val trailingHeight = maxHeight
@@ -354,32 +336,50 @@ internal fun TextAttachmentReaderScreen(
 }
 
 /**
- * Keeps the prototype titled navigation and overflow on the existing external-open callback. Share sends the original
- * file to another app (#3331) and is unavailable while a share is still being prepared.
+ * Keeps the prototype titled navigation with read-aloud, Copy and Share as visible icons (#3385). Share sends the
+ * original file to another app (#3331) and is unavailable while a share is still being prepared, while Save and Open
+ * externally stay in the overflow.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "LongMethod")
 private fun TextAttachmentReaderTopBar(
     onDismiss: () -> Unit,
     onOpenExternal: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
     shareBusy: Boolean,
-    onReadFromTop: () -> Unit,
+    onCopy: () -> Unit,
+    canCopy: Boolean,
+    onReadAloud: () -> Unit,
     canRead: Boolean,
 ) {
     var more by remember { mutableStateOf(false) }
     TopAppBar(
-        title = { Text(stringResource(R.string.text_attachment_reader_title)) },
+        title = {
+            Text(
+                stringResource(R.string.text_attachment_reader_title),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onDismiss) {
                 Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
             }
         },
         actions = {
-            IconButton(onClick = onReadFromTop, enabled = canRead) {
+            IconButton(onClick = onReadAloud, enabled = canRead) {
                 Icon(painterResource(R.drawable.ic_volume_up), contentDescription = stringResource(R.string.read_aloud))
+            }
+            IconButton(onClick = onCopy, enabled = canCopy) {
+                Icon(
+                    painterResource(R.drawable.ic_content_copy),
+                    contentDescription = stringResource(R.string.copy_text),
+                )
+            }
+            IconButton(onClick = onShare, enabled = !shareBusy) {
+                Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
             }
             Box {
                 IconButton(onClick = { more = true }) {
@@ -396,12 +396,6 @@ private fun TextAttachmentReaderTopBar(
                                 onClick = onSave,
                             ),
                             WhiteNoiseMenuItem(
-                                label = stringResource(R.string.share),
-                                icon = R.drawable.ic_share,
-                                onClick = onShare,
-                                enabled = !shareBusy,
-                            ),
-                            WhiteNoiseMenuItem(
                                 label = stringResource(R.string.text_attachment_open_external),
                                 onClick = onOpenExternal,
                             ),
@@ -412,18 +406,9 @@ private fun TextAttachmentReaderTopBar(
     )
 }
 
-/** Keeps native transport and selection actions above navigation insets, scrollable at large text. */
+/** Keeps active playback transport above navigation insets, scrollable at large text. */
 @Composable
-@Suppress("LongParameterList", "LongMethod")
-private fun TextAttachmentReaderBottomBar(
-    preview: TextAttachmentPreview?,
-    selection: TextAttachmentSelectionController,
-    onCopy: (String) -> Unit,
-    onReadAloud: (TextAttachmentPreview) -> Unit,
-    isReading: Boolean,
-    busy: Boolean,
-    transport: @Composable () -> Unit,
-) {
+private fun TextAttachmentReaderBottomBar(transport: @Composable () -> Unit) {
     val maximumHeight =
         with(LocalDensity.current) {
             LocalWindowInfo.current.containerSize.height
@@ -439,22 +424,6 @@ private fun TextAttachmentReaderBottomBar(
             .padding(horizontal = 16.dp),
     ) {
         transport()
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val copyLabel = stringResource(R.string.copy_text)
-            TextButton(
-                enabled = preview?.text?.isNotEmpty() == true,
-                onClick = { preview?.let { onCopy(selection.selectedText(it.text)) } },
-                modifier = Modifier.semantics { contentDescription = copyLabel },
-            ) { Text(copyLabel) }
-            val speakLabel = stringResource(if (isReading) R.string.tts_bar_stop else R.string.speak_aloud)
-            TextButton(
-                enabled = !busy && preview?.text?.isNotBlank() == true,
-                onClick = {
-                    preview?.let { onReadAloud(textAttachmentSelectedPreview(it, selection.selectedText(it.text))) }
-                },
-                modifier = Modifier.semantics { contentDescription = speakLabel },
-            ) { Text(speakLabel) }
-        }
     }
 }
 
