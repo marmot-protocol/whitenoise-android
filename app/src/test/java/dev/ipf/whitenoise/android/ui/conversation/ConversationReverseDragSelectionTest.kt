@@ -5,6 +5,7 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -42,6 +43,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.TimeZone
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Covers hold-drag selection through the production reversed conversation list. */
 @RunWith(RobolectricTestRunner::class)
@@ -55,6 +57,7 @@ internal class ConversationReverseDragSelectionTest {
     private var lastPointer = Offset.Zero
     private lateinit var edgeEvidence: EdgeEvidence
     private lateinit var edgeController: ConversationController
+    private lateinit var edgeSubscription: ScriptedConversationTimelineSubscription
 
     /** A stationary top-edge hold must leave index zero and select newly revealed older rows. */
     @Test
@@ -118,7 +121,17 @@ internal class ConversationReverseDragSelectionTest {
             val oldest = evidence.latest()
             assertTrue("all loaded history must be reachable", !oldest.canScrollForward)
             val atOldest = surface.selectedMessages.keys.toSet()
-            advanceFrames(20)
+            val selectionWrites = AtomicInteger(0)
+            val observer =
+                Snapshot.registerApplyObserver { changed, _ ->
+                    if (changed.any { it === surface.selectedMessages }) selectionWrites.incrementAndGet()
+                }
+            try {
+                advanceFrames(20)
+            } finally {
+                observer.dispose()
+            }
+            assertEquals("stationary range must not rewrite selection each frame", 0, selectionWrites.get())
             assertEquals(oldest.anchor, evidence.latest().anchor)
             assertEquals(atOldest, surface.selectedMessages.keys.toSet())
             moveToEdge(top = false)
@@ -134,6 +147,28 @@ internal class ConversationReverseDragSelectionTest {
             composeRule
                 .onNodeWithTag("reverse-drag-conversation-host")
                 .captureRoboImage("src/test/snapshots/conversation_tail_edge_drag_selection.png")
+        }
+    }
+
+    /** A new range gesture renews quiet paging and admits a subscription-delivered older row while held. */
+    @Test
+    fun topEdgeHoldRenewsBlockedOlderPrefetch() {
+        withScrollableConversation(olderPageAvailable = true) { surface, _, ids ->
+            composeRule.runOnUiThread { edgeController.automaticPaging.older.recordFailure() }
+            composeRule.runOnIdle {
+                assertTrue(edgeController.automaticOlderPagingBlocked)
+                assertEquals(0, edgeSubscription.backwardsCallCount)
+            }
+            holdAtEdge(ids.last(), top = true, frames = 250)
+            composeRule.waitUntil(timeoutMillis = 10_000L) {
+                edgeSubscription.backwardsCallCount > 0 &&
+                    edgeController.timeline.any { it.record.messageIdHex == "ab".repeat(32) }
+            }
+            advanceFrames(30)
+            assertEquals("one renewed paging request reaches the subscription", 1, edgeSubscription.backwardsCallCount)
+            assertTrue("the stationary range includes the new row", "ab".repeat(32) in surface.selectedMessages)
+            assertSelectionAtPointer(surface, listOf("ab".repeat(32)) + ids, ids.last())
+            releaseDrag()
         }
     }
 
@@ -186,7 +221,10 @@ internal class ConversationReverseDragSelectionTest {
 
     /** Mounts a full-height real route with more rows than fit, using the production viewport observer. */
     @Suppress("LongMethod") // Controller, page, and Compose lifetime must be retired by one fixture owner.
-    private fun withScrollableConversation(block: (ConversationSurfaceState, EdgeEvidence, List<String>) -> Unit) {
+    private fun withScrollableConversation(
+        olderPageAvailable: Boolean = false,
+        block: (ConversationSurfaceState, EdgeEvidence, List<String>) -> Unit,
+    ) {
         val group = conversationTimelineTestGroup()
         val members = conversationTimelineMemberSnapshot()
         val records =
@@ -197,11 +235,17 @@ internal class ConversationReverseDragSelectionTest {
                     plaintext = "edge message $index",
                 )
             }
-        val scripted =
-            ScriptedConversationLiveSubscriptions(
-                listOf(ScriptedConversationTimelineSubscription(timelinePage(*records.toTypedArray()))),
-                group,
+        val subscription =
+            ScriptedConversationTimelineSubscription(
+                snapshotPage = timelinePage(*records.toTypedArray()).copy(hasMoreBefore = olderPageAvailable),
+                backwardsPage =
+                    timelinePage(
+                        timelineRecord("ab".repeat(32), 0uL, "Subscription-delivered older message"),
+                        *records.toTypedArray(),
+                    ),
             )
+        edgeSubscription = subscription
+        val scripted = ScriptedConversationLiveSubscriptions(listOf(subscription), group)
         val appState = conversationTimelineTestAppState(scripted.subscriptions)
         val controller =
             ConversationController(

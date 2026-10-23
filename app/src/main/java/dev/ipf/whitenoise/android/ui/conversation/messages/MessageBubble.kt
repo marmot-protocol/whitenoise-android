@@ -122,7 +122,6 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
-import dev.ipf.whitenoise.android.ui.common.messageDragDiagnostic
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
@@ -1663,9 +1662,6 @@ internal fun MessageBubble(
                                     if (linkDestination != null) copyMarkdownLink(linkDestination)
                                 },
                                 onDragStart = { position ->
-                                    messageDragDiagnostic(
-                                        "bubble_drag_started coordinates=${pressState.rowCoordinates[0] != null}",
-                                    )
                                     pressState.initiatingMenuHoldActive = false
                                     if (deleted) return@longPressOrVerticalDrag
                                     // A range gesture begins after the threshold
@@ -1688,7 +1684,6 @@ internal fun MessageBubble(
                                     if (!deleted) onDragSelectionEnd()
                                 },
                                 onGestureCancel = {
-                                    messageDragDiagnostic("bubble_cancelled")
                                     pressState.initiatingMenuHoldActive = false
                                     textLayouts.pendingLongPressLinkDestination[0] = null
                                     onActionMenuOpenChange(false)
@@ -2689,10 +2684,7 @@ internal fun MessageBubble(
                             directConversation = controller.isDirectConversation,
                         ),
                     quickReactionEmojis = quickReactionEmojis,
-                    onDismissRequest = {
-                        messageDragDiagnostic("popup_dismissed")
-                        onActionMenuOpenChange(false)
-                    },
+                    onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
                         if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
