@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core.nostr
 
+import dev.ipf.whitenoise.android.updates.ZapstoreReleaseClient
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -16,27 +17,18 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 import java.io.IOException
+import java.net.ProtocolException
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 class NostrRelayReceiveLimitCoverageTest {
     @Test
-    fun bothProductionRelayClientBuildersInstallTheReceiveBoundary() {
-        val sourceRoot =
-            generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
-                .map { File(it, "app/src/main/java/dev/ipf/whitenoise/android") }
-                .first { it.isDirectory }
-        for (path in listOf("core/nostr/NostrRelayQueryClient.kt", "updates/ZapstoreReleaseClient.kt")) {
-            val source = File(sourceRoot, path).readText()
-            assertEquals(
-                "Every production relay builder must install the boundary: $path",
-                1,
-                Regex(Regex.escape(".limitNostrRelayMessages()")).findAll(source).count(),
-            )
-        }
+    fun productionReleaseTransportInstallsTheReceiveBoundary() {
+        val productionClient = ZapstoreReleaseClient.defaultHttpClient()
+        assertEquals(1, productionClient.interceptors.count { it is NostrRelayReceiveLimitInterceptor })
     }
 
     @Test
@@ -94,7 +86,8 @@ class NostrRelayReceiveLimitCoverageTest {
                         text: String,
                     ) {
                         // Same guard with a small test ceiling: no memory-pressure fixture.
-                        webSocket.send("x".repeat(129))
+                        val subscription = JSONArray(text).getString(1)
+                        webSocket.send(JSONArray().put("EOSE").put(subscription).toString() + " ".repeat(129))
                     }
                 },
             ),
@@ -121,15 +114,21 @@ class NostrRelayReceiveLimitCoverageTest {
         )
         server.start()
         try {
-            assertThrows(IOException::class.java) {
-                runBlocking {
-                    NostrRelayQueryClient(client).query(
-                        listOf(server.url("/").toString()),
-                        JSONObject(),
-                        timeoutMillis = 2000,
-                    )
+            val failure =
+                assertThrows(IOException::class.java) {
+                    runBlocking {
+                        NostrRelayQueryClient(client).query(
+                            listOf(server.url("/").toString()),
+                            JSONObject(),
+                            timeoutMillis = 2000,
+                        )
+                    }
                 }
-            }
+            assertTrue(
+                generateSequence<Throwable>(failure) { it.cause }.any {
+                    it is ProtocolException && it.message == "Relay message exceeds receive limit"
+                },
+            )
             val result =
                 runBlocking {
                     NostrRelayQueryClient(client).query(

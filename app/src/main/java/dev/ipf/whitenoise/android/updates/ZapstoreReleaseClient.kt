@@ -90,7 +90,8 @@ class ZapstoreReleaseClient internal constructor(
         // the newest is chosen by CalVer, so relay ordering does not matter.
         private const val RELEASE_QUERY_LIMIT = 50
 
-        private fun defaultHttpClient(): OkHttpClient =
+        /** Build the guarded transport used by production release discovery. */
+        internal fun defaultHttpClient(): OkHttpClient =
             OkHttpClient
                 .Builder()
                 .limitNostrRelayMessages()

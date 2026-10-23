@@ -12,7 +12,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
 import okhttp3.Dns
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -25,7 +24,6 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
@@ -64,7 +62,7 @@ internal class PublicRelayDns(
  * timeout, or coroutine cancellation.
  */
 internal class NostrRelayQueryClient(
-    private val webSocketFactory: WebSocket.Factory = defaultHttpClient(),
+    private val webSocketFactory: WebSocket.Factory,
     maxConcurrentSockets: Int = DEFAULT_MAX_CONCURRENT_SOCKETS,
 ) {
     private val socketPermits = Semaphore(maxConcurrentSockets.coerceIn(1, DEFAULT_MAX_CONCURRENT_SOCKETS))
@@ -264,19 +262,5 @@ internal class NostrRelayQueryClient(
         const val MAX_RELAY_MESSAGE_CHARS = 256 * 1024
         const val MAX_EVENT_CONTENT_CHARS = 128 * 1024
         const val NORMAL_CLOSE_CODE = 1_000
-
-        val sharedDefaultHttpClient: OkHttpClient by lazy {
-            OkHttpClient
-                .Builder()
-                .limitNostrRelayMessages()
-                .dns(PublicRelayDns())
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .readTimeout(0, TimeUnit.MILLISECONDS)
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .build()
-        }
-
-        fun defaultHttpClient(): OkHttpClient = sharedDefaultHttpClient
     }
 }
