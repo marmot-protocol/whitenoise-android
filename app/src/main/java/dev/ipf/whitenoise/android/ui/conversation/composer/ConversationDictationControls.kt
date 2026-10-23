@@ -268,6 +268,7 @@ private fun ConversationDictationActiveActions(
             description = sendLabel,
             icon = R.drawable.ic_arrow_upward,
             enabled = controller.completionActionsEnabled,
+            modifier = Modifier.semantics { selected = false },
             // The composer's disc is 40dp wide because it sits in a crowded row. These three
             // commands are the whole control, and each keeps a 48dp target.
             width = 48.dp,
@@ -472,5 +473,6 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
             ConversationDictationFailure.SendBlocked -> R.string.dictation_send_blocked
             ConversationDictationFailure.DeliveryUnknown -> R.string.delivery_not_confirmed
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
+            ConversationDictationFailure.DraftWriteDeferred -> R.string.dictation_waiting_for_unlock
         },
     )

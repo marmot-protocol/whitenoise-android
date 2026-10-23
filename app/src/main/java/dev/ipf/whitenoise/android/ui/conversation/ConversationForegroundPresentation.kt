@@ -69,6 +69,20 @@ internal suspend fun awaitCommittedConversationTimeline(receipt: Deferred<Boolea
     }
 }
 
+/** Keeps an unsafe retained frame behind the existing handoff/admission deadline. */
+internal suspend fun awaitConversationForegroundAdmission(
+    preDrawSignals: ReceiveChannel<Unit>,
+    canPresent: () -> Boolean,
+    timeoutMillis: Long,
+    awaitLocalTimeline: suspend () -> Unit,
+) {
+    withTimeoutOrNull(timeoutMillis) {
+        awaitLocalTimeline()
+        // A missing handoff receipt is not proof that this controller is current and unlocked.
+        while (!canPresent()) preDrawSignals.receive()
+    }
+}
+
 /** Layout and IME animation state required before the foreground frame can be exposed. */
 internal data class ConversationForegroundSettleState(
     val geometry: ConversationForegroundGeometry,

@@ -185,6 +185,17 @@ internal fun ConversationForegroundRestoreEffects(
                 )
             },
         )
+    val currentCanPresentRetainedFrame by
+        rememberUpdatedState(
+            newValue = {
+                canPresentRetainedConversationFrame(
+                    anchored = currentInitialTimelineAnchored,
+                    ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation,
+                    appReady = controller.appState.phase == AppPhase.Ready,
+                    lockVisible = controller.appState.appLockScreenVisible,
+                )
+            },
+        )
     ConversationForegroundDrawGateEffect(
         isBlocked = { scrollCoordinator.foregroundRestoreInProgress },
         onPreDraw = { foregroundPreDrawSignals.trySend(Unit) },
@@ -223,18 +234,12 @@ internal fun ConversationForegroundRestoreEffects(
                 imeRequested = restoreToken?.expectedImeVisible == true || restoreFocus,
                 imeObserved = currentForegroundGeometryProvider().imeBottomPx > 0,
             )
-            val retainedPresentationSafe =
-                canPresentRetainedConversationFrame(
-                    anchored = currentInitialTimelineAnchored,
-                    ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation,
-                    appReady = controller.appState.phase == AppPhase.Ready,
-                    lockVisible = controller.appState.appLockScreenVisible,
-                )
+            val retainedPresentationSafe = currentCanPresentRetainedFrame()
             if (restoreToken != null && retainedPresentationSafe) {
                 scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
                 WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.RetainedFrameReleased)
                 requestConversationForegroundFrame(rootView)
-            } else {
+            } else if (restoreToken == null) {
                 scrollCoordinator.cancelForegroundRestore()
             }
             val pendingLocalTimeline = controller.pendingTimelineAtForeground()
@@ -277,6 +282,10 @@ internal fun ConversationForegroundRestoreEffects(
                             },
                         )
                     try {
+                        if (!currentCanPresentRetainedFrame()) {
+                            scrollCoordinator.cancelForegroundRestore(restoreToken)
+                            return@launchResumeWork
+                        }
                         scrollCoordinator.completeForegroundRestore(
                             token = restoreToken,
                             resumedGeometry = resumedPresentation.geometry,
@@ -288,8 +297,17 @@ internal fun ConversationForegroundRestoreEffects(
                     } finally {
                         if (!releaseFrameRequested) requestConversationForegroundFrame(rootView)
                     }
-                } else {
-                    scrollCoordinator.cancelForegroundRestore()
+                } else if (restoreToken != null) {
+                    // This pause snapshot was unsafe at resume. Wait for the actual current
+                    // handoff/admission or the same bounded fallback, but never apply its old anchor.
+                    awaitConversationForegroundAdmission(
+                        preDrawSignals = foregroundPreDrawSignals,
+                        canPresent = currentCanPresentRetainedFrame,
+                        timeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
+                        awaitLocalTimeline = { awaitCommittedConversationTimeline(pendingLocalTimeline) },
+                    )
+                    scrollCoordinator.cancelForegroundRestore(restoreToken)
+                    requestConversationForegroundFrame(rootView)
                 }
             }
         },

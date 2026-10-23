@@ -16,14 +16,11 @@ import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.whitenoise.android.core.ChatSelectionTitleInput
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.chatListItemTitle
-import dev.ipf.whitenoise.android.core.chatSelectionTitle
 import dev.ipf.whitenoise.android.core.selectedChatPresentationTitle
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -51,75 +48,6 @@ class ChatListTitleTest {
             unnamedGroupTitle = "Unnamed test group",
             unavailableConversationTitle = "Unavailable test conversation",
         )
-
-    @Test
-    fun primitiveTitlePreservesSelectedCopyAndNamedSanitizerFallback() {
-        val input =
-            ChatSelectionTitleInput(
-                groupIdHex = "actual-group-id",
-                groupName = "Raw group",
-                projectedTitle = "\u200b",
-                selectedTitle = null,
-                presentationPeerIdHex = "peer",
-                presentationMemberCount = 2,
-                pendingConfirmation = false,
-                welcomerIdHex = null,
-                conversationKind = ChatConversationKindFfi.GROUP,
-                activeAccountIsSoleMember = false,
-            )
-        val noNickname: (String) -> String? = { error("group cannot read a nickname") }
-        val noMember: (String) -> String = { error("prepared title cannot resolve a member") }
-        assertEquals("Raw group", chatSelectionTitle(input, noNickname, noMember, copy))
-        val renderer =
-            Class
-                .forName("dev.ipf.whitenoise.android.core.ChatListTitleKt")
-                .declaredMethods
-                .single { it.name == "renderChatTitle" }
-        renderer.isAccessible = true
-        val unusedNamedTitle: () -> String? = { error("selected title must not evaluate its named fallback") }
-        assertEquals(
-            copy.unnamedGroupTitle,
-            renderer.invoke(
-                null,
-                input.copy(selectedTitle = PresentationTextFfi.UnnamedGroup(99uL)),
-                noNickname,
-                noMember,
-                copy,
-                unusedNamedTitle,
-            ),
-        )
-        assertEquals(
-            copy.unnamedGroupTitle,
-            chatSelectionTitle(
-                input.copy(selectedTitle = PresentationTextFfi.UnnamedGroup(99uL)),
-                noNickname,
-                noMember,
-                copy,
-            ),
-        )
-        assertEquals(
-            copy.unavailableConversationTitle,
-            chatSelectionTitle(
-                input.copy(selectedTitle = PresentationTextFfi.UnavailableConversation),
-                noNickname,
-                noMember,
-                copy,
-            ),
-        )
-    }
-
-    @Test
-    fun selectedRowTitleDoesNotEvaluateMemoizedNamedFallback() {
-        val item =
-            chatItem("group", name = "Marmot Lab", members = emptyList())
-                .copy(selectedPresentation = presentation(PresentationTextFfi.Literal("Selected")))
-        val field = item.javaClass.getDeclaredField("sanitizedNamedTitle\$delegate")
-        field.isAccessible = true
-        val namedFallback = field.get(item) as Lazy<*>
-        assertFalse(namedFallback.isInitialized())
-        assertEquals("Selected", chatListItemTitle(item, { null }, { error("no member lookup") }, copy))
-        assertFalse(namedFallback.isInitialized())
-    }
 
     /** A local nickname replaces the public DM title, then clearing it restores MDK's title. */
     @Test

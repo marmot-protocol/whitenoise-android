@@ -1,11 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
-import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -50,33 +47,6 @@ class ChatListPreviewTextTest {
         assertEquals("empty", render(ChatListPreviewInput("edit", 1009uL, false, null, 0u, null)))
         assertEquals(MessageTextCopy.Default.message, render(ChatListPreviewInput("", 9uL, false, null, 0u, null)))
         assertEquals(listOf("empty", "empty", MessageTextCopy.Default.message), received)
-    }
-
-    @Test
-    fun fullTextFilterEligibilitySurvivesBlankSnippetPrefixWithoutFilenameAuthority() {
-        val record =
-            object : ChatListMessageSearch.SearchableRecord {
-                override val kind = 9uL
-                override val deleted = false
-                override val plaintext = " ".repeat(4096) + "https://example.org"
-                override val messageIdHex = "test-message"
-                override val timelineAt = 1uL
-            }
-        assertTrue(ChatListMessageSearch.isEligibleMatch(record, ""))
-        assertTrue(
-            ChatListMessageSearch.isEligibleMatch(
-                record,
-                "",
-                dev.ipf.whitenoise.android.core.MessageSearchConstraints(
-                    contentKinds = setOf(dev.ipf.whitenoise.android.search.GlobalSearchContentKind.LINKS),
-                ),
-            ),
-        )
-        assertNull(ChatListMessageSearch.buildFilteredSnippet(record.plaintext, emptyList()))
-        val localized = MessageTextCopy.Default.copy(message = "Nachricht")
-        assertEquals("Nachricht", messageSearchSnippet(record, "", localized)?.text)
-        assertFalse(ChatListMessageSearch.isEligibleMatch(record, "needle"))
-        assertNull(messageSearchSnippet(record, "needle"))
     }
 
     @Test

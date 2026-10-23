@@ -44,6 +44,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "surface": "Unsafe retained frame waits for current admission or bounded fallback",
+        "anchor": "internal suspend fun awaitConversationForegroundAdmission(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

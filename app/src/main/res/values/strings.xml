@@ -2548,4 +2548,5 @@
     <string name="search_message_content_loading">Searching message content…</string>
     <string name="search_message_content_failed">Couldn’t search message content.</string>
     <string name="avatar_preparation_interrupted">The image update was interrupted. Check the current image before selecting it again.</string>
+    <string name="dictation_waiting_for_unlock">Dictation saved temporarily. Unlock the app to paste it.</string>
 </resources>

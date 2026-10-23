@@ -2382,5 +2382,5 @@
     <string name="search_message_content_failed">Impossible de rechercher dans le contenu des messages.</string>
     <string name="document_save_interrupted">L’authentification a interrompu cet enregistrement. Choisis à nouveau Enregistrer pour sélectionner une destination.</string>
     <string name="avatar_preparation_interrupted">La mise à jour de l’image a été interrompue. Vérifie l’image actuelle avant de la sélectionner à nouveau.</string>
-    <string name="dictation_interrupted">Dictée interrompue. Vérifiez le texte récupéré et tout enregistrement audio restant avant l’envoi.</string>
+    <string name="dictation_interrupted">Dictée interrompue. Vérifie le texte récupéré et tout enregistrement audio restant avant l’envoi.</string>
 </resources>

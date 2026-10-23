@@ -621,6 +621,7 @@ private fun ConversationDictationPersistentControlTest.assertProcessingActionsAc
         composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
         val action = composeRule.onNodeWithContentDescription(label)
         action.assertIsEnabled().assertHasClickAction()
+        action.assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, label == selectedLabel))
         val bounds = action.getUnclippedBoundsInRoot()
         assertTrue(bounds.right - bounds.left >= 48.dp)
         assertTrue(bounds.bottom - bounds.top >= 48.dp)

@@ -94,6 +94,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "ConversationDictationDraftWriteDeferred",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_waiting_for_unlock",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ],
     "settings_controls": [

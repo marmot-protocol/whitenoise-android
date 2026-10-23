@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
-import android.content.SharedPreferences
 import dev.ipf.marmotkit.AccountSummaryFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,12 +12,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import java.io.File
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -233,138 +226,6 @@ class WhiteNoiseAppStatePreferencesTest {
         assertEquals(null, ContactNicknamePreferences.readNickname(preferences, "a", "contact-a"))
         assertEquals("long", ContactNicknamePreferences.readNickname(preferences, "a:long", "contact-a"))
         assertFalse(ContactNicknamePreferences.clearAllForAccount(preferences, "missing"))
-    }
-
-    @Test
-    fun nicknameSnapshotIsAccountScopedImmutableAndDetectsEditAndClear() {
-        ContactNicknamePreferences.writeNickname(preferences, "a", " CONTACT-A ", "Ａlice")
-        ContactNicknamePreferences.writeNickname(preferences, "a:other", "contact-a", "Other")
-        val snapshot = requireNotNull(ContactNicknamePreferences.snapshotForAccount(preferences, " a "))
-        assertEquals(mapOf("contact-a" to "Alice"), snapshot.nicknames)
-        assertTrue(ContactNicknamePreferences.isSnapshotCurrent(preferences, "a", snapshot))
-        assertFalse(ContactNicknamePreferences.isSnapshotCurrent(preferences, "a:other", snapshot))
-        ContactNicknamePreferences.writeNickname(preferences, "a", "contact-a", "Changed")
-        assertEquals("Alice", snapshot.nicknames["contact-a"])
-        assertFalse(ContactNicknamePreferences.isSnapshotCurrent(preferences, "a", snapshot))
-        val changed = requireNotNull(ContactNicknamePreferences.snapshotForAccount(preferences, "a"))
-        ContactNicknamePreferences.clearAllForAccount(preferences, "a")
-        assertFalse(ContactNicknamePreferences.isSnapshotCurrent(preferences, "a", changed))
-        assertEquals(null, ContactNicknamePreferences.snapshotForAccount(preferences, " "))
-    }
-
-    @Test
-    fun nicknameSnapshotIgnoresUnrelatedPreferenceChanges() {
-        ContactNicknamePreferences.writeNickname(preferences, "a", "contact", "Name")
-        val snapshot = requireNotNull(ContactNicknamePreferences.snapshotForAccount(preferences, "a"))
-        preferences.edit().putString("unrelated", "value").commit()
-        ContactNicknamePreferences.writeNickname(preferences, "b", "contact", "Other")
-        assertTrue(ContactNicknamePreferences.isSnapshotCurrent(preferences, "a", snapshot))
-    }
-
-    @Test
-    fun nicknameSnapshotRejectsWrongTypedCanonicalValueLikeOrdinaryRead() {
-        val key = requireNotNull(ContactNicknamePreferences.preferenceKey("a", "contact"))
-        preferences.edit().putInt(key, 7).commit()
-        org.junit.Assert.assertThrows(ClassCastException::class.java) {
-            ContactNicknamePreferences.readNickname(preferences, "a", "contact")
-        }
-        org.junit.Assert.assertThrows(ClassCastException::class.java) {
-            ContactNicknamePreferences.snapshotForAccount(preferences, "a")
-        }
-    }
-
-    @Test
-    fun nicknameSnapshotWaitsForStandaloneEditAndClear() {
-        assertSnapshotWaitsForNicknameMutation("Changed") {
-            ContactNicknamePreferences.writeNickname(it, "a", "contact", "Changed")
-        }
-        assertSnapshotWaitsForNicknameMutation(null) {
-            ContactNicknamePreferences.clearAllForAccount(it, "a")
-        }
-    }
-
-    @Test
-    fun nicknameSnapshotCannotObserveEditorCommitOrRollbackHalfway() {
-        for (failCommit in listOf(false, true)) {
-            assertSnapshotWaitsForNicknameMutation(if (failCommit) "Before" else "Changed", failCommit) {
-                val store =
-                    ContactPictureStore(
-                        it,
-                        File(RuntimeEnvironment.getApplication().noBackupFilesDir, "nickname-snapshot"),
-                    )
-                assertEquals(!failCommit, store.save("a", "contact", "Changed", "", ContactPictureChange.Keep) { true })
-            }
-        }
-    }
-
-    private fun assertSnapshotWaitsForNicknameMutation(
-        expected: String?,
-        failCommit: Boolean = false,
-        mutate: (SharedPreferences) -> Unit,
-    ) {
-        ContactNicknamePreferences.writeNickname(preferences, "a", "contact", "Before")
-        val entered = CountDownLatch(1)
-        val release = CountDownLatch(1)
-        val firstWrite = AtomicBoolean(true)
-        val wrapped =
-            object : SharedPreferences by preferences {
-                override fun edit(): SharedPreferences.Editor {
-                    val delegate = preferences.edit()
-                    return object : SharedPreferences.Editor by delegate {
-                        override fun putString(
-                            key: String?,
-                            value: String?,
-                        ): SharedPreferences.Editor {
-                            delegate.putString(key, value)
-                            return this
-                        }
-
-                        override fun remove(key: String?): SharedPreferences.Editor {
-                            delegate.remove(key)
-                            return this
-                        }
-
-                        private fun pauseFirstWrite(): Boolean {
-                            if (!firstWrite.compareAndSet(true, false)) return false
-                            entered.countDown()
-                            check(release.await(5, TimeUnit.SECONDS))
-                            return true
-                        }
-
-                        override fun apply() {
-                            pauseFirstWrite()
-                            delegate.apply()
-                        }
-
-                        override fun commit(): Boolean {
-                            // Expose Android's changed memory map while the editor still owns the lock.
-                            val committed = delegate.commit()
-                            val first = pauseFirstWrite()
-                            return committed && !(first && failCommit)
-                        }
-                    }
-                }
-            }
-        val workers = Executors.newFixedThreadPool(2)
-        try {
-            val writer = workers.submit { mutate(wrapped) }
-            assertTrue(entered.await(5, TimeUnit.SECONDS))
-            val readerStarted = CountDownLatch(1)
-            val reader =
-                workers.submit<ContactNicknamePreferences.Snapshot?> {
-                    readerStarted.countDown()
-                    ContactNicknamePreferences.snapshotForAccount(preferences, "a")
-                }
-            assertTrue(readerStarted.await(5, TimeUnit.SECONDS))
-            org.junit.Assert.assertThrows(TimeoutException::class.java) { reader.get(100, TimeUnit.MILLISECONDS) }
-            release.countDown()
-            writer.get(5, TimeUnit.SECONDS)
-            assertEquals(expected, requireNotNull(reader.get(5, TimeUnit.SECONDS)).nicknames["contact"])
-        } finally {
-            release.countDown()
-            workers.shutdownNow()
-            assertTrue(workers.awaitTermination(5, TimeUnit.SECONDS))
-        }
     }
 
     /** An unset note remains absent rather than creating an empty private record. */

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -32,11 +31,14 @@ class ChatListBodySearchKeyTest {
         )
         assertTrue(
             "body-search results must share the projection's canonical group-id identity",
-            "canonicalChatListBodyMatches(" in source && localizedBodySearchCall(source),
+            Regex(
+                "canonicalChatListBodyMatches\\(\\s*controller\\.searchMessageBodies\\(" +
+                    "scopedSourceList, trimmedQuery, messageSearchConstraints\\)",
+            ).containsMatchIn(source),
         )
         assertTrue(
             "ordinary message-body search must keep using the trimmed text query",
-            localizedBodySearchCall(source),
+            "controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints)" in source,
         )
         assertTrue(
             "search interactions and lazy rows must share canonical identity",
@@ -60,47 +62,15 @@ class ChatListBodySearchKeyTest {
         )
         assertTrue(
             "the body search must receive the sender / date / content constraints",
-            localizedBodySearchCall(source),
+            "controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints)" in source,
         )
         assertTrue(
             "the body search key must include the constraints so a filter change restarts it",
             "constraints = messageSearchConstraints," in source,
         )
         assertTrue(
-            "localized copy must invalidate the request and reach the snippet renderer",
-            "val messageTextCopy = rememberMessageTextCopy()" in source &&
-                "messageTextCopy = messageTextCopy," in source &&
-                "val messageTextCopy: MessageTextCopy," in source &&
-                Regex("messageSearchConstraints,\\s*messageTextCopy,\\s*\\)\\s*\\{").containsMatchIn(source),
-        )
-        assertTrue(
             "no legacy availability gate may remain",
             "interactiveGlobalSearchFilterSectionsAvailable" !in source,
-        )
-    }
-
-    private fun localizedBodySearchCall(source: String): Boolean =
-        Regex(
-            "controller\\.searchMessageBodies\\(\\s*scopedSourceList,\\s*trimmedQuery," +
-                "\\s*messageSearchConstraints,\\s*messageTextCopy,?\\s*\\)",
-        ).containsMatchIn(source)
-
-    @Test
-    fun controllerForwardsLocalizedCopyToEachEligibleMessageSnippet() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            ).first { it.exists() }.readText()
-        val helperParameters =
-            source
-                .substringAfter("private suspend fun searchOneChat(")
-                .substringBefore("): MessageBodyMatch?")
-        assertTrue("copy: MessageTextCopy," in helperParameters)
-        assertFalse("ciNeedle: String" in helperParameters)
-        assertTrue("messageSearchSnippet(match, needle, copy)" in source)
-        assertTrue(
-            Regex("searchOneChat\\([\\s\\S]*?constraints,\\s*copy,?\\s*\\)").containsMatchIn(source),
         )
     }
 

@@ -18,6 +18,25 @@ import java.util.concurrent.CancellationException
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Scroll state-machine invariants share one command/writer harness.
 class ConversationScrollCoordinatorTest {
+    /** A late unsafe admission/deadline completion cannot retire a newer pause snapshot. */
+    @Test
+    fun tokenScopedCancellationCannotClearReplacementRestore() {
+        val coordinator = ConversationScrollCoordinator(RecordingScrollWriter())
+        val snapshot =
+            ConversationForegroundSnapshot(
+                coordinator.bookmark(anchor(messageId = "retained", listIndex = 4)),
+                ConversationForegroundGeometry(720, 0, 96),
+            )
+        val old = coordinator.beginForegroundRestore(snapshot)
+        val current = coordinator.beginForegroundRestore(snapshot)
+        coordinator.cancelForegroundRestore(old)
+        assertTrue(coordinator.foregroundRestoreInProgress)
+        assertTrue(coordinator.foregroundRestorePending)
+        coordinator.cancelForegroundRestore(current)
+        assertFalse(coordinator.foregroundRestoreInProgress)
+        assertFalse(coordinator.foregroundRestorePending)
+    }
+
     @Test
     fun typingIntentCancelsAnAlreadyStartedForegroundCorrection() =
         runTest {

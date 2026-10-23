@@ -775,6 +775,166 @@ class ConversationDictationControllerTest {
             assertEquals(1, sends)
         }
 
+    /** Normal Paste waits for the exact host-deferred write and never chooses Send. */
+    @Test
+    fun pasteDuringLockCompletesExactlyOnceAfterUnlock() {
+        var locked = false
+        var sends = 0
+        val f =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                appLocked = { locked },
+                sendTranscriptIfOriginUnchanged = {
+                    sends++
+                    true
+                },
+            )
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.paste()
+        locked = true
+        f.platform.listener.onResult("accepted")
+        assertEquals(0, f.writes)
+        assertEquals(
+            ConversationDictationFailure.DraftWriteDeferred,
+            (f.controller.state as ConversationDictationState.Failed).reason,
+        )
+        f.controller.onAppForegrounded()
+        assertEquals(0, f.writes)
+        locked = false
+        f.controller.onAppForegrounded()
+        assertEquals("Draft accepted", f.drafts.getValue(key()).text)
+        assertEquals(1, f.writes)
+        assertEquals(ConversationDictationState.Idle, f.controller.state)
+        f.controller.onAppForegrounded()
+        assertEquals(1, f.writes)
+        assertEquals(0, sends)
+    }
+
+    /** A throwing deferred retry retains the transcript without a second write or Send. */
+    @Test
+    fun lockedPasteRetryThrowRetainsTextWithoutFallback() {
+        var locked = false
+        var attempts = 0
+        var sends = 0
+        val f =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                appLocked = { locked },
+                allowDraftWrite = {
+                    attempts++
+                    error("write refused by host")
+                },
+                sendTranscriptIfOriginUnchanged = {
+                    sends++
+                    true
+                },
+            )
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.paste()
+        locked = true
+        f.platform.listener.onResult("accepted")
+        assertEquals(0, attempts)
+        locked = false
+        f.controller.onAppForegrounded()
+        val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.Unknown, failed.reason)
+        assertEquals("accepted", failed.retainedTranscript)
+        assertEquals("Draft", f.drafts.getValue(key()).text)
+        assertEquals(1, attempts)
+        assertEquals(0, f.writes)
+        repeat(2) { f.controller.onAppForegrounded() }
+        assertEquals(1, attempts)
+        assertEquals(0, sends)
+    }
+
+    /** Unlock cannot replace a newer editor revision with the captured deferred value. */
+    @Test
+    fun lockedPasteRetryPreservesInterveningEditorRevision() {
+        var locked = false
+        var attempts = 0
+        var sends = 0
+        val f =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                appLocked = { locked },
+                allowDraftWrite = {
+                    attempts++
+                    true
+                },
+                sendTranscriptIfOriginUnchanged = {
+                    sends++
+                    true
+                },
+            )
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.paste()
+        locked = true
+        f.platform.listener.onResult("accepted")
+        f.edit(key(), TextFieldValue("New editor text"))
+        locked = false
+        f.controller.onAppForegrounded()
+        val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(true, failed.draftSuperseded)
+        assertEquals("accepted", failed.retainedTranscript)
+        repeat(2) { f.controller.onAppForegrounded() }
+        assertEquals("New editor text", f.drafts.getValue(key()).text)
+        assertEquals(0, attempts)
+        assertEquals(0, f.writes)
+        assertEquals(0, sends)
+    }
+
+    /** Authoritative removal is a retained failure, not a promise that unlocking will fix it. */
+    @Test
+    fun lockedPasteRetryRejectsRemovedOriginWithoutWriting() {
+        var locked = false
+        var available = true
+        var attempts = 0
+        var sends = 0
+        val f =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                appLocked = { locked },
+                targetAvailable = { available },
+                allowDraftWrite = {
+                    attempts++
+                    true
+                },
+                sendTranscriptIfOriginUnchanged = {
+                    sends++
+                    true
+                },
+            )
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.paste()
+        locked = true
+        f.platform.listener.onResult("accepted")
+        available = false
+        locked = false
+        f.controller.onAppForegrounded()
+        val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.Unknown, failed.reason)
+        assertEquals("accepted", failed.retainedTranscript)
+        repeat(2) { f.controller.onAppForegrounded() }
+        assertEquals("Draft", f.drafts.getValue(key()).text)
+        assertEquals(0, attempts)
+        assertEquals(0, f.writes)
+        assertEquals(0, sends)
+    }
+
+    /** An unlocked CAS refusal stays a real failure, rather than a claim that the host is locked. */
+    @Test
+    fun pasteRefusalDoesNotClaimHostDeferral() {
+        val f = fixture(draft = TextFieldValue("Draft"), allowDraftWrite = { false })
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.paste()
+        f.platform.listener.onResult("accepted")
+        assertEquals(
+            ConversationDictationFailure.Unknown,
+            (f.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertEquals(0, f.writes)
+    }
+
     /** The production app-lock write fence defers recovery and unlock writes it exactly once. */
     @Test
     fun focusInterruptionDefersDraftWriteUntilAppUnlock() {
@@ -936,11 +1096,32 @@ class ConversationDictationControllerTest {
             assertTrue(capture.cancelled)
             assertFalse(f.controller.ownsMicrophone)
             assertEquals("Draft accepted", f.drafts.getValue(key()).text)
+            val notice = f.controller.state as ConversationDictationState.Failed
+            assertEquals(ConversationDictationFailure.Interrupted, notice.reason)
+            assertTrue(notice.draftRecovered)
+            assertTrue(notice.recognitionIncomplete)
+            val writesAfterInterruption = f.writes
             assertEquals(0, sends)
             onChange(android.media.AudioManager.AUDIOFOCUS_LOSS)
+            assertEquals("notice must not append saved text twice", writesAfterInterruption, f.writes)
             assertEquals("Draft accepted", f.drafts.getValue(key()).text)
             handoff.afterAudioCapture()
         }
+    }
+
+    /** Empty, microphone-free focus interruption still tells the user why dictation stopped. */
+    @Test
+    fun focusInterruptionWithoutTextOrPcmPublishesInterruptedNotice() {
+        val f = fixture(draft = TextFieldValue("Draft"))
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        assertFalse(f.platform.pendingCallerAudio)
+        f.controller.interruptForAudioFocusLoss()
+        val notice = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.Interrupted, notice.reason)
+        assertTrue(notice.recognitionIncomplete)
+        assertEquals("Draft", f.drafts.getValue(key()).text)
+        assertEquals(0, f.writes)
+        assertFalse(f.controller.ownsMicrophone)
     }
 
     /** An involuntary interruption retires an already pending Send validation. */
@@ -8881,6 +9062,22 @@ class ConversationDictationControllerTest {
                             writes += 1
                             onDraftWritten(value)
                             expectedRevision + 1L
+                        }
+                    }
+                },
+                completionWrite = { account, group, expectedRevision, value ->
+                    if (appLocked() || appUnlockEvaluationPending()) {
+                        ConversationDictationDraftWrite.DeferredByHost
+                    } else {
+                        val target = account to group
+                        if (!allowDraftWrite() || (revisions[target] ?: 0L) != expectedRevision) {
+                            ConversationDictationDraftWrite.Refused
+                        } else {
+                            drafts[target] = value
+                            revisions[target] = expectedRevision + 1L
+                            writes += 1
+                            onDraftWritten(value)
+                            ConversationDictationDraftWrite.Written(expectedRevision + 1L)
                         }
                     }
                 },

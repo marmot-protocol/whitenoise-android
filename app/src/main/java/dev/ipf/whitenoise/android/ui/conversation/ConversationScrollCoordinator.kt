@@ -391,6 +391,12 @@ internal class ConversationScrollCoordinator(
         foregroundRestoreInProgress = false
     }
 
+    /** Retires only this resume's snapshot; a late handoff cannot cancel its replacement. */
+    fun cancelForegroundRestore(token: ConversationForegroundRestoreToken) {
+        if (!foregroundRestoreLifetime.isCurrent(token.revision)) return
+        cancelForegroundRestore()
+    }
+
     /** Typing/focus/navigation also retire an already-started deferred lifecycle writer. */
     fun cancelForegroundRestoreForUserIntent() {
         if (!foregroundRestorePending) return

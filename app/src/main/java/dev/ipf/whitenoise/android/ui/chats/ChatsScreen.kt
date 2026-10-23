@@ -81,7 +81,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
-import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.canonicalChatListBodyMatches
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
@@ -123,7 +122,6 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
@@ -468,7 +466,6 @@ internal fun ChatsScreen(
         remember(scopedSourceList) {
             scopedSourceList.map { canonicalChatListGroupId(it.id) }.distinct().sorted()
         }
-    val messageTextCopy = rememberMessageTextCopy()
     val bodySearchKey =
         remember(
             normalizedSearchQuery,
@@ -476,7 +473,6 @@ internal fun ChatsScreen(
             showArchived,
             bodySearchGroupIds,
             messageSearchConstraints,
-            messageTextCopy,
         ) {
             ChatListBodySearchKey(
                 query = normalizedSearchQuery,
@@ -484,7 +480,6 @@ internal fun ChatsScreen(
                 showArchived = showArchived,
                 canonicalGroupIds = bodySearchGroupIds,
                 constraints = messageSearchConstraints,
-                messageTextCopy = messageTextCopy,
             )
         }
     // Use a request identity as well as the structural cache key. If a user
@@ -497,12 +492,7 @@ internal fun ChatsScreen(
     val bodySearchResult =
         rememberGlobalSearchLookup(bodySearchRequest, bodySearchEnabled, "GLOBAL_BODY_SEARCH") {
             canonicalChatListBodyMatches(
-                controller.searchMessageBodies(
-                    scopedSourceList,
-                    trimmedQuery,
-                    messageSearchConstraints,
-                    messageTextCopy,
-                ),
+                controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints),
             )
         }
     val bodyMatches =
@@ -2400,7 +2390,6 @@ private data class ChatListBodySearchKey(
     val showArchived: Boolean,
     val canonicalGroupIds: List<String>,
     val constraints: MessageSearchConstraints? = null,
-    val messageTextCopy: MessageTextCopy,
 )
 
 private class ChatListBodySearchRequest

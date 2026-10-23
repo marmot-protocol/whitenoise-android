@@ -239,9 +239,17 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "surface": "Typing and navigation retire deferred geometry",
-        "anchor": "snapshotFlow { composerTextState.valueState.value }",
+        "anchor": "snapshotFlow { composerTextState.userTextEditRevision }",
         "test_ids": [
           "CON-033"
+        ]
+      },
+      {
+        "surface": "Reversed conversation physical-edge selection and post-scroll endpoint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "fun messageDragSelectionEffects()",
+        "test_ids": [
+          "MSG-004"
         ]
       }
     ]

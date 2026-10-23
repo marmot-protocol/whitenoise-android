@@ -215,6 +215,35 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         }
     }
 
+    /** Actual production lifecycle wiring keeps a retired runtime behind the bounded draw fence. */
+    @Test
+    fun retiredRuntimeAtResumeDoesNotSynchronouslyExposeOldTranscript() {
+        val fixture = mountFixture(controlledOwner = true)
+        val owner = checkNotNull(fixture.owner)
+        try {
+            composeRule.runOnUiThread {
+                owner.moveTo(Lifecycle.State.CREATED)
+                publishFixtureOwner(fixture.appState, ConversationTimelineTestIds.ACCOUNT_REF, true)
+                assertFalse(fixture.controller.ownsRetainedForegroundPresentation)
+                fixture.recording.set(true)
+            }
+            val preDrawsBeforeResume = fixture.preDraws.get()
+            val resumedAt = SystemClock.uptimeMillis()
+            composeRule.runOnUiThread { owner.moveTo(Lifecycle.State.RESUMED) }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+                fixture.preDraws.get() > preDrawsBeforeResume && fixture.firstBlockedAt != null
+            }
+            assertTrue("a retired runtime cannot draw synchronously on resume", fixture.draws.isEmpty())
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            assertTrue(
+                "only the bounded fallback can release this retired owner",
+                fixture.firstDrawAt - resumedAt >= 1_500L,
+            )
+        } finally {
+            fixture.close()
+        }
+    }
+
     /** A new chat cannot inherit a delayed page or cached painted layer from the previous chat. */
     @Test
     fun chatReplacementRejectsHeldOldRoutePreparation() {

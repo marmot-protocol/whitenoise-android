@@ -31,6 +31,50 @@ class ConversationForegroundPresentationTest {
         assertFalse(canPresentRetainedConversationFrame(true, true, true, true))
     }
 
+    /** A missing handoff cannot authenticate a replaced owner, locked app or non-Ready frame. */
+    @Test
+    fun unsafeAdmissionWaitsForLiveSafetyOrTheOriginalDeadline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            var safe = false
+            val waiting = async { awaitConversationForegroundAdmission(signals, { safe }, 1_500) {} }
+            runCurrent()
+            signals.trySend(Unit)
+            advanceTimeBy(1_499)
+            runCurrent()
+            assertFalse(waiting.isCompleted)
+            safe = true
+            signals.trySend(Unit)
+            runCurrent()
+            waiting.await()
+            safe = false
+            val expired = async { awaitConversationForegroundAdmission(signals, { safe }, 1_500) {} }
+            runCurrent()
+            advanceTimeBy(1_500)
+            runCurrent()
+            assertTrue(expired.isCompleted)
+        }
+
+    /** Superseded receipt remains a refusal even when live ownership later becomes safe. */
+    @Test
+    fun unsafeAdmissionCannotTreatSupersededHandoffAsCommitted() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val waiting =
+                async {
+                    awaitConversationForegroundAdmission(signals, { true }, 1_500) {
+                        awaitCommittedConversationTimeline(CompletableDeferred(false))
+                    }
+                }
+            runCurrent()
+            advanceTimeBy(1_499)
+            runCurrent()
+            assertFalse(waiting.isCompleted)
+            advanceTimeBy(1)
+            runCurrent()
+            assertTrue(waiting.isCompleted)
+        }
+
     /** A consumed local publication still waits for its actual layout, even without an outstanding receipt. */
     @Test
     fun consumedTimelineWaitsForMatchingMeasuredPublication() =
