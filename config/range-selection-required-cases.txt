@@ -1,0 +1,1 @@
+dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest#heldPointerCrossesTheActionPopupAndSelectsAnAdjacentMessage
