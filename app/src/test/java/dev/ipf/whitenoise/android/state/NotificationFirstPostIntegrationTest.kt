@@ -250,15 +250,21 @@ class NotificationFirstPostIntegrationTest {
             }
         }
 
-    /** Covers captioned and captionless media precedence through the real resolver. */
+    /** Prefers a photo caption through the real resolver in its own process-state fixture. */
     @Test
-    fun firstPostMediaMatrixUsesCaptionBeforeTypeAndTypeBeforeGenericFallback() =
+    fun firstPostPhotoUsesItsCaptionBeforeTheTypeFallback() =
         runBlocking {
             assertFirstBody(
                 preview = "**release notes**",
                 timeline = timelineRecord(tags = imageTags()),
                 expected = "release notes",
             )
+        }
+
+    /** Resolves captionless photo history without reusing another scenario's runtime/card lifetime. */
+    @Test
+    fun firstPostCaptionlessPhotoUsesItsTypeBeforeTheGenericFallback() =
+        runBlocking {
             val captionlessRecord = messageRecord(tags = imageTags())
             assertEquals(ReplyMediaKind.Photo, MessageProjector.mediaKind(captionlessRecord))
             assertFirstBody(
