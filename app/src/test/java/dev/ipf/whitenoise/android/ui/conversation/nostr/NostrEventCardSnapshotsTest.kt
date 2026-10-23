@@ -112,6 +112,38 @@ class NostrEventCardSnapshotsTest {
             assertNull(snapshots[NostrEventReference.Event(eventId(3)).stableId])
         }
 
+    /**
+     * The default capacity covers every card a full conversation window can name, three per row, so warming the whole
+     * window keeps every snapshot it read rather than evicting its own earlier batches.
+     */
+    @Test
+    fun warmingAFullWindowKeepsEverySnapshot() =
+        runTest {
+            val rows = 200
+            val records =
+                (0 until rows).map { row ->
+                    val notes =
+                        (0 until MAX_CARDS_PER_MESSAGE).map { card ->
+                            noteBech32(eventId(row * MAX_CARDS_PER_MESSAGE + card))
+                        }
+                    eventCardTimelineRecord(
+                        messageIdHex = "m$row",
+                        plaintext = notes.joinToString(" ") { "nostr:$it" },
+                        timelineAt = row.toULong(),
+                        contentTokens = eventCardDocument(*notes.toTypedArray()),
+                    )
+                }
+            val snapshots = NostrEventCardSnapshots()
+
+            val read = snapshots.warm(records) { references -> references.map { loaded(it) } }
+
+            assertEquals(rows * MAX_CARDS_PER_MESSAGE, read)
+            (0 until rows * MAX_CARDS_PER_MESSAGE).forEach { index ->
+                val stableId = NostrEventReference.Event(eventId(index)).stableId
+                assertEquals("card $index kept", loaded(noteBech32(eventId(index))), snapshots[stableId])
+            }
+        }
+
     /** The snapshot keeps at most its capacity, dropping the least recently used entry first. */
     @Test
     fun snapshotsStayBounded() {

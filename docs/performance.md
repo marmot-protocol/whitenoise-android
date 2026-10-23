@@ -75,11 +75,18 @@ stays on screen. The rows' Markdown is parsed once, for both the card read and
 the commit. The rows read are those of the window that will be committed: the
 subscription's newest installed window, and if a newer one is installed while
 the read runs, its new card rows are read too, within what is left of the same
-budget. Unlike the first page's read, which reads at most 32 references, a later
-page's read covers every card its new rows name, in batches of 16, within the
-budget. A message edited while the read runs counts as new and is read again,
-and only parsed Markdown is carried onto the committed window, never an older
-copy of a row. A page without such rows is applied at once, as before.
+budget. Like the first page's read, it covers every card its rows name, in
+batches of 16 and within the budget, nearest the rows on screen first (an older
+page's newest rows, a newer page's oldest), so the cards a reader meets first
+are read first. A row already on screen whose card no read has asked about yet,
+as a first page cut short by its budget can leave, is read too. A message
+edited while the read runs counts as new and is read again. When the budget
+runs out, the page is applied with the one parse and with every batch read so
+far; only the unread cards resolve themselves. Only parsed Markdown is carried
+onto the committed window, never an older copy of a row. The conversation's
+card snapshots hold every card a full window can name (200 rows of up to 3
+cards), so one read never evicts what it just read. A page without such rows
+is applied at once, as before.
 
 `op=chat_history_page phase=event_card_page_warm layer=storage` records one
 such read. `duration_ms` is the binding work alone: the parse and the batched

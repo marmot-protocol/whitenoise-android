@@ -82,6 +82,7 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.core.nostrEventReferences
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
@@ -117,6 +118,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
+import dev.ipf.whitenoise.android.ui.conversation.nostr.MAX_CARDS_PER_MESSAGE
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NEWEST_FIRST
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardSnapshots
 import dev.ipf.whitenoise.android.ui.conversation.nostr.mayRenderNostrEventCard
 import dev.ipf.whitenoise.android.ui.conversation.nostr.readCachedPublicEventCards
@@ -153,6 +156,7 @@ import kotlinx.coroutines.yield
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
@@ -12923,30 +12927,40 @@ class ConversationController(
         var target = page
         var reading = true
         while (reading) {
-            val (window, candidates) = laterPageCardCandidates(page, read)
+            val (window, candidates, order) = laterPageCardCandidates(page, read)
             target = window
             val remaining = LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS - (SystemClock.elapsedRealtime() - startedAt)
             candidates.mapTo(read) { it.messageIdHex to it.plaintext }
             val warmed =
                 candidates
                     .takeIf { it.isNotEmpty() && remaining > 0L }
-                    ?.let { readLaterPageEventCards(scope, it, remaining) }
-            // Read again only when this read settled: a newer window may have been installed meanwhile.
-            reading = warmed != null
-            warmed?.let(parsed::addAll)
+                    ?.let { readLaterPageEventCards(scope, it, order, remaining) }
+            // Whatever was parsed is applied, even past the budget. Read again only when this read settled, since a
+            // newer window may have been installed meanwhile.
+            warmed?.parsed?.let(parsed::addAll)
+            reading = warmed?.settled == true
         }
         return if (read.isEmpty()) page else target.withParsedRecords(parsed)
     }
 
+    /** The window a later page would commit, its rows whose cards to read, and the order to read them in. */
+    private data class LaterPageCardCandidates(
+        val window: TimelinePageFfi,
+        val records: List<TimelineMessageRecordFfi>,
+        val order: Comparator<TimelineMessageRecordFfi>,
+    )
+
     /**
      * The window [applyTimelinePage] would commit now — the newest installed one, else [page] — with its rows that may
-     * render a card and are not on screen with that text, nor among [read] (message id and text). An edited message
-     * therefore counts as new, since it may name other cards. None before the first page is prepared.
+     * render a card, are not among [read] (message id and text), and are not on screen with that text or still name a
+     * card no warm has read. An edited message therefore counts as new, since it may name other cards. The rows are
+     * read nearest the rows on screen first, which a reader paging either way meets first. None before the first
+     * page is prepared.
      */
     private suspend fun laterPageCardCandidates(
         page: TimelinePageFfi,
         read: Set<Pair<String, String>>,
-    ): Pair<TimelinePageFfi, List<TimelineMessageRecordFfi>> =
+    ): LaterPageCardCandidates =
         withContext(Dispatchers.Main.immediate) {
             val window = timelineSubscription?.latestInstalledWindow()?.page ?: page
             val candidates =
@@ -12954,26 +12968,65 @@ class ConversationController(
                     emptyList()
                 } else {
                     window.messages.filter { record ->
-                        val shown = timelineRecords[record.messageIdHex]?.plaintext == record.plaintext
-                        mayRenderNostrEventCard(record) && !shown && (record.messageIdHex to record.plaintext) !in read
+                        mayRenderNostrEventCard(record) &&
+                            (record.messageIdHex to record.plaintext) !in read &&
+                            needsEventCardRead(record)
                     }
                 }
-            window to candidates
+            LaterPageCardCandidates(window, candidates, nearestToShownRows())
         }
 
     /**
-     * Parses [candidates] once and reads their cached cards in its own job on the event-card read lane, so the whole
-     * read takes one main-thread turn to resume, and [budgetMillis] can give up on a binding call that never returns
-     * instead of waiting it out. Returns the parsed rows, or null past the budget
-     * or on failure. Each read is recorded once it ends, past the budget too, with how long its binding work took.
+     * Whether [record]'s cards still need a read: it is not on screen with this text, or it is, but names a card no
+     * warm has asked MDK about yet, as a first page cut short by its budget can leave behind.
+     */
+    private fun needsEventCardRead(record: TimelineMessageRecordFfi): Boolean {
+        val shown = timelineRecords[record.messageIdHex]?.takeIf { it.plaintext == record.plaintext } ?: return true
+        return nostrEventReferences(shown.contentTokens)
+            .take(MAX_CARDS_PER_MESSAGE)
+            .any { !eventCardSnapshots.isKnown(it.reference.stableId) }
+    }
+
+    /**
+     * Orders rows by their distance in time from the rows on screen, then newest first: an older page's newest rows and
+     * a newer page's oldest rows border the reader's view. With nothing on screen it is simply newest first.
+     */
+    private fun nearestToShownRows(): Comparator<TimelineMessageRecordFfi> {
+        val shown = timelineRecords.values
+        if (shown.isEmpty()) return NEWEST_FIRST
+        val oldest = shown.minOf { it.timelineAt }
+        val newest = shown.maxOf { it.timelineAt }
+        return compareBy<TimelineMessageRecordFfi> { record ->
+            when {
+                record.timelineAt < oldest -> oldest - record.timelineAt
+                record.timelineAt > newest -> record.timelineAt - newest
+                else -> 0uL
+            }
+        }.then(NEWEST_FIRST)
+    }
+
+    /** What one later-page read finished: the rows it parsed, if the parse finished, and whether every read did. */
+    private class LaterPageCardRead(
+        val parsed: List<TimelineMessageRecordFfi>?,
+        val settled: Boolean,
+    )
+
+    /**
+     * Parses [candidates] that lack Markdown and reads their cached cards in [order], in its own job on the event-card
+     * read lane, so the whole read takes one main-thread turn to resume, and [budgetMillis] can give up on a binding
+     * call that never returns instead of waiting it out. Past the budget it still returns the parse if that finished,
+     * and every batch read by then keeps its snapshots, so the page applies with what finished. Each read is recorded
+     * once it ends, past the budget too, with how long its binding work took.
      */
     private suspend fun readLaterPageEventCards(
         scope: CoroutineScope,
         candidates: List<TimelineMessageRecordFfi>,
+        order: Comparator<TimelineMessageRecordFfi>,
         budgetMillis: Long,
-    ): List<TimelineMessageRecordFfi>? {
+    ): LaterPageCardRead {
         val startedAt = SystemClock.elapsedRealtime()
         val laneMillis = AtomicLong(-1L)
+        val parsedSoFar = AtomicReference<List<TimelineMessageRecordFfi>?>(null)
         val accountRef = conversationAccountRef
         val warm =
             scope.async {
@@ -12982,29 +13035,24 @@ class ConversationController(
                     onEventCardReadLane {
                         val laneStartedAt = SystemClock.elapsedRealtime()
                         try {
-                            val parsed =
-                                candidates.map { record ->
-                                    val document = appState.parseMarkdownOrEmpty(record.plaintext)
-                                    if (document.blocks.isEmpty()) record else record.withMarkdownTokens(document)
-                                }
+                            val parsed = candidates.map { record -> parsedForCardRead(record) }
+                            parsedSoFar.set(parsed)
                             // A read past its budget is abandoned, so it must not write snapshots after the fact.
                             currentCoroutineContext().ensureActive()
-                            // Every card the page names, not the first page's cap: the budget bounds the read instead.
-                            eventCardSnapshots.warm(parsed, maxReferences = Int.MAX_VALUE) { references ->
+                            eventCardSnapshots.warm(parsed, order) { references ->
                                 val states = appState.readCachedPublicEventCards(accountRef, references)
                                 currentCoroutineContext().ensureActive()
                                 states
                             }
-                            parsed
                         } finally {
                             // Also when the budget cancelled it, so a dropped read still reports its binding time.
                             laneMillis.set(SystemClock.elapsedRealtime() - laneStartedAt)
                         }
                     }
-                }.getOrNull()
+                }.isSuccess
             }
-        val parsed = withTimeoutOrNull(budgetMillis) { warm.await() }
-        if (parsed != null) {
+        val settled = withTimeoutOrNull(budgetMillis) { warm.await() } == true
+        if (settled) {
             recordLaterPageEventCardWarm(startedAt, laneMillis.get(), candidates.size, settled = true)
         } else {
             warm.cancel()
@@ -13013,7 +13061,14 @@ class ConversationController(
                 recordLaterPageEventCardWarm(startedAt, laneMillis.get(), candidates.size, settled = false)
             }
         }
-        return parsed
+        return LaterPageCardRead(parsedSoFar.get(), settled)
+    }
+
+    /** [record] with its Markdown parsed on the calling thread, unless it already carries it. */
+    private suspend fun parsedForCardRead(record: TimelineMessageRecordFfi): TimelineMessageRecordFfi {
+        if (!needsTimelineMarkdownHydration(record)) return record
+        val document = appState.parseMarkdownOrEmpty(record.plaintext)
+        return if (document.blocks.isEmpty()) record else record.withMarkdownTokens(document)
     }
 
     /**

@@ -57,6 +57,9 @@ internal class EventCardConversationFixture(
     private val cacheRead: () -> Unit,
 ) {
     val cacheReads = AtomicInteger()
+
+    /** How many times MDK parsed a message naming a `nostr:` card, so a test can tell a parse was not repeated. */
+    val cardParses = AtomicInteger()
     val composed: MutableList<NostrEventCardState> = Collections.synchronizedList(mutableListOf())
 
     /** Every distinct row order the screen composed, oldest first, so a test can see what the reader saw. */
@@ -147,7 +150,11 @@ internal class EventCardConversationFixture(
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, args ->
             when (method.name.substringBefore('-')) {
-                "parseMarkdown" -> parsedNote(args!![0] as String)
+                "parseMarkdown" -> {
+                    val text = args!![0] as String
+                    if ("nostr:" in text) cardParses.incrementAndGet()
+                    parsedNote(text)
+                }
                 "cachedPublicEventPreviews" -> {
                     cacheReads.incrementAndGet()
                     cacheRead()

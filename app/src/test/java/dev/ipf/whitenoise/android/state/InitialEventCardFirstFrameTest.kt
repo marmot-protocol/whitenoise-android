@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.L
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.NOTE
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.READ_BLOCK_SECONDS
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.describe
+import dev.ipf.whitenoise.android.ui.conversation.nostr.noteBech32
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -49,6 +50,32 @@ class InitialEventCardFirstFrameTest {
                 listOf("$LOADED $EVENT_ID"),
                 fixture.composed.map(::describe).distinct(),
             )
+        } finally {
+            fixture.close()
+        }
+    }
+
+    /** A first page naming more cards than the old 32-reference cap has every card read: all compose Loaded. */
+    @Test
+    fun firstPageWithManyCardsHasEveryCardRead() {
+        val cards =
+            (1..MANY_CARDS).map { index ->
+                val eventId = index.toString(16).padStart(64, '0')
+                timelineRecord(index.toString(16).padStart(64, 'c'), index.toULong(), "nostr:${noteBech32(eventId)}")
+            }
+        val fixture =
+            EventCardConversationFixture(
+                composeRule = composeRule,
+                snapshotPage = timelinePage(*cards.toTypedArray()),
+                cacheRead = {},
+            )
+        try {
+            fixture.compose()
+            fixture.awaitIdleCondition { fixture.openedWithACard() && fixture.composed.size >= MANY_CARDS }
+
+            val states = fixture.composed.map(::describe)
+            assertFalse("no card composes Loading", LOADING in states)
+            assertEquals(MANY_CARDS, states.toSet().size)
         } finally {
             fixture.close()
         }
@@ -106,5 +133,6 @@ class InitialEventCardFirstFrameTest {
 
     private companion object {
         val MESSAGE_ID = "d1".repeat(32)
+        const val MANY_CARDS = 40
     }
 }

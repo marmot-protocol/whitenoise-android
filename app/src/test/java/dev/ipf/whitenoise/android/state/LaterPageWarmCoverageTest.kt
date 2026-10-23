@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.LOADED
 import dev.ipf.whitenoise.android.state.EventCardConversationFixture.Companion.LOADING
@@ -30,6 +31,7 @@ import org.robolectric.annotation.Config
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Coverage of a later page's event-card read at its edges (#2238): a page naming more cards than the first page's cap,
@@ -53,11 +55,7 @@ class LaterPageWarmCoverageTest {
     /** An older page naming more cards than the first page's cap of 32 has every card read: all compose Loaded. */
     @Test
     fun olderPageWithManyCardsHasEveryCardRead() {
-        val cards =
-            (1..MANY_CARDS).map { index ->
-                val eventId = index.toString(16).padStart(64, '0')
-                timelineRecord(index.toString(16).padStart(64, 'c'), index.toULong(), "nostr:${noteBech32(eventId)}")
-            }
+        val cards = manyCards()
         val newest = timelineRecord(NEWEST_ID, (MANY_CARDS + 1).toULong(), plaintext = "plain newest")
         val fixture =
             EventCardConversationFixture(
@@ -74,6 +72,44 @@ class LaterPageWarmCoverageTest {
             assertFalse("no card composes Loading", LOADING in states)
             assertEquals(MANY_CARDS, states.filter { it.startsWith(LOADED) }.toSet().size)
         } finally {
+            fixture.close()
+        }
+    }
+
+    /**
+     * A dense older page whose first batch of cards is read and whose next batch never answers: the page is applied at
+     * the budget, not later, with every row's Markdown from the one parse, the cards nearest the reader (the page's
+     * newest) read first and composed Loaded, and only the unread ones left to resolve themselves.
+     */
+    @Test
+    fun readCutShortKeepsItsParseAndItsNearestCards() {
+        val later = CountDownLatch(1)
+        val reads = AtomicInteger()
+        val cards = manyCards()
+        val newest = timelineRecord(NEWEST_ID, (MANY_CARDS + 1).toULong(), plaintext = "plain newest")
+        val fixture =
+            EventCardConversationFixture(
+                composeRule = composeRule,
+                snapshotPage = timelinePage(newest).copy(hasMoreBefore = true),
+                backwardsPage = timelinePage(*(cards + newest).toTypedArray()),
+                cacheRead = { if (reads.incrementAndGet() > 1) later.await(NEVER_SECONDS, TimeUnit.SECONDS) },
+            )
+        try {
+            val advanced = fixture.pageOlder()
+            fixture.awaitIdleCondition { fixture.cacheReads.get() >= 2 }
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS + 1L))
+            fixture.awaitIdleCondition { advanced.value != null && fixture.composed.size >= MANY_CARDS }
+
+            assertEquals("each card message is parsed once", MANY_CARDS, fixture.cardParses.get())
+            val loaded =
+                fixture.composed
+                    .map(::describe)
+                    .filter { it.startsWith(LOADED) }
+                    .toSet()
+            val nearest = (MANY_CARDS downTo MANY_CARDS - BATCH + 1).map { "$LOADED ${eventIdOf(it)}" }.toSet()
+            assertEquals("the first batch is the page's newest cards", nearest, loaded)
+        } finally {
+            later.countDown()
             fixture.close()
         }
     }
@@ -166,6 +202,16 @@ class LaterPageWarmCoverageTest {
         return result
     }
 
+    /** [MANY_CARDS] older rows, the row at time `i` naming the card of event [eventIdOf] `i`. */
+    private fun manyCards(): List<TimelineMessageRecordFfi> =
+        (1..MANY_CARDS).map { index ->
+            val note = noteBech32(eventIdOf(index))
+            timelineRecord(index.toString(16).padStart(64, 'c'), index.toULong(), "nostr:$note")
+        }
+
+    /** The event id of the [index]th card. */
+    private fun eventIdOf(index: Int): String = index.toString(16).padStart(64, '0')
+
     /** The dropped later-page card reads recorded so far. */
     private fun droppedWarmLines(): List<String> =
         PerformanceDiagnostics.exportLines().filter { " phase=event_card_page_warm " in it && " result=dropped " in it }
@@ -174,6 +220,8 @@ class LaterPageWarmCoverageTest {
         val NEWEST_ID = "d1".repeat(32)
         val EDITED_ID = "e1".repeat(32)
         const val MANY_CARDS = 40
+        const val BATCH = 16
+        const val NEVER_SECONDS = 120L
         val DURATION = Regex(" duration_ms=(\\d+) ")
     }
 }
