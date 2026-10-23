@@ -601,12 +601,15 @@ internal class ForwardSession(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Exception) {
-            // A rejection spent the token and may mean the destination references were encrypted at an epoch the group
-            // has left, so the user's Retry admits under a fresh token after uploading that message again. Other
-            // messages keep their references.
+            // A rejection spent the token and may mean the group has left the epoch the destination references were
+            // encrypted at. Every reference uploaded before that change is then stale, so every unsent message from
+            // the rejected one onward drops its references and token, and one Retry uploads and admits them afresh.
+            // Messages before it are already the engine's and keep both.
             if (failure is ForwardPublishRejectedException) {
-                publishTokens.forget(targetGroupIdHex, failure.messageIndex)
-                uploadedReferencesByTarget[targetGroupIdHex]?.remove(failure.messageIndex)
+                for (messageIndex in failure.messageIndex until totalMessageCount) {
+                    publishTokens.forget(targetGroupIdHex, messageIndex)
+                    uploadedReferencesByTarget[targetGroupIdHex]?.remove(messageIndex)
+                }
             }
             failureStage = targetFailureStage(failureStage, failure)
             onFailure(targetGroupIdHex, failureStage, failure)

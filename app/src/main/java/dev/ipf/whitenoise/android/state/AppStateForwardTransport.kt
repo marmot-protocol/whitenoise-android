@@ -23,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -228,31 +229,36 @@ internal fun WhiteNoiseAppState.forwardTransport(
         ) {
             requireDestinationAccount()
             val lockRequestedAtMs = diagnostics?.startSpan()
-            withGroupCommitLock(account, targetGroupIdHex) {
-                if (lockRequestedAtMs != null) diagnostics?.commitLockAcquired(lockRequestedAtMs)
-                for (messageIndex in startIndex until messages.size) {
-                    currentCoroutineContext().ensureActive()
-                    onBeforeMessagePublished(messageIndex)
-                    requireDestinationAccount()
-                    val message = messages[messageIndex]
-                    val references = uploadedReferences[messageIndex].orEmpty()
-                    if (message is PreparedForwardMessage.Media) {
-                        check(references.isNotEmpty()) { "missing destination media references" }
+            var admittedAny = false
+            try {
+                withGroupCommitLock(account, targetGroupIdHex) {
+                    if (lockRequestedAtMs != null) diagnostics?.commitLockAcquired(lockRequestedAtMs)
+                    for (messageIndex in startIndex until messages.size) {
+                        currentCoroutineContext().ensureActive()
+                        onBeforeMessagePublished(messageIndex)
+                        requireDestinationAccount()
+                        val message = messages[messageIndex]
+                        val references = uploadedReferences[messageIndex].orEmpty()
+                        if (message is PreparedForwardMessage.Media) {
+                            check(references.isNotEmpty()) { "missing destination media references" }
+                        }
+                        val token = clientTokenFor(messageIndex)
+                        if (publishOne(targetGroupIdHex, messageIndex, message, references, token)) admittedAny = true
+                        requireDestinationAccount()
+                        onMessagePublished(messageIndex)
                     }
-                    publishOne(targetGroupIdHex, messageIndex, message, references, clientTokenFor(messageIndex))
-                    requireDestinationAccount()
-                    onMessagePublished(messageIndex)
                 }
+            } finally {
+                // Once per destination per attempt, after the commit lock is released, whether or not a later
+                // message failed: every message admitted here is already the engine's to deliver.
+                if (admittedAny) launchConvergenceNudge(targetGroupIdHex)
             }
         }
 
         /**
-         * Admits one message and waits for the engine to own it. Every status read and the admission run detached, so
-         * the deadline can stop waiting while a blocking native call is still running. The publish span covers
-         * admission and engine handoff, with admission timed on its own. A new admission then gets its convergence
-         * nudge after the engine owns the message, so the nudge never runs ahead of the worker drain the forward was
-         * waiting for and never spends that budget; it still follows only a new admission, as the composer nudges only
-         * its own accepted-pending send.
+         * Admits one message and waits for the engine to own it, returning whether this call admitted it. Every status
+         * read and the admission run detached, so the deadline can stop waiting while a blocking native call is still
+         * running. The publish span covers admission and engine handoff, with admission timed on its own.
          */
         private suspend fun publishOne(
             targetGroupIdHex: String,
@@ -260,22 +266,20 @@ internal fun WhiteNoiseAppState.forwardTransport(
             message: PreparedForwardMessage,
             references: List<MediaAttachmentReferenceFfi>,
             token: String,
-        ) {
+        ): Boolean {
             val admissionStartedAtMs = diagnostics?.startSpan()
-            val admittedNow =
-                diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
-                    admitForwardPublish(
-                        messageIndex = messageIndex,
-                        token = token,
-                        probe = { detachedNative { localSendStatus(account, targetGroupIdHex, token) } },
-                        beforeAdmit = ::requireDestinationAccount,
-                        admit = { detachedNative { admit(targetGroupIdHex, message, references, token) } },
-                        onAdmitted = {
-                            if (admissionStartedAtMs != null) diagnostics?.admissionAccepted(admissionStartedAtMs)
-                        },
-                    )
-                }
-            if (admittedNow) nudgeConvergence(targetGroupIdHex)
+            return diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
+                admitForwardPublish(
+                    messageIndex = messageIndex,
+                    token = token,
+                    probe = { detachedNative { localSendStatus(account, targetGroupIdHex, token) } },
+                    beforeAdmit = ::requireDestinationAccount,
+                    admit = { detachedNative { admit(targetGroupIdHex, message, references, token) } },
+                    onAdmitted = {
+                        if (admissionStartedAtMs != null) diagnostics?.admissionAccepted(admissionStartedAtMs)
+                    },
+                )
+            }
         }
 
         /** Admits [message] to [targetGroupIdHex] under [token] through MDK's matching token-bound send. */
@@ -300,10 +304,17 @@ internal fun WhiteNoiseAppState.forwardTransport(
             }
 
         /**
-         * Gives a newly admitted message the same best-effort convergence nudge the composer gives an accepted-pending
-         * send. It is bounded on its own, a nudge that runs out of time is recorded as a failure, and it never fails
-         * the forward; the engine still owns delivery.
+         * Gives a destination that received new admissions the same best-effort convergence nudge the composer gives
+         * an accepted-pending send, under the same commit lock. It is launched on the app's mutation scope without
+         * being awaited, so a forward counts its messages as sent as soon as the engine owns them and no nudge time
+         * enters the phase timings or the batch loop. It is bounded on its own, a nudge that runs out of time is
+         * recorded as a failure, and it never fails the forward; the engine still owns delivery.
          */
+        private fun launchConvergenceNudge(targetGroupIdHex: String) {
+            mutationsScope.launch { nudgeConvergence(targetGroupIdHex) }
+        }
+
+        /** Runs one bounded convergence nudge and records its outcome truthfully. */
         @Suppress("TooGenericExceptionCaught")
         private suspend fun nudgeConvergence(targetGroupIdHex: String) {
             val startedAtMs = diagnostics?.startSpan()
@@ -311,7 +322,9 @@ internal fun WhiteNoiseAppState.forwardTransport(
             val result =
                 try {
                     withTimeoutOrNull(FORWARD_CONVERGENCE_NUDGE_MILLIS) {
-                        detachedNative { retryGroupConvergence(account, targetGroupIdHex) }
+                        withGroupCommitLock(account, targetGroupIdHex) {
+                            detachedNative { retryGroupConvergence(account, targetGroupIdHex) }
+                        }
                     }?.let { PerformanceResult.SUCCESS } ?: PerformanceResult.FAILURE
                 } catch (cancellation: CancellationException) {
                     if (startedAtMs != null) diagnostics?.convergenceReturn(startedAtMs, PerformanceResult.DROPPED)

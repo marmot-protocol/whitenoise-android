@@ -113,7 +113,10 @@ internal class ForwardDiagnostics private constructor(
             since(startedAtMs),
         )
 
-    /** Marks the start of the convergence nudge after a forwarded message is admitted. */
+    /**
+     * Marks the start of the convergence nudge after a destination received new admissions. The nudge is not
+     * awaited, so it and its return may be recorded after the terminal phase.
+     */
     fun convergenceStart() {
         phase(PerformancePhase.CONVERGENCE_START, PerformanceResult.PENDING, PerformanceLayer.MDK)
     }

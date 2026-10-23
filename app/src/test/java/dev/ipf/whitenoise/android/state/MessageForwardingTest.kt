@@ -309,6 +309,49 @@ class MessageForwardingTest {
         }
 
     /**
+     * An epoch change makes every reference uploaded before it stale, so rejecting the first unsent message also
+     * drops the later messages' references: one Retry uploads both again and the batch completes.
+     */
+    @Test
+    fun aRejectionDropsTheReferencesOfEveryLaterUnsentMessageSoOneRetrySuffices() =
+        runTest {
+            val transport =
+                RecordingForwardTransport(
+                    scriptedOutcomeOnce = mutableMapOf("target" to ScriptedAdmission.RejectWhileQueued),
+                    scriptedMessageIndex = 0,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages =
+                        listOf(
+                            mediaPayload("first", "first caption", "first.jpg"),
+                            mediaPayload("second", "second caption", "second.jpg"),
+                        ),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            assertEquals(
+                ForwardFailureStage.PublishRejected,
+                session.state.value.targets
+                    .single()
+                    .failureStage,
+            )
+            assertEquals(2, transport.uploadTargets.size)
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(4, transport.uploadTargets.size)
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+            assertEquals(2, transport.tokensForMessage(0).toSet().size)
+        }
+
+    /**
      * A synchronous stale-epoch refusal takes the same path: it is never retried automatically with the stale
      * references, and the user's Retry uploads that message again before admitting it.
      */
@@ -1440,6 +1483,9 @@ class MessageForwardingTest {
         /** Reference hashes encrypted at an epoch the destination has left, which MDK refuses to admit again. */
         private val staleReferenceHashes = mutableSetOf<String>()
 
+        /** Every reference hash uploaded to each destination, all of which an epoch change there makes stale. */
+        private val uploadedHashesByTarget = mutableMapOf<String, MutableSet<String>>()
+
         /** Hands every message held at Queued to the engine, as MDK's account worker eventually does. */
         fun releaseQueued() {
             heldQueued.forEach { token -> tokenStatuses[token] = LocalSendStatusFfi.EngineOwned }
@@ -1522,12 +1568,16 @@ class MessageForwardingTest {
             if (stallUploadOnceFor.remove(targetGroupIdHex)) throw ForwardUploadStalledException(null)
             // Each upload encrypts afresh, so a re-upload yields references distinct from any earlier, stale ones.
             val uploadNumber = uploadTargets.size
-            return message.attachments.mapIndexed { index, attachment ->
-                reference(
-                    fileName = attachment.fileName,
-                    hashPrefix = "$targetGroupIdHex-$index-u$uploadNumber",
-                )
-            }
+            return message.attachments
+                .mapIndexed { index, attachment ->
+                    reference(
+                        fileName = attachment.fileName,
+                        hashPrefix = "$targetGroupIdHex-$index-u$uploadNumber",
+                    )
+                }.also { references ->
+                    uploadedHashesByTarget.getOrPut(targetGroupIdHex) { mutableSetOf() } +=
+                        references.map(MediaAttachmentReferenceFfi::ciphertextSha256)
+                }
         }
 
         /**
@@ -1606,13 +1656,13 @@ class MessageForwardingTest {
                 ScriptedAdmission.RejectWhileQueued -> {
                     tokenStatuses[token] = LocalSendStatusFfi.Queued
                     rejected += target to index
-                    // The account worker drains it and fails validation after an epoch change, so these references
-                    // are stale from now on.
+                    // The account worker drains it and fails validation after an epoch change, so every reference
+                    // uploaded to this destination before it is stale from now on.
                     tokenStatuses[token] = LocalSendStatusFfi.Rejected
-                    staleReferenceHashes += hashes
+                    staleReferenceHashes += uploadedHashesByTarget[target].orEmpty()
                 }
                 ScriptedAdmission.RefuseStaleEpoch -> {
-                    staleReferenceHashes += hashes
+                    staleReferenceHashes += uploadedHashesByTarget[target].orEmpty()
                     throw staleEpochRefusal()
                 }
                 null -> {

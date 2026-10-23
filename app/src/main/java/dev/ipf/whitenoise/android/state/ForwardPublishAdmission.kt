@@ -103,9 +103,8 @@ private suspend fun admitOrClassify(
         } catch (failure: Exception) {
             when (probeOrNull(probe)) {
                 LocalSendStatusFfi.Rejected -> throw ForwardPublishRejectedException(messageIndex)
-                // MDK reports a stale media reference the same way for every media kind, emoji included.
                 null ->
-                    if (isStaleEmojiReference(failure)) {
+                    if (isStaleMediaReferenceEpoch(failure)) {
                         throw ForwardPublishRejectedException(messageIndex)
                     } else {
                         throw ForwardPublishNotCommittedException(failure)

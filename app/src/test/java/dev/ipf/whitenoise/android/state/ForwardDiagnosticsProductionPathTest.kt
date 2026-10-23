@@ -141,7 +141,10 @@ class ForwardDiagnosticsProductionPathTest {
         }
     }
 
-    /** One uncached single-attachment forward to one destination emits the full phase sequence and nothing else. */
+    /**
+     * One uncached single-attachment forward to one destination emits the full phase sequence and nothing else, with
+     * its unawaited convergence nudge recorded exactly once, whenever it finishes.
+     */
     @Test
     fun uncachedMediaForwardEmitsClosedPhasesWithoutIdentifiers() {
         PerformanceDiagnostics.stop()
@@ -172,12 +175,13 @@ class ForwardDiagnosticsProductionPathTest {
                 "media_publish_start",
                 "durable_accepted",
                 "media_publish_return",
-                "convergence_start",
-                "convergence_return",
                 "forward_complete",
             ),
-            phases.filterNot { it == "commit_lock_acquired" },
+            phases.filterNot { it == "commit_lock_acquired" || it.startsWith("convergence_") },
         )
+        val convergence = awaitForwardPhase("convergence_return")
+        assertEquals(1, convergence.count { "phase=convergence_start " in it })
+        assertTrue(convergence.single { "phase=convergence_return " in it }.contains(" result=success layer=mdk"))
         assertTrue(lines.single { "phase=forward_source_lookup " in it }.contains(" result=pending layer=storage"))
         assertTrue(lines.single { "phase=forward_source_download_return " in it }.contains(" result=success layer=mdk"))
         assertTrue(lines.single { "phase=media_upload_return " in it }.contains(" result=success layer=ffi"))
@@ -240,6 +244,21 @@ class ForwardDiagnosticsProductionPathTest {
             signedOut = false,
             running = true,
         )
+
+    /** Waits for an unawaited forward [phase] and returns the forward lines recorded by then. */
+    private fun awaitForwardPhase(
+        phase: String,
+        timeoutMillis: Long = FIXTURE_WAIT_MILLIS,
+    ): List<String> {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        while (System.currentTimeMillis() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            val lines = PerformanceDiagnostics.exportLines().filter { " op=message_forward " in it }
+            if (lines.any { " phase=$phase " in it }) return lines
+            Thread.sleep(5)
+        }
+        error("forward diagnostic timeout waiting for $phase")
+    }
 
     /** Waits for both terminal UI state and the independently scheduled terminal diagnostic before exporting. */
     private fun awaitTerminalDiagnostics(
