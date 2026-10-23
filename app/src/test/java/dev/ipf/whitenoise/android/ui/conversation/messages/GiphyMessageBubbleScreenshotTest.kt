@@ -83,14 +83,14 @@ class GiphyMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         TimeZone.setDefault(originalZone)
     }
 
-    /** Incoming and outgoing envelopes each own exactly one card footer and timestamp. */
+    /** Direct links and whitespace-wrapped iOS envelopes both render as inline cards. */
     @Test
     fun realGiphyMessagesKeepAttributionAndMetadataTogether() {
         val incoming =
             fileTimelineMessage(
                 index = 20,
                 fileName = "",
-                caption = "https://media.giphy.com/media/abc/giphy.gif\nvia GIPHY · Long creator attribution",
+                caption = "https://media3.giphy.com/media/v1.encoded/200_d.gif",
                 attachments = emptyList(),
             )
         val outgoing =
@@ -98,7 +98,7 @@ class GiphyMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                 index = 21,
                 fileName = "",
                 mine = true,
-                caption = "https://media.giphy.com/media/def/giphy.gif\nvia GIPHY",
+                caption = " \r\nhttps://media.giphy.com/media/def/giphy.gif\r\nvia GIPHY · Long creator attribution\r\n",
                 attachments = emptyList(),
             )
         composeRule.setContent {
@@ -121,7 +121,7 @@ class GiphyMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures() {
     @Test
     fun rejectedEnvelopeKeepsLink() {
         val url = "https://media3.giphy.com/media/v1.encoded/200_d.gif"
-        val body = "$url\nvia GIPHY · Late Night with Seth Meyers\n"
+        val body = "$url\nvia GIPHY · Late Night with Seth Meyers\nextra"
         val fixture = fileTimelineMessage(22, "", caption = body, attachments = emptyList())
         val document =
             markdown(body).copy(
@@ -130,7 +130,7 @@ class GiphyMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                         MarkdownBlockFfi.Paragraph(
                             listOf(
                                 MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI, MarkdownLinkDestinationKindFfi.WEB),
-                                MarkdownInlineFfi.Text("\nvia GIPHY · Late Night with Seth Meyers\n"),
+                                MarkdownInlineFfi.Text("\nvia GIPHY · Late Night with Seth Meyers\nextra"),
                             ),
                         ),
                     ),

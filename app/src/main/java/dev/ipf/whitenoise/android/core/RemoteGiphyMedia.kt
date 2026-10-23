@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.core
 import java.net.URI
 import java.util.Locale
 
-/** A bounded GIPHY media envelope emitted by White Noise on iOS. */
+/** A bounded direct GIPHY media link, optionally carrying the iOS picker's attribution. */
 @Suppress("ReturnCount") // Trust-boundary parsing fails closed at each rejected envelope or URL property.
 data class RemoteGiphyMedia(
     val url: String,
@@ -43,13 +43,20 @@ data class RemoteGiphyMedia(
         private val numberedMediaHost = Regex("media\\d+\\.giphy\\.com", RegexOption.IGNORE_CASE)
         private val allowedExtensions = setOf("gif", "webp", "mp4")
 
-        /** Parses the exact two-line text envelope used by the iOS GIPHY picker. */
+        /** Accepts standalone media links and iOS envelopes, including surrounding whitespace and CRLF. */
         fun parse(raw: String): RemoteGiphyMedia? {
             if (raw.length > MAX_WIRE_TEXT_LENGTH) return null
-            val newline = raw.indexOf('\n')
-            if (newline <= 0 || raw.indexOf('\n', newline + 1) != -1) return null
-            val url = raw.substring(0, newline)
-            val attributionLine = raw.substring(newline + 1)
+            val text = raw.trim()
+            val newline = text.indexOf('\n')
+            val url = if (newline < 0) text else text.substring(0, newline).removeSuffix("\r")
+            if (!isAllowedMediaUrl(url)) {
+                return null
+            }
+            if (newline < 0) {
+                return RemoteGiphyMedia(url = url, attribution = null)
+            }
+            if (text.indexOf('\n', newline + 1) != -1) return null
+            val attributionLine = text.substring(newline + 1)
             val attribution =
                 when {
                     attributionLine == ATTRIBUTION_PREFIX -> null
@@ -58,18 +65,20 @@ data class RemoteGiphyMedia(
                     else -> return null
                 }
             if (attribution != null && !isExactAttribution(attribution)) return null
-            if (!isAllowedMediaUrl(url)) return null
             return RemoteGiphyMedia(url = url, attribution = attribution)
         }
 
         /** Detects the bounded GIPHY envelope shape for compact previews without leaking its CDN URL. */
         fun isEnvelopeText(raw: String?): Boolean {
             if (raw == null || raw.length > MAX_WIRE_TEXT_LENGTH) return false
-            val newline = raw.indexOf('\n')
-            if (newline <= 0) return false
-            val tail = raw.substring(newline + 1)
+            val text = raw.trim()
+            val newline = text.indexOf('\n')
+            if (newline < 0) {
+                return isAllowedMediaUrl(text)
+            }
+            val tail = text.substring(newline + 1)
             val attributionShaped = tail.startsWith(ATTRIBUTION_PREFIX) || ATTRIBUTION_PREFIX.startsWith(tail)
-            return attributionShaped && isAllowedGiphyAuthority(raw.substring(0, newline).trim())
+            return attributionShaped && isAllowedGiphyAuthority(text.substring(0, newline).trim())
         }
 
         /** Restricts media loads, including redirects, to approved GIPHY CDN URLs and formats. */

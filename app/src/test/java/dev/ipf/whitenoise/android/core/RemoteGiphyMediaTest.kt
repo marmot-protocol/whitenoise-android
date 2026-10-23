@@ -8,6 +8,20 @@ import org.junit.Test
 
 class RemoteGiphyMediaTest {
     @Test
+    fun parsesSharedGifLinks() {
+        val url = "https://media3.giphy.com/media/v1.encoded/200_d.gif"
+        assertEquals(RemoteGiphyMedia(url, null), RemoteGiphyMedia.parse(url))
+        assertEquals(RemoteGiphyMedia(url, null), RemoteGiphyMedia.parse(" \r\n$url\r\n "))
+        assertEquals(
+            RemoteGiphyMedia(url, "Late Night with Seth Meyers"),
+            RemoteGiphyMedia.parse(" \r\n$url\r\nvia GIPHY · Late Night with Seth Meyers\r\n "),
+        )
+        assertTrue(RemoteGiphyMedia.isEnvelopeText(url))
+        assertNull(RemoteGiphyMedia.parse("Look at $url"))
+        assertNull(RemoteGiphyMedia.parse("$url\nMy caption"))
+    }
+
+    @Test
     fun parsesExactIosEnvelopeWithOptionalCreator() {
         val plain = RemoteGiphyMedia.parse("https://media.giphy.com/media/abc/giphy.gif\nvia GIPHY")
         val credited = RemoteGiphyMedia.parse("https://media12.giphy.com/media/abc/giphy.webp\nvia GIPHY · Alice")
@@ -32,7 +46,6 @@ class RemoteGiphyMediaTest {
     @Test
     fun rejectsMalformedOrEmbellishedEnvelopes() {
         val url = "https://media.giphy.com/media/abc/giphy.gif"
-        assertNull(RemoteGiphyMedia.parse(" $url\nvia GIPHY"))
         assertNull(RemoteGiphyMedia.parse("$url\nvia giphy"))
         assertNull(RemoteGiphyMedia.parse("$url\nvia GIPHY · "))
         assertNull(RemoteGiphyMedia.parse("$url\nvia GIPHY · Alice  Smith"))
