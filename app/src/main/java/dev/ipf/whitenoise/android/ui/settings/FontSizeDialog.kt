@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
 
 /** Four persistent choices reuse the app's existing scale owner and inherited system × app density. */
@@ -99,7 +100,7 @@ private fun FontSizeSample(
             presentation = other,
             mine = false,
             modifier = Modifier.align(Alignment.Start),
-            time = "10:42",
+            time = rememberedClockTime(38_520uL),
         )
         PreviewBubble(
             text = stringResource(R.string.font_size_sample_sent),
@@ -107,7 +108,7 @@ private fun FontSizeSample(
             mine = true,
             modifier = Modifier.align(Alignment.End),
             quote = stringResource(R.string.font_size_sample_quote),
-            time = "10:43",
+            time = rememberedClockTime(38_580uL),
         )
     }
 }

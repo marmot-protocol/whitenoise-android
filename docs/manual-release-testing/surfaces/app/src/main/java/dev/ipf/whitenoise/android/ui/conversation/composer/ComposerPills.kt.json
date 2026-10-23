@@ -168,9 +168,9 @@
     ],
     "settings_controls": [
       {
-        "surface": "action:paste",
+        "surface": "action:paste_from_clipboard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
-        "anchor": "R.string.paste",
+        "anchor": "R.string.paste_from_clipboard",
         "test_ids": [
           "CON-013"
         ]

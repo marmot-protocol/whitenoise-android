@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -55,6 +56,9 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w320dp-h640dp-mdpi")
 class ConversationDictationPersistentControlTest {
+    private val transcriptPasteLabel: String
+        get() = ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_dictation_transcript)
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -72,7 +76,7 @@ class ConversationDictationPersistentControlTest {
             .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Dictating…"))
         val actions =
-            listOf("Cancel", "Paste", "Send").map { label ->
+            listOf("Cancel", transcriptPasteLabel, "Send").map { label ->
                 composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
             }
         actions.forEach { action ->
@@ -90,7 +94,7 @@ class ConversationDictationPersistentControlTest {
         composeRule
             .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Dictating…"))
-        listOf("Cancel", "Paste", "Send").forEach { label ->
+        listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
             composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
         }
         composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertIsDisplayed()
@@ -125,7 +129,7 @@ class ConversationDictationPersistentControlTest {
         val progress = composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(progress.left >= send.left && progress.right <= send.right)
         assertTrue(progress.top >= send.top && progress.bottom <= send.bottom)
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
     }
 
@@ -232,7 +236,7 @@ class ConversationDictationPersistentControlTest {
             runCurrent()
             render(fixture)
             assertEquals("Draft dictated", fixture.draft.text)
-            composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Retry Send").assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Dismiss").assertDoesNotExist()
             composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
@@ -250,7 +254,7 @@ class ConversationDictationPersistentControlTest {
         fixture.platform.listener.onResult("dictated")
         render(fixture)
         assertEquals("Updated dictated", fixture.draft.text)
-        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Retry Send").assertDoesNotExist()
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
@@ -355,10 +359,10 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
         )
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Retry Send").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
         composeRule.onNodeWithText("Incomplete dictation").assertDoesNotExist()
         composeRule.onNodeWithText("Send recognized text").assertDoesNotExist()
     }
@@ -390,10 +394,10 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
         )
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Retry Send").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
         composeRule.onNodeWithText("Incomplete dictation").assertDoesNotExist()
         composeRule.onNodeWithText("Send recognized text").assertDoesNotExist()
     }
@@ -442,7 +446,7 @@ class ConversationDictationPersistentControlTest {
                     recognitionIncomplete = true,
                 ),
         )
-        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
         composeRule.onNodeWithTag("dictation-partial-send-dialog").assertDoesNotExist()
     }
 
@@ -465,7 +469,7 @@ class ConversationDictationPersistentControlTest {
         )
         composeRule.onNodeWithContentDescription("Retry Send").performClick()
         composeRule.onAllNodesWithText("Incomplete dictation").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertDoesNotExist()
     }
 
     /** Unknown recognition failures never offer an implicit or confirmed partial-prefix send. */
@@ -486,7 +490,7 @@ class ConversationDictationPersistentControlTest {
                     recognitionIncomplete = true,
                 ),
         )
-        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
         composeRule.onNodeWithText("Incomplete dictation").assertDoesNotExist()
         composeRule.onNodeWithText("Send recognized text").assertDoesNotExist()
     }
@@ -548,6 +552,33 @@ class ConversationDictationPersistentControlTest {
             assertEquals(1, sends)
             assertEquals("Edited saved text", fixture.draft.text)
         }
+
+    /** The composed editor exposes both intended paste actions without giving them the same accessible name. */
+    @Test fun clipboardAndTranscriptPasteHaveDistinctLocalizedNamesTogether() {
+        val fixture = fixture(TextFieldValue())
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerBar(
+                    replyingTo = null,
+                    messageTextCopy = dev.ipf.whitenoise.android.core.MessageTextCopy.Default,
+                    onCancelReply = {},
+                    onSend = { _, _ -> },
+                    textState = rememberComposerTextState(draftKey = ACCOUNT to GROUP, initialDraft = TextFieldValue()),
+                    draftKey = ACCOUNT to GROUP,
+                    draftAccountRef = ACCOUNT,
+                    draftGroupIdHex = GROUP,
+                    dictationController = fixture.controller,
+                    dictationAccountRef = ACCOUNT,
+                    dictationGroupIdHex = GROUP,
+                )
+            }
+        }
+        composeRule.onAllNodesWithContentDescription(context.getString(R.string.paste_from_clipboard)).assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription(context.getString(R.string.paste_dictation_transcript)).assertCountEquals(1)
+        composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
+    }
 
     private fun render(
         fixture: Fixture,

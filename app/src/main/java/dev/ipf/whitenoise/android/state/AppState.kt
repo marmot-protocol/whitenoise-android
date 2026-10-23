@@ -8184,31 +8184,36 @@ class WhiteNoiseAppState private constructor(
         fontScale = scale
         val revision = ++fontScaleSaveRevision
         val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
-        mutationsScope.launch {
-            hostPreferenceCommitMutex.withLock {
-                val saved =
-                    withContext(Dispatchers.IO) {
-                        runCatchingCancellable {
-                            val editor = preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue)
-                            var committed = false
-                            completeHostPreferenceCommit(attempt) { editor.commit().also { committed = it } }
-                            committed
-                        }.getOrDefault(false)
-                    }
-                if (saved) {
-                    durableFontScale = scale
-                } else {
-                    // SharedPreferences changes its memory map even when the disk commit fails.
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            preferences.edit().putString(FONT_SCALE_KEY, durableFontScale.preferenceValue).commit()
+        mutationsScope
+            .launch {
+                hostPreferenceCommitMutex.withLock {
+                    val saved =
+                        withContext(Dispatchers.IO) {
+                            runCatchingCancellable {
+                                val editor = preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue)
+                                var committed = false
+                                completeHostPreferenceCommit(attempt) { editor.commit().also { committed = it } }
+                                committed
+                            }.onFailure { attempt.failure() }.getOrDefault(false)
+                        }
+                    if (saved) {
+                        durableFontScale = scale
+                    } else {
+                        // SharedPreferences changes its memory map even when the disk commit fails.
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                preferences.edit().putString(FONT_SCALE_KEY, durableFontScale.preferenceValue).commit()
+                            }
+                        }
+                        if (revision == fontScaleSaveRevision) {
+                            fontScale = durableFontScale
+                            presentTransient(R.string.font_size_save_failed)
                         }
                     }
-                    if (revision == fontScaleSaveRevision) fontScale = durableFontScale
-                    presentTransient(R.string.font_size_save_failed)
                 }
+            }.invokeOnCompletion { cause ->
+                if (cause is CancellationException) attempt.cancel()
             }
-        }
     }
 
     fun updateAppFont(font: AppFont) {

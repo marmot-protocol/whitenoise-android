@@ -746,6 +746,8 @@
     <string name="diagnostic_send_to_self_failed">Не удалось отправить себе: %1$s</string>
     <string name="clear">Очистить</string>
     <string name="paste">Вставить</string>
+    <string name="paste_from_clipboard">Вставить из буфера обмена</string>
+    <string name="paste_dictation_transcript">Вставить расшифровку</string>
     <string name="live">Прямой эфир</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Снимка реле пока нет.</string>
@@ -2356,7 +2358,7 @@
     <string name="profile_notifications_android_vibration">Задано в Android</string>
     <string name="profile_notification_scope_detail">Настройки Android для этого человека применяются к сообщениям, приглашениям и изменениям ролей в группах, связанным с ним, во всех чатах этого аккаунта. Отключение уведомлений действует только для сообщений. Доставка и счётчики непрочитанных не меняются.</string>
     <string name="profile_notification_precedence">Сначала действуют правила отключения уведомлений чата и уведомлений только об упоминаниях. Затем — отключение уведомлений или свои настройки Android для этого человека. Настройки по умолчанию возвращают настройки чата и общие настройки. Существующие уведомления сохраняют исходный канал.</string>
-    <string name="profile_notification_channel_name">%1$s · Сообщения во всех чатах</string>
+    <string name="profile_notification_channel_name">%1$s · Уведомления во всех чатах</string>
     <string name="destination_filter_all">Все чаты</string>
     <string name="destination_filter_selected">Проверить выбранные (%1$d)</string>
     <string name="destination_filter_label">Фильтр чатов</string>

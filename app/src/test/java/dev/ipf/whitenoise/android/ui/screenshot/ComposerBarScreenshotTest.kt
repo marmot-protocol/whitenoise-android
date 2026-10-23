@@ -72,7 +72,15 @@ class ComposerBarScreenshotTest {
 
     @Test
     fun composerPasteNarrowLargeAmoledRtl() {
-        render(darkTheme = true, amoled = true, draft = "", width = 280, fontScale = 1.6f, rtl = true, attachmentsEnabled = true)
+        render(
+            darkTheme = true,
+            amoled = true,
+            draft = "",
+            width = 280,
+            fontScale = 1.6f,
+            rtl = true,
+            attachmentsEnabled = true,
+        )
         composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_paste_narrow_large_amoled_rtl.png")
     }

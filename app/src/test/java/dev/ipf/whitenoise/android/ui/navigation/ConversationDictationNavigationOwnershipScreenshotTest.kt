@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import android.content.Context
 import android.view.View
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
@@ -27,7 +28,6 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
@@ -47,6 +49,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,6 +70,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ConversationDictationNavigationOwnershipScreenshotTest {
+    private val transcriptPasteLabel: String
+        get() = ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_dictation_transcript)
+
     private val scheduler = TestCoroutineScheduler()
 
     @get:Rule
@@ -107,7 +113,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         val rootBounds = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         val keyboardTop = rootBounds.bottom - observedImeBottom
-        listOf("Cancel", "Paste", "Send").forEach { label ->
+        listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
             val matcher = hasContentDescription(label) and hasAnyAncestor(hasTestTag(APP_DICTATION_CONTROL_TAG))
             composeRule.onAllNodes(matcher).assertCountEquals(1)
             val action = composeRule.onNode(matcher).assertIsDisplayed()
@@ -198,7 +204,12 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
             fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null)
             fixture.locked = true
         }
-        listOf("Cancel", "Paste", "Send").forEach { label ->
+        listOf(
+            "Cancel",
+            transcriptPasteLabel,
+            ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_from_clipboard),
+            "Send",
+        ).forEach { label ->
             composeRule.onAllNodesWithContentDescription(label).assertCountEquals(0)
         }
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
@@ -213,7 +224,10 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         }
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         composeRule.mainClock.autoAdvance = true
-        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule
+            .onNode(
+                hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+            ).performClick()
         composeRule.runOnUiThread { fixture.platform.listener.onResult("dictated words") }
         assertEquals(listOf(ACCOUNT to GROUP), fixture.writes)
         assertEquals("dictated words", fixture.draft.text)
@@ -238,9 +252,10 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     }
 
     private fun assertSingleActionSet() {
-        listOf("Cancel", "Paste", "Send").forEach { label ->
-            composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
-            composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
+        listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
+            val action = hasContentDescription(label) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG))
+            composeRule.onAllNodes(action).assertCountEquals(1)
+            composeRule.onNode(action).assertIsDisplayed()
         }
     }
 

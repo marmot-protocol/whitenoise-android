@@ -1560,7 +1560,7 @@ internal fun ComposerPill(
                                     ) {
                                         Icon(
                                             painter = painterResource(R.drawable.ic_content_paste),
-                                            contentDescription = stringResource(R.string.paste),
+                                            contentDescription = stringResource(R.string.paste_from_clipboard),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(24.dp),
                                         )

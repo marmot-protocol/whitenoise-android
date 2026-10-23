@@ -23,6 +23,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import org.robolectric.util.ReflectionHelpers
+import org.robolectric.util.ReflectionHelpers.ClassParameter
 
 /** Presenter integration verifies actual posted channel IDs and People metadata, not a duplicate routing function. */
 @RunWith(RobolectricTestRunner::class)
@@ -272,6 +274,81 @@ class ProfileNotificationPresenterTest {
                 assertNotEquals(id, card(event).channelId)
             }
             assertEquals(1, manager.notificationChannels.count { it.id.startsWith(ProfileNotificationChannels.PREFIX) })
+        }
+
+    /** Category controls win over person sound, including Android channel-group disablement. */
+    @Test fun actorCustomSoundCannotBypassCategoryOrGroupDisablement() =
+        runBlocking {
+            for (trigger in listOf(
+                NotificationTriggerFfi.GROUP_INVITE,
+                NotificationTriggerFfi.MADE_ADMIN,
+                NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                NotificationTriggerFfi.REMOVED_FROM_GROUP,
+            )) {
+                for (blockGroup in listOf(false, true)) {
+                    // Reset only this Robolectric fixture. Android cannot raise a user's existing channel importance.
+                    org.robolectric.shadows.ShadowNotificationManager
+                        .reset()
+                    setUp()
+                    val profileId = customize(alice)
+                    val event = update(group = "blocked-$trigger-$blockGroup", message = "blocked").copy(trigger = trigger)
+                    val category = NotificationChannelSpec.forUpdate(event)
+                    val channel = requireNotNull(manager.getNotificationChannel(category.id))
+                    val importance = channel.importance
+                    val groupId = requireNotNull(channel.group)
+                    assertTrue(importance > NotificationManager.IMPORTANCE_NONE)
+                    assertFalse(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
+                    val healthy = event.copy(messageIdHex = "healthy-before")
+                    assertTrue(presenter.show(healthy, shortNpub = { it }))
+                    assertEquals(profileId, card(healthy).channelId)
+                    val channelCount = manager.notificationChannels.size
+                    if (blockGroup) {
+                        val group = requireNotNull(manager.getNotificationChannelGroup(groupId))
+                        ReflectionHelpers.callInstanceMethod<Void>(
+                            group,
+                            "setBlocked",
+                            ClassParameter.from(Boolean::class.javaPrimitiveType!!, true),
+                        )
+                        manager.createNotificationChannelGroup(group)
+                        assertTrue(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
+                        assertEquals(importance, requireNotNull(manager.getNotificationChannel(category.id)).importance)
+                    } else {
+                        channel.importance = NotificationManager.IMPORTANCE_NONE
+                        manager.createNotificationChannel(channel)
+                        assertEquals(NotificationManager.IMPORTANCE_NONE, requireNotNull(manager.getNotificationChannel(category.id)).importance)
+                        assertFalse(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
+                    }
+                    assertFalse(presenter.show(event, shortNpub = { it }))
+                    assertFalse(presenter.show(event, redactContent = true, shortNpub = { it }))
+                    assertEquals(channelCount, manager.notificationChannels.size)
+
+                    // A fresh healthy framework fixture proves the next iteration cannot inherit a muted category.
+                    org.robolectric.shadows.ShadowNotificationManager
+                        .reset()
+                    setUp()
+                    customize(alice)
+                    assertEquals(importance, requireNotNull(manager.getNotificationChannel(category.id)).importance)
+                    assertFalse(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
+                    val recovered = event.copy(messageIdHex = "healthy-after")
+                    assertTrue(presenter.show(recovered, shortNpub = { it }))
+                    assertEquals(profileId, card(recovered).channelId)
+                }
+            }
+        }
+
+    /** Corrections keep their silent channel; reset changes future actor events without exposing a private name. */
+    @Test fun actorEventCorrectionsAndResetKeepTheirExistingOwnership() =
+        runBlocking {
+            val profileId = customize(alice)
+            val event = update(message = "actor-invite").copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
+            assertTrue(presenter.show(event, shortNpub = { it }))
+            ProfileNotificationOverridePreferences(context).set("personal", alice, ProfileNotificationOverride())
+            assertTrue(presenter.show(event, silentUpdate = true, shortNpub = { it }))
+            assertEquals(profileId, card(event).channelId)
+            val future = event.copy(messageIdHex = "after-actor-reset", timestampMs = event.timestampMs + 1000)
+            assertTrue(presenter.show(future, redactContent = true, senderNameOverride = "Private actor", shortNpub = { it }))
+            assertNotEquals(profileId, card(future).channelId)
+            assertFalse(manager.getNotificationChannel(card(future).channelId).name.contains("Private actor"))
         }
 
     /** Creates a real OS channel plus its persisted routing choice for assertions against posted notifications. */

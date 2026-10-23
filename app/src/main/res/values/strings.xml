@@ -1051,6 +1051,8 @@
     <string name="diagnostic_send_to_self_failed">Send-to-self failed: %1$s</string>
     <string name="clear">Clear</string>
     <string name="paste">Paste</string>
+    <string name="paste_from_clipboard">Paste from clipboard</string>
+    <string name="paste_dictation_transcript">Paste transcript</string>
     <string name="live">Live</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">No relay snapshot yet.</string>
@@ -2455,7 +2457,7 @@
     <string name="profile_notifications_android_vibration">Set by Android</string>
     <string name="profile_notification_scope_detail">Custom Android settings apply to messages, invitations and group role changes attributed to this person across conversations for this account. Muting applies only to messages. Delivery and unread counts are unchanged.</string>
     <string name="profile_notification_precedence">Chat mute and mentions-only rules apply first. This person’s mute or custom Android settings apply next. Use defaults restores chat and global settings. Existing notifications keep their original channel.</string>
-    <string name="profile_notification_channel_name">%1$s · Messages across chats</string>
+    <string name="profile_notification_channel_name">%1$s · Notifications across chats</string>
     <string name="destination_filter_all">All chats</string>
     <string name="destination_filter_selected">Review selected (%1$d)</string>
     <string name="destination_filter_label">Filter chats</string>

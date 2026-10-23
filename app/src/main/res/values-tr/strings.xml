@@ -710,6 +710,8 @@
     <string name="diagnostic_send_to_self_failed">Kendine gönderme başarısız: %1$s</string>
     <string name="clear">Temizle</string>
     <string name="paste">Yapıştır</string>
+    <string name="paste_from_clipboard">Panodan yapıştır</string>
+    <string name="paste_dictation_transcript">Dökümü yapıştır</string>
     <string name="live">Canlı</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Henüz aktarma anlık görüntüsü yok.</string>
@@ -2284,7 +2286,7 @@
     <string name="profile_notifications_android_vibration">Android tarafından ayarlandı</string>
     <string name="profile_notification_scope_detail">Özel Android ayarları, bu hesabın tüm sohbetlerinde bu kişiye atfedilen mesajlar, davetler ve grup rolü değişiklikleri için geçerlidir. Sessize alma yalnızca mesajlara uygulanır. İletim ve okunmamış sayıları değişmez.</string>
     <string name="profile_notification_precedence">Önce sohbeti sessize alma ve yalnızca bahsetmeler kuralları uygulanır. Ardından bu kişinin sessize alma veya özel Android ayarları gelir. Varsayılanları kullanmak sohbet ve genel ayarları geri getirir. Mevcut bildirimler özgün kanallarını korur.</string>
-    <string name="profile_notification_channel_name">%1$s · Tüm sohbetlerdeki mesajlar</string>
+    <string name="profile_notification_channel_name">%1$s · Sohbetler genelinde bildirimler</string>
     <string name="destination_filter_all">Tüm sohbetler</string>
     <string name="destination_filter_selected">Seçilenleri incele (%1$d)</string>
     <string name="destination_filter_label">Sohbetleri filtrele</string>

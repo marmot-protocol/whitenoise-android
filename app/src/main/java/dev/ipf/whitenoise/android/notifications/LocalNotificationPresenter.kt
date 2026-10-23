@@ -996,6 +996,35 @@ class LocalNotificationPresenter(
                             null
                         }
                     if (replacementHasChanged) return@withRegisteredShow false
+                    val category = NotificationChannelSpec.forUpdate(update)
+                    if (
+                        update.trigger != NotificationTriggerFfi.NEW_MESSAGE &&
+                        profileNotificationSoundAuthor(update) != null
+                    ) {
+                        // A person sound changes the alert, never the category or chat suppression policy.
+                        // settings() only reads existing routing; no channel is materialized by this check.
+                        val categoryBlocked =
+                            withContext(Dispatchers.IO) {
+                                val categorySettings =
+                                    conversationNotificationRouting
+                                        .settings(
+                                            NotificationConversationDescriptor(
+                                                conversationShortcutId(update.accountRef, update.groupIdHex),
+                                                update.isDm,
+                                                conversationTitleOverride,
+                                                ConversationVibrationPattern.SYSTEM_DEFAULT,
+                                            ),
+                                        ).filter { it.channel == category } +
+                                        ConversationNotificationCategorySetting(
+                                            category,
+                                            ConversationNotificationScope.USE_GLOBAL_DEFAULT,
+                                            false,
+                                            AndroidNotificationSettingsTarget.Global(category),
+                                        )
+                                category in androidBlockedConversationCategories(context, categorySettings)
+                            }
+                        if (categoryBlocked) return@withRegisteredShow false
+                    }
                     // Ordinary messages keep their required People/conversation child.
                     // Other event types inherit the stable global channel until this
                     // chat has an explicit or legacy custom override.

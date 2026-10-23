@@ -710,6 +710,8 @@
     <string name="diagnostic_send_to_self_failed">Falha ao enviar para si mesmo: %1$s</string>
     <string name="clear">Limpar</string>
     <string name="paste">Colar</string>
+    <string name="paste_from_clipboard">Colar da área de transferência</string>
+    <string name="paste_dictation_transcript">Colar transcrição</string>
     <string name="live">Ao vivo</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Nenhum instantâneo de retransmissão ainda.</string>
@@ -2286,7 +2288,7 @@
     <string name="profile_notifications_android_vibration">Definido pelo Android</string>
     <string name="profile_notification_scope_detail">As configurações personalizadas do Android se aplicam a mensagens, convites e mudanças de função em grupos atribuídas a esta pessoa em todas as conversas desta conta. Silenciar se aplica apenas às mensagens. A entrega e as contagens de não lidas não mudam.</string>
     <string name="profile_notification_precedence">As regras de silenciamento do chat e de apenas menções se aplicam primeiro. Depois, o silenciamento ou as configurações personalizadas do Android desta pessoa. Usar padrões restaura as configurações do chat e globais. As notificações existentes mantêm o canal original.</string>
-    <string name="profile_notification_channel_name">%1$s · Mensagens em todos os chats</string>
+    <string name="profile_notification_channel_name">%1$s · Notificações entre conversas</string>
     <string name="destination_filter_all">Todas as conversas</string>
     <string name="destination_filter_selected">Rever seleção (%1$d)</string>
     <string name="destination_filter_label">Filtrar conversas</string>

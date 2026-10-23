@@ -5881,6 +5881,12 @@
           "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified."
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+      "symbol": "FontSizeDialog",
+      "bindings": [],
+      "remaining": "Font-size preview dialog needs a directly asserted modal entry and live Small/Default/Large/Extra large selection journey, persistence and cancellation, large-font/RTL/AMOLED layout, lifecycle and accessibility qualification. Source screenshot and host tests alone do not establish executed Maestro coverage."
     }
   ]
 }

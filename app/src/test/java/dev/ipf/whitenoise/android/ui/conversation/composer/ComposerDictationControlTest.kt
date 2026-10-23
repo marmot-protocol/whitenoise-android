@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -10,7 +11,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -22,6 +26,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
@@ -53,6 +58,9 @@ private typealias DictationListener = ConversationDictationRecognitionListener
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w320dp-h640dp-mdpi")
 class ComposerDictationControlTest {
+    private val transcriptPasteLabel: String
+        get() = ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_dictation_transcript)
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -177,7 +185,10 @@ class ComposerDictationControlTest {
         assertTrue(controller.state is ConversationDictationState.Starting)
         assertTrue(controller.ownsMicrophone)
         composeRule.onNodeWithTag(COMPOSER_DICTATION_STRIP_TAG).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule
+            .onNode(
+                hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+            ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
         field.assertIsDisplayed().assertIsFocused()
         assertEquals(
@@ -198,7 +209,10 @@ class ComposerDictationControlTest {
 
         assertTrue(controller.state is ConversationDictationState.Starting)
         field.assertIsDisplayed().assertIsNotFocused()
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule
+            .onNode(
+                hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+            ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
     }
@@ -214,7 +228,10 @@ class ComposerDictationControlTest {
             composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
             composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+            composeRule
+                .onNode(
+                    hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+                ).assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
         } finally {
@@ -275,7 +292,12 @@ class ComposerDictationControlTest {
 
         /** Records the dispatched action. */
         fun action(label: String) {
-            val node = composeRule.onNodeWithContentDescription(label).performScrollTo().assertIsDisplayed()
+            val node =
+                composeRule
+                    .onNode(
+                        hasContentDescription(label) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+                    ).performScrollTo()
+                    .assertIsDisplayed()
             val bounds = node.fetchSemanticsNode().boundsInRoot
             val root = composeRule.onNodeWithTag(ROOT_TAG).fetchSemanticsNode().boundsInRoot
             val emoji = composeRule.onNodeWithContentDescription("Open emoji picker").fetchSemanticsNode().boundsInRoot
@@ -283,7 +305,7 @@ class ComposerDictationControlTest {
             assertTrue("RTL actions must stay clear of leading tools", bounds.right <= emoji.left)
             node.performClick()
         }
-        action("Paste")
+        action(transcriptPasteLabel)
         FakeDictationPlatform.listener.onResult("first")
         assertTrue(controller.state is ConversationDictationState.Idle)
         composeRule.onNodeWithContentDescription("Dictate text").performClick()
