@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
+import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
@@ -57,9 +59,13 @@ internal fun WhiteNoiseAppState.forwardTransport(
     // Disk this forward's concurrent destination uploads hold for staged copies, so they never count on the same space.
     val diskClaims = StagedDiskClaims()
 
-    // Native calls a publish deadline may stop waiting for. They finish on their own after the wait ends, and MDK's
-    // client token keeps a late admission from becoming a second message. The blocking call itself still runs on
-    // marmotIo's dispatcher; this scope only owns the detached wait, so it starts undispatched.
+    // Native calls a publish deadline may stop waiting for. A call is abandoned, not cancelled: when the wait ends it
+    // keeps running, and may hold one marmotIo thread until the native call returns. Status reads and admission run
+    // one at a time, so at most one such call is outstanding per message per attempt. Its result is never observed
+    // and writes nothing back. An abandoned admission may still land after the user dismissed the forward, which
+    // matches MDK's outlives-cancellation contract; its client token keeps it from becoming a second message on a
+    // retry. The blocking call itself runs on marmotIo's dispatcher; this scope only owns the detached wait, so it
+    // starts undispatched.
     val nativeCalls = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     return object : ForwardTransport {
@@ -241,9 +247,12 @@ internal fun WhiteNoiseAppState.forwardTransport(
         }
 
         /**
-         * Admits one message and waits for the engine to own it. Every status read, the admission and the
-         * convergence nudge run detached, so the deadline can stop waiting while a blocking native call is still
-         * running. The publish span covers admission and engine handoff, with admission timed on its own.
+         * Admits one message and waits for the engine to own it. Every status read and the admission run detached, so
+         * the deadline can stop waiting while a blocking native call is still running. The publish span covers
+         * admission and engine handoff, with admission timed on its own. A new admission then gets its convergence
+         * nudge after the engine owns the message, so the nudge never runs ahead of the worker drain the forward was
+         * waiting for and never spends that budget; it still follows only a new admission, as the composer nudges only
+         * its own accepted-pending send.
          */
         private suspend fun publishOne(
             targetGroupIdHex: String,
@@ -253,54 +262,65 @@ internal fun WhiteNoiseAppState.forwardTransport(
             token: String,
         ) {
             val admissionStartedAtMs = diagnostics?.startSpan()
-            diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
-                admitForwardPublish(
-                    messageIndex = messageIndex,
-                    token = token,
-                    probe = { detachedNative { localSendStatus(account, targetGroupIdHex, token) } },
-                    beforeAdmit = ::requireDestinationAccount,
-                    admit = {
-                        detachedNative {
-                            when (message) {
-                                is PreparedForwardMessage.Text ->
-                                    sendTextWithClientToken(account, targetGroupIdHex, message.text, token)
-                                is PreparedForwardMessage.Media ->
-                                    sendPreparedMediaWithClientToken(
-                                        account,
-                                        targetGroupIdHex,
-                                        references,
-                                        message.caption,
-                                        token,
-                                        null,
-                                    )
-                            }
-                        }
-                    },
-                    onAdmitted = {
-                        if (admissionStartedAtMs != null) diagnostics?.admissionAccepted(admissionStartedAtMs)
-                        nudgeConvergence(targetGroupIdHex)
-                    },
-                )
-            }
+            val admittedNow =
+                diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
+                    admitForwardPublish(
+                        messageIndex = messageIndex,
+                        token = token,
+                        probe = { detachedNative { localSendStatus(account, targetGroupIdHex, token) } },
+                        beforeAdmit = ::requireDestinationAccount,
+                        admit = { detachedNative { admit(targetGroupIdHex, message, references, token) } },
+                        onAdmitted = {
+                            if (admissionStartedAtMs != null) diagnostics?.admissionAccepted(admissionStartedAtMs)
+                        },
+                    )
+                }
+            if (admittedNow) nudgeConvergence(targetGroupIdHex)
         }
+
+        /** Admits [message] to [targetGroupIdHex] under [token] through MDK's matching token-bound send. */
+        private suspend fun MarmotInterface.admit(
+            targetGroupIdHex: String,
+            message: PreparedForwardMessage,
+            references: List<MediaAttachmentReferenceFfi>,
+            token: String,
+        ): LocalSendAcceptanceFfi =
+            when (message) {
+                is PreparedForwardMessage.Text ->
+                    sendTextWithClientToken(account, targetGroupIdHex, message.text, token)
+                is PreparedForwardMessage.Media ->
+                    sendPreparedMediaWithClientToken(
+                        account,
+                        targetGroupIdHex,
+                        references,
+                        message.caption,
+                        token,
+                        null,
+                    )
+            }
 
         /**
          * Gives a newly admitted message the same best-effort convergence nudge the composer gives an accepted-pending
-         * send. It is bounded on its own and never fails the forward; the engine still owns delivery.
+         * send. It is bounded on its own, a nudge that runs out of time is recorded as a failure, and it never fails
+         * the forward; the engine still owns delivery.
          */
         @Suppress("TooGenericExceptionCaught")
         private suspend fun nudgeConvergence(targetGroupIdHex: String) {
-            try {
-                diagnostics.span(ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn) {
+            val startedAtMs = diagnostics?.startSpan()
+            diagnostics?.convergenceStart()
+            val result =
+                try {
                     withTimeoutOrNull(FORWARD_CONVERGENCE_NUDGE_MILLIS) {
                         detachedNative { retryGroupConvergence(account, targetGroupIdHex) }
-                    }
+                    }?.let { PerformanceResult.SUCCESS } ?: PerformanceResult.FAILURE
+                } catch (cancellation: CancellationException) {
+                    if (startedAtMs != null) diagnostics?.convergenceReturn(startedAtMs, PerformanceResult.DROPPED)
+                    throw cancellation
+                } catch (_: Exception) {
+                    // Best effort only: the account worker publishes the admitted message either way.
+                    PerformanceResult.FAILURE
                 }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                // Best effort only: the account worker publishes the admitted message either way.
-            }
+            if (startedAtMs != null) diagnostics?.convergenceReturn(startedAtMs, result)
         }
 
         /** Runs [block] on the native dispatcher outside this coroutine, so cancelling the wait never blocks on it. */

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -221,6 +223,40 @@ class ForwardPublishAdmissionTest {
             assertEquals(DEADLINE_MILLIS, currentTime)
         }
 
+    /** An acceptance for a different token fails loudly instead of being counted as sent. */
+    @Test
+    fun anAcceptanceForAnotherTokenFailsLoudly() =
+        runTest {
+            val failure =
+                runCatching {
+                    admitForwardPublish(
+                        messageIndex = 0,
+                        token = TOKEN,
+                        probe = { null },
+                        admit = { LocalSendAcceptanceFfi(clientToken = "other-token", messageIdHex = "message") },
+                        deadlineMillis = DEADLINE_MILLIS,
+                        pollMillis = POLL_MILLIS,
+                    )
+                }.exceptionOrNull()
+
+            assertTrue("expected a token mismatch, got $failure", failure is IllegalStateException)
+            assertTrue(failure !is ForwardPublishNotCommittedException && failure !is ForwardPublishTimeoutException)
+        }
+
+    /** A synchronous stale-epoch refusal is reported as rejected, so the session uploads that message again. */
+    @Test
+    fun aStaleEpochRefusalIsReportedAsRejected() =
+        runTest {
+            val ledger = FakeTokenLedger()
+            val stale =
+                MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+
+            val failure = runCatching { publish(ledger, admitFailure = stale) }.exceptionOrNull()
+
+            assertTrue("expected rejected, got $failure", failure is ForwardPublishRejectedException)
+            assertTrue(ledger.messages.isEmpty())
+        }
+
     /** The convergence nudge runs once after a new admission and never for a token MDK already owned. */
     @Test
     fun theConvergenceNudgeFollowsOnlyANewAdmission() =
@@ -231,11 +267,11 @@ class ForwardPublishAdmissionTest {
                 delay(HANDOFF_MILLIS)
                 fresh.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
             }
-            publish(fresh, onAdmitted = { nudges += 1 })
+            assertTrue(publish(fresh, onAdmitted = { nudges += 1 }))
             assertEquals(1, nudges)
 
             val owned = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.EngineOwned }
-            publish(owned, onAdmitted = { nudges += 1 })
+            assertFalse(publish(owned, onAdmitted = { nudges += 1 }))
             assertEquals(1, nudges)
         }
 
@@ -244,5 +280,6 @@ class ForwardPublishAdmissionTest {
         const val DEADLINE_MILLIS = 5_000L
         const val POLL_MILLIS = 100L
         const val HANDOFF_MILLIS = 1_000L
+        const val STALE_EPOCH_DETAILS = "media reference was encrypted at epoch 3 but the group is at 4"
     }
 }

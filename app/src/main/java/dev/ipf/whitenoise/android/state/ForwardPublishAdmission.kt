@@ -22,9 +22,11 @@ internal const val FORWARD_PUBLISH_STATUS_POLL_MILLIS = 250L
 internal class ForwardPublishTimeoutException : IllegalStateException("forward publish was not handed off in time")
 
 /**
- * MDK rejected the forwarded message at [messageIndex], either at admission or while it was still queued. Its client
- * token is spent, so the session replaces it, and the destination waits for a deliberate Retry rather than
- * re-admitting automatically, so repeated rejections never stack failed messages.
+ * MDK rejected the forwarded message at [messageIndex]: while it was still queued, or at admission because its
+ * destination media references were encrypted at an epoch the group has since left. Its client token is spent and its
+ * references may be stale, so the session replaces the token and drops that message's destination references, and
+ * the destination waits for a deliberate Retry that uploads again rather than re-admitting automatically, so repeated
+ * rejections never stack failed messages.
  */
 internal class ForwardPublishRejectedException(
     val messageIndex: Int,
@@ -47,10 +49,11 @@ private val LocalSendStatusFfi?.handedOff: Boolean
  * it, so a message that is merely queued and later rejected can never be reported as sent.
  *
  * An owned token is never admitted again: an earlier admission is waited on, and only a token MDK does not know is
- * admitted, after [beforeAdmit] re-checks the owner. [onAdmitted] runs once after a new admission, for the same
- * best-effort convergence nudge the composer gives an accepted-pending send. The whole sequence, including every
- * status read, is bounded by [deadlineMillis] and ends in [ForwardPublishTimeoutException]; the callers' probe and
- * admission must therefore be cancellable while their native call is still running.
+ * admitted, after [beforeAdmit] re-checks the owner. [onAdmitted] runs right after a new admission, for timing only.
+ * The whole sequence, including every status read, is bounded by [deadlineMillis] and ends in
+ * [ForwardPublishTimeoutException]; the callers' probe and admission must therefore be cancellable while their
+ * native call is still running. Returns whether this call admitted the message, so the caller can give a new
+ * admission its convergence nudge after the engine has taken it rather than inside this budget.
  */
 @Suppress("LongParameterList", "ThrowsCount")
 internal suspend fun admitForwardPublish(
@@ -62,25 +65,28 @@ internal suspend fun admitForwardPublish(
     onAdmitted: suspend () -> Unit = {},
     deadlineMillis: Long = FORWARD_PUBLISH_ADMISSION_MILLIS,
     pollMillis: Long = FORWARD_PUBLISH_STATUS_POLL_MILLIS,
-) {
+): Boolean =
     withTimeoutOrNull(deadlineMillis) {
         val existing = probeOrNull(probe)
         when {
-            existing.handedOff -> return@withTimeoutOrNull Unit
+            existing.handedOff -> return@withTimeoutOrNull false
             existing == LocalSendStatusFfi.Rejected -> throw ForwardPublishRejectedException(messageIndex)
-            existing == null -> {
-                beforeAdmit()
-                admitOrClassify(messageIndex, token, probe, admit)
-                onAdmitted()
-            }
+        }
+        val admittedNow = existing == null
+        if (admittedNow) {
+            beforeAdmit()
+            admitOrClassify(messageIndex, token, probe, admit)
+            onAdmitted()
         }
         awaitEngineHandoff(messageIndex, probe, pollMillis)
+        admittedNow
     } ?: throw ForwardPublishTimeoutException()
-}
 
 /**
  * Admits a token MDK does not yet know. A failed admission is classified from the token's status afterwards: owned
- * continues to the handoff wait, rejected is reported, and absent or unreadable means nothing was admitted.
+ * continues to the handoff wait, rejected is reported, a stale-epoch refusal is reported as rejected so Retry uploads
+ * again, and anything else absent or unreadable means nothing was admitted. A successful acceptance for a different
+ * token fails loudly instead of being counted.
  */
 @Suppress("ThrowsCount", "TooGenericExceptionCaught")
 private suspend fun admitOrClassify(
@@ -89,18 +95,25 @@ private suspend fun admitOrClassify(
     probe: suspend () -> LocalSendStatusFfi?,
     admit: suspend () -> LocalSendAcceptanceFfi,
 ) {
-    try {
-        val acceptance = admit()
-        check(acceptance.clientToken == token) { "forward admission changed the caller token" }
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (failure: Exception) {
-        when (probeOrNull(probe)) {
-            LocalSendStatusFfi.Rejected -> throw ForwardPublishRejectedException(messageIndex)
-            null -> throw ForwardPublishNotCommittedException(failure)
-            else -> Unit
+    val acceptance =
+        try {
+            admit()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (failure: Exception) {
+            when (probeOrNull(probe)) {
+                LocalSendStatusFfi.Rejected -> throw ForwardPublishRejectedException(messageIndex)
+                // MDK reports a stale media reference the same way for every media kind, emoji included.
+                null ->
+                    if (isStaleEmojiReference(failure)) {
+                        throw ForwardPublishRejectedException(messageIndex)
+                    } else {
+                        throw ForwardPublishNotCommittedException(failure)
+                    }
+                else -> return
+            }
         }
-    }
+    check(acceptance.clientToken == token) { "forward admission changed the caller token" }
 }
 
 /** Polls the token until MDK's engine owns it; a rejection while queued is reported, an unreadable read retried. */

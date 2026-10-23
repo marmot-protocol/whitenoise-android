@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
@@ -263,6 +264,102 @@ class MessageForwardingTest {
             assertEquals(2, transport.tokensForMessage(1).toSet().size)
             assertEquals(listOf("target" to 1), transport.rejected)
             assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+        }
+
+    /**
+     * A message MDK rejects after queuing it, as after a destination epoch change, gets fresh destination references:
+     * Retry uploads that message again, keeps the other message's references, and then sends it under a fresh token.
+     */
+    @Test
+    fun retryAfterARejectionUploadsOnlyThatMessageAgainAndThenSucceeds() =
+        runTest {
+            val transport =
+                RecordingForwardTransport(
+                    scriptedOutcomeOnce = mutableMapOf("target" to ScriptedAdmission.RejectWhileQueued),
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages =
+                        listOf(
+                            mediaPayload("first", "first caption", "first.jpg"),
+                            mediaPayload("second", "second caption", "second.jpg"),
+                        ),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            assertEquals(
+                ForwardFailureStage.PublishRejected,
+                session.state.value.targets
+                    .single()
+                    .failureStage,
+            )
+            assertEquals(2, transport.uploadTargets.size)
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(3, transport.uploadTargets.size)
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+            assertEquals(2, transport.tokensForMessage(1).toSet().size)
+        }
+
+    /**
+     * A synchronous stale-epoch refusal takes the same path: it is never retried automatically with the stale
+     * references, and the user's Retry uploads that message again before admitting it.
+     */
+    @Test
+    fun aStaleEpochRefusalIsNotRetriedAutomaticallyAndRetryUploadsAgain() =
+        runTest {
+            val terminalSnapshots = mutableListOf<ForwardOperationSnapshot>()
+            val transport =
+                RecordingForwardTransport(
+                    scriptedOutcomeOnce = mutableMapOf("target" to ScriptedAdmission.RefuseStaleEpoch),
+                )
+            val owner =
+                ForwardOperationOwner(
+                    scope = this,
+                    automaticRetryAttempts = 3,
+                    retryDelayMillis = { 1_000L },
+                    onTerminal = terminalSnapshots::add,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages =
+                        listOf(
+                            mediaPayload("first", "first caption", "first.jpg"),
+                            mediaPayload("second", "second caption", "second.jpg"),
+                        ),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            assertTrue(owner.start(session))
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, owner.state.value?.phase)
+            assertEquals(
+                ForwardFailureStage.PublishRejected,
+                owner.state.value
+                    ?.targets
+                    ?.single()
+                    ?.failureStage,
+            )
+            assertEquals(listOf(0), transport.publishStartIndices)
+            assertEquals(2, transport.uploadTargets.size)
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(3, transport.uploadTargets.size)
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+            owner.release()
         }
 
     /** A message that stays queued is never admitted a second time, however often the user retries. */
@@ -1340,6 +1437,9 @@ class MessageForwardingTest {
         /** Every rejected message, as (destination, message index), each of which left a failed bubble. */
         val rejected = mutableListOf<Pair<String, Int>>()
 
+        /** Reference hashes encrypted at an epoch the destination has left, which MDK refuses to admit again. */
+        private val staleReferenceHashes = mutableSetOf<String>()
+
         /** Hands every message held at Queued to the engine, as MDK's account worker eventually does. */
         fun releaseQueued() {
             heldQueued.forEach { token -> tokenStatuses[token] = LocalSendStatusFfi.EngineOwned }
@@ -1420,10 +1520,12 @@ class MessageForwardingTest {
             (uploadGates.removeFirstOrNull() ?: uploadGate)?.await()
             if (failUploadOnceFor.remove(targetGroupIdHex)) error("upload failed")
             if (stallUploadOnceFor.remove(targetGroupIdHex)) throw ForwardUploadStalledException(null)
+            // Each upload encrypts afresh, so a re-upload yields references distinct from any earlier, stale ones.
+            val uploadNumber = uploadTargets.size
             return message.attachments.mapIndexed { index, attachment ->
                 reference(
                     fileName = attachment.fileName,
-                    hashPrefix = "$targetGroupIdHex-$index",
+                    hashPrefix = "$targetGroupIdHex-$index-u$uploadNumber",
                 )
             }
         }
@@ -1454,7 +1556,9 @@ class MessageForwardingTest {
                     messageIndex = index,
                     token = token,
                     probe = { probeToken(token) },
-                    admit = { admitToken(targetGroupIdHex, index, token, scripted) },
+                    admit = {
+                        admitToken(targetGroupIdHex, index, token, scripted, uploadedReferences[index].orEmpty())
+                    },
                 )
                 val message = messages[index]
                 if (message is PreparedForwardMessage.Media) {
@@ -1475,14 +1579,18 @@ class MessageForwardingTest {
          * Admits a token as MDK would: an owned token returns its existing identity without a new message, a fresh
          * one creates exactly one, and the scripted outcome for this destination's scripted message applies once.
          */
+        @Suppress("LongMethod")
         private suspend fun admitToken(
             target: String,
             index: Int,
             token: String,
             scripted: ScriptedAdmission?,
+            references: List<MediaAttachmentReferenceFfi>,
         ): LocalSendAcceptanceFfi {
             val acceptance = LocalSendAcceptanceFfi(clientToken = token, messageIdHex = "message-$token")
             if (tokenStatuses[token] != null) return acceptance
+            val hashes = references.map(MediaAttachmentReferenceFfi::ciphertextSha256)
+            if (hashes.any(staleReferenceHashes::contains)) throw staleEpochRefusal()
             if (scripted != null) scriptedOutcomeOnce.remove(target)
             when (scripted) {
                 ScriptedAdmission.FailBeforeAdmission -> error("admission refused before it was stored")
@@ -1498,8 +1606,14 @@ class MessageForwardingTest {
                 ScriptedAdmission.RejectWhileQueued -> {
                     tokenStatuses[token] = LocalSendStatusFfi.Queued
                     rejected += target to index
-                    // The account worker drains it and fails validation, as an epoch change would.
+                    // The account worker drains it and fails validation after an epoch change, so these references
+                    // are stale from now on.
                     tokenStatuses[token] = LocalSendStatusFfi.Rejected
+                    staleReferenceHashes += hashes
+                }
+                ScriptedAdmission.RefuseStaleEpoch -> {
+                    staleReferenceHashes += hashes
+                    throw staleEpochRefusal()
                 }
                 null -> {
                     tokenStatuses[token] = LocalSendStatusFfi.EngineOwned
@@ -1521,8 +1635,11 @@ class MessageForwardingTest {
         /** Admitted, but held at Queued until [RecordingForwardTransport.releaseQueued]. */
         HoldQueued,
 
-        /** Admitted and queued, then rejected when the account worker drains it. */
+        /** Admitted and queued, then rejected when the account worker drains it; its references are stale after. */
         RejectWhileQueued,
+
+        /** Refused synchronously at admission because its references were encrypted at an epoch the group left. */
+        RefuseStaleEpoch,
     }
 
     private fun textPayload(
@@ -1582,3 +1699,9 @@ class MessageForwardingTest {
         const val APK_MIME = "application/vnd.android.package-archive"
     }
 }
+
+/** MDK's synchronous refusal of a media reference encrypted at an epoch the destination has left. */
+private fun staleEpochRefusal() =
+    MarmotKitException.InvalidMediaReference(
+        "media reference was encrypted at epoch 3 but the group is at epoch 4",
+    )
