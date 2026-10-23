@@ -668,6 +668,13 @@
     <string name="relay_imported_issue_title">Une adresse de relais nécessite votre attention</string>
     <string name="relay_imported_issue_detail">Un relais importé n’utilise pas d’adresse sécurisée wss://. Supprimez-le ou ajoutez un remplaçant sécurisé. Ses rôles ont été conservés.</string>
     <string name="relay_needs_attention">Nécessite votre attention</string>
+    <string name="relay_onion_issue_title">Le relais onion nécessite Tor</string>
+    <string name="relay_onion_issue_detail">Un relais .onion importé n’est accessible que via Tor, et White Noise ne se connecte pas lui-même via Tor, il n’est donc pas utilisé. Si vous modifiez ces listes ici, elles seront publiées sans lui.</string>
+    <string name="relay_onion_needs_tor">Nécessite Tor</string>
+    <string name="relay_onion_add_error">Les relais onion ne sont accessibles que via Tor, et White Noise ne se connecte pas lui-même via Tor.</string>
+    <string name="relay_unusable_issue_title">Impossible d’utiliser l’adresse du relais</string>
+    <string name="relay_unusable_issue_detail">Une adresse de relais importée est mal formée ou pointe vers une destination que White Noise ne peut pas utiliser. Supprimez-la ou ajoutez un remplaçant wss:// valide.</string>
+    <string name="relay_unusable_address">Inutilisable</string>
     <string name="profile_relays">Relais du profil</string>
     <string name="relays_explanation">Les relais permettent à votre profil de publier des informations, de recevoir des invitations et de transmettre des messages.</string>
     <string name="restore_default_relays">Rétablir les relais par défaut</string>

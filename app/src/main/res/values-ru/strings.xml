@@ -704,6 +704,13 @@
     <string name="relay_imported_issue_title">Адрес реле требует внимания</string>
     <string name="relay_imported_issue_detail">Импортированное реле не использует безопасный адрес wss://. Удалите его или добавьте безопасную замену. Его ролевые назначения были сохранены.</string>
     <string name="relay_needs_attention">Требует внимания</string>
+    <string name="relay_onion_issue_title">Onion-реле требует Tor</string>
+    <string name="relay_onion_issue_detail">Импортированное реле .onion доступно только через Tor, а White Noise сам не подключается через Tor, поэтому оно не используется. Если изменить эти списки здесь, они будут опубликованы без него.</string>
+    <string name="relay_onion_needs_tor">Нужен Tor</string>
+    <string name="relay_onion_add_error">Onion-реле доступны только через Tor, а White Noise сам не подключается через Tor.</string>
+    <string name="relay_unusable_issue_title">Адрес реле нельзя использовать</string>
+    <string name="relay_unusable_issue_detail">Импортированный адрес реле некорректен или указывает туда, где White Noise не может его использовать. Удалите его или добавьте действительную замену wss://.</string>
+    <string name="relay_unusable_address">Нельзя использовать</string>
     <string name="profile_relays">Профильные реле</string>
     <string name="relays_explanation">Ретрансляторы позволяют вашему профилю публиковать информацию, получать приглашения в чат и доставлять сообщения.</string>
     <string name="restore_default_relays">Восстановить реле по умолчанию</string>

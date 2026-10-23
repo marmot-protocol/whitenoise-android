@@ -668,6 +668,13 @@
     <string name="relay_imported_issue_title">Röle adresine dikkat edilmesi gerekiyor</string>
     <string name="relay_imported_issue_detail">İçe aktarılan geçiş, güvenli bir wss:// adresi kullanmaz. Kaldırın veya güvenli bir yedek ekleyin. Rol atamaları korundu.</string>
     <string name="relay_needs_attention">Dikkat edilmesi gerekiyor</string>
+    <string name="relay_onion_issue_title">Onion rölesi Tor gerektirir</string>
+    <string name="relay_onion_issue_detail">İçe aktarılan bir .onion rölesine yalnızca Tor üzerinden ulaşılabilir ve White Noise kendisi Tor üzerinden bağlanmadığı için kullanılmaz. Bu listeleri burada düzenlersen, bu röle olmadan yayımlanırlar.</string>
+    <string name="relay_onion_needs_tor">Tor gerekli</string>
+    <string name="relay_onion_add_error">Onion rölelerine yalnızca Tor üzerinden ulaşılabilir ve White Noise kendisi Tor üzerinden bağlanmaz.</string>
+    <string name="relay_unusable_issue_title">Röle adresi kullanılamıyor</string>
+    <string name="relay_unusable_issue_detail">İçe aktarılan bir röle adresi hatalı ya da White Noise’un kullanamayacağı bir yeri gösteriyor. Kaldır ya da geçerli bir wss:// yedeği ekle.</string>
+    <string name="relay_unusable_address">Kullanılamıyor</string>
     <string name="profile_relays">Profil röleleri</string>
     <string name="relays_explanation">Aktarmalar, profilinizin bilgi yayınlamasına, sohbet davetleri almasına ve mesaj iletmesine olanak tanır.</string>
     <string name="restore_default_relays">Varsayılan Röleleri Geri Yükle</string>

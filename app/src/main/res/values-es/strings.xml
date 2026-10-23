@@ -668,6 +668,13 @@
     <string name="relay_imported_issue_title">La dirección del relé necesita atención</string>
     <string name="relay_imported_issue_detail">Un relé importado no usa una dirección segura wss://. Elimínalo o añade un reemplazo seguro. Sus roles se conservaron.</string>
     <string name="relay_needs_attention">Necesita atención</string>
+    <string name="relay_onion_issue_title">El relé onion necesita Tor</string>
+    <string name="relay_onion_issue_detail">Un relé .onion importado solo es accesible a través de Tor, y White Noise no se conecta a través de Tor por sí mismo, así que no se usa. Si editas estas listas aquí, se publicarán sin él.</string>
+    <string name="relay_onion_needs_tor">Necesita Tor</string>
+    <string name="relay_onion_add_error">Los relés onion solo son accesibles a través de Tor, y White Noise no se conecta a través de Tor por sí mismo.</string>
+    <string name="relay_unusable_issue_title">No se puede usar la dirección del relé</string>
+    <string name="relay_unusable_issue_detail">Una dirección de relé importada está mal formada o apunta a un destino que White Noise no puede usar. Elimínala o añade un reemplazo wss:// válido.</string>
+    <string name="relay_unusable_address">No se puede usar</string>
     <string name="profile_relays">Relés del perfil</string>
     <string name="relays_explanation">Los relés permiten que tu perfil publique información, reciba invitaciones a chats y entregue mensajes.</string>
     <string name="restore_default_relays">Restaurar relés predeterminados</string>

@@ -654,6 +654,13 @@
     <string name="relay_imported_issue_title">中继地址需要注意</string>
     <string name="relay_imported_issue_detail">某个导入的中继未使用安全的 wss:// 地址。请移除它或添加安全的替代。其角色分配已保留。</string>
     <string name="relay_needs_attention">需要注意</string>
+    <string name="relay_onion_issue_title">Onion 中继需要 Tor</string>
+    <string name="relay_onion_issue_detail">导入的 .onion 中继只能通过 Tor 访问，而 White Noise 本身不通过 Tor 连接，因此不会使用它。在此编辑这些列表时，发布的列表将不包含它。</string>
+    <string name="relay_onion_needs_tor">需要 Tor</string>
+    <string name="relay_onion_add_error">Onion 中继只能通过 Tor 访问，而 White Noise 本身不通过 Tor 连接。</string>
+    <string name="relay_unusable_issue_title">无法使用该中继地址</string>
+    <string name="relay_unusable_issue_detail">某个导入的中继地址格式错误，或指向 White Noise 无法使用的位置。请移除它或添加有效的 wss:// 替代。</string>
+    <string name="relay_unusable_address">无法使用</string>
     <string name="profile_relays">个人资料中继</string>
     <string name="relays_explanation">中继让你的个人资料能够发布信息、接收聊天邀请并传递消息。</string>
     <string name="restore_default_relays">恢复默认中继</string>
