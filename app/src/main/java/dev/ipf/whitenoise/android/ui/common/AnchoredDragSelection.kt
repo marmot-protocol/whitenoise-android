@@ -104,6 +104,9 @@ internal fun dragSelectionAutoScrollDelta(
  * Movement before the timeout remains available to scrolling and sibling
  * gestures such as swipe-to-reply. After the hold wins, this detector owns the
  * pointer through release.
+ *
+ * [enabled] gates new holds only. The pointer node itself is always installed so a
+ * selection-driven recomposition cannot detach it, and with it cancel, an active hold.
  */
 
 @Composable
@@ -121,6 +124,7 @@ internal fun Modifier.longPressOrVerticalDrag(
     onDragEnd: () -> Unit,
     onGestureCancel: () -> Unit,
 ): Modifier {
+    val currentEnabled by rememberUpdatedState(enabled)
     val currentLongPressStart by rememberUpdatedState(onLongPressStart)
     val currentLongPressRelease by rememberUpdatedState(onLongPressRelease)
     val currentDragStart by rememberUpdatedState(onDragStart)
@@ -128,95 +132,96 @@ internal fun Modifier.longPressOrVerticalDrag(
     val currentDragEnd by rememberUpdatedState(onDragEnd)
     val currentGestureCancel by rememberUpdatedState(onGestureCancel)
     val pinnableContainer = LocalPinnableContainer.current
-    return if (!enabled) {
-        this
-    } else {
-        pointerInput(pinnableContainer) {
-            awaitEachGesture {
-                val down = awaitFirstDown(requireUnconsumed = false)
-                val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
-                longPress.consume()
-                val origin = longPress.position
-                var dragging = false
-                var rangeActivated = false
-                var horizontalGestureWon = false
-                var terminalCallbackDelivered = false
-                var pinnedHandle: PinnableContainer.PinnedHandle? = null
+    return pointerInput(pinnableContainer) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            // The node stays installed while disabled: removing it would detach
+            // an in-flight hold, so availability is decided per gesture instead.
+            if (!currentEnabled) return@awaitEachGesture
+            val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+            // Availability can change during the timeout; only a won hold keeps ownership.
+            if (!currentEnabled) return@awaitEachGesture
+            longPress.consume()
+            val origin = longPress.position
+            var dragging = false
+            var rangeActivated = false
+            var horizontalGestureWon = false
+            var terminalCallbackDelivered = false
+            var pinnedHandle: PinnableContainer.PinnedHandle? = null
 
+            try {
+                // Lazy lists normally dispose rows after they leave the
+                // viewport. Pin the originating row for the gesture so edge
+                // auto-scroll cannot orphan the pointer before release.
+                pinnedHandle = pinnableContainer?.pin()
+                currentLongPressStart(origin)
+
+                while (true) {
+                    val change =
+                        // Consume the won hold before a descendant ListItem sees its release.
+                        awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                            ?: run {
+                                terminalCallbackDelivered = true
+                                currentGestureCancel()
+                                break
+                            }
+                    // Compose cancellation synthesizes a consumed up. It must never commit a range.
+                    if (change.isConsumed) {
+                        terminalCallbackDelivered = true
+                        currentGestureCancel()
+                        break
+                    }
+                    val displacement = change.position - origin
+                    if (!dragging && !horizontalGestureWon) {
+                        val verticalDistance = abs(displacement.y)
+                        val horizontalDistance = abs(displacement.x)
+                        when {
+                            verticalDistance > viewConfiguration.touchSlop &&
+                                verticalDistance >= horizontalDistance -> {
+                                dragging = true
+                                currentDragStart(origin)
+                                rangeActivated = currentDrag(change.position)
+                            }
+                            horizontalDistance > viewConfiguration.touchSlop &&
+                                horizontalDistance > verticalDistance -> {
+                                horizontalGestureWon = true
+                            }
+                        }
+                    } else if (dragging) {
+                        rangeActivated = currentDrag(change.position) || rangeActivated
+                    }
+
+                    // The hold has won. Consume every remaining change,
+                    // including the final up, so a stationary long press cannot
+                    // fall through to a parent/child clickable on release.
+                    change.consume()
+                    if (change.changedToUpIgnoreConsumed()) {
+                        terminalCallbackDelivered = true
+                        when {
+                            dragging && rangeActivated -> currentDragEnd()
+                            dragging -> {
+                                currentGestureCancel()
+                                currentLongPressRelease(origin)
+                            }
+                            horizontalGestureWon -> currentGestureCancel()
+                            else -> currentLongPressRelease(origin)
+                        }
+                        break
+                    }
+                    if (!change.pressed) {
+                        terminalCallbackDelivered = true
+                        currentGestureCancel()
+                        break
+                    }
+                }
+            } finally {
                 try {
-                    // Lazy lists normally dispose rows after they leave the
-                    // viewport. Pin the originating row for the gesture so edge
-                    // auto-scroll cannot orphan the pointer before release.
-                    pinnedHandle = pinnableContainer?.pin()
-                    currentLongPressStart(origin)
-
-                    while (true) {
-                        val change =
-                            // Consume the won hold before a descendant ListItem sees its release.
-                            awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
-                                ?: run {
-                                    terminalCallbackDelivered = true
-                                    currentGestureCancel()
-                                    break
-                                }
-                        // Compose cancellation synthesizes a consumed up. It must never commit a range.
-                        if (change.isConsumed) {
-                            terminalCallbackDelivered = true
-                            currentGestureCancel()
-                            break
-                        }
-                        val displacement = change.position - origin
-                        if (!dragging && !horizontalGestureWon) {
-                            val verticalDistance = abs(displacement.y)
-                            val horizontalDistance = abs(displacement.x)
-                            when {
-                                verticalDistance > viewConfiguration.touchSlop &&
-                                    verticalDistance >= horizontalDistance -> {
-                                    dragging = true
-                                    currentDragStart(origin)
-                                    rangeActivated = currentDrag(change.position)
-                                }
-                                horizontalDistance > viewConfiguration.touchSlop &&
-                                    horizontalDistance > verticalDistance -> {
-                                    horizontalGestureWon = true
-                                }
-                            }
-                        } else if (dragging) {
-                            rangeActivated = currentDrag(change.position) || rangeActivated
-                        }
-
-                        // The hold has won. Consume every remaining change,
-                        // including the final up, so a stationary long press cannot
-                        // fall through to a parent/child clickable on release.
-                        change.consume()
-                        if (change.changedToUpIgnoreConsumed()) {
-                            terminalCallbackDelivered = true
-                            when {
-                                dragging && rangeActivated -> currentDragEnd()
-                                dragging -> {
-                                    currentGestureCancel()
-                                    currentLongPressRelease(origin)
-                                }
-                                horizontalGestureWon -> currentGestureCancel()
-                                else -> currentLongPressRelease(origin)
-                            }
-                            break
-                        }
-                        if (!change.pressed) {
-                            terminalCallbackDelivered = true
-                            currentGestureCancel()
-                            break
-                        }
-                    }
+                    // Detachment, navigation, or a dataset replacement can
+                    // cancel pointerInput without an up event. Always retire
+                    // screen-owned drag and auto-scroll state in that case.
+                    if (dragging && !terminalCallbackDelivered) currentGestureCancel()
                 } finally {
-                    try {
-                        // Detachment, navigation, or a dataset replacement can
-                        // cancel pointerInput without an up event. Always retire
-                        // screen-owned drag and auto-scroll state in that case.
-                        if (dragging && !terminalCallbackDelivered) currentGestureCancel()
-                    } finally {
-                        pinnedHandle?.release()
-                    }
+                    pinnedHandle?.release()
                 }
             }
         }
