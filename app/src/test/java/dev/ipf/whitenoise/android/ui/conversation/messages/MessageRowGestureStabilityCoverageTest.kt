@@ -26,7 +26,8 @@ class MessageRowGestureStabilityCoverageTest {
             assertFalse(
                 "$function must not return an unmodified chain when disabled",
                 declaration.lines().any { it.trim() == "this" } ||
-                    Regex("""\breturn(@\w+)?\s+this\b""").containsMatchIn(declaration),
+                    Regex("""\breturn(@\w+)?\s+this\b|\bthis\s+else\b|\belse\s+this\b""")
+                        .containsMatchIn(declaration),
             )
             assertTrue("$function must always install pointerInput", declaration.contains("pointerInput("))
         }
