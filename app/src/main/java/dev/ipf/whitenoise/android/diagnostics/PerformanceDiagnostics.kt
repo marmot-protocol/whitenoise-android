@@ -260,6 +260,7 @@ internal enum class PerformanceAttachmentState(
     COMPLETED_UNRETAINED("completed_unretained"),
     RETRY_EXHAUSTED("retry_exhausted"),
     STORAGE_BLOCKED("storage_blocked"),
+    CLEANED_BY_SETTING("cleaned_by_setting"),
 }
 
 internal class PerformanceTrace internal constructor(

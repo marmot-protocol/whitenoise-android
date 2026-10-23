@@ -75,6 +75,20 @@ class NativeAttachmentTransfersTest {
         assertFalse(AttachmentTransferState.StorageBlocked.isTransferInProgress())
     }
 
+    /** Retention cleanup is a terminal local absence, never an automatic retry or active download. */
+    @Test
+    fun `setting-cleaned media stays unavailable until a deliberate retry`() {
+        val state = AttachmentTransferStateFfi.CLEANED_BY_SETTING
+        assertEquals(AttachmentTransferState.NotRetained, status(state).toPresentationState())
+        assertTrue(state in NATIVE_TRANSFER_TERMINAL_FAILURES)
+        assertFalse(
+            shouldRetryAttachmentDownloadWork(
+                transientRetrySpent = false,
+                failure = NativeAttachmentTerminalException(state),
+            ),
+        )
+    }
+
     /** Observer disposal closes only its feed; explicit cancellation owns native cancellation. */
     @Test
     fun `native acquisition teardown does not cancel shared durable work`() {

@@ -10,6 +10,7 @@ private val NATIVE_TRANSFER_DELIBERATE_RETRY_STATES =
         AttachmentTransferStateFfi.FAILED,
         AttachmentTransferStateFfi.CANCELLED,
         AttachmentTransferStateFfi.REMOVED,
+        AttachmentTransferStateFfi.CLEANED_BY_SETTING,
         AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
         AttachmentTransferStateFfi.RETRY_EXHAUSTED,

@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentDemand.kt",
+  "legacy_sha256": "6244ba9547b4532528d15b63188c47a9a4d705d9d76d270c40aeb26f49db8b0e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Interactive attachment demand and post-admission native state; setting-cleaned media requires deliberate download-again, never ordinary join or durable replay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentDemand.kt",
+        "anchor": "internal suspend fun MarmotInterface.requestNativeInteractiveAttachment(",
+        "test_ids": [
+          "MED-024"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
