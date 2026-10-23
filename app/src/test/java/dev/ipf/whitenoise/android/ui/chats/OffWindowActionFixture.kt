@@ -130,40 +130,49 @@ internal class OffWindowActionFixture(
                 ),
         )
 
+    private fun readCommand(args: Array<out Any?>?): ChatListRowFfi {
+        check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
+        calls += "read:${args[2]}"
+        return row.updateAndGet { it.copy(manuallyMarkedUnread = args[2] as Boolean) }
+    }
+
+    private fun pinCommand(args: Array<out Any?>?): ChatPinStateFfi {
+        check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
+        val pinned = args[2] as Boolean
+        calls += "pin:$pinned"
+        row.updateAndGet { it.copy(pinned = pinned, pinnedPosition = if (pinned) 0u else null) }
+        return ChatPinStateFfi(if (pinned) listOf(ACTION_TARGET) else emptyList())
+    }
+
+    private fun muteCommand(
+        name: String,
+        args: Array<out Any?>?,
+    ): ChatNotificationSettingsFfi {
+        check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
+        if (name != "chatNotificationSettings") {
+            val muted = name == "setChatMuted"
+            calls += "mute:$muted"
+            row.updateAndGet { it.copy(muted = muted) }
+        }
+        return ChatNotificationSettingsFfi(
+            accountRef = ACTION_ACCOUNT,
+            accountIdHex = ACTION_ACCOUNT_ID,
+            groupIdHex = ACTION_TARGET,
+            muted = row.get().muted,
+            mutedUntilMs = null,
+            updatedAtMs = 1L,
+        )
+    }
+
     private fun native(): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, args ->
             when (val name = method.name.substringBefore('-')) {
-                "setChatManuallyUnread" -> {
-                    check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
-                    calls += "read:${args[2]}"
-                    row.updateAndGet { it.copy(manuallyMarkedUnread = args[2] as Boolean) }
-                }
-                "setChatPinned" -> {
-                    check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
-                    val pinned = args[2] as Boolean
-                    calls += "pin:$pinned"
-                    row.updateAndGet { it.copy(pinned = pinned, pinnedPosition = if (pinned) 0u else null) }
-                    ChatPinStateFfi(if (pinned) listOf(ACTION_TARGET) else emptyList())
-                }
-                "setChatMuted", "clearChatMuted", "chatNotificationSettings" -> {
-                    check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
-                    if (name != "chatNotificationSettings") {
-                        val muted = name == "setChatMuted"
-                        calls += "mute:$muted"
-                        row.updateAndGet { it.copy(muted = muted) }
-                    }
-                    ChatNotificationSettingsFfi(
-                        accountRef = ACTION_ACCOUNT,
-                        accountIdHex = ACTION_ACCOUNT_ID,
-                        groupIdHex = ACTION_TARGET,
-                        muted = row.get().muted,
-                        mutedUntilMs = null,
-                        updatedAtMs = 1L,
-                    )
-                }
+                "setChatManuallyUnread" -> readCommand(args)
+                "setChatPinned" -> pinCommand(args)
+                "setChatMuted", "clearChatMuted", "chatNotificationSettings" -> muteCommand(name, args)
                 "chatListRow" -> row.get()
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit

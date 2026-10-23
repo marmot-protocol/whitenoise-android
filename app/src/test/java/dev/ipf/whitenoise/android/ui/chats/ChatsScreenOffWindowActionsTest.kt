@@ -3,8 +3,10 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -300,8 +302,10 @@ class ChatsScreenOffWindowActionsTest {
     }
 
     private fun swipeTarget() {
+        awaitTargetInteraction()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").performTouchInput {
-            down(Offset(width * 0.15f, height / 2f))
+            // Start on the row body, clear of the independently clickable avatar.
+            down(Offset(width * 0.35f, height / 2f))
             moveTo(Offset(width * 0.8f, height / 2f), 250)
             up()
         }
@@ -309,8 +313,24 @@ class ChatsScreenOffWindowActionsTest {
     }
 
     private fun openMenu(action: String = "Archive") {
-        rule.onNodeWithTag("chat.row.$ACTION_TARGET").performTouchInput { longClick() }
+        awaitTargetInteraction()
+        val row = rule.onNodeWithTag("chat.row.$ACTION_TARGET")
+        // Flush the won hold while the pointer is still down, as the production range/menu tests do.
+        row.performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveTo(center)
+        }
+        rule.onNodeWithTag("chat.menu.$ACTION_TARGET").assertIsDisplayed()
+        row.performTouchInput { up() }
         rule.onNodeWithTag("chat.action.$action").assertExists()
+    }
+
+    private fun awaitTargetInteraction() {
+        val row = rule.onNodeWithTag("chat.row.$ACTION_TARGET")
+        // Row membership can publish before its placement/input gate reopens.
+        awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
+        row.assertIsDisplayed().assertIsEnabled()
     }
 
     private fun assertOffWindow(model: OffWindowActionFixture) {
@@ -319,6 +339,9 @@ class ChatsScreenOffWindowActionsTest {
 
     private fun awaitProgress(ready: () -> Boolean) {
         rule.waitUntil {
+            scope.testScheduler.runCurrent()
+            // Controller/native continuations post to Android Main; Compose frames do not run its 16ms debounce.
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
             scope.testScheduler.runCurrent()
             ready()
         }

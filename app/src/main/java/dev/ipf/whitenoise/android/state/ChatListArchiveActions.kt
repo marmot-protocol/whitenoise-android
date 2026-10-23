@@ -75,7 +75,8 @@ internal class ChatListArchiveActions(
             // Cancellation retires unstarted overlays without rolling back native work.
             intents.forEach { (groupIdHex, intent) -> finish(groupIdHex, intent) }
         }
-        if (notify && succeeded > 0 && intents.any { isCurrent(it.second.bindEpoch) && it.second.ownerIsCurrent() }) {
+        val shouldNotify = notify && succeeded > 0
+        if (shouldNotify && intents.any { isCurrent(it.second.bindEpoch) && it.second.ownerIsCurrent() }) {
             onSuccess(archived)
         }
         return succeeded
