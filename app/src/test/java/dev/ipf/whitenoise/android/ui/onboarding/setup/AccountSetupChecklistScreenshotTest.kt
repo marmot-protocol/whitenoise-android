@@ -34,15 +34,15 @@ class AccountSetupChecklistScreenshotTest {
     /** Black surfaces preserve outlined primary controls. */
     @Test fun amoled() = capture("amoled", dark = true, amoled = true)
 
-    /** The form stays 520 dp wide on a tablet. */
+    /** The focused content uses the available tablet width. */
     @Test
     @Config(qualifiers = "en-w1000dp-h780dp-mdpi")
     fun tablet() = capture("tablet")
 
-    /** RTL double-size status text can grow without hiding the pinned primary. */
+    /** RTL double-size text keeps the primary action in the same scroll flow. */
     @Test fun rtlLargeText() = capture("rtl_200", rtl = true, scale = 2f)
 
-    /** A short viewport preserves a scrollable checklist and separate action region. */
+    /** A short viewport keeps the focused decision and actions in one scroll flow. */
     @Test
     @Config(qualifiers = "en-w780dp-h360dp-mdpi")
     fun landscape() = capture("landscape", scale = 2f)
