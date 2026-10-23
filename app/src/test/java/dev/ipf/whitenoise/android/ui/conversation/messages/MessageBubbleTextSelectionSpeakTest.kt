@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ResolveInfo
 import android.provider.Settings
-import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -55,10 +54,7 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
-import dev.ipf.whitenoise.android.audio.tts.TtsEngineInfo
-import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -1393,20 +1389,6 @@ class MessageBubbleTextSelectionSpeakTest {
         if (usableTts) appState.forceUsableTtsResolutionForTests()
         appState.ttsController.attachEngine(engine)
         return appState
-    }
-
-    private fun WhiteNoiseAppState.forceUsableTtsResolutionForTests() {
-        val delegateField = WhiteNoiseAppState::class.java.getDeclaredField("ttsResolution\$delegate")
-        delegateField.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val delegate = delegateField.get(this) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
-        delegate.value =
-            TtsResolutionResult(
-                status = TextToSpeech.SUCCESS,
-                engines = listOf(TtsEngineInfo("com.test.tts", "Test TTS", EngineTrust.Local)),
-                defaultEnginePackage = "com.test.tts",
-                handle = null,
-            )
     }
 
     private fun conversationController(appState: WhiteNoiseAppState): ConversationController =

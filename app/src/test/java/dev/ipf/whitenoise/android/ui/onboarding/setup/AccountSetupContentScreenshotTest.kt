@@ -36,6 +36,31 @@ import org.robolectric.annotation.GraphicsMode
 class AccountSetupContentScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** AMOLED overview shows the native cause and one primary recovery action. */
+    @Test fun relayRecoveryOverviewAmoled() =
+        capture(
+            "relay_recovery_overview_amoled",
+            relayChoicesState().apply {
+                snapshot!!.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+                    listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"))
+            },
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
+    /** Staged editor removal exposes Undo before native review. */
+    @Test fun relayEditorUndoAmoled() =
+        capture(
+            "relay_editor_undo_amoled",
+            mixedRelayEditorState(),
+            theme = SetupScreenshotTheme.AMOLED,
+            removeFirstRelay = true,
+        )
+
+    /** Compact relay rows keep exact endpoint controls visible. */
+    @Test fun relayEditorRemovalPreviewAmoled() {
+        capture("relay_remove_controls_amoled", mixedRelayEditorState(), theme = SetupScreenshotTheme.AMOLED)
+    }
+
     /** Both explicit choices are visible without opening diagnostic details. */
     @Test fun relayRepairChoices() = capture("relay_repair_choices", relayChoicesState())
 
@@ -79,7 +104,7 @@ class AccountSetupContentScreenshotTest {
     @Test fun relayRepairPreviewAmoled() =
         capture(
             "relay_repair_preview_amoled",
-            AccountSetupState(snapshot = relayDiffSnapshot()),
+            AccountSetupState(snapshot = relayDiffSnapshot(), detailsExpanded = true),
             theme = SetupScreenshotTheme.AMOLED,
         )
 
@@ -292,6 +317,21 @@ class AccountSetupContentScreenshotTest {
             theme = SetupScreenshotTheme.DARK,
         )
 
+    /** A disconnected signer still exposes its exact native reconnect grant beside resume checks. */
+    @Test fun signerDisconnectedAmoled() =
+        capture(
+            "signer_disconnected_amoled",
+            AccountSetupState(
+                snapshot =
+                    setupSnapshot(
+                        OnboardingStepFfi.KEY_PACKAGE,
+                        listOf(OnboardingActionFfi.RECONNECT_SIGNER, OnboardingActionFfi.RETRY),
+                    ),
+                disconnected = true,
+            ),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
     /** Expanded device diagnostics explain an inconclusive result without asserting another device is absent. */
     @Test fun deviceDiscoveryDetails() =
         capture(
@@ -459,6 +499,81 @@ class AccountSetupContentScreenshotTest {
                 )
         }
 
+    /** The six design-review frames are actual Compose renders of the focused surface. */
+    @Test fun focusedConnectingAmoled() {
+        val snapshot = setupSnapshot()
+        snapshot.steps.first { it.step == OnboardingStepFfi.PROFILE }.status = OnboardingStatusFfi.CHECKING
+        capture(
+            "focused_connecting_amoled",
+            AccountSetupState(snapshot, busy = true),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+    }
+
+    @Test fun focusedOptionalProfileAmoled() =
+        capture(
+            "focused_profile_amoled",
+            AccountSetupState(setupSnapshot()),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
+    @Test fun focusedTimeoutAmoled() {
+        val snapshot =
+            setupSnapshot(
+                OnboardingStepFfi.RELAYS,
+                listOf(OnboardingActionFfi.RETRY, OnboardingActionFfi.EDIT_RELAYS),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.apply {
+            status = OnboardingStatusFfi.RETRYABLE_FAILURE
+            findings = listOf(OnboardingFindingFfi(OnboardingIssueFfi.TIMED_OUT, "wss://slow.example"))
+        }
+        capture(
+            "focused_timeout_amoled",
+            AccountSetupState(snapshot),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+    }
+
+    @Test fun focusedRetiredRemoveAmoled() {
+        val snapshot =
+            setupSnapshot(
+                OnboardingStepFfi.RELAYS,
+                listOf(OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.RETRY),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"))
+        capture(
+            "focused_retired_remove_amoled",
+            AccountSetupState(snapshot),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+    }
+
+    @Test fun focusedNativeSaveReviewAmoled() =
+        capture(
+            "focused_native_save_review_amoled",
+            AccountSetupState(snapshot = relayDiffSnapshot(), removalReview = true),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
+    @Test
+    @Config(qualifiers = "en-w320dp-h640dp-mdpi")
+    fun focusedManualEditorNarrowRtlLargeAmoled() {
+        val state = mixedRelayEditorState()
+        val editor =
+            checkNotNull(state.editor).copy(
+                reads = "wss://a-very-long-community-relay-name-for-private-conversations.example",
+                writes = "wss://new.example",
+            )
+        capture(
+            "focused_manual_editor_narrow_rtl_200_amoled",
+            state.copy(editor = editor),
+            theme = SetupScreenshotTheme.AMOLED,
+            rtl = true,
+            fontScale = 2f,
+        )
+    }
+
     /** Freezes animation time and records the supplied state with explicit theme, direction, and density. */
     private fun capture(
         name: String,
@@ -466,6 +581,7 @@ class AccountSetupContentScreenshotTest {
         theme: SetupScreenshotTheme = SetupScreenshotTheme.LIGHT,
         rtl: Boolean = false,
         fontScale: Float = 1f,
+        removeFirstRelay: Boolean = false,
     ) {
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
@@ -482,9 +598,7 @@ class AccountSetupContentScreenshotTest {
             }
         }
         composeRule.mainClock.autoAdvance = true
-        state.checklistInspectionStep?.takeIf { state.editor == null }?.let {
-            composeRule.onNodeWithTag("setup-step-${it.name}").performScrollTo().performClick()
-        }
+        if (removeFirstRelay) composeRule.onNodeWithTag("setup.relay.remove.0").performScrollTo().performClick()
         composeRule.mainClock.autoAdvance = false
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_$name.png")

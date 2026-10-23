@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
@@ -36,6 +37,8 @@ internal data class SetupEditor(
 )
 
 /** Immutable presentation envelope around the authoritative native snapshot. */
+internal enum class RelayRemovalIssue { UNSAFE_DECLARATION, ADD_REQUIRED_RELAY }
+
 internal data class AccountSetupState(
     val snapshot: OnboardingSnapshotFfi? = null,
     val busy: Boolean = false,
@@ -44,6 +47,8 @@ internal data class AccountSetupState(
     val staleDecision: Boolean = false,
     val editor: SetupEditor? = null,
     val detailsExpanded: Boolean = false,
+    val relayRemovalIssue: RelayRemovalIssue? = null,
+    val removalReview: Boolean = false,
 ) {
     val accountLabel: String
         get() = snapshot?.accountIdHex?.let { it.take(12) + "…" + it.takeLast(8) }.orEmpty()
@@ -146,7 +151,13 @@ internal class AccountSetupController(
                     if (isCurrent()) onCancelled()
                 } else {
                     accept(result)
-                    mutableState.value = mutableState.value.copy(editor = null, detailsExpanded = false)
+                    mutableState.value =
+                        mutableState.value.copy(
+                            editor = null,
+                            detailsExpanded = false,
+                            relayRemovalIssue = null,
+                            removalReview = false,
+                        )
                 }
             }
         }
@@ -157,41 +168,21 @@ internal class AccountSetupController(
         step: OnboardingStepFfi,
         action: OnboardingActionFfi,
         revision: ULong,
+        endpoint: String? = null,
+        recoveryEpoch: String? = mutableState.value.snapshot?.recoveryEpoch,
     ) {
-        val request = SetupRequest(revision, step, action, recoveryEpoch = mutableState.value.snapshot?.recoveryEpoch)
+        val request = SetupRequest(revision, step, action, recoveryEpoch = recoveryEpoch)
         if (!mutableState.canAct(request, account, isCurrent())) return
-        operate {
-            val latest = client.snapshot()
-            if (latest == null || !latest.matchesDecision(account, request)) {
-                latest?.let(::accept)
-                mutableState.value = mutableState.value.copy(staleDecision = true)
-                return@operate
+        if (endpoint == null) {
+            operate { client.loadSetupEditor(request, mutableState, account, isCurrent, ::accept) }
+        } else {
+            val displayed = mutableState.value.snapshot
+            if (displayed != null && mutableState.value.matchesRenderedRelayRemoval(request, endpoint)) {
+                operate {
+                    AccountSetupRelayRemoval(client, account, isCurrent, mutableState, ::accept)
+                        .prepare(request, displayed, endpoint)
+                }
             }
-            if (action == OnboardingActionFfi.EDIT_RELAYS) {
-                val discarded =
-                    client.installRelayPreview(request.step) { preview ->
-                        val editor = preview.relayEditor(request)
-                        val matchesLoad = preview.matchesRelayEditorLoad(account, request, mutableState.value.snapshot)
-                        if (!isCurrent() || !matchesLoad) {
-                            false
-                        } else {
-                            accept(preview)
-                            mutableState.value = mutableState.value.copy(editor = editor)
-                            true
-                        }
-                    }
-                discarded?.let(::accept)
-                return@operate
-            }
-            val existing = mutableState.value.editor
-            val profile = if (action == OnboardingActionFfi.EDIT_PROFILE) client.profile() else null
-            if (!isCurrent() || mutableState.value.snapshot?.revision != revision) return@operate
-            if (mutableState.value.snapshot?.recoveryEpoch != request.recoveryEpoch) return@operate
-            mutableState.value =
-                mutableState.value.copy(
-                    editor =
-                        existing.forRequest(request, profile),
-                )
         }
     }
 
@@ -211,6 +202,7 @@ internal class AccountSetupController(
                                 previous.displayNameEdited || editor.displayName != previous.displayName,
                             aboutEdited = previous.aboutEdited || editor.about != previous.about,
                         ),
+                    relayRemovalIssue = null,
                 )
         }
     }
@@ -221,12 +213,12 @@ internal class AccountSetupController(
         if (current.busy || !isCurrent()) return
         val preview = current.snapshot.takeIf { current.editor?.action == OnboardingActionFfi.EDIT_RELAYS }
         if (preview == null) {
-            mutableState.value = current.copy(editor = null)
+            mutableState.value = current.copy(editor = null, relayRemovalIssue = null)
         } else {
             operate {
                 val latest = client.discardRelayPreview(preview) ?: client.snapshot()
                 latest?.let(::accept)
-                if (isCurrent()) mutableState.value = mutableState.value.copy(editor = null)
+                if (isCurrent()) mutableState.value = mutableState.value.copy(editor = null, relayRemovalIssue = null)
             }
         }
     }
@@ -291,7 +283,7 @@ internal class AccountSetupController(
 }
 
 /** Grants must match the reviewed recovery epoch as well as the proposal or checkpoint revision. */
-private fun OnboardingSnapshotFfi.matchesDecision(
+internal fun OnboardingSnapshotFfi.matchesDecision(
     account: String,
     request: SetupRequest,
 ): Boolean {
@@ -349,6 +341,58 @@ internal fun SetupEditor.request(): SetupRequest {
     )
 }
 
+/** Exact rendered grant and finding stay bound to the selected retired endpoint. */
+private fun AccountSetupState.matchesRenderedRelayRemoval(
+    request: SetupRequest,
+    endpoint: String,
+): Boolean {
+    val selected = currentStep ?: return false
+    val validTarget = request.action == OnboardingActionFfi.EDIT_RELAYS && endpoint.isNotBlank()
+    val matchingStep = selected.step == request.step
+    val matchingFinding =
+        selected.findings.any {
+            it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
+        }
+    return validTarget && matchingStep && matchingFinding
+}
+
+/** Keeps a long-lived editor request inside the controller's serialized operation without adding controller state. */
+private suspend fun AccountSetupClient.loadSetupEditor(
+    request: SetupRequest,
+    state: MutableStateFlow<AccountSetupState>,
+    account: String,
+    isCurrent: () -> Boolean,
+    accept: (OnboardingSnapshotFfi) -> Unit,
+) {
+    val latest = snapshot()
+    if (latest == null || !latest.matchesDecision(account, request)) {
+        latest?.let(accept)
+        state.value = state.value.copy(staleDecision = true)
+    } else if (request.action == OnboardingActionFfi.EDIT_RELAYS) {
+        val discarded =
+            installRelayPreview(request.step) { preview ->
+                val editor = preview.relayEditor(request)
+                val matchesLoad = preview.matchesRelayEditorLoad(account, request, state.value.snapshot)
+                if (!isCurrent() || !matchesLoad) {
+                    false
+                } else {
+                    accept(preview)
+                    state.value = state.value.copy(editor = editor)
+                    true
+                }
+            }
+        discarded?.let(accept)
+    } else {
+        val existing = state.value.editor
+        val profile = if (request.action == OnboardingActionFfi.EDIT_PROFILE) profile() else null
+        val currentRevision = state.value.snapshot?.revision == request.revision
+        val currentEpoch = state.value.snapshot?.recoveryEpoch == request.recoveryEpoch
+        if (isCurrent() && currentRevision && currentEpoch) {
+            state.value = state.value.copy(editor = existing.forRequest(request, profile))
+        }
+    }
+}
+
 /** Checks the rendered native decision before entering the controller's single-flight operation. */
 private fun MutableStateFlow<AccountSetupState>.canAct(
     request: SetupRequest,
@@ -364,7 +408,7 @@ private fun MutableStateFlow<AccountSetupState>.canAct(
 }
 
 /** Projects only a matching native relay proposal into an editor bound to that preview's revision and epoch. */
-private fun OnboardingSnapshotFfi.relayEditor(request: SetupRequest): SetupEditor {
+internal fun OnboardingSnapshotFfi.relayEditor(request: SetupRequest): SetupEditor {
     val repair = checkNotNull(proposal?.takeIf { it.step == request.step }?.relayRepair)
     return SetupEditor(revision, request.step, request.action, recoveryEpoch = recoveryEpoch)
         .withRelayDeclaration(repair)

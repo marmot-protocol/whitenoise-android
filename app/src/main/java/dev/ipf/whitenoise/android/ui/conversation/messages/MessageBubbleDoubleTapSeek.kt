@@ -73,69 +73,74 @@ internal fun Modifier.observeMessageTextDoubleTap(
     val currentOnPointerDown = rememberUpdatedState(onPointerDown)
     val currentOnPointerFinished = rememberUpdatedState(onPointerFinished)
     val currentOnDoubleTap = rememberUpdatedState(onDoubleTap)
-    return if (!enabled) {
-        this
-    } else {
-        // Callback refresh is state-backed, so sentence recomposition does not
-        // restart gesture recognition or leave a stale closure behind.
-        pointerInput(Unit) {
-            var previousTapAt = 0L
-            var previousTapPosition: Offset? = null
-            awaitEachGesture {
-                val down =
-                    awaitFirstDown(
-                        requireUnconsumed = false,
-                        pass = PointerEventPass.Final,
-                    )
-                val allowConsumedTap = currentAllowConsumedTapAt.value(down.position)
-                currentOnPointerDown.value(down.position)
-                var movedTooFar = false
-                var consumed = down.isConsumed
-                var upAt = 0L
-                var upPosition: Offset? = null
-                while (upPosition == null) {
-                    val event = awaitPointerEvent(pass = PointerEventPass.Final)
-                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                    consumed = consumed || change.isConsumed
-                    if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                        movedTooFar = true
-                    }
-                    if (!change.pressed) {
-                        upAt = change.uptimeMillis
-                        upPosition = change.position
-                    }
-                }
-                val observedUp = upPosition
-                currentOnPointerFinished.value()
-                if (
-                    observedUp == null ||
-                    movedTooFar ||
-                    (consumed && !allowConsumedTap)
-                ) {
-                    previousTapAt = 0L
-                    previousTapPosition = null
-                    return@awaitEachGesture
-                }
-                val elapsed = upAt - previousTapAt
-                val previousPosition = previousTapPosition
-                val closeEnough =
-                    previousPosition != null &&
-                        (observedUp - previousPosition).getDistance() <= viewConfiguration.touchSlop
-                if (
-                    closeEnough &&
-                    elapsed in viewConfiguration.doubleTapMinTimeMillis..viewConfiguration.doubleTapTimeoutMillis
-                ) {
-                    previousTapAt = 0L
-                    previousTapPosition = null
-                    currentOnDoubleTap.value(observedUp)
-                } else {
-                    previousTapAt = upAt
-                    previousTapPosition = observedUp
-                }
-                // The observer never consumes pointer changes. Consumed child
-                // gestures are ignored except links, whose activation is
-                // deliberately deferred so the second tap can become a seek.
+    val currentEnabled = rememberUpdatedState(enabled)
+    // Callback refresh is state-backed, so sentence recomposition does not
+    // restart gesture recognition or leave a stale closure behind. The node also
+    // stays mounted while disabled, so toggling availability never restructures
+    // the row's modifier chain beneath an active hold.
+    return pointerInput(Unit) {
+        var previousTapAt = 0L
+        var previousTapPosition: Offset? = null
+        awaitEachGesture {
+            val down =
+                awaitFirstDown(
+                    requireUnconsumed = false,
+                    pass = PointerEventPass.Final,
+                )
+            if (!currentEnabled.value) {
+                // A disabled span ends any pending double tap, as unmounting the node used to.
+                previousTapAt = 0L
+                previousTapPosition = null
+                return@awaitEachGesture
             }
+            val allowConsumedTap = currentAllowConsumedTapAt.value(down.position)
+            currentOnPointerDown.value(down.position)
+            var movedTooFar = false
+            var consumed = down.isConsumed
+            var upAt = 0L
+            var upPosition: Offset? = null
+            while (upPosition == null) {
+                val event = awaitPointerEvent(pass = PointerEventPass.Final)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                consumed = consumed || change.isConsumed
+                if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                    movedTooFar = true
+                }
+                if (!change.pressed) {
+                    upAt = change.uptimeMillis
+                    upPosition = change.position
+                }
+            }
+            val observedUp = upPosition
+            currentOnPointerFinished.value()
+            if (
+                observedUp == null ||
+                movedTooFar ||
+                (consumed && !allowConsumedTap)
+            ) {
+                previousTapAt = 0L
+                previousTapPosition = null
+                return@awaitEachGesture
+            }
+            val elapsed = upAt - previousTapAt
+            val previousPosition = previousTapPosition
+            val closeEnough =
+                previousPosition != null &&
+                    (observedUp - previousPosition).getDistance() <= viewConfiguration.touchSlop
+            if (
+                closeEnough &&
+                elapsed in viewConfiguration.doubleTapMinTimeMillis..viewConfiguration.doubleTapTimeoutMillis
+            ) {
+                previousTapAt = 0L
+                previousTapPosition = null
+                currentOnDoubleTap.value(observedUp)
+            } else {
+                previousTapAt = upAt
+                previousTapPosition = observedUp
+            }
+            // The observer never consumes pointer changes. Consumed child
+            // gestures are ignored except links, whose activation is
+            // deliberately deferred so the second tap can become a seek.
         }
     }
 }

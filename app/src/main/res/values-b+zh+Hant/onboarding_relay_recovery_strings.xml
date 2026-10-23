@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_technical_details">技術詳情</string>
+    <string name="setup_relay_publication_scope">變更也會影響使用此帳號的其他 Nostr 應用程式。</string>
+    <string name="setup_relay_remove_scope">從兩個清單中移除此位址。儲存前請檢查。</string>
+    <string name="setup_undo_removal">復原移除</string>
+</resources>

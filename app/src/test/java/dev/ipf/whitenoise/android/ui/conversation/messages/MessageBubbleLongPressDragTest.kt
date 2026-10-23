@@ -261,11 +261,43 @@ class MessageBubbleLongPressDragTest {
 
     /** Long press drag selects four message rows without lifting. */
     @Test
-    @Suppress("LongMethod") // Exercises four real MessageBubble rows through their public gesture contract.
     fun longPressDragSelectsFourMessageRowsWithoutLifting() {
+        assertFourRowHeldRange(mine = false, upward = false)
+    }
+
+    /** Own rows keep a downward held range while selection removes their reply-swipe and double-tap input. */
+    @Test
+    fun ownRowsKeepADownwardHeldRangeWithoutLifting() {
+        assertFourRowHeldRange(mine = true, upward = false)
+    }
+
+    /** Own rows keep an upward held range while selection removes their reply-swipe and double-tap input. */
+    @Test
+    fun ownRowsKeepAnUpwardHeldRangeWithoutLifting() {
+        assertFourRowHeldRange(mine = true, upward = true)
+    }
+
+    /** Received rows that can be read aloud mount the double-tap observer and keep the held range too. */
+    @Test
+    fun speakableReceivedRowsKeepAHeldRangeWithoutLifting() {
+        assertFourRowHeldRange(mine = false, upward = true, usableTts = true)
+    }
+
+    /**
+     * Holds one of four real rows, drags across a neighbour and then the far end without lifting.
+     * The range must survive the recomposition that turns on selection chrome, which is when the
+     * row's optional gesture modifiers used to drop out and cancel the hold (#3407 follow-up).
+     */
+    @Suppress("LongMethod") // Exercises four real MessageBubble rows through their public gesture contract.
+    private fun assertFourRowHeldRange(
+        mine: Boolean,
+        upward: Boolean,
+        usableTts: Boolean = false,
+    ) {
         val appState = appState()
+        if (usableTts) appState.forceUsableTtsResolutionForTests()
         val controller = ConversationController(appState = appState, initialGroup = group())
-        val items = List(4, ::timelineMessage)
+        val items = List(4) { index -> timelineMessage(index, mine) }
         val composerTextState = ComposerTextState(TextFieldValue(""))
         val rowBounds = arrayOfNulls<Rect>(items.size)
         var selectedIds by mutableStateOf(emptySet<String>())
@@ -346,21 +378,16 @@ class MessageBubbleLongPressDragTest {
             }
         }
 
-        val start =
+        /** Window-space center of one fixture row. */
+        fun rowCenter(index: Int) =
             composeRule
-                .onNodeWithTag("message-range-row-0")
+                .onNodeWithTag("message-range-row-$index")
                 .fetchSemanticsNode()
                 .boundsInRoot.center
-        val second =
-            composeRule
-                .onNodeWithTag("message-range-row-1")
-                .fetchSemanticsNode()
-                .boundsInRoot.center
-        val fourth =
-            composeRule
-                .onNodeWithTag("message-range-row-3")
-                .fetchSemanticsNode()
-                .boundsInRoot.center
+        val order = if (upward) listOf(3, 2, 0) else listOf(0, 1, 3)
+        val start = rowCenter(order[0])
+        val neighbour = rowCenter(order[1])
+        val farEnd = rowCenter(order[2])
         val root = composeRule.onNodeWithTag(MESSAGE_RANGE_HOST_TAG)
         root.performTouchInput {
             down(start)
@@ -369,17 +396,17 @@ class MessageBubbleLongPressDragTest {
         }
         composeRule.runOnIdle {
             assertEquals(1, actionOpens)
-            assertEquals(0, openedIndex)
+            assertEquals(order[0], openedIndex)
         }
         root.performTouchInput {
-            moveTo(second)
+            moveTo(neighbour)
         }
         composeRule.runOnIdle {
             assertEquals(2, selectedIds.size)
             assertEquals(-1, openedIndex)
         }
         root.performTouchInput {
-            updatePointerTo(0, fourth)
+            updatePointerTo(0, farEnd)
             move(100)
             up()
         }
@@ -460,16 +487,20 @@ class MessageBubbleLongPressDragTest {
         return timestampText
     }
 
-    private fun timelineMessage(index: Int = 0): TimelineMessage {
+    /** A plain text row, received by default or sent by the active account when [mine]. */
+    private fun timelineMessage(
+        index: Int = 0,
+        mine: Boolean = false,
+    ): TimelineMessage {
         val messageId = (5 + index).toString(16).padStart(2, '0') + "00".repeat(31)
         return TimelineMessage(
             id = "msg:$messageId",
             record =
                 AppMessageRecordFfi(
                     messageIdHex = messageId,
-                    direction = "received",
+                    direction = if (mine) "sent" else "received",
                     groupIdHex = GROUP_ID,
-                    sender = SENDER_ID,
+                    sender = if (mine) ACCOUNT_ID else SENDER_ID,
                     plaintext = "$MESSAGE_BODY $index",
                     contentTokens =
                         MarkdownDocumentFfi(
@@ -485,7 +516,7 @@ class MessageBubbleLongPressDragTest {
                     recordedAt = 1uL,
                     receivedAt = 1uL,
                 ),
-            status = MessageStatus.Received,
+            status = if (mine) MessageStatus.Sent else MessageStatus.Received,
         )
     }
 
