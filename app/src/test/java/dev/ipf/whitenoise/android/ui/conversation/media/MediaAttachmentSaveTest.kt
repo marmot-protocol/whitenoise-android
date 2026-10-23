@@ -10,10 +10,14 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.core.content.IntentCompat
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.BoundedPlaintextSink
+import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -26,6 +30,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.File
 import java.io.FilterOutputStream
+import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
 
 @RunWith(RobolectricTestRunner::class)
@@ -104,6 +109,55 @@ class MediaAttachmentSaveTest {
         } finally {
             source.delete()
         }
+    }
+
+    /** An image above the preview budget streams into Pictures in chunks and is never collected into one array. */
+    @Test
+    fun streamedImageAboveThePreviewBudgetIsCopiedWithoutAWholeArray() {
+        val size = ATTACHMENT_PRESENTATION_MAX_BYTES + 1024L * 1024L
+        val source = PatternPlaintext(size)
+
+        val saved = saveAttachmentToMediaStore(context(), source, "large.png", "image/png")
+
+        assertTrue(saved)
+        assertEquals(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+        assertEquals(size, outputFile.length())
+        assertEquals(1, source.copies)
+        assertFalse("the image was collected into a bounded array", source.sawBoundedSink)
+        assertEquals(0, provider.updatedValues?.getAsInteger(MediaStore.Images.Media.IS_PENDING))
+        outputFile.inputStream().use { input ->
+            val head = ByteArray(PATTERN_PERIOD)
+            input.read(head)
+            assertArrayEquals(ByteArray(PATTERN_PERIOD) { it.toByte() }, head)
+        }
+    }
+
+    /** The streamed overload routes videos and documents exactly like the byte overload. */
+    @Test
+    fun streamedSourceRoutesVideosAndDocumentsLikeTheByteOverload() {
+        val source = AttachmentPlaintext.Bytes(PAYLOAD)
+        assertTrue(saveAttachmentToMediaStore(context(), source, "clip.mp4", "video/mp4"))
+        assertEquals(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+        assertArrayEquals(PAYLOAD, outputFile.readBytes())
+
+        assertTrue(saveAttachmentToMediaStore(context(), source, "../report.pdf", "application/pdf"))
+        assertEquals(MediaStore.Downloads.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+        assertEquals("report.pdf", provider.insertedValues?.getAsString(MediaStore.Downloads.DISPLAY_NAME))
+        assertArrayEquals(PAYLOAD, outputFile.readBytes())
+    }
+
+    /** A failed streamed image write reports its stage and removes the pending gallery entry. */
+    @Test
+    fun streamedImageWriteFailureDeletesThePendingEntry() {
+        provider.writeFailure = java.io.IOException("disk full")
+
+        val failure =
+            runCatching {
+                saveImageToGallery(context(), AttachmentPlaintext.Bytes(PAYLOAD), "photo.png", "image/png")
+            }.exceptionOrNull()
+
+        assertEquals(AttachmentSaveStage.MEDIASTORE_WRITE, (failure as AttachmentSaveException).stage)
+        assertEquals(1, provider.deleteCount)
     }
 
     @Test
@@ -421,6 +475,32 @@ class MediaAttachmentSaveTest {
 
     private fun context() = RuntimeEnvironment.getApplication()
 
+    /** Streams a repeating byte pattern of [size] in chunks and records whether a bounded array sink received it. */
+    private class PatternPlaintext(
+        override val size: Long,
+    ) : AttachmentPlaintext {
+        var copies = 0
+            private set
+        var sawBoundedSink = false
+            private set
+
+        /** Writes the pattern one chunk at a time, never as one array. */
+        override fun copyTo(output: OutputStream) {
+            copies += 1
+            if (output is BoundedPlaintextSink) sawBoundedSink = true
+            val chunk = ByteArray(PATTERN_PERIOD * 1024) { (it % PATTERN_PERIOD).toByte() }
+            var remaining = size
+            while (remaining > 0) {
+                val length = minOf(chunk.size.toLong(), remaining).toInt()
+                output.write(chunk, 0, length)
+                remaining -= length
+            }
+        }
+
+        /** The fixture owns no external resource. */
+        override fun close() = Unit
+    }
+
     private class RecordingMediaProvider(
         private val outputFile: File,
         private val resolver: ContentResolver,
@@ -505,5 +585,6 @@ class MediaAttachmentSaveTest {
 
     private companion object {
         val PAYLOAD = "attachment bytes".toByteArray()
+        const val PATTERN_PERIOD = 251
     }
 }

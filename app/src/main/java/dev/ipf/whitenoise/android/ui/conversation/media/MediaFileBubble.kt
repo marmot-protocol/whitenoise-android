@@ -454,15 +454,15 @@ internal fun MediaFileBubble(
             senderDisplayName = senderDisplayName,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
+            // One byte past the preview limit is enough to tell an over-limit file apart, so the reader never
+            // reads the rest of a large file onto the heap.
             loadBytes = {
-                requireNotNull(
-                    loadMediaFileBytes(
-                        controller = controller,
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                        reference = reference,
-                        mine = mine,
-                    ),
+                loadTextReaderBytes(
+                    controller = controller,
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = attachmentIndex,
+                    reference = reference,
+                    mine = mine,
                 )
             },
             onOpenExternal = openExternal@{

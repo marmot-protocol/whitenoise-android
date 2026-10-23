@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
+import dev.ipf.whitenoise.android.ui.conversation.media.localAttachmentBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -98,6 +99,28 @@ class CachedAttachmentPlaintextBoundedReadTest {
 
             assertArrayEquals(bytes, read)
             assertEquals(emptyList<String>(), leaseFileNames())
+        }
+
+    /**
+     * A cache-only read for a small file type, such as a vCard, passes its own budget through, so an oversized
+     * entry is rejected by its size instead of being copied up to the general preview budget.
+     */
+    @Test
+    fun aLocalReadWithACallerBudgetRejectsAnOversizedEntry() =
+        runTest(dispatcher) {
+            fixture.state.diskMediaCache.put(request(0).cacheKey(), ByteArray(LARGE_ENTRY_BYTES) { it.toByte() })
+
+            val failure =
+                runCatching {
+                    localAttachmentBytes(controller, request(0).messageIdHex, 0, mine = false, maxBytes = BUDGET_BYTES)
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(BUDGET_BYTES, (failure as AttachmentTooLargeToPresentException).limitBytes)
+            assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
         }
 
     /** An entry small enough for L1 is still read directly. */

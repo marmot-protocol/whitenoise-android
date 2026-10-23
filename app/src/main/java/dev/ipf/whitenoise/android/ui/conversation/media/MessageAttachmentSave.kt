@@ -4,7 +4,6 @@ import android.content.Context
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
-import dev.ipf.whitenoise.android.state.ATTACHMENT_EXPLICIT_READ_MAX_BYTES
 import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -115,31 +114,31 @@ private suspend fun saveMessageVideoAttachment(
     return saved
 }
 
-/** Saves one image's whole verified bytes to the gallery; explicit saves are not bound by the preview budget. */
+/**
+ * Saves one image's whole verified file to the gallery, streamed from its source so an image of any size is never
+ * read into one array. A pending own send still uses its retained in-memory bytes.
+ */
 private suspend fun saveMessageImageAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
-): Boolean {
-    // An explicit Save hands the whole verified image to MediaStore, so it is not bounded by the preview budget.
-    val bytes =
-        attachmentBytes(
-            controller = context.controller,
-            messageIdHex = context.messageIdHex,
-            attachmentIndex = attachmentIndex,
-            reference = reference,
-            mine = context.mine,
-            maxBytes = ATTACHMENT_EXPLICIT_READ_MAX_BYTES,
-        )
-    return withContext(Dispatchers.IO) {
-        saveAttachmentToMediaStore(
-            context = context.androidContext,
-            bytes = bytes,
-            fileName = reference.fileName,
-            mediaType = reference.mediaType,
-        )
+): Boolean =
+    attachmentSource(
+        controller = context.controller,
+        messageIdHex = context.messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+        mine = context.mine,
+    ).use { source ->
+        withContext(Dispatchers.IO) {
+            saveAttachmentToMediaStore(
+                context = context.androidContext,
+                source = source,
+                fileName = reference.fileName,
+                mediaType = reference.mediaType,
+            )
+        }
     }
-}
 
 /**
  * Saves one document to Downloads from a materialized file, preferring the sender's in-memory retry bytes

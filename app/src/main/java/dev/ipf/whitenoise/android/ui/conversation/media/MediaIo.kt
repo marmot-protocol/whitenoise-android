@@ -495,6 +495,25 @@ internal fun saveImageToGallery(
     bytes: ByteArray,
     fileName: String,
     mediaType: String,
+): Boolean = saveImageToGallery(context, fileName, mediaType) { output -> output.write(bytes) }
+
+/**
+ * Streams a received image's verified plaintext into the gallery, so an explicit Save never holds the whole image
+ * on the heap. The caller owns and closes [source].
+ */
+internal fun saveImageToGallery(
+    context: android.content.Context,
+    source: AttachmentPlaintext,
+    fileName: String,
+    mediaType: String,
+): Boolean = saveImageToGallery(context, fileName, mediaType, source::copyTo)
+
+/** Publishes one gallery image whose bytes [write] produces, with the same pending-entry and naming rules. */
+private fun saveImageToGallery(
+    context: android.content.Context,
+    fileName: String,
+    mediaType: String,
+    write: (java.io.OutputStream) -> Unit,
 ): Boolean {
     val resolver = context.contentResolver
     val values =
@@ -510,7 +529,8 @@ internal fun saveImageToGallery(
         resolver = resolver,
         collection = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
         values = values,
-    ) { output -> output.write(bytes) }
+        write = write,
+    )
 }
 
 /** Persist a decrypted video to the public Movies/White Noise folder via the
@@ -529,6 +549,24 @@ internal fun saveVideoToGallery(
     fileName: String,
     mediaType: String,
 ): Boolean = source.inputStream().use { saveVideoToGallery(context, it, fileName, mediaType) }
+
+/**
+ * Streams a decrypted attachment into the public collection appropriate for its MIME type, the same routing as the
+ * byte overload, without reading the whole file into memory. The caller owns and closes [source].
+ */
+internal fun saveAttachmentToMediaStore(
+    context: Context,
+    source: AttachmentPlaintext,
+    fileName: String,
+    mediaType: String,
+): Boolean {
+    val normalizedMime = normalizeDocumentMime(mediaType)
+    return when {
+        normalizedMime.startsWith("image/") -> saveImageToGallery(context, source, fileName, normalizedMime)
+        normalizedMime.startsWith("video/") -> publishVideoToGallery(context, fileName, normalizedMime, source::copyTo)
+        else -> publishFileToDownloads(context, fileName, normalizedMime, source::copyTo)
+    }
+}
 
 /** Save a decrypted attachment to the public collection appropriate for its MIME type. */
 internal fun saveAttachmentToMediaStore(
@@ -561,11 +599,23 @@ private fun saveFileToDownloads(
     mediaType: String,
 ): Boolean = saveFileToDownloads(context, bytes.inputStream(), fileName, mediaType)
 
+/** Streams [source] into Download/White Noise without reading it whole. */
 private fun saveFileToDownloads(
     context: Context,
     source: java.io.InputStream,
     fileName: String,
     mediaType: String,
+): Boolean =
+    publishFileToDownloads(context, fileName, mediaType) { output ->
+        source.copyTo(output, DEFAULT_BUFFER_SIZE)
+    }
+
+/** Publishes one Downloads entry whose bytes [write] produces, with the same pending-entry and naming rules. */
+private fun publishFileToDownloads(
+    context: Context,
+    fileName: String,
+    mediaType: String,
+    write: (java.io.OutputStream) -> Unit,
 ): Boolean {
     val resolver = context.contentResolver
     val values =
@@ -579,14 +629,27 @@ private fun saveFileToDownloads(
         resolver = resolver,
         collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
         values = values,
-    ) { output -> source.copyTo(output, DEFAULT_BUFFER_SIZE) }
+        write = write,
+    )
 }
 
+/** Streams [source] into Movies/White Noise without reading it whole. */
 private fun saveVideoToGallery(
     context: android.content.Context,
     source: java.io.InputStream,
     fileName: String,
     mediaType: String,
+): Boolean =
+    publishVideoToGallery(context, fileName, mediaType) { output ->
+        source.copyTo(output, DEFAULT_BUFFER_SIZE)
+    }
+
+/** Publishes one gallery video whose bytes [write] produces, with the same pending-entry and naming rules. */
+private fun publishVideoToGallery(
+    context: android.content.Context,
+    fileName: String,
+    mediaType: String,
+    write: (java.io.OutputStream) -> Unit,
 ): Boolean {
     val resolver = context.contentResolver
     val values =
@@ -600,7 +663,8 @@ private fun saveVideoToGallery(
         resolver = resolver,
         collection = android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
         values = values,
-    ) { output -> source.copyTo(output, DEFAULT_BUFFER_SIZE) }
+        write = write,
+    )
 }
 
 private inline fun publishMediaStoreEntry(

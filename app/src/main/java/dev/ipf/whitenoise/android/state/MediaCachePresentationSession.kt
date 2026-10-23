@@ -46,7 +46,8 @@ internal suspend fun ConversationController.cachedAttachmentPlaintext(
 }
 
 /**
- * Reads MDK-retained plaintext for a cache-only render, never starting a transfer.
+ * Reads MDK-retained plaintext for a cache-only render, never starting a transfer and never copying more than
+ * [maxBytes].
  *
  * The host presentation caches can be empty while MDK still holds verified bytes, for example after the cache was
  * trimmed or for media received while no host copy was written. A result that finishes after an account or session
@@ -55,6 +56,7 @@ internal suspend fun ConversationController.cachedAttachmentPlaintext(
 internal suspend fun ConversationController.retainedNativeAttachmentBytes(
     messageIdHex: String,
     attachmentIndex: Int,
+    maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
 ): ByteArray? {
     val account = boundAccountRef ?: return null
     val request =
@@ -65,7 +67,7 @@ internal suspend fun ConversationController.retainedNativeAttachmentBytes(
             attachmentIndex,
             sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
         )
-    return appState.readRetainedAttachmentBytes(account) { appState.openNativeAttachment(request) }
+    return appState.readRetainedAttachmentBytes(account, maxBytes) { appState.openNativeAttachment(request) }
 }
 
 /**
