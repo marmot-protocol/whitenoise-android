@@ -76,51 +76,56 @@ internal fun SetupEditorContent(
         val discovery = editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
             Text(stringResource(editor.relayEditHelp()))
-        } else {
-            Text(stringResource(R.string.setup_discovery_help))
-        }
-        if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
             SetupRelayEditorRows(editor, fields, busy, findings)
-        }
-        if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
             androidx.compose.material3.TextButton(
                 onClick = { advanced = !advanced },
                 modifier = Modifier.testTag("setup.relay.edit_addresses"),
             ) {
                 Text(stringResource(R.string.setup_action_edit_relays))
             }
-        }
-        if (editor.action == OnboardingActionFfi.EDIT_RELAYS && !editor.canEditRelayDeclaration) {
-            editor.relayDeclaration?.let { SetupRelayRepairContent(it, findings) }
-        }
-        if (discovery || advanced) {
-            WhiteNoiseTextField(
-                state = fields.reads,
-                enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),
-                lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-                label = {
-                    Text(
-                        stringResource(
-                            when {
-                                discovery -> R.string.setup_discovery_list
-                                editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_inbox_list
-                                else -> R.string.setup_read_list
-                            },
-                        ),
-                    )
-                },
-                modifier = Modifier.fillMaxWidth().testTag("setup.editor.reads"),
-            )
-            if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
-                WhiteNoiseTextField(
-                    state = fields.writes,
-                    enabled = !busy && editor.canEditRelayDeclaration,
-                    lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-                    label = { Text(stringResource(R.string.setup_write_list)) },
-                    modifier = Modifier.fillMaxWidth().testTag("setup.editor.writes"),
-                )
+            if (!editor.canEditRelayDeclaration) {
+                editor.relayDeclaration?.let { SetupRelayRepairContent(it, findings) }
             }
+        } else {
+            Text(stringResource(R.string.setup_discovery_help))
         }
+        if (discovery || advanced) SetupRelayAddressFields(editor, fields, busy, discovery)
+    }
+}
+
+/** Existing multiline controls remain available for discovery and advanced relay edits. */
+@Composable
+private fun SetupRelayAddressFields(
+    editor: SetupEditor,
+    fields: SetupEditorFields,
+    busy: Boolean,
+    discovery: Boolean,
+) {
+    WhiteNoiseTextField(
+        state = fields.reads,
+        enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),
+        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
+        label = {
+            Text(
+                stringResource(
+                    when {
+                        discovery -> R.string.setup_discovery_list
+                        editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_inbox_list
+                        else -> R.string.setup_read_list
+                    },
+                ),
+            )
+        },
+        modifier = Modifier.fillMaxWidth().testTag("setup.editor.reads"),
+    )
+    if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
+        WhiteNoiseTextField(
+            state = fields.writes,
+            enabled = !busy && editor.canEditRelayDeclaration,
+            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
+            label = { Text(stringResource(R.string.setup_write_list)) },
+            modifier = Modifier.fillMaxWidth().testTag("setup.editor.writes"),
+        )
     }
 }
 

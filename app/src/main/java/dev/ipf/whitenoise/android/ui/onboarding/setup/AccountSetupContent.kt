@@ -118,10 +118,9 @@ internal fun AccountSetupContent(
     ) {
         SetupErrors(state, onReconnect)
         if (!detail) {
-            if (state.busy ||
-                state.snapshot == null ||
-                (state.optionalMetadataPending && !state.error && !state.disconnected && !state.staleDecision)
-            ) {
+            val checksInterrupted = state.error || state.disconnected || state.staleDecision
+            val waitingForMetadata = state.optionalMetadataPending && !checksInterrupted
+            if (state.busy || state.snapshot == null || waitingForMetadata) {
                 SetupProgress()
                 state.snapshot?.let { snapshot ->
                     state.currentStep?.let { step -> SetupOperationNotice(snapshot, step) }
@@ -136,9 +135,14 @@ internal fun AccountSetupContent(
                 state.snapshot?.let { SetupChecklist(it, state.checklistInspectionStep) { step -> detailStep = step } }
             }
             if (state.snapshot != null && state.snapshot?.ready != true && !state.busy) {
-                TextButton(onClick = onToggleDetails, modifier = Modifier.testTag("setup-details")) {
+                TextButton(
+                    onClick = onToggleDetails,
+                    modifier = Modifier.testTag("setup-details"),
+                ) {
                     Text(
-                        stringResource(if (state.detailsExpanded) R.string.setup_hide_details else R.string.setup_details),
+                        stringResource(
+                            if (state.detailsExpanded) R.string.setup_hide_details else R.string.setup_details,
+                        ),
                     )
                 }
             }

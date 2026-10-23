@@ -437,8 +437,12 @@ class AccountSetupContentTest {
         val snapshot =
             setupSnapshot(
                 OnboardingStepFfi.RELAYS,
-                listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.RETRY),
-            ).copy(recoveryEpoch = 7uL)
+                listOf(
+                    OnboardingActionFfi.USE_RECOMMENDED_RELAYS,
+                    OnboardingActionFfi.EDIT_RELAYS,
+                    OnboardingActionFfi.RETRY,
+                ),
+            ).copy(recoveryEpoch = "saved-recovery-epoch")
         snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
             listOf(
                 OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"),
@@ -457,7 +461,7 @@ class AccountSetupContentTest {
                     snapshot.revision,
                     OnboardingStepFfi.RELAYS,
                     OnboardingActionFfi.RETRY,
-                    recoveryEpoch = 7uL,
+                    recoveryEpoch = "saved-recovery-epoch",
                 ),
             ),
             actions,

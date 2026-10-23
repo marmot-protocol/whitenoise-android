@@ -23,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
@@ -58,7 +59,7 @@ internal fun SetupRelayEditorRows(
                     Text(
                         stringResource(
                             when {
-                                editor.step == dev.ipf.marmotkit.OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_repair_inbox
+                                editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_repair_inbox
                                 endpoint in reads && endpoint in writes -> R.string.setup_repair_both
                                 endpoint in writes -> R.string.setup_repair_write
                                 else -> R.string.setup_repair_read

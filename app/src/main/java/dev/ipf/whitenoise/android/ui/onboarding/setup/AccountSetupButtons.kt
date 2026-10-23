@@ -36,18 +36,7 @@ internal fun SetupActionButtons(
         state.orderedRelayActions(step.actions).filterNot {
             it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
         }
-    val actions =
-        if (state.detailsExpanded || snapshot.cancellationPending) {
-            ordered
-        } else {
-            val ordinary = ordered.filter { it != OnboardingActionFfi.CANCEL_ONBOARDING }
-            val visible = ordinary.take(2)
-            if (step.step in relaySetupSteps && OnboardingActionFfi.RETRY in ordinary) {
-                (visible + OnboardingActionFfi.RETRY).distinct()
-            } else {
-                visible
-            }
-        }
+    val actions = state.visibleSetupActions(step.step, ordered, snapshot.cancellationPending)
     actions.forEach { action ->
         val revision =
             if (action == OnboardingActionFfi.APPROVE_REPAIR) {
@@ -81,6 +70,22 @@ internal fun SetupActionButtons(
             modifier = Modifier.fillMaxWidth().testTag("setup-reset-relays"),
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
         ) { Text(stringResource(R.string.setup_reset_relays)) }
+    }
+}
+
+/** Keeps overview actions bounded while retaining a native-offered relay retry. */
+private fun AccountSetupState.visibleSetupActions(
+    step: OnboardingStepFfi,
+    ordered: List<OnboardingActionFfi>,
+    cancellationPending: Boolean,
+): List<OnboardingActionFfi> {
+    if (detailsExpanded || cancellationPending) return ordered
+    val ordinary = ordered.filter { it != OnboardingActionFfi.CANCEL_ONBOARDING }
+    val visible = ordinary.take(2)
+    return if (step in relaySetupSteps && OnboardingActionFfi.RETRY in ordinary) {
+        (visible + OnboardingActionFfi.RETRY).distinct()
+    } else {
+        visible
     }
 }
 
