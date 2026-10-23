@@ -148,6 +148,11 @@ class AnimationSourceAdmissionDeviceTest {
                 .getInstrumentation()
         dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
             .install(instrumentation.targetContext)
+        assertTrue(
+            "Previous isolated animation must finish retirement before the decorative fixture starts",
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedAnimationSession
+                .awaitIdleForTest(),
+        )
         val animated =
             requireNotNull(
                 runBlocking {

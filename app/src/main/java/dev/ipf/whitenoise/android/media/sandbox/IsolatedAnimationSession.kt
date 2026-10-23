@@ -364,6 +364,14 @@ internal class IsolatedAnimationSession private constructor(
             }
         }
 
+        /** Test fixture barrier: borrow admission after confirmed retirement without starting a binding. */
+        internal fun awaitIdleForTest(): Boolean {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            val lease = admission.acquire(decorative = false, MediaDecodePolicy.DEADLINE_MS) ?: return false
+            lease.release() // This fixture lease never started a binding or received source bytes.
+            return true
+        }
+
         fun retireActive() {
             active.get()?.close()
         }
