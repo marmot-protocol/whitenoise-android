@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintextCache.kt",
+  "legacy_sha256": "d8606607fb953ca7c66bebd91876c47279823e0b399bf36420a7d54dc4ecd6af",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Received large APK handoff remains within the bounded shared-file cache",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintextCache.kt",
+        "anchor": "internal const val SHARED_MAX_DIRECTORY_BYTES",
+        "test_ids": [
+          "MED-018"
+        ]
+      },
+      {
+        "surface": "Pending camera output survives empty draft cleanup across authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintextCache.kt",
+        "anchor": "fun clearUnheldFiles(",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -118,6 +118,22 @@ class ConversationAnchoringSourceCoverageTest {
         )
     }
 
+    /** Physical top means older history only in the reversed transcript, and endpoint reads follow layout. */
+    @Test
+    fun reversedDragSelectionMapsEdgesBeforeReadingThePostScrollEndpoint() {
+        val source = conversationScreenSource().readText()
+        val start = source.indexOf("fun messageDragSelectionEffects()")
+        val loop = source.substring(start, source.indexOf("    messageDragSelectionEffects()", start))
+        val scroll = loop.indexOf("listState.scrollBy(-scrollDelta)")
+        val endpoint = loop.indexOf("currentMessageDragSelectionUpdater(pointerWindowY)")
+        assertTrue("reversed list must invert the shared physical edge delta", scroll >= 0)
+        assertTrue("endpoint must use the post-scroll native viewport", endpoint > scroll)
+        assertTrue(loop.contains("while (dragAnchorTimelineId != null)"))
+        assertTrue(loop.contains("withFrameNanos"))
+        assertTrue(loop.contains("dragSelectionAutoScrollDelta("))
+        assertTrue(source.contains("currentMessageDragSelectionUpdater by rememberUpdatedState<(Float) -> Boolean>"))
+    }
+
     private fun String.containsAll(vararg fragments: String): Boolean = fragments.all(::contains)
 
     private fun conversationScreenSource(): File =

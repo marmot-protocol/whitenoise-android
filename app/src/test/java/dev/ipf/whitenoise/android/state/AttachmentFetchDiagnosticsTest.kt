@@ -52,17 +52,22 @@ class AttachmentFetchDiagnosticsTest {
         assertEquals(PerformanceLayer.MDK, events[2].layer)
     }
 
+    /** Every native state remains serializable, including retention cleanup as a terminal local absence. */
     @Test
     fun everyNativeTransferStateMapsToTheClosedDiagnosticSchema() {
         val states = mutableListOf<PerformanceAttachmentState?>()
+        val results = mutableListOf<PerformanceResult>()
         val diagnostics =
             requireNotNull(
                 AttachmentFetchDiagnostics.begin(
                     priority = AttachmentDownloadPriority.Automatic,
                     nowMs = { 10L },
                     begin = { _, _ -> trace() },
-                    record = { _, phase, _, _, _, _, state ->
-                        if (phase == PerformancePhase.ATTACHMENT_TRANSFER_UPDATE) states += state
+                    record = { _, phase, _, _, result, _, state ->
+                        if (phase == PerformancePhase.ATTACHMENT_TRANSFER_UPDATE) {
+                            states += state
+                            results += result
+                        }
                     },
                 ),
             )
@@ -70,6 +75,7 @@ class AttachmentFetchDiagnosticsTest {
         AttachmentTransferStateFfi.entries.forEach(diagnostics::transferUpdate)
 
         assertEquals(AttachmentTransferStateFfi.entries.map { it.name }, states.map { it?.name })
+        assertEquals(PerformanceResult.FAILURE, results[states.indexOf(PerformanceAttachmentState.CLEANED_BY_SETTING)])
     }
 
     @Test

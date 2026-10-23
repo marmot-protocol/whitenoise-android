@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentPlatformLaunchers.kt",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Document save fallback dispatch preserves the guarded save request",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentPlatformLaunchers.kt",
+        "anchor": "suspend fun saveDocumentWithFallback(",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

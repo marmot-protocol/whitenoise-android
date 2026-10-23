@@ -91,6 +91,17 @@ internal object AttachmentPlaintextCache {
         activePublicationPathCounts.computeIfPresent(file.absolutePath) { _, count -> (count - 1).takeIf { it > 0 } }
     }
 
+    /** Removes abandoned flat-directory files while respecting exact active publication/capture holds. */
+    internal fun clearUnheldFiles(directory: File) {
+        synchronized(trimLock) {
+            directory.listFiles()?.filter(File::isFile)?.forEach { file ->
+                if (!activePublicationPathCounts.containsKey(file.absolutePath)) file.delete()
+            }
+            // This succeeds only when no held files remain; never recursively delete through a hold.
+            directory.delete()
+        }
+    }
+
     fun trimKnownDirectories(cacheRoot: File) {
         trimDirectoryToByteCap(File(cacheRoot, MediaCacheDirs.VOICE), VOICE_MAX_DIRECTORY_BYTES)
         trimDirectoryToByteCap(File(cacheRoot, MediaCacheDirs.VIDEO), VIDEO_MAX_DIRECTORY_BYTES)

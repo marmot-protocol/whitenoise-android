@@ -18,6 +18,14 @@
         "test_ids": [
           "MED-035"
         ]
+      },
+      {
+        "surface": "Native follow-list safety limit is distinct from unavailable lookup in private diagnostic summaries",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/DiagnosticFormatter.kt",
+        "anchor": "marmotError is MarmotKitException.FollowListTooLarge -> \"FOLLOW_LIST_TOO_LARGE\"",
+        "test_ids": [
+          "SET-021"
+        ]
       }
     ]
   },

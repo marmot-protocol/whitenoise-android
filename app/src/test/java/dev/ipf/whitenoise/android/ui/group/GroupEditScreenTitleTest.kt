@@ -86,8 +86,10 @@ class GroupEditScreenTitleTest {
     fun editScreenDelegatesToItsSettingsFrame() {
         val screenBody = functionBody("GroupEditScreen")
         assertTrue(
-            "GroupEditScreen must delegate its title and actions to GroupEditScaffold",
-            Regex("""GroupEditScaffold\s*\(\s*onBack\s*=\s*onBack""").containsMatchIn(screenBody),
+            "Group edit Back must settle crop recovery before leaving through GroupEditScaffold",
+            Regex(
+                """GroupEditScaffold\s*\(\s*onBack\s*=\s*\{\s*cropRecovery\.settled\(\)\s*onBack\(\)\s*},""",
+            ).containsMatchIn(screenBody),
         )
     }
 

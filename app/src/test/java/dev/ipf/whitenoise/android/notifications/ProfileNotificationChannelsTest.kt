@@ -70,6 +70,26 @@ class ProfileNotificationChannelsTest {
         assertEquals(1, profileCount())
     }
 
+    /** A parent vibrating with the system default waveform (no explicit pattern) keeps vibrating per person. */
+    @Test fun defaultWaveformParentVibrationSurvivesIntoAProfileChannel() {
+        manager.createNotificationChannel(
+            android.app
+                .NotificationChannel(
+                    NotificationChannelSpec.DIRECT_MESSAGES.id,
+                    "Direct messages",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    setSound(null, null)
+                    enableVibration(true)
+                },
+        )
+        NotificationChannels.ensureChannels(context)
+        val id = ProfileNotificationChannels(context).customize("personal", author, "Alice", default, default)
+        val created = manager.getNotificationChannel(id)
+        assertTrue(created.shouldVibrate())
+        assertNull(created.sound)
+    }
+
     /** A person has one bounded channel identity per local account, independent of the chats where they appear. */
     @Test fun distinctAccountsAndAuthorsHaveDistinctBoundedIdsAndNoGroupDimension() {
         val id = checkNotNull(ProfileNotificationChannels.id("personal", author, default))

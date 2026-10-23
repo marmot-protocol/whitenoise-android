@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -44,6 +46,8 @@ class VoiceTransportBarTest {
     private var stops = 0
     private var opens = 0
     private var rowOpens = 0
+    private val seeks = mutableListOf<Int>()
+    private var speedCycles = 0
 
     /** Records light-theme contrast and the compact elapsed-time layout. */
     @Test fun light() = renderAndCapture("light")
@@ -76,6 +80,31 @@ class VoiceTransportBarTest {
         assertEquals(1, stops)
     }
 
+    /** Ten-second seeks and the speed control dispatch their own actions and never play, stop or open the source. */
+    @Test fun seekAndSpeedControlsDispatchTheirOwnActions() {
+        render()
+        rule.onNodeWithContentDescription(context.getString(R.string.video_seek_back)).performClick()
+        rule.onNodeWithContentDescription(context.getString(R.string.video_seek_forward)).performClick()
+        rule.onNodeWithContentDescription(context.getString(R.string.voice_message_speed, "1.5×")).performClick()
+        assertEquals(listOf(-VOICE_TRANSPORT_SEEK_MS, VOICE_TRANSPORT_SEEK_MS), seeks)
+        assertEquals(1, speedCycles)
+        assertEquals(null, playing)
+        assertEquals(0, stops)
+        assertEquals(0, opens)
+    }
+
+    /** An unprepared clip offers no seek, speed or play action, while Stop stays available. */
+    @Test fun unreadyClipDisablesSeekSpeedAndPlay() {
+        render(ready = false)
+        listOf(
+            context.getString(R.string.video_seek_back),
+            context.getString(R.string.video_seek_forward),
+            context.getString(R.string.voice_message_speed, "1.5×"),
+            context.getString(R.string.voice_message_pause),
+        ).forEach { rule.onNodeWithContentDescription(it).assertIsNotEnabled() }
+        rule.onNodeWithContentDescription(context.getString(R.string.tts_playback_action_stop)).assertIsEnabled()
+    }
+
     /** Captures only the strip after mounting the same destination layout used by interaction assertions. */
     private fun renderAndCapture(
         name: String,
@@ -97,6 +126,7 @@ class VoiceTransportBarTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         paused: Boolean = false,
+        ready: Boolean = true,
     ) {
         rule.setContent {
             CompositionLocalProvider(
@@ -114,7 +144,8 @@ class VoiceTransportBarTest {
                                             isPlaying = !paused,
                                             positionMs = 12_000,
                                             durationMs = 45_000,
-                                            ready = true,
+                                            speed = 1.5f,
+                                            ready = ready,
                                             sessionId = 1,
                                             source =
                                                 VoicePlaybackSource(
@@ -126,6 +157,8 @@ class VoiceTransportBarTest {
                                         ),
                                     onPlayingChange = { playing = it },
                                     onStop = { stops++ },
+                                    onSeekBy = { seeks += it },
+                                    onCycleSpeed = { speedCycles++ },
                                     onBodyClick = { opens++ },
                                 )
                             },

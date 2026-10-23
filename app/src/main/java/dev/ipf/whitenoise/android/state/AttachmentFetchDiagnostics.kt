@@ -122,6 +122,7 @@ private fun AttachmentTransferStateFfi.performanceResult(): PerformanceResult =
         AttachmentTransferStateFfi.FAILED,
         AttachmentTransferStateFfi.CANCELLED,
         AttachmentTransferStateFfi.REMOVED,
+        AttachmentTransferStateFfi.CLEANED_BY_SETTING,
         AttachmentTransferStateFfi.POLICY_BLOCKED,
         AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,

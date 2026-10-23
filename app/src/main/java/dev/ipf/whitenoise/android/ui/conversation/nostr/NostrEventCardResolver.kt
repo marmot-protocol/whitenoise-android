@@ -2,15 +2,12 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.NostrEventReference
-import dev.ipf.whitenoise.android.core.ProfileSanitizer
-import dev.ipf.whitenoise.android.core.nostr.NostrEvent
-import dev.ipf.whitenoise.android.core.nostr.NostrEventVerifier
-import dev.ipf.whitenoise.android.core.nostr.NostrRelayQueryClient
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.normalizeRelayUrls
 import dev.ipf.whitenoise.android.state.relayUrlPassesResolveTimeCheck
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardState.Loaded
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -21,14 +18,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.Locale
+import kotlinx.coroutines.yield
 import kotlin.coroutines.coroutineContext
 
 internal enum class NostrEventCardKind {
@@ -74,6 +65,8 @@ internal sealed interface NostrEventCardState {
 
     data class Loaded(
         val card: NostrEventCardModel,
+        /** Preview text prepared by the read off the main thread, so the first frame is already complete. */
+        val preview: NostrEventPreparedPreview? = null,
     ) : NostrEventCardState
 
     data object NotFound : NostrEventCardState
@@ -83,37 +76,65 @@ internal sealed interface NostrEventCardState {
     data object Failed : NostrEventCardState
 }
 
-/** Conversation-lifetime single-flight resolver with bounded in-memory state. */
+/**
+ * Reads MDK's cached projection for up to [NOSTR_EVENT_CACHE_BATCH] authored references, in input order. A null
+ * entry means nothing is cached yet. The read never touches the network.
+ */
+internal typealias NostrEventCacheRead = suspend (List<String>) -> List<NostrEventCardState?>
+
+/** Asks MDK to refresh one authored reference, returning its local state afterwards or null when still missing. */
+internal typealias NostrEventRefresh = suspend (String) -> NostrEventCardState?
+
+/** Refreshes a loaded card's author profile, returning the card unchanged when nothing new is known. */
+internal typealias NostrEventAuthorRefresh = suspend (NostrEventCardState.Loaded) -> NostrEventCardState.Loaded
+
+/**
+ * Conversation-lifetime adapter over MDK's cached-read and refresh contract for public event cards (#2238).
+ *
+ * MDK owns fetching, signature verification, deletion, addressable monotonicity and persistence. This class only
+ * keeps the presented state for each card. A card already in [snapshots] starts from that state, so a reopened
+ * conversation or a recreated resolver never shows a loading frame for a card it has resolved before. Only a card
+ * with nothing cached starts as [NostrEventCardState.Loading]. A background refresh never replaces a loaded card
+ * with a loading, missing or failed state, only with newer content or MDK's authorized deletion.
+ */
 internal class NostrEventCardResolver(
     parentScope: CoroutineScope,
-    private val relayProvider: suspend () -> List<String>,
-    private val relayHintProvider: suspend (List<String>) -> List<String> = ::safePublicEventRelayHints,
-    private val fetchEvents: suspend (List<String>, JSONObject) -> List<NostrEvent> = defaultNostrEventQuery(),
-    private val verifyEvent: (NostrEvent) -> Boolean = NostrEventVerifier::verifies,
+    private val readCached: NostrEventCacheRead,
+    private val refresh: NostrEventRefresh,
+    private val refreshAuthor: NostrEventAuthorRefresh? = null,
+    private val snapshots: NostrEventCardSnapshots = NostrEventCardSnapshots(),
     private val maxEntries: Int = MAX_RESOLVED_ENTRIES,
-    private val verificationDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : AutoCloseable {
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]))
     private val lock = Any()
-    private val relayLock = Mutex()
-    private val relayHintPermits = Semaphore(MAX_CONCURRENT_HINT_RESOLUTIONS)
     private val states = LinkedHashMap<String, MutableStateFlow<NostrEventCardState>>(16, 0.75f, true)
     private val jobs = HashMap<String, Job>()
-    private var cachedRelays: List<String>? = null
+    private val pendingCacheReads = LinkedHashMap<String, CompletableDeferred<NostrEventCardState?>>()
+    private var cacheReadJob: Job? = null
 
-    fun state(reference: NostrEventReference): StateFlow<NostrEventCardState> =
+    /**
+     * The presented state of [reference], created on first use. Its initial value is the snapshot of a previously
+     * resolved card, so the first composed frame is complete, otherwise [NostrEventCardState.Loading].
+     */
+    fun state(
+        reference: NostrEventReference,
+        authoredReference: String = reference.stableId,
+    ): StateFlow<NostrEventCardState> =
         synchronized(lock) {
             states[reference.stableId]?.also { return@synchronized it }
             makeRoomForNewEntryLocked()
-            MutableStateFlow<NostrEventCardState>(NostrEventCardState.Loading).also { state ->
+            val seeded = snapshots[reference.stableId]
+            MutableStateFlow(seeded ?: NostrEventCardState.Loading).also { state ->
                 states[reference.stableId] = state
-                startResolveLocked(reference, state)
+                startResolveLocked(reference, state, authoredReference, readCache = seeded == null)
             }
         }
 
+    /** Refreshes [reference] again, keeping a loaded card on screen while the refresh runs. */
     fun retry(
         reference: NostrEventReference,
         observedState: StateFlow<NostrEventCardState>? = null,
+        authoredReference: String = reference.stableId,
     ) {
         synchronized(lock) {
             val state =
@@ -126,64 +147,100 @@ internal class NostrEventCardResolver(
                     }
                 }
             jobs.remove(reference.stableId)?.cancel()
-            state.value = NostrEventCardState.Loading
-            startResolveLocked(reference, state, refreshRelays = true)
+            if (state.value !is NostrEventCardState.Loaded) state.value = NostrEventCardState.Loading
+            startResolveLocked(reference, state, authoredReference, readCache = false)
         }
     }
 
+    /** Starts the single resolve job owning [state], replacing any earlier one for the same reference. */
     private fun startResolveLocked(
         reference: NostrEventReference,
         state: MutableStateFlow<NostrEventCardState>,
-        refreshRelays: Boolean = false,
+        authoredReference: String,
+        readCache: Boolean,
     ) {
-        val job = scope.launch(start = CoroutineStart.LAZY) { resolve(reference, state, refreshRelays) }
+        val job =
+            scope.launch(start = CoroutineStart.LAZY) {
+                resolve(reference, authoredReference, state, readCache)
+            }
         jobs[reference.stableId] = job
         job.start()
     }
 
+    /** Publishes the cached projection when the card has no state yet, then MDK's refreshed state and author. */
     private suspend fun resolve(
         reference: NostrEventReference,
+        authoredReference: String,
         state: MutableStateFlow<NostrEventCardState>,
-        refreshRelays: Boolean = false,
+        readCache: Boolean,
     ) {
-        val relaysAndResult =
-            try {
-                val relays = relays(reference, refreshRelays)
-                relays to
-                    if (relays.isEmpty()) {
-                        NostrEventCardState.Failed
-                    } else {
-                        resolveFromRelays(reference, relays)
-                    }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                emptyList<String>() to NostrEventCardState.Failed
-            }
-        val (relays, result) = relaysAndResult
         val currentJob = coroutineContext[Job]
-        if (result !is NostrEventCardState.Loaded) {
-            publishResolvedState(reference, state, currentJob, result, complete = true)
-            return
-        }
-
-        // Do not hold the card behind a second relay round trip. The verified
-        // event is useful immediately; Kind 0 metadata enriches it in place.
-        if (!publishResolvedState(reference, state, currentJob, result, complete = false)) return
-        val enriched =
-            try {
-                resolveAuthorMetadata(result.card.authorPubkeyHex, relays)?.let { metadata ->
-                    result.copy(card = result.card.copy(authorMetadata = metadata))
-                } ?: result
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                result
+        if (readCache && !publishCached(reference, authoredReference, state, currentJob)) return
+        val outcome = refresh.outcomeFor(authoredReference)
+        coroutineContext.ensureActive()
+        val settled = settleRefresh(state.value, outcome)
+        val author = refreshAuthor
+        if (settled is NostrEventCardState.Loaded && author != null) {
+            if (publish(reference, state, currentJob, settled, complete = false)) {
+                publish(reference, state, currentJob, enrichedAuthor(author, settled), complete = true)
             }
-        publishResolvedState(reference, state, currentJob, enriched, complete = true)
+        } else {
+            publish(reference, state, currentJob, settled, complete = true)
+        }
     }
 
-    private fun publishResolvedState(
+    /** Publishes the cached state, if any, and returns whether this job still owns the card. */
+    private suspend fun publishCached(
+        reference: NostrEventReference,
+        authoredReference: String,
+        state: MutableStateFlow<NostrEventCardState>,
+        currentJob: Job?,
+    ): Boolean {
+        val cached = cachedState(authoredReference)
+        coroutineContext.ensureActive()
+        return cached == null || publish(reference, state, currentJob, cached, complete = false)
+    }
+
+    /** Joins the next batched cache read; a failed read is treated as a miss so the refresh still runs. */
+    private suspend fun cachedState(authoredReference: String): NostrEventCardState? {
+        val pending =
+            synchronized(lock) {
+                val deferred = pendingCacheReads.getOrPut(authoredReference) { CompletableDeferred() }
+                if (cacheReadJob?.isActive != true) cacheReadJob = scope.launch { drainCacheReads() }
+                deferred
+            }
+        return pending.await()
+    }
+
+    /** Reads every queued reference in batches of at most [NOSTR_EVENT_CACHE_BATCH], one native call per batch. */
+    private suspend fun drainCacheReads() {
+        // Cards composed in the same frame queue their references before the first batch is read.
+        yield()
+        while (true) {
+            val batch =
+                synchronized(lock) {
+                    val next = pendingCacheReads.entries.take(NOSTR_EVENT_CACHE_BATCH).map { it.key to it.value }
+                    next.forEach { (key, _) -> pendingCacheReads.remove(key) }
+                    if (next.isEmpty()) cacheReadJob = null
+                    next
+                }
+            if (batch.isEmpty()) return
+            val results =
+                try {
+                    readCached(batch.map { it.first })
+                } catch (cancelled: CancellationException) {
+                    batch.forEach { (_, deferred) -> deferred.cancel(cancelled) }
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A failed projection read is not proof that the event is absent: fall through to refresh.
+                    emptyList()
+                }
+            batch.forEachIndexed { index, (_, deferred) -> deferred.complete(results.getOrNull(index)) }
+        }
+    }
+
+    /** Sets [value] only while [currentJob] still owns [state], and remembers settled values for later frames. */
+    private fun publish(
         reference: NostrEventReference,
         state: MutableStateFlow<NostrEventCardState>,
         currentJob: Job?,
@@ -195,70 +252,13 @@ internal class NostrEventCardResolver(
                 false
             } else {
                 state.value = value
+                snapshots.put(reference.stableId, value)
                 if (complete) jobs.remove(reference.stableId)
                 true
             }
         }
 
-    private suspend fun relays(
-        reference: NostrEventReference,
-        refresh: Boolean,
-    ): List<String> {
-        val hintedRelays =
-            if (reference.relayHints.isEmpty()) {
-                emptyList()
-            } else {
-                relayHintPermits.withPermit { relayHintProvider(reference.relayHints) }
-            }
-        return (hintedRelays + managedRelays(refresh)).distinct().take(MAX_QUERY_RELAYS)
-    }
-
-    private suspend fun managedRelays(refresh: Boolean): List<String> =
-        relayLock.withLock {
-            if (refresh) cachedRelays = null
-            cachedRelays ?: relayProvider().take(MAX_QUERY_RELAYS).also { cachedRelays = it }
-        }
-
-    private suspend fun resolveFromRelays(
-        reference: NostrEventReference,
-        relays: List<String>,
-    ): NostrEventCardState {
-        val events = fetchEvents(relays, reference.exactFilter())
-        return withContext(verificationDispatcher) {
-            val verified = events.filter(verifyEvent)
-            val matching = verified.filter { reference.matches(it) }
-            val selected =
-                matching
-                    .sortedWith(
-                        compareByDescending<NostrEvent> { it.createdAt }
-                            .thenBy { it.id.lowercase(Locale.ROOT) },
-                    ).firstOrNull()
-            when {
-                selected != null -> NostrEventCardState.Loaded(selected.toCardModel())
-                events.isNotEmpty() -> NostrEventCardState.Invalid
-                else -> NostrEventCardState.NotFound
-            }
-        }
-    }
-
-    private suspend fun resolveAuthorMetadata(
-        authorPubkeyHex: String,
-        relays: List<String>,
-    ): NostrEventAuthorMetadata? {
-        val events = fetchEvents(relays, authorMetadataFilter(authorPubkeyHex))
-        return withContext(verificationDispatcher) {
-            events
-                .asSequence()
-                .filter(verifyEvent)
-                .filter { event -> event.kind == KIND_PROFILE_METADATA && event.pubkey.equals(authorPubkeyHex, true) }
-                .sortedWith(
-                    compareByDescending<NostrEvent> { it.createdAt }
-                        .thenBy { it.id.lowercase(Locale.ROOT) },
-                ).firstOrNull()
-                ?.toAuthorMetadata()
-        }
-    }
-
+    /** Evicts a settled entry, or failing that the eldest, so the resolver stays bounded across long histories. */
     private fun makeRoomForNewEntryLocked() {
         val limit = maxEntries.coerceAtLeast(1)
         if (states.size < limit) return
@@ -274,36 +274,97 @@ internal class NostrEventCardResolver(
         jobs.remove(candidate.key)?.cancel()
     }
 
+    /** Cancels every read and refresh, so no late result reaches a retired conversation. */
     override fun close() {
         scope.cancel()
         synchronized(lock) {
             jobs.clear()
             states.clear()
+            pendingCacheReads.clear()
+            cacheReadJob = null
         }
     }
 
     private companion object {
         const val MAX_RESOLVED_ENTRIES = 64
-        const val MAX_QUERY_RELAYS = 4
-        const val MAX_CONCURRENT_HINT_RESOLUTIONS = 3
     }
 }
 
-/** Defers client and TLS initialization until a query needs them, away from the composition thread. */
-internal fun defaultNostrEventQuery(
-    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    clientFactory: () -> NostrRelayQueryClient = { NostrRelayQueryClient() },
-): suspend (List<String>, JSONObject) -> List<NostrEvent> {
-    val client by lazy(clientFactory)
-    return { relays, filter ->
-        withContext(ioDispatcher) {
-            val initializedClient = client
-            coroutineContext.ensureActive()
-            initializedClient.query(relays, filter, maxEvents = EVENT_CARD_QUERY_LIMIT).events
+/** What a refresh produced: MDK's local state afterwards, or a failure before it answered. */
+private sealed interface RefreshOutcome {
+    data class Completed(
+        val state: NostrEventCardState?,
+    ) : RefreshOutcome
+
+    data object Failed : RefreshOutcome
+}
+
+/** MDK's refreshed local state, or [RefreshOutcome.Failed] when the refresh itself failed. */
+private suspend fun NostrEventRefresh.outcomeFor(authoredReference: String): RefreshOutcome =
+    try {
+        RefreshOutcome.Completed(this(authoredReference))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        RefreshOutcome.Failed
+    }
+
+/** The card with refreshed author metadata, or unchanged when the author refresh fails. */
+private suspend fun enrichedAuthor(
+    author: NostrEventAuthorRefresh,
+    loaded: NostrEventCardState.Loaded,
+): NostrEventCardState.Loaded {
+    val enriched =
+        try {
+            author(loaded)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            loaded
         }
+    coroutineContext.ensureActive()
+    return enriched
+}
+
+/**
+ * The state a card shows after a refresh. Known-good content is never replaced by a transient miss or failure, and
+ * author metadata or prepared preview text the refreshed card lacks is carried over from the same event author and
+ * text. MDK's authorized deletion and newer content do replace it.
+ */
+private fun settleRefresh(
+    previous: NostrEventCardState,
+    outcome: RefreshOutcome,
+): NostrEventCardState {
+    val refreshed = (outcome as? RefreshOutcome.Completed)?.state
+    val previousLoaded = previous as? NostrEventCardState.Loaded
+    return when {
+        refreshed is NostrEventCardState.Loaded -> refreshed.carryingPresentationOf(previousLoaded)
+        refreshed == null || refreshed == NostrEventCardState.Failed ->
+            when {
+                previous != NostrEventCardState.Loading && previous != NostrEventCardState.Failed -> previous
+                outcome is RefreshOutcome.Completed && refreshed == null -> NostrEventCardState.NotFound
+                else -> NostrEventCardState.Failed
+            }
+        else -> refreshed
     }
 }
 
+/** This refreshed card with [previous]'s author metadata and preview filled in where they still apply. */
+private fun Loaded.carryingPresentationOf(previous: Loaded?): Loaded {
+    val author =
+        card.authorMetadata
+            ?: previous?.card?.authorMetadata.takeIf { previous?.card?.authorPubkeyHex == card.authorPubkeyHex }
+    val withAuthor = if (author == card.authorMetadata) card else card.copy(authorMetadata = author)
+    // An unchanged refresh keeps the previous instance, so the card does not recompose at all. Prepared previews
+    // are compared through their card, because parsed documents hold arrays that only compare by identity.
+    return when {
+        previous == null -> this
+        withAuthor == previous.card -> previous
+        else -> NostrEventCardState.Loaded(withAuthor, preview ?: previous.preview?.takeIf { it.describes(card) })
+    }
+}
+
+/** The account relays an event card author refresh may query, validated and capped off the main thread. */
 internal suspend fun WhiteNoiseAppState.publicEventCardRelays(): List<String> {
     val lists = accountRelayLists()
     val candidates =
@@ -321,64 +382,7 @@ internal suspend fun WhiteNoiseAppState.publicEventCardRelays(): List<String> {
     }
 }
 
-internal suspend fun safePublicEventRelayHints(
-    hints: List<String>,
-    passesResolveTimeCheck: (String) -> Boolean = ::relayUrlPassesResolveTimeCheck,
-): List<String> {
-    if (hints.isEmpty()) return emptyList()
-    return withContext(Dispatchers.IO) {
-        normalizeRelayUrls(hints)
-            .asSequence()
-            .filter(passesResolveTimeCheck)
-            .take(MAX_PUBLIC_EVENT_RELAYS)
-            .toList()
-    }
-}
-
-private fun NostrEventReference.exactFilter(): JSONObject =
-    when (this) {
-        is NostrEventReference.Event ->
-            JSONObject()
-                .put("ids", JSONArray().put(eventIdHex))
-                .put("limit", EXACT_EVENT_QUERY_LIMIT)
-        is NostrEventReference.Address ->
-            JSONObject()
-                .put("authors", JSONArray().put(authorPubkeyHex))
-                .put("kinds", JSONArray().put(kind.toLong()))
-                .put("#d", JSONArray().put(identifier))
-                .put("limit", EVENT_CARD_QUERY_LIMIT)
-    }
-
-private fun authorMetadataFilter(authorPubkeyHex: String): JSONObject =
-    JSONObject()
-        .put("authors", JSONArray().put(authorPubkeyHex))
-        .put("kinds", JSONArray().put(KIND_PROFILE_METADATA))
-        .put("limit", PROFILE_METADATA_QUERY_LIMIT)
-
-private fun NostrEvent.toAuthorMetadata(): NostrEventAuthorMetadata? {
-    val profile = runCatching { JSONObject(content) }.getOrNull() ?: return null
-    val displayName =
-        ProfileSanitizer.displayName(profile.opt("display_name") as? String)
-            ?: ProfileSanitizer.displayName(profile.opt("name") as? String)
-    val pictureUrl = ProfileSanitizer.protocolImageUrl(profile.opt("picture") as? String)
-    return NostrEventAuthorMetadata(
-        displayName = displayName,
-        pictureUrl = pictureUrl,
-    ).takeIf { it.displayName != null || it.pictureUrl != null }
-}
-
-private fun NostrEventReference.matches(event: NostrEvent): Boolean =
-    when (this) {
-        is NostrEventReference.Event ->
-            event.id.equals(eventIdHex, ignoreCase = true)
-        is NostrEventReference.Address ->
-            event.pubkey.equals(authorPubkeyHex, ignoreCase = true) &&
-                event.kind.toUInt() == kind &&
-                event.firstTagValue("d") == identifier
-    }
+/** The most public-event references MDK accepts in one cached read. */
+internal const val NOSTR_EVENT_CACHE_BATCH = 16
 
 private const val MAX_PUBLIC_EVENT_RELAYS = 4
-private const val EXACT_EVENT_QUERY_LIMIT = 1
-private const val EVENT_CARD_QUERY_LIMIT = 8
-private const val PROFILE_METADATA_QUERY_LIMIT = 1
-private const val KIND_PROFILE_METADATA = 0

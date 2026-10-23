@@ -48,6 +48,23 @@ complete either timing. Request/row keys remain in controller-local memory;
 only closed categories, opaque diagnostic counters and timing values are emitted
 through the existing opt-in bounded session. Projection traces are capped at 32.
 
+### First-page event cards
+
+`op=chat_open phase=event_card_cache_warm layer=storage` times the cache-only
+read that restores a conversation's previously resolved public event cards
+before its first page is shown (#2238). It is emitted only for a first page
+whose messages name `note`, `nevent` or `naddr` references. `duration_ms` covers
+the wait for that page's Markdown hydration plus the batched MDK cache read, and
+`count` is the number of references read. While it runs, the page stays
+unpublished, so every open path (chat list, notification, share or a restored
+chat) first composes those rows with their cards complete, and a chat-list tap
+waits up to the card budget beyond its usual 300 ms. Pages without card
+references publish at once and keep the 300 ms open bound. `result=dropped`
+means the read did not settle, either because a newer page superseded it or
+because it exceeded the one-second card budget, after which the page published
+and each card resolved itself. A cold-start value near the budget is the
+encrypted-cache open, not the network.
+
 ### Conversation history pages
 
 `op=chat_history_page` covers one page of history in either direction: older,
@@ -86,6 +103,18 @@ filenames/paths, notification or message text, ciphertext, keys/tokens, or raw
 errors. Turn the switch off and repeat an action to confirm no new lines appear.
 White Noise controls future emission only; retention of lines already written to
 Logcat is controlled by Android/GrapheneOS.
+
+### Notification candidate admission
+
+`op=notification_post phase=notification_candidate_gate layer=android` measures
+the complete read-state gate, including bounded admission and awaiting its native
+read. It does not measure when an abandoned synchronous binding actually finishes.
+Only gates taking at least 100 ms emit this phase. Fast reads and fail-fast
+rejections do not consume the shared 256-event session budget, leaving room for
+`push_recovery` evidence during catch-up. Slow gates still share that finite cap.
+The phase contains no account, conversation, message identity or content. An absent
+phase can mean a below-threshold gate or inactive diagnostics; it does not prove
+that no candidate was checked.
 
 ### Send and attachment diagnosis
 

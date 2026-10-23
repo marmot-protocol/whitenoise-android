@@ -246,6 +246,22 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Accepted avatar crop preparation interruption across authentication; no automatic upload retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "        fun uploadPublicAvatar(",
+        "test_ids": [
+          "STB-001"
+        ]
+      },
+      {
+        "surface": "Avatar preparation interruption notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.avatar_preparation_interrupted",
+        "test_ids": [
+          "STB-001"
+        ]
       }
     ]
   },

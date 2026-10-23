@@ -193,21 +193,19 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationM
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
-import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
-import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachmentSaveSummaries
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
-import dev.ipf.whitenoise.android.ui.conversation.media.createImageCaptureFile
-import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationCameraCapture
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationMediaViewerSessionState
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberOriginGuardedResultLauncher
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -226,11 +224,14 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.rememberKeptMessageEn
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberKeptMessagesController
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
-import dev.ipf.whitenoise.android.ui.conversation.nostr.publicEventCardRelays
+import dev.ipf.whitenoise.android.ui.conversation.nostr.readCachedPublicEventCards
+import dev.ipf.whitenoise.android.ui.conversation.nostr.refreshPublicEventCard
+import dev.ipf.whitenoise.android.ui.conversation.nostr.refreshPublicEventCardAuthor
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
+import dev.ipf.whitenoise.android.ui.conversation.share.SharedContactSaver
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
@@ -1269,7 +1270,7 @@ internal fun ConversationScreen(
     }
     viewportEvidenceEffect()
 
-    /** Extends the drag selection to the row under the pointer; true when the endpoint changed. */
+    /** Resolves the live range without rewriting unchanged selection keys; true while a nonempty range is active. */
     @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
     fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
         val anchorId = dragAnchorTimelineId ?: return false
@@ -1301,13 +1302,12 @@ internal fun ConversationScreen(
                 anchorId = anchorId,
                 endpointId = endpointId,
             )
+        val nextSelections = nextTimelineIds.mapNotNull(timelineSelectionById::get)
+        val nextMessageIds = nextSelections.mapTo(linkedSetOf()) { it.action.messageId }
+        if (nextMessageIds == selectedMessages.keys) return nextMessageIds.isNotEmpty()
         selectedMessages.clear()
-        nextTimelineIds.forEach { timelineId ->
-            timelineSelectionById[timelineId]?.let { selection ->
-                selectedMessages[selection.action.messageId] = selection
-            }
-        }
-        return true
+        nextSelections.forEach { selection -> selectedMessages[selection.action.messageId] = selection }
+        return nextMessageIds.isNotEmpty()
     }
 
     /** Ends a message drag, optionally clearing the selection, and settles reading at the current anchor. */
@@ -1319,7 +1319,18 @@ internal fun ConversationScreen(
         if (hadActiveDrag) scrollCoordinator.settleReadingAt(currentScrollAnchor())
     }
 
-    /** Ends a drag selection whose anchor row left the timeline and auto-scrolls while a drag is active. */
+    // Local function references compare equal despite changed captures. A lambda lets the frame loop
+    // observe the current timeline and action eligibility even while the pointer stays stationary.
+    val currentMessageDragSelectionUpdater by rememberUpdatedState<(Float) -> Boolean> { pointerWindowY ->
+        updateMessageDragSelection(pointerWindowY)
+    }
+
+    /**
+     * Ends a drag whose anchor left the timeline and scrolls while its pointer is held at an edge.
+     * The shared delta uses physical top/bottom signs for a normal list. This transcript is reversed:
+     * positive logical scroll reveals older rows at the physical top, so only this caller negates it.
+     * Resolve the stationary pointer again after the native list has consumed the scroll.
+     */
     @Composable
     fun messageDragSelectionEffects() {
         LaunchedEffect(orderedTimelineIds, selectableTimelineIds) {
@@ -1343,8 +1354,8 @@ internal fun ConversationScreen(
                         maxStep = dragMaxScrollStepPx,
                     )
                 if (scrollDelta != 0f) {
-                    listState.scrollBy(scrollDelta)
-                    updateMessageDragSelection(pointerWindowY)
+                    listState.scrollBy(-scrollDelta)
+                    currentMessageDragSelectionUpdater(pointerWindowY)
                 }
             }
         }
@@ -1709,9 +1720,13 @@ internal fun ConversationScreen(
 
     val eventCardResolver =
         remember(controller, appState, conversationAccountRef, appState.runtimeGeneration) {
+            // Seeded from the controller's snapshots, so a recreated resolver never flashes cards back to Loading.
             NostrEventCardResolver(
                 parentScope = scope,
-                relayProvider = appState::publicEventCardRelays,
+                readCached = { references -> appState.readCachedPublicEventCards(conversationAccountRef, references) },
+                refresh = { reference -> appState.refreshPublicEventCard(conversationAccountRef, reference) },
+                refreshAuthor = { loaded -> appState.refreshPublicEventCardAuthor(loaded) },
+                snapshots = controller.eventCardSnapshots,
             )
         }
     DisposableEffect(eventCardResolver) {
@@ -1763,7 +1778,7 @@ internal fun ConversationScreen(
     }
 
     val context = LocalContext.current
-    val documentSaveFallback = rememberDocumentSaveFallback()
+    val documentSaveFallback = rememberDocumentSaveFallback(appState, controller.group.groupIdHex)
     val mediaSender =
         rememberConversationMediaSender(
             appState = appState,
@@ -1961,16 +1976,10 @@ internal fun ConversationScreen(
         }
     }
     importedShareEffects()
-    // Survives process death while the camera app is foreground (the result
-    // callback fires into a recreated activity, otherwise the capture is lost).
-    var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
-        mutableStateOf<android.net.Uri?>(null)
-    }
-    // Survives process death alongside `cameraOutputUri` so a capture
-    // cancelled after a death-and-restore can still delete the empty temp
-    // file instead of leaking it (issue #531).
-    var cameraOutputFile by rememberSaveable(stateSaver = NullableFileSaver) {
-        mutableStateOf<java.io.File?>(null)
+    val attachmentRuntime = appState.runtimeGeneration
+    val attachmentOrigin = "$attachmentRuntime:$conversationAccountRef:${chat.group.groupIdHex}"
+    val attachmentOwnerCurrent = {
+        appState.activeAccountRef == conversationAccountRef && appState.runtimeGeneration == attachmentRuntime
     }
 
     // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
@@ -1979,58 +1988,65 @@ internal fun ConversationScreen(
     // cap comes from MEDIA_PICKER_MAX_ITEMS; picking a single image still works
     // (returns a one-element list).
     val imagePickerLauncher =
-        rememberLauncherForActivityResult(
+        rememberOriginGuardedResultLauncher(
             ActivityResultContracts.PickMultipleVisualMedia(maxItems = MEDIA_PICKER_MAX_ITEMS),
+            attachmentOrigin,
+            attachmentOwnerCurrent,
         ) { uris ->
-            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            if (uris.isEmpty()) return@rememberOriginGuardedResultLauncher
             // Append rather than replace so a follow-up "Add more" tile-pick
             // grows the staging shelf instead of clobbering whatever the user
             // already queued. Each occurrence gets its own stable slot identity
             // so selecting the same URI twice still produces independent edits.
             pendingMediaSlots = appendPendingMediaSlots(pendingMediaSlots, uris, MEDIA_PICKER_MAX_ITEMS)
         }
-    val cameraLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.TakePicture(),
-        ) { success ->
-            val captured = cameraOutputUri
-            if (success && captured != null) {
-                // Append to whatever's already queued so an in-progress staging
-                // shelf survives a camera capture.
-                pendingMediaSlots =
-                    appendPendingMediaSlots(pendingMediaSlots, listOf(captured), MEDIA_PICKER_MAX_ITEMS)
-            } else {
-                cameraOutputFile?.delete() // cancelled — don't leak the empty temp
-            }
-            cameraOutputUri = null
-            cameraOutputFile = null
-        }
-
-    fun launchCameraCapture() {
-        val file = createImageCaptureFile(context)
-        if (file == null) {
-            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
-            return
-        }
-        cameraOutputFile = file
-        val uri = fileProviderUri(context, file)
-        cameraOutputUri = uri
-        cameraLauncher.launch(uri)
-    }
+    val launchCameraCapture =
+        rememberConversationCameraCapture(
+            origin = "$conversationAccountRef:${chat.group.groupIdHex}",
+            onCaptured = { captured ->
+                val updated = appendPendingMediaSlots(pendingMediaSlots, listOf(captured), MEDIA_PICKER_MAX_ITEMS)
+                val accepted = updated.size > pendingMediaSlots.size
+                pendingMediaSlots = updated
+                accepted
+            },
+            onFailure = { appState.present(R.string.toast_couldnt_decode_image, copyable = true) },
+            isCurrent = {
+                appState.activeAccountRef == conversationAccountRef &&
+                    appState.runtimeGeneration == attachmentRuntime &&
+                    !appState.signOutInProgress &&
+                    !appState.wipeInProgress
+            },
+            onRejected = {
+                appState.presentText(
+                    AppText.Plain(
+                        context.resources.getQuantityString(R.plurals.toast_share_attachments_dropped, 1, 1),
+                    ),
+                )
+            },
+        )
 
     // TakePicture needs no permission of its own, but because CAMERA is declared
     // in the manifest (for the QR scanner) some OEMs require the runtime grant
     // before launching the capture intent — request it first if missing.
     val cameraPermissionLauncher =
-        rememberLauncherForActivityResult(
+        rememberOriginGuardedResultLauncher(
             ActivityResultContracts.RequestPermission(),
-        ) { granted -> if (granted) launchCameraCapture() }
+            attachmentOrigin,
+            attachmentOwnerCurrent,
+        ) { granted ->
+            if (granted) launchCameraCapture()
+        }
 
     // Contact share (attachment sheet): the phone-row picker returns a data
     // URI whose temporary read grant covers the chosen entry's name + number
     // directly, so no READ_CONTACTS permission is requested and nothing
     // beyond that one picked row is read — never the address book.
-    var pendingContactShare by remember(chat.id) { mutableStateOf<SharedContact?>(null) }
+    var pendingContactShare by rememberSaveable(
+        conversationAccountRef,
+        chat.id,
+        stateSaver = SharedContactSaver,
+    ) { mutableStateOf<SharedContact?>(null) }
+    var pendingContactUri by rememberSaveable(conversationAccountRef, chat.id) { mutableStateOf<String?>(null) }
     // The picked point lives only here until the user sends or cancels; the
     // keyless OSM picker is the single confirmation surface.
     var locationPickerOpen by remember(chat.id) { mutableStateOf(false) }
@@ -2041,20 +2057,31 @@ internal fun ConversationScreen(
     var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
-        rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
-            if (contactUri == null) return@rememberLauncherForActivityResult
-            scope.launch {
-                val contact =
-                    withContext(Dispatchers.IO) {
-                        readSharedContact(context.contentResolver, contactUri)
-                    }
-                if (contact == null || contact.isEmpty) {
-                    appState.present(R.string.contact_read_failed)
-                } else {
-                    pendingContactShare = contact
-                }
-            }
+        rememberOriginGuardedResultLauncher(
+            PickContactPhoneRow(),
+            attachmentOrigin,
+            attachmentOwnerCurrent,
+        ) { contactUri ->
+            if (contactUri != null) pendingContactUri = contactUri.toString()
         }
+    LaunchedEffect(pendingContactUri, attachmentOrigin) {
+        val uri = pendingContactUri ?: return@LaunchedEffect
+        val contact =
+            withContext(Dispatchers.IO) {
+                readSharedContact(context.contentResolver, android.net.Uri.parse(uri))
+            }
+        pendingContactUri = null
+        if (appState.activeAccountRef != conversationAccountRef ||
+            appState.runtimeGeneration != attachmentRuntime
+        ) {
+            return@LaunchedEffect
+        }
+        if (contact == null || contact.isEmpty) {
+            appState.present(R.string.contact_read_failed)
+        } else {
+            pendingContactShare = contact
+        }
+    }
 
     fun hasLocationGrant(permission: String): Boolean = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
@@ -2272,10 +2299,12 @@ internal fun ConversationScreen(
     // to recorded voice notes until this client grows a general audio
     // transcode path.
     val documentPickerLauncher =
-        rememberLauncherForActivityResult(
+        rememberOriginGuardedResultLauncher(
             ActivityResultContracts.OpenMultipleDocuments(),
+            attachmentOrigin,
+            attachmentOwnerCurrent,
         ) { uris ->
-            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            if (uris.isEmpty()) return@rememberOriginGuardedResultLauncher
             // Append into the document side of the staging shelf rather than
             // sending immediately. The preview sheet renders both lists and
             // a single Send dispatches both decoders into one kind-9 album.
@@ -4095,7 +4124,9 @@ internal fun ConversationScreen(
                         cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                     }
                 },
-                onPickDocument = { documentPickerLauncher.launch(arrayOf("*/*")) },
+                onPickDocument = {
+                    documentPickerLauncher.launch(arrayOf("*/*"))
+                },
                 onShareLocation = {
                     if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
                         hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -4111,7 +4142,9 @@ internal fun ConversationScreen(
                     }
                 },
                 onShareUser = { shareUserPickerOpen = true },
-                onShareContact = { contactPickerLauncher.launch(Unit) },
+                onShareContact = {
+                    contactPickerLauncher.launch(Unit)
+                },
                 onCreatePoll =
                     if (!controller.isDirectConversation) {
                         { pollCreateOpen = true }
@@ -4501,6 +4534,7 @@ internal fun ConversationScreen(
                                                     appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
                                             )
                                             scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                                            controller.onOlderPagingGestureStarted()
                                             dragAnchorTimelineId = item.presentationId
                                             dragPointerWindowY = pointerWindowY
                                         },
@@ -4934,7 +4968,9 @@ internal fun ConversationScreen(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                 )
             },
-            onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
+            onAddDocuments = {
+                documentPickerLauncher.launch(arrayOf("*/*"))
+            },
             onAfterSend = { revealSentMessage() },
         )
 

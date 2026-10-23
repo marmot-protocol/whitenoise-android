@@ -21,6 +21,7 @@ internal val NATIVE_TRANSFER_TERMINAL_FAILURES =
         AttachmentTransferStateFfi.FAILED,
         AttachmentTransferStateFfi.CANCELLED,
         AttachmentTransferStateFfi.REMOVED,
+        AttachmentTransferStateFfi.CLEANED_BY_SETTING,
         AttachmentTransferStateFfi.POLICY_BLOCKED,
         AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
@@ -62,6 +63,7 @@ internal fun AttachmentTransferStatusFfi.toPresentationState(): AttachmentTransf
         AttachmentTransferStateFfi.RETRY_EXHAUSTED,
         -> AttachmentTransferState.Failed
         AttachmentTransferStateFfi.REMOVED,
+        AttachmentTransferStateFfi.CLEANED_BY_SETTING,
         AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
         -> AttachmentTransferState.NotRetained

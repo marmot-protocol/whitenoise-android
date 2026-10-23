@@ -126,6 +126,22 @@
           "GRP-032",
           "GRP-034"
         ]
+      },
+      {
+        "surface": "External operation ownership through authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "fun WhiteNoiseApp(",
+        "test_ids": [
+          "STB-001"
+        ]
+      },
+      {
+        "surface": "startup diagnostics read-error lifetime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "StartupUsageDiagnosticsPrompt(",
+        "test_ids": [
+          "STB-004"
+        ]
       }
     ]
   },

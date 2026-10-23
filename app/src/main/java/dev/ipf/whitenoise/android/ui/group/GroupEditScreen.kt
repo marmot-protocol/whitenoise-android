@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
+import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
@@ -123,6 +124,20 @@ internal fun GroupEditScreen(
                 GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
             }
         DisposableEffect(imageFailureScope) { onDispose { imageFailureScope.dispose() } }
+        val imageAccount = appState.activeAccountRef
+        val imageRuntime = appState.runtimeGeneration
+        val cropRecovery =
+            rememberAvatarPreparationRecovery(
+                origin = "$imageRuntime:$imageAccount:${controller.group.groupIdHex}:group-avatar",
+                isCurrent = {
+                    imageAccount != null &&
+                        appState.activeAccountRef == imageAccount &&
+                        appState.runtimeGeneration == imageRuntime &&
+                        !appState.signOutInProgress &&
+                        !appState.wipeInProgress
+                },
+                onInterrupted = { appState.present(R.string.avatar_preparation_interrupted) },
+            )
         val context = LocalContext.current
         val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
         val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
@@ -255,14 +270,21 @@ internal fun GroupEditScreen(
          * Blossom because people outside the encrypted group cannot read the private group image.
          */
         @Suppress("TooGenericExceptionCaught") // Preparation, upload, and FFI calls have different failure types.
-        fun uploadPublicAvatar(load: suspend () -> ImageUploadDraft) {
+        fun uploadPublicAvatar(
+            acceptedCrop: Boolean = false,
+            load: suspend () -> ImageUploadDraft,
+        ) {
             val accountRef = appState.activeAccountRef ?: return
             if (imageSaving || controller.mutationInFlight) return
+            if (acceptedCrop) cropRecovery.accepted()
             val failureAttempt = imageFailureScope.begin()
             imageSaving = true
             controller.clearLastMutationError()
             appState.launchMutation {
-                val attemptIsCurrent = { imageAttemptIsCurrent(failureAttempt, accountRef) }
+                val attemptIsCurrent = {
+                    imageAttemptIsCurrent(failureAttempt, accountRef) &&
+                        (!acceptedCrop || appState.runtimeGeneration == imageRuntime)
+                }
                 try {
                     val attempt =
                         GroupAvatarUploadAttempt(
@@ -281,6 +303,10 @@ internal fun GroupEditScreen(
                                 val change = ScopedGroupImageMutation(safeUrl, attemptIsCurrent)
                                 controller.updateGroupAvatarUrl(change, commitIfCurrent = attemptIsCurrent)
                             },
+                            // Any outcome — including a stale owner or an unreported `false` —
+                            // clears the saved crop evidence, so only a real interruption
+                            // shows the "interrupted" notice after recreation.
+                            finished = { if (acceptedCrop) cropRecovery.settled() },
                         )
                     if (updated) {
                         showImageSearch = false
@@ -293,12 +319,7 @@ internal fun GroupEditScreen(
                     if (!attemptIsCurrent()) return@launchMutation
                     val uploadFailure = error as? GroupAvatarUploadFailure
                     appState.presentFailure(
-                        titleRes =
-                            if (uploadFailure?.stage != GroupAvatarUploadStage.Prepare) {
-                                R.string.toast_couldnt_upload_group_image
-                            } else {
-                                R.string.toast_couldnt_prepare_image
-                            },
+                        titleRes = groupAvatarFailureTitle(uploadFailure?.stage),
                         operationCode = uploadFailure?.stage?.operationCode ?: "GROUP_IMAGE_UPLOAD",
                         throwable = error,
                         detail = groupImageFailureDetail(error),
@@ -314,7 +335,10 @@ internal fun GroupEditScreen(
         // conversation. This composes after the details screen's own BackHandler
         // (rendered just before the early return that shows this screen), so it
         // wins the back event while the editor is open.
-        BackHandler { onBack() }
+        BackHandler {
+            cropRecovery.settled()
+            onBack()
+        }
 
         var photoMenuOpen by remember { mutableStateOf(false) }
         var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -338,13 +362,16 @@ internal fun GroupEditScreen(
             },
             onCropped = { bytes, crop ->
                 pendingCropUri = null
-                uploadPublicAvatar { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+                uploadPublicAvatar(acceptedCrop = true) { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
             },
         )
 
         val saveLabel = stringResource(if (saving) R.string.saving_group else R.string.save_group)
         GroupEditScaffold(
-            onBack = onBack,
+            onBack = {
+                cropRecovery.settled()
+                onBack()
+            },
             bottomBar = {
                 if (canEdit) {
                     StickyFormActionBar {

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,6 +24,8 @@ import dev.ipf.whitenoise.android.state.SavedComposerExpansion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.bindBlockListMirror
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingCameraCaptureFiles
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsCloseOwner
 
 /**
  * Process-owned presentation state for the one active shell.
@@ -34,6 +37,9 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 internal class MainShellProcessState(
     private val appState: WhiteNoiseAppState,
 ) {
+    val startupDiagnosticsPrompt = StartupDiagnosticsCloseOwner()
+
+    val pendingCameraCaptureFiles = PendingCameraCaptureFiles()
     val selectedChat = mutableStateOf<ChatListItem?>(null)
     val selectedChatOpenContext = mutableStateOf(ConversationOpenContext())
     val selectedChatJustCreated = mutableStateOf(false)
@@ -139,6 +145,12 @@ internal class MainShellProcessState(
         while (iterator.hasNext()) {
             val entry = iterator.next()
             if (entry.value !in retained) {
+                val retiredGroupId = entry.value.group.groupIdHex
+                val keepsOrigin =
+                    retained.any {
+                        it.boundAccountRef == entry.key.accountRef && it.group.groupIdHex == retiredGroupId
+                    }
+                if (!keepsOrigin) pendingCameraCaptureFiles.releaseOrigin("${entry.key.accountRef}:$retiredGroupId")
                 appState.detachConversationController(entry.value)
                 entry.value.onCleared()
                 iterator.remove()
@@ -197,6 +209,7 @@ internal class MainShellProcessState(
     }
 
     private fun clearConversationControllers() {
+        pendingCameraCaptureFiles.releaseAll()
         conversationControllers.values.forEach { controller ->
             appState.detachConversationController(controller)
             controller.onCleared()
@@ -266,6 +279,37 @@ internal class MainShellStateHolder(
      */
     val inboundShareRequest = mutableStateOf<ShareRequest?>(null)
     val pendingShareRequest = mutableStateOf<ShareRequest?>(null)
+
+    // The account-switch handoff must outlive lock-driven shell disposal, but only for its own share.
+    private var stagedShareOpen by mutableStateOf(
+        restoreStagedShareOpen(savedStateHandle.get<Bundle>(SAVED_STAGED_SHARE_OPEN_KEY)).also { restored ->
+            if (restored == null) savedStateHandle.remove<Bundle>(SAVED_STAGED_SHARE_OPEN_KEY)
+        },
+    )
+
+    /** The staged share's pending cross-account chat open, persisted with its request identity and age. */
+    var pendingStagedShareOpen: PendingStagedShareOpen?
+        get() = stagedShareOpen
+        set(value) {
+            stagedShareOpen = value
+            if (value == null) {
+                savedStateHandle.remove<Bundle>(SAVED_STAGED_SHARE_OPEN_KEY)
+            } else {
+                savedStateHandle[SAVED_STAGED_SHARE_OPEN_KEY] =
+                    Bundle().apply {
+                        putString("request", value.requestId)
+                        putString("account", value.accountRef)
+                        putString("group", value.groupIdHex)
+                        putInt("other_count", value.otherChatCount)
+                        putLong("staged_at", value.stagedAtElapsedMillis)
+                    }
+            }
+        }
+
+    /** The application process owns an unfinished diagnostics dismissal across fresh Activities. */
+    fun startupDiagnosticsPrompt(runtimeGeneration: Int) = processState.startupDiagnosticsPrompt(runtimeGeneration)
+
+    val pendingCameraCaptureFiles = processState.pendingCameraCaptureFiles
     val selectedChat = processState.selectedChat
     val selectedChatOpenContext = processState.selectedChatOpenContext
     val selectedChatJustCreated = processState.selectedChatJustCreated
@@ -305,6 +349,8 @@ internal class MainShellStateHolder(
             pendingShareRequest.value = null
             savePendingShareRequestId(null)
         }
+        // A newer share owns navigation now, so an older share's deferred chat open is retired.
+        if (pendingStagedShareOpen?.requestId?.let { it != request.requestId } == true) pendingStagedShareOpen = null
     }
 
     /** Promotes one parsed intent into the picker-owned route after encrypted persistence is attempted. */
@@ -600,6 +646,7 @@ internal class MainShellStateHolder(
         const val SAVED_ACCOUNT_REF_KEY = "main_shell_selected_account_ref"
         const val SAVED_GROUP_ID_KEY = "main_shell_selected_group_id"
         const val SAVED_PENDING_SHARE_REQUEST_ID_KEY = "main_shell_pending_share_request_id"
+        const val SAVED_STAGED_SHARE_OPEN_KEY = "pending_staged_share_open"
         const val SAVED_COMPOSER_EXPANSION_KEY = "main_shell_composer_expansion"
     }
 }
@@ -639,6 +686,33 @@ private fun decodeComposerExpansionSavedState(bundle: Bundle?): List<SavedCompos
         )
     }
 }
+
+/**
+ * Rebuilds a saved staged-share open only when it names its share request and is still fresh. A token
+ * from an older build, or one restored long after the share or across a reboot, is dropped.
+ */
+internal fun restoreStagedShareOpen(
+    state: Bundle?,
+    nowElapsedMillis: Long = SystemClock.elapsedRealtime(),
+): PendingStagedShareOpen? =
+    state
+        ?.takeIf { it.containsKey("staged_at") }
+        ?.let { saved ->
+            val request = saved.getString("request")
+            val account = saved.getString("account")
+            val group = saved.getString("group")
+            if (request == null || account == null || group == null) {
+                null
+            } else {
+                PendingStagedShareOpen(
+                    requestId = request,
+                    accountRef = account,
+                    groupIdHex = group,
+                    otherChatCount = saved.getInt("other_count"),
+                    stagedAtElapsedMillis = saved.getLong("staged_at"),
+                )
+            }
+        }?.takeIf { it.isFresh(nowElapsedMillis) }
 
 private const val COMPOSER_EXPANSION_ACCOUNTS = "account_refs"
 private const val COMPOSER_EXPANSION_GROUPS = "group_ids"

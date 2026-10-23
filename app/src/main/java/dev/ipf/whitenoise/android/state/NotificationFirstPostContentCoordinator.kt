@@ -41,6 +41,7 @@ internal data class NotificationFirstPost(
     val presentation: NotificationContentPresentation,
     val avatars: PreWarmedNotificationAvatars = PreWarmedNotificationAvatars(null, null),
     val lateCorrectionPermit: NotificationLateCorrectionPermit = NotificationLateCorrectionPermit(),
+    val contentRemovalVersion: Long = 0L,
 )
 
 /** Privacy-safe stages exposed to deterministic JVM and device timing probes. */
@@ -48,6 +49,7 @@ internal enum class NotificationFirstPostTimingStage {
     Received,
     EligibilityComplete,
     ContentComplete,
+    CandidateGateComplete,
     NotifyWritten,
 }
 

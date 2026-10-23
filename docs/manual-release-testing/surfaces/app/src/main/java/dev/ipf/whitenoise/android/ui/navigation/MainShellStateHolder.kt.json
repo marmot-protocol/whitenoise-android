@@ -32,6 +32,22 @@
         "test_ids": [
           "INT-012"
         ]
+      },
+      {
+        "surface": "External operation ownership through authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt",
+        "anchor": "var pendingStagedShareOpen:",
+        "test_ids": [
+          "STB-001"
+        ]
+      },
+      {
+        "surface": "runtime-scoped diagnostics close survives Activity holder replacement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt",
+        "anchor": "fun startupDiagnosticsPrompt(",
+        "test_ids": [
+          "STB-004"
+        ]
       }
     ]
   },

@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationTranscriptSaveAction.kt",
+  "legacy_sha256": "8b8207be7ab042de23e017d37ab26c02c43f7ad6b3447c044d1d88194db28be5",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberConversationTranscriptSave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationTranscriptSaveAction.kt",
+        "anchor": "fun rememberConversationTranscriptSave(",
+        "test_ids": [
+          "GRP-022"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.toast_couldnt_export_transcript",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationTranscriptSaveAction.kt",
+        "anchor": "R.string.toast_couldnt_export_transcript",
+        "test_ids": [
+          "GRP-022"
+        ]
+      },
+      {
+        "surface": "External operation ownership through authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationTranscriptSaveAction.kt",
+        "anchor": "fun rememberConversationTranscriptSave(",
+        "test_ids": [
+          "STB-001"
+        ]
+      },
+      {
+        "surface": "Authentication-return feedback: R.string.document_save_interrupted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationTranscriptSaveAction.kt",
+        "anchor": "R.string.document_save_interrupted",
+        "test_ids": [
+          "STB-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

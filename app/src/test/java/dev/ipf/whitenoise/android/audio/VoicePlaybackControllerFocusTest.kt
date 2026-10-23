@@ -18,7 +18,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
 import java.io.File
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -107,6 +109,126 @@ class VoicePlaybackControllerFocusTest {
         assertNull(VoicePlaybackController.state.value.source)
     }
 
+    /** Banner seeks move the retained player by the requested step, clamp to the clip and keep a pause paused. */
+    @Test fun shellSeekClampsToTheClipAndPreservesPause() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
+        assertTrue(VoicePlaybackController.setSessionPlaying(42, false))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertEquals(player.durationMs, player.seekedToMs)
+        assertEquals(player.durationMs, VoicePlaybackController.state.value.positionMs)
+        assertTrue(VoicePlaybackController.seekSessionBy(42, -10_000))
+        assertEquals(0, player.seekedToMs)
+        assertEquals(0, VoicePlaybackController.state.value.positionMs)
+        assertFalse(player.playing)
+        assertFalse(VoicePlaybackController.state.value.isPlaying)
+        assertEquals(0, player.startCount)
+    }
+
+    /** A codec reporting no duration falls back to the known clip length, and with none known the seek is skipped. */
+    @Test fun shellSeekUsesTheKnownLengthWhenTheCodecReportsNone() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        player.durationMs = 0
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 900))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertEquals(900, player.seekedToMs)
+        assertEquals(900, VoicePlaybackController.state.value.durationMs)
+
+        player.seekedToMs = null
+        setPlaybackState(VoicePlaybackController.state.value.copy(positionMs = 123, durationMs = 0))
+        assertFalse(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertEquals(null, player.seekedToMs)
+        assertEquals(123, VoicePlaybackController.state.value.positionMs)
+    }
+
+    /** Quick repeated taps build on the seek still in flight instead of re-reading the stale playhead. */
+    @Test fun shellSeeksAccumulateWhileTheCodecIsStillSeeking() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 100))
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 100))
+
+        assertEquals(player.positionMs + 200, player.seekedToMs)
+        assertEquals(player.positionMs + 200, VoicePlaybackController.state.value.positionMs)
+    }
+
+    /** An earlier queued seek completing keeps the later target, so a third quick tap still advances once more. */
+    @Test fun earlierSeekCompletionKeepsTheLaterPendingTarget() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 5_000))
+        player.durationMs = 5_000
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        player.positionMs = 1_123
+        settlePendingSeek(player)
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        assertEquals(3_123, player.seekedToMs)
+
+        player.positionMs = 3_123
+        settlePendingSeek(player)
+        player.positionMs = 3_500
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 1_000))
+        assertEquals(4_500, player.seekedToMs)
+    }
+
+    /** An off-target completion cannot pin a stale target: after the tap window the player's position wins again. */
+    @Test fun missedSettleExpiresSoLaterSeeksStartFromThePlayhead() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        player.durationMs = 120_000
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 120_000))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, 10_000))
+        player.positionMs = 10_723
+        settlePendingSeek(player)
+        player.positionMs = 40_000
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(30))
+
+        assertTrue(VoicePlaybackController.seekSessionBy(42, -10_000))
+        assertEquals(30_000, player.seekedToMs)
+    }
+
+    /** A seek the codec rejects reports failure and leaves the published playhead where it was. */
+    @Test fun rejectedShellSeekReportsFailureAndKeepsThePlayhead() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer(failSeek = true)
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
+
+        assertFalse(VoicePlaybackController.seekSessionBy(42, 100))
+        assertEquals(player.positionMs, VoicePlaybackController.state.value.positionMs)
+    }
+
+    /** A stale banner cannot seek or change the speed of the session that replaced it. */
+    @Test fun replacedShellSessionRejectsSeekAndSpeed() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setControllerField("currentSpeed", 1f)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 43, ready = true, speed = 1f))
+
+        assertFalse(VoicePlaybackController.seekSessionBy(42, 10_000))
+        assertNull(VoicePlaybackController.cycleSessionSpeed(42))
+        assertNull(player.seekedToMs)
+        assertEquals(1f, VoicePlaybackController.state.value.speed)
+
+        assertEquals(1.5f, VoicePlaybackController.cycleSessionSpeed(43))
+        assertEquals(1.5f, VoicePlaybackController.state.value.speed)
+    }
+
     /** Equal attachment keys under another account must prepare new bytes instead of resuming the old player. */
     @Test fun sameKeyDifferentAccountDoesNotResumeCapturedAudio() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
@@ -155,6 +277,7 @@ class VoicePlaybackControllerFocusTest {
     @After
     fun tearDown() {
         VoicePlaybackController.stop()
+        setControllerField("currentSpeed", 1f)
         setAudioFocusOwnerField("audioManager", null)
         setAudioFocusOwnerField("focusRequest", null)
         setAudioFocusOwnerField("currentOwner", null)
@@ -485,6 +608,14 @@ class VoicePlaybackControllerFocusTest {
         return method.invoke(VoicePlaybackController, mediaPlayer) as Boolean
     }
 
+    /** Delivers a seek completion through the controller's actual private settle path. */
+    private fun settlePendingSeek(mediaPlayer: MediaPlayer) {
+        val method =
+            VoicePlaybackController::class.java.getDeclaredMethod("settlePendingSeek", MediaPlayer::class.java)
+        method.isAccessible = true
+        method.invoke(VoicePlaybackController, mediaPlayer)
+    }
+
     /** Delivers a focus event through the controller's actual private callback. */
     private fun handleAudioFocusChange(change: Int) {
         val method = VoicePlaybackController::class.java.getDeclaredMethod("handleAudioFocusChange", Integer.TYPE)
@@ -573,13 +704,14 @@ class VoicePlaybackControllerFocusTest {
         private val failVolumeChange: Boolean = false,
         private val failVolumeRestore: Boolean = false,
         private val failPlayingQuery: Boolean = false,
+        private val failSeek: Boolean = false,
     ) : MediaPlayer() {
         var playing = true
         var released = false
         var leftVolume = 1f
         var rightVolume = 1f
         var startCount = 0
-        val positionMs = 123
+        var positionMs = 123
         var durationMs = 456
         var failDurationQuery = false
 
@@ -603,6 +735,14 @@ class VoicePlaybackControllerFocusTest {
         }
 
         override fun getCurrentPosition(): Int = positionMs
+
+        var seekedToMs: Int? = null
+
+        /** Records the clamped target the controller hands to the codec, or rejects it like an invalid player. */
+        override fun seekTo(msec: Int) {
+            if (failSeek) throw IllegalStateException("seekTo failed")
+            seekedToMs = msec
+        }
 
         /** Models codecs that discover duration late or reject a metadata query without losing the player. */
         override fun getDuration(): Int {
