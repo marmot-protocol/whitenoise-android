@@ -68,6 +68,8 @@ internal data class ForwardTargetProgress(
     val sentMessages: Int = 0,
     val totalMessages: Int,
     val failureStage: ForwardFailureStage? = null,
+    /** This destination has stayed in its current phase past [FORWARD_PHASE_SLOW_MILLIS]; display only. */
+    val slow: Boolean = false,
 )
 
 @Immutable
@@ -76,6 +78,8 @@ internal data class ForwardOperationSnapshot(
     val preparedAttachments: Int,
     val totalAttachments: Int,
     val targets: List<ForwardTargetProgress>,
+    /** Preparing the source attachments has run past [FORWARD_PHASE_SLOW_MILLIS]; display only. */
+    val preparationSlow: Boolean = false,
 ) {
     val completedTargets: Int get() = targets.count { it.phase == ForwardTargetPhase.Completed }
     val failedTargets: Int get() = targets.count { it.phase == ForwardTargetPhase.Failed }
@@ -117,6 +121,7 @@ internal data class ForwardOperationSnapshot(
 private fun ForwardOperationSnapshot.asCancelled(): ForwardOperationSnapshot =
     copy(
         phase = ForwardOperationPhase.Cancelled,
+        preparationSlow = false,
         targets =
             targets.map { target ->
                 if (
@@ -125,7 +130,7 @@ private fun ForwardOperationSnapshot.asCancelled(): ForwardOperationSnapshot =
                 ) {
                     target
                 } else {
-                    target.copy(phase = ForwardTargetPhase.Cancelled)
+                    target.copy(phase = ForwardTargetPhase.Cancelled, slow = false)
                 }
             },
     )
@@ -382,6 +387,7 @@ internal class ForwardSession(
         launchAttempt(normalizedTargets)
     }
 
+    /** Retries only failed, retryable destinations, resetting their phase and any slow notice. */
     fun retryFailed() {
         if (released || activeJob?.isActive == true || !_state.value.canRetry) return
         val failedTargets =
@@ -400,10 +406,11 @@ internal class ForwardSession(
                     } else {
                         ForwardOperationPhase.Running
                     },
+                preparationSlow = false,
                 targets =
                     snapshot.targets.map { target ->
                         if (target.groupIdHex in failedTargets) {
-                            target.copy(phase = ForwardTargetPhase.Waiting, failureStage = null)
+                            target.copy(phase = ForwardTargetPhase.Waiting, failureStage = null, slow = false)
                         } else {
                             target
                         }
@@ -444,13 +451,17 @@ internal class ForwardSession(
                 try {
                     val prepared =
                         preparedMessages
-                            ?: withTimeoutOrNull(preparationTimeoutMillis) { materializeMessages() }
+                            ?: withTimeoutOrNull(preparationTimeoutMillis) {
+                                withSlowPhaseNotice(markSlow = { markPreparationSlow(_state) }) {
+                                    materializeMessages()
+                                }
+                            }
                             ?: run {
                                 currentCoroutineContext().ensureActive()
                                 transport.cancelStalledMaterializationBestEffort()
                                 throw ForwardPreparationTimeoutException()
                             }
-                    _state.update { it.copy(phase = ForwardOperationPhase.Running) }
+                    _state.update { it.copy(phase = ForwardOperationPhase.Running, preparationSlow = false) }
                     runTargets(targets, prepared)
                     finishAttempt()
                 } catch (cancellation: CancellationException) {
@@ -539,65 +550,77 @@ internal class ForwardSession(
         try {
             val targetReferences = uploadedReferencesByTarget.getOrPut(targetGroupIdHex) { mutableMapOf() }
             updateForwardTarget(_state, targetGroupIdHex) {
-                it.copy(phase = ForwardTargetPhase.Uploading, failureStage = null)
+                it.copy(phase = ForwardTargetPhase.Uploading, failureStage = null, slow = false)
             }
-            prepared.forEachIndexed { messageIndex, message ->
-                currentCoroutineContext().ensureActive()
-                if (message !is PreparedForwardMessage.Media || messageIndex in targetReferences) return@forEachIndexed
-                ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
-                val references = transport.upload(targetGroupIdHex, message)
-                if (references.size != message.attachments.size) {
-                    throw IllegalStateException("forward upload returned the wrong attachment count")
-                }
-                targetReferences[messageIndex] = references
-                updateForwardTarget(_state, targetGroupIdHex) { progress ->
-                    progress.copy(uploadedAttachments = targetReferences.values.sumOf { it.size })
+            withSlowPhaseNotice(
+                markSlow = { markForwardTargetSlow(_state, targetGroupIdHex, ForwardTargetPhase.Uploading) },
+            ) {
+                prepared.forEachIndexed { messageIndex, message ->
+                    currentCoroutineContext().ensureActive()
+                    if (message !is PreparedForwardMessage.Media || messageIndex in targetReferences) {
+                        return@forEachIndexed
+                    }
+                    ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+                    val references = transport.upload(targetGroupIdHex, message)
+                    if (references.size != message.attachments.size) {
+                        throw IllegalStateException("forward upload returned the wrong attachment count")
+                    }
+                    targetReferences[messageIndex] = references
+                    updateForwardTarget(_state, targetGroupIdHex) { progress ->
+                        progress.copy(uploadedAttachments = targetReferences.values.sumOf { it.size })
+                    }
                 }
             }
 
             currentCoroutineContext().ensureActive()
             failureStage = ForwardFailureStage.Publish
-            updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending) }
-            uncertainPublishByTarget[targetGroupIdHex]?.let { evidence ->
-                val message = prepared[evidence.messageIndex]
-                val recovery =
-                    transport.recoverPendingPublish(
-                        targetGroupIdHex = targetGroupIdHex,
-                        message = message,
-                        uploadedReferences = targetReferences[evidence.messageIndex].orEmpty(),
-                        evidence = evidence,
-                    )
-                when (recovery) {
-                    ForwardPublishRecoveryResult.Published -> {
-                        val recoveredCount = evidence.messageIndex + 1
-                        publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
-                        uncertainPublishByTarget.remove(targetGroupIdHex)
-                        updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = recoveredCount) }
+            updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending, slow = false) }
+            // Display only: a slow publish is never abandoned or resent, the native result stays authoritative.
+            withSlowPhaseNotice(
+                markSlow = { markForwardTargetSlow(_state, targetGroupIdHex, ForwardTargetPhase.Sending) },
+            ) {
+                uncertainPublishByTarget[targetGroupIdHex]?.let { evidence ->
+                    val message = prepared[evidence.messageIndex]
+                    val recovery =
+                        transport.recoverPendingPublish(
+                            targetGroupIdHex = targetGroupIdHex,
+                            message = message,
+                            uploadedReferences = targetReferences[evidence.messageIndex].orEmpty(),
+                            evidence = evidence,
+                        )
+                    when (recovery) {
+                        ForwardPublishRecoveryResult.Published -> {
+                            val recoveredCount = evidence.messageIndex + 1
+                            publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
+                            uncertainPublishByTarget.remove(targetGroupIdHex)
+                            updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = recoveredCount) }
+                        }
+                        ForwardPublishRecoveryResult.NotCommitted -> uncertainPublishByTarget.remove(targetGroupIdHex)
+                        ForwardPublishRecoveryResult.Unavailable -> throw ForwardPublishRecoveryUnavailableException()
                     }
-                    ForwardPublishRecoveryResult.NotCommitted -> uncertainPublishByTarget.remove(targetGroupIdHex)
-                    ForwardPublishRecoveryResult.Unavailable -> throw ForwardPublishRecoveryUnavailableException()
                 }
-            }
-            transport.publishBatch(
-                targetGroupIdHex = targetGroupIdHex,
-                messages = prepared,
-                uploadedReferences = targetReferences,
-                startIndex = publishedMessageCountByTarget.getValue(targetGroupIdHex),
-                onBeforeMessagePublished = { messageIndex ->
-                    (prepared[messageIndex] as? PreparedForwardMessage.Media)?.let { message ->
-                        ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
-                    }
-                },
-            ) { publishedIndex ->
-                val publishedCount = publishedIndex + 1
-                publishedMessageCountByTarget[targetGroupIdHex] = publishedCount
-                updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = publishedCount) }
+                transport.publishBatch(
+                    targetGroupIdHex = targetGroupIdHex,
+                    messages = prepared,
+                    uploadedReferences = targetReferences,
+                    startIndex = publishedMessageCountByTarget.getValue(targetGroupIdHex),
+                    onBeforeMessagePublished = { messageIndex ->
+                        (prepared[messageIndex] as? PreparedForwardMessage.Media)?.let { message ->
+                            ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+                        }
+                    },
+                ) { publishedIndex ->
+                    val publishedCount = publishedIndex + 1
+                    publishedMessageCountByTarget[targetGroupIdHex] = publishedCount
+                    updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = publishedCount) }
+                }
             }
             updateForwardTarget(_state, targetGroupIdHex) {
                 it.copy(
                     phase = ForwardTargetPhase.Completed,
                     sentMessages = totalMessageCount,
                     failureStage = null,
+                    slow = false,
                 )
             }
         } catch (cancellation: CancellationException) {
@@ -609,7 +632,7 @@ internal class ForwardSession(
             failureStage = targetFailureStage(failureStage, failure)
             onFailure(targetGroupIdHex, failureStage, failure)
             updateForwardTarget(_state, targetGroupIdHex) {
-                it.copy(phase = ForwardTargetPhase.Failed, failureStage = failureStage)
+                it.copy(phase = ForwardTargetPhase.Failed, failureStage = failureStage, slow = false)
             }
         }
     }
@@ -645,12 +668,13 @@ internal class ForwardSession(
             } else {
                 snapshot.copy(
                     phase = ForwardOperationPhase.Failed,
+                    preparationSlow = false,
                     targets =
                         snapshot.targets.map { target ->
                             if (target.phase == ForwardTargetPhase.Completed) {
                                 target
                             } else {
-                                target.copy(phase = ForwardTargetPhase.Failed, failureStage = stage)
+                                target.copy(phase = ForwardTargetPhase.Failed, failureStage = stage, slow = false)
                             }
                         },
                 )
@@ -816,6 +840,22 @@ private fun ensureForwardAttachmentNotExpired(
 ) {
     if (expiresAtSeconds?.takeIf { it > 0uL }?.let { it <= clockSeconds() } == true) {
         throw ForwardAttachmentExpiredException()
+    }
+}
+
+/** Marks [groupIdHex] slow, but only while it is still in [phase], so a late timer never mislabels a later phase. */
+private fun markForwardTargetSlow(
+    state: MutableStateFlow<ForwardOperationSnapshot>,
+    groupIdHex: String,
+    phase: ForwardTargetPhase,
+) {
+    updateForwardTarget(state, groupIdHex) { target -> if (target.phase == phase) target.copy(slow = true) else target }
+}
+
+/** Marks source preparation slow, but only while the operation is still preparing. */
+private fun markPreparationSlow(state: MutableStateFlow<ForwardOperationSnapshot>) {
+    state.update { snapshot ->
+        if (snapshot.phase == ForwardOperationPhase.Preparing) snapshot.copy(preparationSlow = true) else snapshot
     }
 }
 

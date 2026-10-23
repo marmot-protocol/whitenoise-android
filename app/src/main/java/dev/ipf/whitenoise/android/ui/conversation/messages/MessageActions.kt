@@ -416,6 +416,7 @@ private fun LazyListScope.forwardFolderSection(
     }
 }
 
+/** Forward details: the operation summary, slow-aware preparation progress and one row per destination. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod") // Exhaustive operation phases stay beside their progress semantics.
 internal fun ForwardProgressContent(
@@ -461,11 +462,15 @@ internal fun ForwardProgressContent(
             )
             Text(
                 text =
-                    stringResource(
-                        R.string.forward_preparing_attachments,
-                        snapshot.preparedAttachments,
-                        snapshot.totalAttachments,
-                    ),
+                    if (snapshot.preparationSlow) {
+                        stringResource(R.string.forward_preparing_slow)
+                    } else {
+                        stringResource(
+                            R.string.forward_preparing_attachments,
+                            snapshot.preparedAttachments,
+                            snapshot.totalAttachments,
+                        )
+                    },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
@@ -498,17 +503,26 @@ private fun ForwardTargetProgressRow(
         when (progress.phase) {
             ForwardTargetPhase.Waiting -> stringResource(R.string.forward_waiting)
             ForwardTargetPhase.Uploading ->
-                stringResource(
-                    R.string.forward_uploading_attachments,
-                    progress.uploadedAttachments,
-                    progress.totalAttachments,
-                )
+                if (progress.slow) {
+                    stringResource(R.string.forward_uploading_slow)
+                } else {
+                    stringResource(
+                        R.string.forward_uploading_attachments,
+                        progress.uploadedAttachments,
+                        progress.totalAttachments,
+                    )
+                }
+            // A slow send keeps its spinner and says it can no longer be cancelled and will not be sent twice.
             ForwardTargetPhase.Sending ->
-                stringResource(
-                    R.string.forward_sending_messages,
-                    progress.sentMessages,
-                    progress.totalMessages,
-                )
+                if (progress.slow) {
+                    stringResource(R.string.forward_sending_slow)
+                } else {
+                    stringResource(
+                        R.string.forward_sending_messages,
+                        progress.sentMessages,
+                        progress.totalMessages,
+                    )
+                }
             ForwardTargetPhase.Completed -> stringResource(R.string.forward_sent)
             ForwardTargetPhase.Cancelled ->
                 if (progress.sentMessages > 0) {
@@ -524,9 +538,8 @@ private fun ForwardTargetProgressRow(
             ForwardTargetPhase.Failed -> {
                 val failure =
                     when (progress.failureStage) {
-                        ForwardFailureStage.Upload,
-                        ForwardFailureStage.UploadTimeout,
-                        -> stringResource(R.string.forward_failed_upload)
+                        ForwardFailureStage.Upload -> stringResource(R.string.forward_failed_upload)
+                        ForwardFailureStage.UploadTimeout -> stringResource(R.string.forward_failed_upload_timeout)
                         ForwardFailureStage.Publish -> stringResource(R.string.forward_failed_publish)
                         ForwardFailureStage.PayloadTooLarge -> stringResource(R.string.forward_payload_too_large)
                         ForwardFailureStage.Expired -> stringResource(R.string.forward_failed_expired)
@@ -556,7 +569,8 @@ private fun ForwardTargetProgressRow(
             },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { EmojiLabel(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(supportingText, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        // Uncapped so slow and failure explanations stay readable in full at large text in every locale.
+        supportingContent = { Text(supportingText) },
         leadingContent = {
             when (progress.phase) {
                 ForwardTargetPhase.Uploading,

@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -935,12 +936,255 @@ class MessageForwardingTest {
             assertFalse(snapshot.canCancel)
         }
 
+    /** A publish held past the slow threshold shows the notice, stays uncancellable and still publishes only once. */
+    @Test
+    fun slowPublishShowsTheNoticeButStaysUncancellableAndPublishesOnce() =
+        runTest {
+            val publishGate = CompletableDeferred<Unit>()
+            val transport = RecordingForwardTransport(publishGate = publishGate)
+            val session = textSession(transport)
+
+            session.start()
+            advanceTimeBy(FORWARD_PHASE_SLOW_MILLIS - 1)
+            runCurrent()
+            assertFalse(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+            advanceTimeBy(1)
+            runCurrent()
+
+            val slow = session.state.value
+            assertEquals(ForwardTargetPhase.Sending, slow.targets.single().phase)
+            assertTrue(slow.targets.single().slow)
+            assertFalse(slow.canCancel)
+            assertFalse(slow.canRetry)
+            session.cancel()
+            publishGate.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertFalse(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+            assertEquals(listOf("target" to 0), transport.published)
+        }
+
+    /** A slow publish that ends uncertain goes through the existing recovery and is never sent a second time. */
+    @Test
+    fun slowPublishThatEndsUncertainIsNeverResent() =
+        runTest {
+            val publishGate = CompletableDeferred<Unit>()
+            val transport =
+                RecordingForwardTransport(
+                    publishGate = publishGate,
+                    failPublishUncertainOnceFor = mutableSetOf("target"),
+                    defaultRecoveryResult = ForwardPublishRecoveryResult.Unavailable,
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(textPayload("first", "first"), textPayload("second", "second")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceTimeBy(FORWARD_PHASE_SLOW_MILLIS)
+            runCurrent()
+            assertTrue(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+            publishGate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertFalse(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(listOf("target" to 0), transport.published)
+            assertEquals(listOf("target"), transport.convergenceTargets)
+        }
+
+    /** The upload notice belongs to the upload phase and clears as soon as the destination starts sending. */
+    @Test
+    fun slowUploadNoticeClearsWhenSendingStarts() =
+        runTest {
+            val uploadGate = CompletableDeferred<Unit>()
+            val publishGate = CompletableDeferred<Unit>()
+            val transport = RecordingForwardTransport(uploadGate = uploadGate, publishGate = publishGate)
+            val session = mediaSession(transport)
+
+            session.start()
+            advanceTimeBy(FORWARD_PHASE_SLOW_MILLIS)
+            runCurrent()
+            assertEquals(
+                ForwardTargetPhase.Uploading,
+                session.state.value.targets
+                    .single()
+                    .phase,
+            )
+            assertTrue(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+
+            uploadGate.complete(Unit)
+            runCurrent()
+
+            assertEquals(
+                ForwardTargetPhase.Sending,
+                session.state.value.targets
+                    .single()
+                    .phase,
+            )
+            assertFalse(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+            publishGate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+        }
+
+    /** A retry starts its own slow timer, so the failed attempt's earlier start can never mark it slow early. */
+    @Test
+    fun retryIsNotMarkedSlowByAnEarlierAttemptsTimer() =
+        runTest {
+            val firstUpload = CompletableDeferred<Unit>()
+            val retryUpload = CompletableDeferred<Unit>()
+            val transport =
+                RecordingForwardTransport(
+                    failUploadOnceFor = mutableSetOf("target"),
+                    uploadGates = ArrayDeque(listOf(firstUpload, retryUpload)),
+                )
+            val session = mediaSession(transport)
+
+            session.start()
+            advanceTimeBy(FORWARD_PHASE_SLOW_MILLIS - 5_000L)
+            firstUpload.complete(Unit)
+            runCurrent()
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+
+            session.retryFailed()
+            advanceTimeBy(FORWARD_PHASE_SLOW_MILLIS - 1_000L)
+            runCurrent()
+            assertEquals(
+                ForwardTargetPhase.Uploading,
+                session.state.value.targets
+                    .single()
+                    .phase,
+            )
+            assertFalse(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+
+            advanceTimeBy(1_000L)
+            runCurrent()
+            assertTrue(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+            retryUpload.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+        }
+
+    /** Slow preparation is announced well before the preparation deadline and cleared once that deadline fails it. */
+    @Test
+    fun slowPreparationIsAnnouncedBeforeThePreparationTimeout() =
+        runTest {
+            val transport = RecordingForwardTransport(materializeGates = ArrayDeque(listOf(CompletableDeferred())))
+            val session = mediaSession(transport)
+
+            session.start()
+            advanceTimeBy(FORWARD_PHASE_SLOW_MILLIS)
+            runCurrent()
+            assertEquals(ForwardOperationPhase.Preparing, session.state.value.phase)
+            assertTrue(session.state.value.preparationSlow)
+
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            assertEquals(
+                ForwardFailureStage.PreparationTimeout,
+                session.state.value.targets
+                    .single()
+                    .failureStage,
+            )
+            assertFalse(session.state.value.preparationSlow)
+        }
+
+    /** Cancelling while a slow upload is still running publishes nothing and leaves no slow notice behind. */
+    @Test
+    fun cancellingASlowUploadPublishesNothing() =
+        runTest {
+            val transport = RecordingForwardTransport(uploadGate = CompletableDeferred())
+            val session = mediaSession(transport)
+
+            session.start()
+            advanceTimeBy(FORWARD_PHASE_SLOW_MILLIS)
+            runCurrent()
+            assertTrue(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+            assertTrue(session.state.value.canCancel)
+
+            session.cancel()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Cancelled, session.state.value.phase)
+            assertFalse(
+                session.state.value.targets
+                    .single()
+                    .slow,
+            )
+            assertEquals(emptyList<Pair<String, Int>>(), transport.published)
+        }
+
+    /** One-target text forward used by the slow-phase tests. */
+    private fun CoroutineScope.textSession(transport: ForwardTransport) =
+        ForwardSession(
+            scope = this,
+            messages = listOf(textPayload("first", "first")),
+            targetGroupIds = listOf("target"),
+            transport = transport,
+        )
+
+    /** One-target single-attachment forward used by the slow-phase tests. */
+    private fun CoroutineScope.mediaSession(transport: ForwardTransport) =
+        ForwardSession(
+            scope = this,
+            messages = listOf(mediaPayload("media", null, "notes.txt")),
+            targetGroupIds = listOf("target"),
+            transport = transport,
+        )
+
     private class RecordingForwardTransport(
         private val failUploadOnceFor: MutableSet<String> = mutableSetOf(),
         private val stallUploadOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishUncertainOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishBeforeCommitOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
+        private val uploadGates: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque(),
+        private val publishGate: CompletableDeferred<Unit>? = null,
         private val materializeGate: CompletableDeferred<Unit>? = null,
         private val materializeGates: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque(),
         private val failMaterializationCleanup: Boolean = false,
@@ -993,14 +1237,17 @@ class MessageForwardingTest {
             if (failMaterializationCleanup) error("cleanup failed")
         }
 
-        /** Records the upload and waits on its gate, then fails or never starts once per chosen target, or uploads. */
+        /**
+         * Records the upload and waits on its per-attempt gate, then fails or never starts once per chosen target, or
+         * uploads.
+         */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
         ): List<MediaAttachmentReferenceFfi> {
             uploadTargets += targetGroupIdHex
             onUpload()
-            uploadGate?.await()
+            (uploadGates.removeFirstOrNull() ?: uploadGate)?.await()
             if (failUploadOnceFor.remove(targetGroupIdHex)) error("upload failed")
             if (stallUploadOnceFor.remove(targetGroupIdHex)) throw ForwardUploadStalledException(null)
             return message.attachments.mapIndexed { index, attachment ->
@@ -1011,6 +1258,7 @@ class MessageForwardingTest {
             }
         }
 
+        /** Waits on the publish gate, then records each publish or fails once at index 1 as configured. */
         override suspend fun publishBatch(
             targetGroupIdHex: String,
             messages: List<PreparedForwardMessage>,
@@ -1020,6 +1268,7 @@ class MessageForwardingTest {
             onMessagePublished: (messageIndex: Int) -> Unit,
         ) {
             publishStartIndices += startIndex
+            publishGate?.await()
             for (index in startIndex until messages.size) {
                 currentCoroutineContext().ensureActive()
                 onBeforeMessagePublished(index)
