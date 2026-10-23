@@ -128,7 +128,10 @@ class ForwardProductionBoundaryCoverageTest {
     fun forwardingSessionBoundsPreparationWithoutAutomaticRestall() {
         val source = messageForwardingSource().readText()
 
-        assertTrue("withTimeoutOrNull(preparationTimeoutMillis) { materializeMessages() }" in source)
+        val bounded = source.substringAfter("withTimeoutOrNull(preparationTimeoutMillis) {").substringBefore("?: run {")
+        assertTrue("preparation must stay inside its timeout", "materializeMessages()" in bounded)
+        // The slow notice only changes what is shown inside that same bound, it never extends or restarts it.
+        assertTrue("withSlowPhaseNotice(" in bounded)
         assertTrue("throw ForwardPreparationTimeoutException()" in source)
         assertTrue("if (snapshot.canAutomaticallyRetry && retryCount < automaticRetryAttempts)" in source)
     }
