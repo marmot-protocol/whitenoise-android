@@ -12,6 +12,7 @@ class RemoteGiphyMediaTest {
         val url = "https://media3.giphy.com/media/v1.encoded/200_d.gif"
         assertEquals(RemoteGiphyMedia(url, null), RemoteGiphyMedia.parse(url))
         assertEquals(RemoteGiphyMedia(url, null), RemoteGiphyMedia.parse(" \r\n$url\r\n "))
+        assertEquals(RemoteGiphyMedia(url, null), RemoteGiphyMedia.parse("$url \t\r\nvia GIPHY"))
         assertEquals(
             RemoteGiphyMedia(url, "Late Night with Seth Meyers"),
             RemoteGiphyMedia.parse(" \r\n$url\r\nvia GIPHY · Late Night with Seth Meyers\r\n "),

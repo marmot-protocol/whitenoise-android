@@ -46,7 +46,10 @@ internal fun messageBubbleDisplayedBody(
         // for kind-9 edits the body is the latest version verbatim.
         editState != null && item.record.kind == CHAT_MESSAGE_KIND -> editState.latestText
         // Rich cards consume valid envelopes; rejected ones still need their URL for Markdown fallback.
-        item.record.kind == CHAT_MESSAGE_KIND && RemoteGiphyMedia.isEnvelopeText(item.record.plaintext) -> item.record.plaintext
+        item.record.kind == CHAT_MESSAGE_KIND &&
+            RemoteGiphyMedia.isEnvelopeText(
+                item.record.plaintext,
+            ) -> item.record.plaintext
         item.projected != null ->
             TimelineProjector.displayBody(
                 item.projected,

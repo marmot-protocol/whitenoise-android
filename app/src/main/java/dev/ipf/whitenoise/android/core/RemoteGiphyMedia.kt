@@ -48,7 +48,7 @@ data class RemoteGiphyMedia(
             if (raw.length > MAX_WIRE_TEXT_LENGTH) return null
             val text = raw.trim()
             val newline = text.indexOf('\n')
-            val url = if (newline < 0) text else text.substring(0, newline).removeSuffix("\r")
+            val url = if (newline < 0) text else text.substring(0, newline).trim()
             if (!isAllowedMediaUrl(url)) {
                 return null
             }

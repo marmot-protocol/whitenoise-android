@@ -93,12 +93,13 @@ class GiphyMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                 caption = "https://media3.giphy.com/media/v1.encoded/200_d.gif",
                 attachments = emptyList(),
             )
+        val outgoingUrl = "https://media.giphy.com/media/def/giphy.gif"
         val outgoing =
             fileTimelineMessage(
                 index = 21,
                 fileName = "",
                 mine = true,
-                caption = " \r\nhttps://media.giphy.com/media/def/giphy.gif\r\nvia GIPHY · Long creator attribution\r\n",
+                caption = " \r\n$outgoingUrl \t\r\nvia GIPHY · Long creator attribution\r\n",
                 attachments = emptyList(),
             )
         composeRule.setContent {
@@ -129,7 +130,11 @@ class GiphyMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                     listOf(
                         MarkdownBlockFfi.Paragraph(
                             listOf(
-                                MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI, MarkdownLinkDestinationKindFfi.WEB),
+                                MarkdownInlineFfi.Autolink(
+                                    url = url,
+                                    kind = MarkdownAutolinkKindFfi.URI,
+                                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                                ),
                                 MarkdownInlineFfi.Text("\nvia GIPHY · Late Night with Seth Meyers\nextra"),
                             ),
                         ),
