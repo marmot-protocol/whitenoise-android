@@ -201,9 +201,11 @@ class ForwardOperationStatusInteractionTest {
                 "Sending is taking longer than usual. It can’t be cancelled now and won’t be sent twice.",
                 substring = true,
             ).assertIsDisplayed()
-        composeRule.onNodeWithText("Cancel").assertDoesNotExist()
-        composeRule.onNodeWithText("Retry").assertDoesNotExist()
-        composeRule.onNodeWithText("Dismiss").assertDoesNotExist()
+        // Both the sheet's text buttons and the row's icon-only controls must be absent.
+        listOf("Cancel", "Retry", "Dismiss").forEach { label ->
+            composeRule.onNodeWithText(label).assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(label).assertDoesNotExist()
+        }
     }
 
     /** A slow upload keeps showing how far it got, with the notice added beneath rather than replacing the count. */
