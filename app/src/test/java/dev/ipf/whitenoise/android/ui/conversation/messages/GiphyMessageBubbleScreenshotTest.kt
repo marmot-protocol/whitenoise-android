@@ -140,6 +140,7 @@ class GiphyMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures() {
             WhiteNoiseTheme { Surface { GiphyMessage(item) } }
         }
         composeRule.onAllNodesWithTag("giphy.attribution", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/giphy_fallback_link_light.png")
         composeRule.onNodeWithText(url, substring = true).performFirstLinkClick()
         val opened = shadowOf(context as Application).nextStartedActivity
         assertEquals(Intent.ACTION_VIEW, opened?.action)
