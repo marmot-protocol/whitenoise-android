@@ -111,6 +111,63 @@ class AccountWideLocalRemovalTest {
             }
         }
 
+    @Test fun deletionDuringAnInFlightFullReadInvalidatesItsPreDeleteRows() =
+        runTest {
+            val readEntered = CompletableDeferred<Unit>()
+            val releaseRead = CompletableDeferred<Unit>()
+            val nativeEntered = CompletableDeferred<Unit>()
+            val fixture = fixtureWithHeldRead(readEntered, releaseRead, nativeEntered)
+            val reading = async { fixture.controller.loadAccountWideForwardTargets() }
+            var deletion: kotlinx.coroutines.Deferred<Boolean>? = null
+            try {
+                readEntered.await()
+                assertFalse(reading.isCompleted)
+                val pending = async { fixture.controller.deleteGroupLocalFromChatList(LOCAL_DELETE_GROUP) }
+                deletion = pending
+                nativeEntered.await()
+                assertFalse(reading.isCompleted)
+                assertTrue(pending.await())
+                releaseRead.complete(Unit)
+                val old = requireNotNull(reading.await())
+                assertFalse(old.hasCurrentMembership)
+                assertTrue(old.items().isEmpty())
+                assertTrue(old.chatListItems(emptyList()).isEmpty())
+                val fresh = requireNotNull(fixture.controller.loadAccountWideForwardTargets())
+                assertEquals(listOf(SURVIVOR), fresh.chatListItems(emptyList()).map { it.id })
+            } finally {
+                releaseRead.complete(Unit)
+                reading.cancelAndJoin()
+                deletion?.cancelAndJoin()
+            }
+        }
+
+    /** The first native response captures rows before deletion, then returns them only after release. */
+    private fun TestScope.fixtureWithHeldRead(
+        readEntered: CompletableDeferred<Unit>,
+        releaseRead: CompletableDeferred<Unit>,
+        nativeEntered: CompletableDeferred<Unit>,
+    ): LocalGroupDeleteFixture =
+        localGroupDeleteFixture(
+            controllers,
+            beforeDelete = { nativeEntered.complete(Unit) },
+            configureState = { state, present ->
+                state.liveSubscriptionOverrides.chatList =
+                    reader {
+                        val rows =
+                            if (present.get()) {
+                                listOf(presentedRow(LOCAL_DELETE_GROUP), presentedRow(SURVIVOR))
+                            } else {
+                                listOf(presentedRow(SURVIVOR))
+                            }
+                        if (!readEntered.isCompleted) {
+                            readEntered.complete(Unit)
+                            releaseRead.await()
+                        }
+                        rows
+                    }
+            },
+        )
+
     private fun TestScope.heldRemovalFixture(
         entered: CompletableDeferred<Unit>,
         release: CompletableDeferred<Unit>,

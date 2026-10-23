@@ -4389,14 +4389,17 @@ class ChatsController private constructor(
         scheduleRecompute()
     }
 
-    /** Full native reads wait for admitted local removals and reject a superseding runtime. */
+    /** Waits for admitted removals without serializing independent full native reads. */
     internal suspend fun readAfterRemovals(read: suspend () -> List<PresentedChatRowFfi>?): List<PresentedChatRowFfi>? {
         val runtime = appState.runtimeGeneration
-        val rows =
+        val sameRuntime =
             appState.localGroupDeleteCleanupMutex.withLock {
-                if (appState.runtimeGeneration != runtime) null else read()
+                appState.runtimeGeneration == runtime
             }
-        return rows.takeIf { appState.runtimeGeneration == runtime }
+        // A deletion admitted after this barrier changes the revision captured by the caller before
+        // admission, so its in-flight snapshot cannot restore pre-delete rows. The native read itself
+        // must remain concurrent with other readers, including a superseding profile request.
+        return if (sameRuntime) read().takeIf { appState.runtimeGeneration == runtime } else null
     }
 
     private fun noteMaterializedGroupMembershipChanged() {
