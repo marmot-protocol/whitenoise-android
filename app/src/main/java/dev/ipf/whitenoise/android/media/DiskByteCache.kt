@@ -212,14 +212,21 @@ internal class DiskByteCache(
     /** Returns an authenticated entry when its bounded allocation fits current heap headroom. */
     fun get(key: String): ByteArray? = getInternal(key, smallOnly = false)
 
-    /** Returns only entries that are safe to promote into the bounded plaintext L1. */
-    fun getIfSmall(key: String): ByteArray? = getInternal(key, smallOnly = true)
+    /**
+     * Returns only entries that are safe to promote into the bounded plaintext L1, and only when the entry also fits
+     * the caller's [maxBytes], so a reader with a tighter budget never decrypts an entry it would reject.
+     */
+    fun getIfSmall(
+        key: String,
+        maxBytes: Long = Long.MAX_VALUE,
+    ): ByteArray? = getInternal(key, smallOnly = true, maxBytes = maxBytes)
 
     /** Authenticates and reads one entry while preserving recoverable misses on resource pressure. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     private fun getInternal(
         key: String,
         smallOnly: Boolean,
+        maxBytes: Long = Long.MAX_VALUE,
     ): ByteArray? {
         val hashed = fileNameFor(key)
         // Look up (and LRU-promote) the entry under the lock, then read the
@@ -231,7 +238,7 @@ internal class DiskByteCache(
             synchronized(this) {
                 (index[hashed] ?: return null) to cacheLifetime.capture()
             }
-        if (smallOnly && entry.plaintextSize > maxInMemoryEntryBytes) return null
+        if (smallOnly && (entry.plaintextSize > maxInMemoryEntryBytes || entry.plaintextSize > maxBytes)) return null
         return try {
             val bytes = readEncrypted(entry.file, hashed)
             synchronized(this) {

@@ -123,6 +123,29 @@ class CachedAttachmentPlaintextBoundedReadTest {
             assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
         }
 
+    /**
+     * An entry small enough for the L1 path but larger than the caller's budget is rejected by its size rather than
+     * decrypted whole, as a vCard bigger than its parse limit but under the L1 entry ceiling would otherwise be.
+     */
+    @Test
+    fun aSmallDiskEntryAboveTheCallerBudgetIsRejected() =
+        runTest(dispatcher) {
+            val tightBudget = SMALL_ENTRY_BYTES / 4L
+            fixture.state.diskMediaCache.put(request(0).cacheKey(), ByteArray(SMALL_ENTRY_BYTES / 2) { it.toByte() })
+
+            val failure =
+                runCatching {
+                    localAttachmentBytes(controller, request(0).messageIdHex, 0, mine = false, maxBytes = tightBudget)
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(tightBudget, (failure as AttachmentTooLargeToPresentException).limitBytes)
+            assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
+        }
+
     /** An entry small enough for L1 is still read directly. */
     @Test
     fun aSmallDiskEntryIsReadDirectly() =

@@ -551,8 +551,8 @@ internal fun saveVideoToGallery(
 ): Boolean = source.inputStream().use { saveVideoToGallery(context, it, fileName, mediaType) }
 
 /**
- * Streams a decrypted attachment into the public collection appropriate for its MIME type, the same routing as the
- * byte overload, without reading the whole file into memory. The caller owns and closes [source].
+ * Streams a decrypted attachment into the public collection appropriate for its MIME type without reading the whole
+ * file into memory. The caller owns and closes [source]; a pending own send passes its retained bytes as a source.
  */
 internal fun saveAttachmentToMediaStore(
     context: Context,
@@ -568,21 +568,6 @@ internal fun saveAttachmentToMediaStore(
     }
 }
 
-/** Save a decrypted attachment to the public collection appropriate for its MIME type. */
-internal fun saveAttachmentToMediaStore(
-    context: Context,
-    bytes: ByteArray,
-    fileName: String,
-    mediaType: String,
-): Boolean {
-    val normalizedMime = normalizeDocumentMime(mediaType)
-    return when {
-        normalizedMime.startsWith("image/") -> saveImageToGallery(context, bytes, fileName, normalizedMime)
-        normalizedMime.startsWith("video/") -> saveVideoToGallery(context, bytes, fileName, normalizedMime)
-        else -> saveFileToDownloads(context, bytes, fileName, normalizedMime)
-    }
-}
-
 /** Stream a reusable general-file artifact into public Downloads. */
 internal fun saveDocumentToDownloads(
     context: Context,
@@ -590,14 +575,6 @@ internal fun saveDocumentToDownloads(
     fileName: String,
     mediaType: String,
 ): Boolean = source.inputStream().use { saveFileToDownloads(context, it, fileName, mediaType) }
-
-/** Persist an arbitrary attachment to Download/White Noise via MediaStore. */
-private fun saveFileToDownloads(
-    context: Context,
-    bytes: ByteArray,
-    fileName: String,
-    mediaType: String,
-): Boolean = saveFileToDownloads(context, bytes.inputStream(), fileName, mediaType)
 
 /** Streams [source] into Download/White Noise without reading it whole. */
 private fun saveFileToDownloads(

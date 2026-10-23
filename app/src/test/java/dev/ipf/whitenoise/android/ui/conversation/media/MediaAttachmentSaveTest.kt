@@ -54,7 +54,7 @@ class MediaAttachmentSaveTest {
 
     @Test
     fun imageAttachmentSavesToPicturesCollection() {
-        val saved = saveAttachmentToMediaStore(context(), PAYLOAD, "photo.png", "IMAGE/PNG")
+        val saved = saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), "photo.png", "IMAGE/PNG")
 
         assertTrue(saved)
         assertEquals(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, provider.insertedCollection)
@@ -62,7 +62,7 @@ class MediaAttachmentSaveTest {
 
     @Test
     fun videoAttachmentSavesToMoviesCollection() {
-        val saved = saveAttachmentToMediaStore(context(), PAYLOAD, "clip.mp4", "video/mp4")
+        val saved = saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), "clip.mp4", "video/mp4")
 
         assertTrue(saved)
         assertEquals(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, provider.insertedCollection)
@@ -70,7 +70,8 @@ class MediaAttachmentSaveTest {
 
     @Test
     fun fileAttachmentSavesSanitizedBytesToDownloadsCollection() {
-        val saved = saveAttachmentToMediaStore(context(), PAYLOAD, "../report.pdf", "application/pdf")
+        val source = AttachmentPlaintext.Bytes(PAYLOAD)
+        val saved = saveAttachmentToMediaStore(context(), source, "../report.pdf", "application/pdf")
 
         assertTrue(saved)
         assertEquals(MediaStore.Downloads.EXTERNAL_CONTENT_URI, provider.insertedCollection)
@@ -162,7 +163,7 @@ class MediaAttachmentSaveTest {
 
     @Test
     fun unknownDocumentMetadataUsesSafeGenericFallbackOnSaveAndPicker() {
-        assertTrue(saveAttachmentToMediaStore(context(), PAYLOAD, "../..", "*/*"))
+        assertTrue(saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), "../..", "*/*"))
         assertEquals("file", provider.insertedValues?.getAsString(MediaStore.Downloads.DISPLAY_NAME))
         assertEquals("application/octet-stream", provider.insertedValues?.getAsString(MediaStore.Downloads.MIME_TYPE))
         val intent = createDocumentIntent("..\\..", "application/pdf/invalid")
@@ -374,7 +375,12 @@ class MediaAttachmentSaveTest {
 
         val failure =
             runCatching {
-                saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+                saveAttachmentToMediaStore(
+                    context(),
+                    AttachmentPlaintext.Bytes(PAYLOAD),
+                    "private-name.png",
+                    "image/png",
+                )
             }.exceptionOrNull()
 
         assertTrue(failure is AttachmentSaveException)
@@ -389,7 +395,12 @@ class MediaAttachmentSaveTest {
 
         val failure =
             runCatching {
-                saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+                saveAttachmentToMediaStore(
+                    context(),
+                    AttachmentPlaintext.Bytes(PAYLOAD),
+                    "private-name.png",
+                    "image/png",
+                )
             }.exceptionOrNull()
 
         assertTrue(failure is AttachmentSaveException)
@@ -427,7 +438,7 @@ class MediaAttachmentSaveTest {
         ).forEachIndexed { index, (fileName, mediaType, collection) ->
             val failure =
                 runCatching {
-                    saveAttachmentToMediaStore(context(), PAYLOAD, fileName, mediaType)
+                    saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), fileName, mediaType)
                 }.exceptionOrNull()
 
             assertTrue(failure is AttachmentSaveException)
@@ -470,7 +481,7 @@ class MediaAttachmentSaveTest {
     fun mediaStoreCancellationIsNeverReducedToSaveFailure() {
         provider.outputFailure = CancellationException("cancelled")
 
-        saveAttachmentToMediaStore(context(), PAYLOAD, "private-name.png", "image/png")
+        saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), "private-name.png", "image/png")
     }
 
     private fun context() = RuntimeEnvironment.getApplication()

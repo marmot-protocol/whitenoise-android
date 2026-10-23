@@ -199,10 +199,39 @@ class ForwardOperationStatusInteractionTest {
         composeRule
             .onNodeWithText(
                 "Sending is taking longer than usual. It can’t be cancelled now and won’t be sent twice.",
+                substring = true,
             ).assertIsDisplayed()
         composeRule.onNodeWithText("Cancel").assertDoesNotExist()
         composeRule.onNodeWithText("Retry").assertDoesNotExist()
         composeRule.onNodeWithText("Dismiss").assertDoesNotExist()
+    }
+
+    /** A slow upload keeps showing how far it got, with the notice added beneath rather than replacing the count. */
+    @Test
+    fun slowUploadKeepsItsProgressCountBesideTheNotice() {
+        renderStatus(
+            ForwardOperationSnapshot(
+                phase = ForwardOperationPhase.Running,
+                preparedAttachments = 3,
+                totalAttachments = 3,
+                targets =
+                    listOf(
+                        ForwardTargetProgress(
+                            groupIdHex = "family",
+                            phase = ForwardTargetPhase.Uploading,
+                            totalAttachments = 3,
+                            totalMessages = 1,
+                            uploadedAttachments = 2,
+                            slow = true,
+                        ),
+                    ),
+            ),
+        )
+
+        composeRule.onNodeWithTag(FORWARD_OPERATION_STATUS_TEST_TAG).performClick()
+        composeRule
+            .onNodeWithText("Uploading attachments 2 of 3\nUploading is taking longer than usual")
+            .assertIsDisplayed()
     }
 
     /** An upload that never started names that cause and keeps explicit Retry available. */

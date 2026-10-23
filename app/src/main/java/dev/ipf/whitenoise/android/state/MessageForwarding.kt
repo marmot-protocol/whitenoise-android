@@ -452,7 +452,10 @@ internal class ForwardSession(
                     val prepared =
                         preparedMessages
                             ?: withTimeoutOrNull(preparationTimeoutMillis) {
-                                withSlowPhaseNotice(markSlow = { markPreparationSlow(_state) }) {
+                                withSlowPhaseNotice(
+                                    markSlow = { markPreparationSlow(_state) },
+                                    progress = { _state.value.preparedAttachments },
+                                ) {
                                     materializeMessages()
                                 }
                             }
@@ -508,9 +511,12 @@ internal class ForwardSession(
                                         clockSeconds = clockSeconds,
                                     ) { preparedCount ->
                                         _state.update { snapshot ->
+                                            val prepared = maxOf(snapshot.preparedAttachments, preparedCount)
                                             snapshot.copy(
-                                                preparedAttachments =
-                                                    maxOf(snapshot.preparedAttachments, preparedCount),
+                                                preparedAttachments = prepared,
+                                                preparationSlow =
+                                                    snapshot.preparationSlow &&
+                                                        prepared == snapshot.preparedAttachments,
                                             )
                                         }
                                     }
@@ -554,6 +560,7 @@ internal class ForwardSession(
             }
             withSlowPhaseNotice(
                 markSlow = { markForwardTargetSlow(_state, targetGroupIdHex, ForwardTargetPhase.Uploading) },
+                progress = { forwardTarget(_state, targetGroupIdHex)?.uploadedAttachments },
             ) {
                 prepared.forEachIndexed { messageIndex, message ->
                     currentCoroutineContext().ensureActive()
@@ -567,7 +574,7 @@ internal class ForwardSession(
                     }
                     targetReferences[messageIndex] = references
                     updateForwardTarget(_state, targetGroupIdHex) { progress ->
-                        progress.copy(uploadedAttachments = targetReferences.values.sumOf { it.size })
+                        progress.advancedTo(uploaded = targetReferences.values.sumOf { it.size })
                     }
                 }
             }
@@ -578,6 +585,7 @@ internal class ForwardSession(
             // Display only: a slow publish is never abandoned or resent, the native result stays authoritative.
             withSlowPhaseNotice(
                 markSlow = { markForwardTargetSlow(_state, targetGroupIdHex, ForwardTargetPhase.Sending) },
+                progress = { forwardTarget(_state, targetGroupIdHex)?.sentMessages },
             ) {
                 uncertainPublishByTarget[targetGroupIdHex]?.let { evidence ->
                     val message = prepared[evidence.messageIndex]
@@ -593,7 +601,7 @@ internal class ForwardSession(
                             val recoveredCount = evidence.messageIndex + 1
                             publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
                             uncertainPublishByTarget.remove(targetGroupIdHex)
-                            updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = recoveredCount) }
+                            updateForwardTarget(_state, targetGroupIdHex) { it.advancedTo(sent = recoveredCount) }
                         }
                         ForwardPublishRecoveryResult.NotCommitted -> uncertainPublishByTarget.remove(targetGroupIdHex)
                         ForwardPublishRecoveryResult.Unavailable -> throw ForwardPublishRecoveryUnavailableException()
@@ -612,7 +620,7 @@ internal class ForwardSession(
                 ) { publishedIndex ->
                     val publishedCount = publishedIndex + 1
                     publishedMessageCountByTarget[targetGroupIdHex] = publishedCount
-                    updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = publishedCount) }
+                    updateForwardTarget(_state, targetGroupIdHex) { it.advancedTo(sent = publishedCount) }
                 }
             }
             updateForwardTarget(_state, targetGroupIdHex) {

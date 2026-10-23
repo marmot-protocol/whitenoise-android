@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -35,9 +36,14 @@ internal suspend fun ConversationController.cachedAttachmentPlaintext(
 ): ByteArray? {
     val account = boundAccountRef ?: return null
     val key = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
+    // Every path honours [maxBytes]: an over-budget small entry falls through to the bounded lease, which rejects it
+    // from its declared size before copying anything.
     return withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(key) }
+        ?.also { bytes ->
+            if (bytes.size > maxBytes) throw AttachmentTooLargeToPresentException(maxBytes, bytes.size.toLong())
+        }
         ?: withContext(Dispatchers.IO) {
-            appState.diskMediaCache.getIfSmall(key)
+            appState.diskMediaCache.getIfSmall(key, maxBytes)
                 ?: appState.diskMediaCache
                     .materialize(key) { ensureActive() }
                     ?.let(AttachmentPlaintext::Lease)

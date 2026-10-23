@@ -462,15 +462,14 @@ internal fun ForwardProgressContent(
             )
             Text(
                 text =
-                    if (snapshot.preparationSlow) {
-                        stringResource(R.string.forward_preparing_slow)
-                    } else {
+                    withSlowNotice(
                         stringResource(
                             R.string.forward_preparing_attachments,
                             snapshot.preparedAttachments,
                             snapshot.totalAttachments,
-                        )
-                    },
+                        ),
+                        stringResource(R.string.forward_preparing_slow).takeIf { snapshot.preparationSlow },
+                    ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
@@ -492,6 +491,12 @@ internal fun ForwardProgressContent(
     }
 }
 
+/** Appends a slow-phase [notice] on its own line beneath the progress [count], or returns the count alone. */
+private fun withSlowNotice(
+    count: String,
+    notice: String?,
+): String = if (notice == null) count else "$count\n$notice"
+
 /** Projects a destination's transfer phase and actionable failure reason into one accessible row. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
@@ -502,27 +507,26 @@ private fun ForwardTargetProgressRow(
     val supportingText =
         when (progress.phase) {
             ForwardTargetPhase.Waiting -> stringResource(R.string.forward_waiting)
+            // A slow phase keeps its count and spinner and adds the notice beneath, so real progress stays visible.
             ForwardTargetPhase.Uploading ->
-                if (progress.slow) {
-                    stringResource(R.string.forward_uploading_slow)
-                } else {
+                withSlowNotice(
                     stringResource(
                         R.string.forward_uploading_attachments,
                         progress.uploadedAttachments,
                         progress.totalAttachments,
-                    )
-                }
-            // A slow send keeps its spinner and says it can no longer be cancelled and will not be sent twice.
+                    ),
+                    stringResource(R.string.forward_uploading_slow).takeIf { progress.slow },
+                )
+            // A slow send also says it can no longer be cancelled and will not be sent twice.
             ForwardTargetPhase.Sending ->
-                if (progress.slow) {
-                    stringResource(R.string.forward_sending_slow)
-                } else {
+                withSlowNotice(
                     stringResource(
                         R.string.forward_sending_messages,
                         progress.sentMessages,
                         progress.totalMessages,
-                    )
-                }
+                    ),
+                    stringResource(R.string.forward_sending_slow).takeIf { progress.slow },
+                )
             ForwardTargetPhase.Completed -> stringResource(R.string.forward_sent)
             ForwardTargetPhase.Cancelled ->
                 if (progress.sentMessages > 0) {
