@@ -12,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -34,20 +36,26 @@ internal fun SetupRelayEditorRows(
     editor: SetupEditor,
     fields: SetupEditorFields,
     busy: Boolean,
-    findings: List<dev.ipf.marmotkit.OnboardingFindingFfi> = emptyList(),
+    findings: List<OnboardingFindingFfi> = emptyList(),
 ) {
     val current = fields.current(editor)
     val endpoints =
         (
             current.originalReads.lines() + current.originalWrites.lines() +
                 current.reads.lines() + current.writes.lines()
-        ).filter(String::isNotBlank).distinct()
+        ).map(String::trim).filter(String::isNotBlank).distinct()
     var undo by remember(fields) { mutableStateOf<RelayRemovalUndo?>(null) }
-    Text(stringResource(R.string.setup_relay_publication_scope), style = MaterialTheme.typography.bodySmall)
-    Text(stringResource(R.string.setup_relay_remove_scope), style = MaterialTheme.typography.bodySmall)
     endpoints.forEachIndexed { index, endpoint ->
-        val reads = current.reads.lines().filter(String::isNotBlank)
-        val writes = current.writes.lines().filter(String::isNotBlank)
+        val reads =
+            current.reads
+                .lines()
+                .map(String::trim)
+                .filter(String::isNotBlank)
+        val writes =
+            current.writes
+                .lines()
+                .map(String::trim)
+                .filter(String::isNotBlank)
         val selected = endpoint in reads || endpoint in writes
         if (selected) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
@@ -60,9 +68,9 @@ internal fun SetupRelayEditorRows(
                         stringResource(
                             when {
                                 editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_repair_inbox
-                                endpoint in reads && endpoint in writes -> R.string.setup_repair_both
-                                endpoint in writes -> R.string.setup_repair_write
-                                else -> R.string.setup_repair_read
+                                endpoint in reads && endpoint in writes -> R.string.setup_review_role_both
+                                endpoint in writes -> R.string.setup_review_role_write
+                                else -> R.string.setup_review_role_read
                             },
                         ),
                         style = MaterialTheme.typography.labelSmall,
@@ -89,7 +97,7 @@ internal fun SetupRelayEditorRows(
     }
     val saved = undo
     if (saved != null && saved.afterReads == current.reads && saved.afterWrites == current.writes) {
-        androidx.compose.material3.TextButton(onClick = {
+        TextButton(onClick = {
             fields.reads.setTextAndPlaceCursorAtEnd(saved.beforeReads)
             fields.writes.setTextAndPlaceCursorAtEnd(saved.beforeWrites)
             undo = null
@@ -99,6 +107,7 @@ internal fun SetupRelayEditorRows(
     }
 }
 
+/** Exact pre-removal text restores duplicate addresses, order, and whitespace on Undo. */
 private data class RelayRemovalUndo(
     val beforeReads: String,
     val beforeWrites: String,
@@ -106,9 +115,9 @@ private data class RelayRemovalUndo(
     val afterWrites: String,
 )
 
-/** Stage removal of all exact occurrences in both roles; MDK owns normalization and the resulting tag diff. */
+/** Removes every line matching the selected trimmed address in both roles; other draft text and Undo stay raw. */
 internal fun SetupEditor.withoutRelayEndpoint(endpoint: String): SetupEditor =
     copy(
-        reads = reads.lines().filterNot { it == endpoint }.joinToString("\n"),
-        writes = writes.lines().filterNot { it == endpoint }.joinToString("\n"),
+        reads = reads.lines().filterNot { it.trim() == endpoint }.joinToString("\n"),
+        writes = writes.lines().filterNot { it.trim() == endpoint }.joinToString("\n"),
     )

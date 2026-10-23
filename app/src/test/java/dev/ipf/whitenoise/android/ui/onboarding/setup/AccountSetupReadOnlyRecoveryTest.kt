@@ -32,8 +32,7 @@ class AccountSetupReadOnlyRecoveryTest {
     /** Opening a saved approved repair reveals its exact proposal without inventing Retry or Approval. */
     @Test fun noActionApprovedRepairShowsNoticeAndReadOnlyProposal() {
         val client = showNative(approvedRepair())
-        composeRule.onNodeWithText("Your saved change needs to finish.", substring = true).assertExists()
-        composeRule.onNodeWithTag("setup-step-RELAYS").performScrollTo().performClick()
+        composeRule.onNodeWithText("Your approval is saved.", substring = true).assertExists()
         composeRule.onNodeWithText("wss://read.example").performScrollTo().assertExists()
         composeRule.onNodeWithText("wss://write.example").performScrollTo().assertExists()
         composeRule.onNodeWithTag("setup-details").performScrollTo().performClick()
@@ -47,9 +46,7 @@ class AccountSetupReadOnlyRecoveryTest {
     @Test fun noActionCancellationRetainsExplanationAndNeverOffersApproval() {
         val snapshot = setupSnapshot(OnboardingStepFfi.INBOX_RELAYS, emptyList()).copy(cancellationPending = true)
         val client = showNative(snapshot)
-        composeRule.onNodeWithText("Cancellation stopped.", substring = true).assertExists()
-        composeRule.onNodeWithTag("setup-step-INBOX_RELAYS").performScrollTo().performClick()
-        composeRule.onNodeWithText("Cancellation stopped.", substring = true).assertExists()
+        composeRule.onNodeWithText("Cancellation pending", substring = true).assertExists()
         composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-action-CANCEL_ONBOARDING").assertDoesNotExist()
         assertTrue(client.requests.isEmpty())
@@ -74,12 +71,12 @@ class AccountSetupReadOnlyRecoveryTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Your saved change needs to finish.", substring = true).assertExists()
+        composeRule.onNodeWithText("Your approval is saved.", substring = true).assertExists()
         composeRule.onNodeWithTag("setup-step-RELAYS").assertDoesNotExist()
     }
 
-    /** Selection belongs to the displayed native step; returning A after B cannot resurrect an old A detail. */
-    @Test fun nativeStepRoundTripRequiresFreshDetailNavigation() {
+    /** A new native decision appears directly without reopening a checklist row. */
+    @Test fun nativeStepRoundTripShowsCurrentDecisionImmediately() {
         val state = mutableStateOf(AccountSetupState(snapshot = setupSnapshot()))
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -97,17 +94,19 @@ class AccountSetupReadOnlyRecoveryTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
         composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertExists()
         composeRule.runOnIdle {
-            state.value = AccountSetupState(setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.RETRY)))
+            state.value =
+                AccountSetupState(
+                    setupSnapshot(
+                        OnboardingStepFfi.RELAYS,
+                        listOf(OnboardingActionFfi.RETRY),
+                    ),
+                )
         }
-        composeRule.onNodeWithTag("setup-step-RELAYS").assertExists()
+        composeRule.onNodeWithTag("setup-action-RETRY").assertExists()
+        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertDoesNotExist()
         composeRule.runOnIdle { state.value = AccountSetupState(setupSnapshot(revision = 5uL)) }
-        composeRule.onNodeWithTag("setup-step-PROFILE").assertExists()
-        composeRule.onNodeWithTag("setup-details").assertExists()
-        composeRule.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
-        composeRule.onNodeWithTag("setup-step-PROFILE").assertDoesNotExist()
         composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertExists()
     }
 

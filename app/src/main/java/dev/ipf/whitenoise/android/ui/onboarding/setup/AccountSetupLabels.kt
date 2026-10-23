@@ -13,7 +13,7 @@ internal fun setupStepTitle(value: OnboardingStepFfi): Int =
         OnboardingStepFfi.FOLLOWS -> R.string.setup_step_follows
         OnboardingStepFfi.RELAYS -> R.string.setup_step_relays
         OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_step_inbox_relays
-        OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_step_single_device
+        OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_device_stage
         OnboardingStepFfi.KEY_PACKAGE -> R.string.setup_step_key_package
     }
 
@@ -25,7 +25,7 @@ internal fun setupStatusTitle(value: OnboardingStatusFfi): Int =
         OnboardingStatusFfi.PASSED -> R.string.setup_status_passed
         OnboardingStatusFfi.NEEDS_INPUT -> R.string.setup_status_needs_input
         OnboardingStatusFfi.RETRYABLE_FAILURE -> R.string.setup_status_retryable_failure
-        OnboardingStatusFfi.WAITING_FOR_SIGNER -> R.string.setup_status_waiting_for_signer
+        OnboardingStatusFfi.WAITING_FOR_SIGNER -> R.string.setup_status_signer_pending
         OnboardingStatusFfi.SKIPPED -> R.string.setup_status_skipped
     }
 
@@ -33,16 +33,16 @@ internal fun setupStatusTitle(value: OnboardingStatusFfi): Int =
 internal fun setupActionTitle(value: OnboardingActionFfi): Int =
     when (value) {
         OnboardingActionFfi.RETRY -> R.string.setup_action_retry
-        OnboardingActionFfi.CONTINUE_WITHOUT -> R.string.setup_action_continue_without
-        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.string.setup_action_use_recommended_relays
+        OnboardingActionFfi.CONTINUE_WITHOUT -> R.string.setup_continue_without_profile
+        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.string.setup_review_suggested_changes
         OnboardingActionFfi.EDIT_RELAYS -> R.string.setup_action_edit_relays
         OnboardingActionFfi.EDIT_PROFILE -> R.string.setup_action_edit_profile
         OnboardingActionFfi.EDIT_FOLLOWS -> R.string.setup_action_edit_follows
         OnboardingActionFfi.APPROVE_REPAIR -> R.string.setup_action_approve_repair
         OnboardingActionFfi.CANCEL_REPAIR -> R.string.setup_action_cancel_repair
-        OnboardingActionFfi.RECONNECT_SIGNER -> R.string.setup_action_reconnect_signer
+        OnboardingActionFfi.RECONNECT_SIGNER -> R.string.setup_reconnect_signer
         OnboardingActionFfi.EDIT_DISCOVERY_RELAYS -> R.string.setup_action_edit_discovery_relays
-        OnboardingActionFfi.CONTINUE_ANYWAY -> R.string.setup_action_continue_anyway
+        OnboardingActionFfi.CONTINUE_ANYWAY -> R.string.setup_acknowledge_single_device
         OnboardingActionFfi.CANCEL_ONBOARDING -> R.string.setup_action_cancel_onboarding
     }
 

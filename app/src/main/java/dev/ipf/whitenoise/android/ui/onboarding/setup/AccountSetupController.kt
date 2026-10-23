@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
@@ -36,6 +37,8 @@ internal data class SetupEditor(
 )
 
 /** Immutable presentation envelope around the authoritative native snapshot. */
+internal enum class RelayRemovalIssue { UNSAFE_DECLARATION, ADD_REQUIRED_RELAY }
+
 internal data class AccountSetupState(
     val snapshot: OnboardingSnapshotFfi? = null,
     val busy: Boolean = false,
@@ -44,6 +47,8 @@ internal data class AccountSetupState(
     val staleDecision: Boolean = false,
     val editor: SetupEditor? = null,
     val detailsExpanded: Boolean = false,
+    val relayRemovalIssue: RelayRemovalIssue? = null,
+    val removalReview: Boolean = false,
 ) {
     val accountLabel: String
         get() = snapshot?.accountIdHex?.let { it.take(12) + "…" + it.takeLast(8) }.orEmpty()
@@ -146,7 +151,13 @@ internal class AccountSetupController(
                     if (isCurrent()) onCancelled()
                 } else {
                     accept(result)
-                    mutableState.value = mutableState.value.copy(editor = null, detailsExpanded = false)
+                    mutableState.value =
+                        mutableState.value.copy(
+                            editor = null,
+                            detailsExpanded = false,
+                            relayRemovalIssue = null,
+                            removalReview = false,
+                        )
                 }
             }
         }
@@ -157,9 +168,29 @@ internal class AccountSetupController(
         step: OnboardingStepFfi,
         action: OnboardingActionFfi,
         revision: ULong,
+        endpoint: String? = null,
+        recoveryEpoch: String? = mutableState.value.snapshot?.recoveryEpoch,
     ) {
-        val request = SetupRequest(revision, step, action, recoveryEpoch = mutableState.value.snapshot?.recoveryEpoch)
+        val request = SetupRequest(revision, step, action, recoveryEpoch = recoveryEpoch)
         if (!mutableState.canAct(request, account, isCurrent())) return
+        if (endpoint != null) {
+            val displayed = mutableState.value.snapshot ?: return
+            val selected = mutableState.value.currentStep
+            if (action != OnboardingActionFfi.EDIT_RELAYS ||
+                endpoint.isBlank() ||
+                selected?.step != step ||
+                selected.findings.none {
+                    it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
+                }
+            ) {
+                return
+            }
+            operate {
+                AccountSetupRelayRemoval(client, account, isCurrent, mutableState, ::accept)
+                    .prepare(request, displayed, endpoint)
+            }
+            return
+        }
         operate {
             val latest = client.snapshot()
             if (latest == null || !latest.matchesDecision(account, request)) {
@@ -211,6 +242,7 @@ internal class AccountSetupController(
                                 previous.displayNameEdited || editor.displayName != previous.displayName,
                             aboutEdited = previous.aboutEdited || editor.about != previous.about,
                         ),
+                    relayRemovalIssue = null,
                 )
         }
     }
@@ -221,12 +253,12 @@ internal class AccountSetupController(
         if (current.busy || !isCurrent()) return
         val preview = current.snapshot.takeIf { current.editor?.action == OnboardingActionFfi.EDIT_RELAYS }
         if (preview == null) {
-            mutableState.value = current.copy(editor = null)
+            mutableState.value = current.copy(editor = null, relayRemovalIssue = null)
         } else {
             operate {
                 val latest = client.discardRelayPreview(preview) ?: client.snapshot()
                 latest?.let(::accept)
-                if (isCurrent()) mutableState.value = mutableState.value.copy(editor = null)
+                if (isCurrent()) mutableState.value = mutableState.value.copy(editor = null, relayRemovalIssue = null)
             }
         }
     }
@@ -291,7 +323,7 @@ internal class AccountSetupController(
 }
 
 /** Grants must match the reviewed recovery epoch as well as the proposal or checkpoint revision. */
-private fun OnboardingSnapshotFfi.matchesDecision(
+internal fun OnboardingSnapshotFfi.matchesDecision(
     account: String,
     request: SetupRequest,
 ): Boolean {
@@ -364,7 +396,7 @@ private fun MutableStateFlow<AccountSetupState>.canAct(
 }
 
 /** Projects only a matching native relay proposal into an editor bound to that preview's revision and epoch. */
-private fun OnboardingSnapshotFfi.relayEditor(request: SetupRequest): SetupEditor {
+internal fun OnboardingSnapshotFfi.relayEditor(request: SetupRequest): SetupEditor {
     val repair = checkNotNull(proposal?.takeIf { it.step == request.step }?.relayRepair)
     return SetupEditor(revision, request.step, request.action, recoveryEpoch = recoveryEpoch)
         .withRelayDeclaration(repair)

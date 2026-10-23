@@ -10,7 +10,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -36,16 +35,12 @@ class AccountSetupNavigationPortTest {
     private var opens = 0
     private val visible = mutableStateOf(true)
 
-    /** Checklist navigation does not grant consent, while the explicit native decision retains its revision. */
-    @Test fun checklistAndBackAreLocalUntilAnOfferedActionIsChosen() {
+    /** The profile decision is immediately visible, and Back exits the main sign-in surface. */
+    @Test fun focusedDecisionAndBackKeepNativeConsentExplicit() {
         show()
         composeRule.onNodeWithTag("setup-open-chats").assertDoesNotExist()
-        composeRule.onNodeWithTag("setup-step-FOLLOWS").assertDoesNotExist()
         openProfile()
         assertTrue(client.requests.isEmpty())
-        composeRule.onNodeWithContentDescription("Back").performClick()
-        assertEquals(0, exits)
-        openProfile()
         composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").performClick()
         composeRule.waitForIdle()
         assertEquals(
@@ -53,6 +48,8 @@ class AccountSetupNavigationPortTest {
             client.requests,
         )
         assertEquals(0, opens)
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        assertEquals(1, exits)
     }
 
     /** The new detail button cannot bypass the controller's authoritative reread when the checkpoint advances. */
@@ -134,16 +131,15 @@ class AccountSetupNavigationPortTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertDoesNotExist()
-        composeRule.onNodeWithTag("setup-step-RELAYS").performScrollTo().performClick()
         composeRule.onNodeWithTag("setup-action-RETRY").performClick()
         composeRule.waitForIdle()
         assertEquals(4uL, client.requests.single().revision)
         assertEquals(OnboardingStepFfi.RELAYS, client.requests.single().step)
     }
 
-    /** Current native row navigation is scrollable at every supported checklist position. */
+    /** The current profile decision is on the first surface. */
     private fun openProfile() {
-        composeRule.onNodeWithTag("setup-step-PROFILE").performScrollTo().performClick()
+        composeRule.onNodeWithTag("setup-action-CONTINUE_WITHOUT").assertExists()
     }
 
     /** Keeps the controller above view visibility, matching the actual coordinator's process ownership. */

@@ -96,7 +96,6 @@ class AccountSetupChecklistPresentationTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("setup-step-KEY_PACKAGE").performScrollTo().performClick()
         composeRule.onNodeWithTag("setup-action-RECONNECT_SIGNER").performScrollTo().performClick()
         assertEquals(1, calls)
     }

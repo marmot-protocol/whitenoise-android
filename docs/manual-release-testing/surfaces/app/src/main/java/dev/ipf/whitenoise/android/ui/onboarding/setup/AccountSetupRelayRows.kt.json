@@ -12,25 +12,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_relay_publication_scope",
+        "surface": "R.string.setup_review_role_both",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
-        "anchor": "R.string.setup_relay_publication_scope",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_relay_remove_scope",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
-        "anchor": "R.string.setup_relay_remove_scope",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_repair_both",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
-        "anchor": "R.string.setup_repair_both",
+        "anchor": "R.string.setup_review_role_both",
         "test_ids": [
           "ONB-017"
         ]
@@ -44,17 +28,17 @@
         ]
       },
       {
-        "surface": "R.string.setup_repair_read",
+        "surface": "R.string.setup_review_role_read",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
-        "anchor": "R.string.setup_repair_read",
+        "anchor": "R.string.setup_review_role_read",
         "test_ids": [
           "ONB-017"
         ]
       },
       {
-        "surface": "R.string.setup_repair_write",
+        "surface": "R.string.setup_review_role_write",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
-        "anchor": "R.string.setup_repair_write",
+        "anchor": "R.string.setup_review_role_write",
         "test_ids": [
           "ONB-017"
         ]

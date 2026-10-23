@@ -7,9 +7,11 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -17,7 +19,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
@@ -67,21 +72,25 @@ internal fun SetupEditorContent(
     fields: SetupEditorFields,
     busy: Boolean,
     randomName: (String?) -> String,
-    findings: List<dev.ipf.marmotkit.OnboardingFindingFfi> = emptyList(),
+    findings: List<OnboardingFindingFfi> = emptyList(),
 ) {
     if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
         SetupProfileFields(fields, busy, randomName)
     } else {
-        var advanced by androidx.compose.runtime.remember(fields) { androidx.compose.runtime.mutableStateOf(false) }
+        var advanced by remember(fields) { mutableStateOf(false) }
         val discovery = editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
-            Text(stringResource(editor.relayEditHelp()))
+            if (!editor.canEditRelayDeclaration) Text(stringResource(editor.relayEditHelp()))
             SetupRelayEditorRows(editor, fields, busy, findings)
-            androidx.compose.material3.TextButton(
+            val addressState =
+                stringResource(
+                    if (advanced) R.string.onboarding_details_expanded else R.string.onboarding_details_collapsed,
+                )
+            TextButton(
                 onClick = { advanced = !advanced },
-                modifier = Modifier.testTag("setup.relay.edit_addresses"),
+                modifier = Modifier.testTag("setup.relay.edit_addresses").semantics { stateDescription = addressState },
             ) {
-                Text(stringResource(R.string.setup_action_edit_relays))
+                Text(stringResource(R.string.setup_edit_addresses))
             }
             if (!editor.canEditRelayDeclaration) {
                 editor.relayDeclaration?.let { SetupRelayRepairContent(it, findings) }

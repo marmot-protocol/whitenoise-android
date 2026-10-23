@@ -18,74 +18,169 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 
-/** Orders presentation only: every offered action retains its exact native revision, recovery epoch, and callback. */
+/** Native actions retain exact revision and epoch, with one primary decision per state. */
 @Composable
 internal fun SetupActionButtons(
     state: AccountSetupState,
     onAction: (SetupRequest) -> Unit,
     onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
 ) {
-    val snapshot = state.snapshot ?: return
+    if (state.snapshot == null) return
     val step = state.currentStep ?: return
-    val recoveryEpoch = snapshot.recoveryEpoch
-    val ordered =
+    val offered =
         state.orderedRelayActions(step.actions).filterNot {
             it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
         }
-    val actions = state.visibleSetupActions(step.step, ordered, snapshot.cancellationPending)
-    actions.forEach { action ->
-        val revision =
-            if (action == OnboardingActionFfi.APPROVE_REPAIR) {
-                snapshot.proposal?.takeIf { it.step == step.step }?.revision ?: snapshot.revision
-            } else {
-                snapshot.revision
-            }
-        val canApprove = action != OnboardingActionFfi.APPROVE_REPAIR || snapshot.proposal?.step == step.step
-        SetupActionButton(action, primary = action == actions.firstOrNull(), enabled = !state.busy && canApprove) {
-            if (action in setupEditorActions) {
-                onEdit(step.step, action, revision)
-            } else {
-                onAction(SetupRequest(revision, step.step, action, recoveryEpoch = recoveryEpoch))
-            }
-        }
-    }
-    if (state.offersRelayReset()) {
-        TextButton(
-            onClick = {
-                onAction(
-                    SetupRequest(
-                        snapshot.revision,
-                        step.step,
-                        OnboardingActionFfi.USE_RECOMMENDED_RELAYS,
-                        recoveryEpoch = recoveryEpoch,
-                        resetRelays = true,
-                    ),
-                )
-            },
-            enabled = !state.busy,
-            modifier = Modifier.fillMaxWidth().testTag("setup-reset-relays"),
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        ) { Text(stringResource(R.string.setup_reset_relays)) }
+    val plan = state.actionPlan(offered)
+    val visible = listOfNotNull(plan.primary, plan.secondary).distinct()
+    visible.forEach { action ->
+        SetupOfferedAction(state, action, action == plan.primary && !plan.directRemove, onAction, onEdit)
     }
 }
 
-/** Keeps overview actions bounded while retaining a native-offered relay retry. */
-private fun AccountSetupState.visibleSetupActions(
-    step: OnboardingStepFfi,
-    ordered: List<OnboardingActionFfi>,
-    cancellationPending: Boolean,
-): List<OnboardingActionFfi> {
-    if (detailsExpanded || cancellationPending) return ordered
-    val ordinary = ordered.filter { it != OnboardingActionFfi.CANCEL_ONBOARDING }
-    val visible = ordinary.take(2)
-    return if (step in relaySetupSteps && OnboardingActionFfi.RETRY in ordinary) {
-        (visible + OnboardingActionFfi.RETRY).distinct()
-    } else {
-        visible
+/** Other native grants remain reachable under the shared Details disclosure. */
+@Composable
+internal fun SetupAlternativeActions(
+    state: AccountSetupState,
+    onAction: (SetupRequest) -> Unit,
+    onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
+) {
+    if (state.editor != null ||
+        state.error ||
+        state.disconnected ||
+        state.staleDecision ||
+        state.optionalMetadataPending
+    ) {
+        return
+    }
+    val step = state.currentStep ?: return
+    val offered =
+        state.orderedRelayActions(step.actions).filterNot {
+            it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
+        }
+    val plan = state.actionPlan(offered)
+    val visible = listOfNotNull(plan.primary, plan.secondary).distinct()
+    val alternatives = offered.filterNot { it in visible }
+    if (alternatives.isEmpty() && !state.offersRelayReset()) return
+    Text(stringResource(R.string.setup_other_options), style = MaterialTheme.typography.titleSmall)
+    alternatives.forEach { action -> SetupOfferedAction(state, action, false, onAction, onEdit) }
+    if (state.offersRelayReset()) SetupResetRelayAction(state, onAction)
+}
+
+/** Full replacement is a separate offered action and captures the rendered native grant. */
+@Composable
+private fun SetupResetRelayAction(
+    state: AccountSetupState,
+    onAction: (SetupRequest) -> Unit,
+) {
+    val snapshot = state.snapshot ?: return
+    val step = state.currentStep ?: return
+    val revision = snapshot.revision
+    val recoveryEpoch = snapshot.recoveryEpoch
+    TextButton(
+        onClick = {
+            onAction(
+                SetupRequest(
+                    revision,
+                    step.step,
+                    OnboardingActionFfi.USE_RECOMMENDED_RELAYS,
+                    recoveryEpoch = recoveryEpoch,
+                    resetRelays = true,
+                ),
+            )
+        },
+        enabled = !state.busy,
+        modifier = Modifier.fillMaxWidth().testTag("setup-reset-relays"),
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) { Text(stringResource(R.string.setup_reset_relays)) }
+}
+
+/** Pure projection of the current native grant, including the focused exact Remove choice. */
+private data class SetupActionPlan(
+    val primary: OnboardingActionFfi?,
+    val secondary: OnboardingActionFfi?,
+    val directRemove: Boolean,
+)
+
+private fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): SetupActionPlan {
+    val snapshot = checkNotNull(snapshot)
+    val step = checkNotNull(currentStep)
+    val directRemove = directRemoveAvailable(offered)
+    val primary =
+        when {
+            snapshot.cancellationPending -> offered.firstOrNull()
+            OnboardingActionFfi.APPROVE_REPAIR in offered -> OnboardingActionFfi.APPROVE_REPAIR
+            step.step == OnboardingStepFfi.PROFILE && OnboardingActionFfi.CONTINUE_WITHOUT in offered ->
+                OnboardingActionFfi.CONTINUE_WITHOUT
+            step.step == OnboardingStepFfi.SINGLE_DEVICE && OnboardingActionFfi.CONTINUE_ANYWAY in offered ->
+                OnboardingActionFfi.CONTINUE_ANYWAY
+            OnboardingActionFfi.RECONNECT_SIGNER in offered -> OnboardingActionFfi.RECONNECT_SIGNER
+            directRemove -> null
+            OnboardingActionFfi.RETRY in offered -> OnboardingActionFfi.RETRY
+            else -> offered.firstOrNull()
+        }
+    val secondary =
+        if (directRemove) {
+            OnboardingActionFfi.EDIT_RELAYS
+        } else {
+            offered.firstOrNull { it != primary && it != OnboardingActionFfi.CANCEL_ONBOARDING }
+        }
+    return SetupActionPlan(primary, secondary, directRemove)
+}
+
+private fun AccountSetupState.directRemoveAvailable(offered: List<OnboardingActionFfi>): Boolean {
+    val step = currentStep ?: return false
+    return step.step in relaySetupSteps &&
+        snapshot?.proposal == null &&
+        OnboardingActionFfi.EDIT_RELAYS in offered &&
+        step.findings
+            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
+            .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
+            .distinct()
+            .size == 1
+}
+
+/** Dispatches only currently offered actions and proposal revision for approval. */
+@Composable
+private fun SetupOfferedAction(
+    state: AccountSetupState,
+    action: OnboardingActionFfi,
+    primary: Boolean,
+    onAction: (SetupRequest) -> Unit,
+    onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
+) {
+    val snapshot = state.snapshot ?: return
+    val step = state.currentStep ?: return
+    val recoveryEpoch = snapshot.recoveryEpoch
+    val revision =
+        if (action == OnboardingActionFfi.APPROVE_REPAIR) {
+            snapshot.proposal?.takeIf { it.step == step.step }?.revision ?: snapshot.revision
+        } else {
+            snapshot.revision
+        }
+    val canApprove =
+        action != OnboardingActionFfi.APPROVE_REPAIR ||
+            snapshot.proposal?.step == step.step
+    SetupActionButton(
+        action,
+        primary,
+        !state.busy && canApprove,
+        if (action == OnboardingActionFfi.CANCEL_REPAIR && state.removalReview) {
+            R.string.setup_undo_removal
+        } else {
+            setupActionTitle(action)
+        },
+    ) {
+        if (action in setupEditorActions) {
+            onEdit(step.step, action, revision)
+        } else {
+            onAction(SetupRequest(revision, step.step, action, recoveryEpoch = recoveryEpoch))
+        }
     }
 }
 
@@ -95,10 +190,11 @@ private fun SetupActionButton(
     action: OnboardingActionFfi,
     primary: Boolean,
     enabled: Boolean,
+    labelId: Int,
     onClick: () -> Unit,
 ) {
     val modifier = Modifier.fillMaxWidth().testTag("setup-action-${action.name}")
-    val label = stringResource(setupActionTitle(action))
+    val label = stringResource(labelId)
     val content: @Composable () -> Unit = {
         Icon(painterResource(setupActionIcon(action)), null)
         Spacer(Modifier.width(8.dp))
@@ -153,11 +249,12 @@ private fun AccountSetupState.orderedRelayActions(actions: List<OnboardingAction
 
 /** Reset is visible only among expanded native repair choices, before a proposal exists. */
 private fun AccountSetupState.offersRelayReset(): Boolean {
-    if (!detailsExpanded || snapshot?.proposal != null) return false
+    if (snapshot?.proposal != null) return false
     val step = currentStep
     return step != null && step.step in relaySetupSteps && OnboardingActionFfi.USE_RECOMMENDED_RELAYS in step.actions
 }
 
+/** Icons describe the offered operation; a decision to skip or continue never displays a success check. */
 private fun setupActionIcon(action: OnboardingActionFfi): Int =
     when (action) {
         OnboardingActionFfi.RETRY, OnboardingActionFfi.RECONNECT_SIGNER -> R.drawable.ic_refresh
@@ -165,5 +262,7 @@ private fun setupActionIcon(action: OnboardingActionFfi): Int =
         OnboardingActionFfi.EDIT_PROFILE, OnboardingActionFfi.EDIT_FOLLOWS,
         -> R.drawable.ic_edit
         OnboardingActionFfi.CANCEL_REPAIR, OnboardingActionFfi.CANCEL_ONBOARDING -> R.drawable.ic_close
-        else -> R.drawable.ic_check
+        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.drawable.ic_refresh
+        OnboardingActionFfi.CONTINUE_WITHOUT, OnboardingActionFfi.CONTINUE_ANYWAY -> R.drawable.ic_forward
+        OnboardingActionFfi.APPROVE_REPAIR -> R.drawable.ic_check
     }

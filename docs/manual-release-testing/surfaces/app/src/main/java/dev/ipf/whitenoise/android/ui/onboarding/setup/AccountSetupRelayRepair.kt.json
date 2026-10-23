@@ -12,14 +12,6 @@
         ]
       },
       {
-        "surface": "R.string.setup_repair_added",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_added",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_repair_after",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
         "anchor": "R.string.setup_repair_after",
@@ -36,14 +28,6 @@
         ]
       },
       {
-        "surface": "R.string.setup_repair_both",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_both",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_repair_content",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
         "anchor": "R.string.setup_repair_content",
@@ -52,65 +36,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_repair_inbox",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_inbox",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
         "surface": "R.string.setup_repair_manual",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
         "anchor": "R.string.setup_repair_manual",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_repair_other",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_other",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_repair_preview",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_preview",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_repair_read",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_read",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_repair_removed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_removed",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_repair_retained",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_retained",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_repair_write",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "R.string.setup_repair_write",
         "test_ids": [
           "ONB-017"
         ]
@@ -132,9 +60,17 @@
         ]
       },
       {
-        "surface": "relayRoleLabel",
+        "surface": "SetupRelayRepairDetails",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
-        "anchor": "fun relayRoleLabel(",
+        "anchor": "fun SetupRelayRepairDetails(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "SetupRelayChange",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "fun SetupRelayChange(",
         "test_ids": [
           "ONB-017"
         ]
@@ -145,6 +81,94 @@
         "surface": "R.string.setup_technical_details",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
         "anchor": "R.string.setup_technical_details",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_detail_to_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_detail_to_add",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_detail_to_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_detail_to_remove",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_relay_to_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_relay_to_add",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_relay_to_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_relay_to_remove",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_relay_unchanged",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_relay_unchanged",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_review_role_both",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_review_role_both",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_review_role_inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_review_role_inbox",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_review_role_other",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_review_role_other",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_review_role_read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_review_role_read",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_review_role_write",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_review_role_write",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_unchanged_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_unchanged_relays",
         "test_ids": [
           "ONB-017"
         ]

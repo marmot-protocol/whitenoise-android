@@ -6,7 +6,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
@@ -31,32 +30,35 @@ class AccountSetupRelayRepairContentTest {
         assertEquals(fields, JSONArray(text).let { json -> (0 until json.length()).map(json::getString) })
     }
 
-    /** Event content is ordinary text, not an invented JSON array around the native content. */
-    @Test fun repairContentDisplaysReadableTagsAndPlainContent() {
+    /** The proposed summary omits raw native event data until Details is opened. */
+    @Test fun repairSummaryDoesNotRepeatRawNativeData() {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                Column { SetupRelayRepairContent(relayRepairFixture()) }
-            }
+            WhiteNoiseTheme { Column { SetupRelayRepairContent(relayRepairFixture()) } }
         }
         composeRule.onAllNodesWithText("[\"r\",\"wss://Custom.example/path/\"]").assertCountEquals(0)
-        composeRule.onNodeWithTag("setup.repair.technical").performClick()
+        composeRule.onAllNodesWithText("preserved content").assertCountEquals(0)
+        composeRule.onNodeWithTag("setup.repair.technical").assertDoesNotExist()
+    }
+
+    /** Shared Details preserves ordered tags and plain event content without inventing JSON arrays. */
+    @Test fun repairDetailsDisplaysReadableTagsAndPlainContent() {
+        composeRule.setContent {
+            WhiteNoiseTheme { Column { SetupRelayRepairDetails(relayRepairFixture()) } }
+        }
         composeRule.onAllNodesWithText("[\"r\",\"wss://Custom.example/path/\"]").assertCountEquals(2)
         composeRule.onAllNodesWithText("preserved content").assertCountEquals(2)
         composeRule.onNodeWithText("[\"preserved content\"]").assertDoesNotExist()
-        composeRule.onNodeWithTag("setup.repair.technical").performClick()
-        composeRule.onAllNodesWithText("preserved content").assertCountEquals(0)
     }
 
-    /** An empty native content field uses the existing localized empty-value label. */
+    /** Empty native content is labelled without inventing an empty JSON array. */
     @Test fun emptyContentUsesEmptyValueLabel() {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Column {
-                    SetupRelayRepairContent(relayRepairFixture().copy(originalContent = "", proposedContent = ""))
+                    SetupRelayRepairDetails(relayRepairFixture().copy(originalContent = "", proposedContent = ""))
                 }
             }
         }
-        composeRule.onNodeWithTag("setup.repair.technical").performClick()
         composeRule.onAllNodesWithText("None").assertCountEquals(2)
         composeRule.onNodeWithText("[\"\"]").assertDoesNotExist()
     }

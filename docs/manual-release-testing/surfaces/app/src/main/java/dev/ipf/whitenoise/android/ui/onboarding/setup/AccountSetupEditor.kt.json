@@ -197,9 +197,25 @@
     ],
     "settings_controls": [
       {
-        "surface": "R.string.setup_action_edit_relays",
+        "surface": "R.string.setup_edit_addresses",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
-        "anchor": "R.string.setup_action_edit_relays",
+        "anchor": "R.string.setup_edit_addresses",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.onboarding_details_expanded",
         "test_ids": [
           "ONB-017"
         ]
