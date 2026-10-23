@@ -179,6 +179,7 @@ import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
+import dev.ipf.whitenoise.android.ui.common.messageDragDiagnostic
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
@@ -1273,7 +1274,10 @@ internal fun ConversationScreen(
     /** Extends the drag selection to the row under the pointer; true when the endpoint changed. */
     @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
     fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
-        val anchorId = dragAnchorTimelineId ?: return false
+        val anchorId = dragAnchorTimelineId ?: run {
+            messageDragDiagnostic("range_without_anchor")
+            return false
+        }
         val endpointId =
             reverseLazyListDragSelectionEndpoint(
                 timelineViewport.readingLayoutInfo().visibleItemsInfo.mapNotNull { visible ->
@@ -1293,7 +1297,14 @@ internal fun ConversationScreen(
                 // A reversed list's item offsets start above its bottom content padding.
                 viewportHeight =
                     listState.layoutInfo.viewportSize.height - listState.layoutInfo.beforeContentPadding,
-            ) ?: return false
+            ) ?: run {
+                messageDragDiagnostic("range_without_endpoint visible=${listState.layoutInfo.visibleItemsInfo.size}")
+                return false
+            }
+        messageDragDiagnostic(
+            "range_endpoint same=${endpointId == anchorId} anchor_eligible=${anchorId in selectableTimelineIds} " +
+                "endpoint_eligible=${endpointId in selectableTimelineIds} selected=${selectedMessages.size}",
+        )
         if (endpointId == anchorId && selectedMessages.isEmpty()) return false
         val nextTimelineIds =
             anchoredDragSelection(
@@ -1302,6 +1313,7 @@ internal fun ConversationScreen(
                 anchorId = anchorId,
                 endpointId = endpointId,
             )
+        messageDragDiagnostic("range_resolved count=${nextTimelineIds.size}")
         selectedMessages.clear()
         nextTimelineIds.forEach { timelineId ->
             timelineSelectionById[timelineId]?.let { selection ->
@@ -1313,6 +1325,7 @@ internal fun ConversationScreen(
 
     /** Ends a message drag, optionally clearing the selection, and settles reading at the current anchor. */
     fun finishMessageDrag(clearSelection: Boolean) {
+        messageDragDiagnostic("range_finished clear=$clearSelection selected=${selectedMessages.size}")
         val hadActiveDrag = dragAnchorTimelineId != null
         dragAnchorTimelineId = null
         dragPointerWindowY = null
@@ -4527,6 +4540,7 @@ internal fun ConversationScreen(
                                         },
                                         rangeDragActive = dragAnchorTimelineId == item.presentationId,
                                         onDragSelectionStart = { pointerWindowY ->
+                                            messageDragDiagnostic("screen_drag_started")
                                             openActionMenuId = null
                                             clearTextSelection()
                                             ttsFollowHandle.suspendForDirectDrag(

@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.common
 
+import android.util.Log
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
@@ -15,6 +16,7 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LocalPinnableContainer
 import androidx.compose.ui.layout.PinnableContainer
+import dev.ipf.whitenoise.android.BuildConfig
 import kotlin.math.abs
 
 /** A visible lazy-list item expressed in the list's local coordinate space. */
@@ -148,6 +150,7 @@ internal fun Modifier.longPressOrVerticalDrag(
                     // viewport. Pin the originating row for the gesture so edge
                     // auto-scroll cannot orphan the pointer before release.
                     pinnedHandle = pinnableContainer?.pin()
+                    messageDragDiagnostic("hold_started")
                     currentLongPressStart(origin)
 
                     while (true) {
@@ -156,12 +159,14 @@ internal fun Modifier.longPressOrVerticalDrag(
                             awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
                                 ?: run {
                                     terminalCallbackDelivered = true
+                                    messageDragDiagnostic("cancel_missing_pointer")
                                     currentGestureCancel()
                                     break
                                 }
                         // Compose cancellation synthesizes a consumed up. It must never commit a range.
                         if (change.isConsumed) {
                             terminalCallbackDelivered = true
+                            messageDragDiagnostic("cancel_consumed_pointer pressed=${change.pressed}")
                             currentGestureCancel()
                             break
                         }
@@ -173,8 +178,10 @@ internal fun Modifier.longPressOrVerticalDrag(
                                 verticalDistance > viewConfiguration.touchSlop &&
                                     verticalDistance >= horizontalDistance -> {
                                     dragging = true
+                                    messageDragDiagnostic("drag_started")
                                     currentDragStart(origin)
                                     rangeActivated = currentDrag(change.position)
+                                    messageDragDiagnostic("first_range activated=$rangeActivated")
                                 }
                                 horizontalDistance > viewConfiguration.touchSlop &&
                                     horizontalDistance > verticalDistance -> {
@@ -191,6 +198,7 @@ internal fun Modifier.longPressOrVerticalDrag(
                         change.consume()
                         if (change.changedToUpIgnoreConsumed()) {
                             terminalCallbackDelivered = true
+                            messageDragDiagnostic("released dragging=$dragging activated=$rangeActivated")
                             when {
                                 dragging && rangeActivated -> currentDragEnd()
                                 dragging -> {
@@ -213,6 +221,9 @@ internal fun Modifier.longPressOrVerticalDrag(
                         // Detachment, navigation, or a dataset replacement can
                         // cancel pointerInput without an up event. Always retire
                         // screen-owned drag and auto-scroll state in that case.
+                        messageDragDiagnostic(
+                            "detector_finished dragging=$dragging terminal=$terminalCallbackDelivered",
+                        )
                         if (dragging && !terminalCallbackDelivered) currentGestureCancel()
                     } finally {
                         pinnedHandle?.release()
@@ -220,5 +231,12 @@ internal fun Modifier.longPressOrVerticalDrag(
                 }
             }
         }
+    }
+}
+
+/** Temporary opt-in phase probe for the physical popup/hold admission failure; contains no identities or content. */
+internal fun messageDragDiagnostic(phase: String) {
+    if (BuildConfig.ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS && Log.isLoggable("WNDragSelection", Log.DEBUG)) {
+        Log.d("WNDragSelection", phase)
     }
 }
