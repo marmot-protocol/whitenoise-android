@@ -260,7 +260,11 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         receiver: AccountSummaryFfi,
         group: String,
     ): JSONObject {
-        setPolicy(BackgroundReceiptPolicyCase.DisabledType, receiver, MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Video)
+        setPolicy(
+            BackgroundReceiptPolicyCase.DisabledType,
+            receiver,
+            MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Video,
+        )
         HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$DISABLED_START_MARKER")
         val before = HeldAttachmentCancellationProbe.ledger(blobPort).count { it.getString("kind") == "get" }
         val image = FixtureMediaAssets.jpeg(IMAGE_SEED + 1)
@@ -366,7 +370,11 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         receiver: AccountSummaryFfi,
         group: String,
     ): JSONObject {
-        setPolicy(BackgroundReceiptPolicyCase.ProcessStop, receiver, MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Document)
+        setPolicy(
+            BackgroundReceiptPolicyCase.ProcessStop,
+            receiver,
+            MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Document,
+        )
         val bytes = heldFileBytes()
         val attachment = FixtureMediaAssets.attachment(bytes, "application/pdf", "held.pdf")
         val sent = send(sender, group, listOf(attachment))
