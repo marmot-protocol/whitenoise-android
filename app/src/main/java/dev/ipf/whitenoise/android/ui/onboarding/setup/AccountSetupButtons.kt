@@ -2,8 +2,11 @@
 
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -11,7 +14,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
@@ -35,7 +40,13 @@ internal fun SetupActionButtons(
         if (state.detailsExpanded || snapshot.cancellationPending) {
             ordered
         } else {
-            ordered.filter { it != OnboardingActionFfi.CANCEL_ONBOARDING }.take(2)
+            val ordinary = ordered.filter { it != OnboardingActionFfi.CANCEL_ONBOARDING }
+            val visible = ordinary.take(2)
+            if (step.step in relaySetupSteps && OnboardingActionFfi.RETRY in ordinary) {
+                (visible + OnboardingActionFfi.RETRY).distinct()
+            } else {
+                visible
+            }
         }
     actions.forEach { action ->
         val revision =
@@ -83,6 +94,11 @@ private fun SetupActionButton(
 ) {
     val modifier = Modifier.fillMaxWidth().testTag("setup-action-${action.name}")
     val label = stringResource(setupActionTitle(action))
+    val content: @Composable () -> Unit = {
+        Icon(painterResource(setupActionIcon(action)), null)
+        Spacer(Modifier.width(8.dp))
+        Text(label)
+    }
     when {
         action == OnboardingActionFfi.CANCEL_ONBOARDING ->
             TextButton(
@@ -90,11 +106,11 @@ private fun SetupActionButton(
                 modifier,
                 enabled,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text(label) }
-        primary -> WhiteNoiseButton(onClick, modifier, enabled) { Text(label) }
+            ) { content() }
+        primary -> WhiteNoiseButton(onClick, modifier, enabled) { content() }
         action == OnboardingActionFfi.RETRY || action == OnboardingActionFfi.CANCEL_REPAIR ->
-            TextButton(onClick, modifier, enabled) { Text(label) }
-        else -> OutlinedButton(onClick, modifier, enabled) { Text(label) }
+            TextButton(onClick, modifier, enabled) { content() }
+        else -> OutlinedButton(onClick, modifier, enabled) { content() }
     }
 }
 
@@ -136,3 +152,13 @@ private fun AccountSetupState.offersRelayReset(): Boolean {
     val step = currentStep
     return step != null && step.step in relaySetupSteps && OnboardingActionFfi.USE_RECOMMENDED_RELAYS in step.actions
 }
+
+private fun setupActionIcon(action: OnboardingActionFfi): Int =
+    when (action) {
+        OnboardingActionFfi.RETRY, OnboardingActionFfi.RECONNECT_SIGNER -> R.drawable.ic_refresh
+        OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.EDIT_DISCOVERY_RELAYS,
+        OnboardingActionFfi.EDIT_PROFILE, OnboardingActionFfi.EDIT_FOLLOWS,
+        -> R.drawable.ic_edit
+        OnboardingActionFfi.CANCEL_REPAIR, OnboardingActionFfi.CANCEL_ONBOARDING -> R.drawable.ic_close
+        else -> R.drawable.ic_check
+    }

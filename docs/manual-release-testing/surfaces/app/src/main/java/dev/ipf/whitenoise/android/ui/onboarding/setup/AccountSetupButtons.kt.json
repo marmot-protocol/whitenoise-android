@@ -30,6 +30,32 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "setupOrderedActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "fun setupOrderedActions(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "setupActionIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "fun setupActionIcon(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Concise relay recovery and staged endpoint review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "fun SetupActionButtons(",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   },

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
@@ -69,8 +68,8 @@ class AccountSetupChecklistPresentationTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("setup-step-PROFILE").assertHasNoClickAction()
-        composeRule.onNodeWithTag("setup-open-chats").assertIsNotEnabled()
+        composeRule.onNodeWithTag("setup-step-PROFILE").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-open-chats").assertDoesNotExist()
         composeRule.runOnIdle { state.value = AccountSetupState(snapshot = setupSnapshot(ready = true)) }
         composeRule.onNodeWithTag("setup-open-chats").assertIsEnabled()
     }

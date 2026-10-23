@@ -106,7 +106,7 @@ internal fun AccountSetupContent(
                         },
                         onDismiss = onDismissEditor,
                     )
-                !detail ->
+                !detail && state.snapshot?.ready == true ->
                     WhiteNoiseButton(
                         onClick = onOpenChats,
                         enabled = state.snapshot?.let { it.ready && !it.cancellationPending } == true && !state.busy,
@@ -118,13 +118,30 @@ internal fun AccountSetupContent(
     ) {
         SetupErrors(state, onReconnect)
         if (!detail) {
-            if (state.snapshot?.ready != true) {
-                Text(stringResource(R.string.setup_working), style = MaterialTheme.typography.bodyLarge)
+            if (state.busy ||
+                state.snapshot == null ||
+                (state.optionalMetadataPending && !state.error && !state.disconnected && !state.staleDecision)
+            ) {
+                SetupProgress()
+                state.snapshot?.let { snapshot ->
+                    state.currentStep?.let { step -> SetupOperationNotice(snapshot, step) }
+                }
+            } else if (!state.optionalMetadataPending) {
+                state.currentStep?.let { step ->
+                    if (!state.detailsExpanded) SetupCurrentStep(step) { detailStep = step.step }
+                    SetupDecisionContent(state)
+                }
             }
-            state.snapshot?.let { snapshot ->
-                state.currentStep?.let { SetupOperationNotice(snapshot, it) }
-                SetupChecklist(snapshot, state.checklistInspectionStep) { step -> detailStep = step }
-            } ?: SetupProgress()
+            if (state.detailsExpanded || state.snapshot?.ready == true) {
+                state.snapshot?.let { SetupChecklist(it, state.checklistInspectionStep) { step -> detailStep = step } }
+            }
+            if (state.snapshot != null && state.snapshot?.ready != true && !state.busy) {
+                TextButton(onClick = onToggleDetails, modifier = Modifier.testTag("setup-details")) {
+                    Text(
+                        stringResource(if (state.detailsExpanded) R.string.setup_hide_details else R.string.setup_details),
+                    )
+                }
+            }
             if (!state.routineDeviceNotice && state.snapshot?.ready != true) {
                 TextButton(onClick = onLater, modifier = Modifier.testTag("setup-later")) {
                     Text(stringResource(R.string.setup_later))
@@ -138,6 +155,7 @@ internal fun AccountSetupContent(
                         checkNotNull(editorFields),
                         state.busy,
                         randomName,
+                        state.currentStep?.findings.orEmpty(),
                     )
                 state.busy || state.snapshot == null -> SetupProgress(state.snapshot?.ready == true)
                 state.optionalMetadataPending -> {
@@ -190,12 +208,16 @@ private fun SetupDecisionContent(state: AccountSetupState) {
         }
         SetupOperationNotice(snapshot, step)
         if (step.step != OnboardingStepFfi.PROFILE && snapshot.proposal?.step != step.step) {
-            state.decisionFinding?.let { SetupFindingContent(it) }
+            step.findings
+                .distinct()
+                .filterNot {
+                    step.step == OnboardingStepFfi.SINGLE_DEVICE && state.routineDeviceNotice
+                }.forEach { SetupFindingContent(it) }
         }
         if (step.step == OnboardingStepFfi.SINGLE_DEVICE) {
             SetupSingleDeviceNotice(snapshot.singleDeviceNotice?.discovery)
         }
-        snapshot.proposal?.takeIf { it.step == step.step }?.let { SetupProposalContent(it) }
+        snapshot.proposal?.takeIf { it.step == step.step }?.let { SetupProposalContent(it, step.findings) }
     }
 }
 
@@ -227,7 +249,10 @@ private fun SetupSingleDeviceNotice(discovered: OnboardingDeviceDiscoveryFfi?) {
 
 /** Shows usable relay routes and explains recommendation preservation versus custom replacement. */
 @Composable
-private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
+private fun SetupProposalContent(
+    proposal: OnboardingRepairProposalFfi,
+    findings: List<dev.ipf.marmotkit.OnboardingFindingFfi>,
+) {
     if (proposal.step == OnboardingStepFfi.PROFILE) {
         Text(stringResource(R.string.setup_profile_publish_help))
         proposal.profile?.let { profile ->
@@ -235,7 +260,7 @@ private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
             EmojiLabel(profile.about.orEmpty())
         }
     } else if (proposal.relayRepair != null) {
-        SetupRelayRepairContent(checkNotNull(proposal.relayRepair))
+        SetupRelayRepairContent(checkNotNull(proposal.relayRepair), findings)
     } else {
         if (proposal.previousEventId != null) SetupNotice(stringResource(R.string.setup_replacement_warning))
         val listTitle =

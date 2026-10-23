@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "R.string.remove_named_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.remove_named_relay",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_relay_publication_scope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.setup_relay_publication_scope",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_relay_remove_scope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.setup_relay_remove_scope",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_repair_both",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.setup_repair_both",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_repair_inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.setup_repair_inbox",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_repair_read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.setup_repair_read",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_repair_write",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.setup_repair_write",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_undo_removal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.setup_undo_removal",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "SetupRelayEditorRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "fun SetupRelayEditorRows(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Concise relay recovery and staged endpoint review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "fun SetupRelayEditorRows(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ]
+  }
+}

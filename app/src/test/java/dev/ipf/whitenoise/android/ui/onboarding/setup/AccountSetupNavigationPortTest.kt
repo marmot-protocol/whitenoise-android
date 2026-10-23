@@ -4,8 +4,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.test.assertHasNoClickAction
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -41,8 +39,8 @@ class AccountSetupNavigationPortTest {
     /** Checklist navigation does not grant consent, while the explicit native decision retains its revision. */
     @Test fun checklistAndBackAreLocalUntilAnOfferedActionIsChosen() {
         show()
-        composeRule.onNodeWithTag("setup-open-chats").assertIsNotEnabled()
-        composeRule.onNodeWithTag("setup-step-FOLLOWS").assertHasNoClickAction()
+        composeRule.onNodeWithTag("setup-open-chats").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-step-FOLLOWS").assertDoesNotExist()
         openProfile()
         assertTrue(client.requests.isEmpty())
         composeRule.onNodeWithContentDescription("Back").performClick()

@@ -167,6 +167,24 @@
           "ONB-021",
           "ONB-023"
         ]
+      },
+      {
+        "surface": "Concise relay recovery and staged endpoint review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun rememberSetupEditorFields(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.setup_action_edit_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_action_edit_relays",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   },

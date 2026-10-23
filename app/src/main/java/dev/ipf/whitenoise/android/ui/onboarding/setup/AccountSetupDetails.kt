@@ -16,6 +16,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -124,17 +125,36 @@ internal fun SetupFooter(
 /** Keeps the affected endpoint beside its finding, including before the user opens diagnostic details. */
 @Composable
 internal fun SetupFindingContent(finding: OnboardingFindingFfi) {
-    Column(
-        modifier = Modifier.semantics(mergeDescendants = true) {},
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+    Row(
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
     ) {
-        finding.endpoint?.takeIf { it.isNotBlank() }?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium)
+        Icon(painterResource(R.drawable.ic_info), null, Modifier.size(20.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+            finding.endpoint?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+            }
+            Text(
+                stringResource(setupFindingTitle(finding.issue)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Text(
-            stringResource(setupFindingTitle(finding.issue)),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    }
+}
+
+/** Current checkpoint is immediately inspectable without a full checklist. */
+@Composable
+internal fun SetupCurrentStep(
+    step: dev.ipf.marmotkit.OnboardingStepStateFfi,
+    onClick: () -> Unit,
+) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag("setup-step-${step.step.name}")) {
+        SetupStatusIcon(step.status)
+        Column(Modifier.weight(1f).padding(start = Dimens.spaceSm)) {
+            Text(stringResource(setupStepTitle(step.step)), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(setupStatusTitle(step.status)), style = MaterialTheme.typography.bodySmall)
+        }
+        Icon(painterResource(R.drawable.ic_chevron_right), null)
     }
 }

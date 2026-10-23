@@ -36,6 +36,29 @@ import org.robolectric.annotation.GraphicsMode
 class AccountSetupContentScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    @Test fun relayRecoveryOverviewAmoled() =
+        capture(
+            "relay_recovery_overview_amoled",
+            relayChoicesState().apply {
+                snapshot!!.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+                    listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"))
+            },
+            theme = SetupScreenshotTheme.AMOLED,
+            inspectCurrentStep = false,
+        )
+
+    @Test fun relayEditorUndoAmoled() =
+        capture(
+            "relay_editor_undo_amoled",
+            mixedRelayEditorState(),
+            theme = SetupScreenshotTheme.AMOLED,
+            removeFirstRelay = true,
+        )
+
+    @Test fun relayEditorRemovalPreviewAmoled() {
+        capture("relay_remove_controls_amoled", mixedRelayEditorState(), theme = SetupScreenshotTheme.AMOLED)
+    }
+
     /** Both explicit choices are visible without opening diagnostic details. */
     @Test fun relayRepairChoices() = capture("relay_repair_choices", relayChoicesState())
 
@@ -466,6 +489,8 @@ class AccountSetupContentScreenshotTest {
         theme: SetupScreenshotTheme = SetupScreenshotTheme.LIGHT,
         rtl: Boolean = false,
         fontScale: Float = 1f,
+        inspectCurrentStep: Boolean = true,
+        removeFirstRelay: Boolean = false,
     ) {
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
@@ -482,9 +507,10 @@ class AccountSetupContentScreenshotTest {
             }
         }
         composeRule.mainClock.autoAdvance = true
-        state.checklistInspectionStep?.takeIf { state.editor == null }?.let {
+        state.checklistInspectionStep?.takeIf { state.editor == null && inspectCurrentStep }?.let {
             composeRule.onNodeWithTag("setup-step-${it.name}").performScrollTo().performClick()
         }
+        if (removeFirstRelay) composeRule.onNodeWithTag("setup.relay.remove.0").performScrollTo().performClick()
         composeRule.mainClock.autoAdvance = false
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_$name.png")

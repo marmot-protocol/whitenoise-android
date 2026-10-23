@@ -9,8 +9,10 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -65,41 +67,59 @@ internal fun SetupEditorContent(
     fields: SetupEditorFields,
     busy: Boolean,
     randomName: (String?) -> String,
+    findings: List<dev.ipf.marmotkit.OnboardingFindingFfi> = emptyList(),
 ) {
     if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
         SetupProfileFields(fields, busy, randomName)
     } else {
+        var advanced by androidx.compose.runtime.remember(fields) { androidx.compose.runtime.mutableStateOf(false) }
         val discovery = editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
             Text(stringResource(editor.relayEditHelp()))
         } else {
             Text(stringResource(R.string.setup_discovery_help))
         }
-        WhiteNoiseTextField(
-            state = fields.reads,
-            enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),
-            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-            label = {
-                Text(
-                    stringResource(
-                        when {
-                            discovery -> R.string.setup_discovery_list
-                            editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_inbox_list
-                            else -> R.string.setup_read_list
-                        },
-                    ),
-                )
-            },
-            modifier = Modifier.fillMaxWidth().testTag("setup.editor.reads"),
-        )
-        if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
+        if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
+            SetupRelayEditorRows(editor, fields, busy, findings)
+        }
+        if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
+            androidx.compose.material3.TextButton(
+                onClick = { advanced = !advanced },
+                modifier = Modifier.testTag("setup.relay.edit_addresses"),
+            ) {
+                Text(stringResource(R.string.setup_action_edit_relays))
+            }
+        }
+        if (editor.action == OnboardingActionFfi.EDIT_RELAYS && !editor.canEditRelayDeclaration) {
+            editor.relayDeclaration?.let { SetupRelayRepairContent(it, findings) }
+        }
+        if (discovery || advanced) {
             WhiteNoiseTextField(
-                state = fields.writes,
-                enabled = !busy && editor.canEditRelayDeclaration,
+                state = fields.reads,
+                enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),
                 lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-                label = { Text(stringResource(R.string.setup_write_list)) },
-                modifier = Modifier.fillMaxWidth().testTag("setup.editor.writes"),
+                label = {
+                    Text(
+                        stringResource(
+                            when {
+                                discovery -> R.string.setup_discovery_list
+                                editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_inbox_list
+                                else -> R.string.setup_read_list
+                            },
+                        ),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().testTag("setup.editor.reads"),
             )
+            if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
+                WhiteNoiseTextField(
+                    state = fields.writes,
+                    enabled = !busy && editor.canEditRelayDeclaration,
+                    lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
+                    label = { Text(stringResource(R.string.setup_write_list)) },
+                    modifier = Modifier.fillMaxWidth().testTag("setup.editor.writes"),
+                )
+            }
         }
     }
 }

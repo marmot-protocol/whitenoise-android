@@ -122,6 +122,42 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "relayTagJson",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "fun relayTagJson(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "relayRoleLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "fun relayRoleLabel(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.setup_technical_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "R.string.setup_technical_details",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Concise relay recovery and staged endpoint review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRepair.kt",
+        "anchor": "fun SetupRelayRepairContent(",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   },

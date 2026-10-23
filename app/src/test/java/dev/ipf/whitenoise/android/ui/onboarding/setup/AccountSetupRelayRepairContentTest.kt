@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
@@ -36,9 +38,13 @@ class AccountSetupRelayRepairContentTest {
                 Column { SetupRelayRepairContent(relayRepairFixture()) }
             }
         }
+        composeRule.onAllNodesWithText("[\"r\",\"wss://Custom.example/path/\"]").assertCountEquals(0)
+        composeRule.onNodeWithTag("setup.repair.technical").performClick()
         composeRule.onAllNodesWithText("[\"r\",\"wss://Custom.example/path/\"]").assertCountEquals(2)
         composeRule.onAllNodesWithText("preserved content").assertCountEquals(2)
         composeRule.onNodeWithText("[\"preserved content\"]").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup.repair.technical").performClick()
+        composeRule.onAllNodesWithText("preserved content").assertCountEquals(0)
     }
 
     /** An empty native content field uses the existing localized empty-value label. */
@@ -50,6 +56,7 @@ class AccountSetupRelayRepairContentTest {
                 }
             }
         }
+        composeRule.onNodeWithTag("setup.repair.technical").performClick()
         composeRule.onAllNodesWithText("None").assertCountEquals(2)
         composeRule.onNodeWithText("[\"\"]").assertDoesNotExist()
     }

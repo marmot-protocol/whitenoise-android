@@ -192,6 +192,7 @@ class AccountSetupContentTest {
                         .withRelayDeclaration(relayRepairFixture().copy(beforeTags = emptyList())),
             ),
         )
+        composeRule.onNodeWithTag("setup.relay.edit_addresses").performClick()
         composeRule.onNode(hasSetTextAction() and hasText("Inbox relays")).assertExists()
         composeRule.onNodeWithText("Read relays").assertDoesNotExist()
         composeRule.onNodeWithText("Write relays").assertDoesNotExist()
@@ -431,8 +432,43 @@ class AccountSetupContentTest {
         composeRule.onNodeWithText("Follow list").assertExists()
     }
 
+    /** Default entry exposes the exact relay findings and Retry without entering a detail destination. */
+    @Test fun relayOverviewRetainsAllFindingsAndExactRetryGrant() {
+        val snapshot =
+            setupSnapshot(
+                OnboardingStepFfi.RELAYS,
+                listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.RETRY),
+            ).copy(recoveryEpoch = 7uL)
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(
+                OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, "wss://retired.example"),
+                OnboardingFindingFfi(OnboardingIssueFfi.TIMED_OUT, "wss://slow.example"),
+            )
+        show(AccountSetupState(snapshot = snapshot), inspectCurrentStep = false)
+        composeRule.onNodeWithTag("setup-step-RELAYS").assertExists()
+        composeRule.onNodeWithText("wss://retired.example").assertExists()
+        composeRule.onNodeWithText("wss://slow.example").assertExists()
+        composeRule.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").assertExists()
+        composeRule.onNodeWithTag("setup-action-EDIT_RELAYS").assertExists()
+        composeRule.onNodeWithTag("setup-action-RETRY").performScrollTo().performClick()
+        assertEquals(
+            listOf(
+                SetupRequest(
+                    snapshot.revision,
+                    OnboardingStepFfi.RELAYS,
+                    OnboardingActionFfi.RETRY,
+                    recoveryEpoch = 7uL,
+                ),
+            ),
+            actions,
+        )
+    }
+
     /** Mounts the stateless screen with callback recorders for the supplied native setup state. */
-    private fun show(state: AccountSetupState) {
+    private fun show(
+        state: AccountSetupState,
+        inspectCurrentStep: Boolean = true,
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 AccountSetupContent(
@@ -450,7 +486,7 @@ class AccountSetupContentTest {
                 )
             }
         }
-        state.checklistInspectionStep?.takeIf { state.editor == null }?.let {
+        state.checklistInspectionStep?.takeIf { state.editor == null && inspectCurrentStep }?.let {
             composeRule.onNodeWithTag("setup-step-${it.name}").performScrollTo().performClick()
         }
     }
