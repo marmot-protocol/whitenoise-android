@@ -59,6 +59,17 @@ on:
         type: choice
         options: ['30', '34', '36']
         default: '30'
+      range_selection_only:
+        description: Run only real-window held-pointer range-selection regression
+        required: false
+        type: boolean
+        default: false
+      range_selection_api:
+        description: Android API for real-window held-pointer qualification
+        required: false
+        type: choice
+        options: ['34', '37.0']
+        default: '34'
       responsiveness_only:
         description: Run only retained transcript and connectivity responsiveness acceptance
         required: false
@@ -149,6 +160,15 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/WarmResumeFirstUsefulFrameTest.kt'
       # Retained content and banner assertions inspect actual Android draws at foreground handoff.
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRetainedTranscriptFirstFrameAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/ConversationDragSelectionPopupAndroidTest.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnchoredDragSelection.kt'
+      - 'config/range-selection-required-cases.txt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/DirectionalSwipe.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleDoubleTapSeek.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/chats/ChatListConnectionResumeDeviceTest.kt'
       - 'app/src/testSupport/kotlin/dev/ipf/whitenoise/android/state/ConversationLiveSubscriptionsTestSupport.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelineHandoff.kt'
@@ -226,7 +246,7 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.mdk_preview_qualification && 'mdk-signed-preview' || inputs.mdk_qualification && 'mdk-qualification' || inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.mdk_preview_qualification && 'mdk-signed-preview' || inputs.mdk_qualification && 'mdk-qualification' || inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.range_selection_only && 'range-selection' || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
   cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.mdk_qualification || inputs.mdk_preview_qualification)) }}
 
 permissions:
@@ -258,7 +278,7 @@ jobs:
 
   attachment-fixture:
     needs: changes
-    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification
+    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -314,7 +334,7 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification
+    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.range_selection_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -387,8 +407,8 @@ jobs:
           echo "Select one focused instrumented suite per dispatch" >&2
           exit 2
 
-      - name: Update SDK cmdline-tools for share qualification on API 37
-        if: inputs.outbound_share_only && inputs.outbound_share_api == '37.0'
+      - name: Update SDK cmdline-tools for focused API 37 qualification
+        if: ((inputs.outbound_share_only && inputs.outbound_share_api == '37.0') || (inputs.range_selection_only && inputs.range_selection_api == '37.0'))
         shell: bash
         run: |
           set -euo pipefail
@@ -402,8 +422,8 @@ jobs:
           cat "$cmdline_tools_bin/../source.properties"
           printf '%s\n' "$cmdline_tools_bin" >> "$GITHUB_PATH"
 
-      - name: Retry Android 17 input-service readiness for sharing
-        if: inputs.outbound_share_only && inputs.outbound_share_api == '37.0'
+      - name: Retry Android 17 input-service readiness for focused qualification
+        if: ((inputs.outbound_share_only && inputs.outbound_share_api == '37.0') || (inputs.range_selection_only && inputs.range_selection_api == '37.0'))
         shell: bash
         run: |
           set -euo pipefail
@@ -415,22 +435,28 @@ jobs:
           printf 'ANDROID17_REAL_ADB=%s\n' "$real_adb" >> "$GITHUB_ENV"
           printf '%s\n' "$wrapper_dir" >> "$GITHUB_PATH"
 
+      - name: Reject overlapping range-selection dispatches
+        if: inputs.range_selection_only && (inputs.mdk_adoption_only || inputs.mdk_qualification || inputs.mdk_preview_qualification || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix)
+        run: |
+          echo "Select one focused instrumented suite per dispatch" >&2
+          exit 2
+
       - name: Run connected Android tests
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: ${{ inputs.outbound_share_only && inputs.outbound_share_api || inputs.media_sandbox_only && inputs.media_sandbox_api || 34 }}
-          target: ${{ inputs.outbound_share_only && inputs.outbound_share_api == '37.0' && 'google_apis_ps16k' || 'google_apis' }}
+          api-level: ${{ inputs.range_selection_only && inputs.range_selection_api || inputs.outbound_share_only && inputs.outbound_share_api || inputs.media_sandbox_only && inputs.media_sandbox_api || 34 }}
+          target: ${{ ((inputs.outbound_share_only && inputs.outbound_share_api == '37.0') || (inputs.range_selection_only && inputs.range_selection_api == '37.0')) && 'google_apis_ps16k' || 'google_apis' }}
           arch: x86_64
-          profile: ${{ inputs.outbound_share_only && inputs.outbound_share_api == '37.0' && 'pixel_6' || '' }}
-          ram-size: ${{ inputs.outbound_share_only && '4096M' || '2048M' }}
-          disk-size: ${{ inputs.outbound_share_only && '8G' || '' }}
-          pre-emulator-launch-script: ${{ inputs.outbound_share_only && inputs.outbound_share_api == '37.0' && './scripts/stabilize-android17-emulator.sh' || 'true' }}
+          profile: ${{ ((inputs.outbound_share_only && inputs.outbound_share_api == '37.0') || (inputs.range_selection_only && inputs.range_selection_api == '37.0')) && 'pixel_6' || '' }}
+          ram-size: ${{ (inputs.range_selection_only || inputs.outbound_share_only) && '4096M' || '2048M' }}
+          disk-size: ${{ (inputs.range_selection_only || inputs.outbound_share_only) && '8G' || '' }}
+          pre-emulator-launch-script: ${{ ((inputs.outbound_share_only && inputs.outbound_share_api == '37.0') || (inputs.range_selection_only && inputs.range_selection_api == '37.0')) && './scripts/stabilize-android17-emulator.sh' || 'true' }}
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu ${{ inputs.outbound_share_only && inputs.outbound_share_api == '37.0' && 'swangle' || 'swiftshader_indirect' }} -noaudio -no-boot-anim -camera-back none ${{ inputs.outbound_share_only && inputs.outbound_share_api == '37.0' && '-feature GLDirectMem' || '' }}
+          emulator-options: -no-snapshot-save -no-window -gpu ${{ ((inputs.outbound_share_only && inputs.outbound_share_api == '37.0') || (inputs.range_selection_only && inputs.range_selection_api == '37.0')) && 'swangle' || 'swiftshader_indirect' }} -noaudio -no-boot-anim -camera-back none ${{ ((inputs.outbound_share_only && inputs.outbound_share_api == '37.0') || (inputs.range_selection_only && inputs.range_selection_api == '37.0')) && '-feature GLDirectMem' || '' }}
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}" "${{ inputs.outbound_share_only }}" "${{ inputs.mdk_adoption_only }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}" "${{ inputs.outbound_share_only }}" "${{ inputs.mdk_adoption_only }}" "${{ inputs.range_selection_only }}"
 
       - name: Upload instrumented test reports
         if: always()
@@ -467,7 +493,7 @@ jobs:
 
   maestro-pilot:
     name: Optional Maestro onboarding pilot
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !startsWith(inputs.maestro_suite, 'runtime-')
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -579,7 +605,7 @@ jobs:
 
   maestro-runtime-build:
     name: Build isolated Maestro fixture pair
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-')
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -771,7 +797,7 @@ jobs:
 
   maestro-runtime-summary:
     name: Reconcile every selected Maestro runtime case
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-')
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-')
     needs: [maestro-runtime-build, maestro-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -810,7 +836,7 @@ jobs:
     timeout-minutes: 75
     steps:
       - name: Reject mixed campaigns
-        if: inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix
+        if: inputs.range_selection_only || inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix
         run: exit 2
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -874,7 +900,7 @@ jobs:
       actions: read
     steps:
       - name: Reject mixed campaigns
-        if: inputs.mdk_qualification || inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix
+        if: inputs.range_selection_only || inputs.mdk_qualification || inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.review_demo_e2e || inputs.document_provider_matrix
         run: exit 2
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

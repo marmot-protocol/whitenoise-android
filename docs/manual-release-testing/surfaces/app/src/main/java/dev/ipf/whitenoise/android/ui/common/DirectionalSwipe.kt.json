@@ -16,7 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DirectionalSwipe.kt",
         "anchor": "fun Modifier.directionalSwipe(",
         "test_ids": [
-          "SET-032"
+          "SET-032",
+          "MSG-004"
         ]
       }
     ]
