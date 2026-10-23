@@ -542,7 +542,7 @@ class NotificationFirstPostIntegrationTest {
             }
         }
 
-    /** Runs one typed content fixture and requires exactly one resolved platform write. */
+    /** Verifies body precedence under controlled time; runner scheduling is not a first-post latency measurement. */
     private suspend fun assertFirstBody(
         preview: String,
         timeline: TimelineMessageRecordFfi,
@@ -560,11 +560,14 @@ class NotificationFirstPostIntegrationTest {
                 markdownDocumentFactory = markdownDocumentFactory,
                 notificationFirstPostTimingObserver = events::add,
                 notificationDispatcher = Dispatchers.Unconfined,
+                marmotIoDispatcher = Dispatchers.Unconfined,
+                emitStartupNotification = false,
             )
         try {
             withNotificationWriteCount { writes ->
                 fixture.bootstrap()
-                fixture.awaitNotificationPosted()
+                fixture.emitNotification()
+                fixture.awaitNotificationPosted(advanceMainClock = false)
                 delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
 
                 assertEquals(
