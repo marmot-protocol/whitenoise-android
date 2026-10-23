@@ -21,7 +21,11 @@ class AccountSetupDirectRemovalTest {
     @Test fun missingFindingGrantCannotStartInlineRemoval() =
         runTest {
             val decision = retiredDecision()
-            decision.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings.single().actions = emptyList()
+            decision.steps
+                .first { it.step == OnboardingStepFfi.RELAYS }
+                .findings
+                .single()
+                .actions = emptyList()
             val client = FakeSetupClient(decision)
             val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
             controller.reconnect()
