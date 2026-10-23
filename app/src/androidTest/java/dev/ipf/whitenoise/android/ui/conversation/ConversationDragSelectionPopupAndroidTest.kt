@@ -25,10 +25,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.conversationTimelineMemberSnapshot
@@ -58,11 +60,35 @@ class ConversationDragSelectionPopupAndroidTest {
 
     /** Selection must be visible before UP, after actions were committed while the same finger stayed down. */
     @Test
-    @Suppress("LongMethod") // One owner must retire the global input stream, window callback and controller together.
     fun heldPointerCrossesTheActionPopupAndSelectsAnAdjacentMessage() {
+        assertHeldSelection(
+            records = (1..4).map { timelineRecord(it.toString().repeat(64), it.toULong(), "message-$it") },
+            scenario = "received-short",
+        )
+    }
+
+    /** Matches the overflowing sent-row conversation on which the Pixel's continued hold was cancelled. */
+    @Test
+    fun heldPointerSelectsOwnRowsInAnOverflowingConversation() {
+        val records =
+            (1..60).map { index ->
+                timelineRecord(
+                    messageId = index.toString(16).padStart(64, '0'),
+                    timelineAt = index.toULong(),
+                    plaintext = "WN3407 row $index baseline edge control",
+                ).copy(direction = "sent", sender = ConversationTimelineTestIds.ACCOUNT_ID)
+            }
+        assertHeldSelection(records, scenario = "sent-overflow")
+    }
+
+    /** Owns one real window/input lifecycle through settled popup, progressive drag and selected pre-UP frames. */
+    @Suppress("LongMethod") // One owner must retire the global input stream, window callback and controller together.
+    private fun assertHeldSelection(
+        records: List<TimelineMessageRecordFfi>,
+        scenario: String,
+    ) {
         val group = conversationTimelineTestGroup()
         val members = conversationTimelineMemberSnapshot()
-        val records = (1..4).map { timelineRecord(it.toString().repeat(64), it.toULong(), "message-$it") }
         val subscription = ScriptedConversationTimelineSubscription(timelinePage(*records.toTypedArray()))
         val scripted = ScriptedConversationLiveSubscriptions(listOf(subscription), group)
         val appState = conversationTimelineTestAppState(scripted.subscriptions)
@@ -135,11 +161,15 @@ class ConversationDragSelectionPopupAndroidTest {
                 val rootScreenOrigin = IntArray(2)
                 composeRule.runOnIdle { hostView.getLocationOnScreen(rootScreenOrigin) }
 
-                /** Maps the current real Compose root into Android's screen-space touch coordinates. */
+                /** Starts inside the authored text, rather than the full-width row's empty space. */
                 fun screenPoint(id: String): Offset {
                     val bounds =
                         composeRule
-                            .onNodeWithTag(messageBubbleRowTestTag(id))
+                            .onNodeWithText(
+                                checkNotNull(records.first { it.messageIdHex == id }.plaintext),
+                                substring = true,
+                                useUnmergedTree = true,
+                            ).assertIsDisplayed()
                             .fetchSemanticsNode()
                             .boundsInRoot
                     return bounds.center + Offset(rootScreenOrigin[0].toFloat(), rootScreenOrigin[1].toFloat())
@@ -149,7 +179,7 @@ class ConversationDragSelectionPopupAndroidTest {
                 val endpoint = records[records.lastIndex - 1].messageIdHex
                 composeRule.onNodeWithTag(messageBubbleRowTestTag(anchor)).assertIsDisplayed()
                 composeRule.onNodeWithTag(messageBubbleRowTestTag(endpoint)).assertIsDisplayed()
-                saveScreenshot("ready-transcript")
+                saveScreenshot("$scenario-ready-transcript")
                 last = screenPoint(anchor)
                 val adjacent = screenPoint(endpoint)
                 downTime = SystemClock.uptimeMillis()
@@ -158,10 +188,21 @@ class ConversationDragSelectionPopupAndroidTest {
                 composeRule.mainClock.advanceTimeBy(1_000L)
                 SystemClock.sleep(1_000L)
                 composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertIsDisplayed()
-                saveScreenshot("held-menu")
+                // Presence of the popup's semantics precedes its measured/travel placement and visible paint.
+                composeRule.mainClock.advanceTimeBy(500L)
+                SystemClock.sleep(500L)
+                composeRule.waitForIdle()
+                composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertIsDisplayed()
+                composeRule.onNodeWithTag("message-actions-preview").assertIsDisplayed()
+                saveScreenshot("$scenario-held-menu")
                 composeRule.mainClock.autoAdvance = false
-                last = adjacent
-                inject(downTime, MotionEvent.ACTION_MOVE, last)
+                val origin = last
+                for (step in 1..8) {
+                    last = origin + (adjacent - origin) * (step / 8f)
+                    inject(downTime, MotionEvent.ACTION_MOVE, last)
+                    composeRule.mainClock.advanceTimeBy(16L)
+                    SystemClock.sleep(16L)
+                }
                 try {
                     composeRule.waitUntil(timeoutMillis = 3_000L) { surface.selectedMessages.size == 2 }
                 } catch (failure: ComposeTimeoutException) {
@@ -191,14 +232,14 @@ class ConversationDragSelectionPopupAndroidTest {
                     )
                 composeRule.onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE).assertIsDisplayed()
                 composeRule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
-                saveScreenshot("selected-before-up")
+                saveScreenshot("$scenario-selected-before-up")
                 inject(downTime, MotionEvent.ACTION_UP, last)
                 held = false
                 composeRule.mainClock.autoAdvance = originalAutoAdvance
                 composeRule.waitForIdle()
                 composeRule.runOnIdle { assertEquals(setOf(anchor, endpoint), surface.selectedMessages.keys.toSet()) }
             }.recoverCatching { failure ->
-                runCatching { saveScreenshot("failure") }.exceptionOrNull()?.let(failure::addSuppressed)
+                runCatching { saveScreenshot("$scenario-failure") }.exceptionOrNull()?.let(failure::addSuppressed)
                 throw AssertionError("raw actions=$rawActions; applied selection sizes=$selectionSizes", failure)
             }
         // Attempt every owner cleanup, preserving the original failure and suppressing cleanup failures onto it.
