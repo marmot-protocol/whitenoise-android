@@ -527,6 +527,16 @@ internal fun MainShell(
             runtimeGeneration = appState.runtimeGeneration,
         )
     val scopedGlobalSearchState = globalSearch.scopedState
+    // Only the temporary view choice survives conversation navigation; native rows stay screen-owned.
+    val unreadFilterAccount = appState.activeAccountRef
+    val unreadFilterRuntime = appState.runtimeGeneration
+    val unreadFilterFolder = selectedChatListFolderId
+    val unreadFilterSearchOpen = scopedGlobalSearchState.isOpen
+    val unreadFilter =
+        remember(unreadFilterAccount, unreadFilterRuntime, unreadFilterFolder, unreadFilterSearchOpen) {
+            mutableStateOf(false)
+        }
+    val currentUnreadFilter by rememberUpdatedState(unreadFilter)
     LaunchedEffect(globalSearch.conversationReturn, scopedGlobalSearchState.isOpen, selectedChat, sectionName) {
         val origin = globalSearch.conversationReturn ?: return@LaunchedEffect
         if (sectionName != MainSection.Chats.name) {
@@ -2038,14 +2048,17 @@ internal fun MainShell(
                         SettingsRouteMotion(
                             target = section,
                             depth =
-                                if (section == MainSection.Chats) {
-                                    0
-                                } else if (section == MainSection.Settings) {
-                                    1
-                                } else {
-                                    2
+                                when (section) {
+                                    MainSection.Chats -> 0
+                                    MainSection.Settings -> 1
+                                    MainSection.Diagnostics -> 2
                                 },
                             ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+                            suppressMotion =
+                                routingNotification ||
+                                    routingShare ||
+                                    routingAppUpdate ||
+                                    pendingTtsDestinationNavigation != null,
                             contentVisible = !appState.appLockScreenVisible,
                         ) { animatedSection ->
                             when (animatedSection) {
@@ -2071,6 +2084,16 @@ internal fun MainShell(
                                         globalSearchState = scopedGlobalSearchState,
                                         onGlobalSearchStateChange = globalSearch.update,
                                         searchViewport = globalSearch.viewport,
+                                        unreadOnlyFilter = unreadFilter.value,
+                                        onUnreadOnlyFilterChange = { enabled ->
+                                            if (currentUnreadFilter === unreadFilter &&
+                                                appState.activeAccountRef == unreadFilterAccount &&
+                                                appState.runtimeGeneration == unreadFilterRuntime &&
+                                                selectedChatListFolderId == unreadFilterFolder
+                                            ) {
+                                                unreadFilter.value = enabled
+                                            }
+                                        },
                                         selectedFolderId = selectedChatListFolderId,
                                         onSelectFolder = { selectedChatListFolderId = it },
                                         onTtsTransportBodyClick = guardedPlaybackSourceOpen,
@@ -2134,6 +2157,11 @@ internal fun MainShell(
                                 MainSection.Settings ->
                                     SettingsScreen(
                                         appState = appState,
+                                        suppressMotion =
+                                            routingNotification ||
+                                                routingShare ||
+                                                routingAppUpdate ||
+                                                pendingTtsDestinationNavigation != null,
                                         onBackToChats = {
                                             sectionName = MainSection.Chats.name
                                             settingsDetailName = null

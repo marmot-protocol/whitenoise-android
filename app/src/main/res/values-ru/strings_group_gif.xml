@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">Использовать этот GIF для группы?</string>
+    <string name="group_gif_upload_notice">Анимированный GIF будет загружен на общедоступный сервер изображений. Любой, у кого есть ссылка, сможет его просмотреть. GIF будет использован целиком, без обрезки.</string>
+    <string name="group_gif_upload_confirm">Загрузить GIF</string>
+</resources>

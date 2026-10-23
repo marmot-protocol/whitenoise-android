@@ -35,6 +35,7 @@ internal class ProfileAccountWideGroupsHolder(
     private val accountAtOpen = appState.activeAccountRef
     private val runtimeAtOpen = appState.runtimeGeneration
 
+    /** Requires the holder's opening account and runtime before exposing snapshots or starting another read. */
     private fun ownsCurrentAccount(): Boolean {
         val sameRuntime = appState.runtimeGeneration == runtimeAtOpen
         return sameRuntime && appState.activeAccountRef == accountAtOpen

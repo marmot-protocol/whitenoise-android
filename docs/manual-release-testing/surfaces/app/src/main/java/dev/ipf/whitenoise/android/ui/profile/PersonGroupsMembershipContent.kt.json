@@ -20,6 +20,14 @@
         ]
       },
       {
+        "surface": "MembershipControllerEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "fun MembershipControllerEffect(",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
         "surface": "MembershipRemovalConfirmation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
         "anchor": "fun MembershipRemovalConfirmation(",
@@ -75,6 +83,22 @@
         "anchor": "R.string.toast_member_removed",
         "test_ids": [
           "ACC-022"
+        ]
+      },
+      {
+        "surface": "R.string.group_identifiers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.group_identifiers",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "R.string.person_group_memberships_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.person_group_memberships_unavailable",
+        "test_ids": [
+          "GRP-034"
         ]
       }
     ]

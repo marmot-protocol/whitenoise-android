@@ -11,7 +11,7 @@ internal enum class SwipeBinding { MessageLeft, MessageRight, ChatLeft, ChatRigh
 /** Only local interaction choices; commands continue to use their existing native eligibility. */
 internal enum class SwipeAction { Default, Off, Reply, Forward, React, ReadUnread, MuteUnmute, PinUnpin }
 
-/** Four app-wide interaction preferences, with no conversation or protocol data. */
+/** App-wide gesture preferences, with no conversation or protocol data. */
 internal data class SwipePreferenceState(
     val messageLeft: SwipeAction = SwipeAction.Default,
     val messageRight: SwipeAction = SwipeAction.Default,
@@ -57,12 +57,13 @@ internal class SwipePreferences(
         state = read()
     }
 
+    /** Persists the pull-to-unread gesture independently of the four horizontal swipe bindings. */
     fun setPullUnread(enabled: Boolean) {
         preferences.edit().putBoolean("pull_unread", enabled).apply()
         state = read()
     }
 
-    /** Removes only these four UI settings and restores upgrade-compatible behavior. */
+    /** Removes only these gesture preferences and restores upgrade-compatible behavior. */
     fun reset() {
         preferences
             .edit()

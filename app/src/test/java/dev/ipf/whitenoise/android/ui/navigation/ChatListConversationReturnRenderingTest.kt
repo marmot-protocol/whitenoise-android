@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -129,6 +130,98 @@ class ChatListConversationReturnRenderingTest {
         }
     }
 
+    /** The actual shell must retain the view choice after disposing the outgoing ChatsScreen. */
+    @Test
+    fun unreadFilterSurvivesConversationBackUntilShowAll() {
+        val fixture = ReturnFixture(unreadTarget = true)
+        withMountedUnreadShell(fixture) { holder ->
+            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")
+            composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").assertIsDisplayed().performClick()
+            awaitCondition { holder.selectedChat.value?.id == fixture.target.groupIdHex }
+            composeRule.mainClock.advanceTimeBy(1_000)
+            composeRule.waitForIdle()
+            val readsBeforeBack = fixture.unreadSnapshotReads.get()
+            composeRule.onNodeWithContentDescription("Back").performClick()
+            awaitCondition { holder.selectedChat.value == null && fixture.unreadSnapshotReads.get() > readsBeforeBack }
+            composeRule.mainClock.advanceTimeBy(1_000)
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")
+            composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
+            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Unread only")
+            composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertIsDisplayed()
+        }
+    }
+
+    /** A new folder or account cannot inherit the old view choice, including a return to that account. */
+    @Test
+    fun unreadFilterClearsOnFolderAndAccountChanges() {
+        val fixture = ReturnFixture(unreadTarget = true)
+        val folder =
+            checkNotNull(
+                fixture.appState.chatFolderPreferences.createFolder(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    "Unread scope",
+                ),
+            )
+        withMountedUnreadShell(fixture) {
+            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
+            composeRule.onNodeWithTag("chats.folder.${folder.id}").performClick()
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Unread only")
+            composeRule.onNodeWithTag("chats.scope.chats").performClick()
+            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")
+            composeRule.runOnIdle { replaceUnreadAccount(fixture.appState, "other-unread-account") }
+            composeRule.waitForIdle()
+            composeRule.runOnIdle { replaceUnreadAccount(fixture.appState, ConversationTimelineTestIds.ACCOUNT_REF) }
+            composeRule.waitForIdle()
+            composeRule.mainClock.advanceTimeBy(1_000)
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Unread only")
+        }
+    }
+
+    /** Mounts production navigation with the existing real controller and always releases its jobs. */
+    private fun withMountedUnreadShell(
+        fixture: ReturnFixture,
+        exercise: (MainShellStateHolder) -> Unit,
+    ) {
+        val mounted = mutableStateOf(true)
+        val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
+        val controller =
+            holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
+        fixture.appState.setAppInForeground(true)
+        composeRule.setContent {
+            if (mounted.value) WhiteNoiseTheme { MainShell(appState = fixture.appState, stateHolder = holder) }
+        }
+        try {
+            awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+            composeRule.waitForIdle()
+            exercise(holder)
+        } finally {
+            composeRule.runOnIdle {
+                mounted.value = false
+                holder.release()
+            }
+            composeRule.waitForIdle()
+        }
+    }
+
+    /** Uses the same private account setter as mounted settings isolation tests. */
+    private fun replaceUnreadAccount(
+        appState: WhiteNoiseAppState,
+        account: String,
+    ) {
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("setActiveAccountRef", String::class.java)
+            .apply { isAccessible = true }
+            .invoke(appState, account)
+    }
+
     /** Measures the production lazy items, including animated placement and clipping. */
     private fun rowBounds(rows: List<ChatListRowFfi>): Map<String, Rect> =
         rows.associate { row ->
@@ -151,7 +244,9 @@ class ChatListConversationReturnRenderingTest {
 internal class ReturnFixture(
     avatarAssetForRow: (ChatListRowFfi) -> AvatarAssetFfi? = { null },
     private val readAvatars: suspend (List<String>) -> List<AvatarBytesFfi> = { emptyList() },
+    private val unreadTarget: Boolean = false,
 ) {
+    val unreadSnapshotReads = AtomicInteger()
     val avatarReads = AtomicInteger()
     val avatarRequests = AtomicInteger()
     val rows =
@@ -162,8 +257,8 @@ internal class ReturnFixture(
                 title = "Return chat $index",
                 groupName = "Return chat $index",
                 activitySortAt = (10 - index).toULong(),
-                unreadCount = 0uL,
-                hasUnread = false,
+                unreadCount = if (unreadTarget && index == 5) 1uL else 0uL,
+                hasUnread = unreadTarget && index == 5,
             )
         }
     val target = rows.last()
@@ -185,6 +280,15 @@ internal class ReturnFixture(
                         if (view == ChatListViewFfi.CHATS) activeWindow else ReturnWindow(view, emptyList())
                     },
                     openChats = { _, _ -> ReturnGroups(rows.map(::emptyGroupRecord)) },
+                    presentedChatList =
+                        if (unreadTarget) {
+                            { _, _ ->
+                                unreadSnapshotReads.incrementAndGet()
+                                MarmotWindowTestFakes.windowSnapshot(ChatListViewFfi.CHATS, rows).rows
+                            }
+                        } else {
+                            null
+                        },
                 )
         }
 

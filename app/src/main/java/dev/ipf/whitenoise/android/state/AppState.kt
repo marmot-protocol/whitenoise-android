@@ -8428,12 +8428,13 @@ class WhiteNoiseAppState private constructor(
         muted: Boolean,
         onCommitted: () -> Unit = {},
         isCurrent: () -> Boolean = { true },
+        completionIsCurrent: () -> Boolean = isCurrent,
     ) {
         val accountRef = activeAccountRef ?: return
         if (muted) {
-            submitMuteCommand(accountRef, groupIdHex, null, onCommitted, isCurrent)
+            submitMuteCommand(accountRef, groupIdHex, null, onCommitted, isCurrent, completionIsCurrent)
         } else {
-            submitUnmuteCommand(accountRef, groupIdHex, onCommitted, isCurrent)
+            submitUnmuteCommand(accountRef, groupIdHex, onCommitted, isCurrent, completionIsCurrent)
         }
     }
 
@@ -8457,12 +8458,14 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Sends the command to MDK; UI changes only after MDK returns its authoritative settings. */
+    @Suppress("LongParameterList") // Admission and committed-result ownership differ after presentation retires.
     private fun submitMuteCommand(
         accountRef: String,
         groupIdHex: String,
         mutedUntilMs: Long?,
         onCommitted: () -> Unit = {},
         isCurrent: () -> Boolean = { true },
+        completionIsCurrent: () -> Boolean = isCurrent,
     ) {
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
         val runtime = runtimeGeneration
@@ -8475,7 +8478,7 @@ class WhiteNoiseAppState private constructor(
                     .setMuted(accountRef, groupIdHex, mutedUntilMs) {
                         activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
                     }.onSuccess {
-                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && completionIsCurrent()) {
                             authoritativeMuteOverrides[key] = it
                             onCommitted()
                         }
@@ -8495,6 +8498,7 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         onCommitted: () -> Unit = {},
         isCurrent: () -> Boolean = { true },
+        completionIsCurrent: () -> Boolean = isCurrent,
     ) {
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
         val runtime = runtimeGeneration
@@ -8507,7 +8511,7 @@ class WhiteNoiseAppState private constructor(
                     .clearMuted(accountRef, groupIdHex) {
                         activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
                     }.onSuccess {
-                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && completionIsCurrent()) {
                             authoritativeMuteOverrides[key] = it
                             onCommitted()
                         }
@@ -11906,6 +11910,7 @@ class WhiteNoiseAppState private constructor(
     internal var pendingProfileGroupsInCommon by mutableStateOf(false)
         private set
 
+    /** Requests a profile with its initial groups-in-common view, clearing discovery-only metadata. */
     fun presentProfile(
         npub: String,
         groupsInCommon: Boolean = false,

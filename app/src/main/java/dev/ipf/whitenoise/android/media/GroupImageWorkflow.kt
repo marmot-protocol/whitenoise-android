@@ -123,9 +123,8 @@ internal sealed class ImageUploadPreparationException : Exception() {
 }
 
 /**
- * Converts a user-selected public image URL into bounded, metadata-stripped
- * JPEG bytes suitable for MDK's encrypted group-image or public profile-image
- * upload APIs.
+ * Prepares bounded, metadata-stripped image drafts for MDK upload APIs. Group selections can retain
+ * sanitized GIF animation; ordinary static and public profile-image preparation produces JPEG bytes.
  */
 internal object GroupImageDraftProcessor {
     private const val CONNECT_TIMEOUT_MS = 5_000
@@ -139,6 +138,7 @@ internal object GroupImageDraftProcessor {
             fromGroupBytes(source, url)
         }
 
+    /** Preserves sanitized GIF frames for group picks; other formats use the existing static-image preparation. */
     internal fun fromGroupBytes(
         source: ByteArray,
         sourceUrl: String?,
@@ -149,6 +149,7 @@ internal object GroupImageDraftProcessor {
             fromBytes(source, sourceUrl)
         }
 
+    /** Rejects sanitized GIF drafts outside the shared animation-source bounds before upload is admitted. */
     private fun validateGroupGif(draft: ImageUploadDraft): ImageUploadDraft {
         if (admitAnimationSource(draft.plaintext) !is AnimationSourceAdmission.Admitted) {
             throw ImageUploadPreparationException.UnsupportedImage

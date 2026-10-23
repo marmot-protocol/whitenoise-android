@@ -89,14 +89,13 @@ import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
+import dev.ipf.whitenoise.android.core.unreadMemberCandidateIds
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
-import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
-import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
@@ -110,7 +109,6 @@ import dev.ipf.whitenoise.android.state.localDeleteBatchRetryNotice
 import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.recordProductObservation
-import dev.ipf.whitenoise.android.state.references
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
@@ -139,6 +137,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -207,6 +206,9 @@ internal fun ChatsScreen(
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
+    // Optional shell ownership preserves the view choice across conversation navigation.
+    unreadOnlyFilter: Boolean? = null,
+    onUnreadOnlyFilterChange: ((Boolean) -> Unit)? = null,
     onTtsTransportBodyClick: (() -> Unit)? = null,
     showPlaybackTransport: Boolean = true,
     onGroupCreateSubmitted: () -> Long = { 0L },
@@ -268,8 +270,13 @@ internal fun ChatsScreen(
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
     // The complete native snapshot exists only while this temporary view is open.
     var unreadPullProgress by remember { mutableFloatStateOf(0f) }
-    var unreadOnly by remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
-        mutableStateOf(false)
+    var localUnreadOnly by
+        remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
+            mutableStateOf(false)
+        }
+    val unreadOnly = unreadOnlyFilter ?: localUnreadOnly
+    val setUnreadOnly: (Boolean) -> Unit = { enabled ->
+        if (onUnreadOnlyFilterChange != null) onUnreadOnlyFilterChange(enabled) else localUnreadOnly = enabled
     }
     var unreadSnapshot by remember(controller, selectedFolderId) { mutableStateOf<AccountWideForwardTargets?>(null) }
     var unreadReadFailed by remember(controller, selectedFolderId) { mutableStateOf(false) }
@@ -277,45 +284,53 @@ internal fun ChatsScreen(
     var unreadLoadedRevision by remember(controller, selectedFolderId) { mutableLongStateOf(-1L) }
     var unreadLoadedFolderState by remember(controller, selectedFolderId) { mutableStateOf(folderStoreState) }
     val unreadRevision = controller.forwardTargetsRevision
-    LaunchedEffect(
-        controller,
-        unreadOnly,
-        unreadRevision,
-        controller.materializedGroupsRevision,
-        unreadRetry,
-        folderStoreState,
-    ) {
-        if (!unreadOnly) unreadSnapshot = null
-        unreadReadFailed = false
-        if (unreadOnly) {
-            when (val read = controller.readAccountWideForwardTargets()) {
-                is AccountWideRead.Loaded -> {
-                    val rule =
-                        appState.activeAccountRef?.let { account ->
-                            selectedFolderId?.let { appState.chatFolderPreferences.folderRule(account, it) }
-                        }
-                    val needsMembers =
-                        rule?.includeMemberPubkeys?.isNotEmpty() == true ||
-                            rule
-                                ?.smartFilter
-                                ?.let(SmartFolderCodec::decode)
-                                ?.references(FolderField.PARTICIPANTS) == true
-                    val ids =
-                        read.snapshot
-                            .chatListItems(controller.items + controller.archivedItems)
-                            .mapTo(mutableSetOf()) { it.group.groupIdHex }
-                    val unresolved = if (needsMembers) read.snapshot.resolveChatListMembers(ids) else emptySet()
-                    if (unresolved.isNotEmpty()) {
-                        unreadReadFailed = true
-                    } else {
-                        unreadSnapshot = read.snapshot
-                        unreadLoadedRevision = unreadRevision
-                        unreadLoadedFolderState = folderStoreState
-                    }
-                }
-                AccountWideRead.Failed, AccountWideRead.Unavailable -> unreadReadFailed = true
-            }
+    LaunchedEffect(controller, unreadOnly, unreadRetry, folderStoreState) {
+        if (!unreadOnly) {
+            unreadSnapshot = null
+            unreadReadFailed = false
+            return@LaunchedEffect
         }
+        // Projection bursts request one latest follow-up without cancelling the active native read.
+        snapshotFlow { controller.forwardTargetsRevision to controller.materializedGroupsRevision }
+            .conflate()
+            .collect { (revision, _) ->
+                unreadReadFailed = false
+                when (val read = controller.readAccountWideForwardTargets()) {
+                    is AccountWideRead.Loaded -> {
+                        val account = appState.activeAccountRef
+                        val rule =
+                            account?.let { owner ->
+                                selectedFolderId?.let { appState.chatFolderPreferences.folderRule(owner, it) }
+                            }
+                        val rows = read.snapshot.chatListItems(controller.items + controller.archivedItems)
+                        val manual =
+                            account
+                                ?.let { owner ->
+                                    selectedFolderId?.let { appState.chatFolderPreferences.membershipFor(owner, it) }
+                                }.orEmpty()
+                        val excluded =
+                            account
+                                ?.let { owner ->
+                                    selectedFolderId?.let { appState.chatFolderPreferences.excludedChats(owner, it) }
+                                }.orEmpty()
+                        val ids =
+                            rule.unreadMemberCandidateIds(rows, manual, excluded, controller.boundAccountIdHex()) {
+                                chatListItemDisplayTitle(it, appState, groupTitleCopy)
+                            }
+                        val unresolved = read.snapshot.resolveChatListMembers(ids)
+                        if (read.snapshot.isCurrent) {
+                            unreadSnapshot = read.snapshot
+                            unreadLoadedFolderState = folderStoreState
+                            unreadReadFailed = unresolved.isNotEmpty()
+                            unreadLoadedRevision = if (unreadReadFailed) -1L else revision
+                        } else {
+                            setUnreadOnly(false)
+                        }
+                    }
+                    AccountWideRead.Failed -> unreadReadFailed = true
+                    AccountWideRead.Unavailable -> setUnreadOnly(false)
+                }
+            }
     }
     val currentUnreadSnapshot =
         unreadSnapshot?.takeIf {
@@ -381,6 +396,7 @@ internal fun ChatsScreen(
     // the source list to archived chats (replacing the old Archived chip).
     val advancedFolder = selectedFolderRule?.smartFilter != null
     val showArchived = !advancedFolder && selectedFolderRule?.archivedOnly == true
+    val unreadFolderSelected = unreadOnly || (!advancedFolder && selectedFolderRule?.unreadOnly == true)
     // A confirmation still holding the previous account's or list variant's rows must not survive
     // into the next one, where those rows are not even addressable.
     var pendingBulkDelete by
@@ -824,11 +840,14 @@ internal fun ChatsScreen(
     var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
     var pendingHeadDemotion by
         remember(
+            controller,
             appState.activeAccountRef,
             appState.runtimeGeneration,
             showArchived,
             selectedFolderId,
             trimmedQuery,
+            searchOpen,
+            unreadOnly,
         ) {
             mutableStateOf<ChatListHeadDemotion?>(null)
         }
@@ -1009,6 +1028,7 @@ internal fun ChatsScreen(
                     !muted,
                     onCommitted = { controller.refreshChatListActionProjection(owner) },
                     isCurrent = { controller.chatListActionIsCurrent(owner) },
+                    completionIsCurrent = { controller.chatListActionSessionIsCurrent(owner) },
                 )
             }
         }
@@ -1985,22 +2005,9 @@ internal fun ChatsScreen(
         ) {
             if (!searchOpen && !selectionMode) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    if (unreadPullProgress > 0f) {
-                        Text(
-                            stringResource(
-                                if (unreadPullProgress >= 1f) {
-                                    R.string.pull_unread_release
-                                } else {
-                                    R.string.pull_unread_hint
-                                },
-                            ),
-                            Modifier.padding(start = 16.dp),
-                        )
-                    } else if (unreadOnly) {
-                        Text(stringResource(R.string.pull_unread_only), Modifier.padding(start = 16.dp))
-                    }
+                    ChatListUnreadHint(progress = { unreadPullProgress }, unreadOnly = unreadOnly)
                     TextButton(
-                        onClick = { unreadOnly = !unreadOnly },
+                        onClick = { setUnreadOnly(!unreadOnly) },
                         modifier = Modifier.testTag("chats.unread_filter"),
                     ) {
                         Text(
@@ -2014,7 +2021,7 @@ internal fun ChatsScreen(
                     if (unreadRefreshPending && retainedUnreadVisible) {
                         CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
                     }
-                    if (unreadReadFailed && unreadOnly) {
+                    if (unreadReadFailed && unreadOnly && displayUnreadSnapshot != null && visibleItems.isNotEmpty()) {
                         TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
                     }
                 }
@@ -2151,8 +2158,8 @@ internal fun ChatsScreen(
                             bodySearchFailure,
                             onRetry = { bodySearchRetry++ },
                         )
-                    sourceList.isEmpty() && showArchived -> EmptyArchivedChats()
-                    sourceList.isEmpty() ->
+                    sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
+                    sourceList.isEmpty() && !unreadOnly ->
                         EmptyChats(onCreate = openNewMessageFlow)
                     visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                         controller.error
@@ -2177,7 +2184,7 @@ internal fun ChatsScreen(
                             Box(Modifier.fillMaxWidth().weight(1f)) {
                                 ChatListNoResults(
                                     query = searchQuery.trim(),
-                                    unreadFolderSelected = !advancedFolder && selectedFolderRule?.unreadOnly == true,
+                                    unreadFolderSelected = unreadFolderSelected,
                                     filtersActive = filtersActive,
                                 )
                             }
@@ -2219,7 +2226,7 @@ internal fun ChatsScreen(
                                                     selectedFolderId,
                                                 ),
                                             onProgress = { unreadPullProgress = it },
-                                            onActivate = { unreadOnly = true },
+                                            onActivate = { setUnreadOnly(true) },
                                         ).trackWhiteNoiseHeader(chatListState)
                                         .clipToBounds()
                                         .chatListEdgeFade(chatListState)
@@ -2663,4 +2670,22 @@ internal fun ChatListSearchSectionHeader(
                 .padding(16.dp),
         style = MaterialTheme.typography.titleSmall,
     )
+}
+
+/** Pull movement invalidates only this small feedback label, rather than the chat-list scaffold. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListUnreadHint(
+    progress: () -> Float,
+    unreadOnly: Boolean,
+) {
+    val pull = progress()
+    val label =
+        when {
+            pull >= 1f -> R.string.pull_unread_release
+            pull > 0f -> R.string.pull_unread_hint
+            unreadOnly -> R.string.pull_unread_only
+            else -> null
+        }
+    if (label != null) Text(stringResource(label), Modifier.padding(start = 16.dp))
 }

@@ -392,6 +392,7 @@ internal fun SettingsScreen(
     onDetailChange: (SettingsDetail?) -> Unit,
     homeViewport: SettingsHomeViewport,
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
+    suppressMotion: Boolean = false,
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -406,6 +407,7 @@ internal fun SettingsScreen(
         target = detail,
         depth = settingsDetailDepth(detail),
         ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+        suppressMotion = suppressMotion,
         contentVisible = !appState.appLockScreenVisible,
     ) { route ->
         if (route == null) {

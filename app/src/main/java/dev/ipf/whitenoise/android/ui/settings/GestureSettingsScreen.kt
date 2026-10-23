@@ -23,7 +23,7 @@ import dev.ipf.whitenoise.android.ui.common.SpeechChoice
 import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
-/** Settings owns only four Android input preferences; command eligibility stays with each current row. */
+/** Settings owns Android gesture preferences; command eligibility stays with each current row. */
 @Composable
 internal fun GestureSettingsScreen(
     appState: WhiteNoiseAppState,

@@ -8,11 +8,13 @@ internal class OptimisticArchiveIntent(
     val bindEpoch: Long,
     val archived: Boolean,
     val ownerIsCurrent: () -> Boolean = { true },
+    val completionIsCurrent: () -> Boolean = ownerIsCurrent,
 )
 
 internal class ResolvedArchiveRows(
     val rows: Collection<ChatListRowFfi>,
     val isCurrent: () -> Boolean,
+    val completionIsCurrent: () -> Boolean = isCurrent,
 )
 
 /**
@@ -41,6 +43,7 @@ internal class ChatListArchiveActions(
         notify: Boolean,
     ): Int = commit(account, begin(groupIds, archived, epoch), archived, notify)
 
+    /** Uses resolved off-window rows while preserving distinct admission and committed-completion fences. */
     suspend fun setArchivedRows(
         account: String,
         epoch: Long,
@@ -48,10 +51,14 @@ internal class ChatListArchiveActions(
         archived: Boolean,
         notify: Boolean,
     ): Int {
-        val intents = beginRows(resolved.rows, archived, epoch, resolved.isCurrent)
+        val intents = beginRows(resolved.rows, archived, epoch, resolved.isCurrent, resolved.completionIsCurrent)
         return commit(account, intents, archived, notify)
     }
 
+    /**
+     * Settles each overlay by identity after its native attempt; cancellation also retires unstarted overlays.
+     * Errors and success feedback remain scoped to a current presentation, independently of committed work.
+     */
     private suspend fun commit(
         account: String,
         intents: List<Pair<String, OptimisticArchiveIntent>>,
@@ -89,14 +96,16 @@ internal class ChatListArchiveActions(
         epoch: Long,
     ): List<Pair<String, OptimisticArchiveIntent>> {
         val rows = groupIds.map(String::trim).filter(String::isNotEmpty).mapNotNull(rowForGroup)
-        return beginRows(rows, archived, epoch) { true }
+        return beginRows(rows, archived, epoch, { true }, { true })
     }
 
+    /** Deduplicates resolved rows and publishes only changed archive intents before any native call starts. */
     private fun beginRows(
         rows: Collection<ChatListRowFfi>,
         archived: Boolean,
         epoch: Long,
         ownerIsCurrent: () -> Boolean,
+        completionIsCurrent: () -> Boolean,
     ): List<Pair<String, OptimisticArchiveIntent>> {
         if (!ownerIsCurrent()) return emptyList()
         val intents =
@@ -104,7 +113,7 @@ internal class ChatListArchiveActions(
                 val key = row.groupIdHex.lowercase()
                 val currentArchived = intentsByGroup[key]?.archived ?: row.archived
                 if (currentArchived == archived) return@mapNotNull null
-                val intent = OptimisticArchiveIntent(epoch, archived, ownerIsCurrent)
+                val intent = OptimisticArchiveIntent(epoch, archived, ownerIsCurrent, completionIsCurrent)
                 intentsByGroup[key] = intent
                 row.groupIdHex to intent
             }
@@ -132,6 +141,15 @@ internal class ChatListArchiveActions(
         val ownsBinding = isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()
         return ownsBinding && intentsByGroup[groupIdHex.lowercase()] === intent
     }
+
+    /** Settles committed work only for the same binding and exact overlay identity. */
+    fun ownsCompletion(
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent,
+    ): Boolean =
+        isCurrent(intent.bindEpoch) &&
+            intent.completionIsCurrent() &&
+            intentsByGroup[groupIdHex.lowercase()] === intent
 
     /** Applies the temporary archive flag without changing the authoritative row. */
     fun projectRow(row: ChatListRowFfi): ChatListRowFfi =

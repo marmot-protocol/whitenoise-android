@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.MutableIntState
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
@@ -18,10 +19,13 @@ import dev.ipf.whitenoise.android.state.emptyGroupRecord
 import dev.ipf.whitenoise.android.state.noChatRowActions
 import dev.ipf.whitenoise.android.state.presentedRow
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 internal const val ACTION_ACCOUNT = "unread-actions-account"
@@ -32,16 +36,22 @@ internal val ACTION_SURVIVOR = "c7".repeat(16)
 /** Populated native boundary: each successful command changes subsequent keyed and whole-list reads. */
 internal class OffWindowActionFixture(
     scope: TestScope,
+    ioDispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
+    memberLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi> = { _, _ -> emptyList() },
 ) {
     val calls = ConcurrentLinkedQueue<String>()
     val row = AtomicReference(chatRow(ACTION_TARGET).copy(manuallyMarkedUnread = true))
     val retainedRow = AtomicReference(chatRow(ACTION_SURVIVOR).copy(manuallyMarkedUnread = true))
+    var beforeSnapshotRead: (suspend () -> Unit)? = null
+    var snapshotExtras: List<ChatListRowFfi> = emptyList()
     var snapshotReads = 0
     var keyedReads = 0
     var lookupEntered: CompletableDeferred<Unit>? = null
     var releaseLookup: CompletableDeferred<Unit>? = null
     var archiveEntered: CompletableDeferred<Unit>? = null
     var releaseArchive: CompletableDeferred<Unit>? = null
+    var nativeEntered: CountDownLatch? = null
+    var releaseNative: CountDownLatch? = null
     var archiveFails = false
     val state: WhiteNoiseAppState
     val controller: ChatsController
@@ -56,7 +66,7 @@ internal class OffWindowActionFixture(
                 accounts = listOf(AccountSummaryFfi(ACTION_ACCOUNT, ACTION_ACCOUNT_ID, true, false, false, true)),
                 activeAccountRef = ACTION_ACCOUNT,
                 initialMarmotRuntime = AppMarmotRuntime("unread-actions-test", native()),
-                marmotIoDispatcher = StandardTestDispatcher(scope.testScheduler),
+                marmotIoDispatcher = ioDispatcher,
             )
         state.liveSubscriptionOverrides.chatList =
             ChatListLiveSubscriptions(
@@ -65,7 +75,8 @@ internal class OffWindowActionFixture(
                 presentedChatList = { account, _ ->
                     check(account == ACTION_ACCOUNT)
                     snapshotReads++
-                    listOf(presented(row.get()), presented(retainedRow.get()))
+                    beforeSnapshotRead?.invoke()
+                    listOf(presented(row.get()), presented(retainedRow.get())) + snapshotExtras.map(::presented)
                 },
                 presentedRowByGroup = { account, id ->
                     check(account == ACTION_ACCOUNT && id == ACTION_TARGET)
@@ -79,7 +90,7 @@ internal class OffWindowActionFixture(
             ChatsController(
                 appState = state,
                 initialAccountRef = ACTION_ACCOUNT,
-                memberSnapshotLoader = { _, _ -> emptyList() },
+                memberSnapshotLoader = memberLoader,
                 groupArchivedUpdater = { account, id, archived ->
                     check(account == ACTION_ACCOUNT && id in listOf(ACTION_TARGET, ACTION_SURVIVOR))
                     calls += if (id == ACTION_TARGET) "archive:$archived" else "archive-survivor:$archived"
@@ -133,6 +144,7 @@ internal class OffWindowActionFixture(
     private fun readCommand(args: Array<out Any?>?): ChatListRowFfi {
         check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
         calls += "read:${args[2]}"
+        holdNativeCommand()
         return row.updateAndGet { it.copy(manuallyMarkedUnread = args[2] as Boolean) }
     }
 
@@ -140,6 +152,7 @@ internal class OffWindowActionFixture(
         check(args!![0] == ACTION_ACCOUNT && args[1] == ACTION_TARGET)
         val pinned = args[2] as Boolean
         calls += "pin:$pinned"
+        holdNativeCommand()
         row.updateAndGet { it.copy(pinned = pinned, pinnedPosition = if (pinned) 0u else null) }
         return ChatPinStateFfi(if (pinned) listOf(ACTION_TARGET) else emptyList())
     }
@@ -152,6 +165,7 @@ internal class OffWindowActionFixture(
         if (name != "chatNotificationSettings") {
             val muted = name == "setChatMuted"
             calls += "mute:$muted"
+            holdNativeCommand()
             row.updateAndGet { it.copy(muted = muted) }
         }
         return ChatNotificationSettingsFfi(
@@ -162,6 +176,11 @@ internal class OffWindowActionFixture(
             mutedUntilMs = null,
             updatedAtMs = 1L,
         )
+    }
+
+    private fun holdNativeCommand() {
+        nativeEntered?.countDown()
+        check(releaseNative?.await(5, TimeUnit.SECONDS) != false) { "Native command gate timed out" }
     }
 
     private fun native(): MarmotInterface =

@@ -795,7 +795,7 @@ class CachedGroupAvatarSourceTest {
 
     /** An old legacy callback cannot borrow cached URL bytes after an owner/cache replacement. */
     @Test
-    fun legacyUrlAnimationRejectsRetiredOwnerAndPreservesEncryptedReader() =
+    fun legacyAnimationRejectsRetiredOwnerAndKeepsEncryptedMissCacheOnly() =
         runBlocking {
             val fixture = AvatarLocalFixture()
             val url = "https://example.invalid/group-avatar"
@@ -811,19 +811,20 @@ class CachedGroupAvatarSourceTest {
                 fixture.state.legacyGroupAnimationReader(ACCOUNT_REF, url) {
                     error("URL reader must remain cache-only")
                 }
-            var encryptedReads = 0
+            var encryptedCacheReads = 0
             val encrypted =
                 fixture.state.legacyGroupAnimationReader(ACCOUNT_REF, null) {
-                    encryptedReads++
-                    gif
+                    encryptedCacheReads++
+                    dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
+                        .peekAnimatedSource("uncached-encrypted")
                 }
-            assertSame(gif, encrypted())
-            assertEquals(1, encryptedReads)
+            assertNull(encrypted())
+            assertEquals(1, encryptedCacheReads)
             AvatarImageLoader.clear()
             AvatarImageLoader.putCachedAnimated(url, image, gif)
             assertNull(retired())
             assertNull(encrypted())
-            assertEquals(1, encryptedReads)
+            assertEquals(1, encryptedCacheReads)
         }
 
     /** Thumbnail playback reuses the first-frame source and rejects an old owner after cache replacement. */

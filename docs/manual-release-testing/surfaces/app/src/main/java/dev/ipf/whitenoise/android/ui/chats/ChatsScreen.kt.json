@@ -53,6 +53,14 @@
           "GRP-034",
           "CHL-031"
         ]
+      },
+      {
+        "surface": "ChatListUnreadHint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListUnreadHint(",
+        "test_ids": [
+          "CHL-031"
+        ]
       }
     ],
     "settings_controls": [

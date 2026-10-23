@@ -30,7 +30,7 @@ internal data class GroupAvatarAnimation(
     val readBytes: suspend () -> ByteArray?,
 )
 
-/** Shared across lists, headers and settings: at most three group thumbnails retain bytes/decoders. */
+/** At most three source reads; the shared isolated-worker admission separately permits one decoder. */
 internal const val MAX_PLAYING_GROUP_AVATARS = 3
 internal val groupAvatarAnimationPermits = Semaphore(MAX_PLAYING_GROUP_AVATARS)
 
@@ -46,13 +46,14 @@ internal fun AnimatedGroupAvatarOverlay(
     modifier: Modifier = Modifier,
     maxEdgePx: Int,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
-    decode: suspend (ByteArray, Int) -> android.graphics.drawable.Drawable? = ::decodeAnimatedProfileAvatar,
+    decode: suspend (ByteArray, Int) -> android.graphics.drawable.Drawable? = ::decodeAnimatedGroupThumbnail,
 ) {
     key(animation.key) {
         GroupAvatarPlayback(animation, modifier, maxEdgePx, animationsEnabled, decode)
     }
 }
 
+/** Keeps static pixels on decoder refusal and releases the source permit when playback becomes inactive. */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupAvatarPlayback(
@@ -83,7 +84,9 @@ private fun GroupAvatarPlayback(
                         }.getOrNull()
                 value =
                     profileAvatarAnimationSource(bytes)?.takeIf {
-                        admitAnimationSource(it) is AnimationSourceAdmission.Admitted
+                        (admitAnimationSource(it) as? AnimationSourceAdmission.Admitted)?.frameCount?.let { frames ->
+                            frames > 1
+                        } == true
                     }
                 // Unsupported/static images relinquish the scarce slot immediately.
                 if (value != null) awaitDispose { }

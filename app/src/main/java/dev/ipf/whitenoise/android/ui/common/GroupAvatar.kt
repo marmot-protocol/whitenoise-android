@@ -97,11 +97,13 @@ internal fun rememberGroupAvatarPresentation(
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
         readOriginalBytes = originalReader,
         groupAnimation =
-            originalReader?.takeIf { groupOwnsPicture }?.let { reader ->
+            originalReader?.takeIf { groupOwnsPicture }?.let {
                 GroupAvatarAnimation(
                     "${appState.runtimeGeneration}|${AvatarImageLoader.currentCacheLifetime()}|" +
                         "$accountRef|${group.groupIdHex}|${legacyUrl ?: encryptedKey}",
-                    appState.legacyGroupAnimationReader(accountRef, legacyUrl, reader),
+                    appState.legacyGroupAnimationReader(accountRef, legacyUrl) {
+                        GroupAvatarImageLoader.peekAnimatedSource(encryptedKey)
+                    },
                 )
             },
     )

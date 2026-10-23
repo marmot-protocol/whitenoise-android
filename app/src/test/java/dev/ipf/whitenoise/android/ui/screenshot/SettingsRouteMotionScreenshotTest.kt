@@ -1,11 +1,16 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.app.Application
+import android.graphics.Bitmap
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -17,6 +22,7 @@ import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -87,10 +93,42 @@ class SettingsRouteMotionScreenshotTest {
         }
         rule.runOnIdle { detail.value = SettingsDetail.Gestures }
         rule.mainClock.advanceTimeByFrame()
-        rule.onRoot().captureRoboImage("src/test/snapshots/settings_motion_${name}_first.png")
+        captureFrame(name, "first")
         rule.mainClock.advanceTimeBy(96)
-        rule.onRoot().captureRoboImage("src/test/snapshots/settings_motion_${name}_middle.png")
+        captureFrame(name, "middle")
         rule.mainClock.advanceTimeBy(200)
-        rule.onRoot().captureRoboImage("src/test/snapshots/settings_motion_${name}_settled.png")
+        captureFrame(name, "settled")
+    }
+
+    /** Every recorded frame must contain actual gesture-row ink, not merely its top bar or semantics. */
+    private fun captureFrame(
+        name: String,
+        frame: String,
+    ) {
+        val row = rule.onNodeWithTag("gestures.MessageLeft", useUnmergedTree = true).assertIsDisplayed()
+        val bounds = row.fetchSemanticsNode().boundsInRoot
+        val bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
+        val left = bounds.left.toInt().coerceIn(0, bitmap.width - 1)
+        val right = bounds.right.toInt().coerceIn(left + 1, bitmap.width)
+        val top = bounds.top.toInt().coerceIn(0, bitmap.height - 1)
+        val bottom = bounds.bottom.toInt().coerceIn(top + 1, bitmap.height)
+        assertGestureRowInk(bitmap, left, top, right, bottom)
+        bitmap.captureRoboImage("src/test/snapshots/settings_motion_${name}_$frame.png")
+    }
+
+    /** Empty-body captures have one flat fill; real text and controls provide many anti-aliased colors. */
+    private fun assertGestureRowInk(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+    ) {
+        val colors = mutableSetOf<Int>()
+        for (y in top until bottom) {
+            for (x in left until right) colors += bitmap.getPixel(x, y)
+            if (colors.size > 8) return
+        }
+        assertTrue("Gesture row body must render at every motion frame", colors.size > 8)
     }
 }

@@ -24,9 +24,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +50,7 @@ import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.ScopedGroupImageMutation
+import dev.ipf.whitenoise.android.state.StalenessGuard
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -106,6 +109,27 @@ internal fun GroupEditScreen(
         surfaceIdentity = controller,
     ) {
         val groupTitleCopy = rememberGroupTitleCopy()
+        val imageAccount = appState.activeAccountRef
+        val imageRuntime = appState.runtimeGeneration
+        val imageGroup = controller.group.groupIdHex
+        val currentImageController by rememberUpdatedState(controller)
+        val imageOwner = remember(appState, controller, imageGroup, imageAccount, imageRuntime) { StalenessGuard() }
+        val imageOwnerEpoch = remember(imageOwner) { imageOwner.capture() }
+        DisposableEffect(imageOwner) { onDispose { imageOwner.advance() } }
+
+        /** This exact editor owns callbacks permanently; later owners cannot revive an old selection. */
+        fun imageOwnerIsCurrent(): Boolean {
+            val ownsController =
+                currentImageController === controller &&
+                    controller.group.groupIdHex == imageGroup &&
+                    controller.boundAccountRef == imageAccount
+            val ownsSession =
+                imageAccount != null &&
+                    appState.activeAccountRef == imageAccount &&
+                    appState.runtimeGeneration == imageRuntime
+            val available = !appState.signOutInProgress && !appState.wipeInProgress
+            return imageOwner.isCurrent(imageOwnerEpoch) && ownsController && ownsSession && available
+        }
         // Key only on the group id, not on name/description: the group-state
         // subscription can converge a backend update (another admin's edit, a
         // kind-1210 row) while this screen is open, and re-keying on those values
@@ -121,14 +145,12 @@ internal fun GroupEditScreen(
         var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
         var avatarViewerOpen by remember { mutableStateOf(false) }
         var saving by remember { mutableStateOf(false) }
-        var imageSaving by remember { mutableStateOf(false) }
+        var imageSaving by remember(imageOwner) { mutableStateOf(false) }
         val imageFailureScope =
-            remember(appState, appState.activeAccountRef, appState.runtimeGeneration, controller.group.groupIdHex) {
+            remember(imageOwner) {
                 GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
             }
         DisposableEffect(imageFailureScope) { onDispose { imageFailureScope.dispose() } }
-        val imageAccount = appState.activeAccountRef
-        val imageRuntime = appState.runtimeGeneration
         val cropRecovery =
             rememberAvatarPreparationRecovery(
                 origin = "$imageRuntime:$imageAccount:${controller.group.groupIdHex}:group-avatar",
@@ -220,7 +242,8 @@ internal fun GroupEditScreen(
             attempt: Long,
             accountRef: String,
         ): Boolean =
-            imageFailureScope.isCurrent(attempt) &&
+            imageOwnerIsCurrent() &&
+                imageFailureScope.isCurrent(attempt) &&
                 appState.activeAccountRef == accountRef &&
                 controller.boundAccountRef == accountRef &&
                 controller.isSelfMember &&
@@ -278,7 +301,9 @@ internal fun GroupEditScreen(
             load: suspend () -> ImageUploadDraft,
         ) {
             val accountRef = appState.activeAccountRef ?: return
-            if (imageSaving || controller.mutationInFlight) return
+            val editable = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
+            val busy = imageSaving || controller.mutationInFlight
+            if (!imageOwnerIsCurrent() || !editable || busy) return
             if (acceptedCrop) cropRecovery.accepted()
             val failureAttempt = imageFailureScope.begin()
             imageSaving = true
@@ -343,35 +368,72 @@ internal fun GroupEditScreen(
             onBack()
         }
 
-        var photoMenuOpen by remember { mutableStateOf(false) }
-        var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+        var photoMenuOpen by remember(imageOwner) { mutableStateOf(false) }
+        var pendingCropUri by rememberSaveable(imageOwner) { mutableStateOf<Uri?>(null) }
+        var pendingGifUri by remember(imageOwner) { mutableStateOf<Uri?>(null) }
         val imagePickerScope = rememberCoroutineScope()
-        var imagePickGeneration by remember { mutableStateOf(0) }
+        val imagePickGeneration = remember(imageOwner) { StalenessGuard() }
 
+        /** Only the latest pick can open a review in the editor that requested it. */
         fun pickGroupImage(uri: Uri) {
-            val generation = ++imagePickGeneration
+            if (!imageOwnerIsCurrent()) return
+            pendingGifUri = null
+            pendingCropUri = null
+            val generation = imagePickGeneration.advance()
             imagePickerScope.launch {
                 val gif = ProfilePictureDraftProcessor.isGifSource(context.contentResolver, uri)
-                val current = appState.activeAccountRef == imageAccount && appState.runtimeGeneration == imageRuntime
-                val mutationInFlight = imageSaving || controller.mutationInFlight
-                if (generation != imagePickGeneration || !current || mutationInFlight) {
-                    return@launch
-                }
+                val editable = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
+                val current = imagePickGeneration.isCurrent(generation) && imageOwnerIsCurrent()
+                val busy = imageSaving || controller.mutationInFlight
+                if (!current || !editable || busy) return@launch
                 if (gif) {
-                    uploadPublicAvatar { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, uri) }
+                    pendingGifUri = uri
                 } else {
                     pendingCropUri = uri
                 }
             }
         }
 
+        pendingGifUri?.let { selected ->
+            val generation = imagePickGeneration.capture()
+
+            fun selectionIsCurrent(): Boolean = imageOwnerIsCurrent() && imagePickGeneration.isCurrent(generation) && pendingGifUri == selected
+            dev.ipf.whitenoise.android.ui.common.ConfirmDialog(
+                title = stringResource(R.string.group_gif_upload_title),
+                message = stringResource(R.string.group_gif_upload_notice),
+                confirmLabel = stringResource(R.string.group_gif_upload_confirm),
+                confirmEnabled = canEdit && !imageSaving && !controller.mutationInFlight,
+                onDismiss = {
+                    if (selectionIsCurrent()) {
+                        imagePickGeneration.advance()
+                        pendingGifUri = null
+                    }
+                },
+                onConfirm = {
+                    val editable = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
+                    if (selectionIsCurrent() && editable && !imageSaving && !controller.mutationInFlight) {
+                        imagePickGeneration.advance()
+                        pendingGifUri = null
+                        uploadPublicAvatar {
+                            GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, selected)
+                        }
+                    }
+                },
+            )
+        }
+
+        // Retiring only the launcher registrations prevents an old system result from targeting a new editor.
         val photoPicker =
-            rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-                if (uri != null) pickGroupImage(uri)
+            key(imageOwner) {
+                rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    if (uri != null) pickGroupImage(uri)
+                }
             }
         val filePicker =
-            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                if (uri != null) pickGroupImage(uri)
+            key(imageOwner) {
+                rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                    if (uri != null) pickGroupImage(uri)
+                }
             }
         IdentityImageCropFlow(
             uri = pendingCropUri,

@@ -16,7 +16,6 @@ import android.os.Parcel
 import android.os.Process
 import android.os.SharedMemory
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -26,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 internal class IsolatedAnimationSession private constructor(
     private val context: Context,
     private val edge: Int,
+    private val admissionLease: AnimationAdmission.Lease,
 ) : AnimationSessionControl {
     private val id = ids.incrementAndGet()
     private val output = SharedMemory.create("animation-pixels", requireNotNull(MediaDecodePolicy.outputCapacity(edge)))
@@ -171,6 +171,10 @@ internal class IsolatedAnimationSession private constructor(
 
     private fun open(bytes: ByteArray): IsolatedAnimationDrawable? {
         synchronized(lock) {
+            if (closed) {
+                releaseLease() // No binding was started.
+                return null
+            }
             bound =
                 context.bindIsolatedService(
                     Intent(context, MediaAnimationService::class.java),
@@ -285,7 +289,7 @@ internal class IsolatedAnimationSession private constructor(
     }
 
     private fun releaseLease() {
-        if (leaseReleased.compareAndSet(false, true)) admission.release()
+        if (leaseReleased.compareAndSet(false, true)) admissionLease.release()
         connected.countDown()
         firstFrame.countDown()
     }
@@ -319,7 +323,7 @@ internal class IsolatedAnimationSession private constructor(
 
     companion object {
         private val ids = AtomicInteger()
-        private val admission = Semaphore(1)
+        private val admission = AnimationAdmission()
         private val active =
             java.util.concurrent.atomic
                 .AtomicReference<IsolatedAnimationSession?>()
@@ -329,27 +333,29 @@ internal class IsolatedAnimationSession private constructor(
             context: Context,
             bytes: ByteArray,
             edge: Int,
+            decorative: Boolean = false,
         ): IsolatedAnimationDrawable? {
             val validSource =
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
                     edge in 1..AnimationFrameProtocol.MAX_EDGE
             if (Looper.myLooper() == Looper.getMainLooper() ||
-                !validSource ||
-                !admission.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+                !validSource
             ) {
                 return null
             }
+            val admissionLease = admission.acquire(decorative, MediaDecodePolicy.DEADLINE_MS) ?: return null
             var session: IsolatedAnimationSession? = null
             var delivered: IsolatedAnimationDrawable? = null
             return try {
-                val created = IsolatedAnimationSession(context.applicationContext, edge)
+                val created = IsolatedAnimationSession(context.applicationContext, edge, admissionLease)
                 session = created
                 active.set(created)
+                admissionLease.onRetire { created.close() }
                 created.open(bytes).also { delivered = it }
             } finally {
                 // The facade handles failure/cancellation; this scope only owns cleanup.
                 if (delivered == null) {
-                    if (session == null) admission.release() else session.close()
+                    if (session == null) admissionLease.release() else session.close()
                 }
             }
         }

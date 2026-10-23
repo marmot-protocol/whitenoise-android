@@ -144,8 +144,8 @@ internal fun SettingsSwitch(
 }
 
 /**
- * A single navigation action with wrapping value/subtitle text and a decorative mirrored chevron.
- * A subtitle equal to the value is shown once rather than repeated.
+ * A navigation action with wrapping value/subtitle text and a mirrored chevron or caller-owned end control.
+ * A subtitle equal to the value is shown once rather than repeated; busy state replaces either end control.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -175,12 +175,15 @@ internal fun SettingsLink(
         enabled = editable,
         leadingContent = leading,
         supportingContent = summary?.let { { SettingsRowSupportingText(it, editable) } },
-        trailingContent =
-            trailing ?: {
-                SettingsRowTrailing(busy) {
+        trailingContent = {
+            SettingsRowTrailing(busy) {
+                if (trailing != null) {
+                    trailing()
+                } else {
                     Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null)
                 }
-            },
+            }
+        },
         colors = settingsRowColors(context),
         content = { SettingsRowTitle(title, editable, destructive) },
     )

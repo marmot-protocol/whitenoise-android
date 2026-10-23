@@ -4582,6 +4582,10 @@ class ChatsController private constructor(
         return archiveActions.setArchived(account, bindEpoch, groupIds, archived, notify)
     }
 
+    /**
+     * Resolves rows beyond the retained window before installing this presentation's archive intents.
+     * Admission follows the view owner; already-started native commits settle against its session fence.
+     */
     internal suspend fun setArchivedForOwner(
         groupIds: Collection<String>,
         archived: Boolean,
@@ -4597,7 +4601,12 @@ class ChatsController private constructor(
                     }?.row
             }
         return if (chatListActionIsCurrent(owner)) {
-            val resolved = ResolvedArchiveRows(rows) { chatListActionIsCurrent(owner) }
+            val resolved =
+                ResolvedArchiveRows(
+                    rows,
+                    isCurrent = { chatListActionIsCurrent(owner) },
+                    completionIsCurrent = { chatListActionSessionIsCurrent(owner) },
+                )
             archiveActions.setArchivedRows(owner.accountRef, owner.bindEpoch, resolved, archived, notify)
         } else {
             0
@@ -4614,7 +4623,7 @@ class ChatsController private constructor(
         appState.withGroupCommitLock(account, groupIdHex) {
             if (!archiveActions.ownsIntent(groupIdHex, intent)) return@withGroupCommitLock false
             val updated = groupArchivedUpdater(account, groupIdHex, archived)
-            if (archiveActions.ownsIntent(groupIdHex, intent)) {
+            if (archiveActions.ownsCompletion(groupIdHex, intent)) {
                 applyLocalGroupUpdate(updated)
                 true
             } else {
@@ -5145,6 +5154,7 @@ class ChatsController private constructor(
         recompute()
     }
 
+    /** Pins the controller binding, active account and runtime together with the caller's view lifetime. */
     internal fun captureChatListActionOwner(presentationIsCurrent: () -> Boolean = { true }): ChatListActionOwner? =
         accountRef?.let {
             ChatListActionOwner(
@@ -5156,7 +5166,14 @@ class ChatsController private constructor(
             )
         }
 
+    /** Requires both the captured session and its presentation before admitting queued row actions. */
     internal fun chatListActionIsCurrent(owner: ChatListActionOwner): Boolean {
+        val ownsSession = chatListActionSessionIsCurrent(owner)
+        return ownsSession && owner.presentationIsCurrent()
+    }
+
+    /** Native work already admitted belongs to its account/binding, even after a folder or search changes. */
+    internal fun chatListActionSessionIsCurrent(owner: ChatListActionOwner): Boolean {
         val ownsBoundReference =
             boundAccountRef == owner.accountRef || (owner.activeAccountRef == null && boundAccountRef == null)
         val ownsBinding =
@@ -5168,7 +5185,7 @@ class ChatsController private constructor(
         val available = !appState.signOutInProgress && !appState.wipeInProgress
         val eligibleOwner = ownsBinding && ownsSession
         val eligibleSession = selectedOrLegacy && available
-        return eligibleOwner && eligibleSession && owner.presentationIsCurrent()
+        return eligibleOwner && eligibleSession
     }
 
     /** Resolves a displayed full-list row without materializing it into the bounded controller window. */
@@ -5202,10 +5219,12 @@ class ChatsController private constructor(
         }
     }
 
+    /** Reprojects a committed command for the same session even if its original view has retired. */
     internal fun refreshChatListActionProjection(owner: ChatListActionOwner) {
-        if (chatListActionIsCurrent(owner)) scheduleRecompute()
+        if (chatListActionSessionIsCurrent(owner)) scheduleRecompute()
     }
 
+    /** Updates retained native rows without inserting an off-window command result into the bounded list. */
     private fun applyChatListActionRow(row: ChatListRowFfi?) {
         if (row != null && containsGroup(row.groupIdHex)) applyChatListRow(row) else scheduleRecompute()
     }
@@ -5232,16 +5251,18 @@ class ChatsController private constructor(
         val hasReadTarget = lastId != null || item.projection?.manuallyMarkedUnread == true
         return hasReadTarget &&
             runCatchingCancellable {
+                var admitted = false
                 val row =
                     appState.marmotIo {
                         if (!chatListActionIsCurrent(owner)) return@marmotIo null
+                        admitted = true
                         if (lastId != null) {
                             markTimelineMessageRead(account, item.group.groupIdHex, lastId)
                         } else {
                             setChatManuallyUnread(account, item.group.groupIdHex, false)
                         }
                     }
-                if (!chatListActionIsCurrent(owner)) return@runCatchingCancellable false
+                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
                 applyChatListActionRow(row)
                 appState.dismissConversationNotifications(account, item.group.groupIdHex)
                 true
@@ -5265,15 +5286,17 @@ class ChatsController private constructor(
         val account = owner.accountRef
         return !item.removedFromGroup(appState.activeAccount?.accountIdHex) &&
             runCatchingCancellable {
+                var admitted = false
                 val row =
                     appState.marmotIo {
                         if (chatListActionIsCurrent(owner)) {
+                            admitted = true
                             setChatManuallyUnread(account, item.group.groupIdHex, true)
                         } else {
                             null
                         }
                     }
-                if (!chatListActionIsCurrent(owner)) return@runCatchingCancellable false
+                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
                 applyChatListActionRow(row)
                 true
             }.onFailure {
@@ -5298,7 +5321,7 @@ class ChatsController private constructor(
                         null
                     }
                 }
-            if (state == null || !chatListActionIsCurrent(owner)) return@runCatchingCancellable false
+            if (state == null || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
             applyPinState(state)
             scheduleRecompute()
             true

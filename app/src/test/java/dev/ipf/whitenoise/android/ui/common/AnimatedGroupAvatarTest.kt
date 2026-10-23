@@ -84,6 +84,39 @@ class AnimatedGroupAvatarTest {
     }
 
     @Test
+    fun singleFrameGifNeverOpensAnAnimationSession() {
+        var reads = 0
+        var decodes = 0
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides TestOwner()) {
+                AnimatedGroupAvatarOverlay(
+                    GroupAvatarAnimation("static-gif") {
+                        reads++
+                        dev.ipf.whitenoise.android.media.AnimationSourceFixtures.gif(
+                            frames =
+                                listOf(
+                                    dev.ipf.whitenoise.android.media.AnimationSourceFixtures
+                                        .gifFrame(),
+                                ),
+                        )
+                    },
+                    Modifier.size(40.dp),
+                    maxEdgePx = 40,
+                    animationsEnabled = true,
+                    decode = { _, _ ->
+                        decodes++
+                        StillDrawable()
+                    },
+                )
+            }
+        }
+        composeRule.waitUntil { reads == 1 }
+        composeRule.waitForIdle()
+        assertEquals(0, decodes)
+        assertEquals(MAX_PLAYING_GROUP_AVATARS, groupAvatarAnimationPermits.availablePermits)
+    }
+
+    @Test
     fun reducedMotionNeverReadsGroupBytes() {
         var reads = 0
         composeRule.setContent {

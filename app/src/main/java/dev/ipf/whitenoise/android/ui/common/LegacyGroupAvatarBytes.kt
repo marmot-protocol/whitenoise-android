@@ -20,6 +20,7 @@ internal suspend fun readLegacyGroupAvatarBytes(
     readSnapshotGroup: suspend () -> AppGroupRecordFfi?,
     readBytes: suspend () -> ByteArray?,
 ): ByteArray? {
+    /** Rechecks the owning session and exact image identity, using MDK when the retained row is absent. */
     suspend fun sourceIsCurrent(): Boolean {
         if (!ownerIsCurrent()) return false
         val current = currentGroup() ?: readSnapshotGroup()
@@ -37,12 +38,12 @@ internal suspend fun readLegacyGroupAvatarBytes(
 /**
  * URL thumbnail acquisition belongs to the ordinary first-frame loader. Re-entering a static, missing
  * or source-evicted avatar keeps its warm pixels instead of starting a second media fetch. The legacy
- * encrypted path retains its authoritative reader; full viewers keep their separate original reader.
+ * encrypted path also reads retained first-frame bytes; full viewers keep their original reader.
  */
 internal fun WhiteNoiseAppState.legacyGroupAnimationReader(
     accountRef: String?,
     legacyUrl: String?,
-    encryptedReader: suspend () -> ByteArray?,
+    encryptedCachedSource: () -> ByteArray?,
 ): suspend () -> ByteArray? {
     val owner = captureHostPerformanceRuntimeOwner()
     val generation = runtimeGeneration
@@ -54,7 +55,8 @@ internal fun WhiteNoiseAppState.legacyGroupAnimationReader(
     }
     return {
         if (ownsSource()) {
-            val bytes = if (legacyUrl == null) encryptedReader() else AvatarImageLoader.peekAnimatedSource(legacyUrl)
+            val bytes =
+                if (legacyUrl == null) encryptedCachedSource() else AvatarImageLoader.peekAnimatedSource(legacyUrl)
             bytes?.takeIf { ownsSource() }
         } else {
             null

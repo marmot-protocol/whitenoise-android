@@ -1737,7 +1737,7 @@ internal fun GroupDetailsScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.person_groups_in_common),
                                 onClick = { appState.presentProfile(dmPeerNpub, groupsInCommon = true) },
-                                leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                                leading = { Icon(painterResource(R.drawable.ic_group), contentDescription = null) },
                                 modifier = Modifier.testTag("chat_info.groups_in_common"),
                             )
                         }

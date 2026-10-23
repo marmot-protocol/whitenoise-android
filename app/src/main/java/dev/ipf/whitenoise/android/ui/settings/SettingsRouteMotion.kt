@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -20,17 +19,12 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 internal const val SETTINGS_ROUTE_MOTION_MILLIS = 200
-private const val SETTINGS_ROUTE_FADE_RANGE = 0.15f
 
 /** Navigation hierarchy supplies direction; peer destinations use the forward treatment. */
 internal fun settingsRouteDirection(
     previousDepth: Int,
     nextDepth: Int,
-    layoutDirection: LayoutDirection,
-): Int {
-    val forward = if (nextDepth < previousDepth) -1 else 1
-    return if (layoutDirection == LayoutDirection.Rtl) -forward else forward
-}
+): Int = if (nextDepth < previousDepth) -1 else 1
 
 /** Derives nested depth from the same parent relation used by Back. */
 internal fun settingsDetailDepth(detail: SettingsDetail?): Int {
@@ -44,7 +38,7 @@ private class SettingsMotionHistory<T>(
 )
 
 /**
- * Animate only the destination's draw layer. The old route is disposed immediately: it cannot keep
+ * Slide the opaque destination's draw layer. The old route is disposed immediately: it cannot keep
  * Back handlers, editable state, focus, or protected pixels alive during an exit animation. Keeping
  * the content call outside a route key preserves the existing screen/state ownership semantics.
  * First composition (including a direct privacy-sensitive route) is settled, never a delayed reveal.
@@ -61,34 +55,31 @@ internal fun <T> SettingsRouteMotion(
     content: @Composable (T) -> Unit,
 ) {
     if (!contentVisible) return
-    key(ownerKey) {
-        val history = remember { SettingsMotionHistory(target, depth) }
-        val layoutDirection = LocalLayoutDirection.current
-        val logicalDirection =
-            remember(target) { settingsRouteDirection(history.depth, depth, LayoutDirection.Ltr) }
-        val direction = if (layoutDirection == LayoutDirection.Rtl) -logicalDirection else logicalDirection
-        val motion = animationsEnabled && !suppressMotion
-        val progress = remember(target, motion) { Animatable(if (motion && history.target != target) 0f else 1f) }
-        SideEffect {
-            history.target = target
-            history.depth = depth
+    val history = remember(ownerKey) { SettingsMotionHistory(target, depth) }
+    val layoutDirection = LocalLayoutDirection.current
+    val logicalDirection =
+        remember(ownerKey, target) { settingsRouteDirection(history.depth, depth) }
+    val direction = if (layoutDirection == LayoutDirection.Rtl) -logicalDirection else logicalDirection
+    val motion = animationsEnabled && !suppressMotion
+    val progress = remember(ownerKey, target, motion) { Animatable(if (motion && history.target != target) 0f else 1f) }
+    SideEffect {
+        history.target = target
+        history.depth = depth
+    }
+    LaunchedEffect(progress) {
+        if (motion) {
+            progress.animateTo(1f, tween(SETTINGS_ROUTE_MOTION_MILLIS, easing = FastOutSlowInEasing))
+        } else {
+            progress.snapTo(1f)
         }
-        LaunchedEffect(progress) {
-            if (motion) {
-                progress.animateTo(1f, tween(SETTINGS_ROUTE_MOTION_MILLIS, easing = FastOutSlowInEasing))
-            } else {
-                progress.snapTo(1f)
-            }
-        }
-        val travel = with(LocalDensity.current) { 48.dp.toPx() }
-        Box(
-            Modifier.fillMaxSize().graphicsLayer {
-                val remaining = if (motion) 1f - progress.value else 0f
-                translationX = direction * travel * remaining
-                alpha = 1f - SETTINGS_ROUTE_FADE_RANGE * remaining
-            },
-        ) {
-            content(target)
-        }
+    }
+    val travel = with(LocalDensity.current) { 48.dp.toPx() }
+    Box(
+        Modifier.fillMaxSize().graphicsLayer {
+            val remaining = if (motion) 1f - progress.value else 0f
+            translationX = direction * travel * remaining
+        },
+    ) {
+        content(target)
     }
 }

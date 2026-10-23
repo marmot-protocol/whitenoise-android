@@ -91,6 +91,16 @@ internal suspend fun decodeAnimatedProfileAvatar(
         discard = { (it as? java.io.Closeable)?.close() },
     )
 
+/** Decorative thumbnails yield the single isolated worker to explicit media use. */
+internal suspend fun decodeAnimatedGroupThumbnail(
+    source: ByteArray,
+    maxEdgePx: Int,
+): Drawable? =
+    dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+        decode = { MediaPipeline.decodeAnimatedDrawable(source, maxEdgePx, decorative = true) },
+        discard = { (it as? java.io.Closeable)?.close() },
+    )
+
 /**
  * Overlays the cached animation for [url] at no more than [maxEdgePx], on top of the first frame the
  * caller already draws. Static, uncached and evicted avatars compose nothing, and an account clear drops

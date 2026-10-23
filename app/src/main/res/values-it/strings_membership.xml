@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="shared_group_remove_person">Rimuovi %1$s da %2$s</string>
-    <string name="shared_group_remove_confirmation">Rimuovere %1$s (%2$s) da %3$s?\nGruppo: %4$s\nAccount utilizzato: %5$s (%6$s).\n\nL’accesso di questa persona al gruppo verrà revocato.</string>
+    <string name="shared_group_remove_confirmation">Rimuovere %1$s (%2$s) da %3$s?\nAccount utilizzato: %4$s (%5$s).\n\nL’accesso di questa persona al gruppo verrà revocato.</string>
 </resources>
