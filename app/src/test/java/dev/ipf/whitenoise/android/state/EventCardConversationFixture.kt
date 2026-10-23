@@ -6,8 +6,10 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ComposeTimeoutException
@@ -64,6 +66,12 @@ internal class EventCardConversationFixture(
 
     /** Every distinct row order the screen composed, oldest first, so a test can see what the reader saw. */
     val composedOrders: MutableList<List<String>> = Collections.synchronizedList(mutableListOf())
+
+    /**
+     * Which published rows the screen composes, as a scrolled list composes only the rows in view. Every row by
+     * default; a test narrows it to model rows off screen and widens it to scroll them in.
+     */
+    var composesRow: (String) -> Boolean by mutableStateOf({ _: String -> true })
     private val scripts =
         ScriptedConversationLiveSubscriptions(
             timelineScripts =
@@ -114,7 +122,9 @@ internal class EventCardConversationFixture(
 
     /** Composes the controller's published rows as the conversation screen does. */
     fun compose() {
-        composeRule.setContent { WhiteNoiseTheme { PublishedCardRows(appState, controller, composed, composedOrders) } }
+        composeRule.setContent {
+            WhiteNoiseTheme { PublishedCardRows(appState, controller, composed, composedOrders, composesRow) }
+        }
     }
 
     /**
@@ -237,6 +247,7 @@ private fun PublishedCardRows(
     controller: ConversationController,
     composed: MutableList<NostrEventCardState>,
     composedOrders: MutableList<List<String>>,
+    composesRow: (String) -> Boolean,
 ) {
     val scope = rememberCoroutineScope()
     val order = controller.timeline.map { it.record.messageIdHex }
@@ -254,7 +265,7 @@ private fun PublishedCardRows(
                 snapshots = controller.eventCardSnapshots,
             )
         }
-    controller.timeline.forEach { message ->
+    controller.timeline.filter { composesRow(it.record.messageIdHex) }.forEach { message ->
         key(message.id) {
             val record = message.record
             val document =

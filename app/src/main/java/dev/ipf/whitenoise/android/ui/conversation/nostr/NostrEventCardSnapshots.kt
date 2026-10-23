@@ -18,17 +18,22 @@ import dev.ipf.whitenoise.android.state.CONVERSATION_WINDOW_MAX_ROWS
  */
 internal class NostrEventCardSnapshots(
     private val capacity: Int = DEFAULT_CAPACITY,
+    private val nowMs: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
 ) {
     private val entries = LinkedHashMap<String, NostrEventCardState>(16, 0.75f, true)
 
-    // References a warm already asked MDK about, hits and misses alike, so a later warm does not ask again.
-    private val attempted = LinkedHashMap<String, Unit>(16, 0.75f, true)
+    // References a warm asked MDK about and found nothing cached for, with when. A hit lives in entries instead.
+    private val misses = LinkedHashMap<String, Long>(16, 0.75f, true)
 
     /**
-     * True when [stableId] has a snapshot or a warm already asked MDK for it, so reading it again would learn nothing
-     * new. A miss stays unknown to the snapshots, and its card resolves itself as before.
+     * True when [stableId] has a snapshot, or a warm found it uncached within the last [MISS_MEMORY_MILLIS], so
+     * reading it again now would most likely learn nothing new. A miss is forgotten after that, or as soon as a
+     * resolver settles the card, since MDK may have cached it meanwhile.
      */
-    fun isKnown(stableId: String): Boolean = synchronized(entries) { stableId in entries || stableId in attempted }
+    fun isKnown(stableId: String): Boolean =
+        synchronized(entries) {
+            stableId in entries || misses[stableId]?.let { nowMs() - it < MISS_MEMORY_MILLIS } == true
+        }
 
     /** The settled state last read for [stableId], or null when the conversation has not read it yet. */
     operator fun get(stableId: String): NostrEventCardState? = synchronized(entries) { entries[stableId] }
@@ -41,6 +46,7 @@ internal class NostrEventCardSnapshots(
         if (!state.isSettled()) return
         synchronized(entries) {
             entries[stableId] = state
+            misses.remove(stableId)
             evictLocked()
         }
     }
@@ -48,8 +54,9 @@ internal class NostrEventCardSnapshots(
     /**
      * Reads MDK's cached projection for the cards [records] will show, in [order], keeps every hit and returns how
      * many references it read. A warm reads at most the snapshot capacity, so it can never evict its own snapshots;
-     * the capacity covers the most cards a conversation window can name (see [DEFAULT_CAPACITY]). References already
-     * known are skipped, and a reference a resolver settled while the read ran keeps the resolver's newer state. Each
+     * the capacity covers the most cards a conversation window can name (see [DEFAULT_CAPACITY]). References with a
+     * snapshot are skipped, but an earlier miss is asked about again, since MDK may have cached it since, and a
+     * reference a resolver settled while the read ran keeps the resolver's newer state. Each
      * batch is kept as soon as it is read, so a warm stopped part-way keeps what it finished. Only parsed records name
      * cards, so the warm never parses Markdown itself.
      */
@@ -60,13 +67,19 @@ internal class NostrEventCardSnapshots(
     ): Int {
         val missing =
             nostrEventCardWarmOccurrences(records, capacity, order)
-                .filterNot { isKnown(it.reference.stableId) }
+                .filter { synchronized(entries) { it.reference.stableId !in entries } }
         missing.chunked(NOSTR_EVENT_CACHE_BATCH).forEach { batch ->
             val states = readCached(batch.map(NostrEventReferenceOccurrence::authoredReference))
             synchronized(entries) {
+                val readAt = nowMs()
                 batch.zip(states).forEach { (occurrence, state) ->
-                    attempted[occurrence.reference.stableId] = Unit
-                    if (state != null && state.isSettled()) entries.putIfAbsent(occurrence.reference.stableId, state)
+                    val stableId = occurrence.reference.stableId
+                    if (state != null && state.isSettled()) {
+                        entries.putIfAbsent(stableId, state)
+                        misses.remove(stableId)
+                    } else if (stableId !in entries) {
+                        misses[stableId] = readAt
+                    }
                 }
                 evictLocked()
             }
@@ -74,9 +87,9 @@ internal class NostrEventCardSnapshots(
         return missing.size
     }
 
-    /** Drops the least recently used entries, and attempted references, beyond [capacity]. */
+    /** Drops the least recently used entries, and remembered misses, beyond [capacity] each. */
     private fun evictLocked() {
-        listOf(entries.keys, attempted.keys).forEach { keys ->
+        listOf(entries.keys, misses.keys).forEach { keys ->
             val iterator = keys.iterator()
             while (keys.size > capacity.coerceAtLeast(1) && iterator.hasNext()) {
                 iterator.next()
@@ -88,9 +101,15 @@ internal class NostrEventCardSnapshots(
     private companion object {
         /**
          * Every card one conversation window can name: [CONVERSATION_WINDOW_MAX_ROWS] rows of at most
-         * [MAX_CARDS_PER_MESSAGE] cards each, so a warm of the whole window keeps all of its snapshots.
+         * [MAX_CARDS_PER_MESSAGE] cards each, so a warm of the whole window keeps all of its snapshots. The bound is
+         * per conversation controller, and the app can retain several controllers at once (one per open or recently
+         * open conversation), each with its own snapshots, so the process-wide total is a multiple of it.
          */
         val DEFAULT_CAPACITY = CONVERSATION_WINDOW_MAX_ROWS.toInt() * MAX_CARDS_PER_MESSAGE
+
+        /** How long a miss keeps an on-screen row from being read again; MDK may cache the card meanwhile. */
+        const val MISS_MEMORY_MILLIS = 30_000L
+        const val NANOS_PER_MILLI = 1_000_000L
     }
 }
 

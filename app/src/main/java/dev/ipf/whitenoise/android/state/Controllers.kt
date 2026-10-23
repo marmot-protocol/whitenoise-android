@@ -12918,7 +12918,10 @@ class ConversationController(
      * was parsed and its other cards resolve themselves as before. Callers run this before their `TIMELINE_APPLY`
      * timing starts.
      */
-    internal suspend fun warmLaterPageEventCards(page: TimelinePageFfi): TimelinePageFfi {
+    internal suspend fun warmLaterPageEventCards(
+        page: TimelinePageFfi,
+        anchorMessageId: String? = null,
+    ): TimelinePageFfi {
         val scope = conversationScope ?: return page
         val startedAt = SystemClock.elapsedRealtime()
         // Keyed by text as well as id: a message edited while it was read names other cards and is read again.
@@ -12927,7 +12930,7 @@ class ConversationController(
         var target = page
         var reading = true
         while (reading) {
-            val (window, candidates, order) = laterPageCardCandidates(page, read)
+            val (window, candidates, order) = laterPageCardCandidates(page, read, anchorMessageId)
             target = window
             val remaining = LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS - (SystemClock.elapsedRealtime() - startedAt)
             candidates.mapTo(read) { it.messageIdHex to it.plaintext }
@@ -12954,12 +12957,13 @@ class ConversationController(
      * The window [applyTimelinePage] would commit now — the newest installed one, else [page] — with its rows that may
      * render a card, are not among [read] (message id and text), and are not on screen with that text or still name a
      * card no warm has read. An edited message therefore counts as new, since it may name other cards. The rows are
-     * read nearest the rows on screen first, which a reader paging either way meets first. None before the first
-     * page is prepared.
+     * read nearest [anchorMessageId] first when the window holds it, as a jump lands there, else nearest the rows on
+     * screen, which a reader paging either way meets first. None before the first page is prepared.
      */
     private suspend fun laterPageCardCandidates(
         page: TimelinePageFfi,
         read: Set<Pair<String, String>>,
+        anchorMessageId: String?,
     ): LaterPageCardCandidates =
         withContext(Dispatchers.Main.immediate) {
             val window = timelineSubscription?.latestInstalledWindow()?.page ?: page
@@ -12973,7 +12977,9 @@ class ConversationController(
                             needsEventCardRead(record)
                     }
                 }
-            LaterPageCardCandidates(window, candidates, nearestToShownRows())
+            val anchor = anchorMessageId?.let { id -> window.messages.firstOrNull { it.messageIdHex == id } }
+            val order = anchor?.let { nearestTo(it.timelineAt, it.timelineAt) } ?: nearestToShownRows()
+            LaterPageCardCandidates(window, candidates, order)
         }
 
     /**
@@ -12994,16 +13000,21 @@ class ConversationController(
     private fun nearestToShownRows(): Comparator<TimelineMessageRecordFfi> {
         val shown = timelineRecords.values
         if (shown.isEmpty()) return NEWEST_FIRST
-        val oldest = shown.minOf { it.timelineAt }
-        val newest = shown.maxOf { it.timelineAt }
-        return compareBy<TimelineMessageRecordFfi> { record ->
+        return nearestTo(shown.minOf { it.timelineAt }, shown.maxOf { it.timelineAt })
+    }
+
+    /** Orders rows by their distance in time from the range [oldest]..[newest], then newest first. */
+    private fun nearestTo(
+        oldest: ULong,
+        newest: ULong,
+    ): Comparator<TimelineMessageRecordFfi> =
+        compareBy<TimelineMessageRecordFfi> { record ->
             when {
                 record.timelineAt < oldest -> oldest - record.timelineAt
                 record.timelineAt > newest -> record.timelineAt - newest
                 else -> 0uL
             }
         }.then(NEWEST_FIRST)
-    }
 
     /** What one later-page read finished: the rows it parsed, if the parse finished, and whether every read did. */
     private class LaterPageCardRead(

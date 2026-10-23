@@ -76,10 +76,13 @@ the commit. The rows read are those of the window that will be committed: the
 subscription's newest installed window, and if a newer one is installed while
 the read runs, its new card rows are read too, within what is left of the same
 budget. Like the first page's read, it covers every card its rows name, in
-batches of 16 and within the budget, nearest the rows on screen first (an older
-page's newest rows, a newer page's oldest), so the cards a reader meets first
-are read first. A row already on screen whose card no read has asked about yet,
-as a first page cut short by its budget can leave, is read too. A message
+batches of 16 and within the budget, nearest the message a jump lands on, or
+otherwise nearest the rows on screen (an older page's newest rows, a newer
+page's oldest), so the cards a reader meets first are read first. A row already
+on screen whose card no read has asked about yet, as a first page cut short by
+its budget can leave, is read too. A card found uncached is asked about again
+by the next page that brings its row back, since MDK may have cached it
+meanwhile; it only keeps an on-screen row from a re-read for 30 seconds. A message
 edited while the read runs counts as new and is read again. When the budget
 runs out, the page is applied with the one parse and with every batch read so
 far; only the unread cards resolve themselves. Only parsed Markdown is carried

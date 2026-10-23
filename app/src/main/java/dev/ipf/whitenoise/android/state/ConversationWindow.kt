@@ -486,7 +486,7 @@ internal suspend fun ConversationController.reportVisibleMessage(
         if (!ownsHandle()) return@withLock false
         // Inside the lock, like the report itself: the re-centred window's card rows are read before it shows
         // (#2238), only when it brings ones not on screen, typically 23–36 ms and at most the card budget.
-        val page = warmLaterPageEventCards(anchored)
+        val page = warmLaterPageEventCards(anchored, anchorMessageId = messageIdHex)
         if (!ownsHandle()) return@withLock false
         withContext(Dispatchers.Main.immediate) {
             // The native call is IO; installing its page is a main-thread commit.

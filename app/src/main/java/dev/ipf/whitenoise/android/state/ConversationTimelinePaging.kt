@@ -320,7 +320,7 @@ private suspend fun ConversationController.pageOlderIfActive(
             if (anchored != null) {
                 // The anchor and the page after it must share this lock, so its card read runs inside it: only
                 // when the re-centred window brings card rows not on screen, typically 23–36 ms, at most the budget.
-                val anchoredPage = warmLaterPageEventCards(anchored)
+                val anchoredPage = warmLaterPageEventCards(anchored, anchorMessageId = anchorId)
                 if (!retainsSubscription(handle)) return@withLock null
                 measureHostPerformanceCommit(
                     appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
