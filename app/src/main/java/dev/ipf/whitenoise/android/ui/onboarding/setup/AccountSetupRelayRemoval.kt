@@ -130,7 +130,8 @@ private fun OnboardingSnapshotFfi.matchesRenderedRelayRemoval(
 ): Boolean {
     val endpointCurrent =
         steps.firstOrNull { it.step == request.step }?.findings?.any {
-            it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint &&
+            it.issue == OnboardingIssueFfi.RETIRED_RELAY &&
+                it.endpoint == endpoint &&
                 OnboardingActionFfi.EDIT_RELAYS in it.actions
         } == true
     return matchesDecision(account, request) && sameRemovalSource(displayed) && endpointCurrent
