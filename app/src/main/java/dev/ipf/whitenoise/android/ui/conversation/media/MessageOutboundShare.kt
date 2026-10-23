@@ -253,10 +253,14 @@ internal suspend fun stageMessageShareStreams(
         val streams =
             sources.map { source ->
                 currentCoroutineContext().ensureActive()
-                resolveSource(source).use { plaintext ->
-                    currentCoroutineContext().ensureActive()
-                    totalBytes = boundedShareTotal(totalBytes, plaintext.size)
-                    stageShareFile(context, source, plaintext, protectedFiles)
+                val plaintext = resolveSource(source)
+                // A file lease stats its size and deletes itself on close, so both stay off the main thread.
+                withContext(Dispatchers.IO) {
+                    plaintext.use {
+                        currentCoroutineContext().ensureActive()
+                        totalBytes = boundedShareTotal(totalBytes, plaintext.size)
+                        stageShareFile(context, source, plaintext, protectedFiles)
+                    }
                 }
             }
         val stagedFiles = protectedFiles.toList()
