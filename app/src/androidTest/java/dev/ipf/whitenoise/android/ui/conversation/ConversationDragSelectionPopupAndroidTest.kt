@@ -25,6 +25,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.R
@@ -70,16 +73,35 @@ class ConversationDragSelectionPopupAndroidTest {
     /** Matches the overflowing sent-row conversation on which the Pixel's continued hold was cancelled. */
     @Test
     fun heldPointerSelectsOwnRowsInAnOverflowingConversation() {
-        val records =
-            (1..60).map { index ->
+        assertHeldSelection(ownRows(hydrated = false), scenario = "sent-overflow")
+    }
+
+    /** Exercises the same overflow handoff through the paragraph renderer used by native-hydrated messages. */
+    @Test
+    fun hydratedOwnRowsKeepSelectionDuringHeldPopupHandoff() {
+        assertHeldSelection(ownRows(hydrated = true), scenario = "hydrated-sent-overflow")
+    }
+
+    /** Keeps every input identical between fallback and hydrated own-row rendering. */
+    private fun ownRows(hydrated: Boolean): List<TimelineMessageRecordFfi> =
+        (1..60).map { index ->
+            val text = "WN3407 row $index baseline edge control"
+            val record =
                 timelineRecord(
                     messageId = index.toString(16).padStart(64, '0'),
                     timelineAt = index.toULong(),
-                    plaintext = "WN3407 row $index baseline edge control",
+                    plaintext = text,
                 ).copy(direction = "sent", sender = ConversationTimelineTestIds.ACCOUNT_ID)
-            }
-        assertHeldSelection(records, scenario = "sent-overflow")
-    }
+            if (hydrated) record.copy(contentTokens = paragraphDocument(text)) else record
+        }
+
+    /** Represents the native-hydrated paragraph used by real messages, without the fixture's unavailable parser. */
+    private fun paragraphDocument(text: String): MarkdownDocumentFfi =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+            blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(text)))),
+        )
 
     /** Owns one real window/input lifecycle through settled popup, progressive drag and selected pre-UP frames. */
     @Suppress("LongMethod") // One owner must retire the global input stream, window callback and controller together.
@@ -102,6 +124,13 @@ class ConversationDragSelectionPopupAndroidTest {
         val surface = ConversationSurfaceState()
         val rawActions = CopyOnWriteArrayList<Int>()
         val selectionSizes = CopyOnWriteArrayList<Int>()
+        val selectionWriteStacks = CopyOnWriteArrayList<String>()
+        val writeObserver =
+            Snapshot.registerGlobalWriteObserver { changed ->
+                if (changed === surface.selectedMessages && selectionWriteStacks.size < 8) {
+                    selectionWriteStacks += Throwable().stackTrace.take(64).joinToString("\n")
+                }
+            }
         val selectionObserver =
             Snapshot.registerApplyObserver { changed, _ ->
                 if (changed.any { it === surface.selectedMessages }) selectionSizes += surface.selectedMessages.size
@@ -240,7 +269,11 @@ class ConversationDragSelectionPopupAndroidTest {
                 composeRule.runOnIdle { assertEquals(setOf(anchor, endpoint), surface.selectedMessages.keys.toSet()) }
             }.recoverCatching { failure ->
                 runCatching { saveScreenshot("$scenario-failure") }.exceptionOrNull()?.let(failure::addSuppressed)
-                throw AssertionError("raw actions=$rawActions; applied selection sizes=$selectionSizes", failure)
+                throw AssertionError(
+                    "raw actions=$rawActions; applied selection sizes=$selectionSizes; " +
+                        "selection write stacks=$selectionWriteStacks",
+                    failure,
+                )
             }
         // Attempt every owner cleanup, preserving the original failure and suppressing cleanup failures onto it.
         val cleanupResults =
@@ -249,6 +282,7 @@ class ConversationDragSelectionPopupAndroidTest {
                 runCatching { composeRule.mainClock.autoAdvance = originalAutoAdvance },
                 runCatching { retireController(controller, originalCallback) },
                 runCatching { selectionObserver.dispose() },
+                runCatching { writeObserver.dispose() },
             )
         bodyResult.exceptionOrNull()?.let { primary ->
             cleanupResults.forEach { it.exceptionOrNull()?.let(primary::addSuppressed) }

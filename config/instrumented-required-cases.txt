@@ -135,3 +135,4 @@ dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroid
 # #3407: the original held touch survives the action-popup handoff into visible range selection.
 dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest#heldPointerCrossesTheActionPopupAndSelectsAnAdjacentMessage
 dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest#heldPointerSelectsOwnRowsInAnOverflowingConversation
+dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest#hydratedOwnRowsKeepSelectionDuringHeldPopupHandoff
