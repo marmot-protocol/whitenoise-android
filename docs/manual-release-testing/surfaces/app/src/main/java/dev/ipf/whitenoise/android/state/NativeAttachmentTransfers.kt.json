@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
+  "legacy_sha256": "0a02d340a0345639a49d49d58bfe8670ab5d1190874001350c6f6869a524740f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Native attachment transfer observation; setting-cleaned media maps to not-retained and terminates observation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
+        "anchor": "internal suspend fun NativeTransferFeed.nextState()",
+        "test_ids": [
+          "MED-019",
+          "MED-020",
+          "MED-025"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

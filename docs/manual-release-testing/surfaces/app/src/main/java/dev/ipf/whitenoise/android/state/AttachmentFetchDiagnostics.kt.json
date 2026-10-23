@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentFetchDiagnostics.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Closed attachment diagnostics include setting-driven cleanup as terminal local absence without media identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentFetchDiagnostics.kt",
+        "anchor": "AttachmentTransferStateFfi.CLEANED_BY_SETTING",
+        "test_ids": [
+          "MED-019",
+          "SET-021"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
