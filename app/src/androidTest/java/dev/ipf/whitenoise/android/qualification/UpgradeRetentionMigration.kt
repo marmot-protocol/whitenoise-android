@@ -38,9 +38,16 @@ internal suspend fun seedUpgradeRemoval(
         withTimeout(30_000L) {
             awaitRemovalTarget(runtime, account, group, message)
         }
-    val status = runtime.attachmentTransferSnapshot(account, group, listOf(target)).items.single()
-    check(status.state == AttachmentTransferStateFfi.READY)
-    check(runtime.controlAttachment(account, requireNotNull(status.reference), AttachmentControlFfi.REMOVE))
+    val reference =
+        withTimeout(30_000L) {
+            var status = runtime.attachmentTransferSnapshot(account, group, listOf(target)).items.single()
+            while (status.state != AttachmentTransferStateFfi.READY || status.reference == null) {
+                delay(100L)
+                status = runtime.attachmentTransferSnapshot(account, group, listOf(target)).items.single()
+            }
+            requireNotNull(status.reference)
+        }
+    check(runtime.controlAttachment(account, reference, AttachmentControlFfi.REMOVE))
     value.put("removedMessage", target.messageIdHex)
     value.put("removedSource", target.sourceMessageIdHex)
     receipt.writeText(value.toString())

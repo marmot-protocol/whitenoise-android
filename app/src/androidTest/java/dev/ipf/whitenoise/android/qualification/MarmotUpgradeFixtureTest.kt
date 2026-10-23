@@ -108,9 +108,18 @@ class MarmotUpgradeFixtureTest {
             } finally {
                 runtime.shutdownAndClose()
             }
-            recordUpgradeDatabase(root, receipt, phase)
-            if (phase == "seed" && fileStoreBaseline()) recordUpgradeSalts(root, receipt)
+            recordClosedStorage(root, receipt, phase)
         }
+
+    /** Records database and baseline salt evidence only after the native runtime has fully closed. */
+    private fun recordClosedStorage(
+        root: File,
+        receipt: File,
+        phase: String,
+    ) {
+        recordUpgradeDatabase(root, receipt, phase)
+        if (phase == "seed" && fileStoreBaseline()) recordUpgradeSalts(root, receipt)
+    }
 
     /** Native create/send/download calls produce both local upload bodies and a received retained attachment. */
     @Suppress("LongMethod") // One baseline transaction sequence owns the generated account and both upload states.
