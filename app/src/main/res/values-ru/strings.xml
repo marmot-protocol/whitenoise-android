@@ -2500,7 +2500,6 @@
     <string name="document_save_interrupted">Аутентификация прервала сохранение. Нажмите «Сохранить» ещё раз, чтобы выбрать место назначения.</string>
     <string name="avatar_preparation_interrupted">Обновление изображения прервано. Проверьте текущее изображение, прежде чем выбирать его снова.</string>
     <string name="setup_finding_inspection_completed">Проверка завершена. Само по себе это не подтверждает, что реле поддерживает запись.</string>
-    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
     <string name="setup_finding_context_unknown">Источник не указан</string>
     <string name="setup_finding_context_discovery">Обнаружение записей</string>
     <string name="setup_finding_context_declaration">Опубликованная декларация</string>

@@ -2426,7 +2426,6 @@
     <string name="document_save_interrupted">A autenticação interrompeu este salvamento. Escolha Salvar novamente para selecionar um destino.</string>
     <string name="avatar_preparation_interrupted">A atualização da imagem foi interrompida. Confira a imagem atual antes de selecioná-la novamente.</string>
     <string name="setup_finding_inspection_completed">Inspeção concluída. Isto, por si só, não confirma que o relay aceita escrita.</string>
-    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
     <string name="setup_finding_context_unknown">Origem não especificada</string>
     <string name="setup_finding_context_discovery">Descoberta de registos</string>
     <string name="setup_finding_context_declaration">Declaração publicada</string>

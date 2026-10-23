@@ -2426,7 +2426,6 @@
     <string name="document_save_interrupted">L’authentification a interrompu cet enregistrement. Choisis à nouveau Enregistrer pour sélectionner une destination.</string>
     <string name="avatar_preparation_interrupted">La mise à jour de l’image a été interrompue. Vérifie l’image actuelle avant de la sélectionner à nouveau.</string>
     <string name="setup_finding_inspection_completed">Inspection terminée. Cela ne suffit pas à confirmer que le relais accepte les écritures.</string>
-    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
     <string name="setup_finding_context_unknown">Source non précisée</string>
     <string name="setup_finding_context_discovery">Découverte des enregistrements</string>
     <string name="setup_finding_context_declaration">Déclaration publiée</string>

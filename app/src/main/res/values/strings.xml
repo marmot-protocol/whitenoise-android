@@ -2591,7 +2591,8 @@
     <string name="search_message_content_failed">Couldn’t search message content.</string>
     <string name="avatar_preparation_interrupted">The image update was interrupted. Check the current image before selecting it again.</string>
     <string name="setup_finding_inspection_completed">Inspection completed. This alone does not confirm relay write support.</string>
-    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
+    <!-- Punctuation-only format; each argument is already localized. -->
+    <string name="setup_finding_check" translatable="false">%1$s · %2$s · %3$s</string>
     <string name="setup_finding_context_unknown">Unspecified source</string>
     <string name="setup_finding_context_discovery">Record discovery</string>
     <string name="setup_finding_context_declaration">Published declaration</string>

@@ -2426,7 +2426,6 @@
     <string name="document_save_interrupted">La autenticación interrumpió el guardado. Elige Guardar de nuevo para seleccionar un destino.</string>
     <string name="avatar_preparation_interrupted">Se interrumpió la actualización de la imagen. Revisa la imagen actual antes de seleccionarla de nuevo.</string>
     <string name="setup_finding_inspection_completed">Inspección completada. Esto por sí solo no confirma que el relé admita escritura.</string>
-    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
     <string name="setup_finding_context_unknown">Origen no especificado</string>
     <string name="setup_finding_context_discovery">Descubrimiento de registros</string>
     <string name="setup_finding_context_declaration">Declaración publicada</string>

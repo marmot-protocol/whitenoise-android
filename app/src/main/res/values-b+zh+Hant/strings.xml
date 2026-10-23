@@ -2392,7 +2392,6 @@
     <string name="document_save_interrupted">身分驗證中斷了此次儲存。請再次選擇「儲存」以選擇目的地。</string>
     <string name="avatar_preparation_interrupted">圖片更新已中斷。請先檢查目前的圖片，再重新選擇。</string>
     <string name="setup_finding_inspection_completed">檢查已完成。僅憑這一點無法確認中繼支援寫入。</string>
-    <string name="setup_finding_check">%1$s · %2$s · %3$s</string>
     <string name="setup_finding_context_unknown">來源未指定</string>
     <string name="setup_finding_context_discovery">紀錄探索</string>
     <string name="setup_finding_context_declaration">已發布的宣告</string>
