@@ -573,7 +573,11 @@ class NotificationFirstPostIntegrationTest {
             withNotificationWriteCount { writes ->
                 fixture.bootstrap()
                 fixture.emitNotification()
-                fixture.awaitNotificationPosted(advanceMainClock = false)
+                fixture.awaitNotificationPosted(
+                    advanceMainClock = {
+                        events.any { it.stage == NotificationFirstPostTimingStage.ContentComplete }
+                    },
+                )
                 delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
 
                 assertEquals(

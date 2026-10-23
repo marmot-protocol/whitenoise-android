@@ -964,11 +964,11 @@ internal class NotificationBootstrapTestFixture(
     }
 
     /**
-     * Waits for the stable card while optionally advancing Robolectric's Android
-     * clock. Disabling clock advancement is rendering-only control, not
-     * wall-clock or device-latency evidence.
+     * Waits for the stable card, advancing Robolectric's clock only after the
+     * scenario allows it. Body fixtures freeze the content budget, then release
+     * delayed platform work once content completes. This is not latency evidence.
      */
-    suspend fun awaitNotificationPosted(advanceMainClock: Boolean = true) {
+    suspend fun awaitNotificationPosted(advanceMainClock: () -> Boolean = { true }) {
         val manager = appContext.getSystemService(NotificationManager::class.java)
         withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (
@@ -977,7 +977,7 @@ internal class NotificationBootstrapTestFixture(
                 }
             ) {
                 val mainLooper = shadowOf(Looper.getMainLooper())
-                if (advanceMainClock) {
+                if (advanceMainClock()) {
                     mainLooper.idleFor(Duration.ofMillis(1L))
                 } else {
                     mainLooper.idle()
