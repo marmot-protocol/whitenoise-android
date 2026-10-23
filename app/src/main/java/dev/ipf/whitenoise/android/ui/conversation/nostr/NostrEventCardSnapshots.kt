@@ -36,16 +36,18 @@ internal class NostrEventCardSnapshots(
     }
 
     /**
-     * Reads MDK's cached projection for the cards [records] will show, keeps every hit and returns how many
-     * references it read. References already known are skipped, and a reference a resolver settled while the read
-     * ran keeps the resolver's newer state. Only parsed records name cards, so the warm never parses Markdown itself.
+     * Reads MDK's cached projection for the cards [records] will show, at most [maxReferences] of them, keeps every hit
+     * and returns how many references it read. References already known are skipped, and a reference a resolver
+     * settled while the read ran keeps the resolver's newer state. Only parsed records name cards, so the warm never
+     * parses Markdown itself.
      */
     suspend fun warm(
         records: List<TimelineMessageRecordFfi>,
+        maxReferences: Int = MAX_WARM_REFERENCES,
         readCached: NostrEventCacheRead,
     ): Int {
         val missing =
-            nostrEventCardWarmOccurrences(records)
+            nostrEventCardWarmOccurrences(records, maxReferences)
                 .filter { synchronized(entries) { it.reference.stableId !in entries } }
         missing.chunked(NOSTR_EVENT_CACHE_BATCH).forEach { batch ->
             val states = readCached(batch.map(NostrEventReferenceOccurrence::authoredReference))

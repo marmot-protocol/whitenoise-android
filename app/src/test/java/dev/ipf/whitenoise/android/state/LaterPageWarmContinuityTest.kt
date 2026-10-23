@@ -148,8 +148,9 @@ class LaterPageWarmContinuityTest {
 
     /**
      * A newer window is installed while an older page's cards are read, carrying a second previously resolved card the
-     * older page did not have. The newer window is what gets committed, so its card is read too within the same budget,
-     * and both cards first compose Loaded.
+     * older page did not have, and newer metadata for the older card's unchanged message. The newer window is what gets
+     * committed, so its card is read too within the same budget, both cards first compose Loaded, and the older
+     * message keeps the newer window's metadata: only its parsed Markdown is carried over.
      */
     @Test
     fun newerWindowInstalledDuringTheReadHasItsCardsReadToo() {
@@ -172,7 +173,12 @@ class LaterPageWarmContinuityTest {
             fixture.awaitIdleCondition { fixture.cacheReads.get() >= 1 }
             fixture.timelineScript.installedWindow =
                 InstalledConversationWindow(
-                    page = timelinePage(olderCard, newerCard, newest),
+                    page =
+                        timelinePage(
+                            olderCard.copy(hasReports = true, sourceEpoch = NEWER_EPOCH),
+                            newerCard,
+                            newest,
+                        ),
                     frame = MarmotWindowTestFakes.conversationFrame("Timeline group"),
                 )
 
@@ -185,6 +191,10 @@ class LaterPageWarmContinuityTest {
                 setOf("$LOADED $EVENT_ID", "$LOADED $SECOND_EVENT_ID"),
                 fixture.composed.map(::describe).toSet(),
             )
+            val committed = checkNotNull(fixture.controller.timelineRecords[FAR_CARD_ID])
+            assertTrue("the newer window's metadata survives", committed.hasReports)
+            assertEquals(NEWER_EPOCH, committed.sourceEpoch)
+            assertTrue("the parsed Markdown was carried", committed.contentTokens.blocks.isNotEmpty())
         } finally {
             read.countDown()
             fixture.close()
@@ -237,5 +247,6 @@ class LaterPageWarmContinuityTest {
         val PENDING_ID = "f1".repeat(32)
         val SHOWN = listOf(NEW_A_ID, NEW_B_ID)
         const val LIVE_DRAIN_STEP_MILLIS = 8L
+        const val NEWER_EPOCH = 7uL
     }
 }

@@ -75,7 +75,11 @@ stays on screen. The rows' Markdown is parsed once, for both the card read and
 the commit. The rows read are those of the window that will be committed: the
 subscription's newest installed window, and if a newer one is installed while
 the read runs, its new card rows are read too, within what is left of the same
-budget. A page without such rows is applied at once, as before.
+budget. Unlike the first page's read, which reads at most 32 references, a later
+page's read covers every card its new rows name, in batches of 16, within the
+budget. A message edited while the read runs counts as new and is read again,
+and only parsed Markdown is carried onto the committed window, never an older
+copy of a row. A page without such rows is applied at once, as before.
 
 `op=chat_history_page phase=event_card_page_warm layer=storage` records one
 such read. `duration_ms` is the binding work alone: the parse and the batched

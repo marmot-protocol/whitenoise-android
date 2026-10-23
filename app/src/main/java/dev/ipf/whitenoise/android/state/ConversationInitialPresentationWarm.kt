@@ -175,7 +175,7 @@ internal suspend fun warmInitialEventCardSnapshots(
             .orEmpty()
             .associateBy(TimelineMessageRecordFfi::messageIdHex)
     val records = work.eventCardRecords.map { record -> hydrated[record.messageIdHex] ?: record }
-    return snapshots.warm(records, readCached)
+    return snapshots.warm(records, readCached = readCached)
 }
 
 internal const val INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS = 100L

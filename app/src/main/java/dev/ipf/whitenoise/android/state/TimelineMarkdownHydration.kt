@@ -83,24 +83,26 @@ internal fun publishTimelineBeforeMarkdownHydration(
 private const val CHAT_MESSAGE_KIND = 9uL
 
 /**
- * [this] page with every message that lacks Markdown replaced by its parsed copy in [parsed], when that copy has the
- * same text, so a parse made before the commit is the one the commit installs. Returns [this] when nothing changes.
+ * [this] page with the Markdown of [parsed] copied onto each message that lacks it and has the same id and text, so a
+ * parse made before the commit is the one the commit installs. Only the tokens are carried: every other field stays
+ * this page's, which may be newer than the record that was parsed. Returns [this] when nothing changes.
  */
 internal fun TimelinePageFfi.withParsedRecords(parsed: List<TimelineMessageRecordFfi>): TimelinePageFfi {
-    val byId =
+    // Keyed by text as well as id, so an edited message never takes the parse of its earlier text.
+    val byContent =
         parsed
             .filter { it.contentTokens.blocks.isNotEmpty() }
-            .associateBy(TimelineMessageRecordFfi::messageIdHex)
-    if (byId.isEmpty()) return this
+            .associateBy { it.messageIdHex to it.plaintext }
+    if (byContent.isEmpty()) return this
     var changed = false
     val merged =
         messages.map { message ->
-            val replacement =
-                byId[message.messageIdHex]?.takeIf {
-                    needsTimelineMarkdownHydration(message) && it.plaintext == message.plaintext
-                }
-            if (replacement != null) changed = true
-            replacement ?: message
+            val tokens =
+                byContent[message.messageIdHex to message.plaintext]
+                    ?.takeIf { needsTimelineMarkdownHydration(message) }
+                    ?.contentTokens
+            if (tokens != null) changed = true
+            tokens?.let(message::withMarkdownTokens) ?: message
         }
     return if (changed) copy(messages = merged) else this
 }

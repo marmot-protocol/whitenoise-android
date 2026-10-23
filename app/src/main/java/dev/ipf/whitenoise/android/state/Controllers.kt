@@ -12917,7 +12917,8 @@ class ConversationController(
     internal suspend fun warmLaterPageEventCards(page: TimelinePageFfi): TimelinePageFfi {
         val scope = conversationScope ?: return page
         val startedAt = SystemClock.elapsedRealtime()
-        val read = HashSet<String>()
+        // Keyed by text as well as id: a message edited while it was read names other cards and is read again.
+        val read = HashSet<Pair<String, String>>()
         val parsed = mutableListOf<TimelineMessageRecordFfi>()
         var target = page
         var reading = true
@@ -12925,7 +12926,7 @@ class ConversationController(
             val (window, candidates) = laterPageCardCandidates(page, read)
             target = window
             val remaining = LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS - (SystemClock.elapsedRealtime() - startedAt)
-            candidates.mapTo(read, TimelineMessageRecordFfi::messageIdHex)
+            candidates.mapTo(read) { it.messageIdHex to it.plaintext }
             val warmed =
                 candidates
                     .takeIf { it.isNotEmpty() && remaining > 0L }
@@ -12939,11 +12940,12 @@ class ConversationController(
 
     /**
      * The window [applyTimelinePage] would commit now — the newest installed one, else [page] — with its rows that may
-     * render a card, are not on screen and are not among [read]. None before the first page is prepared.
+     * render a card and are not on screen with that text, nor among [read] (message id and text). An edited message
+     * therefore counts as new, since it may name other cards. None before the first page is prepared.
      */
     private suspend fun laterPageCardCandidates(
         page: TimelinePageFfi,
-        read: Set<String>,
+        read: Set<Pair<String, String>>,
     ): Pair<TimelinePageFfi, List<TimelineMessageRecordFfi>> =
         withContext(Dispatchers.Main.immediate) {
             val window = timelineSubscription?.latestInstalledWindow()?.page ?: page
@@ -12952,8 +12954,8 @@ class ConversationController(
                     emptyList()
                 } else {
                     window.messages.filter { record ->
-                        val id = record.messageIdHex
-                        mayRenderNostrEventCard(record) && id !in timelineRecords && id !in read
+                        val shown = timelineRecords[record.messageIdHex]?.plaintext == record.plaintext
+                        mayRenderNostrEventCard(record) && !shown && (record.messageIdHex to record.plaintext) !in read
                     }
                 }
             window to candidates
@@ -12979,20 +12981,25 @@ class ConversationController(
                 runCatchingCancellable {
                     onEventCardReadLane {
                         val laneStartedAt = SystemClock.elapsedRealtime()
-                        val parsed =
-                            candidates.map { record ->
-                                val document = appState.parseMarkdownOrEmpty(record.plaintext)
-                                if (document.blocks.isEmpty()) record else record.withMarkdownTokens(document)
-                            }
-                        // A read past its budget is abandoned, so it must not write snapshots after the fact.
-                        currentCoroutineContext().ensureActive()
-                        eventCardSnapshots.warm(parsed) { references ->
-                            val states = appState.readCachedPublicEventCards(accountRef, references)
+                        try {
+                            val parsed =
+                                candidates.map { record ->
+                                    val document = appState.parseMarkdownOrEmpty(record.plaintext)
+                                    if (document.blocks.isEmpty()) record else record.withMarkdownTokens(document)
+                                }
+                            // A read past its budget is abandoned, so it must not write snapshots after the fact.
                             currentCoroutineContext().ensureActive()
-                            states
+                            // Every card the page names, not the first page's cap: the budget bounds the read instead.
+                            eventCardSnapshots.warm(parsed, maxReferences = Int.MAX_VALUE) { references ->
+                                val states = appState.readCachedPublicEventCards(accountRef, references)
+                                currentCoroutineContext().ensureActive()
+                                states
+                            }
+                            parsed
+                        } finally {
+                            // Also when the budget cancelled it, so a dropped read still reports its binding time.
+                            laneMillis.set(SystemClock.elapsedRealtime() - laneStartedAt)
                         }
-                        laneMillis.set(SystemClock.elapsedRealtime() - laneStartedAt)
-                        parsed
                     }
                 }.getOrNull()
             }

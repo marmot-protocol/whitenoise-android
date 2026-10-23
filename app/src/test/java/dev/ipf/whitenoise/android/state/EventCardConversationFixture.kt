@@ -12,12 +12,15 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.PublicEventPreviewFfi
 import dev.ipf.marmotkit.PublicEventPreviewStateFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
+import dev.ipf.whitenoise.android.core.NostrEventReference
+import dev.ipf.whitenoise.android.core.NostrEventReferenceDecoder
 import dev.ipf.whitenoise.android.core.nostrEventReferences
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberMessageMarkdownDocumentForDisplayedBody
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCard
@@ -185,13 +188,17 @@ internal class EventCardConversationFixture(
                 else -> state.toString()
             }
 
-        /** MDK's parse of [text]: the card reference when it names the note, otherwise nothing structured. */
-        private fun parsedNote(text: String) =
-            when {
-                NOTE in text -> eventCardDocument(NOTE)
-                SECOND_NOTE in text -> eventCardDocument(SECOND_NOTE)
-                else -> EMPTY_MARKDOWN_DOCUMENT
-            }
+        /** MDK's parse of [text]: the card reference of the note it names, otherwise nothing structured. */
+        private fun parsedNote(text: String): MarkdownDocumentFfi {
+            val note = NOTE_TOKEN.find(text)?.value ?: return EMPTY_MARKDOWN_DOCUMENT
+            return eventCardDocument(note)
+        }
+
+        /** The event a cached [reference] names, so every note the conversation names has its own cached card. */
+        private fun eventIdOf(reference: String): String =
+            (NostrEventReferenceDecoder.eventReference(reference) as? NostrEventReference.Event)?.eventIdHex ?: EVENT_ID
+
+        private val NOTE_TOKEN = Regex("note1[02-9ac-hj-np-z]+")
 
         /** MDK's cached projection of the card, present and verified. */
         private fun cachedCardPreview(reference: String) =
@@ -200,7 +207,7 @@ internal class EventCardConversationFixture(
                 state = PublicEventPreviewStateFfi.PRESENT,
                 eventJson =
                     JSONObject()
-                        .put("id", if (reference == SECOND_NOTE) SECOND_EVENT_ID else EVENT_ID)
+                        .put("id", eventIdOf(reference))
                         .put("pubkey", "c".repeat(64))
                         .put("created_at", 1)
                         .put("kind", 1)
