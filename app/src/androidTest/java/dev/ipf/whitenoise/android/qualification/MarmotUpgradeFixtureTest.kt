@@ -109,6 +109,7 @@ class MarmotUpgradeFixtureTest {
                 runtime.shutdownAndClose()
             }
             recordUpgradeDatabase(root, receipt, phase)
+            if (phase == "seed" && fileStoreBaseline()) recordUpgradeSalts(root, receipt)
         }
 
     /** Native create/send/download calls produce both local upload bodies and a received retained attachment. */
@@ -152,6 +153,7 @@ class MarmotUpgradeFixtureTest {
         receipt.writeText(initial.toString())
         // Avatar metadata advances the group epoch; finish it before preparing epoch-bound unsent media.
         if (fileStoreBaseline()) seedUpgradeAvatar(runtime, receipt)
+        if (fileStoreBaseline()) seedUpgradeRemoval(runtime, receipt, blobPort)
         // Keep an uploaded-but-unsent outgoing record across 0113 as well as the published attachment.
         val pending =
             runtime.uploadMedia(
@@ -187,6 +189,7 @@ class MarmotUpgradeFixtureTest {
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
         if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
+        if (fileStoreBaseline()) verifyUpgradeRemoval(runtime, value)
         value.put("${phase}Pid", Process.myPid())
         receipt.writeText(value.toString())
     }

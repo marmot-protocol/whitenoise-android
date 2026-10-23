@@ -5,9 +5,11 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [22 October 2026 nightly evaluation](marmotkit-nightly-20261022.md) records its
-artifact verification, API changes, migration qualification and 30-day retention
-limits. It is testing-only and does not authorize production adoption.
+The [23 October 2026 nightly evaluation](marmotkit-nightly-20261023.md) records the
+current artifact, API compatibility and required rekey/migration qualification.
+The [22 October evaluation](marmotkit-nightly-20261022.md) remains historical
+evidence for its exact revision. Both are testing-only with 30-day retention;
+neither authorizes production adoption.
 
 ## Markdown timestamps
 
@@ -61,7 +63,7 @@ execute: no ignored recovery case can satisfy adoption.
 
 The populated campaign builds current master and the candidate with one disposable
 signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed October 21 source `8c214fee`. Dispatch once on the
+longer pins the reviewed October 22 source `77f22e35`. Dispatch once on the
 candidate branch and reuse a matching active run:
 
 ```bash
@@ -96,6 +98,18 @@ A disposable debug-signed pair is not proof for a trusted preview APK. Request a
 preview only for a concrete handoff/debugging need, then separately qualify the
 exact signed APK under [CI policy](ci-request-policy.md). Never use a physical
 installation, clear data, downgrade or rewrite migration records for this campaign.
+
+For the October 23 pair, migration 0116 adds retention metadata and a separate
+versioned SQLCipher rekey changes the database key presentation. The shared
+baseline fixture also seeds an explicitly removed disposable attachment and
+records private salt digests. Candidate-only `MarmotKeyMigrationQualificationTest`
+requires Forever defaults, preserved removal and salts, and no unfinished key
+migration markers after upgrade and cold restart. Its source stays outside the
+baseline fixture overlay because the previous bindings lack the new getter.
+Retain passing exact-source MDK interrupted-rekey, failed-rekey, WAL process-death
+and external-signer recovery results separately from these Android observations.
+Physical app-performance evidence and upstream security release sign-off remain
+separate from testing-only qualification; phone testing is paused.
 
 ## 1. Select and inspect the release
 
