@@ -317,6 +317,21 @@ class AccountSetupContentScreenshotTest {
             theme = SetupScreenshotTheme.DARK,
         )
 
+    /** A disconnected signer still exposes its exact native reconnect grant beside resume checks. */
+    @Test fun signerDisconnectedAmoled() =
+        capture(
+            "signer_disconnected_amoled",
+            AccountSetupState(
+                snapshot =
+                    setupSnapshot(
+                        OnboardingStepFfi.KEY_PACKAGE,
+                        listOf(OnboardingActionFfi.RECONNECT_SIGNER, OnboardingActionFfi.RETRY),
+                    ),
+                disconnected = true,
+            ),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
     /** Expanded device diagnostics explain an inconclusive result without asserting another device is absent. */
     @Test fun deviceDiscoveryDetails() =
         capture(

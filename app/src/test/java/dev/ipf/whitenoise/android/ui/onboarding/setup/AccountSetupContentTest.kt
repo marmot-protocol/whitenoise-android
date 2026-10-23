@@ -237,7 +237,7 @@ class AccountSetupContentTest {
         composeRule.onNode(hasSetTextAction() and hasText("Inbox relays")).assertExists()
         composeRule.onNodeWithText("Read relays").assertDoesNotExist()
         composeRule.onNodeWithText("Write relays").assertDoesNotExist()
-        composeRule.onNodeWithText("Change a relay before reviewing a replacement.", substring = true).assertExists()
+        composeRule.onNodeWithTag("setup-editor-save").assertIsNotEnabled()
         composeRule.onNodeWithText("full replacement list", substring = true).assertDoesNotExist()
     }
 

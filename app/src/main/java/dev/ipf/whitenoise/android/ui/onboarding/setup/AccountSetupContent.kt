@@ -189,11 +189,9 @@ internal fun AccountSetupContent(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    if (!state.error &&
-                        !state.disconnected &&
-                        !state.staleDecision &&
-                        !state.optionalMetadataPending
-                    ) {
+                    val blockedByFailure = state.error || state.staleDecision || state.optionalMetadataPending
+                    val reconnectOffered = OnboardingActionFfi.RECONNECT_SIGNER in step.actions
+                    if (!blockedByFailure && (!state.disconnected || reconnectOffered)) {
                         SetupActionButtons(state, onAction, onEdit)
                     }
                 }
@@ -226,28 +224,40 @@ internal fun AccountSetupContent(
 private fun SetupDecisionHeading(state: AccountSetupState) {
     val step = state.currentStep ?: return
     val proposal = state.snapshot?.proposal?.takeIf { it.step == step.step }
-    val retired = step.findings.any { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
-    val title =
-        when {
-            state.snapshot?.cancellationPending == true -> R.string.setup_cancel_pending_title
-            proposal != null &&
-                proposal.relayRepair?.mode != OnboardingRelayRepairModeFfi.MANUAL_REVIEW &&
-                OnboardingActionFfi.APPROVE_REPAIR !in step.actions -> R.string.setup_approved_pending_title
-            step.status == dev.ipf.marmotkit.OnboardingStatusFfi.WAITING_FOR_SIGNER ->
-                R.string.setup_signer_title
-            proposal?.profile != null && OnboardingActionFfi.APPROVE_REPAIR in step.actions ->
-                R.string.setup_profile_review_title
-            proposal?.relayRepair != null && OnboardingActionFfi.APPROVE_REPAIR in step.actions ->
-                R.string.setup_relay_review_title
-            step.step == OnboardingStepFfi.PROFILE &&
-                proposal == null &&
-                OnboardingActionFfi.CONTINUE_WITHOUT in step.actions -> R.string.setup_profile_optional_title
-            retired -> R.string.setup_relay_retired_title
-            step.step == OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_one_phone_per_account
-            else -> setupStepTitle(step.step)
-        }
+    val title = setupPendingHeadingTitle(state, step, proposal) ?: setupDefaultHeadingTitle(step, proposal)
     Text(stringResource(title), style = MaterialTheme.typography.titleLarge)
 }
+
+private fun setupPendingHeadingTitle(
+    state: AccountSetupState,
+    step: OnboardingStepStateFfi,
+    proposal: OnboardingRepairProposalFfi?,
+): Int? =
+    when {
+        state.snapshot?.cancellationPending == true -> R.string.setup_cancel_pending_title
+        proposal != null &&
+            proposal.relayRepair?.mode != OnboardingRelayRepairModeFfi.MANUAL_REVIEW &&
+            OnboardingActionFfi.APPROVE_REPAIR !in step.actions -> R.string.setup_approved_pending_title
+        step.status == dev.ipf.marmotkit.OnboardingStatusFfi.WAITING_FOR_SIGNER -> R.string.setup_signer_title
+        proposal?.profile != null && OnboardingActionFfi.APPROVE_REPAIR in step.actions ->
+            R.string.setup_profile_review_title
+        proposal?.relayRepair != null && OnboardingActionFfi.APPROVE_REPAIR in step.actions ->
+            R.string.setup_relay_review_title
+        else -> null
+    }
+
+private fun setupDefaultHeadingTitle(
+    step: OnboardingStepStateFfi,
+    proposal: OnboardingRepairProposalFfi?,
+): Int =
+    when {
+        step.step == OnboardingStepFfi.PROFILE &&
+            proposal == null &&
+            OnboardingActionFfi.CONTINUE_WITHOUT in step.actions -> R.string.setup_profile_optional_title
+        step.findings.any { it.issue == OnboardingIssueFfi.RETIRED_RELAY } -> R.string.setup_relay_retired_title
+        step.step == OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_one_phone_per_account
+        else -> setupStepTitle(step.step)
+    }
 
 /** Single exact endpoint removal enters native review; all other repair choices remain below. */
 @Composable
@@ -257,29 +267,30 @@ private fun SetupDirectRelayRemoval(
 ) {
     val snapshot = state.snapshot ?: return
     val step = state.currentStep ?: return
-    if (step.step !in relaySetupSteps ||
-        snapshot.proposal != null ||
-        OnboardingActionFfi.EDIT_RELAYS !in step.actions
+    if (step.step in relaySetupSteps &&
+        snapshot.proposal == null &&
+        OnboardingActionFfi.EDIT_RELAYS in step.actions
     ) {
-        return
-    }
-    val revision = snapshot.revision
-    val recoveryEpoch = snapshot.recoveryEpoch
-    val retired =
-        step.findings
-            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
-            .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
-            .distinct()
-    if (retired.size != 1) return
-    Text(retired.single(), style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
-    WhiteNoiseButton(
-        onClick = { onRemoveRelay(step.step, retired.single(), revision, recoveryEpoch) },
-        enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision,
-        modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay"),
-    ) {
-        Icon(painterResource(R.drawable.ic_delete), null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.setup_remove_relay))
+        val retired =
+            step.findings
+                .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
+                .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
+                .distinct()
+        if (retired.size == 1) {
+            val endpoint = retired.single()
+            val revision = snapshot.revision
+            val recoveryEpoch = snapshot.recoveryEpoch
+            Text(endpoint, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
+            WhiteNoiseButton(
+                onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) },
+                enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision,
+                modifier = Modifier.fillMaxWidth().testTag("setup-remove-relay"),
+            ) {
+                Icon(painterResource(R.drawable.ic_delete), null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.setup_remove_relay))
+            }
+        }
     }
 }
 
@@ -310,10 +321,8 @@ private fun SetupErrors(
 /** Only native-offered actions are displayed; an empty follow list is never published by this flow. */
 @Composable
 private fun SetupDecisionContent(state: AccountSetupState) {
-    val snapshot = state.snapshot
-    val step = state.currentStep
-    if (snapshot == null) return
-    if (step != null) {
+    val snapshot = state.snapshot ?: return
+    state.currentStep?.let { step ->
         if (step.step == OnboardingStepFfi.PROFILE &&
             snapshot.proposal?.step != step.step &&
             OnboardingActionFfi.CONTINUE_WITHOUT in step.actions
@@ -325,24 +334,7 @@ private fun SetupDecisionContent(state: AccountSetupState) {
             )
         }
         SetupOperationNotice(snapshot, step)
-        if (step.step != OnboardingStepFfi.PROFILE && snapshot.proposal?.step != step.step) {
-            step.findings
-                .distinct()
-                .filterNot {
-                    (step.step == OnboardingStepFfi.SINGLE_DEVICE && state.routineDeviceNotice) ||
-                        (
-                            it.issue == OnboardingIssueFfi.RETIRED_RELAY &&
-                                it.endpoint != null &&
-                                OnboardingActionFfi.EDIT_RELAYS in step.actions &&
-                                step.findings
-                                    .filter { finding ->
-                                        finding.issue == OnboardingIssueFfi.RETIRED_RELAY
-                                    }.mapNotNull { finding -> finding.endpoint?.takeIf(String::isNotBlank) }
-                                    .distinct()
-                                    .size == 1
-                        )
-                }.forEach { SetupFindingContent(it) }
-        }
+        SetupStepFindings(state, snapshot, step)
         if (step.step == OnboardingStepFfi.SINGLE_DEVICE) {
             SetupSingleDeviceNotice(snapshot.singleDeviceNotice?.discovery)
         }
@@ -353,6 +345,32 @@ private fun SetupDecisionContent(state: AccountSetupState) {
             SetupProposalContent(proposal, step.findings)
         }
     }
+}
+
+@Composable
+private fun SetupStepFindings(
+    state: AccountSetupState,
+    snapshot: OnboardingSnapshotFfi,
+    step: OnboardingStepStateFfi,
+) {
+    if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
+    val retiredEndpoint =
+        step.findings
+            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
+            .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
+            .distinct()
+            .singleOrNull()
+    val directRemovalOffered = OnboardingActionFfi.EDIT_RELAYS in step.actions && retiredEndpoint != null
+    step.findings
+        .distinct()
+        .filterNot { finding ->
+            val routineDeviceNotice = step.step == OnboardingStepFfi.SINGLE_DEVICE && state.routineDeviceNotice
+            val directRemovalFinding =
+                directRemovalOffered &&
+                    finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
+                    finding.endpoint == retiredEndpoint
+            routineDeviceNotice || directRemovalFinding
+        }.forEach { SetupFindingContent(it) }
 }
 
 /** Distinguishes a saved cancellation from an approved publication that must finish before cancellation. */

@@ -66,26 +66,7 @@ internal fun SetupStageProgress(state: AccountSetupState) {
             stringResource(if (stopped) R.string.setup_stage_unavailable else R.string.setup_working)
         }
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .testTag("setup-stage-progress")
-                .clearAndSetSemantics {
-                    stateDescription = description
-                    liveRegion = LiveRegionMode.Polite
-                },
-        ) {
-            val track = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.32f)
-            if (total > 0 || stopped) {
-                LinearProgressIndicator(
-                    progress = { if (total > 0) completed.toFloat() / total else 0f },
-                    modifier = Modifier.fillMaxWidth(),
-                    trackColor = track,
-                )
-            } else {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), trackColor = track)
-            }
-        }
+        SetupStageProgressBar(total, completed, stopped, description)
         stageLabel?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, modifier = Modifier.clearAndSetSemantics {})
         }
@@ -96,6 +77,35 @@ internal fun SetupStageProgress(state: AccountSetupState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.clearAndSetSemantics {},
             )
+        }
+    }
+}
+
+@Composable
+private fun SetupStageProgressBar(
+    total: Int,
+    completed: Int,
+    stopped: Boolean,
+    description: String,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .testTag("setup-stage-progress")
+            .clearAndSetSemantics {
+                stateDescription = description
+                liveRegion = LiveRegionMode.Polite
+            },
+    ) {
+        val track = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.32f)
+        if (total > 0 || stopped) {
+            LinearProgressIndicator(
+                progress = { if (total > 0) completed.toFloat() / total else 0f },
+                modifier = Modifier.fillMaxWidth(),
+                trackColor = track,
+            )
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), trackColor = track)
         }
     }
 }
@@ -165,30 +175,6 @@ internal fun SetupDetails(state: AccountSetupState) {
             }
             SetupChecklist(snapshot)
         }
-    }
-}
-
-/** Routine device consent keeps only Details; work and recovery retain an explicit save-and-exit action. */
-@Composable
-internal fun SetupFooter(
-    state: AccountSetupState,
-    onToggleDetails: () -> Unit,
-    onLater: () -> Unit,
-) {
-    if (state.snapshot?.ready == true) return
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            if (!state.busy && state.snapshot != null) {
-                TextButton(onClick = onToggleDetails, modifier = Modifier.testTag("setup-details")) {
-                    Text(
-                        stringResource(
-                            if (state.detailsExpanded) R.string.setup_hide_details else R.string.setup_details,
-                        ),
-                    )
-                }
-            }
-        }
-        if (state.detailsExpanded && !state.busy) SetupDetails(state)
     }
 }
 

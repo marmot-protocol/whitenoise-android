@@ -50,32 +50,41 @@ internal class AccountSetupRelayRemoval(
     private suspend fun finish(endpoint: String) {
         val preview = state.value.snapshot ?: return
         val editor = state.value.editor ?: return
-        if (!editor.canEditRelayDeclaration) {
-            state.value = state.value.copy(relayRemovalIssue = RelayRemovalIssue.UNSAFE_DECLARATION)
-            return
+        when {
+            !editor.canEditRelayDeclaration ->
+                state.value = state.value.copy(relayRemovalIssue = RelayRemovalIssue.UNSAFE_DECLARATION)
+            endpoint !in editor.reads.lines() && endpoint !in editor.writes.lines() ->
+                abandon(preview, null)
+            else -> finishStaged(preview, editor, endpoint)
         }
-        if (endpoint !in editor.reads.lines() && endpoint !in editor.writes.lines()) {
-            abandon(preview, null)
-            return
-        }
+    }
+
+    private suspend fun finishStaged(
+        preview: OnboardingSnapshotFfi,
+        editor: SetupEditor,
+        endpoint: String,
+    ) {
         val staged = editor.withoutRelayEndpoint(endpoint)
         state.value = state.value.copy(editor = staged)
         if (!staged.canReviewRelayEdit) {
             state.value = state.value.copy(relayRemovalIssue = RelayRemovalIssue.ADD_REQUIRED_RELAY)
-            return
+        } else {
+            val fresh = client.snapshot()
+            val visible = state.value.snapshot
+            val nativeOwned = fresh != null && preview.isCurrentRelayPreview(fresh)
+            val visibleOwned = visible != null && preview.isCurrentRelayPreview(visible)
+            val grantCurrent = fresh?.matchesDecision(account, staged.request()) == true
+            val previewCurrent = nativeOwned && visibleOwned
+            val ownerAndGrantCurrent = isCurrent() && grantCurrent
+            if (!previewCurrent || !ownerAndGrantCurrent) {
+                abandon(preview, fresh)
+            } else {
+                client.execute(staged.request())?.let { proposal ->
+                    accept(proposal)
+                    state.value = state.value.copy(editor = null, relayRemovalIssue = null, removalReview = true)
+                }
+            }
         }
-        val fresh = client.snapshot()
-        val visible = state.value.snapshot
-        val nativeOwned = fresh != null && preview.isCurrentRelayPreview(fresh)
-        val visibleOwned = visible != null && preview.isCurrentRelayPreview(visible)
-        val grantCurrent = fresh?.matchesDecision(account, staged.request()) == true
-        if (!isCurrent() || !nativeOwned || !visibleOwned || !grantCurrent) {
-            abandon(preview, fresh)
-            return
-        }
-        val proposal = client.execute(staged.request()) ?: return
-        accept(proposal)
-        state.value = state.value.copy(editor = null, relayRemovalIssue = null, removalReview = true)
     }
 
     /** Discards only the still-owned preview; a newer checkpoint wins. */

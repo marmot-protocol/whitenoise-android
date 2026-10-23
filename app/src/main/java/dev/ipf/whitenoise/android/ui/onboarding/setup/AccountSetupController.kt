@@ -173,32 +173,39 @@ internal class AccountSetupController(
     ) {
         val request = SetupRequest(revision, step, action, recoveryEpoch = recoveryEpoch)
         if (!mutableState.canAct(request, account, isCurrent())) return
-        if (endpoint != null) {
-            val displayed = mutableState.value.snapshot ?: return
-            val selected = mutableState.value.currentStep
-            if (action != OnboardingActionFfi.EDIT_RELAYS ||
-                endpoint.isBlank() ||
-                selected?.step != step ||
-                selected.findings.none {
-                    it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
-                }
-            ) {
-                return
-            }
-            operate {
-                AccountSetupRelayRemoval(client, account, isCurrent, mutableState, ::accept)
-                    .prepare(request, displayed, endpoint)
-            }
-            return
+        if (endpoint == null) {
+            loadEditor(request)
+        } else {
+            prepareRelayRemoval(request, endpoint)
         }
+    }
+
+    private fun prepareRelayRemoval(
+        request: SetupRequest,
+        endpoint: String,
+    ) {
+        val displayed = mutableState.value.snapshot ?: return
+        val selected = mutableState.value.currentStep
+        val validTarget = request.action == OnboardingActionFfi.EDIT_RELAYS && endpoint.isNotBlank()
+        val matchingStep = selected?.step == request.step
+        val matchingFinding =
+            selected?.findings?.any {
+                it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
+            } == true
+        if (!validTarget || !matchingStep || !matchingFinding) return
+        operate {
+            AccountSetupRelayRemoval(client, account, isCurrent, mutableState, ::accept)
+                .prepare(request, displayed, endpoint)
+        }
+    }
+
+    private fun loadEditor(request: SetupRequest) {
         operate {
             val latest = client.snapshot()
             if (latest == null || !latest.matchesDecision(account, request)) {
                 latest?.let(::accept)
                 mutableState.value = mutableState.value.copy(staleDecision = true)
-                return@operate
-            }
-            if (action == OnboardingActionFfi.EDIT_RELAYS) {
+            } else if (request.action == OnboardingActionFfi.EDIT_RELAYS) {
                 val discarded =
                     client.installRelayPreview(request.step) { preview ->
                         val editor = preview.relayEditor(request)
@@ -212,17 +219,15 @@ internal class AccountSetupController(
                         }
                     }
                 discarded?.let(::accept)
-                return@operate
+            } else {
+                val existing = mutableState.value.editor
+                val profile = if (request.action == OnboardingActionFfi.EDIT_PROFILE) client.profile() else null
+                val currentRevision = mutableState.value.snapshot?.revision == request.revision
+                val currentEpoch = mutableState.value.snapshot?.recoveryEpoch == request.recoveryEpoch
+                if (isCurrent() && currentRevision && currentEpoch) {
+                    mutableState.value = mutableState.value.copy(editor = existing.forRequest(request, profile))
+                }
             }
-            val existing = mutableState.value.editor
-            val profile = if (action == OnboardingActionFfi.EDIT_PROFILE) client.profile() else null
-            if (!isCurrent() || mutableState.value.snapshot?.revision != revision) return@operate
-            if (mutableState.value.snapshot?.recoveryEpoch != request.recoveryEpoch) return@operate
-            mutableState.value =
-                mutableState.value.copy(
-                    editor =
-                        existing.forRequest(request, profile),
-                )
         }
     }
 

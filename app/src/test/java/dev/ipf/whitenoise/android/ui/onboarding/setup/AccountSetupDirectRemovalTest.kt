@@ -194,14 +194,16 @@ class AccountSetupDirectRemovalTest {
     ): FakeSetupClient =
         FakeSetupClient(retiredDecision()).apply {
             executeResult = { request ->
-                current =
+                val result =
                     when (request.action) {
                         OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> preview
                         OnboardingActionFfi.EDIT_RELAYS -> review
                         OnboardingActionFfi.CANCEL_REPAIR -> retiredDecision().copy(revision = 6uL)
                         else -> current
                     }
-                current
+                // A delayed native preview may return, but it cannot rewind the newer authoritative stream state.
+                if (current.revision <= result.revision) current = result
+                result
             }
         }
 

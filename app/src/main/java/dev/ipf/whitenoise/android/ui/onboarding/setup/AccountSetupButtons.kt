@@ -33,8 +33,10 @@ internal fun SetupActionButtons(
     if (state.snapshot == null) return
     val step = state.currentStep ?: return
     val offered =
-        state.orderedRelayActions(step.actions).filterNot {
-            it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
+        state.orderedRelayActions(step.actions).filterNot { action ->
+            val routineRetry = action == OnboardingActionFfi.RETRY && state.routineDeviceNotice
+            val disconnectedNonSigner = state.disconnected && action != OnboardingActionFfi.RECONNECT_SIGNER
+            routineRetry || disconnectedNonSigner
         }
     val plan = state.actionPlan(offered)
     val visible = listOfNotNull(plan.primary, plan.secondary).distinct()
@@ -50,27 +52,30 @@ internal fun SetupAlternativeActions(
     onAction: (SetupRequest) -> Unit,
     onEdit: (OnboardingStepFfi, OnboardingActionFfi, ULong) -> Unit,
 ) {
-    if (state.editor != null ||
-        state.error ||
-        state.disconnected ||
-        state.staleDecision ||
-        state.optionalMetadataPending
-    ) {
-        return
-    }
-    val step = state.currentStep ?: return
-    val offered =
-        state.orderedRelayActions(step.actions).filterNot {
-            it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
+    if (!state.hidesAlternativeActions) {
+        state.currentStep?.let { step ->
+            val offered =
+                state.orderedRelayActions(step.actions).filterNot {
+                    it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
+                }
+            val plan = state.actionPlan(offered)
+            val visible = listOfNotNull(plan.primary, plan.secondary).distinct()
+            val alternatives = offered.filterNot { it in visible }
+            if (alternatives.isNotEmpty() || state.offersRelayReset()) {
+                Text(stringResource(R.string.setup_other_options), style = MaterialTheme.typography.titleSmall)
+                alternatives.forEach { action -> SetupOfferedAction(state, action, false, onAction, onEdit) }
+                if (state.offersRelayReset()) SetupResetRelayAction(state, onAction)
+            }
         }
-    val plan = state.actionPlan(offered)
-    val visible = listOfNotNull(plan.primary, plan.secondary).distinct()
-    val alternatives = offered.filterNot { it in visible }
-    if (alternatives.isEmpty() && !state.offersRelayReset()) return
-    Text(stringResource(R.string.setup_other_options), style = MaterialTheme.typography.titleSmall)
-    alternatives.forEach { action -> SetupOfferedAction(state, action, false, onAction, onEdit) }
-    if (state.offersRelayReset()) SetupResetRelayAction(state, onAction)
+    }
 }
+
+private val AccountSetupState.hidesAlternativeActions: Boolean
+    get() {
+        val blockedByEditor = editor != null || error || disconnected
+        val blockedByDecision = staleDecision || optionalMetadataPending
+        return blockedByEditor || blockedByDecision
+    }
 
 /** Full replacement is a separate offered action and captures the rendered native grant. */
 @Composable
@@ -121,6 +126,7 @@ private fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): Se
                 OnboardingActionFfi.CONTINUE_ANYWAY
             OnboardingActionFfi.RECONNECT_SIGNER in offered -> OnboardingActionFfi.RECONNECT_SIGNER
             directRemove -> null
+            OnboardingActionFfi.USE_RECOMMENDED_RELAYS in offered -> OnboardingActionFfi.USE_RECOMMENDED_RELAYS
             OnboardingActionFfi.RETRY in offered -> OnboardingActionFfi.RETRY
             else -> offered.firstOrNull()
         }
@@ -128,7 +134,9 @@ private fun AccountSetupState.actionPlan(offered: List<OnboardingActionFfi>): Se
         if (directRemove) {
             OnboardingActionFfi.EDIT_RELAYS
         } else {
-            offered.firstOrNull { it != primary && it != OnboardingActionFfi.CANCEL_ONBOARDING }
+            offered.firstOrNull {
+                it != primary && it != OnboardingActionFfi.CANCEL_ONBOARDING && it != OnboardingActionFfi.RETRY
+            }
         }
     return SetupActionPlan(primary, secondary, directRemove)
 }
