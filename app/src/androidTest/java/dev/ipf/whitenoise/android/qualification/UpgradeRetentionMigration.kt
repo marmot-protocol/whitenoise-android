@@ -83,7 +83,12 @@ internal suspend fun verifyUpgradeRemoval(
     val target = AttachmentLocalTargetFfi(value.getString("removedMessage"), value.getString("removedSource"), 0u)
     val account = value.getString("sender")
     val group = value.getString("group")
-    val state = runtime.attachmentTransferSnapshot(account, group, listOf(target)).items.single().state
+    val state =
+        runtime
+            .attachmentTransferSnapshot(account, group, listOf(target))
+            .items
+            .single()
+            .state
     check(state == AttachmentTransferStateFfi.REMOVED)
     check(runtime.attachmentLocalAssets(account, group, listOf(target)).single().reference == null)
 }
@@ -102,5 +107,7 @@ internal fun recordUpgradeSalts(
 }
 
 /** Hashes salt bytes only; private paths and digests stay in the unexported synthetic receipt. */
-internal fun upgradeSaltDigest(file: File): String =
-    MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+internal fun upgradeSaltDigest(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+    return digest.joinToString("") { "%02x".format(it) }
+}

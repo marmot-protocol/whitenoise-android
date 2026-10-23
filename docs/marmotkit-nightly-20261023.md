@@ -18,9 +18,15 @@ workflow builder `d274dd228a3ac8d624073d8f5835e06c7cd7b30d`.
   validator: arm64-v8a, armeabi-v7a, x86 and x86_64. The three generated Kotlin
   files and four JNI libraries come directly from the archive.
 - Manifest features are absent, so feature provenance remains explicitly
-  **unverified by the manifest**. The exact-source `bindings.yaml` enables
-  `OTLP_EXPORT=1` and `PRODUCT_ANALYTICS_EXPORT=1`; `kotlin-bindings.sh` maps those
-  to the unchanged `otlp-export,product-analytics-export` selection.
+  **unverified by the manifest**. Compiled features are verified separately through
+  [the publishing run](https://github.com/marmot-protocol/mdk/actions/runs/39902519328):
+  all four ABI compile steps enable `OTLP_EXPORT=1` and `PRODUCT_ANALYTICS_EXPORT=1`,
+  and the exact-source builder passes `otlp-export,product-analytics-export` to Cargo.
+  Assembly checks source, builder, run ID, feature selection and each library hash;
+  its downloaded input digests match the ABI uploads. Retained assembly artifact
+  `12479896923` has SHA-256
+  `c5ff58d0ec1143c074d327ff143eb08b4ab2d90ef076e6e01e4ad70a4148189b`.
+  Its inner release ZIP is byte-identical to the independently verified published ZIP.
 - The reviewed Android baseline is master
   `2f4555008c809b4ebd617fcd23ef74af850409d2`, pinning October 22 MDK
   `77f22e35499a42bc96402ce19b79ceed57ffbcc3` through #3395.
