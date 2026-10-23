@@ -468,7 +468,8 @@ class NotificationHapticVisualTimingDeviceTest {
                 "timelineMessages" -> TimelinePageFfi(emptyList(), hasMoreBefore = false, hasMoreAfter = false)
                 "chatListRow" -> {
                     val callArguments = requireNotNull(arguments)
-                    check(callArguments[0] == update.accountRef && callArguments[1] == update.groupIdHex)
+                    check(callArguments[0] == update.accountRef)
+                    check(callArguments[1] == update.groupIdHex)
                     // The incoming synthetic message has not entered the durable chat-list/timeline projection yet.
                     null
                 }

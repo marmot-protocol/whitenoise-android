@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -81,3 +82,11 @@ internal fun ChatListAvatarSeed.legacyImageFor(
             ChatListAvatarSource.FALLBACK_URL -> legacyUrl == null && encryptedImage == null && key == ownedFallback
         }
     }?.image
+
+/** A private picture can be displayed only for its own known, signed-in local account. */
+internal fun WhiteNoiseAppState.ownsPrivateAvatarSource(
+    source: String,
+    accountRef: String?,
+): Boolean =
+    accounts.any { it.label == accountRef && !it.signedOut } &&
+        PrivateContactAvatarLoader.belongsToAccount(source, accountRef)
