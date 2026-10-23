@@ -15,9 +15,6 @@ import dev.ipf.marmotkit.MediaDownloadResultFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
-import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -102,13 +99,6 @@ class ForwardDiagnosticsProductionPathTest {
                         messageIdHex = "media-id-${messageIdCounter.incrementAndGet()}",
                     )
                 }
-                "retryGroupConvergence" ->
-                    SendSummaryFfi(
-                        published = 0u,
-                        messageIds = emptyList(),
-                        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
-                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
-                    )
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "ForwardDiagnosticsMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -142,8 +132,8 @@ class ForwardDiagnosticsProductionPathTest {
     }
 
     /**
-     * One uncached single-attachment forward to one destination emits the full phase sequence and nothing else, with
-     * its unawaited convergence nudge recorded exactly once, whenever it finishes.
+     * One uncached single-attachment forward to one destination emits the full phase sequence and nothing else; a
+     * healthy forward never asks for convergence.
      */
     @Test
     fun uncachedMediaForwardEmitsClosedPhasesWithoutIdentifiers() {
@@ -177,11 +167,8 @@ class ForwardDiagnosticsProductionPathTest {
                 "media_publish_return",
                 "forward_complete",
             ),
-            phases.filterNot { it == "commit_lock_acquired" || it.startsWith("convergence_") },
+            phases.filterNot { it == "commit_lock_acquired" },
         )
-        val convergence = awaitForwardPhase("convergence_return")
-        assertEquals(1, convergence.count { "phase=convergence_start " in it })
-        assertTrue(convergence.single { "phase=convergence_return " in it }.contains(" result=success layer=mdk"))
         assertTrue(lines.single { "phase=forward_source_lookup " in it }.contains(" result=pending layer=storage"))
         assertTrue(lines.single { "phase=forward_source_download_return " in it }.contains(" result=success layer=mdk"))
         assertTrue(lines.single { "phase=media_upload_return " in it }.contains(" result=success layer=ffi"))
@@ -244,21 +231,6 @@ class ForwardDiagnosticsProductionPathTest {
             signedOut = false,
             running = true,
         )
-
-    /** Waits for an unawaited forward [phase] and returns the forward lines recorded by then. */
-    private fun awaitForwardPhase(
-        phase: String,
-        timeoutMillis: Long = FIXTURE_WAIT_MILLIS,
-    ): List<String> {
-        val deadline = System.currentTimeMillis() + timeoutMillis
-        while (System.currentTimeMillis() < deadline) {
-            shadowOf(Looper.getMainLooper()).idle()
-            val lines = PerformanceDiagnostics.exportLines().filter { " op=message_forward " in it }
-            if (lines.any { " phase=$phase " in it }) return lines
-            Thread.sleep(5)
-        }
-        error("forward diagnostic timeout waiting for $phase")
-    }
 
     /** Waits for both terminal UI state and the independently scheduled terminal diagnostic before exporting. */
     private fun awaitTerminalDiagnostics(

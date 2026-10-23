@@ -5,7 +5,6 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
-import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
@@ -16,19 +15,13 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadSnapshotBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-
-/** Bound on the best-effort convergence nudge after a forwarded message is admitted. */
-private const val FORWARD_CONVERGENCE_NUDGE_MILLIS = 10_000L
 
 /**
  * Builds the production [ForwardTransport] for one forwarding operation with
@@ -229,36 +222,30 @@ internal fun WhiteNoiseAppState.forwardTransport(
         ) {
             requireDestinationAccount()
             val lockRequestedAtMs = diagnostics?.startSpan()
-            var admittedAny = false
-            try {
-                withGroupCommitLock(account, targetGroupIdHex) {
-                    if (lockRequestedAtMs != null) diagnostics?.commitLockAcquired(lockRequestedAtMs)
-                    for (messageIndex in startIndex until messages.size) {
-                        currentCoroutineContext().ensureActive()
-                        onBeforeMessagePublished(messageIndex)
-                        requireDestinationAccount()
-                        val message = messages[messageIndex]
-                        val references = uploadedReferences[messageIndex].orEmpty()
-                        if (message is PreparedForwardMessage.Media) {
-                            check(references.isNotEmpty()) { "missing destination media references" }
-                        }
-                        val token = clientTokenFor(messageIndex)
-                        if (publishOne(targetGroupIdHex, messageIndex, message, references, token)) admittedAny = true
-                        requireDestinationAccount()
-                        onMessagePublished(messageIndex)
+            withGroupCommitLock(account, targetGroupIdHex) {
+                if (lockRequestedAtMs != null) diagnostics?.commitLockAcquired(lockRequestedAtMs)
+                for (messageIndex in startIndex until messages.size) {
+                    currentCoroutineContext().ensureActive()
+                    onBeforeMessagePublished(messageIndex)
+                    requireDestinationAccount()
+                    val message = messages[messageIndex]
+                    val references = uploadedReferences[messageIndex].orEmpty()
+                    if (message is PreparedForwardMessage.Media) {
+                        check(references.isNotEmpty()) { "missing destination media references" }
                     }
+                    publishOne(targetGroupIdHex, messageIndex, message, references, clientTokenFor(messageIndex))
+                    requireDestinationAccount()
+                    onMessagePublished(messageIndex)
                 }
-            } finally {
-                // Once per destination per attempt, after the commit lock is released, whether or not a later
-                // message failed: every message admitted here is already the engine's to deliver.
-                if (admittedAny) launchConvergenceNudge(targetGroupIdHex)
             }
         }
 
         /**
-         * Admits one message and waits for the engine to own it, returning whether this call admitted it. Every status
-         * read and the admission run detached, so the deadline can stop waiting while a blocking native call is still
-         * running. The publish span covers admission and engine handoff, with admission timed on its own.
+         * Admits one message and waits for the engine to own it. Every status read and the admission run detached, so
+         * the deadline can stop waiting while a blocking native call is still running. The publish span covers
+         * admission and engine handoff, with admission timed on its own. A healthy forward never asks for
+         * convergence, matching the attachment fixture's contract; stalled and rejected publishes are resolved from
+         * the token's status instead.
          */
         private suspend fun publishOne(
             targetGroupIdHex: String,
@@ -266,9 +253,9 @@ internal fun WhiteNoiseAppState.forwardTransport(
             message: PreparedForwardMessage,
             references: List<MediaAttachmentReferenceFfi>,
             token: String,
-        ): Boolean {
+        ) {
             val admissionStartedAtMs = diagnostics?.startSpan()
-            return diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
+            diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
                 admitForwardPublish(
                     messageIndex = messageIndex,
                     token = token,
@@ -302,39 +289,6 @@ internal fun WhiteNoiseAppState.forwardTransport(
                         null,
                     )
             }
-
-        /**
-         * Gives a destination that received new admissions the same best-effort convergence nudge the composer gives
-         * an accepted-pending send, under the same commit lock. It is launched on the app's mutation scope without
-         * being awaited, so a forward counts its messages as sent as soon as the engine owns them and no nudge time
-         * enters the phase timings or the batch loop. It is bounded on its own, a nudge that runs out of time is
-         * recorded as a failure, and it never fails the forward; the engine still owns delivery.
-         */
-        private fun launchConvergenceNudge(targetGroupIdHex: String) {
-            mutationsScope.launch { nudgeConvergence(targetGroupIdHex) }
-        }
-
-        /** Runs one bounded convergence nudge and records its outcome truthfully. */
-        @Suppress("TooGenericExceptionCaught")
-        private suspend fun nudgeConvergence(targetGroupIdHex: String) {
-            val startedAtMs = diagnostics?.startSpan()
-            diagnostics?.convergenceStart()
-            val result =
-                try {
-                    withTimeoutOrNull(FORWARD_CONVERGENCE_NUDGE_MILLIS) {
-                        withGroupCommitLock(account, targetGroupIdHex) {
-                            detachedNative { retryGroupConvergence(account, targetGroupIdHex) }
-                        }
-                    }?.let { PerformanceResult.SUCCESS } ?: PerformanceResult.FAILURE
-                } catch (cancellation: CancellationException) {
-                    if (startedAtMs != null) diagnostics?.convergenceReturn(startedAtMs, PerformanceResult.DROPPED)
-                    throw cancellation
-                } catch (_: Exception) {
-                    // Best effort only: the account worker publishes the admitted message either way.
-                    PerformanceResult.FAILURE
-                }
-            if (startedAtMs != null) diagnostics?.convergenceReturn(startedAtMs, result)
-        }
 
         /** Runs [block] on the native dispatcher outside this coroutine, so cancelling the wait never blocks on it. */
         private suspend fun <T> detachedNative(block: suspend MarmotInterface.() -> T): T =

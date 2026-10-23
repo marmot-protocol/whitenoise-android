@@ -14,7 +14,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,7 +48,6 @@ class ForwardPublishAdmissionTest {
         ledger: FakeTokenLedger,
         stallAdmission: Boolean = false,
         admitFailure: Exception? = null,
-        onAdmitted: suspend () -> Unit = {},
     ) = admitForwardPublish(
         messageIndex = 0,
         token = TOKEN,
@@ -59,7 +57,6 @@ class ForwardPublishAdmissionTest {
             admitFailure?.let { throw it }
             ledger.admit(TOKEN)
         },
-        onAdmitted = onAdmitted,
         deadlineMillis = DEADLINE_MILLIS,
         pollMillis = POLL_MILLIS,
     )
@@ -255,24 +252,6 @@ class ForwardPublishAdmissionTest {
 
             assertTrue("expected rejected, got $failure", failure is ForwardPublishRejectedException)
             assertTrue(ledger.messages.isEmpty())
-        }
-
-    /** The convergence nudge runs once after a new admission and never for a token MDK already owned. */
-    @Test
-    fun theConvergenceNudgeFollowsOnlyANewAdmission() =
-        runTest {
-            var nudges = 0
-            val fresh = FakeTokenLedger()
-            launch {
-                delay(HANDOFF_MILLIS)
-                fresh.statuses[TOKEN] = LocalSendStatusFfi.EngineOwned
-            }
-            assertTrue(publish(fresh, onAdmitted = { nudges += 1 }))
-            assertEquals(1, nudges)
-
-            val owned = FakeTokenLedger().apply { statuses[TOKEN] = LocalSendStatusFfi.EngineOwned }
-            assertFalse(publish(owned, onAdmitted = { nudges += 1 }))
-            assertEquals(1, nudges)
         }
 
     private companion object {

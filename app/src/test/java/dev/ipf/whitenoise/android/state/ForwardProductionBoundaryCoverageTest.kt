@@ -139,8 +139,8 @@ class ForwardProductionBoundaryCoverageTest {
 
     /**
      * Destination publishes are admitted by client token (#2556) and count as sent only once MDK's engine owns them:
-     * a retry probes the same token first, every native call is detached so the deadline bounds it, and a new
-     * admission gets the composer's convergence nudge.
+     * a retry probes the same token first and every native call is detached so the deadline bounds it. A healthy
+     * forward never asks for convergence, matching the attachment fixture's contract.
      */
     @Test
     fun publishIsTokenBoundAndTheAppScopeOwnsCompletion() {
@@ -156,7 +156,8 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("sendTextWithClientToken(account, targetGroupIdHex, message.text, token)" in body)
         assertTrue("sendPreparedMediaWithClientToken(" in body)
         assertTrue("beforeAdmit = ::requireDestinationAccount" in body)
-        assertTrue("detachedNative { retryGroupConvergence(account, targetGroupIdHex) }" in body)
+        assertFalse("retryGroupConvergence" in transportSource().readText())
+        assertFalse("onvergence" in forwardDiagnosticsSource().readText())
         assertTrue(".async { marmotIo(block) }" in body)
         assertTrue("CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)" in body)
         assertFalse("recoverPendingPublish" in body)
@@ -186,10 +187,6 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("diagnostics?.commitLockAcquired(lockRequestedAtMs)" in body)
         assertTrue("ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn" in body)
         assertTrue("diagnostics?.admissionAccepted(admissionStartedAtMs)" in body)
-        assertTrue("diagnostics?.convergenceStart()" in body)
-        assertTrue("diagnostics?.convergenceReturn(startedAtMs, result)" in body)
-        assertTrue("if (admittedAny) launchConvergenceNudge(targetGroupIdHex)" in body)
-        assertTrue("mutationsScope.launch { nudgeConvergence(targetGroupIdHex) }" in body)
         assertTrue("diagnostics?.sourceLookup(" in isolated)
         assertTrue("hit = cached != null || retained != null" in isolated)
         assertTrue("native = retained != null" in isolated)

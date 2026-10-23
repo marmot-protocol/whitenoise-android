@@ -52,8 +52,8 @@ private val LocalSendStatusFfi?.handedOff: Boolean
  * admitted, after [beforeAdmit] re-checks the owner. [onAdmitted] runs right after a new admission, for timing only.
  * The whole sequence, including every status read, is bounded by [deadlineMillis] and ends in
  * [ForwardPublishTimeoutException]; the callers' probe and admission must therefore be cancellable while their
- * native call is still running. Returns whether this call admitted the message, so the caller can give a new
- * admission its convergence nudge after the engine has taken it rather than inside this budget.
+ * native call is still running. A healthy forward never asks for convergence: stalled and rejected publishes are
+ * resolved from the token's status, matching the attachment fixture's one-message, no-convergence contract.
  */
 @Suppress("LongParameterList", "ThrowsCount")
 internal suspend fun admitForwardPublish(
@@ -65,22 +65,21 @@ internal suspend fun admitForwardPublish(
     onAdmitted: suspend () -> Unit = {},
     deadlineMillis: Long = FORWARD_PUBLISH_ADMISSION_MILLIS,
     pollMillis: Long = FORWARD_PUBLISH_STATUS_POLL_MILLIS,
-): Boolean =
+) {
     withTimeoutOrNull(deadlineMillis) {
         val existing = probeOrNull(probe)
         when {
-            existing.handedOff -> return@withTimeoutOrNull false
+            existing.handedOff -> return@withTimeoutOrNull
             existing == LocalSendStatusFfi.Rejected -> throw ForwardPublishRejectedException(messageIndex)
         }
-        val admittedNow = existing == null
-        if (admittedNow) {
+        if (existing == null) {
             beforeAdmit()
             admitOrClassify(messageIndex, token, probe, admit)
             onAdmitted()
         }
         awaitEngineHandoff(messageIndex, probe, pollMillis)
-        admittedNow
     } ?: throw ForwardPublishTimeoutException()
+}
 
 /**
  * Admits a token MDK does not yet know. A failed admission is classified from the token's status afterwards: owned

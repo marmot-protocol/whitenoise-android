@@ -113,20 +113,6 @@ internal class ForwardDiagnostics private constructor(
             since(startedAtMs),
         )
 
-    /**
-     * Marks the start of the convergence nudge after a destination received new admissions. The nudge is not
-     * awaited, so it and its return may be recorded after the terminal phase.
-     */
-    fun convergenceStart() {
-        phase(PerformancePhase.CONVERGENCE_START, PerformanceResult.PENDING, PerformanceLayer.MDK)
-    }
-
-    /** Closes the convergence call with its outcome shape. */
-    fun convergenceReturn(
-        startedAtMs: Long,
-        result: PerformanceResult,
-    ) = phase(PerformancePhase.CONVERGENCE_RETURN, result, PerformanceLayer.MDK, since(startedAtMs))
-
     /** Records a terminal operation snapshot: completed, cancelled (dropped) or failed, with completed targets. */
     fun terminal(snapshot: ForwardOperationSnapshot) {
         val result =

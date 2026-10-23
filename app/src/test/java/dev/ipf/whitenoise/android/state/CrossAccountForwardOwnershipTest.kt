@@ -13,9 +13,6 @@ import dev.ipf.marmotkit.MediaDownloadResultFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
-import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -79,15 +76,6 @@ class CrossAccountForwardOwnershipTest {
                     statusGate?.await()
                     // The engine takes every admitted message at once in this fixture.
                     if (arguments[2] in admittedTokens) LocalSendStatusFfi.EngineOwned else null
-                }
-                "retryGroupConvergence" -> {
-                    calls += RecordedCall("retryGroupConvergence", arguments!![0] as String)
-                    SendSummaryFfi(
-                        published = 0u,
-                        messageIds = emptyList(),
-                        acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
-                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
-                    )
                 }
                 "timelineMessages" -> {
                     calls += RecordedCall("timelineMessages", arguments!![0] as String)
