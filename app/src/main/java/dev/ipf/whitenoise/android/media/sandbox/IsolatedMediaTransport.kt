@@ -177,10 +177,15 @@ internal class IsolatedMediaTransport(
                         selected.linked = true
                     } catch (_: android.os.RemoteException) {
                         // linkToDeath can report an already-dead remote; never infer death from send failure.
-                        if (!service.isBinderAlive) selected.dead.countDown()
+                        if (!service.isBinderAlive) {
+                            selected.dead.countDown()
+                        } else {
+                            warnLifetimeHold(selected, "death-registration")
+                        }
                         selected.retiring = true
                     } catch (_: RuntimeException) {
                         selected.retiring = true
+                        warnLifetimeHold(selected, "death-registration")
                     }
                     if (closed || session?.epoch != selected.reply.session.epoch) selected.retiring = true
                     selected.reply.connected.countDown()
@@ -310,10 +315,11 @@ internal class IsolatedMediaTransport(
         block: (Operation) -> T?,
     ): T? {
         if (selected == null || closed) return null
-        val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS)
-        return if (!gate.tryAcquire(remaining(ticket), TimeUnit.MILLISECONDS)) {
+        // Queue admission has its own bound; it never spends the admitted exchange's budget.
+        return if (!gate.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) {
             null
         } else {
+            val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS)
             try {
                 if (!current(ticket)) {
                     null
@@ -362,7 +368,9 @@ internal class IsolatedMediaTransport(
             ticket.session.sources.withInput(bytes) { input ->
                 exchange(ticket, input, output, spec)
             }
-        if (result == null && requestDispatched) recordRefusal(ticket.session, key, now)
+        if (ticket.workerRefused && current(ticket)) {
+            recordRefusal(ticket.session, key, android.os.SystemClock.elapsedRealtime())
+        }
         return result
     }
 
@@ -390,7 +398,9 @@ internal class IsolatedMediaTransport(
             if (!await(reply.ready, ticket)) return null
             retire(selected)
             if (!await(selected.dead, ticket) || !current(ticket)) return null
-            return reply.result?.takeIf(::validResult)
+            val result = reply.result ?: return null
+            ticket.workerRefused = validIsolation(result) && !result.getBoolean("success")
+            return result.takeIf(::validResult)
         } finally {
             synchronized(bindingLock) { if (pending === reply) revokePending() }
             retire(selected)
@@ -430,10 +440,12 @@ internal class IsolatedMediaTransport(
             }
         }
 
-    private fun validResult(result: Bundle): Boolean {
+    private fun validResult(result: Bundle): Boolean = result.getBoolean("success") && validIsolation(result)
+
+    private fun validIsolation(result: Bundle): Boolean {
         val isolated = result.getInt("uid") != Process.myUid() && result.getBoolean("isolated")
         val restricted = !result.getBoolean("internetGranted") && !result.getBoolean("runtimeInitialized")
-        return result.getBoolean("success") && isolated && restricted
+        return isolated && restricted
     }
 
     private fun retire(selected: Worker) {
@@ -447,6 +459,18 @@ internal class IsolatedMediaTransport(
                 }
             }
         runCatching { target?.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
+    }
+
+    /** One input-free diagnostic per held worker; this never supplies a death witness. */
+    private fun warnLifetimeHold(
+        selected: Worker,
+        reason: String,
+    ) {
+        val first =
+            synchronized(bindingLock) {
+                if (selected.holdReported) false else true.also { selected.holdReported = true }
+            }
+        if (first) android.util.Log.w("MediaDecode", "Worker lifetime unresolved: $reason")
     }
 
     internal fun isRequestDispatchedForTest(): Boolean {
@@ -508,6 +532,7 @@ internal class IsolatedMediaTransport(
                     selected.bindComplete = true
                     selected.retiring = true
                 }
+                warnLifetimeHold(selected, "bind-outcome")
                 return false
             }
         val bound =
@@ -581,6 +606,7 @@ internal class IsolatedMediaTransport(
     private data class Operation(
         val session: Session,
         val deadline: Long,
+        var workerRefused: Boolean = false,
     )
 
     private inner class Worker(
@@ -595,6 +621,7 @@ internal class IsolatedMediaTransport(
         var retiring = false
         var retireSent = false
         var disposed = false
+        var holdReported = false
         val dead = CountDownLatch(1)
         val deathRecipient = IBinder.DeathRecipient { died(this) }
     }

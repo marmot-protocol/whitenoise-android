@@ -410,6 +410,178 @@ class MediaBindingRecoveryTest {
         }
     }
 
+    @Test
+    fun admissionWaitDoesNotSpendTheExecutionBudget() {
+        val context =
+            BindingFixture(
+                ApplicationProvider.getApplicationContext(),
+                beforeBind = {
+                    org.robolectric.shadows.ShadowSystemClock
+                        .advanceBy(java.time.Duration.ofSeconds(6))
+                },
+            )
+        val transport = IsolatedMediaTransport(context)
+        val gate = field(transport, "gate") as java.util.concurrent.Semaphore
+        gate.acquire()
+        val call = start(transport, 7)
+        try {
+            val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (!gate.hasQueuedThreads() && System.nanoTime() < until) Thread.yield()
+            assertTrue("Caller must be waiting for admission", gate.hasQueuedThreads())
+            org.robolectric.shadows.ShadowSystemClock
+                .advanceBy(java.time.Duration.ofSeconds(6))
+            gate.release()
+            val selected = context.next()
+            assertTrue(selected.remote.decoded.await(2, TimeUnit.SECONDS))
+            assertTrue(selected.remote.retired.await(2, TimeUnit.SECONDS))
+            selected.remote.die()
+            call.join()
+        } finally {
+            if (gate.availablePermits() == 0 && gate.hasQueuedThreads()) gate.release()
+            call.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    @Test
+    fun deathDeadlineAfterReplyDoesNotQuarantineTheSource() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = IsolatedMediaTransport(context)
+        val firstCall = start(transport, 8)
+        var next: Call? = null
+        try {
+            val first = context.next()
+            assertTrue(first.remote.decoded.await(2, TimeUnit.SECONDS))
+            org.robolectric.shadows.ShadowSystemClock
+                .advanceBy(java.time.Duration.ofSeconds(9))
+            val identity =
+                org.robolectric.shadows.ShadowBinder.CallingIdentity
+                    .newBuilder()
+                    .setUid(android.os.Process.myUid() + 1)
+                    .setPid(android.os.Process.myPid() + 1)
+                    .setUserHandle(android.os.Process.myUserHandle())
+                    .build()
+            val previous =
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(identity)
+            try {
+                assertTrue(
+                    first.remote.deliverHeldReply(
+                        Bundle().apply {
+                            putBoolean("success", true)
+                            putBoolean("isolated", true)
+                            putBoolean("pixels", true)
+                            putInt("width", 1)
+                            putInt("height", 1)
+                            putInt("sourceWidth", 1)
+                            putInt("sourceHeight", 1)
+                            putInt("orientation", 1)
+                            putString("mime", "image/png")
+                        },
+                    ),
+                )
+            } finally {
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(previous)
+            }
+            assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
+            firstCall.join()
+            assertNull(firstCall.result.get())
+            val session = checkNotNull(field(transport, "session"))
+            assertTrue((field(session, "refusals") as Map<*, *>).isEmpty())
+            first.remote.die()
+            next = start(transport, 8)
+            val second = context.next()
+            assertTrue(second.remote.decoded.await(2, TimeUnit.SECONDS))
+            assertEquals(2, context.bindings.size)
+        } finally {
+            firstCall.interruptAndJoin()
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    @Test
+    fun unattestedTerminalReplyDoesNotQuarantineTheSource() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext())
+        val transport = IsolatedMediaTransport(context)
+        val firstCall = start(transport, 9)
+        var next: Call? = null
+        try {
+            val first = context.next()
+            assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
+            first.remote.die()
+            firstCall.join()
+            val session = checkNotNull(field(transport, "session"))
+            assertTrue((field(session, "refusals") as Map<*, *>).isEmpty())
+            next = start(transport, 9)
+            val second = context.next()
+            assertTrue(second.remote.decoded.await(2, TimeUnit.SECONDS))
+            second.remote.die()
+            next.join()
+        } finally {
+            firstCall.interruptAndJoin()
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** Simulated callback identity exercises provenance; this is not an OS-isolation attestation. */
+    @Test
+    fun attestedWorkerNegativeAfterExactDeathQuarantinesOnlyTheSameSource() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = IsolatedMediaTransport(context)
+        val firstCall = start(transport, 10)
+        var next: Call? = null
+        try {
+            val first = context.next()
+            assertTrue(first.remote.decoded.await(2, TimeUnit.SECONDS))
+            val identity =
+                org.robolectric.shadows.ShadowBinder.CallingIdentity
+                    .newBuilder()
+                    .setUid(android.os.Process.myUid() + 1)
+                    .setPid(android.os.Process.myPid() + 1)
+                    .setUserHandle(android.os.Process.myUserHandle())
+                    .build()
+            val previous =
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(identity)
+            try {
+                assertTrue(
+                    first.remote.deliverHeldReply(
+                        Bundle().apply {
+                            putBoolean("success", false)
+                            putBoolean("isolated", true)
+                        },
+                    ),
+                )
+            } finally {
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(previous)
+            }
+            assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
+            val session = field(transport, "session")
+            assertTrue("No cooldown before exact death", (field(session, "refusals") as Map<*, *>).isEmpty())
+            first.remote.die()
+            firstCall.join()
+            assertEquals(1, (field(session, "refusals") as Map<*, *>).size)
+            assertNull(transport.decode(byteArrayOf(10), 1, false, MediaDecodePolicy.DECODE))
+            assertEquals(1, context.bindings.size)
+            next = start(transport, 11)
+            val second = context.next()
+            assertTrue(second.remote.decoded.await(2, TimeUnit.SECONDS))
+            assertEquals(2, context.bindings.size)
+        } finally {
+            firstCall.interruptAndJoin()
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
     private fun start(
         transport: IsolatedMediaTransport,
         value: Int,
@@ -500,6 +672,7 @@ class MediaBindingRecoveryTest {
         private val reply: Boolean = true,
         private val throwAfterBind: Boolean = false,
         private val failLink: Boolean = false,
+        private val beforeBind: () -> Unit = {},
     ) : ContextWrapper(base) {
         var acceptBind = true
         val bindings = mutableListOf<Bound>()
@@ -518,6 +691,7 @@ class MediaBindingRecoveryTest {
             executor: Executor,
             conn: ServiceConnection,
         ): Boolean {
+            beforeBind()
             val bound = Bound(conn, ReplyingBinder(reply, failLink))
             synchronized(bindings) { bindings += bound }
             if (acceptBind && connect) conn.onServiceConnected(component, bound.remote)
@@ -565,7 +739,7 @@ class MediaBindingRecoveryTest {
 
         fun die() = synchronized(recipients) { recipients.toList() }.forEach { it.binderDied() }
 
-        fun deliverHeldReply(): Boolean {
+        fun deliverHeldReply(result: Bundle = Bundle()): Boolean {
             val (callback, id) = checkNotNull(heldReply)
             var accepted: Boolean? = null
             val recording =
@@ -577,7 +751,7 @@ class MediaBindingRecoveryTest {
                         flags: Int,
                     ): Boolean = callback.transact(code, data, reply, flags).also { accepted = it }
                 }
-            sendMediaDecodeReply(recording, id, Bundle())
+            sendMediaDecodeReply(recording, id, result)
             return checkNotNull(accepted)
         }
 

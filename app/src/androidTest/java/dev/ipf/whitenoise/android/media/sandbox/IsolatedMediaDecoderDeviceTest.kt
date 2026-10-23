@@ -128,30 +128,46 @@ class IsolatedMediaDecoderDeviceTest {
     }
 
     @Test
-    fun accountResetRetiresThePriorWorkerAndKeepsRenderingAvailable() {
-        IsolatedMediaDecoder.install(InstrumentationRegistry.getInstrumentation().targetContext)
-        requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.runOnMainSync {
-            val app =
-                instrumentation.targetContext.applicationContext as
-                    dev.ipf.whitenoise.android.WhiteNoiseApplication
-            app.appState.clearCrossAccountCachesForTest()
+    fun accountResetRetiresThePriorWorkerAndKeepsRenderingAvailable() =
+        withObservedImageOwner { context, owner ->
+            val executor =
+                java.util.concurrent.Executors
+                    .newSingleThreadExecutor()
+            try {
+                val started = android.os.SystemClock.elapsedRealtime()
+                val blocked = executor.submit { IsolatedMediaDecoder.exerciseWatchdogForTest() }
+                awaitDispatch(owner)
+                assertTrue(context.isEndpointAlive(1))
+                assertEquals(1, context.snapshot().getInt("binding_attempts"))
+                val instrumentation = InstrumentationRegistry.getInstrumentation()
+                instrumentation.runOnMainSync {
+                    val app =
+                        instrumentation.targetContext.applicationContext as
+                            dev.ipf.whitenoise.android.WhiteNoiseApplication
+                    app.appState.clearCrossAccountCachesForTest()
+                }
+                blocked.get(5, java.util.concurrent.TimeUnit.SECONDS)
+                awaitEndpointDeath(context, 1)
+                assertTrue(android.os.SystemClock.elapsedRealtime() - started < MediaDecodePolicy.WATCHDOG_MS)
+                requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
+                assertEquals(2, context.snapshot().getInt("binding_attempts"))
+                awaitEndpointDeath(context, 2)
+            } finally {
+                executor.shutdownNow()
+            }
         }
-        requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
-        assertNotEquals(Process.myUid(), requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
-    }
 
     @Test
-    fun watchdogTerminatesOnlyTheWorkerAndPermitsVerifiedDeathRecovery() {
-        IsolatedMediaDecoder.install(InstrumentationRegistry.getInstrumentation().targetContext)
-        requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
-        val caller = Process.myPid()
-        IsolatedMediaDecoder.exerciseWatchdogForTest()
-        requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
-        assertEquals(caller, Process.myPid())
-        assertNotEquals(Process.myUid(), requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
-    }
+    fun watchdogTerminatesOnlyTheWorkerAndPermitsVerifiedDeathRecovery() =
+        withObservedImageOwner { context, _ ->
+            val caller = Process.myPid()
+            IsolatedMediaDecoder.exerciseWatchdogForTest()
+            awaitEndpointDeath(context, 1)
+            requireNotNull(IsolatedMediaDecoder.decode(png(), 128)).recycle()
+            assertEquals(caller, Process.myPid())
+            assertEquals(2, context.snapshot().getInt("binding_attempts"))
+            awaitEndpointDeath(context, 2)
+        }
 
     @Test
     fun isolatedImagesAndPlatformVideoUseSelectedDescriptors() {
@@ -263,7 +279,7 @@ class IsolatedMediaDecoderDeviceTest {
 
     @Test
     fun interruptedImageRequestRetiresOnlyItsWorkerAndCanRecover() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = MediaWorkerBaselineBinding(InstrumentationRegistry.getInstrumentation().targetContext)
         val transport = IsolatedMediaTransport(context, "interrupted_images")
         val executor =
             java.util.concurrent.Executors
@@ -271,6 +287,7 @@ class IsolatedMediaDecoderDeviceTest {
         val ended = java.util.concurrent.CountDownLatch(1)
         try {
             requireNotNull(transport.decode(png(), 2, false, MediaDecodePolicy.DECODE)).recycle()
+            awaitEndpointDeath(context, 1)
             val blocked =
                 executor.submit {
                     try {
@@ -287,8 +304,10 @@ class IsolatedMediaDecoderDeviceTest {
                 Thread.sleep(20L)
             }
             assertTrue(transport.isRequestDispatchedForTest())
+            assertEquals(2, context.snapshot().getInt("binding_attempts"))
             blocked.cancel(true)
             assertTrue(ended.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            awaitEndpointDeath(context, 2)
             val recoveryDeadline = android.os.SystemClock.elapsedRealtime() + 5000L
             var recovered: Bitmap? = null
             while (recovered == null && android.os.SystemClock.elapsedRealtime() < recoveryDeadline) {
@@ -296,11 +315,58 @@ class IsolatedMediaDecoderDeviceTest {
                 if (recovered == null) Thread.sleep(20L)
             }
             requireNotNull(recovered).recycle()
-            assertNotEquals(Process.myUid(), requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)
+            assertEquals(3, context.snapshot().getInt("binding_attempts"))
+            awaitEndpointDeath(context, 3)
         } finally {
             executor.shutdownNow()
             transport.close()
+            context.closeObservers()
         }
+    }
+
+    /** Observe the real facade owner without changing the production context/factory contract. */
+    private fun withObservedImageOwner(block: (MediaWorkerBaselineBinding, IsolatedMediaTransport) -> Unit) {
+        val target = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = MediaWorkerBaselineBinding(target)
+        val field = IsolatedMediaDecoder::class.java.getDeclaredField("imageOwner").apply { isAccessible = true }
+        val previous = field.get(IsolatedMediaDecoder)
+        val owner = IsolatedMediaTransport(context, "observed_images")
+        IsolatedMediaDecoder.clear()
+        try {
+            field.set(IsolatedMediaDecoder, owner)
+            IsolatedMediaDecoder.install(target)
+            block(context, owner)
+        } finally {
+            IsolatedMediaDecoder.clear()
+            owner.close()
+            field.set(IsolatedMediaDecoder, previous)
+            IsolatedMediaDecoder.install(target)
+            context.closeObservers()
+        }
+    }
+
+    private fun awaitDispatch(owner: IsolatedMediaTransport) {
+        val deadline = android.os.SystemClock.elapsedRealtime() + 5_000L
+        while (!owner.isRequestDispatchedForTest() && android.os.SystemClock.elapsedRealtime() < deadline) {
+            android.os.SystemClock.sleep(20)
+        }
+        assertTrue(owner.isRequestDispatchedForTest())
+    }
+
+    private fun awaitEndpointDeath(
+        context: MediaWorkerBaselineBinding,
+        generation: Int,
+    ) {
+        val deadline = android.os.SystemClock.elapsedRealtime() + 5_000L
+        var endpoint = context.snapshot().getJSONArray("endpoints").getJSONObject(generation - 1)
+        while (endpoint.isNull("death_observed_elapsed_ns") && android.os.SystemClock.elapsedRealtime() < deadline) {
+            android.os.SystemClock.sleep(20)
+            endpoint = context.snapshot().getJSONArray("endpoints").getJSONObject(generation - 1)
+        }
+        assertEquals(generation, endpoint.getInt("generation"))
+        assertFalse(endpoint.getBoolean("death_registration_failed"))
+        assertFalse(endpoint.isNull("death_observed_elapsed_ns"))
+        assertFalse(context.isEndpointAlive(generation))
     }
 
     private fun png(): ByteArray = imageBytes(Bitmap.CompressFormat.PNG, Color.RED)

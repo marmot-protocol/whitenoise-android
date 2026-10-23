@@ -26,6 +26,11 @@ gradle.beforeProject { project ->
                 instrumented.java.setIncludes(traceSources)
                 instrumented.kotlin.setIncludes(traceSources)
                 def benchmark = android.buildTypes.getByName('benchmarkRelease')
+                // Only this explicit trace command needs release-derived optimization.
+                // Reapply the existing benchmark identity/selectors after initWith resets them.
+                benchmark.initWith(android.buildTypes.getByName('release'))
+                benchmark.signingConfig = android.signingConfigs.getByName('debug')
+                benchmark.buildConfigField('boolean', 'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true')
                 // The runner shares Trace with the minified app under test.
                 benchmark.proguardFiles(project.rootProject.file('scripts/hosted-startup-trace.pro'))
                 if (benchmark.debuggable || !benchmark.minifyEnabled || !benchmark.shrinkResources) {

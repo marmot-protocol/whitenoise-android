@@ -99,9 +99,18 @@ class HostedStartupTraceTests(unittest.TestCase):
         self.assertIn("android.testBuildType = 'benchmarkRelease'",init)
         self.assertIn('benchmark.debuggable || !benchmark.minifyEnabled || !benchmark.shrinkResources',init)
         self.assertLess(init.index('finalizeDsl'),init.index('projectsEvaluated'))
+        self.assertIn("benchmark.initWith(android.buildTypes.getByName('release'))",init)
+        self.assertIn("benchmark.signingConfig = android.signingConfigs.getByName('debug')",init)
+        self.assertIn("benchmark.buildConfigField('boolean', 'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true')",init)
+        self.assertLess(init.index('benchmark.initWith'),init.index('benchmark.signingConfig'))
+        self.assertLess(init.index('benchmark.initWith'),init.index('benchmark.buildConfigField'))
+        self.assertLess(init.index('benchmark.buildConfigField'),init.index('if (benchmark.debuggable'))
+
+    def test_default_benchmark_keeps_existing_identity_without_release_initialization(self):
         build=(ROOT/'app/build.gradle.kts').read_text().split('create("benchmarkRelease") {',1)[1].split('\n        }',1)[0]
-        self.assertIn('initWith(getByName("release"))',build)
+        self.assertNotIn('initWith',build)
         self.assertIn('signingConfigs.getByName("debug")',build)
+        self.assertIn('buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")',build)
 
     def test_unsupported_runtime_stops_before_instrumentation_and_start(self):
         _,r,receipt,calls=self.execute('unsupported')
