@@ -141,6 +141,100 @@ class MessageForwardingTest {
             assertEquals(1, transport.uploadTargets.size)
         }
 
+    /**
+     * Every destination and message gets its own client token, and a retry of the same message to the same
+     * destination reuses it, which is what lets MDK refuse to publish it twice (#2556).
+     */
+    @Test
+    fun clientTokensAreStableAcrossRetriesAndDistinctPerDestinationAndMessage() =
+        runTest {
+            val transport = RecordingForwardTransport(failPublishBeforeCommitOnceFor = mutableSetOf("target-a"))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(textPayload("first", "first"), textPayload("second", "second")),
+                    targetGroupIds = listOf("target-a", "target-b"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            val tokensBySlot = transport.admissionTokens.groupBy({ it.first to it.second }, { it.third })
+            val retriedSlot = tokensBySlot.getValue("target-a" to 1)
+            assertEquals(2, retriedSlot.size)
+            assertEquals(1, retriedSlot.toSet().size)
+            val firstTokens = tokensBySlot.values.map { it.first() }
+            assertEquals(4, firstTokens.toSet().size)
+            assertTrue(transport.admissionTokens.none { (target, _, token) -> target in token })
+        }
+
+    /** A message that never reached admission fails as a publish timeout, which Retry resolves without resending. */
+    @Test
+    fun aPublishAdmissionTimeoutFailsWithItsOwnStageAndRetryKeepsTheToken() =
+        runTest {
+            val transport = RecordingForwardTransport(timeoutPublishOnceFor = mutableSetOf("target"))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(textPayload("first", "first"), textPayload("second", "second")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+
+            val failed = session.state.value
+            assertEquals(ForwardFailureStage.PublishTimeout, failed.targets.single().failureStage)
+            assertTrue(failed.canRetry)
+            assertFalse(failed.canAutomaticallyRetry)
+            assertEquals(listOf("target" to 0), transport.published)
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(listOf(0, 1), transport.publishStartIndices)
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+            val secondMessageTokens = transport.tokensForMessage(1)
+            assertEquals(2, secondMessageTokens.size)
+            assertEquals(1, secondMessageTokens.toSet().size)
+        }
+
+    /** A rejected admission spent its token, so the deliberate retry admits that message under a fresh one. */
+    @Test
+    fun aRejectedAdmissionGetsAFreshTokenOnRetry() =
+        runTest {
+            val transport = RecordingForwardTransport(rejectPublishOnceFor = mutableSetOf("target"))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(textPayload("first", "first"), textPayload("second", "second")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+            val rejected =
+                session.state.value.targets
+                    .single()
+            assertEquals(ForwardFailureStage.Publish, rejected.failureStage)
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            val secondMessageTokens = transport.tokensForMessage(1)
+            assertEquals(2, secondMessageTokens.toSet().size)
+            val firstMessageTokens = transport.tokensForMessage(0)
+            assertEquals(1, firstMessageTokens.size)
+            assertEquals(listOf("target" to 0, "target" to 1), transport.published)
+        }
+
     @Test
     fun failedConvergenceNeverResendsAnUncertainMessage() =
         runTest {
@@ -1182,6 +1276,8 @@ class MessageForwardingTest {
         private val stallUploadOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishUncertainOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishBeforeCommitOnceFor: MutableSet<String> = mutableSetOf(),
+        private val timeoutPublishOnceFor: MutableSet<String> = mutableSetOf(),
+        private val rejectPublishOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
         private val uploadGates: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque(),
         private val publishGate: CompletableDeferred<Unit>? = null,
@@ -1202,6 +1298,16 @@ class MessageForwardingTest {
         val publishStartIndices = mutableListOf<Int>()
         val convergenceTargets = mutableListOf<String>()
         val published = mutableListOf<Pair<String, Int>>()
+
+        /** Every client token the session supplied, as (destination, message index, token), in admission order. */
+        val admissionTokens = mutableListOf<Triple<String, Int, String>>()
+
+        /** The tokens supplied for message [index] across every destination and attempt, in order. */
+        fun tokensForMessage(index: Int): List<String> =
+            admissionTokens
+                .filter { it.second == index }
+                .map { it.third }
+
         val publishedMediaHashes = mutableMapOf<String, List<String>>()
         val publishedMediaCaptions = mutableMapOf<String, List<String?>>()
         val publishedMediaFileNames = mutableMapOf<String, List<String>>()
@@ -1258,12 +1364,17 @@ class MessageForwardingTest {
             }
         }
 
-        /** Waits on the publish gate, then records each publish or fails once at index 1 as configured. */
+        /**
+         * Waits on the publish gate, then records each publish and its client token, or fails once at index 1 as
+         * configured: not committed, uncertain, timed out or rejected.
+         */
+        @Suppress("ThrowsCount")
         override suspend fun publishBatch(
             targetGroupIdHex: String,
             messages: List<PreparedForwardMessage>,
             uploadedReferences: Map<Int, List<MediaAttachmentReferenceFfi>>,
             startIndex: Int,
+            clientTokenFor: (messageIndex: Int) -> String,
             onBeforeMessagePublished: (messageIndex: Int) -> Unit,
             onMessagePublished: (messageIndex: Int) -> Unit,
         ) {
@@ -1272,6 +1383,13 @@ class MessageForwardingTest {
             for (index in startIndex until messages.size) {
                 currentCoroutineContext().ensureActive()
                 onBeforeMessagePublished(index)
+                admissionTokens += Triple(targetGroupIdHex, index, clientTokenFor(index))
+                if (index == 1 && timeoutPublishOnceFor.remove(targetGroupIdHex)) {
+                    throw ForwardPublishTimeoutException()
+                }
+                if (index == 1 && rejectPublishOnceFor.remove(targetGroupIdHex)) {
+                    throw ForwardPublishRejectedException(index)
+                }
                 if (index == 1 && failPublishBeforeCommitOnceFor.remove(targetGroupIdHex)) {
                     throw ForwardPublishNotCommittedException(IllegalStateException("publish rejected"))
                 }
@@ -1299,6 +1417,7 @@ class MessageForwardingTest {
             }
         }
 
+        /** Records the recovery and answers with the next scripted result, publishing the index when it says so. */
         override suspend fun recoverPendingPublish(
             targetGroupIdHex: String,
             message: PreparedForwardMessage,

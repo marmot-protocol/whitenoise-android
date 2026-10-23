@@ -66,6 +66,14 @@
     ],
     "source_coverage": [
       {
+        "surface": "R.string.forward_failed_publish_timeout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_failed_publish_timeout",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
         "surface": "R.string.forward_preparing_attachments",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
         "anchor": "R.string.forward_preparing_attachments",

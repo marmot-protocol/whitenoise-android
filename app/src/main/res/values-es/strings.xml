@@ -446,6 +446,7 @@
     <string name="forward_uploading_slow">La subida está tardando más de lo habitual</string>
     <string name="forward_sending_slow">El envío está tardando más de lo habitual. Ya no se puede cancelar y no se enviará dos veces.</string>
     <string name="forward_failed_upload_timeout">La subida no comenzó. Reinténtalo o descarta la operación para detener el reenvío.</string>
+    <string name="forward_failed_publish_timeout">El envío no terminó. Reinténtalo o descarta la operación para detener el reenvío. Al reintentar no se enviará dos veces.</string>
     <string name="forward_failed_publish">No se pudieron enviar los mensajes</string>
     <string name="forward_payload_too_large">Estos archivos adjuntos son demasiado grandes para reenviarlos juntos</string>
     <string name="forward_failed_expired">El archivo adjunto caducó antes de poder reenviarlo</string>

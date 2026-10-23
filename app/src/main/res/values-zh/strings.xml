@@ -435,6 +435,7 @@
     <string name="forward_uploading_slow">上传的时间比平常更长</string>
     <string name="forward_sending_slow">发送的时间比平常更长。现在无法取消，也不会重复发送。</string>
     <string name="forward_failed_upload_timeout">上传未开始。请重试，或关闭以停止转发。</string>
+    <string name="forward_failed_publish_timeout">发送未完成。请重试，或关闭以停止转发。重试不会重复发送。</string>
     <string name="forward_failed_publish">无法发送消息</string>
     <string name="forward_payload_too_large">这些附件合计过大，无法转发</string>
     <string name="forward_failed_expired">附件在转发前已过期</string>

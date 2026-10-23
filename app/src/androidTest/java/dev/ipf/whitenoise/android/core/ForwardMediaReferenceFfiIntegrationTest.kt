@@ -188,6 +188,138 @@ class ForwardMediaReferenceFfiIntegrationTest {
             }
         }
 
+    /**
+     * A small text/plain forward through MDK's token admission (#2556): the source is materialized twice, its first and
+     * then its already retained read, the destination gets fresh references, and admitting the same client token again
+     * returns the same message instead of publishing a second one.
+     */
+    @Test
+    @Suppress("LongMethod") // Keep the end-to-end native boundary in one auditable sequence.
+    fun smallTextAttachmentForwardIsAdmittedOnceByClientToken() =
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            MarmotAndroid.initialize(context)
+            val root = File(context.cacheDir, "forward-token-ffi-${UUID.randomUUID()}").apply { mkdirs() }
+            val marmot = Marmot(root.absolutePath, MarmotClient.bootstrapRelays, marmotDeploymentWhiteNoise())
+            var accountRef: String? = null
+            var closed = false
+
+            try {
+                withTimeout(TEST_TIMEOUT_MS) {
+                    marmot.start()
+                    val account =
+                        marmot.createIdentity(
+                            MarmotClient.bootstrapRelays,
+                            MarmotClient.bootstrapRelays,
+                        )
+                    accountRef = account.label
+                    val sourceGroup = marmot.createGroup(account.label, "Token source", emptyList(), null)
+                    val destinationGroup = marmot.createGroup(account.label, "Token destination", emptyList(), null)
+                    val fixture =
+                        ForwardableFixture(
+                            fileName = "note.txt",
+                            mediaType = "text/plain",
+                            plaintext = ByteArray(SMALL_TEXT_BYTES) { index -> ('a'.code + index % 26).toByte() },
+                        )
+                    val sourceReference =
+                        marmot
+                            .uploadMedia(
+                                account.label,
+                                sourceGroup,
+                                listOf(fixture).toUploadRequest(caption = FORWARD_CAPTION, send = true),
+                            ).attachments
+                            .single()
+                            .reference
+
+                    val firstRead = marmot.downloadMedia(account.label, sourceGroup, sourceReference)
+                    val retainedRead = marmot.downloadMedia(account.label, sourceGroup, sourceReference)
+                    assertArrayEquals(fixture.plaintext, firstRead.plaintext)
+                    assertArrayEquals(fixture.plaintext, retainedRead.plaintext)
+
+                    val destinationReferences =
+                        marmot
+                            .uploadMedia(
+                                account.label,
+                                destinationGroup,
+                                MediaUploadRequestFfi(
+                                    attachments =
+                                        listOf(
+                                            MediaUploadAttachmentRequestFfi(
+                                                fileName = retainedRead.fileName,
+                                                mediaType = retainedRead.mediaType,
+                                                plaintext = retainedRead.plaintext,
+                                                dim = sourceReference.dim,
+                                                thumbhash = sourceReference.thumbhash,
+                                            ),
+                                        ),
+                                    caption = FORWARD_CAPTION,
+                                    send = false,
+                                    blossomServer = null,
+                                ),
+                            ).attachments
+                            .map { it.reference }
+                    assertFreshDestinationReferences(listOf(sourceReference), destinationReferences)
+
+                    val token = UUID.randomUUID().toString()
+                    assertEquals(null, marmot.localSendStatus(account.label, destinationGroup, token))
+                    val admitted =
+                        marmot.sendPreparedMediaWithClientToken(
+                            account.label,
+                            destinationGroup,
+                            destinationReferences,
+                            FORWARD_CAPTION,
+                            token,
+                            null,
+                        )
+                    val readmitted =
+                        marmot.sendPreparedMediaWithClientToken(
+                            account.label,
+                            destinationGroup,
+                            destinationReferences,
+                            FORWARD_CAPTION,
+                            token,
+                            null,
+                        )
+
+                    assertEquals(token, admitted.clientToken)
+                    assertEquals("A repeated token must resolve to the same message", admitted, readmitted)
+                    assertNotNull(marmot.localSendStatus(account.label, destinationGroup, token))
+                    val forwarded =
+                        marmot
+                            .timelineMessages(
+                                account.label,
+                                TimelineMessageQueryFfi(
+                                    groupIdHex = destinationGroup,
+                                    search = null,
+                                    before = null,
+                                    beforeMessageId = null,
+                                    after = null,
+                                    afterMessageId = null,
+                                    limit = 20u,
+                                ),
+                            ).messages
+                            .filter { record -> record.plaintext == FORWARD_CAPTION }
+                    assertEquals("The forward must exist exactly once", 1, forwarded.size)
+                    val opened = marmot.downloadMedia(account.label, destinationGroup, destinationReferences.single())
+                    assertEquals(fixture.mediaType, opened.mediaType)
+                    assertArrayEquals(fixture.plaintext, opened.plaintext)
+                }
+            } finally {
+                accountRef?.let { ephemeralAccount ->
+                    runCatching {
+                        withTimeout(CLEANUP_TIMEOUT_MS) { marmot.removeAccount(ephemeralAccount) }
+                    }
+                }
+                try {
+                    withTimeout(CLEANUP_TIMEOUT_MS) { marmot.shutdownAndClose() }
+                    closed = true
+                } finally {
+                    if (!closed) marmot.close()
+                    root.deleteRecursively()
+                }
+            }
+        }
+
     private suspend fun assertReferencesCannotCrossDestinationGroups(
         marmot: Marmot,
         accountRef: String,
@@ -310,5 +442,6 @@ class ForwardMediaReferenceFfiIntegrationTest {
         const val FORWARD_CAPTION = "Forwarded media caption"
         const val TEST_TIMEOUT_MS = 240_000L
         const val CLEANUP_TIMEOUT_MS = 30_000L
+        const val SMALL_TEXT_BYTES = 1_024
     }
 }

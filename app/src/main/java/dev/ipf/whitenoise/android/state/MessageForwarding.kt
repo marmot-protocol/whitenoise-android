@@ -2,10 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.Immutable
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
-import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +52,12 @@ internal enum class ForwardFailureStage {
     /** The destination upload never started; Retry is the user's choice, never automatic (#2556). */
     UploadTimeout,
     Publish,
+
+    /**
+     * A message did not reach durable local admission in time. Retry reuses its client token, so it is never sent
+     * twice, but like the other timeouts it is the user's choice, never automatic (#2556).
+     */
+    PublishTimeout,
     PayloadTooLarge,
     Expired,
     SessionChanged,
@@ -102,7 +106,8 @@ internal data class ForwardOperationSnapshot(
             canRetry &&
                 targets.none { target ->
                     target.failureStage == ForwardFailureStage.PreparationTimeout ||
-                        target.failureStage == ForwardFailureStage.UploadTimeout
+                        target.failureStage == ForwardFailureStage.UploadTimeout ||
+                        target.failureStage == ForwardFailureStage.PublishTimeout
                 }
     val canCancel: Boolean
         get() =
@@ -163,11 +168,17 @@ internal interface ForwardTransport {
         message: PreparedForwardMessage.Media,
     ): List<MediaAttachmentReferenceFfi>
 
+    /**
+     * Admits [messages] from [startIndex] to [targetGroupIdHex], each under the stable token [clientTokenFor] returns
+     * for its index, so a retry of the same message to the same destination can never publish it twice.
+     */
+    @Suppress("LongParameterList")
     suspend fun publishBatch(
         targetGroupIdHex: String,
         messages: List<PreparedForwardMessage>,
         uploadedReferences: Map<Int, List<MediaAttachmentReferenceFfi>>,
         startIndex: Int,
+        clientTokenFor: (messageIndex: Int) -> String,
         onBeforeMessagePublished: (messageIndex: Int) -> Unit,
         onMessagePublished: (messageIndex: Int) -> Unit,
     )
@@ -224,10 +235,15 @@ internal class ForwardSessionInvalidatedException : IllegalStateException("forwa
 
 internal class ForwardPreparationTimeoutException : IllegalStateException("forward attachment preparation timed out")
 
+/**
+ * What a session keeps about an uncertain publish so a retry can resolve it first. A token-bound publish carries its
+ * [clientToken], which MDK resolves on its own; the timeline fields describe publishes made without one.
+ */
 internal data class ForwardPublishRecoveryEvidence(
     val messageIndex: Int,
     val knownMessageIdsBefore: Set<String>,
     val pendingMessageIdHex: String?,
+    val clientToken: String? = null,
 )
 
 internal enum class ForwardPublishRecoveryResult {
@@ -357,6 +373,8 @@ internal class ForwardSession(
     private val uploadedReferencesByTarget = mutableMapOf<String, MutableMap<Int, List<MediaAttachmentReferenceFfi>>>()
     private val publishedMessageCountByTarget = normalizedTargets.associateWithTo(mutableMapOf()) { 0 }
     private val uncertainPublishByTarget = mutableMapOf<String, ForwardPublishRecoveryEvidence>()
+
+    private val publishTokens = ForwardPublishTokens()
     private var activeJob: Job? = null
     private var released = false
     private var started = false
@@ -612,6 +630,7 @@ internal class ForwardSession(
                     messages = prepared,
                     uploadedReferences = targetReferences,
                     startIndex = publishedMessageCountByTarget.getValue(targetGroupIdHex),
+                    clientTokenFor = { messageIndex -> publishTokens.tokenFor(targetGroupIdHex, messageIndex) },
                     onBeforeMessagePublished = { messageIndex ->
                         (prepared[messageIndex] as? PreparedForwardMessage.Media)?.let { message ->
                             ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
@@ -636,6 +655,11 @@ internal class ForwardSession(
         } catch (failure: Exception) {
             if (failure is ForwardPublishUncertainException) {
                 uncertainPublishByTarget[targetGroupIdHex] = failure.evidence
+            }
+            // A rejected admission spent its token, so the next deliberate retry needs a fresh one.
+            if (failure is ForwardPublishRejectedException) {
+                publishTokens.forget(targetGroupIdHex, failure.messageIndex)
+                uncertainPublishByTarget.remove(targetGroupIdHex)
             }
             failureStage = targetFailureStage(failureStage, failure)
             onFailure(targetGroupIdHex, failureStage, failure)
@@ -707,6 +731,7 @@ internal class ForwardSession(
         if (clearRetryState) {
             uploadedReferencesByTarget.clear()
             uncertainPublishByTarget.clear()
+            publishTokens.clear()
         }
     }
 
@@ -837,6 +862,7 @@ private fun targetFailureStage(
 ): ForwardFailureStage =
     when (failure) {
         is ForwardUploadStalledException -> ForwardFailureStage.UploadTimeout
+        is ForwardPublishTimeoutException -> ForwardFailureStage.PublishTimeout
         is ForwardAttachmentExpiredException -> ForwardFailureStage.Expired
         is ForwardSessionInvalidatedException -> ForwardFailureStage.SessionChanged
         else -> reached
@@ -881,32 +907,6 @@ private fun updateForwardTarget(
         )
     }
 }
-
-private const val FORWARD_CHAT_MESSAGE_KIND = 9uL
-
-/**
- * Indexes sent timeline records matching one prepared message's content, used
- * to recognize a forward's own publish when its result was uncertain.
- */
-internal fun forwardProjectionRecords(
-    timeline: List<TimelineMessageRecordFfi>,
-    message: PreparedForwardMessage,
-    references: List<MediaAttachmentReferenceFfi>,
-): Map<String, TimelineMessageRecordFfi> =
-    timeline
-        .asSequence()
-        .filter { record ->
-            record.direction == "sent" &&
-                record.kind == FORWARD_CHAT_MESSAGE_KIND &&
-                when (message) {
-                    is PreparedForwardMessage.Text ->
-                        record.plaintext == message.text && record.media.isEmpty()
-                    is PreparedForwardMessage.Media ->
-                        record.plaintext == message.caption.orEmpty() &&
-                            MessageAttachments.acceptedReferences(record.media).map { it.ciphertextSha256 } ==
-                            references.map { it.ciphertextSha256 }
-                }
-        }.associateBy(TimelineMessageRecordFfi::messageIdHex)
 
 /**
  * Auto-dismisses a forward operation's terminal Completed/Cancelled strip

@@ -3,8 +3,6 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
-import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
@@ -15,7 +13,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadSnapshotBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -25,7 +22,7 @@ import kotlinx.coroutines.withContext
  * Builds the production [ForwardTransport] for one forwarding operation with
  * explicit account ownership. Source attachment lookup and plaintext
  * materialization run only under [sourceAccount]; destination upload, commit
- * locking, publish, convergence recovery, and retries run only under
+ * locking, token-bound publish, its recovery, and retries run only under
  * [account]. Neither boundary ever re-reads the live active account: each
  * revalidates that its own bound owner is still a signed-in signing account,
  * so removal or sign-out of either owner stops the operation without falling
@@ -36,7 +33,6 @@ import kotlinx.coroutines.withContext
 internal fun WhiteNoiseAppState.forwardTransport(
     sourceAccount: String,
     account: String,
-    batchMessageCount: Int,
     diagnostics: ForwardDiagnostics? = null,
 ): ForwardTransport {
     /** Rejects source reads after their explicitly bound signing account leaves the runtime. */
@@ -195,36 +191,18 @@ internal fun WhiteNoiseAppState.forwardTransport(
                 ).attachments.map { it.reference }
             }
 
-        /** Reads enough recent destination history to classify an uncertain batch publication. */
-        private suspend fun recentForwardTimeline(
-            targetGroupIdHex: String,
-            batchMessageCount: Int,
-        ): List<TimelineMessageRecordFfi> {
-            requireDestinationAccount()
-            val limit = maxOf(100u, batchMessageCount.toUInt() + 100u)
-            return marmotIo {
-                timelineMessages(
-                    account,
-                    TimelineMessageQueryFfi(
-                        groupIdHex = targetGroupIdHex,
-                        search = null,
-                        before = null,
-                        beforeMessageId = null,
-                        after = null,
-                        afterMessageId = null,
-                        limit = limit,
-                    ),
-                ).messages
-            }.also { requireDestinationAccount() }
-        }
-
-        /** Serializes a destination batch and records exact evidence around uncertain commits. */
-        @Suppress("LongMethod", "ThrowsCount", "TooGenericExceptionCaught")
+        /**
+         * Admits each message under its stable client token while holding the destination commit lock. Admission
+         * returns once MDK durably owns the message, before relay publication, and each one is bounded by
+         * [FORWARD_PUBLISH_ADMISSION_MILLIS]. A retry probes the token first, so an earlier admission is counted
+         * rather than repeated (#2556).
+         */
         override suspend fun publishBatch(
             targetGroupIdHex: String,
             messages: List<PreparedForwardMessage>,
             uploadedReferences: Map<Int, List<MediaAttachmentReferenceFfi>>,
             startIndex: Int,
+            clientTokenFor: (messageIndex: Int) -> String,
             onBeforeMessagePublished: (messageIndex: Int) -> Unit,
             onMessagePublished: (messageIndex: Int) -> Unit,
         ) {
@@ -232,81 +210,48 @@ internal fun WhiteNoiseAppState.forwardTransport(
             val lockRequestedAtMs = diagnostics?.startSpan()
             withGroupCommitLock(account, targetGroupIdHex) {
                 if (lockRequestedAtMs != null) diagnostics?.commitLockAcquired(lockRequestedAtMs)
-                val knownMessageIds =
-                    recentForwardTimeline(targetGroupIdHex, messages.size)
-                        .mapTo(mutableSetOf(), TimelineMessageRecordFfi::messageIdHex)
                 for (messageIndex in startIndex until messages.size) {
                     currentCoroutineContext().ensureActive()
                     onBeforeMessagePublished(messageIndex)
                     requireDestinationAccount()
                     val message = messages[messageIndex]
                     val references = uploadedReferences[messageIndex].orEmpty()
-                    val evidenceBefore = knownMessageIds.toSet()
-                    try {
-                        val publishedMessageIds =
-                            diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
-                                when (message) {
-                                    is PreparedForwardMessage.Text ->
-                                        marmotIo { sendText(account, targetGroupIdHex, message.text) }.messageIds
-                                    is PreparedForwardMessage.Media -> {
-                                        check(references.isNotEmpty()) { "missing destination media references" }
-                                        marmotIo {
-                                            sendMediaAttachments(
+                    if (message is PreparedForwardMessage.Media) {
+                        check(references.isNotEmpty()) { "missing destination media references" }
+                    }
+                    val token = clientTokenFor(messageIndex)
+                    diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
+                        admitForwardPublish(
+                            messageIndex = messageIndex,
+                            token = token,
+                            probe = { marmotIo { localSendStatus(account, targetGroupIdHex, token) } },
+                            beforeAdmit = ::requireDestinationAccount,
+                            admit = {
+                                marmotIo {
+                                    when (message) {
+                                        is PreparedForwardMessage.Text ->
+                                            sendTextWithClientToken(account, targetGroupIdHex, message.text, token)
+                                        is PreparedForwardMessage.Media ->
+                                            sendPreparedMediaWithClientToken(
                                                 account,
                                                 targetGroupIdHex,
                                                 references,
                                                 message.caption,
+                                                token,
+                                                null,
                                             )
-                                        }.messageIds
                                     }
                                 }
-                            }
-                        knownMessageIds += publishedMessageIds
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (failure: Exception) {
-                        val recoveryEvidence =
-                            ForwardPublishRecoveryEvidence(
-                                messageIndex = messageIndex,
-                                knownMessageIdsBefore = evidenceBefore,
-                                pendingMessageIdHex = null,
-                            )
-                        val timelineAfter =
-                            try {
-                                recentForwardTimeline(targetGroupIdHex, messages.size)
-                            } catch (cancellation: CancellationException) {
-                                throw cancellation
-                            } catch (evidenceFailure: Exception) {
-                                failure.addSuppressed(evidenceFailure)
-                                throw ForwardPublishUncertainException(recoveryEvidence, failure)
-                            }
-                        val projectionsAfter = forwardProjectionRecords(timelineAfter, message, references)
-                        val newProjectionIds = projectionsAfter.keys - evidenceBefore
-                        val newProjection = newProjectionIds.singleOrNull()?.let(projectionsAfter::get)
-                        when {
-                            newProjection?.sourceMessageIdHex != null &&
-                                newProjection.invalidationStatus == null ->
-                                knownMessageIds += newProjection.messageIdHex
-                            newProjection != null &&
-                                !newProjection.deleted &&
-                                newProjection.invalidationStatus == null ->
-                                throw ForwardPublishUncertainException(
-                                    recoveryEvidence.copy(pendingMessageIdHex = newProjection.messageIdHex),
-                                    cause = failure,
-                                )
-                            newProjectionIds.isEmpty() ->
-                                throw ForwardPublishNotCommittedException(failure)
-                            else ->
-                                throw ForwardPublishUncertainException(recoveryEvidence, failure)
-                        }
+                            },
+                        )
                     }
+                    requireDestinationAccount()
                     onMessagePublished(messageIndex)
                 }
             }
         }
 
-        /** Reconciles one uncertain destination publication without risking a duplicate send. */
-        @Suppress("ThrowsCount")
+        /** Resolves an uncertain token-bound publish from MDK's local status, without resubmitting anything. */
         override suspend fun recoverPendingPublish(
             targetGroupIdHex: String,
             message: PreparedForwardMessage,
@@ -315,58 +260,8 @@ internal fun WhiteNoiseAppState.forwardTransport(
         ): ForwardPublishRecoveryResult {
             requireDestinationAccount()
             val recovered =
-                withGroupCommitLock(account, targetGroupIdHex) {
-                    val timeline =
-                        try {
-                            recentForwardTimeline(targetGroupIdHex, batchMessageCount)
-                        } catch (cancellation: CancellationException) {
-                            throw cancellation
-                        } catch (invalidated: ForwardSessionInvalidatedException) {
-                            throw invalidated
-                        } catch (_: Exception) {
-                            return@withGroupCommitLock ForwardPublishRecoveryResult.Unavailable
-                        }
-                    val newProjections =
-                        forwardProjectionRecords(timeline, message, uploadedReferences)
-                            .filterKeys { it !in evidence.knownMessageIdsBefore }
-                    val candidate =
-                        evidence.pendingMessageIdHex
-                            ?.let { pendingId -> newProjections[pendingId] }
-                            ?: newProjections.values.singleOrNull()
-                    if (candidate == null) {
-                        return@withGroupCommitLock if (
-                            evidence.pendingMessageIdHex == null && newProjections.isEmpty()
-                        ) {
-                            ForwardPublishRecoveryResult.NotCommitted
-                        } else {
-                            ForwardPublishRecoveryResult.Unavailable
-                        }
-                    }
-                    if (candidate.invalidationStatus != null || candidate.deleted) {
-                        return@withGroupCommitLock ForwardPublishRecoveryResult.Unavailable
-                    }
-                    if (candidate.sourceMessageIdHex != null) {
-                        return@withGroupCommitLock ForwardPublishRecoveryResult.Published
-                    }
-                    diagnostics.span(ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn) {
-                        marmotIo { retryGroupConvergence(account, targetGroupIdHex) }
-                    }
-                    val delivered =
-                        try {
-                            recentForwardTimeline(targetGroupIdHex, batchMessageCount)
-                                .firstOrNull { it.messageIdHex == candidate.messageIdHex }
-                        } catch (cancellation: CancellationException) {
-                            throw cancellation
-                        } catch (invalidated: ForwardSessionInvalidatedException) {
-                            throw invalidated
-                        } catch (_: Exception) {
-                            null
-                        }
-                    if (delivered?.sourceMessageIdHex != null && delivered.invalidationStatus == null) {
-                        ForwardPublishRecoveryResult.Published
-                    } else {
-                        ForwardPublishRecoveryResult.Unavailable
-                    }
+                recoverForwardPublishByToken(evidence) { token ->
+                    marmotIo { localSendStatus(account, targetGroupIdHex, token) }
                 }
             requireDestinationAccount()
             return recovered

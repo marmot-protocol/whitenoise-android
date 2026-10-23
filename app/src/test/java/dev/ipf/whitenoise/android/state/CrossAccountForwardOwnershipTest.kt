@@ -5,15 +5,13 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaDownloadResultFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
-import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -49,8 +47,8 @@ class CrossAccountForwardOwnershipTest {
 
     private val calls = ConcurrentLinkedQueue<RecordedCall>()
     private val messageIdCounter = AtomicInteger(0)
-    private var timelineGate: CountDownLatch? = null
-    private var onTimelineEntered: (() -> Unit)? = null
+    private var statusGate: CountDownLatch? = null
+    private var onStatusEntered: (() -> Unit)? = null
     private var onUploadEntered: (() -> Unit)? = null
     private var downloadGate: CountDownLatch? = null
     private var onDownloadEntered: (() -> Unit)? = null
@@ -62,19 +60,21 @@ class CrossAccountForwardOwnershipTest {
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             when (method.name) {
-                "sendText" -> {
-                    calls += RecordedCall("sendText", arguments!![0] as String)
-                    SendSummaryFfi(
-                        published = 1u,
-                        messageIds = listOf("id-${messageIdCounter.incrementAndGet()}"),
-                        acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
-                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                "sendTextWithClientToken" -> {
+                    calls += RecordedCall("sendTextWithClientToken", arguments!![0] as String)
+                    LocalSendAcceptanceFfi(
+                        clientToken = arguments[3] as String,
+                        messageIdHex = "id-${messageIdCounter.incrementAndGet()}",
                     )
+                }
+                "localSendStatus" -> {
+                    calls += RecordedCall("localSendStatus", arguments!![0] as String)
+                    onStatusEntered?.invoke()
+                    statusGate?.await()
+                    null
                 }
                 "timelineMessages" -> {
                     calls += RecordedCall("timelineMessages", arguments!![0] as String)
-                    onTimelineEntered?.invoke()
-                    timelineGate?.await()
                     TimelinePageFfi(messages = emptyList(), hasMoreBefore = false, hasMoreAfter = false)
                 }
                 "downloadMedia" -> {
@@ -102,13 +102,11 @@ class CrossAccountForwardOwnershipTest {
                         sent = null,
                     )
                 }
-                "sendMediaAttachments" -> {
-                    calls += RecordedCall("sendMediaAttachments", arguments!![0] as String)
-                    SendSummaryFfi(
-                        published = 1u,
-                        messageIds = listOf("media-id-${messageIdCounter.incrementAndGet()}"),
-                        acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
-                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                "sendPreparedMediaWithClientToken" -> {
+                    calls += RecordedCall("sendPreparedMediaWithClientToken", arguments!![0] as String)
+                    LocalSendAcceptanceFfi(
+                        clientToken = arguments[4] as String,
+                        messageIdHex = "media-id-${messageIdCounter.incrementAndGet()}",
                     )
                 }
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
@@ -216,7 +214,7 @@ class CrossAccountForwardOwnershipTest {
         assertEquals(ACCOUNT_B, appState.activeForwardDestinationAccountRef)
         val accountsUsed = calls.map(RecordedCall::accountRef).toSet()
         assertEquals(setOf(ACCOUNT_B), accountsUsed)
-        assertEquals(4, calls.count { it.method == "sendText" })
+        assertEquals(4, calls.count { it.method == "sendTextWithClientToken" })
     }
 
     /** Start returns false when either bound owner is signed out. */
@@ -256,8 +254,8 @@ class CrossAccountForwardOwnershipTest {
                 activeAccountRef = ACCOUNT_A,
             )
         val gate = CountDownLatch(1)
-        timelineGate = gate
-        onTimelineEntered = { setAccounts(appState, listOf(account(ACCOUNT_A, "aa"))) }
+        statusGate = gate
+        onStatusEntered = { setAccounts(appState, listOf(account(ACCOUNT_A, "aa"))) }
 
         val started =
             appState.startForwardMessages(
@@ -267,14 +265,14 @@ class CrossAccountForwardOwnershipTest {
                 destinationAccountRef = ACCOUNT_B,
             )
         assertTrue(started)
-        awaitCall("timelineMessages")
+        awaitCall("localSendStatus")
         gate.countDown()
 
         val terminal = awaitTerminal(appState)
         assertEquals(ForwardOperationPhase.Failed, terminal.phase)
         assertEquals(ForwardFailureStage.SessionChanged, terminal.targets.single().failureStage)
         assertFalse(terminal.canRetry)
-        assertTrue(calls.none { it.method == "sendText" })
+        assertTrue(calls.none { it.method == "sendTextWithClientToken" })
     }
 
     /** Builds one complete media attachment reference owned by the source group. */
@@ -324,10 +322,10 @@ class CrossAccountForwardOwnershipTest {
         val byMethod = calls.groupBy(RecordedCall::method) { it.accountRef }
         assertEquals(listOf(ACCOUNT_A), byMethod.getValue("downloadMedia").distinct())
         assertEquals(listOf(ACCOUNT_B), byMethod.getValue("uploadMedia").distinct())
-        assertEquals(listOf(ACCOUNT_B), byMethod.getValue("sendMediaAttachments").distinct())
-        assertEquals(listOf(ACCOUNT_B), byMethod.getValue("timelineMessages").distinct())
+        assertEquals(listOf(ACCOUNT_B), byMethod.getValue("sendPreparedMediaWithClientToken").distinct())
+        assertEquals(listOf(ACCOUNT_B), byMethod.getValue("localSendStatus").distinct())
         assertTrue(calls.none { it.accountRef == ACCOUNT_C })
-        assertTrue(calls.none { it.method == "sendText" })
+        assertTrue(calls.none { it.method == "sendTextWithClientToken" })
     }
 
     /**
@@ -362,7 +360,11 @@ class CrossAccountForwardOwnershipTest {
         val terminal = awaitTerminal(appState)
         assertEquals(ForwardOperationPhase.Completed, terminal.phase)
         assertEquals(listOf(ACCOUNT_A), calls.filter { it.method == "downloadMedia" }.map { it.accountRef })
-        assertEquals(listOf(ACCOUNT_B), calls.filter { it.method == "sendMediaAttachments" }.map { it.accountRef })
+        val mediaAdmissionAccounts =
+            calls
+                .filter { it.method == "sendPreparedMediaWithClientToken" }
+                .map { it.accountRef }
+        assertEquals(listOf(ACCOUNT_B), mediaAdmissionAccounts)
     }
 
     /** Replays the account-switch teardown against the shared download pool. */
@@ -402,7 +404,7 @@ class CrossAccountForwardOwnershipTest {
         assertEquals(ForwardOperationPhase.Failed, terminal.phase)
         assertEquals(ForwardFailureStage.SessionChanged, terminal.targets.single().failureStage)
         assertEquals(listOf(ACCOUNT_A), calls.filter { it.method == "downloadMedia" }.map { it.accountRef })
-        assertTrue(calls.none { it.method == "sendMediaAttachments" })
+        assertTrue(calls.none { it.method == "sendPreparedMediaWithClientToken" })
     }
 
     /** Replaces the live account list through the snapshot-state delegate. */

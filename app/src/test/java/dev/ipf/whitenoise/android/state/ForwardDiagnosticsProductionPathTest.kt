@@ -7,15 +7,13 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaDownloadResultFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
-import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -88,12 +86,12 @@ class ForwardDiagnosticsProductionPathTest {
                             ),
                         sent = null,
                     )
-                "sendMediaAttachments", "sendText" ->
-                    SendSummaryFfi(
-                        published = 1u,
-                        messageIds = listOf("media-id-${messageIdCounter.incrementAndGet()}"),
-                        acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
-                        maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                "localSendStatus" -> null
+                "sendTextWithClientToken", "sendPreparedMediaWithClientToken" ->
+                    LocalSendAcceptanceFfi(
+                        // The client token is the fourth text argument and the fifth media argument.
+                        clientToken = arguments!![if (method.name == "sendTextWithClientToken") 3 else 4] as String,
+                        messageIdHex = "media-id-${messageIdCounter.incrementAndGet()}",
                     )
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "ForwardDiagnosticsMarmotFake"

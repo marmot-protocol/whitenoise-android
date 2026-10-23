@@ -446,6 +446,7 @@
     <string name="forward_uploading_slow">Le téléversement prend plus de temps que d’habitude</string>
     <string name="forward_sending_slow">L’envoi prend plus de temps que d’habitude. Il ne peut plus être annulé et ne sera pas envoyé deux fois.</string>
     <string name="forward_failed_upload_timeout">Le téléversement n’a pas démarré. Réessayez ou fermez l’opération pour arrêter le transfert.</string>
+    <string name="forward_failed_publish_timeout">L’envoi n’a pas abouti. Réessayez ou fermez l’opération pour arrêter le transfert. Une nouvelle tentative ne l’enverra pas deux fois.</string>
     <string name="forward_failed_publish">Impossible d’envoyer les messages</string>
     <string name="forward_payload_too_large">Ces pièces jointes sont trop volumineuses pour être transférées ensemble</string>
     <string name="forward_failed_expired">La pièce jointe a expiré avant de pouvoir être transférée</string>

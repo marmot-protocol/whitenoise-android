@@ -544,6 +544,7 @@ private fun ForwardTargetProgressRow(
                     when (progress.failureStage) {
                         ForwardFailureStage.Upload -> stringResource(R.string.forward_failed_upload)
                         ForwardFailureStage.UploadTimeout -> stringResource(R.string.forward_failed_upload_timeout)
+                        ForwardFailureStage.PublishTimeout -> stringResource(R.string.forward_failed_publish_timeout)
                         ForwardFailureStage.Publish -> stringResource(R.string.forward_failed_publish)
                         ForwardFailureStage.PayloadTooLarge -> stringResource(R.string.forward_payload_too_large)
                         ForwardFailureStage.Expired -> stringResource(R.string.forward_failed_expired)

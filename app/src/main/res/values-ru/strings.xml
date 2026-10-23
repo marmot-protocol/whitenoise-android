@@ -468,6 +468,7 @@
     <string name="forward_uploading_slow">Загрузка занимает больше времени, чем обычно</string>
     <string name="forward_sending_slow">Отправка занимает больше времени, чем обычно. Её уже нельзя отменить, и она не будет отправлена дважды.</string>
     <string name="forward_failed_upload_timeout">Загрузка не началась. Повторите попытку или закройте операцию, чтобы остановить пересылку.</string>
+    <string name="forward_failed_publish_timeout">Отправка не завершилась. Повторите попытку или закройте операцию, чтобы остановить пересылку. Повторная попытка не отправит сообщение дважды.</string>
     <string name="forward_failed_publish">Не удалось отправить сообщения</string>
     <string name="forward_payload_too_large">Эти вложения слишком велики для совместной пересылки</string>
     <string name="forward_failed_expired">Срок действия вложения истёк до пересылки</string>
