@@ -2381,4 +2381,5 @@
     <string name="document_save_interrupted">Kimlik doğrulama bu kaydetme işlemini kesintiye uğrattı. Hedef seçmek için tekrar Kaydet’i seçin.</string>
     <string name="avatar_preparation_interrupted">Görüntü güncellemesi kesintiye uğradı. Tekrar seçmeden önce mevcut görüntüyü kontrol edin.</string>
     <string name="dictation_interrupted">Dikte kesintiye uğradı. Göndermeden önce kurtarılan metni ve kalan ses kayıtlarını gözden geçirin.</string>
+    <string name="dictation_waiting_for_unlock">Dikte geçici olarak kaydedildi. Yapıştırmak için uygulamanın kilidini açın.</string>
 </resources>

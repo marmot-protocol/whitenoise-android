@@ -126,8 +126,15 @@ class ConversationWarmResumeNavigationCoverageTest {
                 .substringBefore("val pendingLocalTimeline")
                 .contains("if (restoreToken != null && retainedPresentationSafe)"),
         )
-        assertTrue(resume.contains("ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation"))
-        assertTrue(resume.contains("lockVisible = controller.appState.appLockScreenVisible"))
+        // Admission is captured by the live provider before resume, then rechecked before correction.
+        val admissionProvider = source.substringBefore("ConversationForegroundDrawGateEffect(")
+        assertTrue(
+            admissionProvider.contains("ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation"),
+        )
+        assertTrue(admissionProvider.contains("lockVisible = controller.appState.appLockScreenVisible"))
+        assertTrue(resume.contains("val retainedPresentationSafe = currentCanPresentRetainedFrame()"))
+        assertTrue(resume.contains("if (!currentCanPresentRetainedFrame())"))
+        assertTrue(resume.contains("awaitConversationForegroundAdmission("))
     }
 
     private class RecordingWriter : ConversationScrollWriter {

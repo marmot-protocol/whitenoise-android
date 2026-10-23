@@ -474,5 +474,6 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
             ConversationDictationFailure.DeliveryUnknown -> R.string.delivery_not_confirmed
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
             ConversationDictationFailure.DraftWriteDeferred -> R.string.dictation_waiting_for_unlock
+            ConversationDictationFailure.DraftWriteRefused -> R.string.toast_draft_save_failed
         },
     )

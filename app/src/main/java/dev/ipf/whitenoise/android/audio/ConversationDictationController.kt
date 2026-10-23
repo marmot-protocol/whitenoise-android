@@ -106,6 +106,7 @@ internal enum class ConversationDictationFailure {
     SendBlocked,
     Unknown,
     DraftWriteDeferred,
+    DraftWriteRefused,
 }
 
 /** Empty recognition outcomes share recovery policy without treating a no-match as proof of silence. */
@@ -1895,30 +1896,13 @@ internal class ConversationDictationController internal constructor(
         pendingForegroundRecoverySessionId = (state as? ConversationDictationState.Failed)?.sessionId
         expireRetainedRecoveryIfDue()
         val failed = state as? ConversationDictationState.Failed
-        if (failed?.cause == ConversationDictationFailure.DraftWriteDeferred) return
+        if (failed?.cause == ConversationDictationFailure.DraftWriteDeferred ||
+            failed?.cause == ConversationDictationFailure.DraftWriteRefused
+        ) {
+            return
+        }
         if (failed?.reason == ConversationDictationFailure.DraftWriteDeferred) {
-            val transcript = failed.retainedTranscript ?: return
-            when (completion.retryDeferred(failed.sessionId, failed.target)) {
-                ConversationDictationCompletionOwner.PasteResult.Accepted -> complete(failed.target)
-                ConversationDictationCompletionOwner.PasteResult.Retained ->
-                    fail(
-                        failed.sessionId,
-                        failed.target,
-                        ConversationDictationFailure.Unknown,
-                        retainedTranscript = transcript,
-                        attemptRecovery = false,
-                    )
-                ConversationDictationCompletionOwner.PasteResult.Superseded ->
-                    state =
-                        failed.copy(
-                            reason = ConversationDictationFailure.Unknown,
-                            cause = ConversationDictationFailure.DraftWriteDeferred,
-                            draftSuperseded = true,
-                        )
-                ConversationDictationCompletionOwner.PasteResult.DeferredByHost,
-                ConversationDictationCompletionOwner.PasteResult.Abandoned,
-                -> Unit
-            }
+            retryForegroundDeferredDraft(failed)
             return
         }
         if (failed != null && !failed.draftRecovered) {
@@ -1944,6 +1928,32 @@ internal class ConversationDictationController internal constructor(
         } else {
             pendingForegroundRecoverySessionId = (state as? ConversationDictationState.Failed)?.sessionId
             reattachForegroundRecoveryAfterClosure()
+        }
+    }
+
+    /** Retries only the captured deferred draft; competing edits remain intact. */
+    private fun retryForegroundDeferredDraft(failed: ConversationDictationState.Failed) {
+        val transcript = failed.retainedTranscript ?: return
+        when (completion.retryDeferred(failed.sessionId, failed.target)) {
+            ConversationDictationCompletionOwner.PasteResult.Accepted -> complete(failed.target)
+            ConversationDictationCompletionOwner.PasteResult.Retained ->
+                fail(
+                    failed.sessionId,
+                    failed.target,
+                    ConversationDictationFailure.Unknown,
+                    retainedTranscript = transcript,
+                    attemptRecovery = false,
+                )
+            ConversationDictationCompletionOwner.PasteResult.Superseded ->
+                state =
+                    failed.copy(
+                        reason = ConversationDictationFailure.Unknown,
+                        cause = ConversationDictationFailure.DraftWriteRefused,
+                        draftSuperseded = true,
+                    )
+            ConversationDictationCompletionOwner.PasteResult.DeferredByHost,
+            ConversationDictationCompletionOwner.PasteResult.Abandoned,
+            -> Unit
         }
     }
 
@@ -3458,7 +3468,7 @@ internal class ConversationDictationController internal constructor(
                     if (!attemptRecovery &&
                         reason == ConversationDictationFailure.Unknown
                     ) {
-                        ConversationDictationFailure.DraftWriteDeferred
+                        ConversationDictationFailure.DraftWriteRefused
                     } else {
                         reason.takeIf { failure != it }
                     },
@@ -3469,6 +3479,14 @@ internal class ConversationDictationController internal constructor(
         notificationActionGeneration += 1L
         val failed = state as ConversationDictationState.Failed
         handRecoveryToComposer(failed)
+        protectFailedTranscript(retainedTranscript, failure)
+    }
+
+    /** Protects useful failure text after recognition cleanup and composer handoff. */
+    private fun protectFailedTranscript(
+        retainedTranscript: String?,
+        failure: ConversationDictationFailure,
+    ) {
         (state as? ConversationDictationState.Failed)
             ?.takeIf { !retainedTranscript.isNullOrBlank() && failure != ConversationDictationFailure.DeliveryUnknown }
             ?.let { failed ->
@@ -4020,7 +4038,8 @@ internal class ConversationDictationController internal constructor(
         val failure = retainedAudioFailure ?: interruption
         val transcript = completion.transcript.ifBlank { accumulatedTranscript }.trim()
         val retainsAudio = failure != null && runCatching(platform::callerAudioHasPending).getOrDefault(true)
-        if (sessionId != null && failure != null && (retainsAudio || interruption != null)) {
+        val retainsFailure = retainsAudio || interruption != null
+        if (sessionId != null && failure != null && retainsFailure) {
             if (requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
                 completion.draftRecovery.consumeSubmittedTranscript(sessionId, target, transcript)
             }

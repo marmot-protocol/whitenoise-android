@@ -2383,4 +2383,5 @@
     <string name="document_save_interrupted">La autenticación interrumpió el guardado. Elige Guardar de nuevo para seleccionar un destino.</string>
     <string name="avatar_preparation_interrupted">Se interrumpió la actualización de la imagen. Revisa la imagen actual antes de seleccionarla de nuevo.</string>
     <string name="dictation_interrupted">Dictado interrumpido. Revisa el texto recuperado y cualquier audio restante antes de enviar.</string>
+    <string name="dictation_waiting_for_unlock">Dictado guardado temporalmente. Desbloquea la aplicación para pegarlo.</string>
 </resources>

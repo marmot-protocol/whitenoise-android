@@ -837,6 +837,7 @@ class ConversationDictationControllerTest {
         locked = false
         f.controller.onAppForegrounded()
         val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.DraftWriteRefused, failed.cause)
         assertEquals(ConversationDictationFailure.Unknown, failed.reason)
         assertEquals("accepted", failed.retainedTranscript)
         assertEquals("Draft", f.drafts.getValue(key()).text)
@@ -874,6 +875,7 @@ class ConversationDictationControllerTest {
         locked = false
         f.controller.onAppForegrounded()
         val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.DraftWriteRefused, failed.cause)
         assertEquals(true, failed.draftSuperseded)
         assertEquals("accepted", failed.retainedTranscript)
         repeat(2) { f.controller.onAppForegrounded() }
@@ -912,6 +914,7 @@ class ConversationDictationControllerTest {
         locked = false
         f.controller.onAppForegrounded()
         val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.DraftWriteRefused, failed.cause)
         assertEquals(ConversationDictationFailure.Unknown, failed.reason)
         assertEquals("accepted", failed.retainedTranscript)
         repeat(2) { f.controller.onAppForegrounded() }
@@ -1072,18 +1075,7 @@ class ConversationDictationControllerTest {
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.listener.onResult("accepted")
             f.scheduler.runDelay(500L)
-            val playback =
-                dev.ipf.whitenoise.android.state.ConversationDictationPlaybackHandoff(
-                    ttsState = {
-                        dev.ipf.whitenoise.android.audio.tts.TtsState
-                            .Idle()
-                    },
-                    ttsGeneration = { 0L },
-                    pauseTts = {},
-                    resumeTts = {},
-                    pauseVoice = { null },
-                    resumeVoice = { false },
-                )
+            val playback = idleDictationPlaybackHandoff()
             val handoff =
                 dev.ipf.whitenoise.android.state
                     .ConversationDictationMediaHandoff(playback, lease)
@@ -1108,6 +1100,20 @@ class ConversationDictationControllerTest {
             handoff.afterAudioCapture()
         }
     }
+
+    /** Focus lease tests use the real handoff with idle playback and no resumable audio. */
+    private fun idleDictationPlaybackHandoff() =
+        dev.ipf.whitenoise.android.state.ConversationDictationPlaybackHandoff(
+            ttsState = {
+                dev.ipf.whitenoise.android.audio.tts.TtsState
+                    .Idle()
+            },
+            ttsGeneration = { 0L },
+            pauseTts = {},
+            resumeTts = {},
+            pauseVoice = { null },
+            resumeVoice = { false },
+        )
 
     /** Empty, microphone-free focus interruption still tells the user why dictation stopped. */
     @Test
@@ -9037,7 +9043,7 @@ class ConversationDictationControllerTest {
         val scheduler = FakeTimeoutScheduler()
         val drafts = mutableMapOf(key() to draft)
         val revisions = mutableMapOf(key() to 0L)
-        var writes = 0
+        val writer = FixtureDraftWriter(drafts, revisions, allowDraftWrite, onDraftWritten)
         val controller =
             ConversationDictationController(
                 platform = platform,
@@ -9053,32 +9059,17 @@ class ConversationDictationControllerTest {
                         appLocked(),
                         appUnlockEvaluationPending(),
                     ) {
-                        val target = account to group
-                        if (!allowDraftWrite() || (revisions[target] ?: 0L) != expectedRevision) {
-                            null
-                        } else {
-                            drafts[target] = value
-                            revisions[target] = expectedRevision + 1L
-                            writes += 1
-                            onDraftWritten(value)
-                            expectedRevision + 1L
-                        }
+                        writer.write(account, group, expectedRevision, value)
                     }
                 },
                 completionWrite = { account, group, expectedRevision, value ->
                     if (appLocked() || appUnlockEvaluationPending()) {
                         ConversationDictationDraftWrite.DeferredByHost
                     } else {
-                        val target = account to group
-                        if (!allowDraftWrite() || (revisions[target] ?: 0L) != expectedRevision) {
-                            ConversationDictationDraftWrite.Refused
-                        } else {
-                            drafts[target] = value
-                            revisions[target] = expectedRevision + 1L
-                            writes += 1
-                            onDraftWritten(value)
-                            ConversationDictationDraftWrite.Written(expectedRevision + 1L)
-                        }
+                        writer
+                            .write(account, group, expectedRevision, value)
+                            ?.let { ConversationDictationDraftWrite.Written(it) }
+                            ?: ConversationDictationDraftWrite.Refused
                     }
                 },
                 targetAvailable = { _, _ -> targetAvailable() },
@@ -9103,7 +9094,36 @@ class ConversationDictationControllerTest {
                 onRecoveryExpired = onRecoveryExpired,
                 onSendBlocked = onSendBlocked,
             )
-        return Fixture(controller, platform, scheduler, drafts, revisions) { writes }
+        return Fixture(controller, platform, scheduler, drafts, revisions) { writer.writes }
+    }
+
+    /** Shares the exact successful CAS mutation and callback order between both fixture writers. */
+    private class FixtureDraftWriter(
+        private val drafts: MutableMap<Pair<String, String>, TextFieldValue>,
+        private val revisions: MutableMap<Pair<String, String>, Long>,
+        private val allowDraftWrite: () -> Boolean,
+        private val onDraftWritten: (TextFieldValue) -> Unit,
+    ) {
+        var writes = 0
+            private set
+
+        fun write(
+            account: String,
+            group: String,
+            expectedRevision: Long,
+            value: TextFieldValue,
+        ): Long? {
+            val target = account to group
+            return if (!allowDraftWrite() || (revisions[target] ?: 0L) != expectedRevision) {
+                null
+            } else {
+                drafts[target] = value
+                revisions[target] = expectedRevision + 1L
+                writes += 1
+                onDraftWritten(value)
+                expectedRevision + 1L
+            }
+        }
     }
 
     private data class Fixture(

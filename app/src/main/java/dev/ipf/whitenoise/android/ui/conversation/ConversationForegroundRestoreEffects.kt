@@ -166,7 +166,7 @@ internal fun ConversationForegroundRestoreEffects(
             newValue = {
                 ConversationForegroundGeometry(
                     viewportHeightPx =
-                        (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo).viewportSize.height,
+                        foregroundTimelineViewportHeight(timelineViewport, listState),
                     imeBottomPx = imeInsets.getBottom(density),
                     bottomChromeHeightPx = bottomChromeHeightObserver.currentHeightPx,
                 )
@@ -181,7 +181,7 @@ internal fun ConversationForegroundRestoreEffects(
                     geometry = currentForegroundGeometryProvider(),
                     imeTargetBottomPx = imeAnimationTargetInsets.getBottom(density),
                     bottomChromeMeasured = bottomChromeHeightObserver.hasMeasurement,
-                    timelineMeasured = timelineViewport?.hasMeasuredTimeline(controller.timeline) ?: true,
+                    timelineMeasured = foregroundTimelineMeasured(timelineViewport, controller),
                 )
             },
         )
@@ -318,6 +318,18 @@ internal fun ConversationForegroundRestoreEffects(
         },
     )
 }
+
+/** Reads the measured viewport, falling back to LazyListState before the viewport observer attaches. */
+private fun foregroundTimelineViewportHeight(
+    viewport: ConversationTimelineViewport?,
+    listState: LazyListState,
+): Int = (viewport?.readingLayoutInfo() ?: listState.layoutInfo).viewportSize.height
+
+/** An unattached viewport observer does not add a measurement prerequisite. */
+private fun foregroundTimelineMeasured(
+    viewport: ConversationTimelineViewport?,
+    controller: ConversationController,
+): Boolean = viewport?.hasMeasuredTimeline(controller.timeline) ?: true
 
 /**
  * Snapshots the controller's current transcript row structure.

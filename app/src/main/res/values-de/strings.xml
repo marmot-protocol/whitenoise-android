@@ -2400,4 +2400,5 @@
     <string name="document_save_interrupted">Die Authentifizierung hat diesen Speichervorgang unterbrochen. Wähle erneut „Speichern“, um einen Zielort auszuwählen.</string>
     <string name="avatar_preparation_interrupted">Die Bildänderung wurde unterbrochen. Prüfe das aktuelle Bild, bevor du es erneut auswählst.</string>
     <string name="dictation_interrupted">Diktat unterbrochen. Prüfe den wiederhergestellten Text und alle verbleibenden Audioaufnahmen vor dem Senden.</string>
+    <string name="dictation_waiting_for_unlock">Diktat vorübergehend gespeichert. Entsperre die App, um es einzufügen.</string>
 </resources>

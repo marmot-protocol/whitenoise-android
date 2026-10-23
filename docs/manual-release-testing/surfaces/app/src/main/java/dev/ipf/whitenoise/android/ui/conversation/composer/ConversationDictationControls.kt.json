@@ -225,6 +225,14 @@
           "DIC-001",
           "DIC-002"
         ]
+      },
+      {
+        "surface": "string:toast_draft_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.toast_draft_save_failed",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ],
     "source_coverage": [

@@ -31,35 +31,38 @@ internal class ConversationDictationCompletionOwner(
     fun retryDeferred(
         sessionId: Long,
         target: ConversationDictationTarget,
-    ): PasteResult {
-        return try {
-            val pending = deferredWrite ?: return PasteResult.Retained
-            if (pending.operation.sessionId != sessionId ||
-                pending.operation.target != target ||
-                pending.operation.currentSessionId() != sessionId
-            ) {
-                return PasteResult.Abandoned
-            }
-            when (pending.operation.validate()) {
-                ConversationDictationTargetValidation.Available -> Unit
-                ConversationDictationTargetValidation.Indeterminate -> return PasteResult.DeferredByHost
-                ConversationDictationTargetValidation.DefinitelyRemoved -> return PasteResult.Retained
-            }
-            if (
-                readDraft(target.accountRef, target.groupIdHex).revision != pending.revision
-            ) {
-                return PasteResult.Superseded
-            }
-            when (writeCompletionDraft(pending.operation, pending.revision, pending.value)) {
-                is ConversationDictationDraftWrite.Written -> PasteResult.Accepted
-                ConversationDictationDraftWrite.DeferredByHost -> PasteResult.DeferredByHost
-                ConversationDictationDraftWrite.Refused -> PasteResult.Retained
+    ): PasteResult =
+        try {
+            val pending = deferredWrite
+            when {
+                pending == null -> PasteResult.Retained
+                pending.operation.sessionId != sessionId ||
+                    pending.operation.target != target ||
+                    pending.operation.currentSessionId() != sessionId -> PasteResult.Abandoned
+                else -> retryCapturedDraft(pending)
             }
         } catch (_: Throwable) {
             // Keep the captured text without rebasing or making a second recovery write.
             PasteResult.Retained
         }
-    }
+
+    private fun retryCapturedDraft(pending: DeferredWrite): PasteResult =
+        when (pending.operation.validate()) {
+            ConversationDictationTargetValidation.Indeterminate -> PasteResult.DeferredByHost
+            ConversationDictationTargetValidation.DefinitelyRemoved -> PasteResult.Retained
+            ConversationDictationTargetValidation.Available -> {
+                val target = pending.operation.target
+                if (readDraft(target.accountRef, target.groupIdHex).revision != pending.revision) {
+                    PasteResult.Superseded
+                } else {
+                    when (writeCompletionDraft(pending.operation, pending.revision, pending.value)) {
+                        is ConversationDictationDraftWrite.Written -> PasteResult.Accepted
+                        ConversationDictationDraftWrite.DeferredByHost -> PasteResult.DeferredByHost
+                        ConversationDictationDraftWrite.Refused -> PasteResult.Retained
+                    }
+                }
+            }
+        }
 
     var draftRecovery = ConversationDictationDraftRecovery(readDraft, writeDraft)
         private set
