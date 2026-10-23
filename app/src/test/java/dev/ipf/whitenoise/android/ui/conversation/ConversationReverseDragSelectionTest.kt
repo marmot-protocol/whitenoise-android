@@ -9,12 +9,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
@@ -29,7 +31,6 @@ import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -241,12 +242,13 @@ internal class ConversationReverseDragSelectionTest {
                                 controller = controller,
                                 onBack = {},
                                 surfaceState = surface,
-                                restoredScrollSnapshot = ConversationScrollSnapshot(
-                                    firstVisibleItemIndex = 0,
-                                    firstVisibleItemScrollOffset = 0,
-                                    anchorItemId = "msg:${records.last().messageIdHex}",
-                                    anchorMessageIdHex = records.last().messageIdHex,
-                                ),
+                                restoredScrollSnapshot =
+                                    ConversationScrollSnapshot(
+                                        firstVisibleItemIndex = 0,
+                                        firstVisibleItemScrollOffset = 0,
+                                        anchorItemId = "msg:${records.last().messageIdHex}",
+                                        anchorMessageIdHex = records.last().messageIdHex,
+                                    ),
                             )
                         }
                     }
@@ -270,7 +272,11 @@ internal class ConversationReverseDragSelectionTest {
     }
 
     /** Starts the real long hold, then leaves the pointer stationary while production frame callbacks scroll. */
-    private fun holdAtEdge(anchor: String, top: Boolean, frames: Int = 90) {
+    private fun holdAtEdge(
+        anchor: String,
+        top: Boolean,
+        frames: Int = 90,
+    ) {
         val point =
             composeRule
                 .onNodeWithTag(messageBubbleRowTestTag(anchor))
@@ -312,16 +318,26 @@ internal class ConversationReverseDragSelectionTest {
     }
 
     /** Resolves the endpoint from physical row bounds, independently of the production reversed-offset helper. */
-    private fun assertSelectionAtPointer(surface: ConversationSurfaceState, ids: List<String>, anchor: String) {
-        val rows = edgeEvidence.latest().visibleItems.map { it.key.removePrefix("msg:") }.filter(ids::contains)
-        val endpoint = rows.minBy { id ->
-            val bounds = composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
-            when {
-                lastPointer.y < bounds.top -> bounds.top - lastPointer.y
-                lastPointer.y > bounds.bottom -> lastPointer.y - bounds.bottom
-                else -> 0f
+    private fun assertSelectionAtPointer(
+        surface: ConversationSurfaceState,
+        ids: List<String>,
+        anchor: String,
+    ) {
+        val rows =
+            edgeEvidence
+                .latest()
+                .visibleItems
+                .map { it.key.removePrefix("msg:") }
+                .filter(ids::contains)
+        val endpoint =
+            rows.minBy { id ->
+                val bounds = composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
+                when {
+                    lastPointer.y < bounds.top -> bounds.top - lastPointer.y
+                    lastPointer.y > bounds.bottom -> lastPointer.y - bounds.bottom
+                    else -> 0f
+                }
             }
-        }
         val anchorIndex = ids.indexOf(anchor)
         val endIndex = ids.indexOf(endpoint)
         val range = minOf(anchorIndex, endIndex)..maxOf(anchorIndex, endIndex)
@@ -333,7 +349,11 @@ internal class ConversationReverseDragSelectionTest {
     }
 
     /** The selected IDs must remain one inclusive eligible interval containing the original anchor. */
-    private fun assertRange(surface: ConversationSurfaceState, ids: List<String>, anchor: String) {
+    private fun assertRange(
+        surface: ConversationSurfaceState,
+        ids: List<String>,
+        anchor: String,
+    ) {
         val selected = surface.selectedMessages.keys.toSet()
         assertTrue(selected.contains(anchor))
         val indices = selected.map(ids::indexOf)
@@ -341,8 +361,9 @@ internal class ConversationReverseDragSelectionTest {
     }
 
     /** Resolves the production list, whose semantics expose its real scroll position and bounds. */
-    private fun transcript() =
-        composeRule.onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE, useUnmergedTree = true)
+    private fun transcript(): SemanticsNodeInteraction {
+        return composeRule.onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE, useUnmergedTree = true)
+    }
 
     /** Records actual post-layout positions without adding a production scroll-control seam. */
     private class EdgeEvidence : ConversationScrollEvidenceSink {
