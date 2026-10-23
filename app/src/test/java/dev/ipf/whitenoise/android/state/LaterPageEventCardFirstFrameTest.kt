@@ -191,26 +191,41 @@ class LaterPageEventCardFirstFrameTest {
     }
 
     /**
-     * While every thread of the shared binding IO pool is busy with bulk work, an older page's card is still read on
-     * the card lane well within the budget, so the page is applied with its card composed Loaded on its first frame.
+     * The card read must not depend on the main thread while the reader scrolls (#2238): once under way it parses,
+     * reads the cached card and its author and fills the snapshot with the main looper held, and the page then needs
+     * only the read's single resume to be applied with its card composed Loaded.
      */
     @Test
-    fun olderPageCardIsReadWhileBindingThreadsAreBusy() {
-        val bulkWork = CountDownLatch(1)
-        val fixture = pagedConversation(cacheRead = {})
+    fun olderPageCardReadFinishesWithoutTheMainThread() {
+        val read = CountDownLatch(1)
+        val fixture = pagedConversation(cacheRead = { read.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) })
         try {
-            fixture.compose()
-            fixture.awaitIdleCondition { fixture.controller.hasPreparedInitialPresentation }
-            fixture.occupyBindingThreads(bulkWork)
-            var advanced: Boolean? = null
-            pagingScope.launch { advanced = fixture.controller.loadOlderTimelinePage() }
+            val page = fixture.openThenPageOlder()
+            fixture.awaitIdleCondition { fixture.cacheReads.get() >= 1 }
 
-            fixture.awaitIdleCondition { advanced != null && fixture.composed.isNotEmpty() }
+            // From here on the main looper runs nothing until the read has filled the snapshot.
+            read.countDown()
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(READ_BLOCK_SECONDS)
+            val snapshots = fixture.controller.eventCardSnapshots
+            while (snapshots[CARD_STABLE_ID] == null && System.nanoTime() < deadline) {
+                Thread.sleep(MAIN_HELD_POLL_MILLIS)
+            }
+            assertTrue(
+                "the read needed the main thread before it finished",
+                fixture.controller.eventCardSnapshots[CARD_STABLE_ID] != null,
+            )
+            assertEquals(
+                "nothing is applied while the main thread is held",
+                listOf(NEWEST_ID),
+                timelineMessageIds(fixture.controller),
+            )
 
-            assertEquals(true, advanced)
+            fixture.awaitIdleCondition { page.advanced != null && fixture.composed.isNotEmpty() }
+
+            assertEquals(true, page.advanced)
             assertEquals(listOf("$LOADED $EVENT_ID"), fixture.composed.map(::describe).distinct())
         } finally {
-            bulkWork.countDown()
+            read.countDown()
             fixture.close()
         }
     }
@@ -352,6 +367,8 @@ class LaterPageEventCardFirstFrameTest {
         val CARD_LIVE_ID = "e1".repeat(32)
         val PLAIN_LIVE_ID = "e2".repeat(32)
         const val LIVE_DRAIN_STEP_MILLIS = 8L
+        const val MAIN_HELD_POLL_MILLIS = 5L
+        val CARD_STABLE_ID = "event:$EVENT_ID"
 
         /** Far longer than any wait in these tests, so a read that "never answers" cannot unblock one by chance. */
         const val NEVER_ANSWERS_SECONDS = 120L

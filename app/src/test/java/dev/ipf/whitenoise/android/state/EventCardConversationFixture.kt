@@ -34,9 +34,7 @@ import org.json.JSONObject
 import org.robolectric.Shadows.shadowOf
 import java.lang.reflect.Proxy
 import java.util.Collections
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -132,21 +130,6 @@ internal class EventCardConversationFixture(
         composeRule.waitForIdle()
     }
 
-    /**
-     * Occupies every thread of the shared binding IO pool with bulk work that runs until [release] opens, as page
-     * hydration, prefetch and window commands can while the reader scrolls.
-     */
-    fun occupyBindingThreads(release: CountDownLatch) {
-        val started = CountDownLatch(NATIVE_THREADS)
-        repeat(NATIVE_THREADS) {
-            nativeExecutor.execute {
-                started.countDown()
-                release.await(BULK_WORK_SECONDS, TimeUnit.SECONDS)
-            }
-        }
-        check(started.await(BULK_WORK_SECONDS, TimeUnit.SECONDS)) { "bulk work never started" }
-    }
-
     /** Releases the controller, its scripted window and its native threads. */
     fun close() {
         controller.onCleared()
@@ -193,7 +176,6 @@ internal class EventCardConversationFixture(
         const val READ_BLOCK_SECONDS = 10L
         private const val WAIT_MILLIS = 10_000L
         private const val NATIVE_THREADS = 4
-        private const val BULK_WORK_SECONDS = 120L
 
         /** The card a recorded state draws, by its visible text. */
         fun describe(state: NostrEventCardState): String =

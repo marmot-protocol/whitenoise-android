@@ -80,9 +80,9 @@ budget. A page without such rows is applied at once, as before.
 `op=chat_history_page phase=event_card_page_warm layer=storage` records one
 such read. `duration_ms` is the binding work alone: the parse and the batched
 MDK cache reads, run back to back on a dedicated card-read lane of two IO
-threads, so they never queue behind bulk binding work (page hydration,
-prefetch, window commands) on the shared IO pool, and never return to the main
-thread between steps. `elapsed_ms` runs from the read's start until the caller
+threads: each binding call resumes on the lane rather than the main thread, so
+the read needs a single main-thread turn, its final resume, however busy the
+main thread is while the reader scrolls. `elapsed_ms` runs from the read's start until the caller
 has its result, so `elapsed_ms - duration_ms` is time spent waiting for a lane
 thread and for the main thread to resume the page. `count` is the number of
 rows read for. `result=dropped` means the read did not settle within the

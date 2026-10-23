@@ -4564,13 +4564,8 @@ class WhiteNoiseAppState private constructor(
     private val marmotBridgeTracer = MarmotBridgeTracer()
 
     suspend fun <T> marmotIo(block: suspend MarmotInterface.() -> T): T =
-        if (currentCoroutineContext().isOnEventCardReadLane()) {
-            // A card read already owns a binding thread; hopping would queue it behind bulk work (#2238).
+        withContext(marmotIoDispatcher) {
             marmot().block()
-        } else {
-            withContext(marmotIoDispatcher) {
-                marmot().block()
-            }
         }
 
     /** Measures one bridge attempt only if it began under the current analytics permission. */

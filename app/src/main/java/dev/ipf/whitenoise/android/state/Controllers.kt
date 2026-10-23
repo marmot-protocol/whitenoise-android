@@ -138,6 +138,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -12960,8 +12961,8 @@ class ConversationController(
 
     /**
      * Parses [candidates] once and reads their cached cards in its own job on the event-card read lane, so the whole
-     * read takes one main-thread turn to resume, never queues behind bulk binding work, and [budgetMillis] can give up
-     * on a binding call that never returns instead of waiting it out. Returns the parsed rows, or null past the budget
+     * read takes one main-thread turn to resume, and [budgetMillis] can give up on a binding call that never returns
+     * instead of waiting it out. Returns the parsed rows, or null past the budget
      * or on failure. Each read is recorded once it ends, past the budget too, with how long its binding work took.
      */
     private suspend fun readLaterPageEventCards(
@@ -12983,8 +12984,12 @@ class ConversationController(
                                 val document = appState.parseMarkdownOrEmpty(record.plaintext)
                                 if (document.blocks.isEmpty()) record else record.withMarkdownTokens(document)
                             }
+                        // A read past its budget is abandoned, so it must not write snapshots after the fact.
+                        currentCoroutineContext().ensureActive()
                         eventCardSnapshots.warm(parsed) { references ->
-                            appState.readCachedPublicEventCards(accountRef, references)
+                            val states = appState.readCachedPublicEventCards(accountRef, references)
+                            currentCoroutineContext().ensureActive()
+                            states
                         }
                         laneMillis.set(SystemClock.elapsedRealtime() - laneStartedAt)
                         parsed
