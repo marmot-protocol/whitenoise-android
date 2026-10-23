@@ -278,7 +278,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
     def enabled(self, name, event, selected, responsiveness=False, media_sandbox=False, outbound_share=False,
-                mdk_adoption=False, mdk_qualification=False, mdk_preview_qualification=False):
+                mdk_adoption=False, mdk_qualification=False, mdk_preview_qualification=False, range_selection=False):
         """Evaluate the trusted job condition with restricted event/input fixtures.
 
         Lane narrowing is tested in test_select_instrumented_lanes.py; here the
@@ -288,9 +288,17 @@ class MaestroWorkflowTest(unittest.TestCase):
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         lanes = SimpleNamespace(outputs=SimpleNamespace(attachment_fixture='true', connected='true'))
         return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness, media_sandbox_only=media_sandbox, outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption, mdk_qualification=mdk_qualification, mdk_preview_qualification=mdk_preview_qualification),
+                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness, media_sandbox_only=media_sandbox, outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption, mdk_qualification=mdk_qualification, mdk_preview_qualification=mdk_preview_qualification, range_selection_only=range_selection),
                      'needs': SimpleNamespace(changes=lanes),
                      'startsWith': lambda value, prefix: value.startswith(prefix)})
+
+    def test_range_selection_excludes_unrelated_campaigns(self):
+        """A held-pointer dispatch admits one connected lane without the other emulator campaigns."""
+        for selected in (False, True):
+            self.assertTrue(self.enabled('instrumented', 'workflow_dispatch', selected, range_selection=True))
+            for name in ('attachment-fixture', 'maestro-pilot', 'mdk-qualification', 'mdk-signed-preview'):
+                self.assertFalse(self.enabled(name, 'workflow_dispatch', selected, range_selection=True))
+        self.assertIn("inputs.range_selection_only && 'range-selection'", self.workflow)
 
     def test_mdk_qualification_excludes_ordinary_instrumentation(self):
         """The opt-in upgrade runner must not race another test job over its fixture or run unrelated suites."""

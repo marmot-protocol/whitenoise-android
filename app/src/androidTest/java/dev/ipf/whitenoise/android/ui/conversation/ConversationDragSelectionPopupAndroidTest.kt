@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.graphics.Bitmap
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
@@ -44,6 +45,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** Exercises one OS touchscreen stream across the real conversation's separate action-popup windows. */
@@ -81,9 +83,8 @@ class ConversationDragSelectionPopupAndroidTest {
         var held = false
         var last = Offset.Zero
         var downTime = 0L
-        var primaryFailure: Throwable? = null
         lateinit var hostView: View
-        try {
+        val bodyResult = runCatching {
             composeRule.runOnUiThread {
                 val previousCallback = composeRule.activity.window.callback
                 originalCallback = previousCallback
@@ -131,8 +132,10 @@ class ConversationDragSelectionPopupAndroidTest {
             downTime = SystemClock.uptimeMillis()
             inject(downTime, MotionEvent.ACTION_DOWN, last)
             held = true
+            composeRule.mainClock.advanceTimeBy(1_000L)
             SystemClock.sleep(1_000L)
             composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertIsDisplayed()
+            saveScreenshot("held-menu")
             last = adjacent
             inject(downTime, MotionEvent.ACTION_MOVE, last)
             try {
@@ -141,6 +144,7 @@ class ConversationDragSelectionPopupAndroidTest {
                 throw AssertionError("raw actions=$rawActions; applied selection sizes=$selectionSizes", failure)
             }
             // Keep the finger held across popup disposal and the selection-layout frames.
+            composeRule.mainClock.advanceTimeBy(150L)
             SystemClock.sleep(150L)
             composeRule.waitForIdle()
             composeRule.runOnIdle {
@@ -161,37 +165,57 @@ class ConversationDragSelectionPopupAndroidTest {
                         resources.getQuantityString(R.plurals.message_selected_count, 2, 2),
                     ),
                 )
+            saveScreenshot("selected-before-up")
             inject(downTime, MotionEvent.ACTION_UP, last)
             held = false
             composeRule.waitForIdle()
             composeRule.runOnIdle { assertEquals(setOf(anchor, endpoint), surface.selectedMessages.keys.toSet()) }
-        } catch (failure: Throwable) {
-            primaryFailure = failure
-            throw failure
-        } finally {
+        }.recoverCatching { failure ->
+            runCatching { saveScreenshot("failure") }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw AssertionError("raw actions=$rawActions; applied selection sizes=$selectionSizes", failure)
+        }
+        // Attempt every owner cleanup, preserving the original failure and suppressing cleanup failures onto it.
+        val cleanupResults =
+            listOf(
+                runCatching { if (held) inject(downTime, MotionEvent.ACTION_CANCEL, last) },
+                runCatching { retireController(controller, originalCallback) },
+                runCatching { selectionObserver.dispose() },
+            )
+        bodyResult.exceptionOrNull()?.let { primary ->
+            cleanupResults.forEach { it.exceptionOrNull()?.let(primary::addSuppressed) }
+        }
+        bodyResult.getOrThrow()
+        cleanupResults.forEach { it.getOrThrow() }
+    }
+
+    /** Restores Android dispatch before retiring the synthetic conversation, including a restoration failure. */
+    private fun retireController(
+        controller: ConversationController,
+        originalCallback: Window.Callback?,
+    ) {
+        composeRule.runOnUiThread {
             try {
-                if (held) {
-                    try {
-                        inject(downTime, MotionEvent.ACTION_CANCEL, last)
-                    } catch (cleanupFailure: Throwable) {
-                        val originalFailure = primaryFailure
-                        if (originalFailure == null) throw cleanupFailure
-                        originalFailure.addSuppressed(cleanupFailure)
-                    }
-                }
+                originalCallback?.let { composeRule.activity.window.callback = it }
             } finally {
-                try {
-                    composeRule.runOnUiThread {
-                        try {
-                            originalCallback?.let { composeRule.activity.window.callback = it }
-                        } finally {
-                            controller.onCleared()
-                        }
-                    }
-                } finally {
-                    selectionObserver.dispose()
-                }
+                controller.onCleared()
             }
+        }
+    }
+
+    /** Retains actual popup/selection frames in the standard hosted instrumented-test artifact. */
+    private fun saveScreenshot(name: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val output = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+        val root = output ?: checkNotNull(instrumentation.targetContext.getExternalFilesDir(null)).path
+        val directory = File(root, "conversation-held-selection")
+        check(directory.isDirectory || directory.mkdirs())
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(directory, "$name.png").outputStream().use { stream ->
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream))
+            }
+        } finally {
+            bitmap.recycle()
         }
     }
 
@@ -201,7 +225,35 @@ class ConversationDragSelectionPopupAndroidTest {
         action: Int,
         point: Offset,
     ) {
-        val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, point.x, point.y, 0)
+        val properties =
+            MotionEvent.PointerProperties().apply {
+                id = 0
+                toolType = MotionEvent.TOOL_TYPE_FINGER
+            }
+        val coordinates =
+            MotionEvent.PointerCoords().apply {
+                x = point.x
+                y = point.y
+                pressure = if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) 0f else 1f
+                size = 1f
+            }
+        val event =
+            MotionEvent.obtain(
+                downTime,
+                SystemClock.uptimeMillis(),
+                action,
+                1,
+                arrayOf(properties),
+                arrayOf(coordinates),
+                0,
+                0,
+                1f,
+                1f,
+                0,
+                0,
+                InputDevice.SOURCE_TOUCHSCREEN,
+                0,
+            )
         try {
             event.source = InputDevice.SOURCE_TOUCHSCREEN
             assertTrue(InstrumentationRegistry.getInstrumentation().uiAutomation.injectInputEvent(event, true))
