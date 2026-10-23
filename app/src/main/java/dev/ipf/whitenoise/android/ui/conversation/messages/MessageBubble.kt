@@ -1624,12 +1624,11 @@ internal fun MessageBubble(
                         // threshold while a vertical drag dismisses them and
                         // switches to anchored batch selection. Markdown links
                         // keep their copy-on-release routing. Horizontal motion
-                        // remains available to swipe-to-reply above.
-                        // Batch/text selection own the row. A tombstone remains
-                        // actionable only when its local cleanup path is usable.
-                        // Availability is an argument, never an omitted modifier: the
-                        // selection chrome that a range drag turns on must not restructure
-                        // this chain and so detach the active hold (#3407).
+                        // remains available to swipe-to-reply above. Batch/text selection
+                        // own the row, and a tombstone stays actionable only when its local
+                        // cleanup path is usable. That is an argument, never an omitted
+                        // modifier: selection chrome must not restructure the chain under an
+                        // active hold.
                         Modifier.longPressOrVerticalDrag(
                             enabled =
                                 !tombstoneCleanupUnavailable && !longPressBlockedBySelection && !textSelectionMode,

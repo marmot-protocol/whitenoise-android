@@ -135,8 +135,6 @@ internal fun Modifier.longPressOrVerticalDrag(
     return pointerInput(pinnableContainer) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            // The node stays installed while disabled: removing it would detach
-            // an in-flight hold, so availability is decided per gesture instead.
             if (!currentEnabled) return@awaitEachGesture
             val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
             // Availability can change during the timeout; only a won hold keeps ownership.
