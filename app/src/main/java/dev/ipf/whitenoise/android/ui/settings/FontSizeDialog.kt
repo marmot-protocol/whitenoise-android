@@ -100,7 +100,7 @@ private fun FontSizeSample(
             presentation = other,
             mine = false,
             modifier = Modifier.align(Alignment.Start),
-            time = rememberedClockTime(38_520uL),
+            time = rememberedClockTime(FONT_SAMPLE_RECEIVED_TIMESTAMP),
         )
         PreviewBubble(
             text = stringResource(R.string.font_size_sample_sent),
@@ -108,7 +108,10 @@ private fun FontSizeSample(
             mine = true,
             modifier = Modifier.align(Alignment.End),
             quote = stringResource(R.string.font_size_sample_quote),
-            time = rememberedClockTime(38_580uL),
+            time = rememberedClockTime(FONT_SAMPLE_SENT_TIMESTAMP),
         )
     }
 }
+
+private const val FONT_SAMPLE_RECEIVED_TIMESTAMP = 38_520uL
+private const val FONT_SAMPLE_SENT_TIMESTAMP = 38_580uL

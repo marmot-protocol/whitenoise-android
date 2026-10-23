@@ -291,7 +291,8 @@ class ProfileNotificationPresenterTest {
                         .reset()
                     setUp()
                     val profileId = customize(alice)
-                    val event = update(group = "blocked-$trigger-$blockGroup", message = "blocked").copy(trigger = trigger)
+                    val event =
+                        update(group = "blocked-$trigger-$blockGroup", message = "blocked").copy(trigger = trigger)
                     val category = NotificationChannelSpec.forUpdate(event)
                     val channel = requireNotNull(manager.getNotificationChannel(category.id))
                     val importance = channel.importance
@@ -315,7 +316,10 @@ class ProfileNotificationPresenterTest {
                     } else {
                         channel.importance = NotificationManager.IMPORTANCE_NONE
                         manager.createNotificationChannel(channel)
-                        assertEquals(NotificationManager.IMPORTANCE_NONE, requireNotNull(manager.getNotificationChannel(category.id)).importance)
+                        assertEquals(
+                            NotificationManager.IMPORTANCE_NONE,
+                            requireNotNull(manager.getNotificationChannel(category.id)).importance,
+                        )
                         assertFalse(requireNotNull(manager.getNotificationChannelGroup(groupId)).isBlocked)
                     }
                     assertFalse(presenter.show(event, shortNpub = { it }))
@@ -346,7 +350,9 @@ class ProfileNotificationPresenterTest {
             assertTrue(presenter.show(event, silentUpdate = true, shortNpub = { it }))
             assertEquals(profileId, card(event).channelId)
             val future = event.copy(messageIdHex = "after-actor-reset", timestampMs = event.timestampMs + 1000)
-            assertTrue(presenter.show(future, redactContent = true, senderNameOverride = "Private actor", shortNpub = { it }))
+            assertTrue(
+                presenter.show(future, redactContent = true, senderNameOverride = "Private actor", shortNpub = { it }),
+            )
             assertNotEquals(profileId, card(future).channelId)
             assertFalse(manager.getNotificationChannel(card(future).channelId).name.contains("Private actor"))
         }

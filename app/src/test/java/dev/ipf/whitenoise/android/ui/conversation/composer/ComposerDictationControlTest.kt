@@ -187,7 +187,8 @@ class ComposerDictationControlTest {
         composeRule.onNodeWithTag(COMPOSER_DICTATION_STRIP_TAG).assertDoesNotExist()
         composeRule
             .onNode(
-                hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+                hasContentDescription(transcriptPasteLabel) and
+                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
             ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
         field.assertIsDisplayed().assertIsFocused()
@@ -211,7 +212,8 @@ class ComposerDictationControlTest {
         field.assertIsDisplayed().assertIsNotFocused()
         composeRule
             .onNode(
-                hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+                hasContentDescription(transcriptPasteLabel) and
+                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
             ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
@@ -230,7 +232,8 @@ class ComposerDictationControlTest {
             composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
             composeRule
                 .onNode(
-                    hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+                    hasContentDescription(transcriptPasteLabel) and
+                        hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
                 ).assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Cancel").assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
@@ -295,7 +298,8 @@ class ComposerDictationControlTest {
             val node =
                 composeRule
                     .onNode(
-                        hasContentDescription(label) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+                        hasContentDescription(label) and
+                            hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
                     ).performScrollTo()
                     .assertIsDisplayed()
             val bounds = node.fetchSemanticsNode().boundsInRoot

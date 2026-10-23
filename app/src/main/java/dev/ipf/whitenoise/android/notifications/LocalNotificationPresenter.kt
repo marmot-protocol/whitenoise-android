@@ -977,7 +977,14 @@ class LocalNotificationPresenter(
                                         active?.notification?.extras?.getString(
                                             LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
                                         )
-                                    val matchingCard = active?.takeIf { messageId == update.messageIdHex }
+                                    val matchingCard =
+                                        active?.takeIf { card ->
+                                            if (update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
+                                                card.matchesInvite(update.accountRef, update.groupIdHex)
+                                            } else {
+                                                messageId == update.messageIdHex
+                                            }
+                                        }
                                     existingCardChannel = matchingCard?.notification?.channelId
                                     replacementHasChanged =
                                         replaceCurrentMessage &&

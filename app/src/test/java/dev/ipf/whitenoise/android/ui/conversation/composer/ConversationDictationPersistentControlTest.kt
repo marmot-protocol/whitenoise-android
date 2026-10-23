@@ -575,8 +575,12 @@ class ConversationDictationPersistentControlTest {
                 )
             }
         }
-        composeRule.onAllNodesWithContentDescription(context.getString(R.string.paste_from_clipboard)).assertCountEquals(1)
-        composeRule.onAllNodesWithContentDescription(context.getString(R.string.paste_dictation_transcript)).assertCountEquals(1)
+        composeRule
+            .onAllNodesWithContentDescription(context.getString(R.string.paste_from_clipboard))
+            .assertCountEquals(1)
+        composeRule
+            .onAllNodesWithContentDescription(context.getString(R.string.paste_dictation_transcript))
+            .assertCountEquals(1)
         composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
     }
 

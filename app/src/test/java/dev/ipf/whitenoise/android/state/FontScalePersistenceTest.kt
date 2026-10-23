@@ -139,9 +139,13 @@ class FontScalePersistenceTest {
         runTest {
             val state = state(context.getSharedPreferences("font-cancel-before", Context.MODE_PRIVATE))
             val outcomes = settingsOutcomes(state)
+            val existingChildren =
+                state.mutationsScope.coroutineContext.job.children
+                    .toSet()
             state.updateFontScale(AppFontScale.Large)
             val job =
                 state.mutationsScope.coroutineContext.job.children
+                    .filterNot(existingChildren::contains)
                     .single()
             job.cancel()
             runCurrent()
@@ -154,14 +158,21 @@ class FontScalePersistenceTest {
         runTest {
             val state = state(context.getSharedPreferences("font-cancel-mutex", Context.MODE_PRIVATE))
             val outcomes = settingsOutcomes(state)
-            val field = WhiteNoiseAppState::class.java.getDeclaredField("hostPreferenceCommitMutex").apply { isAccessible = true }
+            val field =
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField("hostPreferenceCommitMutex")
+                    .apply { isAccessible = true }
             val mutex = field.get(state) as Mutex
             mutex.lock()
             try {
+                val existingChildren =
+                    state.mutationsScope.coroutineContext.job.children
+                        .toSet()
                 state.updateFontScale(AppFontScale.ExtraLarge)
                 runCurrent()
                 val job =
                     state.mutationsScope.coroutineContext.job.children
+                        .filterNot(existingChildren::contains)
                         .single()
                 job.cancel()
                 runCurrent()

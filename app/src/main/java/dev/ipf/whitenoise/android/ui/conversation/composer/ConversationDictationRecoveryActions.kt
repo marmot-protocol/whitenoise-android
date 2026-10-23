@@ -76,7 +76,7 @@ private fun dictationFailureActionLabel(
     recovery: ConversationDictationRecovery,
 ): Int =
     when {
-        retrySend && recognitionIncomplete -> R.string.paste
+        retrySend && recognitionIncomplete -> R.string.paste_dictation_transcript
         retrySend -> R.string.dictation_retry_send
         recovery == ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
         recovery == ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service

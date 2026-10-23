@@ -226,7 +226,8 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         composeRule.mainClock.autoAdvance = true
         composeRule
             .onNode(
-                hasContentDescription(transcriptPasteLabel) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+                hasContentDescription(transcriptPasteLabel) and
+                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
             ).performClick()
         composeRule.runOnUiThread { fixture.platform.listener.onResult("dictated words") }
         assertEquals(listOf(ACCOUNT to GROUP), fixture.writes)
@@ -253,7 +254,9 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
 
     private fun assertSingleActionSet() {
         listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
-            val action = hasContentDescription(label) and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG))
+            val action =
+                hasContentDescription(label) and
+                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG))
             composeRule.onAllNodes(action).assertCountEquals(1)
             composeRule.onNode(action).assertIsDisplayed()
         }

@@ -469,7 +469,11 @@ class ConversationScrollCoordinatorTest {
     /** Collapsing history preserves its logical row instead of joining a new arrival or a clipped newer page. */
     @Test fun bodyCollapseInHistoryKeepsItsReadingAnchorAndDoesNotFollowIncoming() =
         runTest {
-            val coordinator = ConversationScrollCoordinator(RecordingScrollWriter(), ConversationScrollMode.ReadingHistory("history", 12))
+            val coordinator =
+                ConversationScrollCoordinator(
+                    RecordingScrollWriter(),
+                    ConversationScrollMode.ReadingHistory("history", 12),
+                )
             val landing = anchor(messageId = "history", listIndex = 8, pixelOffset = 12)
             coordinator.settleLandingAt(
                 landing,

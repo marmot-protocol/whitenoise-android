@@ -4578,7 +4578,8 @@ internal fun ConversationScreen(
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,
                                         onBeforeBodyCollapse = {
-                                            // Collapse cancels deferred movement without changing a tail follower into history.
+                                            // Collapse cancels deferred movement while preserving
+                                            // whether the viewport is following the tail.
                                             val keepFollowingTail =
                                                 scrollCoordinator.isFollowingTail &&
                                                     conversationLandingAtNewestEdge(
@@ -4600,7 +4601,10 @@ internal fun ConversationScreen(
                                                         listIndex = index,
                                                         pixelOffset = offset,
                                                     )
-                                                scrollCoordinator.settleLandingAt(anchor, atNewestEdge = keepFollowingTail)
+                                                scrollCoordinator.settleLandingAt(
+                                                    anchor,
+                                                    atNewestEdge = keepFollowingTail,
+                                                )
                                                 if (!keepFollowingTail) {
                                                     val bookmark = scrollCoordinator.bookmark(anchor)
                                                     scope.launch {
