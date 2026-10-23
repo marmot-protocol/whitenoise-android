@@ -23,6 +23,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.TestScope
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLooper
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 /** Real temporary unread views preserve the current theme and accessible exit in every read state. */
@@ -43,6 +45,16 @@ class ChatListUnreadStatesScreenshotTest {
     private val mounted = mutableStateOf(true)
     private var fixture: OffWindowActionFixture? = null
     private val releaseRead = CompletableDeferred<Unit>()
+    private var originalTimeZone: TimeZone? = null
+
+    @Before fun stableTimeZone() {
+        originalTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    @After fun restoreTimeZone() {
+        originalTimeZone?.let(TimeZone::setDefault)
+    }
 
     /** A held native read shows pending content and keeps Show all usable. */
     @Test fun pendingLight() = capture("pending_light", State.Pending)
@@ -118,10 +130,14 @@ class ChatListUnreadStatesScreenshotTest {
                 assertEquals(
                     "A first-read failure needs one recovery action",
                     1,
-                    rule.onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry)).fetchSemanticsNodes().size,
+                    rule
+                        .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry))
+                        .fetchSemanticsNodes()
+                        .size,
                 )
             }
-            State.Empty -> rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertIsDisplayed()
+            State.Empty ->
+                rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertIsDisplayed()
             State.Matching -> rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertIsDisplayed()
         }
         rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_pull_unread_$name.png")

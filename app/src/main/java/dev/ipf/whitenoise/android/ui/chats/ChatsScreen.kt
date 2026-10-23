@@ -2021,7 +2021,8 @@ internal fun ChatsScreen(
                     if (unreadRefreshPending && retainedUnreadVisible) {
                         CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
                     }
-                    if (unreadReadFailed && unreadOnly && displayUnreadSnapshot != null && visibleItems.isNotEmpty()) {
+                    val failedUnreadSnapshot = unreadReadFailed && unreadOnly && displayUnreadSnapshot != null
+                    if (failedUnreadSnapshot && visibleItems.isNotEmpty()) {
                         TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
                     }
                 }

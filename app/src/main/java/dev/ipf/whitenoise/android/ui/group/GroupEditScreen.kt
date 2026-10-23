@@ -397,7 +397,10 @@ internal fun GroupEditScreen(
         pendingGifUri?.let { selected ->
             val generation = imagePickGeneration.capture()
 
-            fun selectionIsCurrent(): Boolean = imageOwnerIsCurrent() && imagePickGeneration.isCurrent(generation) && pendingGifUri == selected
+            fun selectionIsCurrent(): Boolean =
+                imageOwnerIsCurrent() &&
+                    imagePickGeneration.isCurrent(generation) &&
+                    pendingGifUri == selected
             dev.ipf.whitenoise.android.ui.common.ConfirmDialog(
                 title = stringResource(R.string.group_gif_upload_title),
                 message = stringResource(R.string.group_gif_upload_notice),
@@ -411,7 +414,8 @@ internal fun GroupEditScreen(
                 },
                 onConfirm = {
                     val editable = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
-                    if (selectionIsCurrent() && editable && !imageSaving && !controller.mutationInFlight) {
+                    val currentEditableSelection = selectionIsCurrent() && editable
+                    if (currentEditableSelection && !imageSaving && !controller.mutationInFlight) {
                         imagePickGeneration.advance()
                         pendingGifUri = null
                         uploadPublicAvatar {

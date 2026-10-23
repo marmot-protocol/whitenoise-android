@@ -6,10 +6,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.SavedStateHandle
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
@@ -42,6 +44,7 @@ import dev.ipf.whitenoise.android.state.emptyGroupRecord
 import dev.ipf.whitenoise.android.state.emptyTimelinePage
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
+import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_ROW_PLACEMENT_MILLIS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
@@ -139,6 +142,11 @@ class ChatListConversationReturnRenderingTest {
             awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
             composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")
             composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
+            // Filtering changes both the head and keyed layout; real pointer gates must settle before touching a row.
+            composeRule.mainClock.advanceTimeBy(
+                maxOf(CHAT_LIST_HEAD_INPUT_GATE_MILLIS, CHAT_LIST_ROW_PLACEMENT_MILLIS.toLong()) + 16L,
+            )
+            composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").assertIsDisplayed().performClick()
             awaitCondition { holder.selectedChat.value?.id == fixture.target.groupIdHex }
             composeRule.mainClock.advanceTimeBy(1_000)
@@ -167,11 +175,21 @@ class ChatListConversationReturnRenderingTest {
                     "Unread scope",
                 ),
             )
+        assertTrue(
+            fixture.appState.chatFolderPreferences.setChatInFolder(
+                ConversationTimelineTestIds.ACCOUNT_REF,
+                folder.id,
+                fixture.target.groupIdHex,
+                included = true,
+            ),
+        )
         withMountedUnreadShell(fixture) {
             composeRule.onNodeWithTag("chats.unread_filter").performClick()
             awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
+            composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag("chats.folder.${folder.id}"))
             composeRule.onNodeWithTag("chats.folder.${folder.id}").performClick()
             composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Unread only")
+            composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag("chats.scope.chats"))
             composeRule.onNodeWithTag("chats.scope.chats").performClick()
             composeRule.onNodeWithTag("chats.unread_filter").performClick()
             composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")

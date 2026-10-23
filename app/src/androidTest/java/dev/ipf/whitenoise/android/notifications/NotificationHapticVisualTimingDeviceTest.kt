@@ -246,10 +246,7 @@ class NotificationHapticVisualTimingDeviceTest {
         try {
             runBlocking { appState.processNotificationUpdateForTest(update) }
             reportFirstPostTiming(timingEvents)
-            assertEquals(
-                "unread",
-                timingEvents.single { it.stage == NotificationFirstPostTimingStage.CandidateGateComplete }.outcome,
-            )
+            assertCandidateGateAdmitted(timingEvents)
             val first =
                 checkNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS)) {
                     "Notification listener did not observe the resolved first post"
@@ -374,10 +371,7 @@ class NotificationHapticVisualTimingDeviceTest {
         try {
             runBlocking { appState.processNotificationUpdateForTest(update) }
             reportFirstPostTiming(timingEvents)
-            assertEquals(
-                "unread",
-                timingEvents.single { it.stage == NotificationFirstPostTimingStage.CandidateGateComplete }.outcome,
-            )
+            assertCandidateGateAdmitted(timingEvents)
             val fallback = requireNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS))
             onFallbackDelivered()
             val corrected = requireNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS))
@@ -395,6 +389,12 @@ class NotificationHapticVisualTimingDeviceTest {
         } finally {
             NotificationManagerCompat.from(context).cancel(expected.tag, expected.id)
         }
+    }
+
+    /** Unprojected synthetic candidates still pass the real durable native read gate before posting. */
+    private fun assertCandidateGateAdmitted(events: List<NotificationFirstPostTimingEvent>) {
+        val candidateGate = events.single { it.stage == NotificationFirstPostTimingStage.CandidateGateComplete }
+        assertEquals("unread", candidateGate.outcome)
     }
 
     /** Requires the measured content-stage ceiling for every outcome, including held local work. */
@@ -466,8 +466,12 @@ class NotificationHapticVisualTimingDeviceTest {
                 "displayName" -> displayName(arguments?.firstOrNull() as String)
                 "parseMarkdown" -> markdownDocument(arguments?.firstOrNull() as? String)
                 "timelineMessages" -> TimelinePageFfi(emptyList(), hasMoreBefore = false, hasMoreAfter = false)
-                // No read marker exists for the synthetic incoming message; keep the real candidate gate active.
-                "chatListRow" -> null
+                "chatListRow" -> {
+                    val callArguments = requireNotNull(arguments)
+                    check(callArguments[0] == update.accountRef && callArguments[1] == update.groupIdHex)
+                    // The incoming synthetic message has not entered the durable chat-list/timeline projection yet.
+                    null
+                }
                 "userProfile" -> null
                 "npub" -> MENTION_NPUB
                 "chatList", "groupMemberIdsPage", "groupMembers" -> emptyList<Any>()

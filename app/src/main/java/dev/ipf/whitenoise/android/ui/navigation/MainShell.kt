@@ -2086,8 +2086,10 @@ internal fun MainShell(
                                         searchViewport = globalSearch.viewport,
                                         unreadOnlyFilter = unreadFilter.value,
                                         onUnreadOnlyFilterChange = { enabled ->
-                                            if (currentUnreadFilter === unreadFilter &&
-                                                appState.activeAccountRef == unreadFilterAccount &&
+                                            val currentUnreadOwner =
+                                                currentUnreadFilter === unreadFilter &&
+                                                    appState.activeAccountRef == unreadFilterAccount
+                                            if (currentUnreadOwner &&
                                                 appState.runtimeGeneration == unreadFilterRuntime &&
                                                 selectedChatListFolderId == unreadFilterFolder
                                             ) {

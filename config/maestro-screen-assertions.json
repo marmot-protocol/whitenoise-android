@@ -2232,9 +2232,16 @@
           "selector": {
             "id": "group_edit.photoAction"
           },
-          "scope": "group edit destination exposes photo action; Cancel preserves native group name."
+          "scope": "Generated group editor opens its photo action; Back returns to group info with the fixture title unchanged. This journey never selects a file or opens GIF upload consent.",
+          "entry_assertion": {
+            "id": "group_edit.photoAction"
+          },
+          "opened_by": {
+            "text": "Edit Group"
+          }
         }
-      ]
+      ],
+      "remaining": "GRP-035 still requires real file/photo selection, GIF public-hosting consent, cancel/confirm and retired account/group/picker callbacks on a qualified APK. This fixture journey provides no GIF-dialog, upload, cropping, native mutation or physical-device execution proof."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",

@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -54,7 +55,7 @@ class GroupEditGifUploadTest {
         assertEquals(0, fixture.uploads.get())
         val currentConfirm = composeRule.onNodeWithTag("confirmation.confirm").captureClickCallbackForReplay()
         composeRule.onNodeWithTag("confirmation.confirm").performClick()
-        composeRule.waitUntil(5_000) { fixture.uploads.get() == 1 }
+        awaitProgress { fixture.uploads.get() == 1 }
         composeRule.runOnIdle { currentConfirm() }
         assertEquals(1, fixture.uploads.get())
     }
@@ -78,7 +79,7 @@ class GroupEditGifUploadTest {
         composeRule.runOnIdle { fixture.registry.deliver(fixture.uri("retired-result-replay"), oldRequest) }
         composeRule.onNodeWithText(title()).assertIsDisplayed()
         composeRule.onNodeWithTag("confirmation.confirm").performClick()
-        composeRule.waitUntil(5_000) { fixture.uploads.get() == 1 }
+        awaitProgress { fixture.uploads.get() == 1 }
     }
 
     /** Actual provider sniffing starts in the old editor and completes after its owner is retired. */
@@ -88,14 +89,15 @@ class GroupEditGifUploadTest {
         launchDocument()
         val held = fixture.uri("held-result", hold = true)
         composeRule.runOnIdle { assertTrue(fixture.registry.deliver(held)) }
-        assertTrue("Actual provider read must start", fixture.entered.await(5, TimeUnit.SECONDS))
+        awaitProgress { fixture.entered.count == 0L }
+        assertEquals("Actual provider read must start before replacing its editor", 0L, fixture.entered.count)
         composeRule.runOnIdle { fixture.controller.value = fixture.newController(fixture.secondGroup) }
         fixture.release.countDown()
-        composeRule.waitUntil(5_000) { fixture.closedStreams.get() > 0 }
+        awaitProgress { fixture.closedStreams.get() > 0 }
         // A fresh successful pick orders a new owner result after the held provider has returned.
         pick(fixture.uri("after-held-result"))
         composeRule.onNodeWithTag("confirmation.confirm").performClick()
-        composeRule.waitUntil(5_000) { fixture.uploads.get() == 1 }
+        awaitProgress { fixture.uploads.get() == 1 }
         composeRule.onNodeWithText(title()).assertDoesNotExist()
     }
 
@@ -140,7 +142,7 @@ class GroupEditGifUploadTest {
         }
         composeRule.onNodeWithText(title()).assertIsDisplayed()
         composeRule.onNodeWithTag("confirmation.confirm").performClick()
-        composeRule.waitUntil(5_000) { fixture.uploads.get() == 1 }
+        awaitProgress { fixture.uploads.get() == 1 }
     }
 
     private fun render() {
@@ -155,7 +157,16 @@ class GroupEditGifUploadTest {
     private fun pick(uri: Uri) {
         launchDocument()
         composeRule.runOnIdle { assertTrue(fixture.registry.deliver(uri)) }
-        composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText(title()).fetchSemanticsNodes().isNotEmpty() }
+        awaitProgress { composeRule.onAllNodesWithText(title()).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /** Drive the real Main→IO→Main boundary without blocking the paused Android looper. */
+    private fun awaitProgress(condition: () -> Boolean) {
+        composeRule.waitUntil(5_000) {
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            condition()
+        }
+        composeRule.waitForIdle()
     }
 
     private fun title() = fixture.context.getString(R.string.group_gif_upload_title)

@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.LayoutDirection
@@ -274,7 +275,10 @@ class SettingsRouteMotionTest {
         rule.runOnIdle {
             replaceSettingsState(appState, "setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!, false)
         }
-        rule.mainClock.advanceTimeByFrame()
+        // Unlock remounts the LazyColumn. Allow layout frames, never a full 200 ms route animation.
+        rule.mainClock.advanceTimeUntil(timeoutMillis = 64) {
+            rule.onAllNodesWithTag("gestures.MessageLeft").fetchSemanticsNodes().isNotEmpty()
+        }
         rule.onNodeWithTag("gestures.MessageLeft").assertExists()
     }
 

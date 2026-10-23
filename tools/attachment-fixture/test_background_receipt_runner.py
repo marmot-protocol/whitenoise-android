@@ -78,6 +78,29 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
         diagnostic = runner.failure_diagnostics("private text says TimeoutException\nINSTRUMENTATION_CODE: -1\n")
         self.assertEqual({"kind": "instrumentation-failure", "fixture_lines": []}, diagnostic)
 
+    def test_suspend_boundaries_are_closed_and_never_export_stack_messages(self):
+        """Known suspend helpers retain bounded source positions; arbitrary frames and identities stay private."""
+        output = (
+            "INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: private-account\n"
+            "    at dev.ipf.whitenoise.android.media.AndroidAttachmentFixtureSenderKt$awaitAndroidFixtureReferences$2"
+            ".invokeSuspend(AndroidAttachmentFixtureSender.kt:232)\n"
+            "    at dev.ipf.whitenoise.android.media.MediaLifecycleAttachmentProbe$projectRequests$2"
+            ".invokeSuspend(MediaLifecycleAttachmentProbe.kt:422)\n"
+            "    at private.Account.read(Private.kt:123)\n"
+        )
+        diagnostic = runner.failure_diagnostics(output)
+        self.assertEqual(diagnostic, {"kind": "timeout", "fixture_lines": [], "boundary_lines": [
+            {"boundary": "receiver-projection", "line": 422}, {"boundary": "sender-publication", "line": 232},
+        ]})
+        self.assertNotIn("private", json.dumps(diagnostic))
+
+    def test_progress_boundaries_alone_never_qualify_the_fixture(self):
+        """A closed progress stage is useful on failure but supplies none of the required device/checker facts."""
+        from background_receipt_checker import check_background_receipt
+        self.assertFalse(check_background_receipt(
+            [{"phase": "background-receipt-stage", "stage": "network_policy_start"}], [],
+        )["passed"])
+
     def test_only_the_held_request_ending_releases_the_hand_off(self):
         """An unrelated disconnect after the stop does not end the wait; the held request's own disconnect does."""
         events = [

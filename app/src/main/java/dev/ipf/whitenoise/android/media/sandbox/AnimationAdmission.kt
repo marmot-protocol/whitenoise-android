@@ -15,9 +15,8 @@ internal class AnimationAdmission {
         timeoutMillis: Long,
     ): Lease? {
         if (decorative) {
-            synchronized(lock) {
-                if (interactiveWaiters != 0 || !permit.tryAcquire()) return null
-                return Lease(true).also { current = it }
+            return synchronized(lock) {
+                if (interactiveWaiters != 0 || !permit.tryAcquire()) null else Lease(true).also { current = it }
             }
         }
         val retire =
@@ -25,10 +24,13 @@ internal class AnimationAdmission {
                 interactiveWaiters++
                 current?.takeIf { it.decorative }
             }
-        try {
+        return try {
             retire?.retire()
-            if (!permit.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS)) return null
-            return synchronized(lock) { Lease(false).also { current = it } }
+            if (permit.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS)) {
+                synchronized(lock) { Lease(false).also { current = it } }
+            } else {
+                null
+            }
         } finally {
             synchronized(lock) { interactiveWaiters-- }
         }

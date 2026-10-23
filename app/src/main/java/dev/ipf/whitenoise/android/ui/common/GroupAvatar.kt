@@ -82,14 +82,7 @@ internal fun rememberGroupAvatarPresentation(
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedKey = encryptedGroupAvatarCacheKey(accountRef, group)
     val encryptedImage = rememberEncryptedGroupAvatar(appState, group, accountRef)
-    val remoteImage =
-        key(appState, appState.runtimeGeneration, accountRef, legacyUrl) {
-            val image by rememberRecoverableAvatar(
-                initialImage = AvatarImageLoader.peek(legacyUrl),
-                enabled = legacyUrl != null,
-            ) { AvatarImageLoader.load(checkNotNull(legacyUrl)) }
-            image
-        }
+    val remoteImage = rememberLegacyRemoteGroupAvatar(appState, accountRef, legacyUrl)
     val seededImage = ownedSeed?.legacyImageFor(legacyUrl, encryptedKey, encryptedImage, ownedFallback)
     val originalReader = rememberLegacyGroupAvatarBytes(appState, group, accountRef, legacyUrl, encryptedKey)
     return GroupAvatarPresentation(
@@ -108,6 +101,21 @@ internal fun rememberGroupAvatarPresentation(
             },
     )
 }
+
+/** Keeps legacy public acquisition scoped to the same runtime and account as its presentation. */
+@Composable
+private fun rememberLegacyRemoteGroupAvatar(
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    legacyUrl: String?,
+): ImageBitmap? =
+    key(appState, appState.runtimeGeneration, accountRef, legacyUrl) {
+        val image by rememberRecoverableAvatar(
+            initialImage = AvatarImageLoader.peek(legacyUrl),
+            enabled = legacyUrl != null,
+        ) { AvatarImageLoader.load(checkNotNull(legacyUrl)) }
+        image
+    }
 
 /** A legacy viewer/thumbnail reads only the still-selected image of a current authoritative row. */
 @Composable

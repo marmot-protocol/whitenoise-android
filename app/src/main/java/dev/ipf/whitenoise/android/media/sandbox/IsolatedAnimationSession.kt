@@ -191,38 +191,41 @@ internal class IsolatedAnimationSession private constructor(
                 releaseLease()
                 false
             }
-        if (!available) return null
-        sources.withInput(bytes) { input ->
-            remote?.send(
-                Message.obtain().apply {
-                    what = AnimationFrameProtocol.OPEN
-                    arg1 = id
-                    replyTo = this@IsolatedAnimationSession.callback
-                    data =
-                        android.os.Bundle().apply {
-                            putInt("edge", edge)
-                            putParcelable("input", input)
-                            putParcelable("output", output)
-                            if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
-                                val canary = java.io.File(context.filesDir, "media-containment-canary")
-                                if (canary.isFile) putString("canaryPath", canary.absolutePath)
+        return if (available) {
+            sources.withInput(bytes) { input ->
+                remote?.send(
+                    Message.obtain().apply {
+                        what = AnimationFrameProtocol.OPEN
+                        arg1 = id
+                        replyTo = this@IsolatedAnimationSession.callback
+                        data =
+                            android.os.Bundle().apply {
+                                putInt("edge", edge)
+                                putParcelable("input", input)
+                                putParcelable("output", output)
+                                if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
+                                    val canary = java.io.File(context.filesDir, "media-containment-canary")
+                                    if (canary.isFile) putString("canaryPath", canary.absolutePath)
+                                }
                             }
+                    },
+                )
+            }
+            val received = firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+            synchronized(lock) {
+                if (closed || !received) {
+                    null
+                } else {
+                    firstPixels?.let { pixels ->
+                        IsolatedAnimationDrawable(pixels, this).also {
+                            drawable = it
+                            firstPixels = null
                         }
-                },
-            )
-        }
-        val received = firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
-        return synchronized(lock) {
-            if (closed || !received) {
-                null
-            } else {
-                firstPixels?.let { pixels ->
-                    IsolatedAnimationDrawable(pixels, this).also {
-                        drawable = it
-                        firstPixels = null
                     }
                 }
             }
+        } else {
+            null
         }
     }
 
@@ -338,12 +341,13 @@ internal class IsolatedAnimationSession private constructor(
             val validSource =
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
                     edge in 1..AnimationFrameProtocol.MAX_EDGE
-            if (Looper.myLooper() == Looper.getMainLooper() ||
-                !validSource
-            ) {
-                return null
-            }
-            val admissionLease = admission.acquire(decorative, MediaDecodePolicy.DEADLINE_MS) ?: return null
+            val admissionLease =
+                if (Looper.myLooper() == Looper.getMainLooper() || !validSource) {
+                    null
+                } else {
+                    admission.acquire(decorative, MediaDecodePolicy.DEADLINE_MS)
+                }
+            if (admissionLease == null) return null
             var session: IsolatedAnimationSession? = null
             var delivered: IsolatedAnimationDrawable? = null
             return try {

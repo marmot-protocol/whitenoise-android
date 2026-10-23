@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import android.os.Looper
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
@@ -21,6 +22,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
@@ -111,7 +113,7 @@ class PersonGroupsMembershipAuthorityTest {
             fixture.failures += fixture.fast.id
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()
             rule.onNodeWithText(context.getString(R.string.remove_from_group)).performClick()
-            rule.waitUntil(5_000) { feedback != null }
+            awaitAuthority { feedback != null }
             rule.runOnIdle {
                 assertEquals(AppText.Resource(R.string.toast_couldnt_remove_member), feedback?.title)
                 assertEquals(AppText.Resource(R.string.person_group_memberships_unavailable), feedback?.detail)
@@ -139,7 +141,7 @@ class PersonGroupsMembershipAuthorityTest {
             val fastReads = fixture.reads.count { it == fixture.fast.id }
             fixture.failures.clear()
             rule.runOnIdle { retry() }
-            rule.waitUntil(5_000) { fixture.reads.count { it == fixture.slow.id } >= 2 }
+            awaitAuthority { fixture.reads.count { it == fixture.slow.id } >= 2 }
             rule.waitForIdle()
             rule.onNodeWithText("Remove River from Fast group").assertIsDisplayed()
             assertEquals(fastReads, fixture.reads.count { it == fixture.fast.id })
@@ -174,7 +176,7 @@ class PersonGroupsMembershipAuthorityTest {
             openConfirmation(fixture)
             assertTrue(fixture.commits.isEmpty())
             rule.onNodeWithTag("confirmation.confirm").performClick()
-            rule.waitUntil(5_000) { refreshes == 1 && feedback != null }
+            awaitAuthority { refreshes == 1 && feedback != null }
             rule.waitForIdle()
             assertEquals(listOf(fixture.fast.id to listOf(fixture.person)), fixture.commits.toList())
             assertTrue(fixture.reads.count { it == fixture.fast.id } >= 3)
@@ -197,6 +199,15 @@ class PersonGroupsMembershipAuthorityTest {
         rule.onNodeWithText(fixture.actorNpub, substring = true).assertIsDisplayed()
         rule.onNodeWithText(fixture.personNpub, substring = true).assertIsDisplayed()
         rule.onNodeWithText(fixture.fast.id).assertDoesNotExist()
+    }
+
+    /** Native IO resumes the process mutation scope on Android Main, outside the Compose clock. */
+    private fun awaitAuthority(condition: () -> Boolean) {
+        rule.waitUntil(5_000) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            rule.waitForIdle()
+            condition()
+        }
     }
 
     /** Waits on actual row semantics rather than assuming the main clock drains native IO. */
