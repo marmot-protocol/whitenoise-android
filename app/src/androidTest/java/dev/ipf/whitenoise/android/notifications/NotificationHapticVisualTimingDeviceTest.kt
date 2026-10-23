@@ -245,11 +245,15 @@ class NotificationHapticVisualTimingDeviceTest {
 
         try {
             runBlocking { appState.processNotificationUpdateForTest(update) }
+            reportFirstPostTiming(timingEvents)
+            assertEquals(
+                "unread",
+                timingEvents.single { it.stage == NotificationFirstPostTimingStage.CandidateGateComplete }.outcome,
+            )
             val first =
                 checkNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS)) {
                     "Notification listener did not observe the resolved first post"
                 }
-            reportFirstPostTiming(timingEvents)
             val received = timingEvents.single { it.stage == NotificationFirstPostTimingStage.Received }
             val eligibility = timingEvents.single { it.stage == NotificationFirstPostTimingStage.EligibilityComplete }
             val contentComplete = timingEvents.single { it.stage == NotificationFirstPostTimingStage.ContentComplete }
@@ -369,8 +373,12 @@ class NotificationHapticVisualTimingDeviceTest {
 
         try {
             runBlocking { appState.processNotificationUpdateForTest(update) }
-            val fallback = requireNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS))
             reportFirstPostTiming(timingEvents)
+            assertEquals(
+                "unread",
+                timingEvents.single { it.stage == NotificationFirstPostTimingStage.CandidateGateComplete }.outcome,
+            )
+            val fallback = requireNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS))
             onFallbackDelivered()
             val corrected = requireNotNull(NotificationTimingDeviceEvents.awaitPost(LISTENER_POST_TIMEOUT_MS))
 
@@ -458,6 +466,8 @@ class NotificationHapticVisualTimingDeviceTest {
                 "displayName" -> displayName(arguments?.firstOrNull() as String)
                 "parseMarkdown" -> markdownDocument(arguments?.firstOrNull() as? String)
                 "timelineMessages" -> TimelinePageFfi(emptyList(), hasMoreBefore = false, hasMoreAfter = false)
+                // No read marker exists for the synthetic incoming message; keep the real candidate gate active.
+                "chatListRow" -> null
                 "userProfile" -> null
                 "npub" -> MENTION_NPUB
                 "chatList", "groupMemberIdsPage", "groupMembers" -> emptyList<Any>()

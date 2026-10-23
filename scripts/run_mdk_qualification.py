@@ -19,6 +19,7 @@ APP = 'dev.ipf.whitenoise.android.mdkqualification'
 RUNNER = APP + '.test/dev.ipf.whitenoise.android.qualification.QualificationRunner'
 UPGRADE = 'dev.ipf.whitenoise.android.qualification.MarmotUpgradeFixtureTest'
 RECOVERY = 'dev.ipf.whitenoise.android.state.MarmotKitRecoveryQualificationTest'
+KEY_MIGRATION = 'dev.ipf.whitenoise.android.state.MarmotKeyMigrationQualificationTest'
 RECOVERY_CASES = {
     'offlineReplayBeyondTheRelayClampRecoversEveryMessage',
     'oneSenderBeyondTheReorderToleranceRecoversEveryMessage',
@@ -313,12 +314,18 @@ def main():
             usable_chat('upgrade-ready')
             facts['phases']['upgrade'] = 'passed'
             stop()
+            instrument('key-migration', KEY_MIGRATION, {'migratedAccountsPreserveRetentionAndSalts'}, ports)
+            facts['phases']['key_migration'] = 'passed'
+            stop()
             usable_chat('cold-ready')
             stop()
             instrument('cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'cold'))
             verify_fixture_network_isolation(isolated_uid)
             facts['phases']['cold_restart'] = 'passed'
+            stop()
+            instrument('key-migration-cold', KEY_MIGRATION, {'migratedAccountsPreserveRetentionAndSalts'}, ports)
+            facts['phases']['key_migration_cold'] = 'passed'
         except (RuntimeError, subprocess.SubprocessError) as error:
             facts['phases']['upgrade_campaign'] = type(error).__name__ + ': ' + str(error)
         # Keep independent receiver recovery evidence even if pending-upload promotion fails.
@@ -348,6 +355,7 @@ def main():
                 server.shutdown()
             server.server_close()
     required = {'baseline', 'upgrade', 'cold_restart', 'pending_promotion', 'promoted_cold_restart',
+                'key_migration', 'key_migration_cold',
                 'recovery_refuse', 'recovery_ignore',
                 'media_corrupt_recovery', 'media_lost_recovery'}
     if set(facts['phases']) != required or any(value != 'passed' for value in facts['phases'].values()):

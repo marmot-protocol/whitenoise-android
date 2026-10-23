@@ -14,7 +14,7 @@ import java.io.File
 private val savedUpgradePolicies = mutableMapOf<String, AttachmentDownloadPolicyFfi>()
 private var initialLegacyBytes = 0uL
 
-/** Selects the reviewed October 21 baseline, whose completed attachments already live outside SQL. */
+/** Selects the reviewed file-store baseline, whose completed attachments already live outside SQL. */
 internal fun fileStoreBaseline(): Boolean =
     InstrumentationRegistry
         .getArguments()

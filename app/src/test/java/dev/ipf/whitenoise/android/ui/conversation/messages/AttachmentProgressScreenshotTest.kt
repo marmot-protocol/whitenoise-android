@@ -13,9 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -63,6 +65,31 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
     @Test
     fun progressDarkLargeRtl() = captureProgress("dark-large-rtl", dark = true, rtl = true, fontScale = 1.6f)
 
+    /** Setting-cleaned media names local absence without claiming an active, cancellable download. */
+    @Test
+    fun settingCleanedFileDescribesUnavailabilityWithoutProgress() {
+        val reference = fileReference("cleaned.pdf", "application/pdf")
+        val progress =
+            NativeAttachmentProgress(AttachmentTransferStateFfi.CLEANED_BY_SETTING, 1u, 4uL, 8uL, null, "body")
+        val host =
+            attachmentFilePresentationState(AttachmentTransferState.Remote, progress, AttachmentCancellationState.None)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MediaFileBubbleContent(
+                    reference,
+                    resolveAttachmentPresentation(reference.mediaType, reference.fileName),
+                    host,
+                    nativeProgress = progress,
+                    onCancelTransfer = { error("A setting-cleaned body has no active transfer to cancel") },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Attachment unavailable").assertExists()
+        composeRule.onNodeWithContentDescription("Attachment unavailable").assertHasNoClickAction()
+        composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertCountEquals(0)
+        composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0.5f, 0f..1f))).assertCountEquals(0)
+    }
+
     /** Produces phase-specific cards; cancellation acknowledgement is independent of body completion. */
     private fun captureProgress(
         name: String,
@@ -82,7 +109,8 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         composeRule.onNodeWithText("4.0 MB of 8.0 MB").assertExists()
         composeRule.onNodeWithText("4.0 MB received").assertExists()
         composeRule.onNodeWithText("Download blocked by policy").assertExists()
-        composeRule.onNodeWithText("Attachment unavailable").assertExists()
+        composeRule.onAllNodesWithText("Attachment unavailable").assertCountEquals(2)
+        composeRule.onAllNodesWithContentDescription("Attachment unavailable").assertCountEquals(2)
         composeRule.onNodeWithText("Preparing attachment").assertExists()
         composeRule.onNodeWithContentDescription("Cancelling download").assertExists()
         composeRule.onNodeWithContentDescription("Could not confirm cancellation").assertExists()
@@ -106,6 +134,7 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                 AttachmentTransferStateFfi.READY,
                 AttachmentTransferStateFfi.POLICY_BLOCKED,
                 AttachmentTransferStateFfi.UNAVAILABLE,
+                AttachmentTransferStateFfi.CLEANED_BY_SETTING,
             )
         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(8.dp)) {
             phases.forEachIndexed { index, phase ->

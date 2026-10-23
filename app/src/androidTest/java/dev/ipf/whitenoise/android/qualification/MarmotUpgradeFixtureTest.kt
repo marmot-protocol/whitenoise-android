@@ -108,8 +108,18 @@ class MarmotUpgradeFixtureTest {
             } finally {
                 runtime.shutdownAndClose()
             }
-            recordUpgradeDatabase(root, receipt, phase)
+            recordClosedStorage(root, receipt, phase)
         }
+
+    /** Records database and baseline salt evidence only after the native runtime has fully closed. */
+    private fun recordClosedStorage(
+        root: File,
+        receipt: File,
+        phase: String,
+    ) {
+        recordUpgradeDatabase(root, receipt, phase)
+        if (phase == "seed" && fileStoreBaseline()) recordUpgradeSalts(root, receipt)
+    }
 
     /** Native create/send/download calls produce both local upload bodies and a received retained attachment. */
     @Suppress("LongMethod") // One baseline transaction sequence owns the generated account and both upload states.
@@ -152,6 +162,7 @@ class MarmotUpgradeFixtureTest {
         receipt.writeText(initial.toString())
         // Avatar metadata advances the group epoch; finish it before preparing epoch-bound unsent media.
         if (fileStoreBaseline()) seedUpgradeAvatar(runtime, receipt)
+        if (fileStoreBaseline()) seedUpgradeRemoval(runtime, receipt, blobPort)
         // Keep an uploaded-but-unsent outgoing record across 0113 as well as the published attachment.
         val pending =
             runtime.uploadMedia(
@@ -187,6 +198,7 @@ class MarmotUpgradeFixtureTest {
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
         if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
+        if (fileStoreBaseline()) verifyUpgradeRemoval(runtime, value)
         value.put("${phase}Pid", Process.myPid())
         receipt.writeText(value.toString())
     }
