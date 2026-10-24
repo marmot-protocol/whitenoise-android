@@ -507,8 +507,10 @@ class MediaBindingRecoveryTest {
         try {
             val first = context.next()
             assertTrue(first.remote.decoded.await(2, TimeUnit.SECONDS))
-            org.robolectric.shadows.ShadowSystemClock
-                .advanceBy(java.time.Duration.ofSeconds(9))
+            first.remote.beforeRetire.set {
+                org.robolectric.shadows.ShadowSystemClock
+                    .advanceBy(java.time.Duration.ofSeconds(9))
+            }
             val identity =
                 org.robolectric.shadows.ShadowBinder.CallingIdentity
                     .newBuilder()
@@ -774,6 +776,7 @@ class MediaBindingRecoveryTest {
         private val recipients = mutableListOf<IBinder.DeathRecipient>()
 
         @Volatile private var heldReply: Pair<IBinder, Int>? = null
+        val beforeRetire = AtomicReference<(() -> Unit)?>(null)
         val retired = CountDownLatch(1)
         val decoded = CountDownLatch(1)
 
@@ -823,7 +826,10 @@ class MediaBindingRecoveryTest {
             data.enforceInterface("android.os.IMessenger")
             if (data.readInt() != 0) {
                 val message = Message.CREATOR.createFromParcel(data)
-                if (message.what == MediaDecodePolicy.RETIRE) retired.countDown()
+                if (message.what == MediaDecodePolicy.RETIRE) {
+                    beforeRetire.getAndSet(null)?.invoke()
+                    retired.countDown()
+                }
                 if (message.what == MediaDecodePolicy.DECODE) {
                     requests += 1
                     heldReply = message.replyTo.binder to message.arg1
