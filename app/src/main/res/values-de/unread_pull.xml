@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">Ungelesene Unterhaltungen konnten nicht geladen werden. Versuche es erneut.</string>
     <string name="pull_unread_hint">Ziehen, um ungelesene Unterhaltungen anzuzeigen</string>
     <string name="pull_unread_release">Loslassen, um ungelesene Unterhaltungen anzuzeigen</string>
+    <string name="pull_unread_filtered">Nach ungelesen gefiltert</string>
 </resources>

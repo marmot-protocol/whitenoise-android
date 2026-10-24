@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.state.emptyTimelinePage
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_ROW_PLACEMENT_MILLIS
+import dev.ipf.whitenoise.android.ui.chats.performUnreadFilterAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
@@ -138,9 +139,9 @@ class ChatListConversationReturnRenderingTest {
     fun unreadFilterSurvivesConversationBackUntilShowAll() {
         val fixture = ReturnFixture(unreadTarget = true)
         withMountedUnreadShell(fixture) { holder ->
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
             awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
-            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Filtered by unread")
             composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
             // Filtering changes both the head and keyed layout; real pointer gates must settle before touching a row.
             composeRule.mainClock.advanceTimeBy(
@@ -156,10 +157,10 @@ class ChatListConversationReturnRenderingTest {
             awaitCondition { holder.selectedChat.value == null && fixture.unreadSnapshotReads.get() > readsBeforeBack }
             composeRule.mainClock.advanceTimeBy(1_000)
             composeRule.waitForIdle()
-            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Filtered by unread")
             composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
-            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Unread only")
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+            composeRule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
             composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertIsDisplayed()
         }
     }
@@ -184,21 +185,21 @@ class ChatListConversationReturnRenderingTest {
             ),
         )
         withMountedUnreadShell(fixture) {
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
             awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
             composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag("chats.folder.${folder.id}"))
             composeRule.onNodeWithTag("chats.folder.${folder.id}").performClick()
-            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Unread only")
+            composeRule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
             composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag("chats.scope.chats"))
             composeRule.onNodeWithTag("chats.scope.chats").performClick()
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
-            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Show all")
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Filtered by unread")
             composeRule.runOnIdle { replaceUnreadAccount(fixture.appState, "other-unread-account") }
             composeRule.waitForIdle()
             composeRule.runOnIdle { replaceUnreadAccount(fixture.appState, ConversationTimelineTestIds.ACCOUNT_REF) }
             composeRule.waitForIdle()
             composeRule.mainClock.advanceTimeBy(1_000)
-            composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Unread only")
+            composeRule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         }
     }
 

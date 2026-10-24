@@ -12,18 +12,23 @@ import androidx.compose.ui.input.pointer.positionChange
 import kotlin.math.abs
 
 /** A pull must begin at the logical head; scrolling or flinging into it never arms the action. */
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "NestedBlockDepth")
 internal fun Modifier.chatListUnreadPull(
     enabled: Boolean,
     atTop: () -> Boolean,
     thresholdPx: Float,
     onProgress: (Float) -> Unit = {},
     scopeKey: Any? = Unit,
+    onThreshold: () -> Unit = {},
+    onDistance: (Float) -> Unit = {},
     onActivate: () -> Unit,
 ): Modifier =
     composed {
         val currentAtTop by rememberUpdatedState(atTop)
         val currentActivate by rememberUpdatedState(onActivate)
         val currentProgress by rememberUpdatedState(onProgress)
+        val currentThreshold by rememberUpdatedState(onThreshold)
+        val currentDistance by rememberUpdatedState(onDistance)
         pointerInput(enabled, thresholdPx, scopeKey) {
             if (!enabled) return@pointerInput
             awaitEachGesture {
@@ -33,6 +38,7 @@ internal fun Modifier.chatListUnreadPull(
                 var horizontal = 0f
                 var rejected = !armed
                 var claimed = false
+                var thresholdLatched = false
                 try {
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -44,24 +50,38 @@ internal fun Modifier.chatListUnreadPull(
                         if (unclaimedUnreadPullExpired(claimed, heldMillis, viewConfiguration.longPressTimeoutMillis)) {
                             rejected = true
                         }
+                        if (rejected && claimed) {
+                            currentProgress(0f)
+                            currentDistance(0f)
+                            thresholdLatched = false
+                            change.consume()
+                        }
                         if (change.pressed) {
                             val delta = change.positionChange()
                             distance += delta.y
                             horizontal += delta.x
-                            if (unreadPullDirectionRejected(horizontal, distance, viewConfiguration.touchSlop)) {
+                            if (!claimed && unreadPullDirectionRejected(horizontal, distance, viewConfiguration.touchSlop)) {
                                 rejected = true
                             }
-                            if (!rejected && distance > viewConfiguration.touchSlop) {
+                            if (!rejected && (claimed || distance > viewConfiguration.touchSlop)) {
                                 claimed = true
                                 change.consume()
                                 currentProgress((distance / thresholdPx).coerceIn(0f, 1f))
+                                currentDistance((distance / thresholdPx).coerceAtLeast(0f))
+                                if (distance < thresholdPx * 0.9f) thresholdLatched = false
+                                if (distance >= thresholdPx && !thresholdLatched) {
+                                    thresholdLatched = true
+                                    currentThreshold()
+                                }
                             }
                         } else {
-                            if (!rejected && distance >= thresholdPx) currentActivate()
+                            if (claimed) change.consume()
+                            if (!rejected && claimed && distance >= thresholdPx) currentActivate()
                         }
                     } while (event.changes.any { it.pressed })
                 } finally {
                     currentProgress(0f)
+                    currentDistance(0f)
                 }
             }
         }

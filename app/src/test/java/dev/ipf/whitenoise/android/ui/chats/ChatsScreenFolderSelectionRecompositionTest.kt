@@ -221,7 +221,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
                 ChatsScreen(appState, controller, {}, { _, _, _, _ -> }, selectedFolderId = folder.id)
             }
         }
-        composeRule.onNodeWithTag("chats.unread_filter").performClick()
+        composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
         composeRule.waitUntil { reads == 1 }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
@@ -261,7 +261,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
             composeRule.setContent {
                 WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
             }
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
             composeRule.waitUntil { reads == 1 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$id").assertExists()
@@ -320,7 +320,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
             composeRule.setContent {
                 WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
             }
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
             composeRule.waitUntil { reads == 1 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$deleted").assertExists()
@@ -392,7 +392,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
                     )
                 }
             }
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$unread").assertExists()
             composeRule.onNodeWithTag("chat.row.$read").assertDoesNotExist()
@@ -405,7 +405,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
             composeRule.onNodeWithTag("chat.row.$unread").assertExists()
             composeRule.onNodeWithTag("chat.row.$read").assertExists()
             composeRule.onNodeWithTag("chat.row.$outside").assertDoesNotExist()
-            composeRule.onNodeWithText(context.getString(R.string.pull_unread_show_all)).assertDoesNotExist()
+            composeRule.onNodeWithText(context.getString(R.string.pull_unread_filtered)).assertDoesNotExist()
         } finally {
             composeRule.runOnIdle { controller.onCleared() }
         }

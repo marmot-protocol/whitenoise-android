@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LOCAL_DELETE_ACCOUNT
@@ -50,7 +49,7 @@ class ChatsScreenOffWindowUnreadRemovalTest {
             composeRule.setContent {
                 WhiteNoiseTheme { ChatsScreen(fixture.state, fixture.controller, {}, { _, _, _, _ -> }) }
             }
-            composeRule.onNodeWithTag("chats.unread_filter").performClick()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
             awaitNativeProgress(nativeScope) { reads == 1 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertExists()

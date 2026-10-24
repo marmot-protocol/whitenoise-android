@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">Impossible de charger les discussions non lues. Réessayez.</string>
     <string name="pull_unread_hint">Tirer pour afficher les discussions non lues</string>
     <string name="pull_unread_release">Relâcher pour afficher les discussions non lues</string>
+    <string name="pull_unread_filtered">Filtré par non lus</string>
 </resources>

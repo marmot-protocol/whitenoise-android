@@ -7,7 +7,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -80,7 +79,7 @@ class ChatsScreenUnreadReadLifetimeTest {
             }
         }
         mount(model)
-        rule.onNodeWithTag("chats.unread_filter").performClick()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
         awaitProgress { model.snapshotReads == 1 }
         repeat(4) { index ->
             rule.runOnIdle {
@@ -111,30 +110,45 @@ class ChatsScreenUnreadReadLifetimeTest {
             down(Offset(width * 0.6f, 10f))
             moveTo(Offset(width * 0.6f, 10f + distance), 120)
         }
-        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_release)).assertExists()
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         assertEquals(0, model.snapshotReads)
         row.performTouchInput { up() }
         awaitProgress { model.snapshotReads == 1 }
-        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_show_all)).assertExists()
+        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertExists()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
         assertTrue("pulling must not issue a read, pin, archive or mute command", model.calls.isEmpty())
+        rule.onNodeWithTag("chats.unread_surface").performTouchInput {
+            down(Offset(width * 0.6f, height * 0.3f))
+            moveBy(Offset(0f, distance), 120)
+            up()
+        }
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
     }
 
     /** A successful zero-match read uses the caught-up state while keeping Show all available. */
     @Test fun mountedPullFilterWithOnlyReadChatsShowsUnreadEmptyState() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
+        model.state.swipePreferences.setPullUnread(true)
         model.row.updateAndGet { it.copy(manuallyMarkedUnread = false) }
         model.retainedRow.updateAndGet { it.copy(manuallyMarkedUnread = false) }
         model.controller.applyChatListRow(model.retainedRow.get())
         settle()
         mount(model)
-        rule.onNodeWithTag("chats.unread_filter").performClick()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
         awaitProgress { model.snapshotReads >= 1 }
         rule.waitForIdle()
         rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertExists()
         rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_detail)).assertExists()
-        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_show_all)).assertExists()
+        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertExists()
         rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_chats_title)).assertDoesNotExist()
+        val distance = with(rule.density) { 100.dp.toPx() }
+        rule.onNodeWithTag("chats.unread_surface").performTouchInput {
+            down(Offset(width * 0.6f, height * 0.3f))
+            moveBy(Offset(0f, distance), 120)
+            up()
+        }
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertExists()
     }
 
     /** An unrelated read chat with no roster cannot fail an unread participant-folder request. */
@@ -165,7 +179,7 @@ class ChatsScreenUnreadReadLifetimeTest {
             ChatFolderRule(includeMemberPubkeys = setOf(member), includeMuted = true),
         )
         mount(model, folder.id)
-        rule.onNodeWithTag("chats.unread_filter").performClick()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
         awaitProgress { model.snapshotReads >= 1 && model.controller.hasMemberSnapshot(ACTION_TARGET) }
         settle()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
@@ -200,7 +214,7 @@ class ChatsScreenUnreadReadLifetimeTest {
             ChatFolderRule(includeMemberPubkeys = setOf(member), includeMuted = true),
         )
         mount(model, folder.id)
-        rule.onNodeWithTag("chats.unread_filter").performClick()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
         awaitProgress { model.controller.hasMemberSnapshot(ACTION_TARGET) }
         settle()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
@@ -215,7 +229,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         val release = CompletableDeferred<Unit>().also { releaseRead = it }
         model.beforeSnapshotRead = { if (model.snapshotReads == 1) release.await() }
         mount(model)
-        rule.onNodeWithTag("chats.unread_filter").performClick()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
         awaitProgress { model.snapshotReads == 1 }
         val rebound = scope.launch { model.controller.bind(null) }
         awaitProgress { rebound.isCompleted }
@@ -223,7 +237,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         settle()
         rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_load_failed)).assertDoesNotExist()
         rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_retry)).assertDoesNotExist()
-        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_show_all)).assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertDoesNotExist()
     }
 
     private fun mount(
