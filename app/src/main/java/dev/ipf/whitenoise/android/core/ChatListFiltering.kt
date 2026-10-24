@@ -91,7 +91,7 @@ internal data class ChatListSearchSections<T>(
     fun orderedItems(): List<T> = groups + messages
 }
 
-private enum class ChatListSynchronousSearchMatch {
+internal enum class ChatListSynchronousSearchMatch {
     IDENTIFIER,
     TITLE,
     METADATA,
@@ -110,7 +110,7 @@ private val ChatListSynchronousSearchMatch.priority: Int
         }
 
 @Suppress("ReturnCount") // Ordered guard clauses avoid computing lower-priority matches after a hit.
-private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): ChatListSynchronousSearchMatch {
+internal fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): ChatListSynchronousSearchMatch {
     if (
         looksLikeGroupIdNeedle(ciNeedle) &&
         (

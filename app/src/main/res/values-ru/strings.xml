@@ -2499,6 +2499,8 @@
     <string name="search_message_content_failed">Не удалось выполнить поиск по содержимому сообщений.</string>
     <string name="document_save_interrupted">Аутентификация прервала сохранение. Нажмите «Сохранить» ещё раз, чтобы выбрать место назначения.</string>
     <string name="avatar_preparation_interrupted">Обновление изображения прервано. Проверьте текущее изображение, прежде чем выбирать его снова.</string>
+    <string name="dictation_interrupted">Диктовка прервана. Перед отправкой проверьте восстановленный текст и оставшиеся аудиозаписи.</string>
+    <string name="dictation_waiting_for_unlock">Диктовка временно сохранена. Разблокируйте приложение, чтобы вставить текст.</string>
     <string name="setup_finding_inspection_completed">Проверка завершена. Само по себе это не подтверждает, что реле поддерживает запись.</string>
     <string name="setup_finding_context_unknown">Источник не указан</string>
     <string name="setup_finding_context_discovery">Обнаружение записей</string>

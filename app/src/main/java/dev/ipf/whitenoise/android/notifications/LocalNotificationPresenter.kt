@@ -1191,6 +1191,7 @@ class LocalNotificationPresenter(
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
+                                        builder.addExtras(notificationFixedReactionTargetExtras(actionTarget))
                                         decision.actions.forEach { action ->
                                             when (action) {
                                                 NotificationActionKind.REPLY ->
@@ -2215,29 +2216,34 @@ class LocalNotificationPresenter(
                     id,
                 )
             }
-            val written =
+            var expandedChoiceAttempted = false
+            val post = { expandedChoices: Boolean ->
                 NotificationGroupReconciler.postChild(
                     context,
                     notification,
                     request = groupReconciliation,
-                    isLive = {
-                        if (finalPostAllowed?.invoke() == false) {
-                            false
-                        } else if (!mustBeLive) {
-                            true
-                        } else {
-                            val current =
-                                context.getSystemService(NotificationManager::class.java)?.let {
-                                    activeNotification(it, tag, id)
-                                }
-                            current != null &&
-                                current.notification.extras.getString(EXTRA_GENERATION) ==
-                                notification.extras.getString(EXTRA_GENERATION)
-                        }
-                    },
+                    isLive = { notificationWriteIsLive(notification, tag, id, mustBeLive, finalPostAllowed) },
                 ) {
                     val payload = previewPayload(withCurrentContactPictures(notification), tag, id, hiddenShortcut)
-                    notificationPoster(manager, tag, id, payload)
+                    val expanded =
+                        if (expandedChoices) {
+                            withExpandedReactionChoices(context, payload, tag, id, quickReactionChoices())
+                        } else {
+                            clearExpandedReactionChoices(context, payload)
+                        }
+                    expandedChoiceAttempted = expanded.extras.getBoolean(EXTRA_EXPANDED_REACTION_CHOICES)
+                    notificationPoster(manager, tag, id, expanded)
+                }
+            }
+            val written =
+                try {
+                    post(true)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (exception: RuntimeException) {
+                    if (!expandedChoiceAttempted) throw exception
+                    // Repeat the complete live/profile/privacy fence, never resend the prior rich payload.
+                    post(false)
                 }
             if (written) {
                 ConversationCardPostedRegistry.markPosted(
@@ -2256,6 +2262,28 @@ class LocalNotificationPresenter(
                 "post failed tag=${tag.take(16)} type=${exception.javaClass.simpleName}"
             }
             NotificationCardWriteResult.FAILED
+        }
+
+    /** Same existing write predicate, rechecked independently for the optional native fallback. */
+    private fun notificationWriteIsLive(
+        notification: Notification,
+        tag: String,
+        id: Int,
+        mustBeLive: Boolean,
+        finalPostAllowed: (() -> Boolean)?,
+    ): Boolean =
+        if (finalPostAllowed?.invoke() == false) {
+            false
+        } else if (!mustBeLive) {
+            true
+        } else {
+            val current =
+                context.getSystemService(NotificationManager::class.java)?.let {
+                    activeNotification(it, tag, id)
+                }
+            current != null &&
+                current.notification.extras.getString(EXTRA_GENERATION) ==
+                notification.extras.getString(EXTRA_GENERATION)
         }
 
     private fun canPublishPreviewShortcut(

@@ -1252,6 +1252,7 @@ class WhiteNoiseAppState private constructor(
                 context = appContext,
                 readDraft = ::conversationDictationDraftSnapshot,
                 writeDraft = ::setConversationDictationDraftIfCurrent,
+                completionWrite = ::writeCompletedDictationDraft,
                 // Chat rows are a refreshable projection, not proof that the immutable origin was removed.
                 targetAvailable = { accountRef, _ ->
                     accounts.any { it.label == accountRef && it.signedOut != true }
@@ -1702,7 +1703,9 @@ class WhiteNoiseAppState private constructor(
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
     private val conversationDictationMediaHandoff by lazy {
-        createConversationDictationMediaHandoff(ttsController, appContext) { conversationDictation.cancel() }
+        createConversationDictationMediaHandoff(ttsController, appContext) {
+            conversationDictation.interruptForAudioFocusLoss()
+        }
     }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
@@ -2991,12 +2994,30 @@ class WhiteNoiseAppState private constructor(
         return ConversationDictationDraftSnapshot(value, latest.value)
     }
 
+    private fun writeCompletedDictationDraft(
+        accountRef: String,
+        groupIdHex: String,
+        expectedRevision: Long,
+        value: TextFieldValue,
+    ): dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite =
+        if (appLockScreenVisible || appUnlockEvaluationPending) {
+            dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite.DeferredByHost
+        } else {
+            composerDraftExpansionBridge
+                .writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+                ?.let(dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite::Written)
+                ?: dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite.Refused
+        }
+
     private fun setConversationDictationDraftIfCurrent(
         accountRef: String,
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Long? = composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+    ): Long? =
+        writeConversationDictationDraftWhenUnlocked(appLockScreenVisible, appUnlockEvaluationPending) {
+            composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+        }
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {
@@ -7946,6 +7967,7 @@ class WhiteNoiseAppState private constructor(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
+        if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
         resumePendingInviteNotificationIdentityRefreshes()
         resumePushWakeEpisodeFromLifecycle()
         if (dismissRetainedVisibleConversation) {
@@ -8008,6 +8030,7 @@ class WhiteNoiseAppState private constructor(
                 requestAppUnlock()
             } else {
                 appLockScreenVisible = false
+                if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
                 resumePendingInviteNotificationIdentityRefreshes()
             }
         }

@@ -2425,6 +2425,8 @@
     <string name="search_message_content_failed">Não foi possível pesquisar o conteúdo das mensagens.</string>
     <string name="document_save_interrupted">A autenticação interrompeu este salvamento. Escolha Salvar novamente para selecionar um destino.</string>
     <string name="avatar_preparation_interrupted">A atualização da imagem foi interrompida. Confira a imagem atual antes de selecioná-la novamente.</string>
+    <string name="dictation_interrupted">Ditado interrompido. Reveja o texto recuperado e qualquer áudio restante antes de enviar.</string>
+    <string name="dictation_waiting_for_unlock">Ditado salvo temporariamente. Desbloqueie o app para colá-lo.</string>
     <string name="setup_finding_inspection_completed">Inspeção concluída. Isto, por si só, não confirma que o relay aceita escrita.</string>
     <string name="setup_finding_context_unknown">Origem não especificada</string>
     <string name="setup_finding_context_discovery">Descoberta de registos</string>

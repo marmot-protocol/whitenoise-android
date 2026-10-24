@@ -2390,6 +2390,8 @@
     <string name="search_message_content_failed">无法搜索消息内容。</string>
     <string name="document_save_interrupted">身份验证中断了此次保存。请再次选择“保存”以选择目标位置。</string>
     <string name="avatar_preparation_interrupted">图片更新已中断。请先检查当前图片，再重新选择。</string>
+    <string name="dictation_interrupted">听写已中断。发送前请检查恢复的文本和所有剩余音频。</string>
+    <string name="dictation_waiting_for_unlock">听写已暂存。解锁应用后即可粘贴。</string>
     <string name="setup_finding_inspection_completed">检查已完成。仅凭这一点无法确认中继支持写入。</string>
     <string name="setup_finding_context_unknown">来源未指定</string>
     <string name="setup_finding_context_discovery">记录发现</string>

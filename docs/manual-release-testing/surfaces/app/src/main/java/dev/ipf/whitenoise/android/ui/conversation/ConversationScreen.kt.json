@@ -109,6 +109,14 @@
     ],
     "source_coverage": [
       {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Typing and navigation retire deferred geometry",
+        "anchor": "snapshotFlow { composerTextState.userTextEditRevision }",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
         "surface": "Share-owned attachment discard storage recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.share_import_storage",
