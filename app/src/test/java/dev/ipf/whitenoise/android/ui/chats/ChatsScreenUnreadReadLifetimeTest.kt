@@ -125,6 +125,50 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
     }
 
+    /** The persisted preference gates fresh pulls and cancels an armed pull before a later re-enabled gesture. */
+    @Test fun mountedPullUnreadPreferenceCancelsHeldGestureAndRecovers() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        model.state.swipePreferences.setPullUnread(false)
+        mount(model)
+        val surface = rule.onNodeWithTag("chats.unread_surface")
+        val distance = with(rule.density) { 100.dp.toPx() }
+
+        fun pull(release: Boolean = true) {
+            surface.performTouchInput {
+                down(Offset(width * 0.6f, height * 0.3f))
+                moveBy(Offset(0f, distance), 120)
+                if (release) up()
+            }
+        }
+        pull()
+        settle()
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        assertEquals(0, model.snapshotReads)
+        rule.runOnIdle { model.state.swipePreferences.setPullUnread(true) }
+        rule.waitForIdle()
+        pull()
+        awaitProgress { model.snapshotReads == 1 }
+        rule.onNodeWithTag("chats.unread_filter").assertExists()
+        surface.performUnreadFilterAction(rule)
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        val readsBeforeCancelledPull = model.snapshotReads
+        pull(release = false)
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        rule.runOnIdle { model.state.swipePreferences.setPullUnread(false) }
+        rule.waitForIdle()
+        surface.performTouchInput { up() }
+        settle()
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        assertEquals(readsBeforeCancelledPull, model.snapshotReads)
+        rule.runOnIdle { model.state.swipePreferences.setPullUnread(true) }
+        rule.waitForIdle()
+        pull()
+        awaitProgress { model.snapshotReads > readsBeforeCancelledPull }
+        rule.onNodeWithTag("chats.unread_filter").assertExists()
+        rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
+        assertTrue(model.calls.isEmpty())
+    }
+
     /** A successful zero-match read uses the caught-up state while keeping Show all available. */
     @Test fun mountedPullFilterWithOnlyReadChatsShowsUnreadEmptyState() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
