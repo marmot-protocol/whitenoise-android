@@ -97,9 +97,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwa
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
+import dev.ipf.whitenoise.android.ui.conversation.media.validatedAttachmentCacheFile
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Language
 import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
 import dev.ipf.whitenoise.android.ui.icons.filled.Pause
@@ -794,9 +796,85 @@ private fun VoiceLibraryTab(
     }
 }
 
+/**
+ * The Shared media voice control's glyph: progress while loading, Download until the clip is on the device, then Play
+ * or Pause, so the control never announces an action its tap does not perform.
+ */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun VoiceLibraryActionIcon(
+    loading: Boolean,
+    playable: Boolean,
+    playing: Boolean,
+) {
+    Box(contentAlignment = Alignment.Center) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        } else if (!playable) {
+            Icon(
+                imageVector = Icons.Default.Download,
+                contentDescription = stringResource(R.string.media_tap_to_download),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp),
+            )
+        } else {
+            Icon(
+                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription =
+                    stringResource(
+                        if (playing) R.string.voice_message_pause else R.string.voice_message_play,
+                    ),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Whether a Shared media clip is on the device, or null until the cache probe answers. The reader's own clip still
+ * held in memory for its upload counts at once, as it does for a file row.
+ */
+@Composable
+private fun rememberLibraryClipOnDevice(
+    controller: ConversationController,
+    row: SharedMediaRow,
+    pillKey: String,
+): Boolean? {
+    val retainedOwnClip =
+        remember(pillKey, row.mine) {
+            row.mine &&
+                controller
+                    .pendingAttachmentsList(row.messageIdHex)
+                    .getOrNull(row.attachmentIndex)
+                    ?.inMemoryBytes != null
+        }
+    val onDevice by produceState<Boolean?>(initialValue = true.takeIf { retainedOwnClip }, pillKey, retainedOwnClip) {
+        value = retainedOwnClip || controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
+    }
+    return onDevice
+}
+
+/**
+ * Checks a Shared media clip at tap time, off the main thread. Returns the file the cache still holds, or null once
+ * it was evicted, and whether the clip is on the device: an evicted file also outdates the earlier cache probe, so
+ * that probe counts only while nothing had been loaded yet.
+ */
+private suspend fun libraryClipAtTap(
+    loaded: java.io.File?,
+    probedOnDevice: Boolean,
+): Pair<java.io.File?, Boolean> {
+    val current = loaded?.let { withContext(Dispatchers.IO) { validatedAttachmentCacheFile(it) } }
+    return current to (current != null || (loaded == null && probedOnDevice))
+}
+
 /** One voice row with playback. */
 @Composable
-private fun VoiceLibraryRow(
+internal fun VoiceLibraryRow(
     row: SharedMediaRow,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
@@ -815,6 +893,11 @@ private fun VoiceLibraryRow(
         )
     var localFile by remember(pillKey) { mutableStateOf<java.io.File?>(null) }
     var loading by remember(pillKey) { mutableStateOf(false) }
+    // The control stays hidden and inert until the cache probe answers, so a cached clip never flashes Download; it
+    // then offers Download until the clip is local, and Play after.
+    val onDevice = rememberLibraryClipOnDevice(controller, row, pillKey)
+    val playable = onDevice == true || localFile != null
+    val actionReady = onDevice != null || localFile != null
 
     val isPlayingThis by remember(pillKey) {
         VoicePlaybackController.state
@@ -845,12 +928,17 @@ private fun VoiceLibraryRow(
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clickable(enabled = !loading) {
+                    .clickable(enabled = !loading && actionReady) {
                         if (isPlayingThis) {
                             VoicePlaybackController.pause()
                             return@clickable
                         }
+                        // A clip that is not on the device yet is only downloaded; the next tap plays it. A file the
+                        // cache evicted since it was loaded is checked again here, so it is downloaded, not played.
+                        val probedOnDevice = onDevice == true
                         scope.launch {
+                            val (current, downloaded) = libraryClipAtTap(localFile, probedOnDevice)
+                            localFile = current
                             val file =
                                 localFile ?: runCatching {
                                     loading = true
@@ -872,6 +960,7 @@ private fun VoiceLibraryRow(
                                 }.also { loading = false }
                                     .getOrNull() ?: return@launch
                             localFile = file
+                            if (!downloaded) return@launch
                             val source =
                                 controller.voicePlaybackSource(
                                     appState,
@@ -882,25 +971,7 @@ private fun VoiceLibraryRow(
                         }
                     },
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription =
-                            stringResource(
-                                if (isPlayingThis) R.string.voice_message_pause else R.string.voice_message_play,
-                            ),
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
+            if (actionReady) VoiceLibraryActionIcon(loading = loading, playable = playable, playing = isPlayingThis)
         }
         SenderAvatar(sender = row.sender, appState = appState)
         Column(modifier = Modifier.weight(1f)) {
@@ -951,6 +1022,45 @@ private fun FileLibraryTab(
     }
 }
 
+/** Reports a library file open that did not reach an app, with the conversation file card's messages. */
+internal fun WhiteNoiseAppState.presentLibraryFileOpenOutcome(outcome: OpenAttachmentResult) {
+    when (outcome) {
+        OpenAttachmentResult.Opened,
+        OpenAttachmentResult.DestinationNotVisible,
+        -> Unit
+        OpenAttachmentResult.NoHandler -> present(R.string.media_no_app_to_open)
+        OpenAttachmentResult.NoInstaller -> present(R.string.media_apk_no_installer)
+        OpenAttachmentResult.InstallPermissionDenied,
+        OpenAttachmentResult.InstallPermissionRequired,
+        -> present(R.string.media_apk_permission_denied)
+        OpenAttachmentResult.InstallPermissionUnavailable -> present(R.string.media_apk_permission_unavailable)
+        OpenAttachmentResult.InstallUnsupported -> present(R.string.media_apk_install_unsupported)
+        OpenAttachmentResult.InvalidPackage -> present(R.string.media_apk_invalid)
+        OpenAttachmentResult.MissingArtifact,
+        OpenAttachmentResult.SecurityFailure,
+        OpenAttachmentResult.Error,
+        ->
+            presentFailure(
+                R.string.media_couldnt_open,
+                "MEDIA_LIBRARY_FILE_OPEN",
+                IllegalStateException("attachment open returned $outcome"),
+            )
+    }
+}
+
+/**
+ * Downloads a library file that is not on the device yet without opening it, reporting a failed download. The row
+ * opens it from a later tap, once it is cached.
+ */
+internal suspend fun downloadLibraryFile(
+    appState: WhiteNoiseAppState,
+    fetch: suspend () -> Any,
+) {
+    runCatchingCancellable { fetch() }.onFailure { error ->
+        appState.presentFailure(R.string.media_couldnt_load, "MEDIA_LIBRARY_FILE_DOWNLOAD", error)
+    }
+}
+
 /** One file row with open and save actions. */
 @Composable
 internal fun FileLibraryRow(
@@ -963,12 +1073,6 @@ internal fun FileLibraryRow(
     val scope = rememberCoroutineScope()
     var inFlight by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     var menuOpen by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
-    val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
-    val noInstallerMessage = stringResource(R.string.media_apk_no_installer)
-    val installPermissionDeniedMessage = stringResource(R.string.media_apk_permission_denied)
-    val installPermissionUnavailableMessage = stringResource(R.string.media_apk_permission_unavailable)
-    val installUnsupportedMessage = stringResource(R.string.media_apk_install_unsupported)
-    val invalidPackageMessage = stringResource(R.string.media_apk_invalid)
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
     val presentation =
         remember(row.reference.mediaType, row.reference.fileName) {
@@ -978,8 +1082,9 @@ internal fun FileLibraryRow(
     val openAttachment = rememberAttachmentOpener()
 
     // The tap is the user-initiated download trigger — files never auto-fetch
-    // in the library. Prefer retained bytes for own in-flight sends, mirroring
-    // the conversation file bubble.
+    // in the library. A file that is not on the device yet is only downloaded,
+    // and the next tap opens it. Prefer retained bytes for own in-flight sends,
+    // mirroring the conversation file bubble.
 
     /** The sender's in-memory retry bytes for this row, or null so the attachment is read from MDK. */
     fun retainedBytes(): ByteArray? =
@@ -1025,6 +1130,14 @@ internal fun FileLibraryRow(
                 .clickable(enabled = !inFlight) {
                     inFlight = true
                     scope.launch {
+                        val downloaded =
+                            retainedBytes() != null ||
+                                controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
+                        if (!downloaded) {
+                            downloadLibraryFile(appState) { fetchFile() }
+                            inFlight = false
+                            return@launch
+                        }
                         val outcome =
                             runCatchingCancellable {
                                 openAttachment(
@@ -1043,30 +1156,7 @@ internal fun FileLibraryRow(
                                 inFlight = false
                                 return@launch
                             }
-                        when (outcome) {
-                            OpenAttachmentResult.Opened,
-                            OpenAttachmentResult.DestinationNotVisible,
-                            -> Unit
-                            OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                            OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
-                            OpenAttachmentResult.InstallPermissionDenied,
-                            OpenAttachmentResult.InstallPermissionRequired,
-                            -> appState.present(installPermissionDeniedMessage)
-                            OpenAttachmentResult.InstallPermissionUnavailable -> {
-                                appState.present(installPermissionUnavailableMessage)
-                            }
-                            OpenAttachmentResult.InstallUnsupported -> appState.present(installUnsupportedMessage)
-                            OpenAttachmentResult.InvalidPackage -> appState.present(invalidPackageMessage)
-                            OpenAttachmentResult.MissingArtifact,
-                            OpenAttachmentResult.SecurityFailure,
-                            OpenAttachmentResult.Error,
-                            ->
-                                appState.presentFailure(
-                                    R.string.media_couldnt_open,
-                                    "MEDIA_LIBRARY_FILE_OPEN",
-                                    IllegalStateException("attachment open returned $outcome"),
-                                )
-                        }
+                        appState.presentLibraryFileOpenOutcome(outcome)
                         inFlight = false
                     }
                 }.padding(8.dp),

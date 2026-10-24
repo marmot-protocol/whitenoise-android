@@ -77,6 +77,34 @@ internal class AttachmentOpenCoordinator(
         return true
     }
 
+    /**
+     * Persists a reader's in-place download and promotes its transfer. It is recorded apart from open intents and
+     * traces no open, so nothing it fetches is ever launched.
+     */
+    fun requestDownload(request: AttachmentTransferRequest): Boolean {
+        val openRequest = openRequest(request) ?: return false
+        // A fresh tap supersedes a cancel whose durable revocation has not reached disk yet.
+        userActions.advance()
+        dispatchLifetimes.getOrPut(openRequest, ::StalenessGuard).advance()
+        revokedRequests.remove(openRequest)
+        intentStore.markDownloadIntent(openRequest)
+        enqueue(request, AttachmentDownloadPriority.Interactive)
+        revision += 1
+        return true
+    }
+
+    /** Whether an in-place download is still armed; a cancelled one stops counting before its removal is durable. */
+    fun hasDownloadIntent(request: AttachmentOpenRequest): Boolean {
+        if (request in revokedRequests) return false
+        return intentStore.hasDownloadIntent(request)
+    }
+
+    /** Retires a finished in-place download exactly once. */
+    suspend fun consumeDownload(request: AttachmentOpenRequest): Boolean {
+        val consumed = withContext(persistence) { intentStore.consumeDownloadIntent(request) }
+        return consumed
+    }
+
     /** A cancelled gesture becomes undispatchable before its durable removal reaches disk. */
     fun hasIntent(request: AttachmentOpenRequest): Boolean {
         if (request in revokedRequests) return false

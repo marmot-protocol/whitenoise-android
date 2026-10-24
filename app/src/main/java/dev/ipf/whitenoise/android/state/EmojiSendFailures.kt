@@ -35,12 +35,13 @@ internal fun isRetryableEmojiUploadFailure(throwable: Throwable): Boolean {
 }
 
 /**
- * Whether [throwable] says MDK rejected a media reference because of its epoch, either stale
- * (`MediaReferenceStaleEpoch`) or unsettled (`MediaReferenceEpochUnsettled`). MDK reports both as
- * `InvalidMediaReference` with the same "media reference was encrypted at epoch" text. Other
- * rejections, such as locator policy, are not epoch problems and are not retried.
+ * Whether [throwable] says MDK rejected a media reference, for any media kind, because of its epoch, either stale
+ * (`MediaReferenceStaleEpoch`) or unsettled (`MediaReferenceEpochUnsettled`). At the pinned MarmotKit MDK exposes no
+ * typed variant for these, so this matches the shared "media reference was encrypted at epoch" prefix of
+ * `InvalidMediaReference`; a typed variant would remove the text match. Other rejections, such as locator policy, are
+ * not epoch problems and are not retried.
  */
-internal fun isStaleEmojiReference(throwable: Throwable): Boolean =
+internal fun isStaleMediaReferenceEpoch(throwable: Throwable): Boolean =
     generateSequence(throwable) { it.cause }.any {
         it is MarmotKitException.InvalidMediaReference && "media reference was encrypted at epoch" in it.details
     }

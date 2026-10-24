@@ -173,6 +173,8 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             )
         }
         assertFileGalleryStates(gallery)
+        // Received cards stay hidden until their cache refresh answers, which Compose idleness does not await.
+        composeRule.awaitFileCardsVisible()
         // Capture the fixed-size root rather than a cropped semantics node. Cropped native-graphics
         // capture can fail in Skia's PNG stream encoder on Linux even after all layout assertions pass.
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)

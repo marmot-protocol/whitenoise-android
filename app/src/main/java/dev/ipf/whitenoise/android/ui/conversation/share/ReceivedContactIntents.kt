@@ -11,7 +11,8 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 
-private const val MAX_VCARD_BYTES = 1_048_576
+/** Largest vCard the app reads or parses, so a contact file is never copied past this onto the heap. */
+internal const val MAX_VCARD_BYTES = 1_048_576
 
 /** Rejects oversized, malformed or multi-contact files before handing decrypted bytes to another app. */
 @Suppress("ReturnCount") // Size and read failures stop before any parse.

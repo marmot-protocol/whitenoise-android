@@ -19,7 +19,9 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -368,6 +370,39 @@ class MessageOutboundShareTest {
             share.cancelAndJoin()
 
             assertTrue(chunks < 1024)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    /**
+     * A share cancelled after its source was resolved but before staging switched to IO still closes that source, so
+     * the decrypted lease file is deleted and nothing is staged.
+     */
+    @Test
+    fun aShareCancelledBeforeStagingStartsClosesTheResolvedLease() =
+        runTest {
+            clearSharedFiles()
+            val leaseDirectory = File(context.cacheDir, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+            val lease = File(leaseDirectory, "cancelled.lease").apply { writeBytes("secret".encodeToByteArray()) }
+            val sources =
+                messageShareAttachmentSources(
+                    references = listOf(reference("secret.txt", "text/plain")),
+                    retained = emptyList(),
+                )
+
+            var failure: Throwable? = null
+            launch {
+                failure =
+                    runCatching {
+                        stageMessageShareStreams(context, sources) {
+                            // The screen closes the moment the source is resolved, before staging can begin.
+                            currentCoroutineContext().cancel(CancellationException("screen closed"))
+                            AttachmentPlaintext.Lease(DiskByteCacheLease(lease))
+                        }
+                    }.exceptionOrNull()
+            }.join()
+
+            assertTrue(failure is CancellationException)
+            assertFalse(lease.exists())
             assertTrue(sharedFiles().isEmpty())
         }
 

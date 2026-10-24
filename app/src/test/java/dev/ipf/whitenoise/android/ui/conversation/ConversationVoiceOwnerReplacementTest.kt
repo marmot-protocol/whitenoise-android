@@ -106,7 +106,7 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
             scenario.voiceId,
         ).also {
             clickVoiceAction(scenario.voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(scenario.oldFixture.controller, scenario.voiceId)
+            awaitAttachmentDownloadIntent(scenario.oldFixture.controller, scenario.voiceId)
             scenario.oldControl.awaitMaterializationAttempt(0)
         }
     }
@@ -126,7 +126,7 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
             assertEquals("account-b", newOwnerAnchor.accountRef)
             assertVoiceActionTarget(scenario.voiceId, R.string.media_tap_to_download)
             clickVoiceAction(scenario.voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(scenario.newFixture.controller, scenario.voiceId)
+            awaitAttachmentDownloadIntent(scenario.newFixture.controller, scenario.voiceId)
             assertVoiceActionTarget(scenario.voiceId, R.string.media_downloading)
             assertEquals(1, scenario.oldControl.materializationAttempts)
             assertEquals(0, scenario.newControl.materializationAttempts)
@@ -157,6 +157,9 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
         assertFalse(scenario.oldControl.durationStarted.isCompleted)
         scenario.newControl.releaseHydration()
         scenario.newControl.awaitHydrationCompleted()
+        // The completed download is playable in place, and only the reader's Play tap starts it.
+        awaitVoiceAction(scenario.voiceId, R.string.voice_message_play)
+        clickVoiceAction(scenario.voiceId, R.string.voice_message_play)
         awaitVoiceAction(scenario.voiceId, R.string.voice_message_pause)
         assertViewportStayedFixed("serialized owner replacement", newOwnerAnchor, scenario.newEvidence, checkpoint)
         assertNoScrollWrites("serialized owner replacement", scenario.newEvidence)

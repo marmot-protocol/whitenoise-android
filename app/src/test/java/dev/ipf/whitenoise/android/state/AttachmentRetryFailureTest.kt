@@ -36,33 +36,33 @@ class AttachmentRetryFailureTest {
         )
     }
 
-    /** The prior viewer/materialization reload path is retained for an unresolved native target. */
+    /** An unresolved native target re-arms the in-place download without reporting an admission failure. */
     @Test
-    fun unresolvedReferenceReopensWithoutReportingAnAdmissionFailure() {
+    fun unresolvedReferenceRearmsTheDownloadWithoutReportingAnAdmissionFailure() {
         val events = mutableListOf<String>()
         deliverAttachmentRetryFailure(AttachmentReferenceNotReadyException(), {
-            events += "open"
+            events += "download"
             true
         }, { events += "error" })
-        assertEquals(listOf("open"), events)
+        assertEquals(listOf("download"), events)
     }
 
-    /** If navigation prevents reload, the action still reports an error instead of failing silently. */
+    /** If navigation prevents the re-armed download, the action still reports an error instead of failing silently. */
     @Test
     fun refusedReloadReportsFailure() {
         val events = mutableListOf<String>()
         deliverAttachmentRetryFailure(AttachmentReferenceNotReadyException(), {
-            events += "open"
+            events += "download"
             false
         }, { events += "error" })
-        assertEquals(listOf("open", "error"), events)
+        assertEquals(listOf("download", "error"), events)
     }
 
-    /** Native rejection cannot fall back to a viewer action that might obscure a terminal failure. */
+    /** Native rejection cannot fall back to a re-armed download that might obscure a terminal failure. */
     @Test
-    fun otherNativeFailuresNotifyWithoutOpening() {
+    fun otherNativeFailuresNotifyWithoutRearming() {
         val events = mutableListOf<String>()
-        deliverAttachmentRetryFailure(IOException("rejected"), { error("must not open") }, { events += "error" })
+        deliverAttachmentRetryFailure(IOException("rejected"), { error("must not re-arm") }, { events += "error" })
         assertEquals(listOf("error"), events)
     }
 }

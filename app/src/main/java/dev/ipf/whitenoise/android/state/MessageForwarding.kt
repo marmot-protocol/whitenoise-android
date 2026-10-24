@@ -2,10 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.Immutable
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
-import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +52,18 @@ internal enum class ForwardFailureStage {
     /** The destination upload never started; Retry is the user's choice, never automatic (#2556). */
     UploadTimeout,
     Publish,
+
+    /**
+     * A message was not owned by MDK's engine in time. It may still be sent; Retry re-checks the same client token,
+     * so it is never sent twice, but like the other timeouts it is the user's choice, never automatic (#2556).
+     */
+    PublishTimeout,
+
+    /**
+     * MDK rejected a message at admission or while it was queued. Retry admits it under a fresh token, only when the
+     * user asks, so automatic retries never stack rejected messages in the destination.
+     */
+    PublishRejected,
     PayloadTooLarge,
     Expired,
     SessionChanged,
@@ -68,6 +78,8 @@ internal data class ForwardTargetProgress(
     val sentMessages: Int = 0,
     val totalMessages: Int,
     val failureStage: ForwardFailureStage? = null,
+    /** This destination has stayed in its current phase past [FORWARD_PHASE_SLOW_MILLIS]; display only. */
+    val slow: Boolean = false,
 )
 
 @Immutable
@@ -76,6 +88,13 @@ internal data class ForwardOperationSnapshot(
     val preparedAttachments: Int,
     val totalAttachments: Int,
     val targets: List<ForwardTargetProgress>,
+    /** Preparing the source attachments has run past [FORWARD_PHASE_SLOW_MILLIS]; display only. */
+    val preparationSlow: Boolean = false,
+    /**
+     * Some destination has started publishing in this operation. An admission may then land in MDK even after a
+     * publish timeout, so the operation never offers Cancel again; it never resets before the operation ends.
+     */
+    val publishStarted: Boolean = false,
 ) {
     val completedTargets: Int get() = targets.count { it.phase == ForwardTargetPhase.Completed }
     val failedTargets: Int get() = targets.count { it.phase == ForwardTargetPhase.Failed }
@@ -98,11 +117,14 @@ internal data class ForwardOperationSnapshot(
             canRetry &&
                 targets.none { target ->
                     target.failureStage == ForwardFailureStage.PreparationTimeout ||
-                        target.failureStage == ForwardFailureStage.UploadTimeout
+                        target.failureStage == ForwardFailureStage.UploadTimeout ||
+                        target.failureStage == ForwardFailureStage.PublishTimeout ||
+                        target.failureStage == ForwardFailureStage.PublishRejected
                 }
     val canCancel: Boolean
         get() =
             (phase == ForwardOperationPhase.Preparing || phase == ForwardOperationPhase.Running) &&
+                !publishStarted &&
                 targets.none { target ->
                     target.phase == ForwardTargetPhase.Sending || target.sentMessages > 0
                 }
@@ -117,6 +139,7 @@ internal data class ForwardOperationSnapshot(
 private fun ForwardOperationSnapshot.asCancelled(): ForwardOperationSnapshot =
     copy(
         phase = ForwardOperationPhase.Cancelled,
+        preparationSlow = false,
         targets =
             targets.map { target ->
                 if (
@@ -125,7 +148,7 @@ private fun ForwardOperationSnapshot.asCancelled(): ForwardOperationSnapshot =
                 ) {
                     target
                 } else {
-                    target.copy(phase = ForwardTargetPhase.Cancelled)
+                    target.copy(phase = ForwardTargetPhase.Cancelled, slow = false)
                 }
             },
     )
@@ -158,22 +181,20 @@ internal interface ForwardTransport {
         message: PreparedForwardMessage.Media,
     ): List<MediaAttachmentReferenceFfi>
 
+    /**
+     * Admits [messages] from [startIndex] to [targetGroupIdHex], each under the stable token [clientTokenFor] returns
+     * for its index, so a retry of the same message to the same destination can never publish it twice.
+     */
+    @Suppress("LongParameterList")
     suspend fun publishBatch(
         targetGroupIdHex: String,
         messages: List<PreparedForwardMessage>,
         uploadedReferences: Map<Int, List<MediaAttachmentReferenceFfi>>,
         startIndex: Int,
+        clientTokenFor: (messageIndex: Int) -> String,
         onBeforeMessagePublished: (messageIndex: Int) -> Unit,
         onMessagePublished: (messageIndex: Int) -> Unit,
     )
-
-    /** Resolve an ambiguous publish without minting a duplicate event. */
-    suspend fun recoverPendingPublish(
-        targetGroupIdHex: String,
-        message: PreparedForwardMessage,
-        uploadedReferences: List<MediaAttachmentReferenceFfi>,
-        evidence: ForwardPublishRecoveryEvidence,
-    ): ForwardPublishRecoveryResult
 }
 
 /** Keeps transport cleanup failures from masking cancellation or the actionable timeout state. */
@@ -218,31 +239,6 @@ internal class ForwardAttachmentExpiredException : IllegalStateException("forwar
 internal class ForwardSessionInvalidatedException : IllegalStateException("forward session account changed")
 
 internal class ForwardPreparationTimeoutException : IllegalStateException("forward attachment preparation timed out")
-
-internal data class ForwardPublishRecoveryEvidence(
-    val messageIndex: Int,
-    val knownMessageIdsBefore: Set<String>,
-    val pendingMessageIdHex: String?,
-)
-
-internal enum class ForwardPublishRecoveryResult {
-    Published,
-    NotCommitted,
-    Unavailable,
-}
-
-internal class ForwardPublishUncertainException(
-    val evidence: ForwardPublishRecoveryEvidence,
-    cause: Throwable,
-) : IllegalStateException("forward publish result is uncertain", cause)
-
-internal class ForwardPublishNotCommittedException(
-    cause: Throwable,
-) : IllegalStateException("forward publish failed before a local commit", cause)
-
-private const val FORWARD_PUBLISH_RECOVERY_UNAVAILABLE = "forward pending publish could not be recovered"
-
-internal class ForwardPublishRecoveryUnavailableException : IllegalStateException(FORWARD_PUBLISH_RECOVERY_UNAVAILABLE)
 
 private class ForwardMaterializationAccounting(
     private val retainedPlaintextBuffers: MutableList<ByteArray>,
@@ -351,7 +347,8 @@ internal class ForwardSession(
     private val retainedPlaintextBuffers = mutableListOf<ByteArray>()
     private val uploadedReferencesByTarget = mutableMapOf<String, MutableMap<Int, List<MediaAttachmentReferenceFfi>>>()
     private val publishedMessageCountByTarget = normalizedTargets.associateWithTo(mutableMapOf()) { 0 }
-    private val uncertainPublishByTarget = mutableMapOf<String, ForwardPublishRecoveryEvidence>()
+
+    private val publishTokens = ForwardPublishTokens()
     private var activeJob: Job? = null
     private var released = false
     private var started = false
@@ -382,6 +379,7 @@ internal class ForwardSession(
         launchAttempt(normalizedTargets)
     }
 
+    /** Retries only failed, retryable destinations, resetting their phase and any slow notice. */
     fun retryFailed() {
         if (released || activeJob?.isActive == true || !_state.value.canRetry) return
         val failedTargets =
@@ -400,10 +398,11 @@ internal class ForwardSession(
                     } else {
                         ForwardOperationPhase.Running
                     },
+                preparationSlow = false,
                 targets =
                     snapshot.targets.map { target ->
                         if (target.groupIdHex in failedTargets) {
-                            target.copy(phase = ForwardTargetPhase.Waiting, failureStage = null)
+                            target.copy(phase = ForwardTargetPhase.Waiting, failureStage = null, slow = false)
                         } else {
                             target
                         }
@@ -444,13 +443,20 @@ internal class ForwardSession(
                 try {
                     val prepared =
                         preparedMessages
-                            ?: withTimeoutOrNull(preparationTimeoutMillis) { materializeMessages() }
+                            ?: withTimeoutOrNull(preparationTimeoutMillis) {
+                                withSlowPhaseNotice(
+                                    markSlow = { markPreparationSlow(_state) },
+                                    progress = { _state.value.preparedAttachments },
+                                ) {
+                                    materializeMessages()
+                                }
+                            }
                             ?: run {
                                 currentCoroutineContext().ensureActive()
                                 transport.cancelStalledMaterializationBestEffort()
                                 throw ForwardPreparationTimeoutException()
                             }
-                    _state.update { it.copy(phase = ForwardOperationPhase.Running) }
+                    _state.update { it.copy(phase = ForwardOperationPhase.Running, preparationSlow = false) }
                     runTargets(targets, prepared)
                     finishAttempt()
                 } catch (cancellation: CancellationException) {
@@ -497,9 +503,12 @@ internal class ForwardSession(
                                         clockSeconds = clockSeconds,
                                     ) { preparedCount ->
                                         _state.update { snapshot ->
+                                            val prepared = maxOf(snapshot.preparedAttachments, preparedCount)
                                             snapshot.copy(
-                                                preparedAttachments =
-                                                    maxOf(snapshot.preparedAttachments, preparedCount),
+                                                preparedAttachments = prepared,
+                                                preparationSlow =
+                                                    snapshot.preparationSlow &&
+                                                        prepared == snapshot.preparedAttachments,
                                             )
                                         }
                                     }
@@ -539,77 +548,81 @@ internal class ForwardSession(
         try {
             val targetReferences = uploadedReferencesByTarget.getOrPut(targetGroupIdHex) { mutableMapOf() }
             updateForwardTarget(_state, targetGroupIdHex) {
-                it.copy(phase = ForwardTargetPhase.Uploading, failureStage = null)
+                it.copy(phase = ForwardTargetPhase.Uploading, failureStage = null, slow = false)
             }
-            prepared.forEachIndexed { messageIndex, message ->
-                currentCoroutineContext().ensureActive()
-                if (message !is PreparedForwardMessage.Media || messageIndex in targetReferences) return@forEachIndexed
-                ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
-                val references = transport.upload(targetGroupIdHex, message)
-                if (references.size != message.attachments.size) {
-                    throw IllegalStateException("forward upload returned the wrong attachment count")
-                }
-                targetReferences[messageIndex] = references
-                updateForwardTarget(_state, targetGroupIdHex) { progress ->
-                    progress.copy(uploadedAttachments = targetReferences.values.sumOf { it.size })
+            withSlowPhaseNotice(
+                markSlow = { markForwardTargetSlow(_state, targetGroupIdHex, ForwardTargetPhase.Uploading) },
+                progress = { forwardTarget(_state, targetGroupIdHex)?.uploadedAttachments },
+            ) {
+                prepared.forEachIndexed { messageIndex, message ->
+                    currentCoroutineContext().ensureActive()
+                    if (message !is PreparedForwardMessage.Media || messageIndex in targetReferences) {
+                        return@forEachIndexed
+                    }
+                    ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+                    val references = transport.upload(targetGroupIdHex, message)
+                    if (references.size != message.attachments.size) {
+                        throw IllegalStateException("forward upload returned the wrong attachment count")
+                    }
+                    targetReferences[messageIndex] = references
+                    updateForwardTarget(_state, targetGroupIdHex) { progress ->
+                        progress.advancedTo(uploaded = targetReferences.values.sumOf { it.size })
+                    }
                 }
             }
 
             currentCoroutineContext().ensureActive()
             failureStage = ForwardFailureStage.Publish
-            updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending) }
-            uncertainPublishByTarget[targetGroupIdHex]?.let { evidence ->
-                val message = prepared[evidence.messageIndex]
-                val recovery =
-                    transport.recoverPendingPublish(
-                        targetGroupIdHex = targetGroupIdHex,
-                        message = message,
-                        uploadedReferences = targetReferences[evidence.messageIndex].orEmpty(),
-                        evidence = evidence,
-                    )
-                when (recovery) {
-                    ForwardPublishRecoveryResult.Published -> {
-                        val recoveredCount = evidence.messageIndex + 1
-                        publishedMessageCountByTarget[targetGroupIdHex] = recoveredCount
-                        uncertainPublishByTarget.remove(targetGroupIdHex)
-                        updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = recoveredCount) }
-                    }
-                    ForwardPublishRecoveryResult.NotCommitted -> uncertainPublishByTarget.remove(targetGroupIdHex)
-                    ForwardPublishRecoveryResult.Unavailable -> throw ForwardPublishRecoveryUnavailableException()
+            // From here a message may reach MDK whatever this attempt reports, so Cancel stays off for good.
+            _state.update { it.copy(publishStarted = true) }
+            updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending, slow = false) }
+            // Display only: a slow publish is never abandoned or resent, the native result stays authoritative.
+            withSlowPhaseNotice(
+                markSlow = { markForwardTargetSlow(_state, targetGroupIdHex, ForwardTargetPhase.Sending) },
+                progress = { forwardTarget(_state, targetGroupIdHex)?.sentMessages },
+            ) {
+                transport.publishBatch(
+                    targetGroupIdHex = targetGroupIdHex,
+                    messages = prepared,
+                    uploadedReferences = targetReferences,
+                    startIndex = publishedMessageCountByTarget.getValue(targetGroupIdHex),
+                    clientTokenFor = { messageIndex -> publishTokens.tokenFor(targetGroupIdHex, messageIndex) },
+                    onBeforeMessagePublished = { messageIndex ->
+                        (prepared[messageIndex] as? PreparedForwardMessage.Media)?.let { message ->
+                            ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
+                        }
+                    },
+                ) { publishedIndex ->
+                    val publishedCount = publishedIndex + 1
+                    publishedMessageCountByTarget[targetGroupIdHex] = publishedCount
+                    updateForwardTarget(_state, targetGroupIdHex) { it.advancedTo(sent = publishedCount) }
                 }
-            }
-            transport.publishBatch(
-                targetGroupIdHex = targetGroupIdHex,
-                messages = prepared,
-                uploadedReferences = targetReferences,
-                startIndex = publishedMessageCountByTarget.getValue(targetGroupIdHex),
-                onBeforeMessagePublished = { messageIndex ->
-                    (prepared[messageIndex] as? PreparedForwardMessage.Media)?.let { message ->
-                        ensureForwardAttachmentNotExpired(message.expiresAtSeconds, clockSeconds)
-                    }
-                },
-            ) { publishedIndex ->
-                val publishedCount = publishedIndex + 1
-                publishedMessageCountByTarget[targetGroupIdHex] = publishedCount
-                updateForwardTarget(_state, targetGroupIdHex) { it.copy(sentMessages = publishedCount) }
             }
             updateForwardTarget(_state, targetGroupIdHex) {
                 it.copy(
                     phase = ForwardTargetPhase.Completed,
                     sentMessages = totalMessageCount,
                     failureStage = null,
+                    slow = false,
                 )
             }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Exception) {
-            if (failure is ForwardPublishUncertainException) {
-                uncertainPublishByTarget[targetGroupIdHex] = failure.evidence
+            // A rejection spent the token and may mean the group has left the epoch the destination references were
+            // encrypted at. Every reference uploaded before that change is then stale, so every unsent message from
+            // the rejected one onward drops its references and token, and one Retry uploads and admits them afresh.
+            // Messages before it are already the engine's and keep both.
+            if (failure is ForwardPublishRejectedException) {
+                for (messageIndex in failure.messageIndex until totalMessageCount) {
+                    publishTokens.forget(targetGroupIdHex, messageIndex)
+                    uploadedReferencesByTarget[targetGroupIdHex]?.remove(messageIndex)
+                }
             }
             failureStage = targetFailureStage(failureStage, failure)
             onFailure(targetGroupIdHex, failureStage, failure)
             updateForwardTarget(_state, targetGroupIdHex) {
-                it.copy(phase = ForwardTargetPhase.Failed, failureStage = failureStage)
+                it.copy(phase = ForwardTargetPhase.Failed, failureStage = failureStage, slow = false)
             }
         }
     }
@@ -635,22 +648,23 @@ internal class ForwardSession(
 
     /** Clears sensitive plaintext and atomically marks unfinished destinations failed or cancelled. */
     private fun failMaterialization(stage: ForwardFailureStage): Boolean {
-        // A retry may be re-materializing source bytes for an earlier ambiguous
-        // publish. Preserve destination references and recovery evidence across
-        // another transient materialization failure so a later retry cannot
-        // duplicate that uncertain message.
+        // A retry may be re-materializing source bytes for a message that already
+        // reached MDK. Preserve destination references and client tokens across
+        // another transient materialization failure so a later retry re-checks
+        // that token instead of sending the message again.
         _state.update { snapshot ->
             if (snapshot.phase == ForwardOperationPhase.Cancelling) {
                 snapshot.asCancelled()
             } else {
                 snapshot.copy(
                     phase = ForwardOperationPhase.Failed,
+                    preparationSlow = false,
                     targets =
                         snapshot.targets.map { target ->
                             if (target.phase == ForwardTargetPhase.Completed) {
                                 target
                             } else {
-                                target.copy(phase = ForwardTargetPhase.Failed, failureStage = stage)
+                                target.copy(phase = ForwardTargetPhase.Failed, failureStage = stage, slow = false)
                             }
                         },
                 )
@@ -668,13 +682,18 @@ internal class ForwardSession(
         return !cancelled
     }
 
+    /**
+     * Zeroes retained plaintext, and when [clearRetryState] the session can no longer retry, so its destination
+     * references and client tokens are dropped too. Tokens survive every retryable failure, so a later Retry re-checks
+     * the same token rather than minting a second message.
+     */
     private fun clearSessionState(clearRetryState: Boolean) {
         retainedPlaintextBuffers.forEach { it.fill(0) }
         retainedPlaintextBuffers.clear()
         preparedMessages = null
         if (clearRetryState) {
             uploadedReferencesByTarget.clear()
-            uncertainPublishByTarget.clear()
+            publishTokens.clear()
         }
     }
 
@@ -805,6 +824,8 @@ private fun targetFailureStage(
 ): ForwardFailureStage =
     when (failure) {
         is ForwardUploadStalledException -> ForwardFailureStage.UploadTimeout
+        is ForwardPublishTimeoutException -> ForwardFailureStage.PublishTimeout
+        is ForwardPublishRejectedException -> ForwardFailureStage.PublishRejected
         is ForwardAttachmentExpiredException -> ForwardFailureStage.Expired
         is ForwardSessionInvalidatedException -> ForwardFailureStage.SessionChanged
         else -> reached
@@ -816,6 +837,22 @@ private fun ensureForwardAttachmentNotExpired(
 ) {
     if (expiresAtSeconds?.takeIf { it > 0uL }?.let { it <= clockSeconds() } == true) {
         throw ForwardAttachmentExpiredException()
+    }
+}
+
+/** Marks [groupIdHex] slow, but only while it is still in [phase], so a late timer never mislabels a later phase. */
+private fun markForwardTargetSlow(
+    state: MutableStateFlow<ForwardOperationSnapshot>,
+    groupIdHex: String,
+    phase: ForwardTargetPhase,
+) {
+    updateForwardTarget(state, groupIdHex) { target -> if (target.phase == phase) target.copy(slow = true) else target }
+}
+
+/** Marks source preparation slow, but only while the operation is still preparing. */
+private fun markPreparationSlow(state: MutableStateFlow<ForwardOperationSnapshot>) {
+    state.update { snapshot ->
+        if (snapshot.phase == ForwardOperationPhase.Preparing) snapshot.copy(preparationSlow = true) else snapshot
     }
 }
 
@@ -833,32 +870,6 @@ private fun updateForwardTarget(
         )
     }
 }
-
-private const val FORWARD_CHAT_MESSAGE_KIND = 9uL
-
-/**
- * Indexes sent timeline records matching one prepared message's content, used
- * to recognize a forward's own publish when its result was uncertain.
- */
-internal fun forwardProjectionRecords(
-    timeline: List<TimelineMessageRecordFfi>,
-    message: PreparedForwardMessage,
-    references: List<MediaAttachmentReferenceFfi>,
-): Map<String, TimelineMessageRecordFfi> =
-    timeline
-        .asSequence()
-        .filter { record ->
-            record.direction == "sent" &&
-                record.kind == FORWARD_CHAT_MESSAGE_KIND &&
-                when (message) {
-                    is PreparedForwardMessage.Text ->
-                        record.plaintext == message.text && record.media.isEmpty()
-                    is PreparedForwardMessage.Media ->
-                        record.plaintext == message.caption.orEmpty() &&
-                            MessageAttachments.acceptedReferences(record.media).map { it.ciphertextSha256 } ==
-                            references.map { it.ciphertextSha256 }
-                }
-        }.associateBy(TimelineMessageRecordFfi::messageIdHex)
 
 /**
  * Auto-dismisses a forward operation's terminal Completed/Cancelled strip

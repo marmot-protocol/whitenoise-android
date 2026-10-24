@@ -173,4 +173,117 @@ class ForwardOperationStatusInteractionTest {
             assertEquals(1, dismissals)
         }
     }
+
+    /** A slow send explains itself in the details and offers no Cancel, Retry or Dismiss while it is still sending. */
+    @Test
+    fun slowSendExplainsItselfWithoutOfferingCancelRetryOrDismiss() {
+        renderStatus(
+            ForwardOperationSnapshot(
+                phase = ForwardOperationPhase.Running,
+                preparedAttachments = 0,
+                totalAttachments = 0,
+                targets =
+                    listOf(
+                        ForwardTargetProgress(
+                            groupIdHex = "family",
+                            phase = ForwardTargetPhase.Sending,
+                            totalAttachments = 0,
+                            totalMessages = 1,
+                            slow = true,
+                        ),
+                    ),
+            ),
+        )
+
+        composeRule.onNodeWithTag(FORWARD_OPERATION_STATUS_TEST_TAG).performClick()
+        composeRule
+            .onNodeWithText(
+                "Sending is taking longer than usual. It can’t be cancelled now and won’t be sent twice.",
+                substring = true,
+            ).assertIsDisplayed()
+        // Both the sheet's text buttons and the row's icon-only controls must be absent.
+        listOf("Cancel", "Retry", "Dismiss").forEach { label ->
+            composeRule.onNodeWithText(label).assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(label).assertDoesNotExist()
+        }
+    }
+
+    /** A slow upload keeps showing how far it got, with the notice added beneath rather than replacing the count. */
+    @Test
+    fun slowUploadKeepsItsProgressCountBesideTheNotice() {
+        renderStatus(
+            ForwardOperationSnapshot(
+                phase = ForwardOperationPhase.Running,
+                preparedAttachments = 3,
+                totalAttachments = 3,
+                targets =
+                    listOf(
+                        ForwardTargetProgress(
+                            groupIdHex = "family",
+                            phase = ForwardTargetPhase.Uploading,
+                            totalAttachments = 3,
+                            totalMessages = 1,
+                            uploadedAttachments = 2,
+                            slow = true,
+                        ),
+                    ),
+            ),
+        )
+
+        composeRule.onNodeWithTag(FORWARD_OPERATION_STATUS_TEST_TAG).performClick()
+        composeRule
+            .onNodeWithText("Uploading attachments 2 of 3\nUploading is taking longer than usual")
+            .assertIsDisplayed()
+    }
+
+    /** An upload that never started names that cause and keeps explicit Retry available. */
+    @Test
+    fun uploadThatNeverStartedNamesTheCauseAndOffersRetry() {
+        var retries = 0
+        renderStatus(
+            ForwardOperationSnapshot(
+                phase = ForwardOperationPhase.Failed,
+                preparedAttachments = 1,
+                totalAttachments = 1,
+                targets =
+                    listOf(
+                        ForwardTargetProgress(
+                            groupIdHex = "family",
+                            phase = ForwardTargetPhase.Failed,
+                            totalAttachments = 1,
+                            totalMessages = 1,
+                            failureStage = ForwardFailureStage.UploadTimeout,
+                        ),
+                    ),
+            ),
+            onRetry = { retries += 1 },
+        )
+
+        composeRule.onNodeWithTag(FORWARD_OPERATION_STATUS_TEST_TAG).performClick()
+        composeRule.onNodeWithText("Upload didn’t start. Retry, or dismiss to stop forwarding.").assertIsDisplayed()
+        composeRule.onNodeWithText("Couldn't upload attachments").assertDoesNotExist()
+        composeRule.onNodeWithText("Close").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, retries) }
+    }
+
+    /** Hosts the persistent forward status for [snapshot] with the shared Family title. */
+    private fun renderStatus(
+        snapshot: ForwardOperationSnapshot,
+        onRetry: () -> Unit = {},
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    ForwardOperationStatus(
+                        snapshot = snapshot,
+                        targetTitles = mapOf("family" to "Family"),
+                        onCancel = {},
+                        onRetry = onRetry,
+                        onDismiss = {},
+                    )
+                }
+            }
+        }
+    }
 }

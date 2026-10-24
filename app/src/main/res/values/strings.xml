@@ -578,6 +578,11 @@
     <string name="forward_failed_preparing">Couldn\'t prepare attachments</string>
     <string name="forward_failed_preparation_timeout">Preparation timed out. Retry, or dismiss to stop forwarding.</string>
     <string name="forward_failed_upload">Couldn\'t upload attachments</string>
+    <string name="forward_preparing_slow">Getting the attachments is taking longer than usual</string>
+    <string name="forward_uploading_slow">Uploading is taking longer than usual</string>
+    <string name="forward_sending_slow">Sending is taking longer than usual. It can’t be cancelled now and won’t be sent twice.</string>
+    <string name="forward_failed_upload_timeout">Upload didn’t start. Retry, or dismiss to stop forwarding.</string>
+    <string name="forward_failed_publish_timeout">Sending hasn’t finished and may still go through. Retry checks it without sending it twice.</string>
     <string name="forward_failed_publish">Couldn\'t send messages</string>
     <string name="forward_payload_too_large">These attachments are too large to forward together</string>
     <string name="forward_failed_expired">The attachment expired before it could be forwarded</string>
