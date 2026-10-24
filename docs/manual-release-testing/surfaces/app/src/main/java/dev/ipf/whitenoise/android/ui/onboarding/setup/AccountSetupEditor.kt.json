@@ -60,6 +60,24 @@
           "ONB-023",
           "PRO-010"
         ]
+      },
+      {
+        "surface": "SetupRelayAddressFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun SetupRelayAddressFields(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-017",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023",
+          "ONB-025",
+          "PRO-010"
+        ]
       }
     ],
     "source_coverage": [
@@ -166,6 +184,40 @@
           "ONB-019",
           "ONB-021",
           "ONB-023"
+        ]
+      },
+      {
+        "surface": "Concise relay recovery and staged endpoint review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun rememberSetupEditorFields(",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.setup_edit_addresses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_edit_addresses",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.onboarding_details_expanded",
+        "test_ids": [
+          "ONB-017"
         ]
       }
     ]

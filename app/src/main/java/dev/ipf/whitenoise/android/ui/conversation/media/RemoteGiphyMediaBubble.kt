@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -206,6 +209,15 @@ internal fun RemoteGiphyMediaCard(
     animationSource: InlineAnimationSource? = null,
 ) {
     val attribution = media.attribution?.let { "via GIPHY · $it" } ?: stringResource(R.string.giphy_attribution)
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val openMedia = {
+        try {
+            uriHandler.openUri(media.url)
+        } catch (_: IllegalArgumentException) {
+            Toast.makeText(context, R.string.media_no_app_to_open, Toast.LENGTH_SHORT).show()
+        }
+    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = ConversationRichContentShape,
@@ -229,7 +241,7 @@ internal fun RemoteGiphyMediaCard(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
-                                    .combinedClickable(onClick = {}, onLongClick = onLongPress),
+                                    .combinedClickable(onClick = openMedia, onLongClick = onLongPress),
                         )
                     is DecodedAttachmentPresentation.Animated ->
                         AnimatedDrawableAttachmentImage(
@@ -239,7 +251,7 @@ internal fun RemoteGiphyMediaCard(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
-                                    .combinedClickable(onClick = {}, onLongClick = onLongPress),
+                                    .combinedClickable(onClick = openMedia, onLongClick = onLongPress),
                         )
                     null ->
                         when {
@@ -259,7 +271,7 @@ internal fun RemoteGiphyMediaCard(
                         }
                 }
             }
-            GiphyCardFooter(attribution, footer)
+            GiphyCardFooter(attribution, footer, openMedia)
         }
     }
 }
@@ -270,6 +282,7 @@ internal fun RemoteGiphyMediaCard(
 private fun GiphyCardFooter(
     attribution: String,
     footer: GiphyMessageFooter,
+    onOpen: () -> Unit,
 ) {
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -303,6 +316,7 @@ private fun GiphyCardFooter(
                         .weight(1f)
                         .alignByBaseline()
                         .testTag("giphy.attribution")
+                        .clickable(onClick = onOpen)
                         .semantics { contentDescription = attribution },
             )
             GiphyMetadataRow(footer, timestampStyle, metadataLimit)

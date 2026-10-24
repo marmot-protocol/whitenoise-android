@@ -50,6 +50,13 @@ never copied into redacted reports.
 
 Subprocess failures retain their operation, exit status and fixed diagnostic category. Failed emulator instrumentation also reads at most 100 recent crash records with a ten-second bound; reports retain only a matching package crash marker and a fixed exception category. Raw messages and command arguments stay out of artifacts. Recent-buffer diagnostics do not prove attribution to the current invocation and never qualify missing measurements. Physical fixtures retain the failure fields without collecting crash logs.
 
+The `controller-background-receipt` policy waits emit a `background-receipt-policy-timeout` metric before cleanup.
+Its closed `case` and `stage` distinguish host-policy settling from native approval. The snapshot contains only
+allowed/expected/Wi-Fi-only type names, network categories, account state, pause/validation booleans and whether an
+approval revision is applied. An applied revision does not prove approval for the requested type. These are the
+last observed inputs, not a diagnosis of why they failed to settle. Both 15-second deadlines and all assertions
+remain unchanged; the original timeout is rethrown, and the host retains the metric even without source frames.
+
 The optional `controller` sender mode configures only the generated group's loopback blob endpoint, then uses the shipping `ConversationController.sendAttachments` path without uploader, publisher or accepted-result fakes. Its reference comes from actual native history. The runner requires exact outgoing native lease bytes before and after native runtime reopen with acquisition unavailable; missing controller evidence fails even when transport and budgets pass. This remains a native-runtime lifecycle check, not full Android process restart or manual viewer/installer qualification.
 
 The `controller-restart` mode force-stops only the isolated emulator fixture package between two instrumentation runs. Generated identities remain in a private fixture directory, then the second process verifies the restored native history and reads exact sent/received bytes ten times each while acquisition is unavailable. It asserts a different process id, keeps the HTTP ledger across both processes, and removes only its generated session after readback. The received reopen timing covers one read; the nine additional received and ten outgoing reads are correctness/bandwidth checks, not additional latency samples. No personal-device app or user data is stopped or cleared.

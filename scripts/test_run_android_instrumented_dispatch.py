@@ -22,6 +22,9 @@ class InstrumentedDispatchTest(unittest.TestCase):
             (root / "config/mdk-adoption-required-cases.txt").write_text(
                 (ROOT / "config/mdk-adoption-required-cases.txt").read_text()
             )
+            (root / "config/range-selection-required-cases.txt").write_text(
+                (ROOT / "config/range-selection-required-cases.txt").read_text()
+            )
             gradle = root / "gradlew"
             failure = 'case "$*" in *:app:connected*) exit 23;; esac\n' if fail_app else ''
             gradle.write_text('#!/bin/sh\n' + failure + 'printf "%s\\n" "$*"\n')
@@ -42,6 +45,29 @@ class InstrumentedDispatchTest(unittest.TestCase):
                 cwd=root, text=True, capture_output=True, check=True,
             )
             return result.stdout
+
+    def test_startup_trace_and_range_selection_cannot_mix(self):
+        """Both selected lanes fail before either producer runs."""
+        for api in ("30", "36"):
+            with self.subTest(api=api), self.assertRaises(subprocess.CalledProcessError):
+                self.run_dispatch("workflow_dispatch", *(["false"] * 3), "true", "false", "false", "true", api, "true")
+
+    def test_range_selection_dispatch_uses_one_class_and_requires_its_execution(self):
+        """The real-window regression runs alone and cannot turn green from a skip or a missing result."""
+        flags = ["false"] * 6 + ["false", "30", "true"]
+        output = self.run_dispatch("workflow_dispatch", *flags)
+        self.assertIn("RunnerArguments.class=dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest", output)
+        self.assertIn("--required config/range-selection-required-cases.txt", output)
+        self.assertNotIn(":cryptoBenchmark:", output)
+        self.assertNotIn("install-outbound-share-fixture", output)
+        for options in ({"fail_app": True}, {"fail_required": True}):
+            with self.subTest(options=options), self.assertRaises(subprocess.CalledProcessError):
+                self.run_dispatch("workflow_dispatch", *flags, **options)
+        for index in range(6):
+            overlap = list(flags)
+            overlap[index] = "true"
+            with self.subTest(overlap=index), self.assertRaises(subprocess.CalledProcessError):
+                self.run_dispatch("workflow_dispatch", *overlap)
 
     def test_mdk_adoption_explicitly_enables_diagnostics_and_requires_native_cases(self):
         output = self.run_dispatch("workflow_dispatch", "false", "false", "false", "false", "false", "true")

@@ -11,6 +11,12 @@
 # manual-only suites, the opt-in real-relay and provider matrices, and legacy-API
 # coverage gated by @SdkSuppress(maxSdkVersion) below the runner's API level.
 
+# #3415: policy timeout diagnostics retain closed evidence without changing the fixture outcome.
+dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#timeoutReportsBothStagesAndRethrowsTheOriginalFailure
+dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#successfulWaitDoesNotCollectDiagnostics
+dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#otherFailuresDoNotCollectDiagnostics
+dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#diagnosticFailuresCannotReplaceTheOriginalTimeout
+
 dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePreparationAndroidTest#recipientRemainsActionableWhileProfilePrewarmAndLookupAreDelayed
 dev.ipf.whitenoise.android.state.ChatListColdStartDirectPeerPresentationFfiIntegrationTest#processRecreation_unnamedDirectChat_rendersDurablePeerPresentationOnFirstFrame
 
@@ -140,3 +146,8 @@ dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroid
 dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroidTest#oversizedReplyAndQuoteFitLargeFonts
 dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroidTest#oversizedReplyAndQuoteFitRtl
 dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroidTest#oversizedReplyAndQuoteFitNarrowLargeFontRtl
+
+# #3407: the original held touch survives the action-popup handoff into visible range selection.
+dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest#heldPointerCrossesTheActionPopupAndSelectsAnAdjacentMessage
+dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest#heldPointerSelectsOwnRowsInAnOverflowingConversation
+dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest#hydratedOwnRowsKeepSelectionDuringHeldPopupHandoff
