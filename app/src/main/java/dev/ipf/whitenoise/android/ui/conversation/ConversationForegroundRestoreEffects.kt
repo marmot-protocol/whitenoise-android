@@ -297,7 +297,7 @@ internal fun ConversationForegroundRestoreEffects(
             }
         }
     }
-    ConversationForegroundOwnerHandoffEffect(
+    conversationForegroundOwnerHandoffEffect(
         scrollCoordinator,
         foregroundRestore,
         lifecycleOwner,

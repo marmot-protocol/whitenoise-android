@@ -38,7 +38,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
         "surface": "Restoration-only coordinator replacement after the actual resume event",
-        "anchor": "fun ConversationForegroundOwnerHandoffEffect(",
+        "anchor": "fun conversationForegroundOwnerHandoffEffect(",
         "test_ids": [
           "CON-033"
         ]
@@ -46,9 +46,9 @@
     ],
     "composable_surfaces": [
       {
-        "surface": "ConversationForegroundOwnerHandoffEffect",
+        "surface": "conversationForegroundOwnerHandoffEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
-        "anchor": "fun ConversationForegroundOwnerHandoffEffect(",
+        "anchor": "fun conversationForegroundOwnerHandoffEffect(",
         "test_ids": [
           "CON-033"
         ]

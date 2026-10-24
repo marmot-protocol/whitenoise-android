@@ -52,7 +52,7 @@ internal class ConversationForegroundRestoreBinding private constructor(
 
 /** Transfers only restoration when runtime recomposition follows the actual resume event. */
 @Composable
-internal fun ConversationForegroundOwnerHandoffEffect(
+internal fun conversationForegroundOwnerHandoffEffect(
     currentOwner: ConversationScrollCoordinator,
     retained: ConversationForegroundRestoreBinding?,
     lifecycleOwner: LifecycleOwner?,

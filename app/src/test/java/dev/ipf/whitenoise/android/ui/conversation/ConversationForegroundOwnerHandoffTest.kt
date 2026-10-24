@@ -111,7 +111,7 @@ class ConversationForegroundOwnerHandoffTest {
                 safeAtLastRestore =
                     ConversationForegroundRestoreBinding.canPresentRetainedFrame(paused, composedOwner, true)
             }
-            ConversationForegroundOwnerHandoffEffect(composedOwner, retained, this) {
+            conversationForegroundOwnerHandoffEffect(composedOwner, retained, this) {
                 handoffs++
                 restore()
             }

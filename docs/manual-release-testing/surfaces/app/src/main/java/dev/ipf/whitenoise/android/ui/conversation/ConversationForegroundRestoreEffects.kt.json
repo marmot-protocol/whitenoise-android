@@ -57,7 +57,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
         "surface": "Restoration-only coordinator replacement after the actual resume event",
-        "anchor": "ConversationForegroundOwnerHandoffEffect(",
+        "anchor": "conversationForegroundOwnerHandoffEffect(",
         "test_ids": [
           "CON-033"
         ]
