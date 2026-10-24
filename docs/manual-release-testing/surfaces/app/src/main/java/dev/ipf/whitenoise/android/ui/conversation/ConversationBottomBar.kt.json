@@ -1,0 +1,31 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBottomBar.kt",
+  "legacy_sha256": "a2ec486940fa0249d2b2ad29b0e7bc72d894ed27a4a2a7979b94b8d2e07fc8aa",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Main reply composer artwork",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBottomBar.kt",
+        "anchor": "replyingToEmoji",
+        "test_ids": [
+          "MSG-037",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationBottomBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBottomBar.kt",
+        "anchor": "fun ConversationBottomBar(",
+        "test_ids": [
+          "CON-005",
+          "CON-007",
+          "CON-013",
+          "CON-017",
+          "DIC-001",
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
