@@ -25,6 +25,81 @@ import org.robolectric.annotation.Config
 class ChatListUnreadPullTest {
     @get:Rule val rule = createComposeRule()
 
+    @Test fun secondPointerClearsClaimedMotionBeforeEitherPointerReleases() {
+        var progress = 0f
+        var distance = 0f
+        var activations = 0
+        var thresholds = 0
+        rule.setContent {
+            Box(
+                Modifier.size(300.dp).testTag("list").chatListUnreadPull(
+                    enabled = true,
+                    atTop = { true },
+                    thresholdPx = 72f,
+                    onProgress = { progress = it },
+                    onDistance = { distance = it },
+                    onThreshold = { thresholds++ },
+                    onActivate = { activations++ },
+                ),
+            )
+        }
+        rule.onNodeWithTag("list").performTouchInput {
+            down(Offset(100f, 20f))
+            moveTo(Offset(100f, 140f))
+        }
+        rule.runOnIdle { assertEquals(1f, progress) }
+        rule.onNodeWithTag("list").performTouchInput { down(1, Offset(180f, 140f)) }
+        rule.runOnIdle {
+            assertEquals(0f, progress)
+            assertEquals(0f, distance)
+            assertEquals(0, activations)
+        }
+        rule.onNodeWithTag("list").performTouchInput {
+            up(1)
+            up()
+        }
+        rule.runOnIdle {
+            assertEquals(0, activations)
+            assertEquals(1, thresholds)
+        }
+    }
+
+    @Test fun thresholdHapticHasHysteresisAndRetractedReleaseDoesNotActivate() {
+        var thresholds = 0
+        var activations = 0
+        var distance = 0f
+        rule.setContent {
+            Box(
+                Modifier.size(300.dp).testTag("list").chatListUnreadPull(
+                    enabled = true,
+                    atTop = { true },
+                    thresholdPx = 72f,
+                    onThreshold = { thresholds++ },
+                    onDistance = { distance = it },
+                    onActivate = { activations++ },
+                ),
+            )
+        }
+        rule.onNodeWithTag("list").performTouchInput {
+            down(Offset(100f, 20f))
+            moveTo(Offset(100f, 100f))
+            moveTo(Offset(100f, 91f))
+            moveTo(Offset(100f, 100f))
+        }
+        rule.runOnIdle { assertEquals(1, thresholds) }
+        rule.onNodeWithTag("list").performTouchInput {
+            moveTo(Offset(100f, 60f))
+            moveTo(Offset(100f, 100f))
+            moveTo(Offset(100f, 0f))
+            up()
+        }
+        rule.runOnIdle {
+            assertEquals(2, thresholds)
+            assertEquals(0, activations)
+            assertEquals(0f, distance)
+        }
+    }
+
     @Test fun deliberateTopPullActivatesOnceOnRelease() {
         var activations = 0
         rule.setContent {

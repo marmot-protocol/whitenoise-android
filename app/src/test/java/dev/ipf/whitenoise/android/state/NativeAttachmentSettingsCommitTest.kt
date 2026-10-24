@@ -6,7 +6,9 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentAutomaticPermissionFfi
 import dev.ipf.marmotkit.MarmotInterface
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -88,8 +90,11 @@ class NativeAttachmentSettingsCommitTest {
             assertTrue("native permission used the obsolete matrix", permissions.single().files == enabled)
         } finally {
             releaseCommit.countDown()
-            state.mutationsScope.cancel()
-            Dispatchers.resetMain()
+            try {
+                runBlocking { requireNotNull(state.mutationsScope.coroutineContext[Job]).cancelAndJoin() }
+            } finally {
+                Dispatchers.resetMain()
+            }
         }
     }
 
