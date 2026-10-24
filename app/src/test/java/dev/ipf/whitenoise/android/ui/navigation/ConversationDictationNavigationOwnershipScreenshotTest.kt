@@ -399,39 +399,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
                                     suppressMotion = false,
                                     contentKey = { it ?: "chat-list" },
                                 ) { chatId ->
-                                    Box(Modifier.fillMaxSize()) {
-                                        if (chatId == null) {
-                                            Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                                                ChatsNewMessageFabContent(missingRelays = false) {}
-                                            }
-                                        }
-                                        if (chatId != null) {
-                                            val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
-                                            ComposerBar(
-                                                replyingTo = null,
-                                                messageTextCopy = MessageTextCopy.Default,
-                                                onCancelReply = {},
-                                                onSend = { _, _ -> },
-                                                topInteractionClearance =
-                                                    if (compact) {
-                                                        compactTopClearanceFor(if (largeRtl) 2f else 1f)
-                                                    } else {
-                                                        64.dp
-                                                    },
-                                                dictationController = fixture.controller,
-                                                dictationAccountRef = ACCOUNT,
-                                                dictationGroupIdHex = group,
-                                                dictationControlsVisible =
-                                                    owner == ConversationDictationControlOwner.Composer &&
-                                                        fixture.route.selectedChatId == chatId,
-                                                modifier =
-                                                    Modifier
-                                                        .align(Alignment.BottomCenter)
-                                                        .testTag(COMPOSER_TAG)
-                                                        .floatingDictationAnchor(),
-                                            )
-                                        }
-                                    }
+                                    RenderRouteContents(fixture, owner, chatId, largeRtl, compact)
                                 }
                             }
                         }
@@ -441,6 +409,50 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         }
         composeRule.waitForIdle()
         return fixture
+    }
+
+    /** Paints the actual route-specific FAB/composer inside its existing animation. */
+    @Composable
+    private fun RenderRouteContents(
+        fixture: Fixture,
+        owner: ConversationDictationControlOwner,
+        chatId: String?,
+        largeRtl: Boolean,
+        compact: Boolean,
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            if (chatId == null) {
+                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                    ChatsNewMessageFabContent(missingRelays = false) {}
+                }
+            }
+            if (chatId != null) {
+                val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
+                ComposerBar(
+                    replyingTo = null,
+                    messageTextCopy = MessageTextCopy.Default,
+                    onCancelReply = {},
+                    onSend = { _, _ -> },
+                    topInteractionClearance =
+                        if (compact) {
+                            compactTopClearanceFor(if (largeRtl) 2f else 1f)
+                        } else {
+                            64.dp
+                        },
+                    dictationController = fixture.controller,
+                    dictationAccountRef = ACCOUNT,
+                    dictationGroupIdHex = group,
+                    dictationControlsVisible =
+                        owner == ConversationDictationControlOwner.Composer &&
+                            fixture.route.selectedChatId == chatId,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .testTag(COMPOSER_TAG)
+                            .floatingDictationAnchor(),
+                )
+            }
+        }
     }
 
     @Composable
