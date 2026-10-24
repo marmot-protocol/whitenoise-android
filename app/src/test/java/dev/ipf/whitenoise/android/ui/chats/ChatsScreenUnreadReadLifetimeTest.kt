@@ -131,12 +131,14 @@ class ChatsScreenUnreadReadLifetimeTest {
         model.state.swipePreferences.setPullUnread(false)
         mount(model)
         val surface = rule.onNodeWithTag("chats.unread_surface")
+        val row = rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR")
         val distance = with(rule.density) { 100.dp.toPx() }
 
         fun pull(release: Boolean = true) {
-            surface.performTouchInput {
-                down(Offset(width * 0.6f, height * 0.3f))
-                moveBy(Offset(0f, distance), 120)
+            awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
+            row.performTouchInput {
+                down(Offset(width * 0.6f, 10f))
+                moveTo(Offset(width * 0.6f, 10f + distance), 120)
                 if (release) up()
             }
         }
@@ -152,11 +154,13 @@ class ChatsScreenUnreadReadLifetimeTest {
         surface.performUnreadFilterAction(rule)
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         val readsBeforeCancelledPull = model.snapshotReads
+        val restingTop = row.fetchSemanticsNode().boundsInRoot.top
         pull(release = false)
+        assertTrue(row.fetchSemanticsNode().boundsInRoot.top > restingTop)
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         rule.runOnIdle { model.state.swipePreferences.setPullUnread(false) }
         rule.waitForIdle()
-        surface.performTouchInput { up() }
+        row.performTouchInput { up() }
         settle()
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         assertEquals(readsBeforeCancelledPull, model.snapshotReads)
