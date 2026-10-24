@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -1316,9 +1317,10 @@ private fun rememberCachedVideoAttachmentFileState(
     val contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference)
     val cachedFile =
         remember(contentKey) {
-            mutableStateOf<java.io.File?>(null)
+            newVideoAttachmentCacheFileState()
         }
     LaunchedEffect(contentKey, reference.sourceEpoch) {
+        val expectedFile = cachedFile.value
         val (file, retained) =
             withContext(Dispatchers.IO) {
                 val probed =
@@ -1328,19 +1330,26 @@ private fun rememberCachedVideoAttachmentFileState(
                         attachmentIndex = attachmentIndex,
                         reference = reference,
                     )
-                probed to validatedAttachmentCacheFile(cachedFile.value)
+                probed to validatedAttachmentCacheFile(expectedFile)
             }
-        cachedFile.value =
-            when {
-                file != null -> file
-                // The source epoch may upgrade after a fallback row is shown. The remember key
-                // already fences every cryptographic content field, so that metadata-only change
-                // can keep playing the validated bytes without rebuilding Media3.
-                retained != null -> retained
-                else -> null
-            }
+        // A metadata-only epoch change can retain validated bytes for the same content key, but an IO probe
+        // must not overwrite a file the resolver published while it was suspended.
+        publishVideoAttachmentCacheProbe(cachedFile, expectedFile, file ?: retained)
     }
     return cachedFile
+}
+
+/** Keeps a resolver's newly materialized file observable even when it reuses the same cache path. */
+internal fun newVideoAttachmentCacheFileState(): MutableState<java.io.File?> =
+    mutableStateOf(null, referentialEqualityPolicy())
+
+/** Publishes a disk probe only while no resolver has replaced the state it observed. */
+internal fun publishVideoAttachmentCacheProbe(
+    cachedFile: MutableState<java.io.File?>,
+    expectedFile: java.io.File?,
+    probedFile: java.io.File?,
+) {
+    if (cachedFile.value === expectedFile) cachedFile.value = probedFile
 }
 
 /**
@@ -1455,7 +1464,7 @@ internal fun VideoViewerPage(
     }
     var loadFailed by remember(contentKey) { mutableStateOf(false) }
     var reloadToken by remember(contentKey) { mutableIntStateOf(0) }
-    LaunchedEffect(contentKey, reference.sourceEpoch, isCurrent, reloadToken) {
+    LaunchedEffect(contentKey, reference.sourceEpoch, isCurrent, reloadToken, localFile) {
         if (!isCurrent) return@LaunchedEffect
         if (localFile != null) return@LaunchedEffect
         if (playbackInvalidated) return@LaunchedEffect
