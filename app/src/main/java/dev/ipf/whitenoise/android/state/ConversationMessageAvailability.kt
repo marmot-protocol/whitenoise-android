@@ -28,7 +28,9 @@ internal suspend fun ConversationController.loadMessageAvailability(
     messageIdHex: String,
     maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
 ): MessageAvailability {
-    if (timelineRecords.containsKey(messageIdHex)) return MessageAvailability.AVAILABLE
+    if (timelineRecords.containsKey(messageIdHex)) {
+        return if (isMessagePublished(messageIdHex)) MessageAvailability.AVAILABLE else MessageAvailability.RETRYABLE
+    }
     when (jumpWindowToMessage(messageIdHex)) {
         ConversationWindowJumpResult.AVAILABLE -> return MessageAvailability.AVAILABLE
         ConversationWindowJumpResult.MISSING -> return MessageAvailability.MISSING
@@ -48,11 +50,15 @@ internal suspend fun ConversationController.loadMessageAvailability(
         loadedPageCount += 1
     }
     return when {
-        timelineRecords.containsKey(messageIdHex) -> MessageAvailability.AVAILABLE
-        olderPageBlocked || hasMoreBefore -> MessageAvailability.RETRYABLE
+        isMessagePublished(messageIdHex) -> MessageAvailability.AVAILABLE
+        olderPageBlocked || hasMoreBefore || timelineRecords.containsKey(messageIdHex) -> MessageAvailability.RETRYABLE
         else -> MessageAvailability.MISSING
     }
 }
+
+/** Availability is actionable only once the row belongs to the published transcript. */
+private fun ConversationController.isMessagePublished(messageIdHex: String): Boolean =
+    timeline.any { it.record.messageIdHex == messageIdHex }
 
 /** Compatibility boolean for callers that do not present a missing-target error themselves. */
 suspend fun ConversationController.loadUntilMessageAvailable(
@@ -65,7 +71,7 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
     retryConversationWindowJump(
         subscription = timelineSubscription,
         messageIdHex = messageIdHex,
-        targetLoaded = { timelineRecords.containsKey(messageIdHex) },
+        targetLoaded = { isMessagePublished(messageIdHex) },
         jumpIfActive = ::jumpIfSubscriptionActive,
         installPage = { page ->
             // The jumped-to window shows once its cards are read, so the landing never composes a card Loading.

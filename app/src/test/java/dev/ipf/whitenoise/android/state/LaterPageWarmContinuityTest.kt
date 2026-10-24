@@ -74,7 +74,9 @@ class LaterPageWarmContinuityTest {
             )
         try {
             fixture.compose()
-            fixture.awaitIdleCondition { fixture.controller.timeline.size == SHOWN.size }
+            fixture.awaitIdleCondition {
+                fixture.controller.hasPreparedInitialPresentation && fixture.controller.timeline.size == SHOWN.size
+            }
             val landing = Landing()
             navigationScope.launch {
                 val availability = fixture.controller.loadMessageAvailability(TARGET_ID)
@@ -93,6 +95,43 @@ class LaterPageWarmContinuityTest {
             assertEquals(far, timelineMessageIds(fixture.controller))
             assertEquals(listOf(SHOWN, far), fixture.composedOrders.dropWhile { it != SHOWN })
             assertEquals(listOf("$LOADED $EVENT_ID"), fixture.composed.map(::describe).distinct())
+        } finally {
+            read.countDown()
+            fixture.close()
+        }
+    }
+
+    /** An early landing cannot claim a row while the initial card read still holds its publication. */
+    @Test
+    fun earlyLandingRemainsRetryableUntilItsInitialCardPageIsPublished() {
+        val read = CountDownLatch(1)
+        val fixture =
+            EventCardConversationFixture(
+                composeRule = composeRule,
+                snapshotPage = timelinePage(timelineRecord(TARGET_ID, 1uL, plaintext = "nostr:$NOTE")),
+                cacheRead = { read.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) },
+            )
+        try {
+            fixture.compose()
+            fixture.awaitIdleCondition { fixture.cacheReads.get() >= 1 }
+            val landing = Landing()
+            navigationScope.launch {
+                landing.availability = fixture.controller.loadMessageAvailability(TARGET_ID)
+            }
+            fixture.awaitIdleCondition { landing.availability != null }
+            assertEquals(MessageAvailability.RETRYABLE, landing.availability)
+            assertTrue(TARGET_ID !in timelineMessageIds(fixture.controller))
+
+            read.countDown()
+            fixture.awaitIdleCondition {
+                fixture.controller.hasPreparedInitialPresentation && TARGET_ID in timelineMessageIds(fixture.controller)
+            }
+            landing.availability = null
+            navigationScope.launch {
+                landing.availability = fixture.controller.loadMessageAvailability(TARGET_ID)
+            }
+            fixture.awaitIdleCondition { landing.availability != null }
+            assertEquals(MessageAvailability.AVAILABLE, landing.availability)
         } finally {
             read.countDown()
             fixture.close()
