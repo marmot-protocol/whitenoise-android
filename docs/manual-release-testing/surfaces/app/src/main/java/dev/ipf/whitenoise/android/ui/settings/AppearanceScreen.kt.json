@@ -17,7 +17,8 @@
         "anchor": "fun AppearanceScreen(",
         "test_ids": [
           "SET-001",
-          "SET-002"
+          "SET-002",
+          "SET-006"
         ]
       }
     ],
@@ -77,14 +78,6 @@
         "anchor": "R.string.appearance_enter_help",
         "test_ids": [
           "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:appearance_font_size_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
-        "anchor": "R.string.appearance_font_size_help",
-        "test_ids": [
-          "SET-006"
         ]
       },
       {

@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 @Stable
 internal class MessageBubbleSurfaceState {
     var emojiPickerOpen by mutableStateOf(false)
+    var bodyExceedsCollapseLimit by mutableStateOf(false)
 
     /**
      * A long body clips to a few lines with an inline Read More, and opening it routes through a full-screen

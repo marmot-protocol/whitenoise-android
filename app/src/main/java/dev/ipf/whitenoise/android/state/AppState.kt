@@ -2198,6 +2198,9 @@ class WhiteNoiseAppState private constructor(
     var fontScale by mutableStateOf(AppFontScale.fromPreference(preferences.getString(FONT_SCALE_KEY, null)))
         private set
 
+    private var durableFontScale = fontScale
+    private var fontScaleSaveRevision = 0L
+
     var appFont by mutableStateOf(AppFont.fromPreference(preferences.getString(APP_FONT_KEY, null)))
         private set
 
@@ -8199,9 +8202,67 @@ class WhiteNoiseAppState private constructor(
         persistHostSetting { putString(THEME_MODE_KEY, mode.preferenceValue) }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun updateFontScale(scale: AppFontScale) {
+        if (fontScale == scale) return
         fontScale = scale
-        persistHostSetting { putString(FONT_SCALE_KEY, scale.preferenceValue) }
+        val revision = ++fontScaleSaveRevision
+        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
+        mutationsScope
+            .launch(start = CoroutineStart.ATOMIC) {
+                var reconciled = false
+                try {
+                    hostPreferenceCommitMutex.withLock {
+                        var committed = false
+                        var commitAttempted = false
+                        try {
+                            withContext(Dispatchers.IO) {
+                                runCatchingCancellable {
+                                    val editor = preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue)
+                                    commitAttempted = true
+                                    completeHostPreferenceCommit(attempt) { editor.commit().also { committed = it } }
+                                }.onFailure { attempt.failure() }
+                            }
+                        } finally {
+                            // The dispatcher may discard a completed IO result on cancellation.
+                            // Finalize the actual commit while still owning its serialization lock.
+                            withContext(NonCancellable) {
+                                if (committed) {
+                                    durableFontScale = scale
+                                } else {
+                                    if (commitAttempted) {
+                                        // A failed disk commit can still change SharedPreferences' memory map.
+                                        withContext(Dispatchers.IO) {
+                                            runCatching {
+                                                preferences
+                                                    .edit()
+                                                    .putString(FONT_SCALE_KEY, durableFontScale.preferenceValue)
+                                                    .commit()
+                                            }
+                                        }
+                                    }
+                                    if (revision == fontScaleSaveRevision) {
+                                        fontScale = durableFontScale
+                                        if (commitAttempted) presentTransient(R.string.font_size_save_failed)
+                                    }
+                                }
+                                reconciled = true
+                            }
+                        }
+                    }
+                } finally {
+                    if (!reconciled) {
+                        // Cancellation before acquiring the mutex must wait for prior saves to settle.
+                        withContext(NonCancellable) {
+                            hostPreferenceCommitMutex.withLock {
+                                if (revision == fontScaleSaveRevision) fontScale = durableFontScale
+                            }
+                        }
+                    }
+                }
+            }.invokeOnCompletion { cause ->
+                if (cause is CancellationException) attempt.cancel()
+            }
     }
 
     fun updateAppFont(font: AppFont) {

@@ -13,7 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -118,7 +121,12 @@ class ConversationDictationDraftPresentationTest {
         composeRule.onNode(hasSetTextAction()).performTextReplacement("Next message")
         composeRule.onNode(hasSetTextAction()).performImeAction()
         composeRule.runOnIdle { assertEquals(listOf("Draft recognized", "Next message"), f.sent) }
-        composeRule.onNodeWithContentDescription(context.getString(R.string.paste)).assertDoesNotExist()
+        composeRule
+            .onNode(
+                hasContentDescription(context.getString(R.string.paste_dictation_transcript)) and
+                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+            ).assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.retry)).assertDoesNotExist()
     }
 

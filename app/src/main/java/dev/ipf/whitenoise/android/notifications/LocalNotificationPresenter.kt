@@ -977,7 +977,14 @@ class LocalNotificationPresenter(
                                         active?.notification?.extras?.getString(
                                             LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
                                         )
-                                    val matchingCard = active?.takeIf { messageId == update.messageIdHex }
+                                    val matchingCard =
+                                        active?.takeIf { card ->
+                                            if (update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
+                                                card.matchesInvite(update.accountRef, update.groupIdHex)
+                                            } else {
+                                                messageId == update.messageIdHex
+                                            }
+                                        }
                                     existingCardChannel = matchingCard?.notification?.channelId
                                     replacementHasChanged =
                                         replaceCurrentMessage &&
@@ -996,6 +1003,42 @@ class LocalNotificationPresenter(
                             null
                         }
                     if (replacementHasChanged) return@withRegisteredShow false
+                    val category = NotificationChannelSpec.forUpdate(update)
+                    // Re-read category policy at the final platform write as well as before channel selection.
+                    // A custom person channel must not outlive category/group disablement while pacing waits.
+                    val usesActorCategory =
+                        update.trigger != NotificationTriggerFfi.NEW_MESSAGE &&
+                            profileNotificationSoundAuthor(update) != null
+                    val categoryAllowsPost = {
+                        if (!usesActorCategory) {
+                            true
+                        } else {
+                            // settings() only reads existing routing; it never materializes a channel.
+                            val categorySettings =
+                                conversationShortcutId(update.accountRef, update.groupIdHex)
+                                    ?.let { shortcutId ->
+                                        conversationNotificationRouting
+                                            .settings(
+                                                NotificationConversationDescriptor(
+                                                    shortcutId,
+                                                    update.isDm,
+                                                    conversationTitleOverride,
+                                                    ConversationVibrationPattern.SYSTEM_DEFAULT,
+                                                ),
+                                            ).filter { it.channel == category }
+                                    }.orEmpty() +
+                                    ConversationNotificationCategorySetting(
+                                        category,
+                                        ConversationNotificationScope.USE_GLOBAL_DEFAULT,
+                                        false,
+                                        AndroidNotificationSettingsTarget.Global(category),
+                                    )
+                            category !in androidBlockedConversationCategories(context, categorySettings)
+                        }
+                    }
+                    if (usesActorCategory && !withContext(Dispatchers.IO) { categoryAllowsPost() }) {
+                        return@withRegisteredShow false
+                    }
                     // Ordinary messages keep their required People/conversation child.
                     // Other event types inherit the stable global channel until this
                     // chat has an explicit or legacy custom override.
@@ -1022,7 +1065,7 @@ class LocalNotificationPresenter(
                         }
                     val channelId =
                         withContext(Dispatchers.Default) {
-                            existingCardChannel ?: profileNotificationAuthor(update)?.let { author ->
+                            existingCardChannel ?: profileNotificationSoundAuthor(update)?.let { author ->
                                 val selection = profileNotificationOverrides.get(update.accountRef, author)
                                 if (selection.mode == ProfileNotificationMode.CUSTOM) {
                                     profileNotificationChannels.existing(
@@ -1200,7 +1243,10 @@ class LocalNotificationPresenter(
                                                 // Reaction choices ride on Reply's RemoteInput so SystemUI
                                                 // can render them inline.
                                                 NotificationActionKind.REACT -> Unit
-                                                NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+                                                NotificationActionKind.MARK_READ ->
+                                                    builder.addAction(
+                                                        markReadNotificationAction(actionTarget),
+                                                    )
                                             }
                                         }
                                     }
@@ -1380,7 +1426,8 @@ class LocalNotificationPresenter(
                                                 mustBeLive = rewriteGeneration != null,
                                                 hiddenShortcut = hiddenShortcut,
                                                 finalPostAllowed = {
-                                                    profileAllowsPost() &&
+                                                    categoryAllowsPost() &&
+                                                        profileAllowsPost() &&
                                                         showGenerationAllowsPost() &&
                                                         rewriteLease?.dismissed?.get() != true
                                                 },
@@ -1433,7 +1480,8 @@ class LocalNotificationPresenter(
                                                         mustBeLive = rewriteGeneration != null,
                                                         hiddenShortcut = hiddenShortcut,
                                                         finalPostAllowed = {
-                                                            profileAllowsPost() &&
+                                                            categoryAllowsPost() &&
+                                                                profileAllowsPost() &&
                                                                 showGenerationAllowsPost() &&
                                                                 rewriteLease?.dismissed?.get() != true
                                                         },
@@ -1505,7 +1553,8 @@ class LocalNotificationPresenter(
                                                 mustBeLive = rewriteGeneration != null,
                                                 hiddenShortcut = hiddenShortcut,
                                                 finalPostAllowed = {
-                                                    profileAllowsPost() &&
+                                                    categoryAllowsPost() &&
+                                                        profileAllowsPost() &&
                                                         showGenerationAllowsPost() &&
                                                         rewriteLease?.dismissed?.get() != true
                                                 },
@@ -1538,7 +1587,8 @@ class LocalNotificationPresenter(
                                                     mustBeLive = false,
                                                     hiddenShortcut = hiddenShortcut,
                                                     finalPostAllowed = {
-                                                        profileAllowsPost() &&
+                                                        categoryAllowsPost() &&
+                                                            profileAllowsPost() &&
                                                             showGenerationAllowsPost() &&
                                                             rewriteLease?.dismissed?.get() != true
                                                     },
@@ -1590,7 +1640,9 @@ class LocalNotificationPresenter(
                     }
                     notificationDebug {
                         // Never log the title/body — they carry sender / group names (PII).
-                        "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
+                        "posted tag=${notificationContent.notificationTag.take(
+                            16,
+                        )} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
                     }
                     true
                 }

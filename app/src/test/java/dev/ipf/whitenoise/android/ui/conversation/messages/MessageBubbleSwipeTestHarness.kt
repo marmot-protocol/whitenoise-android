@@ -84,6 +84,10 @@ internal fun SwipeTestBubbleHost(
     amoled: Boolean = false,
     readOnly: Boolean = false,
     selecting: Boolean = false,
+    collapseLongMessages: Boolean = true,
+    isActionMenuOpen: Boolean = false,
+    onActionMenuOpenChange: (Boolean) -> Unit = {},
+    composerTextState: ComposerTextState = ComposerTextState(TextFieldValue("")),
 ) {
     val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -94,7 +98,7 @@ internal fun SwipeTestBubbleHost(
                     controller = surface.controller,
                     appState = surface.appState,
                     showSenderAvatar = surface.item.record.direction != "sent",
-                    composerTextState = ComposerTextState(TextFieldValue("")),
+                    composerTextState = composerTextState,
                     highlighted = false,
                     readOnly = readOnly,
                     selectionMode = selecting,
@@ -112,8 +116,9 @@ internal fun SwipeTestBubbleHost(
                     quickReactionEmojis = emptyList(),
                     recentEmojis = emptyList(),
                     onEmojiUsed = {},
-                    isActionMenuOpen = false,
-                    onActionMenuOpenChange = {},
+                    isActionMenuOpen = isActionMenuOpen,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    collapseLongMessages = collapseLongMessages,
                     onQuickReactionsSave = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
