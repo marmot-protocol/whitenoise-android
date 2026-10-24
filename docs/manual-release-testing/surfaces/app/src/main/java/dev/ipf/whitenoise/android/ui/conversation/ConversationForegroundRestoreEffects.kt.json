@@ -45,6 +45,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "surface": "Measured immediate frame and replacement owner admission",
+        "anchor": "restore.releaseMeasuredFrame(currentForegroundSettleStateProvider().timelineMeasured)",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

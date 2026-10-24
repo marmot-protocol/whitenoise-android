@@ -132,7 +132,7 @@ internal fun ConversationForegroundRestoreEffects(
     timelineViewport: ConversationTimelineViewport? = null,
 ) {
     val foregroundPreDrawSignals = remember(controller) { Channel<Unit>(capacity = Channel.CONFLATED) }
-    var foregroundRestoreToken by remember(controller) { mutableStateOf<ConversationForegroundRestoreToken?>(null) }
+    var foregroundRestore by remember(controller) { mutableStateOf<ConversationForegroundRestoreBinding?>(null) }
     val resumeScrollRestoreCoordinator = remember(controller) { ResumeScrollRestoreCoordinator() }
     val foregroundFocusIntent = remember(controller) { ConversationForegroundFocusIntent() }
     LaunchedEffect(controller, composerFocused) {
@@ -209,9 +209,11 @@ internal fun ConversationForegroundRestoreEffects(
         onPause = {
             foregroundFocusIntent.pause()
             resumeScrollRestoreCoordinator.cancel()
-            foregroundRestoreToken =
+            foregroundRestore?.cancel()
+            foregroundRestore =
                 if (currentInitialTimelineAnchored) {
-                    scrollCoordinator.beginForegroundRestore(
+                    ConversationForegroundRestoreBinding.begin(
+                        scrollCoordinator,
                         ConversationForegroundSnapshot(
                             scrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider()),
                             geometry = currentForegroundGeometryProvider(),
@@ -227,16 +229,28 @@ internal fun ConversationForegroundRestoreEffects(
             foregroundFocusIntent.resume(restoreFocus, clearFocus)
             scope.launch { controller.retryInviteAcceptanceAuthority() }
             foregroundPreDrawSignals.tryReceive()
-            val restoreToken = foregroundRestoreToken
-            foregroundRestoreToken = null
+            val pausedRestore = foregroundRestore
+            val ownerReplaced = pausedRestore != null && pausedRestore.owner !== scrollCoordinator
+            val restore =
+                pausedRestore?.resume(scrollCoordinator) {
+                    ConversationForegroundSnapshot(
+                        scrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider()),
+                        geometry = currentForegroundGeometryProvider(),
+                        timelineStructure = currentTimelineStructureProvider(),
+                    )
+                }
+            foregroundRestore = restore
+            val restoreToken = restore?.token
             WarmResumeTrace.conversationPhase(
                 WarmResumeConversationPhase.Resume,
                 imeRequested = restoreToken?.expectedImeVisible == true || restoreFocus,
                 imeObserved = currentForegroundGeometryProvider().imeBottomPx > 0,
             )
-            val retainedPresentationSafe = currentCanPresentRetainedFrame()
-            if (restoreToken != null && retainedPresentationSafe) {
-                scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
+            val retainedPresentationSafe = !ownerReplaced && currentCanPresentRetainedFrame()
+            if (restore != null &&
+                retainedPresentationSafe &&
+                restore.releaseMeasuredFrame(currentForegroundSettleStateProvider().timelineMeasured)
+            ) {
                 WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.RetainedFrameReleased)
                 requestConversationForegroundFrame(rootView)
             } else if (restoreToken == null) {
@@ -313,8 +327,8 @@ internal fun ConversationForegroundRestoreEffects(
         },
         onObserverDisposed = {
             resumeScrollRestoreCoordinator.cancel()
-            scrollCoordinator.cancelForegroundRestore()
-            foregroundRestoreToken = null
+            foregroundRestore?.cancel()
+            foregroundRestore = null
         },
     )
 }

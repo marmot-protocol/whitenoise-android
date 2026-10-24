@@ -18,6 +18,47 @@ import java.util.concurrent.CancellationException
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("LargeClass") // Scroll state-machine invariants share one command/writer harness.
 class ConversationScrollCoordinatorTest {
+    @Test
+    fun unmeasuredPublicationKeepsGateAndSafeAnchorUntilMeasurement() {
+        val coordinator = ConversationScrollCoordinator(RecordingScrollWriter())
+        val restore =
+            ConversationForegroundRestoreBinding.begin(
+                coordinator,
+                ConversationForegroundSnapshot(
+                    coordinator.bookmark(anchor(messageId = "reader", listIndex = 4)),
+                    ConversationForegroundGeometry(720, 0, 96),
+                ),
+            )
+        assertFalse(restore.releaseMeasuredFrame(false))
+        assertTrue(coordinator.foregroundRestoreInProgress)
+        assertTrue(coordinator.foregroundRestorePending)
+        assertTrue(restore.releaseMeasuredFrame(true))
+        assertFalse(coordinator.foregroundRestoreInProgress)
+        assertTrue(coordinator.foregroundRestorePending)
+    }
+
+    @Test
+    fun replacementOwnerIsArmedAndOldOwnerCancellationCannotReleaseIt() {
+        val oldOwner = ConversationScrollCoordinator(RecordingScrollWriter())
+        val currentOwner = ConversationScrollCoordinator(RecordingScrollWriter())
+
+        fun snapshot(owner: ConversationScrollCoordinator) =
+            ConversationForegroundSnapshot(
+                owner.bookmark(anchor(messageId = "reader", listIndex = 4)),
+                ConversationForegroundGeometry(720, 0, 96),
+            )
+        val old = ConversationForegroundRestoreBinding.begin(oldOwner, snapshot(oldOwner))
+        val current = old.resume(currentOwner) { snapshot(currentOwner) }
+        old.cancel()
+        assertFalse(oldOwner.foregroundRestorePending)
+        assertTrue(currentOwner.foregroundRestoreInProgress)
+        val newer = ConversationForegroundRestoreBinding.begin(currentOwner, snapshot(currentOwner))
+        current.cancel()
+        assertTrue(currentOwner.foregroundRestoreInProgress)
+        newer.cancel()
+        assertFalse(currentOwner.foregroundRestoreInProgress)
+    }
+
     /** A late unsafe admission/deadline completion cannot retire a newer pause snapshot. */
     @Test
     fun tokenScopedCancellationCannotClearReplacementRestore() {
