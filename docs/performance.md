@@ -65,6 +65,52 @@ because it exceeded the one-second card budget, after which the page published
 and each card resolved itself. A cold-start value near the budget is the
 encrypted-cache open, not the network.
 
+Every later page — older or newer history, a jump, a return to the latest
+messages, a visible-row report, a refresh or a live window — reads the cached
+cards of its rows that are not on screen yet before it is applied, so it
+publishes once with those cards complete. Nothing is hidden or held: until the
+read settles the transcript simply shows what it showed before, so a far jump
+keeps the previous messages rather than a blank list, and an optimistic send
+stays on screen. The rows' Markdown is parsed once, for both the card read and
+the commit. The rows read are those of the window that will be committed: the
+subscription's newest installed window, and if a newer one is installed while
+the read runs, its new card rows are read too, within what is left of the same
+budget. Like the first page's read, it covers every card its rows name, in
+batches of 16 and within the budget, nearest the message a jump lands on, or
+otherwise nearest the rows on screen (an older page's newest rows, a newer
+page's oldest), so the cards a reader meets first are read first. A row already
+on screen whose card no read has asked about yet, as a first page cut short by
+its budget can leave, is read too. A card found uncached is asked about again
+by the next page that brings its row back, since MDK may have cached it
+meanwhile; it only keeps an on-screen row from a re-read for 30 seconds. A message
+edited while the read runs counts as new and is read again. When the budget
+runs out, the page is applied with the one parse and with every batch read so
+far; only the unread cards resolve themselves. Only parsed Markdown is carried
+onto the committed window, never an older copy of a row. The conversation's
+card snapshots hold every card a full window can name (200 rows of up to 3
+cards), so one read never evicts what it just read. A page without such rows
+is applied at once, as before.
+
+`op=chat_history_page phase=event_card_page_warm layer=storage` records one
+such read. `duration_ms` is the binding work alone: the parse and the batched
+MDK cache reads, run back to back on a dedicated card-read lane of two IO
+threads: each binding call resumes on the lane rather than the main thread, so
+the read needs a single main-thread turn, its final resume, however busy the
+main thread is while the reader scrolls. `elapsed_ms` runs from the read's start until the caller
+has its result, so `elapsed_ms - duration_ms` is time spent waiting for a lane
+thread and for the main thread to resume the page. `count` is the number of
+rows read for. `result=dropped` means the read did not settle within the
+one-second card budget, or failed, after which the page was applied anyway and
+each card resolved itself; a dropped read is still recorded once its binding
+call returns, so its `duration_ms` shows how long the binding work really took.
+The read runs before the `TIMELINE_APPLY` host timing starts, so that timing
+stays the apply alone, and outside the paging lock, except for a visible-row
+report and the anchor before an older page, which already run under it: their
+read happens only when the re-centred window brings card rows not on screen,
+typically 23 to 36 ms on a Pixel 9a and at most the budget. Live windows
+arriving meanwhile queue behind the one being read, as they queue behind any
+apply.
+
 ### Conversation history pages
 
 `op=chat_history_page` covers one page of history in either direction: older,
