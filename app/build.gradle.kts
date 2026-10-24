@@ -1239,25 +1239,22 @@ tasks.matching { it.name.startsWith("process") && it.name.endsWith("UnitTestJava
     dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
 }
 
-afterEvaluate {
-    val referenceTest = tasks.named<Test>("testDevZapstoreDebugUnitTest")
-    tasks.named<Test>("replayAppFuzzSyntheticCorpus").configure {
-        val reference = referenceTest.get()
-        testClassesDirs = reference.testClassesDirs
-        classpath = reference.classpath
-        reference.taskDependencies.getDependencies(reference).forEach { dependency ->
-            dependsOn(dependency)
-        }
-        filter {
-            includeTestsMatching("dev.ipf.whitenoise.android.updates.NostrEventVerifierTest")
-            includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreEventsTest")
-            includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreReleaseClientTest")
-            includeTestsMatching("dev.ipf.whitenoise.android.core.ProfileLinkTest")
-            includeTestsMatching("dev.ipf.whitenoise.android.core.RecipientReferenceTest")
-            includeTestsMatching("dev.ipf.whitenoise.android.core.GroupSystemEventsTest")
-            includeTestsMatching("dev.ipf.whitenoise.android.media.MediaReferenceSupportTest")
-            includeTestsMatching("dev.ipf.whitenoise.android.amber.Nip55SignerParsingTest")
-        }
+tasks.named<Test>("replayAppFuzzSyntheticCorpus").configure {
+    val reference = tasks.named<Test>("testDevZapstoreDebugUnitTest").get()
+    testClassesDirs = reference.testClassesDirs
+    classpath = reference.classpath
+    reference.taskDependencies.getDependencies(reference).forEach { dependency ->
+        dependsOn(dependency)
+    }
+    filter {
+        includeTestsMatching("dev.ipf.whitenoise.android.updates.NostrEventVerifierTest")
+        includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreEventsTest")
+        includeTestsMatching("dev.ipf.whitenoise.android.updates.ZapstoreReleaseClientTest")
+        includeTestsMatching("dev.ipf.whitenoise.android.core.ProfileLinkTest")
+        includeTestsMatching("dev.ipf.whitenoise.android.core.RecipientReferenceTest")
+        includeTestsMatching("dev.ipf.whitenoise.android.core.GroupSystemEventsTest")
+        includeTestsMatching("dev.ipf.whitenoise.android.media.MediaReferenceSupportTest")
+        includeTestsMatching("dev.ipf.whitenoise.android.amber.Nip55SignerParsingTest")
     }
 }
 

@@ -37,6 +37,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             checker.write_text(
                 "import sys\n"
                 "print('required-cases ' + ' '.join(sys.argv[1:]))\n"
+                "if '--required' in sys.argv: print(open(sys.argv[sys.argv.index('--required') + 1]).read())\n"
                 f"sys.exit({29 if fail_required else 0})\n"
             )
             result = subprocess.run(
@@ -45,9 +46,15 @@ class InstrumentedDispatchTest(unittest.TestCase):
             )
             return result.stdout
 
+    def test_startup_trace_and_range_selection_cannot_mix(self):
+        """Both selected lanes fail before either producer runs."""
+        for api in ("30", "36"):
+            with self.subTest(api=api), self.assertRaises(subprocess.CalledProcessError):
+                self.run_dispatch("workflow_dispatch", *(["false"] * 3), "true", "false", "false", "true", api, "true")
+
     def test_range_selection_dispatch_uses_one_class_and_requires_its_execution(self):
         """The real-window regression runs alone and cannot turn green from a skip or a missing result."""
-        flags = ["false"] * 6 + ["true"]
+        flags = ["false"] * 6 + ["false", "30", "true"]
         output = self.run_dispatch("workflow_dispatch", *flags)
         self.assertIn("RunnerArguments.class=dev.ipf.whitenoise.android.ui.conversation.ConversationDragSelectionPopupAndroidTest", output)
         self.assertIn("--required config/range-selection-required-cases.txt", output)
@@ -95,6 +102,81 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("PullRequestDeviceSmoke", output)
         with self.assertRaises(subprocess.CalledProcessError):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_baseline_is_required_in_focused_containment_and_excluded_from_pr_smoke(self):
+        """Check real class annotations plus the dispatcher's actual required-case selection."""
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        baseline = (directory / "MediaWorkerBaselineDeviceTest.kt").read_text()
+        original = (directory / "IsolatedMediaDecoderDeviceTest.kt").read_text()
+        self.assertIn("@MediaContainmentAcceptance", baseline)
+        self.assertNotIn("@PullRequestDeviceSmoke", baseline)
+        self.assertIn("@PullRequestDeviceSmoke", original)
+        self.assertIn("@MediaContainmentAcceptance", original)
+        method = "characterizeDirectStillTransportWithFixedSyntheticCorpus"
+        self.assertIn("fun " + method + "()", baseline)
+        self.assertNotIn("fun " + method + "()", original)
+        case = "dev.ipf.whitenoise.android.media.sandbox.MediaWorkerBaselineDeviceTest#" + method
+        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        self.assertIn(case, focused)
+        required = (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
+        for line in required:
+            if any("." + name + "#" in line for name in (
+                "IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest", "MediaCodecCorpusDeviceTest"
+            )):
+                self.assertIn(line, focused)
+        smoke = self.run_dispatch("pull_request")
+        self.assertIn("RunnerArguments.annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke", smoke)
+        self.assertNotIn("MediaContainmentAcceptance", smoke)
+        self.assertNotIn(case, smoke)
+
+    def test_healthy_timing_fixture_is_excluded_from_all_existing_suites(self):
+        directory=ROOT/'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox'
+        source=(directory/'MediaWorkerHealthyBaselineDeviceTest.kt').read_text()
+        self.assertIn('@ManualDeviceFixture',source)
+        for annotation in ('@PullRequestDeviceSmoke','@MediaContainmentAcceptance','@ResponsivenessDeviceAcceptance','@MdkAdoptionDeviceAcceptance'):
+            self.assertNotIn(annotation,source)
+        healthy='MediaWorkerHealthyBaselineDeviceTest'
+        routes = [
+            ('pull_request',),
+            ('push',),
+            ('workflow_dispatch',),
+            ('workflow_dispatch','false','false','false','true'),
+            ('workflow_dispatch','false','false','true'),
+            ('workflow_dispatch','false','false','false','false','false','true'),
+        ]
+        for args in routes:
+            output=self.run_dispatch(*args)
+            self.assertNotIn(healthy,output)
+            if len(args) == 1:
+                self.assertIn('notAnnotation=dev.ipf.whitenoise.android.ManualDeviceFixture',output)
+        required=(ROOT/'config/instrumented-required-cases.txt').read_text()
+        self.assertNotIn(healthy,required)
+        runner=(directory/'MediaWorkerBaseline.kt').read_text()
+        self.assertIn('run(it, includeNegativeProbes = true)',runner)
+        self.assertIn('run(it, includeNegativeProbes = false)',runner)
+        self.assertIn('if (includeNegativeProbes)',runner)
+        self.assertIn('probe("watchdog_stimulus", transport, binding, MediaDecodePolicy.DEBUG_HANG)',runner)
+        self.assertIn('"application_debuggable"',runner)
+
+    def test_av_capability_capture_is_required_only_by_containment_selection(self):
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        source = (directory / "MediaAvCapabilityDeviceTest.kt").read_text()
+        self.assertIn("@MediaContainmentAcceptance", source)
+        self.assertNotIn("@PullRequestDeviceSmoke", source)
+        method = "characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid"
+        self.assertIn("fun " + method + "()", source)
+        case = "dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityDeviceTest#" + method
+        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        self.assertIn(case, focused)
+        required = (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
+        names = ("IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest",
+                 "MediaCodecCorpusDeviceTest", "MediaWorkerBaselineDeviceTest")
+        for line in required:
+            if any("." + name + "#" in line for name in names):
+                self.assertIn(line, focused)
+        smoke = self.run_dispatch("pull_request")
+        self.assertNotIn(case, smoke)
+        self.assertIn("RunnerArguments.annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke", smoke)
 
     def test_outbound_share_dispatch_is_focused_and_rejects_overlapping_suites(self):
         """Real package visibility uses its own emulator users without also running the full suite."""
