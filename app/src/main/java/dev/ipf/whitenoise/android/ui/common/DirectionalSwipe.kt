@@ -50,7 +50,11 @@ internal class DirectionalSwipeIntent(
     }
 }
 
-/** No detector is mounted when both bindings are off. Keys revoke an in-flight target or setting change. */
+/**
+ * Recognizes nothing while both bindings are off, but keeps its pointer node mounted: removing
+ * it would change the row's modifier structure and could detach an active outer gesture.
+ * Keys revoke an in-flight target or setting change.
+ */
 internal fun Modifier.directionalSwipe(
     owner: Any?,
     settings: Any?,
@@ -61,12 +65,8 @@ internal fun Modifier.directionalSwipe(
     onCancel: () -> Unit,
     canRecognize: (Int) -> Boolean = { true },
 ): Modifier =
-    if (!left && !right) {
-        this
-    } else {
-        pointerInput(owner, settings, left, right) {
-            detectDirectionalSwipe(left, right, onDistance, onRelease, onCancel, canRecognize)
-        }
+    pointerInput(owner, settings, left, right) {
+        if (left || right) detectDirectionalSwipe(left, right, onDistance, onRelease, onCancel, canRecognize)
     }
 
 /** Shares pointer arbitration between message rows and opt-in conversation rows, without dispatching commands. */

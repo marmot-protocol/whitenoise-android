@@ -84,9 +84,12 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
     request: LocalGroupRemovalRequest,
     isCurrent: () -> Boolean,
     readinessBudget: LocalGroupDeleteReadinessBudget,
+    onAdmitted: () -> Unit = {},
     onNativeCommitted: () -> Unit,
 ): Boolean =
     localGroupDeleteCleanupMutex.withLock {
+        if (!isCurrent()) return@withLock false
+        onAdmitted()
         val account = request.account
         val groupIdHex = request.groupIdHex
         val attempt =

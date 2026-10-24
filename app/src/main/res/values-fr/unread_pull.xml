@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Tirer vers le bas pour afficher les discussions non lues</string>
+    <string name="pull_unread_only">Non lues uniquement</string>
+    <string name="pull_unread_show_all">Tout afficher</string>
+    <string name="pull_unread_retry">Réessayer de charger les discussions non lues</string>
+    <string name="pull_unread_load_failed">Impossible de charger les discussions non lues. Réessayez.</string>
+    <string name="pull_unread_hint">Tirer pour afficher les discussions non lues</string>
+    <string name="pull_unread_release">Relâcher pour afficher les discussions non lues</string>
+</resources>

@@ -51,7 +51,7 @@ class InlineGiphyPlaybackScreenshotTest {
         suffix: String,
     ) {
         IsolatedMediaDecoder.installTestTransport(transport)
-        val media = RemoteGiphyMedia("https://media.giphy.com/media/fixture/giphy.gif", "Fixture creator")
+        val media = requireNotNull(RemoteGiphyMedia.parse("https://media3.giphy.com/media/fixture/giphy.gif"))
         val footer = GiphyMessageFooter("12:34", false, MessageStatus.Sent, null, null)
         val first = DecodedAttachmentPresentation.Static(transport.pixels(Color.RED), true)
         val second = DecodedAttachmentPresentation.Static(transport.pixels(Color.RED), true)

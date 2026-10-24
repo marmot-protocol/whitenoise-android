@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.app.Application
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -15,18 +17,24 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -37,6 +45,23 @@ import org.robolectric.annotation.GraphicsMode
 class RemoteGiphyMediaBubbleScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun opensOriginalFromCard() {
+        render(darkTheme = false)
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        composeRule.onNodeWithContentDescription("GIF via GIPHY").performClick()
+        var opened = shadowOf(app).nextStartedActivity
+        assertEquals(Intent.ACTION_VIEW, opened?.action)
+        assertEquals("https://media.giphy.com/media/abc/giphy.gif", opened?.dataString)
+        for (index in 0..2) {
+            composeRule.onAllNodesWithTag("giphy.attribution", useUnmergedTree = true)[index].performClick()
+            opened = shadowOf(app).nextStartedActivity
+            assertEquals(Intent.ACTION_VIEW, opened?.action)
+            assertEquals("https://media.giphy.com/media/abc/giphy.gif", opened?.dataString)
+        }
+        assertNull(shadowOf(app).nextStartedActivity)
+    }
 
     @Test
     fun giphyCardsLight() {

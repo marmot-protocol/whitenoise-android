@@ -76,6 +76,17 @@ class GestureSettingsScreenTest {
         assertEquals(1, resets)
     }
 
+    @Test fun pullUnreadSettingExposesIndependentOptOut() {
+        var enabled = true
+        rule.setContent {
+            WhiteNoiseTheme {
+                GestureSettingsContent(SwipePreferenceState(), { _, _ -> }, {}, {}, { enabled = it })
+            }
+        }
+        rule.onNodeWithTag("gestures.pull_unread").performScrollTo().performClick()
+        assertEquals(false, enabled)
+    }
+
     /** Mounts the stateless settings screen under controlled theme, direction, text scale and binding state. */
     private fun screen(
         name: String,

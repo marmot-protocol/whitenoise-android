@@ -90,6 +90,7 @@ import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewportEvent
+import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.reduceSettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
@@ -312,6 +313,7 @@ internal fun ProfileGroupForegroundCoordinator(
             onDismiss = onDismissProfile,
             adminController = conversationController,
             securePolicy = profileSecurePolicy,
+            openGroupsInCommon = appState.pendingProfileGroupsInCommon,
         )
     }
 }
@@ -525,6 +527,16 @@ internal fun MainShell(
             runtimeGeneration = appState.runtimeGeneration,
         )
     val scopedGlobalSearchState = globalSearch.scopedState
+    // Only the temporary view choice survives conversation navigation; native rows stay screen-owned.
+    val unreadFilterAccount = appState.activeAccountRef
+    val unreadFilterRuntime = appState.runtimeGeneration
+    val unreadFilterFolder = selectedChatListFolderId
+    val unreadFilterSearchOpen = scopedGlobalSearchState.isOpen
+    val unreadFilter =
+        remember(unreadFilterAccount, unreadFilterRuntime, unreadFilterFolder, unreadFilterSearchOpen) {
+            mutableStateOf(false)
+        }
+    val currentUnreadFilter by rememberUpdatedState(unreadFilter)
     LaunchedEffect(globalSearch.conversationReturn, scopedGlobalSearchState.isOpen, selectedChat, sectionName) {
         val origin = globalSearch.conversationReturn ?: return@LaunchedEffect
         if (sectionName != MainSection.Chats.name) {
@@ -2033,142 +2045,179 @@ internal fun MainShell(
                         )
                     }
                     MainShellContentRoute.Main ->
-                        when (section) {
-                            MainSection.Chats -> {
-                                WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
-                                ChatsScreen(
-                                    appState = appState,
-                                    controller = chatsController,
-                                    retainedAvatarPreparation = retainedAvatarPreparation,
-                                    diagnosticsPrompt = {
-                                        val chatsSettled =
-                                            selectedChat == null &&
-                                                pendingConversationOpen == null &&
-                                                !routeTransition.isRunning
-                                        val shellUnobstructed =
-                                            quickAccountSwitchTransition == null &&
-                                                appState.pendingProfileNpub == null &&
-                                                visiblePickerRequest == null
-                                        if (chatsSettled && navAccountStable && shellUnobstructed) {
-                                            diagnosticsPrompt()
-                                        }
-                                    },
-                                    globalSearchState = scopedGlobalSearchState,
-                                    onGlobalSearchStateChange = globalSearch.update,
-                                    searchViewport = globalSearch.viewport,
-                                    selectedFolderId = selectedChatListFolderId,
-                                    onSelectFolder = { selectedChatListFolderId = it },
-                                    onTtsTransportBodyClick = guardedPlaybackSourceOpen,
-                                    showPlaybackTransport = playbackInChatList,
-                                    onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
-                                    onQuickSwitchToAccount = { targetLabel ->
-                                        appState.requestQuickAccountSwitchTo(
-                                            targetLabel = targetLabel,
-                                            requestSwitch = { target, activated ->
-                                                requestQuickAccountSwitch(target, activated)
-                                            },
-                                            onSwitched = switchNotice::show,
-                                        )
-                                    },
-                                    onGroupCreateSubmitted = onGroupCreateSubmitted,
-                                    onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
-                                    onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
-                                    conversationReturnHead = publishedConversationReturnHead(chatListReturnHeadSnap),
-                                    onConversationReturnHeadHandled = {
-                                        chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
-                                    },
-                                    onOpenSettings = {
-                                        pendingConversationOpen = null
-                                        supersedePendingTtsDestinationNavigation()
-                                        chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                                        supersedePendingGroupCreateOpen()
-                                        sectionName = MainSection.Settings.name
-                                        settingsDetailName = null
-                                        settingsHomeViewport =
-                                            reduceSettingsHomeViewport(
-                                                settingsHomeViewport,
-                                                SettingsHomeViewportEvent.OpenNewSettingsVisit,
+                        SettingsRouteMotion(
+                            target = section,
+                            depth =
+                                when (section) {
+                                    MainSection.Chats -> 0
+                                    MainSection.Settings -> 1
+                                    MainSection.Diagnostics -> 2
+                                },
+                            ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+                            suppressMotion =
+                                routingNotification ||
+                                    routingShare ||
+                                    routingAppUpdate ||
+                                    pendingTtsDestinationNavigation != null,
+                            contentVisible = !appState.appLockScreenVisible,
+                        ) { animatedSection ->
+                            when (animatedSection) {
+                                MainSection.Chats -> {
+                                    WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+                                    ChatsScreen(
+                                        appState = appState,
+                                        controller = chatsController,
+                                        retainedAvatarPreparation = retainedAvatarPreparation,
+                                        diagnosticsPrompt = {
+                                            val chatsSettled =
+                                                selectedChat == null &&
+                                                    pendingConversationOpen == null &&
+                                                    !routeTransition.isRunning
+                                            val shellUnobstructed =
+                                                quickAccountSwitchTransition == null &&
+                                                    appState.pendingProfileNpub == null &&
+                                                    visiblePickerRequest == null
+                                            if (chatsSettled && navAccountStable && shellUnobstructed) {
+                                                diagnosticsPrompt()
+                                            }
+                                        },
+                                        globalSearchState = scopedGlobalSearchState,
+                                        onGlobalSearchStateChange = globalSearch.update,
+                                        searchViewport = globalSearch.viewport,
+                                        unreadOnlyFilter = unreadFilter.value,
+                                        onUnreadOnlyFilterChange = { enabled ->
+                                            val currentUnreadOwner =
+                                                currentUnreadFilter === unreadFilter &&
+                                                    appState.activeAccountRef == unreadFilterAccount
+                                            if (currentUnreadOwner &&
+                                                appState.runtimeGeneration == unreadFilterRuntime &&
+                                                selectedChatListFolderId == unreadFilterFolder
+                                            ) {
+                                                unreadFilter.value = enabled
+                                            }
+                                        },
+                                        selectedFolderId = selectedChatListFolderId,
+                                        onSelectFolder = { selectedChatListFolderId = it },
+                                        onTtsTransportBodyClick = guardedPlaybackSourceOpen,
+                                        showPlaybackTransport = playbackInChatList,
+                                        onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
+                                        onQuickSwitchToAccount = { targetLabel ->
+                                            appState.requestQuickAccountSwitchTo(
+                                                targetLabel = targetLabel,
+                                                requestSwitch = { target, activated ->
+                                                    requestQuickAccountSwitch(target, activated)
+                                                },
+                                                onSwitched = switchNotice::show,
                                             )
-                                    },
-                                    onOpenGroup = { item, focusMessageId, justCreated, visibleHead ->
-                                        commitExplicitConversationOpen(item.group.groupIdHex)
-                                        nextPendingConversationOpenRequestId += 1L
-                                        pendingConversationOpen =
-                                            PendingConversationOpen(
-                                                requestId = nextPendingConversationOpenRequestId,
-                                                accountRef = appState.activeAccountRef,
-                                                item = item,
-                                                focusMessageId = focusMessageId,
-                                                justCreated = justCreated,
-                                                visibleActiveListHead = visibleHead,
-                                            )
-                                    },
-                                    onPresentProfile = { npub, visibleHead ->
-                                        pendingConversationOpen = null
-                                        chatListReturnHeadSnap =
-                                            presentProfileFromChatList(chatListReturnHeadSnap, visibleHead)
-                                        shellNavState =
-                                            armShellProfileForeground(shellNavState, profileGroupForegroundState)
-                                        previousPendingProfileNpub = npub
-                                        appState.presentProfile(npub)
-                                    },
-                                )
+                                        },
+                                        onGroupCreateSubmitted = onGroupCreateSubmitted,
+                                        onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+                                        onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
+                                        conversationReturnHead =
+                                            publishedConversationReturnHead(chatListReturnHeadSnap),
+                                        onConversationReturnHeadHandled = {
+                                            chatListReturnHeadSnap =
+                                                onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                                        },
+                                        onOpenSettings = {
+                                            pendingConversationOpen = null
+                                            supersedePendingTtsDestinationNavigation()
+                                            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                                            supersedePendingGroupCreateOpen()
+                                            sectionName = MainSection.Settings.name
+                                            settingsDetailName = null
+                                            settingsHomeViewport =
+                                                reduceSettingsHomeViewport(
+                                                    settingsHomeViewport,
+                                                    SettingsHomeViewportEvent.OpenNewSettingsVisit,
+                                                )
+                                        },
+                                        onOpenGroup = { item, focusMessageId, justCreated, visibleHead ->
+                                            commitExplicitConversationOpen(item.group.groupIdHex)
+                                            nextPendingConversationOpenRequestId += 1L
+                                            pendingConversationOpen =
+                                                PendingConversationOpen(
+                                                    requestId = nextPendingConversationOpenRequestId,
+                                                    accountRef = appState.activeAccountRef,
+                                                    item = item,
+                                                    focusMessageId = focusMessageId,
+                                                    justCreated = justCreated,
+                                                    visibleActiveListHead = visibleHead,
+                                                )
+                                        },
+                                        onPresentProfile = { npub, visibleHead ->
+                                            pendingConversationOpen = null
+                                            chatListReturnHeadSnap =
+                                                presentProfileFromChatList(chatListReturnHeadSnap, visibleHead)
+                                            shellNavState =
+                                                armShellProfileForeground(shellNavState, profileGroupForegroundState)
+                                            previousPendingProfileNpub = npub
+                                            appState.presentProfile(npub)
+                                        },
+                                    )
+                                }
+                                MainSection.Settings ->
+                                    SettingsScreen(
+                                        appState = appState,
+                                        suppressMotion =
+                                            routingNotification ||
+                                                routingShare ||
+                                                routingAppUpdate ||
+                                                pendingTtsDestinationNavigation != null,
+                                        onBackToChats = {
+                                            sectionName = MainSection.Chats.name
+                                            settingsDetailName = null
+                                            settingsHomeViewport =
+                                                reduceSettingsHomeViewport(
+                                                    settingsHomeViewport,
+                                                    SettingsHomeViewportEvent.ExitSettings,
+                                                )
+                                        },
+                                        onOpenDiagnostics = {
+                                            // Preserve `settingsDetailName` so backing out of
+                                            // Diagnostics returns to Developer (its only entry point)
+                                            // rather than the Settings home, restoring the breadcrumb
+                                            // the user walked in on (#412).
+                                            settingsHomeViewport =
+                                                reduceSettingsHomeViewport(
+                                                    settingsHomeViewport,
+                                                    SettingsHomeViewportEvent.OpenDiagnostics,
+                                                )
+                                            sectionName = MainSection.Diagnostics.name
+                                        },
+                                        onOpenSupportChat = { item ->
+                                            // Land in the conversation itself, not the chat list; no
+                                            // list scroll state exists to snapshot from Settings.
+                                            commitExplicitConversationOpen(item.group.groupIdHex)
+                                            selectedChatOpenedAsDmHint = false
+                                            selectedChat = item
+                                            sectionName = MainSection.Chats.name
+                                            settingsDetailName = null
+                                            settingsHomeViewport =
+                                                reduceSettingsHomeViewport(
+                                                    settingsHomeViewport,
+                                                    SettingsHomeViewportEvent.OpenConversation,
+                                                )
+                                        },
+                                        detail = settingsDetail,
+                                        onDetailChange = { settingsDetailName = it?.name },
+                                        homeViewport = settingsHomeViewport,
+                                        onHomeViewportChange = { settingsHomeViewport = it },
+                                    )
+                                MainSection.Diagnostics ->
+                                    DiagnosticsScreen(
+                                        appState = appState,
+                                        onBack = {
+                                            // Leave `settingsDetailName` alone — it still holds the
+                                            // detail (Developer) the user opened Diagnostics from, so
+                                            // Settings re-enters that screen directly (#412).
+                                            sectionName = MainSection.Settings.name
+                                        },
+                                    )
                             }
-                            MainSection.Settings ->
-                                SettingsScreen(
-                                    appState = appState,
-                                    onBackToChats = {
-                                        sectionName = MainSection.Chats.name
-                                        settingsDetailName = null
-                                        settingsHomeViewport =
-                                            reduceSettingsHomeViewport(
-                                                settingsHomeViewport,
-                                                SettingsHomeViewportEvent.ExitSettings,
-                                            )
-                                    },
-                                    onOpenDiagnostics = {
-                                        // Preserve `settingsDetailName` so backing out of
-                                        // Diagnostics returns to Developer (its only entry point)
-                                        // rather than the Settings home, restoring the breadcrumb
-                                        // the user walked in on (#412).
-                                        settingsHomeViewport =
-                                            reduceSettingsHomeViewport(
-                                                settingsHomeViewport,
-                                                SettingsHomeViewportEvent.OpenDiagnostics,
-                                            )
-                                        sectionName = MainSection.Diagnostics.name
-                                    },
-                                    onOpenSupportChat = { item ->
-                                        // Land in the conversation itself, not the chat list; no
-                                        // list scroll state exists to snapshot from Settings.
-                                        commitExplicitConversationOpen(item.group.groupIdHex)
-                                        selectedChatOpenedAsDmHint = false
-                                        selectedChat = item
-                                        sectionName = MainSection.Chats.name
-                                        settingsDetailName = null
-                                        settingsHomeViewport =
-                                            reduceSettingsHomeViewport(
-                                                settingsHomeViewport,
-                                                SettingsHomeViewportEvent.OpenConversation,
-                                            )
-                                    },
-                                    detail = settingsDetail,
-                                    onDetailChange = { settingsDetailName = it?.name },
-                                    homeViewport = settingsHomeViewport,
-                                    onHomeViewportChange = { settingsHomeViewport = it },
-                                )
-                            MainSection.Diagnostics ->
-                                DiagnosticsScreen(
-                                    appState = appState,
-                                    onBack = {
-                                        // Leave `settingsDetailName` alone — it still holds the
-                                        // detail (Developer) the user opened Diagnostics from, so
-                                        // Settings re-enters that screen directly (#412).
-                                        sectionName = MainSection.Settings.name
-                                    },
-                                )
                         }
                 }
+
                 ConversationRouteSettledPerformanceMarker(
                     conversationId = transitionContent?.chat?.id,
                     routeTransition = routeTransition,

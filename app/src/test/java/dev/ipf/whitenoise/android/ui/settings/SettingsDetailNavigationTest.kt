@@ -39,6 +39,7 @@ class SettingsDetailNavigationTest {
             SettingsDetail.DevicePrivacy,
             SettingsDetail.Relays,
             SettingsDetail.Notifications,
+            SettingsDetail.Gestures,
             SettingsDetail.Appearance,
         ).forEach { assertNull(settingsDetailParent(it)) }
     }

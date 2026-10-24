@@ -32,7 +32,9 @@ class InlineAnimationCoverageTest {
         val source = source("InlineAttachmentImage.kt")
         assertTrue("Semaphore(1)" in source)
         assertTrue("inlineAnimationSlot.withPermit" in source)
-        assertTrue("MediaPipeline.decodeAnimatedDrawable(bytes, INLINE_ANIMATION_MAX_EDGE_PX)" in source)
+        assertTrue(
+            "MediaPipeline.decodeAnimatedDrawable(bytes, INLINE_ANIMATION_MAX_EDGE_PX, decorative = true)" in source,
+        )
         assertTrue("currentCoroutineContext().ensureActive()" in source)
         assertTrue("LocalWindowInfo.current.isWindowFocused" in source)
         assertTrue("Lifecycle.State.RESUMED" in source)

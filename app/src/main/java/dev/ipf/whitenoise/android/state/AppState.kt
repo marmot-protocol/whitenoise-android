@@ -4362,6 +4362,29 @@ class WhiteNoiseAppState private constructor(
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex, accountWide)
             ?: ProfileGroupPickerState.empty()
 
+    /** A non-started administration controller uses the existing authoritative mutation contract.
+     * It owns no timeline subscriptions; accepted mutations are retained by launchMutation.
+     */
+    internal suspend fun profileMembershipController(
+        account: String,
+        item: ChatListItem,
+    ): ConversationController? {
+        if (activeAccountRef != account || item.isDm()) return null
+        val controller =
+            ConversationController(
+                appState = this,
+                initialGroup = item.group,
+                accountRefOverride = account,
+            )
+        var retained = false
+        return try {
+            runCatchingCancellable { controller.refreshManagementState() }.getOrThrow()
+            controller.takeIf { activeAccountRef == account && it.managementState != null }?.also { retained = true }
+        } finally {
+            if (!retained) controller.onCleared()
+        }
+    }
+
     /** Makes [targetRef] an admin of [groupIdHex], asking first if MDK holds the change back. True once committed. */
     suspend fun promoteProfileInGroup(
         targetRef: String,
@@ -8438,9 +8461,16 @@ class WhiteNoiseAppState private constructor(
     fun setConversationMuted(
         groupIdHex: String,
         muted: Boolean,
+        onCommitted: () -> Unit = {},
+        isCurrent: () -> Boolean = { true },
+        completionIsCurrent: () -> Boolean = isCurrent,
     ) {
         val accountRef = activeAccountRef ?: return
-        if (muted) submitMuteCommand(accountRef, groupIdHex, null) else submitUnmuteCommand(accountRef, groupIdHex)
+        if (muted) {
+            submitMuteCommand(accountRef, groupIdHex, null, onCommitted, isCurrent, completionIsCurrent)
+        } else {
+            submitUnmuteCommand(accountRef, groupIdHex, onCommitted, isCurrent, completionIsCurrent)
+        }
     }
 
     /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
@@ -8463,34 +8493,71 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Sends the command to MDK; UI changes only after MDK returns its authoritative settings. */
+    @Suppress("LongParameterList") // Admission and committed-result ownership differ after presentation retires.
     private fun submitMuteCommand(
         accountRef: String,
         groupIdHex: String,
         mutedUntilMs: Long?,
+        onCommitted: () -> Unit = {},
+        isCurrent: () -> Boolean = { true },
+        completionIsCurrent: () -> Boolean = isCurrent,
     ) {
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        val runtime = runtimeGeneration
         pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
         mutationsScope.launch {
-            chatMuteRepository
-                .setMuted(accountRef, groupIdHex, mutedUntilMs)
-                .onSuccess { if (activeAccountRef == accountRef) authoritativeMuteOverrides[key] = it }
-                .onFailure { presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it) }
-            finishMuteCommand(key)
+            try {
+                val ownsSession = activeAccountRef == accountRef && runtimeGeneration == runtime
+                if (!ownsSession || !isCurrent()) return@launch
+                chatMuteRepository
+                    .setMuted(accountRef, groupIdHex, mutedUntilMs) {
+                        activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
+                    }.onSuccess {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && completionIsCurrent()) {
+                            authoritativeMuteOverrides[key] = it
+                            onCommitted()
+                        }
+                    }.onFailure {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                            presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it)
+                        }
+                    }
+            } finally {
+                finishMuteCommand(key)
+            }
         }
     }
 
     private fun submitUnmuteCommand(
         accountRef: String,
         groupIdHex: String,
+        onCommitted: () -> Unit = {},
+        isCurrent: () -> Boolean = { true },
+        completionIsCurrent: () -> Boolean = isCurrent,
     ) {
         val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        val runtime = runtimeGeneration
         pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
         mutationsScope.launch {
-            chatMuteRepository
-                .clearMuted(accountRef, groupIdHex)
-                .onSuccess { if (activeAccountRef == accountRef) authoritativeMuteOverrides[key] = it }
-                .onFailure { presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it) }
-            finishMuteCommand(key)
+            try {
+                val ownsSession = activeAccountRef == accountRef && runtimeGeneration == runtime
+                if (!ownsSession || !isCurrent()) return@launch
+                chatMuteRepository
+                    .clearMuted(accountRef, groupIdHex) {
+                        activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
+                    }.onSuccess {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && completionIsCurrent()) {
+                            authoritativeMuteOverrides[key] = it
+                            onCommitted()
+                        }
+                    }.onFailure {
+                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                            presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it)
+                        }
+                    }
+            } finally {
+                finishMuteCommand(key)
+            }
         }
     }
 
@@ -11868,13 +11935,22 @@ class WhiteNoiseAppState private constructor(
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
+        pendingProfileGroupsInCommon = false
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
         pendingProfileNpub = link.npub
         return true
     }
 
-    fun presentProfile(npub: String) {
+    internal var pendingProfileGroupsInCommon by mutableStateOf(false)
+        private set
+
+    /** Requests a profile with its initial groups-in-common view, clearing discovery-only metadata. */
+    fun presentProfile(
+        npub: String,
+        groupsInCommon: Boolean = false,
+    ) {
+        pendingProfileGroupsInCommon = groupsInCommon
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
         pendingProfileNpub = npub
@@ -11884,6 +11960,7 @@ class WhiteNoiseAppState private constructor(
         npub: String,
         profile: UserProfileMetadataFfi?,
     ) {
+        pendingProfileGroupsInCommon = false
         pendingProfileMetadata = profile
         pendingProfileFromDiscovery = true
         pendingProfileNpub = npub
@@ -11986,6 +12063,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun clearPresentedProfile() {
+        pendingProfileGroupsInCommon = false
         pendingProfileNpub = null
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false

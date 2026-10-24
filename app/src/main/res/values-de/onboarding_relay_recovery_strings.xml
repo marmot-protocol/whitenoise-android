@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_technical_details">Technische Details</string>
+    <string name="setup_relay_publication_scope">Änderungen gelten auch für andere Nostr-Apps dieses Kontos.</string>
+    <string name="setup_relay_remove_scope">Entfernen gilt für diese Adresse in beiden Listen. Vor dem Speichern prüfen.</string>
+    <string name="setup_undo_removal">Entfernen rückgängig</string>
+</resources>

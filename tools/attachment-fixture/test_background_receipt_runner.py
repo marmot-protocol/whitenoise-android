@@ -78,6 +78,74 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
         diagnostic = runner.failure_diagnostics("private text says TimeoutException\nINSTRUMENTATION_CODE: -1\n")
         self.assertEqual({"kind": "instrumentation-failure", "fixture_lines": []}, diagnostic)
 
+    def test_suspend_boundaries_are_closed_and_never_export_stack_messages(self):
+        """Known suspend helpers retain bounded source positions; arbitrary frames and identities stay private."""
+        output = (
+            "INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: private-account\n"
+            "    at dev.ipf.whitenoise.android.media.AndroidAttachmentFixtureSenderKt$awaitAndroidFixtureReferences$2"
+            ".invokeSuspend(AndroidAttachmentFixtureSender.kt:232)\n"
+            "    at dev.ipf.whitenoise.android.media.MediaLifecycleAttachmentProbe$projectRequests$2"
+            ".invokeSuspend(MediaLifecycleAttachmentProbe.kt:422)\n"
+            "    at private.Account.read(Private.kt:123)\n"
+        )
+        diagnostic = runner.failure_diagnostics(output)
+        self.assertEqual(diagnostic, {"kind": "timeout", "fixture_lines": [], "boundary_lines": [
+            {"boundary": "receiver-projection", "line": 422}, {"boundary": "sender-publication", "line": 232},
+        ]})
+        self.assertNotIn("private", json.dumps(diagnostic))
+
+    def test_progress_boundaries_alone_never_qualify_the_fixture(self):
+        """A closed progress stage is useful on failure but supplies none of the required device/checker facts."""
+        from background_receipt_checker import check_background_receipt
+        self.assertFalse(check_background_receipt(
+            [{"phase": "background-receipt-stage", "stage": "network_policy_start"}], [],
+        )["passed"])
+
+    def test_policy_timeout_without_frames_retains_closed_metrics_and_fails_the_attempt(self):
+        """Both policy waits survive host report writing without private exception text or a false hand-off."""
+        for stage in ("HostPolicy", "NativeApproval"):
+            diagnostic = {
+                "phase": "background-receipt-policy-timeout", "case": "NetworkHeld", "stage": stage,
+                "allowed_types": [], "expected_types": ["Video"], "wifi_only_types": ["Video"],
+                "networks": ["WiFi", "Metered"], "account_state": "SignedIn", "paused": False,
+                "validated_internet": True, "approval_applied": False,
+            }
+            instrument_output = (
+                "INSTRUMENTATION_STATUS: controlled_attachment_json=" + json.dumps(diagnostic) + "\n"
+                "INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: private-account\n"
+                "FAILURES!!!\nINSTRUMENTATION_CODE: -1\n"
+            )
+            server = mock.Mock(server_port=4001, ledger=mock.Mock(snapshot=mock.Mock(return_value=[])))
+            relay = mock.Mock(port=4002)
+
+            def adb(_adb, _serial, *args):
+                """Only the runner's fixed emulator and package probes receive synthetic replies."""
+                if "ro.kernel.qemu" in args:
+                    return "1\n"
+                if "list" in args:
+                    return f"package:{runner.APP}\n"
+                if "ro.build.version.sdk" in args:
+                    return "30\n"
+                return "arm64-v8a\n"
+
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as directory, \
+                    mock.patch.object(runner, "adb_command", side_effect=adb), \
+                    mock.patch.object(runner, "FixtureServer", return_value=server), \
+                    mock.patch.object(runner, "FixtureRelay", return_value=relay), \
+                    mock.patch.object(runner, "instrument", return_value=instrument_output) as instrument, \
+                    mock.patch.object(runner.time, "sleep"):
+                output = Path(directory) / "out.json"
+                with self.assertRaises(RuntimeError):
+                    runner.run("adb", "emulator-5554", Path(directory), output)
+                report = json.loads(output.read_text())
+            self.assertEqual([diagnostic], report["metrics"])
+            self.assertEqual({"kind": "timeout", "fixture_lines": []}, report["stages"][0]["failure"])
+            self.assertFalse(report["qualified"])
+            self.assertFalse(report["instrumentation_passed"])
+            self.assertFalse(report["process_ended_abruptly"])
+            self.assertEqual(1, instrument.call_count, "a timeout never launches resume")
+            self.assertNotIn("private-account", json.dumps(report))
+
     def test_only_the_held_request_ending_releases_the_hand_off(self):
         """An unrelated disconnect after the stop does not end the wait; the held request's own disconnect does."""
         events = [

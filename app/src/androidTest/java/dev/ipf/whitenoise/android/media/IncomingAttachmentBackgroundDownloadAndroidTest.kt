@@ -77,6 +77,27 @@ private const val NETWORK_READY_TIMEOUT_MILLIS = 240_000L
 private const val SETTLE_MILLIS = 5_000L
 private const val ACTIVITY_STOP_TIMEOUT_MILLIS = 15_000L
 private const val FLUSH_MILLIS = 500L
+
+/** Closed fixture boundaries only; progress is diagnostic, never qualification evidence. */
+private enum class ReceiptBoundary {
+    BACKGROUND_SEND,
+    BACKGROUND_SENT,
+    BACKGROUND_PROJECTED,
+    BACKGROUND_READY,
+    RETURN_LOCAL_COMPLETE,
+    DISABLED_COMPLETE,
+    NETWORK_POLICY_START,
+    NETWORK_POLICY_APPLIED,
+    WIFI_DISABLE_START,
+    WIFI_DISABLED,
+    NETWORK_SEND,
+    NETWORK_PROJECTED,
+    WIFI_RESTORE_START,
+    WIFI_RESTORED,
+    NETWORK_COMPLETE,
+    STOP_WORK_START,
+}
+
 private const val STAGE_MAIN = "main"
 private const val STAGE_RESUME = "resume"
 private const val MANIFEST = "background-receipt-recreate.json"
@@ -143,14 +164,18 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             val (sender, receiver, group) = createPeers(runtime)
             bindReceiver(runtime, receiver)
             awaitValidatedInternet(requireNotNull(state))
-            setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
+            setPolicy(BackgroundReceiptPolicyCase.Initial, receiver, MediaAutoDownloadType.entries.toSet())
             ActivityScenario.launch(ComponentActivity::class.java).use {
                 stopActivities()
                 val background = backgroundAlbum(sender, receiver, group)
                 val returned = returnWithoutFetching(background)
+                reportBoundary(ReceiptBoundary.RETURN_LOCAL_COMPLETE)
                 stopActivities()
                 val disabled = disabledTypeIsNeverFetched(sender, receiver, group)
+                reportBoundary(ReceiptBoundary.DISABLED_COMPLETE)
                 val network = networkHeldTypeWaitsForWifi(sender, receiver, group)
+                reportBoundary(ReceiptBoundary.NETWORK_COMPLETE)
+                reportBoundary(ReceiptBoundary.STOP_WORK_START)
                 val stopped = stopHeldWorkForTheNextProcess(sender, receiver, group)
                 ControlledAttachmentProbe.report(
                     JSONObject()
@@ -202,9 +227,13 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             )
         HeldAttachmentCancellationProbe.control(blobPort, "/__background-start")
         val started = System.nanoTime()
+        reportBoundary(ReceiptBoundary.BACKGROUND_SEND)
         val sent = send(sender, group, attachments)
+        reportBoundary(ReceiptBoundary.BACKGROUND_SENT)
         val album = project(receiver, group, sent)
+        reportBoundary(ReceiptBoundary.BACKGROUND_PROJECTED)
         awaitReady(receiver, group, album)
+        reportBoundary(ReceiptBoundary.BACKGROUND_READY)
         val readyMillis = (System.nanoTime() - started) / 1_000_000
         val visible = visibleActivities()
         assertEquals("an Activity returned to the foreground", 0, visible)
@@ -260,7 +289,11 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         receiver: AccountSummaryFfi,
         group: String,
     ): JSONObject {
-        setPolicy(receiver, MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Video)
+        setPolicy(
+            BackgroundReceiptPolicyCase.DisabledType,
+            receiver,
+            MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Video,
+        )
         HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$DISABLED_START_MARKER")
         val before = HeldAttachmentCancellationProbe.ledger(blobPort).count { it.getString("kind") == "get" }
         val image = FixtureMediaAssets.jpeg(IMAGE_SEED + 1)
@@ -290,7 +323,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         assertEquals("only the enabled image was fetched", 1, after - before)
         HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$DISABLED_END_MARKER")
         requests += album.requests
-        setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
+        setPolicy(BackgroundReceiptPolicyCase.DisabledType, receiver, MediaAutoDownloadType.entries.toSet())
         return JSONObject()
             .put("enabled_fetched", 1)
             .put("disabled_queued", false)
@@ -309,12 +342,23 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         group: String,
     ): JSONObject {
         val receiverState = requireNotNull(state)
-        setPolicy(receiver, MediaAutoDownloadType.entries.toSet(), wifiOnly = setOf(MediaAutoDownloadType.Video))
+        reportBoundary(ReceiptBoundary.NETWORK_POLICY_START)
+        setPolicy(
+            BackgroundReceiptPolicyCase.NetworkHeld,
+            receiver,
+            MediaAutoDownloadType.entries.toSet(),
+            wifiOnly = setOf(MediaAutoDownloadType.Video),
+        )
+        reportBoundary(ReceiptBoundary.NETWORK_POLICY_APPLIED)
+        reportBoundary(ReceiptBoundary.WIFI_DISABLE_START)
         setWifi(receiver, enabled = false)
+        reportBoundary(ReceiptBoundary.WIFI_DISABLED)
         val video = FixtureMediaAssets.paddedVideo(FixtureMediaAssets.video(), NETWORK_VIDEO_BYTES, 7L)
         val attachment = FixtureMediaAssets.attachment(video, "video/mp4", "network.mp4", "320x240")
         HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$NETWORK_START_MARKER")
+        reportBoundary(ReceiptBoundary.NETWORK_SEND)
         val request = project(receiver, group, send(sender, group, listOf(attachment))).requests.single()
+        reportBoundary(ReceiptBoundary.NETWORK_PROJECTED)
         requests += request
         val manager = WorkManager.getInstance(context)
         val name = attachmentDownloadWorkName(request)
@@ -328,7 +372,9 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         val hold = receiverState.automaticAttachmentPolicy(receiver.label).hold(MediaAutoDownloadType.Video)
         assertEquals(AutomaticAttachmentHold.Network, hold)
         HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$NETWORK_RESTORED_MARKER")
+        reportBoundary(ReceiptBoundary.WIFI_RESTORE_START)
         setWifi(receiver, enabled = true)
+        reportBoundary(ReceiptBoundary.WIFI_RESTORED)
         withTimeout(NETWORK_READY_TIMEOUT_MILLIS) {
             while (manager.getWorkInfosForUniqueWork(name).get().none { it.state == WorkInfo.State.SUCCEEDED }) {
                 delay(50L)
@@ -339,7 +385,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         }
         val visible = visibleActivities()
         assertEquals("an Activity returned to the foreground", 0, visible)
-        setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
+        setPolicy(BackgroundReceiptPolicyCase.NetworkHeld, receiver, MediaAutoDownloadType.entries.toSet())
         return JSONObject()
             .put("queued_without_wifi", true)
             .put("constraint", "unmetered")
@@ -361,14 +407,18 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         receiver: AccountSummaryFfi,
         group: String,
     ): JSONObject {
-        setPolicy(receiver, MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Document)
+        setPolicy(
+            BackgroundReceiptPolicyCase.ProcessStop,
+            receiver,
+            MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Document,
+        )
         val bytes = heldFileBytes()
         val attachment = FixtureMediaAssets.attachment(bytes, "application/pdf", "held.pdf")
         val sent = send(sender, group, listOf(attachment))
         val request = project(receiver, group, sent).requests.single()
         requests += request
         HeldAttachmentCancellationProbe.control(blobPort, "/__hold-resumable-acquisition")
-        setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
+        setPolicy(BackgroundReceiptPolicyCase.ProcessStop, receiver, MediaAutoDownloadType.entries.toSet())
         requireNotNull(state).processNotificationUpdateForTest(receipt(receiver, group, request))
         val manager = WorkManager.getInstance(context)
         val name = attachmentDownloadWorkName(request)
@@ -543,6 +593,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
      * native policy both reflect it on the current Wi-Fi connection.
      */
     private suspend fun setPolicy(
+        case: BackgroundReceiptPolicyCase,
         receiver: AccountSummaryFfi,
         enabled: Set<MediaAutoDownloadType>,
         wifiOnly: Set<MediaAutoDownloadType> = emptySet(),
@@ -556,11 +607,23 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 }
             }
         }
-        withTimeout(15_000L) {
-            while (receiverState.automaticAttachmentPolicy(receiver.label).allowedNow() != enabled) delay(25L)
+        val snapshot = {
+            backgroundReceiptPolicySnapshot(
+                receiverState.automaticAttachmentPolicy(receiver.label),
+                enabled,
+                wifiOnly,
+                permissions(receiverState).appliedRevision(receiver.label) != null,
+            )
+        }
+        withBackgroundReceiptPolicyDiagnostics(case, BackgroundReceiptPolicyStage.HostPolicy, snapshot) {
+            withTimeout(15_000L) {
+                while (receiverState.automaticAttachmentPolicy(receiver.label).allowedNow() != enabled) delay(25L)
+            }
         }
         withContext(Dispatchers.Main.immediate) { receiverState.refreshNativeAttachmentPermissions() }
-        withTimeout(15_000L) { permissions(receiverState).awaitApplied(receiver.label) }
+        withBackgroundReceiptPolicyDiagnostics(case, BackgroundReceiptPolicyStage.NativeApproval, snapshot) {
+            withTimeout(15_000L) { permissions(receiverState).awaitApplied(receiver.label) }
+        }
     }
 
     /** Turns the emulator's Wi-Fi on or off and waits until the receiver's network snapshot follows. */
@@ -580,6 +643,13 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         PlatformBackgroundAttachmentProbe.shell("input keyevent KEYCODE_HOME")
         withTimeout(ACTIVITY_STOP_TIMEOUT_MILLIS) { while (visibleActivities() > 0) delay(10L) }
         withContext(Dispatchers.Main.immediate) { requireNotNull(state).setAppInForeground(false) }
+    }
+
+    /** Emits no identities, locators, exception messages or free-form native state. */
+    private fun reportBoundary(boundary: ReceiptBoundary) {
+        ControlledAttachmentProbe.report(
+            JSONObject().put("phase", "background-receipt-stage").put("stage", boundary.name.lowercase()),
+        )
     }
 
     /** Sends [attachments] as one message through the shipping Android send path. */

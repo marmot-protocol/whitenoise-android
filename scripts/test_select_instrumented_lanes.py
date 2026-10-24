@@ -61,6 +61,17 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
         self.assertTrue(matches(path, TRIGGERS))
         self.assertTrue(select('pull_request', [path], TRIGGERS)['attachment_fixture'])
 
+    def test_policy_diagnostics_run_their_contract_and_controlled_fixture(self):
+        """The helper affects both lanes; its isolated contract test starts connected smoke by itself."""
+        helper = MEDIA_TEST + 'BackgroundReceiptPolicyDiagnostics.kt'
+        contract = MEDIA_TEST + 'BackgroundReceiptPolicyDiagnosticsAndroidTest.kt'
+        self.assertTrue(matches(helper, TRIGGERS))
+        self.assertTrue(matches(contract, TRIGGERS))
+        self.assertEqual(select('pull_request', [helper], TRIGGERS),
+                         {'attachment_fixture': True, 'connected': True})
+        self.assertEqual(select('pull_request', [contract], TRIGGERS),
+                         {'attachment_fixture': False, 'connected': True})
+
     def test_unrelated_files_beside_fixture_inputs_do_not_start_connected(self):
         lanes = select('pull_request', ['README.md', 'app/src/main/java/Other.kt',
                                         'scripts/run-controlled-attachment-fixture.sh'], TRIGGERS)

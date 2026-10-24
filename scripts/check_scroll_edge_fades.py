@@ -56,7 +56,7 @@ def menu_scroll_state_bound(text: str) -> bool:
     code = code_only(text)
     return (re.search(r'\bscrollState\s*=\s*menuScrollState\b', code) is not None
             and re.search(r'\.scrollEdgeFade\(\s*menuScrollState\s*'
-                          r',\s*stableRenderTarget\s*=\s*true\s*\)', code) is not None)
+                          r',\s*stableRenderTarget\s*=\s*true\s*,?\s*\)', code) is not None)
 
 
 def inventory_errors(root: Path = ROOT) -> list[str]:

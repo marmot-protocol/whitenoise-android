@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
+import dev.ipf.whitenoise.android.state.references
 import java.util.Locale
 
 /**
@@ -179,3 +181,54 @@ private fun chatMatchesKeyword(
             localeInvariantFold(displayTitle(item)).contains(ciKeyword) ||
                 localeInvariantFold(item.group.description).contains(ciKeyword)
         )
+
+/** Missing rosters matter only for unread rows whose other folder constraints can still match. */
+internal fun ChatFolderRule?.unreadMemberCandidateIds(
+    items: List<ChatListItem>,
+    manualChatIds: Set<String>,
+    excludedChatIds: Set<String>,
+    activeAccountIdHex: String?,
+    displayTitle: (ChatListItem) -> String,
+): Set<String> {
+    val advanced = this?.smartFilter?.let(SmartFolderCodec::decode)
+    val needsMembers =
+        if (this?.smartFilter != null) {
+            advanced?.references(FolderField.PARTICIPANTS) == true
+        } else {
+            this?.includeMemberPubkeys?.isNotEmpty() == true
+        }
+    val rule = this?.takeIf { needsMembers } ?: return emptySet()
+    val unread = items.filter { it.effectiveHasUnread(activeAccountIdHex) }
+    val muted = unread.filter { it.engineMuted() }.mapTo(hashSetOf()) { it.group.groupIdHex }
+    val known =
+        chatFolderChatIds(
+            unread,
+            manualChatIds,
+            rule,
+            activeAccountIdHex,
+            { it in muted },
+            displayTitle,
+            excludedChatIds,
+        )
+    val possible =
+        if (advanced != null) {
+            unread
+                .filter { smartFolderMatches(advanced, it, displayTitle) != FolderTruth.FALSE }
+                .mapTo(hashSetOf()) { it.foldedId }
+        } else {
+            chatFolderChatIds(
+                unread,
+                manualChatIds,
+                rule.copy(
+                    includeMemberPubkeys = emptySet(),
+                    keyword = null,
+                    includeAll = true,
+                ),
+                activeAccountIdHex,
+                { it in muted },
+                displayTitle,
+                excludedChatIds,
+            )
+        }
+    return possible - known - manualChatIds - excludedChatIds
+}

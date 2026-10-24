@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_technical_details">Teknik ayrıntılar</string>
+    <string name="setup_relay_publication_scope">Değişiklikler bu hesabın diğer Nostr uygulamalarını etkiler.</string>
+    <string name="setup_relay_remove_scope">Bu adres iki listeden de kaldırılır. Kaydetmeden önce inceleyin.</string>
+    <string name="setup_undo_removal">Kaldırmayı geri al</string>
+</resources>

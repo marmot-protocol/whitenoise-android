@@ -1630,112 +1630,112 @@ internal fun MessageBubble(
                         // threshold while a vertical drag dismisses them and
                         // switches to anchored batch selection. Markdown links
                         // keep their copy-on-release routing. Horizontal motion
-                        // remains available to swipe-to-reply above.
-                        if (tombstoneCleanupUnavailable || longPressBlockedBySelection || textSelectionMode) {
-                            // Batch/text selection own the row. A tombstone remains
-                            // actionable only when its local cleanup path is usable.
-                            Modifier
-                        } else {
-                            Modifier.longPressOrVerticalDrag(
-                                onLongPressStart = { position ->
-                                    haptics.performHapticFeedback(
-                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                    )
-                                    textLayouts.pendingLongPressLinkDestination[0] = null
-                                    // A tombstone has exactly one action, so it skips
-                                    // the menu and opens its confirmation directly.
+                        // remains available to swipe-to-reply above. Batch/text selection
+                        // own the row, and a tombstone stays actionable only when its local
+                        // cleanup path is usable. That is an argument, never an omitted
+                        // modifier: selection chrome must not restructure the chain under an
+                        // active hold.
+                        Modifier.longPressOrVerticalDrag(
+                            enabled =
+                                !tombstoneCleanupUnavailable && !longPressBlockedBySelection && !textSelectionMode,
+                            onLongPressStart = { position ->
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                )
+                                textLayouts.pendingLongPressLinkDestination[0] = null
+                                // A tombstone has exactly one action, so it skips
+                                // the menu and opens its confirmation directly.
+                                if (deleted) {
+                                    requestDelete()
+                                    return@longPressOrVerticalDrag
+                                }
+                                val windowPosition =
+                                    pressState.rowCoordinates[0]?.let {
+                                        messageBubbleLongPressPositionInWindow(it, position)
+                                    } ?: return@longPressOrVerticalDrag
+                                val linkLayouts = textLayouts.markdownLinkLayouts.values
+                                val linkDestination =
                                     if (deleted) {
-                                        requestDelete()
-                                        return@longPressOrVerticalDrag
+                                        null
+                                    } else {
+                                        markdownLinkDestinationAt(linkLayouts, windowPosition)
                                     }
-                                    val windowPosition =
-                                        pressState.rowCoordinates[0]?.let {
-                                            messageBubbleLongPressPositionInWindow(it, position)
-                                        } ?: return@longPressOrVerticalDrag
-                                    val linkLayouts = textLayouts.markdownLinkLayouts.values
-                                    val linkDestination =
-                                        if (deleted) {
+                                textLayouts.pendingLongPressLinkDestination[0] = linkDestination
+                                if (linkDestination == null) {
+                                    // Capture the press in window space before
+                                    // opening so both the popover and text
+                                    // selection seed at the finger (#326, #1370).
+                                    pressState.longPressWindowPosition = windowPosition
+                                    pressState.longPressTtsStart =
+                                        captureTtsLongPressStart(
+                                            hit =
+                                                if (record.contentTokens.truncated) {
+                                                    null
+                                                } else {
+                                                    renderedTextHitAtWindowPosition(
+                                                        textLayouts.selectableTextLayouts.snapshot(),
+                                                        windowPosition,
+                                                        requireTextLineHit = true,
+                                                    )
+                                                },
+                                            sourceText = ttsSpeakableSource?.text,
+                                            controller = controller,
+                                            appState = appState,
+                                        )
+                                    pressState.selectionSeedVisibleOffset =
+                                        if (record.contentTokens.truncated) {
                                             null
                                         } else {
-                                            markdownLinkDestinationAt(linkLayouts, windowPosition)
-                                        }
-                                    textLayouts.pendingLongPressLinkDestination[0] = linkDestination
-                                    if (linkDestination == null) {
-                                        // Capture the press in window space before
-                                        // opening so both the popover and text
-                                        // selection seed at the finger (#326, #1370).
-                                        pressState.longPressWindowPosition = windowPosition
-                                        pressState.longPressTtsStart =
-                                            captureTtsLongPressStart(
-                                                hit =
-                                                    if (record.contentTokens.truncated) {
-                                                        null
-                                                    } else {
-                                                        renderedTextHitAtWindowPosition(
-                                                            textLayouts.selectableTextLayouts.snapshot(),
-                                                            windowPosition,
-                                                            requireTextLineHit = true,
-                                                        )
-                                                    },
-                                                sourceText = ttsSpeakableSource?.text,
-                                                controller = controller,
-                                                appState = appState,
+                                            textOffsetAtWindowPosition(
+                                                textLayouts.selectableTextLayouts.snapshot(),
+                                                windowPosition,
                                             )
-                                        pressState.selectionSeedVisibleOffset =
-                                            if (record.contentTokens.truncated) {
-                                                null
-                                            } else {
-                                                textOffsetAtWindowPosition(
-                                                    textLayouts.selectableTextLayouts.snapshot(),
-                                                    windowPosition,
-                                                )
-                                            }
-                                        longPressWindowY = windowPosition.y
-                                        pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
-                                        pressState.initiatingMenuHoldActive = true
-                                        // Freeze the rendered hit now. The bubble
-                                        // can move while its popup is open; an old
-                                        // window coordinate must never be re-hit-
-                                        // tested against a different line later.
-                                        onActionMenuOpenChange(true)
-                                    }
-                                },
-                                onLongPressRelease = {
-                                    pressState.initiatingMenuHoldActive = false
-                                    val linkDestination = textLayouts.pendingLongPressLinkDestination[0]
-                                    textLayouts.pendingLongPressLinkDestination[0] = null
-                                    if (linkDestination != null) copyMarkdownLink(linkDestination)
-                                },
-                                onDragStart = { position ->
-                                    pressState.initiatingMenuHoldActive = false
-                                    if (deleted) return@longPressOrVerticalDrag
-                                    // A range gesture begins after the threshold
-                                    // action was shown. Hand ownership over without
-                                    // leaving a stale popup above selection mode.
-                                    textLayouts.pendingLongPressLinkDestination[0] = null
-                                    onActionMenuOpenChange(false)
-                                    pressState.rowCoordinates[0]
-                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
-                                        ?.let(onDragSelectionStart)
-                                },
-                                onDrag = { position ->
-                                    if (deleted) return@longPressOrVerticalDrag false
-                                    pressState.rowCoordinates[0]
-                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
-                                        ?.let(onDragSelection)
-                                        ?: false
-                                },
-                                onDragEnd = {
-                                    if (!deleted) onDragSelectionEnd()
-                                },
-                                onGestureCancel = {
-                                    pressState.initiatingMenuHoldActive = false
-                                    textLayouts.pendingLongPressLinkDestination[0] = null
-                                    onActionMenuOpenChange(false)
-                                    if (!deleted) onDragSelectionCancel()
-                                },
-                            )
-                        },
+                                        }
+                                    longPressWindowY = windowPosition.y
+                                    pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
+                                    pressState.initiatingMenuHoldActive = true
+                                    // Freeze the rendered hit now. The bubble
+                                    // can move while its popup is open; an old
+                                    // window coordinate must never be re-hit-
+                                    // tested against a different line later.
+                                    onActionMenuOpenChange(true)
+                                }
+                            },
+                            onLongPressRelease = {
+                                pressState.initiatingMenuHoldActive = false
+                                val linkDestination = textLayouts.pendingLongPressLinkDestination[0]
+                                textLayouts.pendingLongPressLinkDestination[0] = null
+                                if (linkDestination != null) copyMarkdownLink(linkDestination)
+                            },
+                            onDragStart = { position ->
+                                pressState.initiatingMenuHoldActive = false
+                                if (deleted) return@longPressOrVerticalDrag
+                                // A range gesture begins after the threshold
+                                // action was shown. Hand ownership over without
+                                // leaving a stale popup above selection mode.
+                                textLayouts.pendingLongPressLinkDestination[0] = null
+                                onActionMenuOpenChange(false)
+                                pressState.rowCoordinates[0]
+                                    ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
+                                    ?.let(onDragSelectionStart)
+                            },
+                            onDrag = { position ->
+                                if (deleted) return@longPressOrVerticalDrag false
+                                pressState.rowCoordinates[0]
+                                    ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
+                                    ?.let(onDragSelection)
+                                    ?: false
+                            },
+                            onDragEnd = {
+                                if (!deleted) onDragSelectionEnd()
+                            },
+                            onGestureCancel = {
+                                pressState.initiatingMenuHoldActive = false
+                                textLayouts.pendingLongPressLinkDestination[0] = null
+                                onActionMenuOpenChange(false)
+                                if (!deleted) onDragSelectionCancel()
+                            },
+                        ),
                     ).messageBubbleSelectionRow(
                         selectionMode = selectionMode,
                         selected = selected,

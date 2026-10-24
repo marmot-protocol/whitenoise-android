@@ -199,7 +199,7 @@ class AccountWideProfileGroupsTest {
                 listOf(RETAINED, BEYOND)
             }
             val anyRoster: RosterRead = { _, _ -> roster() }
-            val (appState, _) = profileController(roster(), presentedOnRetry, anyRoster)
+            val (appState, _) = profileController(roster(), presentedOnRetry, beyondRoster = anyRoster)
             val scope = CoroutineScope(coroutineContext + SupervisorJob())
             val holder = ProfileAccountWideGroupsHolder(appState, scope)
             holder.load()
@@ -247,6 +247,41 @@ class AccountWideProfileGroupsTest {
             assertSame(newer, holder.current().snapshot)
         }
 
+    /** The mutation's authoritative roster must replace a resolved off-window cache without adding a native row. */
+    @Test
+    fun successfulOffWindowRemovalRefreshesCommonGroupsWithoutExpandingTheWindow() =
+        runBlocking {
+            var reads = 0
+            val (appState, controller) =
+                profileController(
+                    presented = {
+                        reads++
+                        listOf(RETAINED, BEYOND)
+                    },
+                    retainBeyondRecord = false,
+                    beyondRoster = { _, _ -> roster(TARGET) },
+                )
+            val scope = CoroutineScope(coroutineContext + SupervisorJob())
+            val holder = ProfileAccountWideGroupsHolder(appState, scope)
+            holder.load()
+            holder.requestMembers(setOf(BEYOND))
+            scope.settle()
+            assertTrue(BEYOND in appState.personSharedGroupsForProfile(TARGET, holder.current()).groups.ids())
+            assertFalse(controller.containsGroup(BEYOND))
+
+            // Same publication boundary used by ConversationController.applyMutationDetails on removal success.
+            appState.applyLocalGroupDetails(ACCOUNT_REF, adminGroup(BEYOND), roster())
+            holder.refreshAfterMembershipChange()
+
+            assertEquals(2, reads)
+            val common = appState.personSharedGroupsForProfile(TARGET, holder.current())
+            assertFalse(BEYOND in common.groups.ids())
+            assertFalse(BEYOND in common.unresolvedGroupIds)
+            assertTrue(RETAINED in common.groups.ids())
+            assertFalse(controller.containsGroup(BEYOND))
+            assertTrue(controller.hasMemberSnapshot(BEYOND))
+        }
+
     /**
      * Binds a controller whose window retains [RETAINED] with [retainedMembers] and whose account-wide read
      * presents the [presented] chats, by default [RETAINED] and [BEYOND], an admin group of this account read
@@ -255,6 +290,7 @@ class AccountWideProfileGroupsTest {
     private fun profileController(
         retainedMembers: List<AppGroupMemberRecordFfi> = roster(TARGET),
         presented: PresentedRead = { listOf(RETAINED, BEYOND) },
+        retainBeyondRecord: Boolean = true,
         beyondRoster: RosterRead,
     ): Pair<WhiteNoiseAppState, ChatsController> {
         val appState = emptyAppState()
@@ -267,7 +303,7 @@ class AccountWideProfileGroupsTest {
         val controller = ChatsController(appState, ACCOUNT_REF, memberSnapshotLoader = beyondRoster)
         controller.applyChatListRow(chatRow(RETAINED))
         controller.applyLocalGroupDetails(adminGroup(RETAINED), retainedMembers)
-        controller.foldGroupRecordForTest(adminGroup(BEYOND))
+        if (retainBeyondRecord) controller.foldGroupRecordForTest(adminGroup(BEYOND))
         appState.attachChatsController(controller)
         return appState to controller
     }
