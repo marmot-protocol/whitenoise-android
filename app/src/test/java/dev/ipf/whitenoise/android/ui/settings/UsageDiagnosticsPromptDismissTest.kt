@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -23,6 +24,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -174,7 +176,10 @@ class UsageDiagnosticsPromptDismissTest {
                 .get(state) as AppMarmotRuntime
         ).marmot
 
-    /** The production owner hides while a decline is pending, then restores a deliberate retry surface. */
+    /**
+     * The production owner hides while a decline is pending, then restores a deliberate retry surface. Its waits are
+     * on what the reader sees, with bounds generous enough for a saturated full-suite run.
+     */
     @Test
     fun slowRejectedCloseHidesBeforeFailureAndReopensRecovery() {
         val entered = CountDownLatch(1)
@@ -182,14 +187,14 @@ class UsageDiagnosticsPromptDismissTest {
         val state =
             privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED, beforeSave = {
                 entered.countDown()
-                check(release.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+                check(release.await(LOADED_SUITE_TIMEOUT_MS, TimeUnit.MILLISECONDS))
                 error("Rejected delayed decline")
             })
         runBlocking { state.refreshSecurityPrivacySettings() }
         composeRule.setContent { WhiteNoiseTheme { StartupUsageDiagnosticsPrompt(state) } }
         try {
             composeRule.onNodeWithContentDescription(CLOSE).performClick()
-            composeRule.waitUntil(timeoutMillis = TIMEOUT_MS) {
+            composeRule.waitUntil(timeoutMillis = LOADED_SUITE_TIMEOUT_MS) {
                 idleAnd {
                     entered.count == 0L &&
                         composeRule.onAllNodesWithContentDescription(CLOSE).fetchSemanticsNodes().isEmpty()
@@ -199,8 +204,11 @@ class UsageDiagnosticsPromptDismissTest {
         } finally {
             release.countDown()
         }
-        composeRule.waitUntil(timeoutMillis = TIMEOUT_MS) { idleAnd { state.diagnostics.failed } }
-        composeRule.onNodeWithText("Retry").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = LOADED_SUITE_TIMEOUT_MS) {
+            idleAnd { composeRule.onAllNodesWithText(RETRY).fetchSemanticsNodes().isNotEmpty() }
+        }
+        composeRule.onNodeWithText(RETRY).assertIsDisplayed()
+        assertTrue(state.diagnostics.failed)
         assertNull(state.diagnostics.observations.ticket())
     }
 
@@ -304,6 +312,10 @@ class UsageDiagnosticsPromptDismissTest {
     private companion object {
         const val CLOSE = "Close"
         const val TIMEOUT_MS = 5_000L
+        const val RETRY = "Retry"
+
+        /** Wall-clock bound for waits that a saturated full-suite run can stretch well past [TIMEOUT_MS]. */
+        const val LOADED_SUITE_TIMEOUT_MS = 30_000L
         const val SETTLING_PASSES = 3
     }
 }

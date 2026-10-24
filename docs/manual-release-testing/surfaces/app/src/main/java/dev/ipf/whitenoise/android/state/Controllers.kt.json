@@ -913,6 +913,14 @@
           "STB-002"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"
+      },
+      {
+        "surface": "A later page reads the cached cards of its new rows before it is applied, so they first show complete",
+        "anchor": "internal suspend fun warmLaterPageEventCards(",
+        "test_ids": [
+          "STB-002"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"
       }
     ]
   },

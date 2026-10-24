@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.ui.conversation.nostr.eventCardDocument
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -15,6 +16,32 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineMarkdownHydrationTest {
+    /**
+     * A parse made before a page is applied replaces only rows still without Markdown and with the same text, so a
+     * newer installed window keeps it, while an edited row or one already parsed is left as it is.
+     */
+    @Test
+    fun parsedRecordsFillOnlyUnparsedRowsWithTheSameText() {
+        val document = eventCardDocument("note1parsed")
+        val unparsed = timelineRecord("unparsed", "same")
+        val edited = timelineRecord("edited", "edited since")
+        val page = timelinePage(unparsed, edited)
+        val parsed =
+            listOf(
+                unparsed.withMarkdownTokens(document),
+                edited
+                    .copy(plaintext = "before the edit")
+                    .withMarkdownTokens(document),
+            )
+
+        val merged = page.withParsedRecords(parsed)
+
+        val (filled, kept) = merged.messages
+        assertEquals(document, filled.contentTokens)
+        assertTrue("an edited row keeps its own text", kept.contentTokens.blocks.isEmpty())
+        assertTrue("nothing to merge returns the same page", page.withParsedRecords(emptyList()) === page)
+    }
+
     @Test
     fun projectedPlainMessageWithoutTokensRequestsAndroidHydration() {
         val empty = timelineRecord("confirmed", "See https://example.com")
