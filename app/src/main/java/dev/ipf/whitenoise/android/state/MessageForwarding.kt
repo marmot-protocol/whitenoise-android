@@ -90,6 +90,11 @@ internal data class ForwardOperationSnapshot(
     val targets: List<ForwardTargetProgress>,
     /** Preparing the source attachments has run past [FORWARD_PHASE_SLOW_MILLIS]; display only. */
     val preparationSlow: Boolean = false,
+    /**
+     * Some destination has started publishing in this operation. An admission may then land in MDK even after a
+     * publish timeout, so the operation never offers Cancel again; it never resets before the operation ends.
+     */
+    val publishStarted: Boolean = false,
 ) {
     val completedTargets: Int get() = targets.count { it.phase == ForwardTargetPhase.Completed }
     val failedTargets: Int get() = targets.count { it.phase == ForwardTargetPhase.Failed }
@@ -119,6 +124,7 @@ internal data class ForwardOperationSnapshot(
     val canCancel: Boolean
         get() =
             (phase == ForwardOperationPhase.Preparing || phase == ForwardOperationPhase.Running) &&
+                !publishStarted &&
                 targets.none { target ->
                     target.phase == ForwardTargetPhase.Sending || target.sentMessages > 0
                 }
@@ -567,6 +573,8 @@ internal class ForwardSession(
 
             currentCoroutineContext().ensureActive()
             failureStage = ForwardFailureStage.Publish
+            // From here a message may reach MDK whatever this attempt reports, so Cancel stays off for good.
+            _state.update { it.copy(publishStarted = true) }
             updateForwardTarget(_state, targetGroupIdHex) { it.copy(phase = ForwardTargetPhase.Sending, slow = false) }
             // Display only: a slow publish is never abandoned or resent, the native result stays authoritative.
             withSlowPhaseNotice(

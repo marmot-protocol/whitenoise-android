@@ -254,13 +254,17 @@ internal suspend fun stageMessageShareStreams(
             sources.map { source ->
                 currentCoroutineContext().ensureActive()
                 val plaintext = resolveSource(source)
-                // A file lease stats its size and deletes itself on close, so both stay off the main thread.
-                withContext(Dispatchers.IO) {
-                    plaintext.use {
+                // Cleanup is owned from the moment the source is acquired, so a cancellation before the IO switch
+                // still closes it. A file lease stats its size and deletes itself on close, so both stay off the
+                // main thread, and the close runs exactly once even when the share is cancelled.
+                try {
+                    withContext(Dispatchers.IO) {
                         currentCoroutineContext().ensureActive()
                         totalBytes = boundedShareTotal(totalBytes, plaintext.size)
                         stageShareFile(context, source, plaintext, protectedFiles)
                     }
+                } finally {
+                    withContext(NonCancellable + Dispatchers.IO) { plaintext.close() }
                 }
             }
         val stagedFiles = protectedFiles.toList()

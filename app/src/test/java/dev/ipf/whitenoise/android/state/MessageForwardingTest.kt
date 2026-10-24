@@ -1399,6 +1399,47 @@ class MessageForwardingTest {
             assertFalse(session.state.value.preparationSlow)
         }
 
+    /**
+     * Once a destination has started publishing, Cancel stays off for the operation: a publish that timed out may
+     * still land in MDK, so a failed destination with nothing counted as sent must not make Cancel available again
+     * while another destination is still uploading.
+     */
+    @Test
+    fun aPublishTimeoutKeepsCancelOffWhileAnotherDestinationIsStillUploading() =
+        runTest {
+            val secondUpload = CompletableDeferred<Unit>()
+            val transport =
+                RecordingForwardTransport(
+                    scriptedOutcomeOnce = mutableMapOf("first" to ScriptedAdmission.StallAdmission),
+                    scriptedMessageIndex = 0,
+                    uploadGateFor = mapOf("second" to secondUpload),
+                )
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "notes.txt")),
+                    targetGroupIds = listOf("first", "second"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceTimeBy(FORWARD_PUBLISH_ADMISSION_MILLIS + 1)
+            runCurrent()
+            val snapshot = session.state.value
+            val first = snapshot.targets.single { it.groupIdHex == "first" }
+            val second = snapshot.targets.single { it.groupIdHex == "second" }
+            assertEquals(ForwardOperationPhase.Running, snapshot.phase)
+            assertEquals(ForwardFailureStage.PublishTimeout, first.failureStage)
+            assertEquals(0, first.sentMessages)
+            assertEquals(ForwardTargetPhase.Uploading, second.phase)
+            assertFalse(snapshot.canCancel)
+
+            session.cancel()
+            secondUpload.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(ForwardOperationPhase.PartialFailure, session.state.value.phase)
+        }
+
     /** Cancelling while a slow upload is still running publishes nothing and leaves no slow notice behind. */
     @Test
     fun cancellingASlowUploadPublishesNothing() =
@@ -1454,6 +1495,8 @@ class MessageForwardingTest {
         private val scriptedMessageIndex: Int = 1,
         private val uploadGate: CompletableDeferred<Unit>? = null,
         private val uploadGates: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque(),
+        /** Destinations whose every upload waits on their own gate, ahead of the shared gates. */
+        private val uploadGateFor: Map<String, CompletableDeferred<Unit>> = emptyMap(),
         private val publishGate: CompletableDeferred<Unit>? = null,
         private val materializeGate: CompletableDeferred<Unit>? = null,
         private val materializeGates: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque(),
@@ -1563,6 +1606,7 @@ class MessageForwardingTest {
         ): List<MediaAttachmentReferenceFfi> {
             uploadTargets += targetGroupIdHex
             onUpload()
+            uploadGateFor[targetGroupIdHex]?.await()
             (uploadGates.removeFirstOrNull() ?: uploadGate)?.await()
             if (failUploadOnceFor.remove(targetGroupIdHex)) error("upload failed")
             if (stallUploadOnceFor.remove(targetGroupIdHex)) throw ForwardUploadStalledException(null)
