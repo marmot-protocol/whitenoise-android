@@ -681,7 +681,10 @@ private fun instrumentedConversationFixture(
     if (clearVoiceCacheOnCreate) {
         references.keys.forEach { messageId ->
             controller.attachmentOpenRequest(messageId, 0)?.let { request ->
-                runBlocking { appState.attachmentOpens.consume(request) }
+                runBlocking {
+                    appState.attachmentOpens.consume(request)
+                    appState.attachmentOpens.consumeDownload(request)
+                }
             }
         }
     }

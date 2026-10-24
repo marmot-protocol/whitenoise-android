@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.core.DiagnosticErrorMetadata
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.IOException
 
 private const val MAX_FILE_UPLOAD_ITEMS = 64
 private const val FILE_AUTH_TAG_BYTES = 16L
@@ -17,6 +19,17 @@ internal data class FileUploadSource(
     val thumbhash: String?,
 ) {
     override fun toString(): String = "FileUploadSource(...)"
+}
+
+/**
+ * This app could not write an upload's snapshot because the disk is full, so the send reports storage rather than a
+ * generic failure (#2284). The send keeps its own bytes, so Retry works once space is freed.
+ */
+internal class UploadStagingStorageFullException :
+    IOException("upload staging ran out of storage"),
+    DiagnosticErrorMetadata {
+    override val diagnosticErrorCode = "STORAGE_FULL"
+    override val diagnosticTechnicalDetail: String? = null
 }
 
 /** Keeps input paths valid through snapshot preparation; it does not own existing retry sources. */
@@ -59,8 +72,7 @@ internal fun fileUploadFits(
 
 /**
  * The disk one staged upload of [attachments] adds while it runs, before the app's reserve: for an item held in
- * memory, this app's snapshot, MDK's snapshot and its ciphertext; for an item already in a private file, only
- * MDK's two copies.
+ * memory, this app's snapshot and MDK's staged copy; for an item already in a private file, only MDK's staged copy.
  */
 internal fun fileUploadCopyBytes(attachments: List<PendingAttachment>): Long =
     attachments.sumOf { item ->
@@ -115,6 +127,8 @@ internal class StagedDiskClaims {
 /**
  * Converts a mixed album to file inputs without growing the byte-array cache.
  * Supply the matching native ciphertext ceiling, including one 16-byte tag per item.
+ * A snapshot that cannot be written while [usableBytes] leaves less than the item plus the app's reserve throws
+ * [UploadStagingStorageFullException]; any other unreadable snapshot is a generic failure.
  * Call off the UI thread. Close this batch after the native call has returned.
  */
 internal fun stageFileUploadSources(
@@ -122,6 +136,7 @@ internal fun stageFileUploadSources(
     directory: File,
     maxCiphertextBytes: Long,
     checkCancellation: () -> Unit = {},
+    usableBytes: (File) -> Long = ::usableSpaceFor,
 ): FileUploadSources {
     require(attachments.isNotEmpty() && attachments.size <= MAX_FILE_UPLOAD_ITEMS)
     var remaining = maxCiphertextBytes
@@ -144,6 +159,9 @@ internal fun stageFileUploadSources(
                             readStagedDocument(directory, item.byteCount, checkCancellation) {
                                 ByteArrayInputStream(item.plaintextBytes)
                             }
+                        if (read is StagedDocumentRead.Unreadable && !snapshotFits(item, directory, usableBytes)) {
+                            throw UploadStagingStorageFullException()
+                        }
                         check(read is StagedDocumentRead.Success) { "upload source unavailable" }
                         read.source.also(resources::add)
                     }
@@ -161,6 +179,17 @@ internal fun stageFileUploadSources(
     }
 }
 
+/**
+ * Whether [item]'s snapshot fits in [directory] with the app's reserve left over. A failed write has already deleted
+ * its partial copy, so this measures the room it had before it started.
+ */
+private fun snapshotFits(
+    item: PendingAttachment,
+    directory: File,
+    usableBytes: (File) -> Long,
+): Boolean = usableBytes(directory) >= item.byteCount + FILE_BACKED_DISK_RESERVE_BYTES
+
+/** The native file input for one staged [source], carrying [item]'s presentation metadata. */
 private fun fileUploadInput(
     source: StagedUploadSource,
     item: PendingAttachment,

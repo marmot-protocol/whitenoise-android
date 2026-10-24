@@ -73,6 +73,30 @@
         ]
       },
       {
+        "surface": "R.string.group_photo_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.group_photo_error",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.group_preparing_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.group_preparing_photo",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.media_set_group_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_set_group_picture",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
         "surface": "R.string.media_viewer_forward_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "R.string.media_viewer_forward_message",
@@ -113,35 +137,11 @@
         ]
       },
       {
-        "surface": "Viewer group-picture crop, permission and native commit ownership",
+        "surface": "R.string.shared_media_share",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "onSetGroupPicture =",
+        "anchor": "R.string.shared_media_share",
         "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
-        "surface": "R.string.group_photo_error",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.group_photo_error",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
-        "surface": "R.string.group_preparing_photo",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.group_preparing_photo",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
-        "surface": "R.string.media_set_group_picture",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.media_set_group_picture",
-        "test_ids": [
-          "GRP-003"
+          "MED-015"
         ]
       },
       {
@@ -158,6 +158,14 @@
         "anchor": "onControllerVisibilityChange =",
         "test_ids": [
           "MED-033"
+        ]
+      },
+      {
+        "surface": "Viewer group-picture crop, permission and native commit ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "onSetGroupPicture =",
+        "test_ids": [
+          "GRP-003"
         ]
       }
     ]

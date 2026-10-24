@@ -147,18 +147,19 @@ internal fun rememberTextAttachmentNativeActions(
                         runCatchingCancellable {
                             saveOwnedTextAttachment(
                                 isCurrent = owned::isCurrent,
+                                // Streams the original file, as the message Save does, so a document of any size
+                                // is never read into one array; a pending own send uses its retained bytes.
                                 materialize = {
-                                    materializeDocumentAttachment(context, messageIdHex, attachmentIndex, reference) {
-                                        requireNotNull(
-                                            loadMediaFileBytes(
-                                                controller,
-                                                messageIdHex,
-                                                attachmentIndex,
-                                                reference,
-                                                mine,
-                                            ),
-                                        )
-                                    }
+                                    val retained =
+                                        retainedMediaFileBytes(controller, messageIdHex, attachmentIndex, mine)
+                                    materializeDocumentFile(
+                                        context = context,
+                                        controller = controller,
+                                        messageIdHex = messageIdHex,
+                                        attachmentIndex = attachmentIndex,
+                                        reference = reference,
+                                        retained = retained,
+                                    )
                                 },
                                 publish = { file ->
                                     val saved =
