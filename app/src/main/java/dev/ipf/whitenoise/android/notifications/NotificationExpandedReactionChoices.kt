@@ -29,8 +29,10 @@ internal fun withExpandedReactionChoices(
             NotificationCompat
                 .Builder(context, clean)
                 .setCustomBigContentView(view)
+                .setRemoteInputHistory(clean.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
                 .addExtras(Bundle().apply { putBoolean(EXTRA_EXPANDED_REACTION_CHOICES, true) })
                 .build()
+                .withoutApi30RemoteInputHistoryItems()
         } catch (
             @Suppress("TooGenericExceptionCaught")
             _: RuntimeException,
@@ -96,8 +98,10 @@ internal fun clearExpandedReactionChoices(
     return NotificationCompat
         .Builder(context, notification)
         .setCustomBigContentView(null)
+        .setRemoteInputHistory(notification.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
         .apply { extras.remove(EXTRA_EXPANDED_REACTION_CHOICES) }
         .build()
+        .withoutApi30RemoteInputHistoryItems()
 }
 
 private fun expandedReactionTarget(

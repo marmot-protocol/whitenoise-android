@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
@@ -44,6 +46,92 @@ class AccountWideForwardTargetsTest {
 
             assertEquals(listOf(ACCOUNT_REF to true), reads)
             assertEquals(listOf(BEYOND), beyond?.items()?.map { it.group.groupIdHex })
+        }
+
+    @Test
+    fun unreadProjectionIncludesBeyondWindowAndInvitesWithoutPickerEligibilityLoss() =
+        runBlocking {
+            val controller =
+                controllerWithAccountWideRead { _, _ ->
+                    listOf(presentedRow(RETAINED), presentedRow(BEYOND), invitation(INVITE))
+                }
+            val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+            val live = chatListItemFromProjection(chatRow(RETAINED).copy(manuallyMarkedUnread = true))
+            val all = snapshot.chatListItems(listOf(live))
+            assertEquals(setOf(RETAINED, BEYOND, INVITE), all.map { it.group.groupIdHex }.toSet())
+            assertSame(live, all.single { it.group.groupIdHex == RETAINED })
+            assertTrue(all.single { it.group.groupIdHex == RETAINED }.effectiveHasUnread(ACCOUNT_HEX))
+        }
+
+    @Test
+    fun fullChatListKeepsDraftRecencyAcrossRetainedAndOffWindowRows() =
+        runBlocking {
+            val controller =
+                controllerWithAccountWideRead { _, _ ->
+                    listOf(presentedRow(BEYOND).let { it.copy(row = it.row.copy(activitySortAt = 10uL)) })
+                }
+            val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+            val retained = chatListItemFromProjection(chatRow(RETAINED).copy(activitySortAt = 5uL))
+            val result =
+                snapshot.chatListItems(listOf(retained)) { item ->
+                    if (item.id == RETAINED) 20uL else null
+                }
+            assertEquals(listOf(RETAINED, BEYOND), result.map { it.id })
+            assertSame(retained, result.first())
+        }
+
+    @Test
+    fun localRemovalWithholdsOldExtrasButPreservesRetainedRowsAndRollback() =
+        runBlocking {
+            val controller =
+                controllerWithAccountWideRead { _, _ -> listOf(presentedRow(RETAINED), presentedRow(BEYOND)) }
+            try {
+                controller.applyChatListRow(chatRow(RETAINED))
+                val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+                // Content-only updates do not invalidate the full read or evict its useful extras.
+                controller.applyChatListRow(chatRow(RETAINED).copy(manuallyMarkedUnread = true))
+                assertTrue(snapshot.hasCurrentMembership)
+                assertEquals(listOf(BEYOND), snapshot.items().map { it.id })
+
+                controller.applyChatListSubscriptionUpdate(
+                    ACCOUNT_REF,
+                    ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, RETAINED),
+                )
+                assertFalse(snapshot.hasCurrentMembership)
+                assertTrue(snapshot.items().isEmpty())
+                val surviving = chatListItemFromProjection(chatRow(BEYOND))
+                assertEquals(listOf(surviving), snapshot.chatListItems(listOf(surviving)))
+                // A restored row is live again; an obsolete snapshot still cannot republish extras.
+                controller.applyChatListRow(chatRow(RETAINED))
+                val restored = chatListItemFromProjection(chatRow(RETAINED))
+                assertEquals(listOf(restored), snapshot.chatListItems(listOf(restored)))
+                assertTrue(requireNotNull(controller.loadAccountWideForwardTargets()).hasCurrentMembership)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun membershipChangeDuringNativeReadCannotPublishItsOldRows() =
+        runBlocking {
+            lateinit var controller: ChatsController
+            controller =
+                controllerWithAccountWideRead { _, _ ->
+                    controller.applyChatListSubscriptionUpdate(
+                        ACCOUNT_REF,
+                        ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, RETAINED),
+                    )
+                    listOf(presentedRow(RETAINED), presentedRow(BEYOND))
+                }
+            try {
+                controller.applyChatListRow(chatRow(RETAINED))
+                val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+                assertFalse(snapshot.hasCurrentMembership)
+                assertTrue(snapshot.items().isEmpty())
+                assertTrue(snapshot.chatListItems(emptyList()).isEmpty())
+            } finally {
+                controller.onCleared()
+            }
         }
 
     /** A read that outlives its account binding is rejected instead of being offered under the next account. */
@@ -170,6 +258,58 @@ class AccountWideForwardTargetsTest {
             snapshot.resolveMembers(setOf(BEYOND))
             assertTrue(snapshot.items().single().memberSnapshot != null)
             assertEquals(2, reads)
+        }
+
+    /** A retained row is not complete until its participant roster has actually published. */
+    @Test
+    fun fullChatListHydratesRetainedParticipantMatchesAndReportsInFlightRows() =
+        runBlocking {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var reads = 0
+            val controller =
+                rosterController { _, _ ->
+                    reads++
+                    started.complete(Unit)
+                    release.await()
+                    listOf(member(ACCOUNT_HEX, true), member(PEER_B, false))
+                }
+            controller.applyChatListRow(chatRow(BEYOND))
+            val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+            assertTrue(controller.containsGroup(BEYOND))
+            assertFalse(controller.hasMemberSnapshot(BEYOND))
+            // Picker hydration intentionally leaves retained rows to their existing owner.
+            assertTrue(snapshot.resolveMembersBeyondWindow(setOf(BEYOND)).isEmpty())
+            assertEquals(0, reads)
+
+            fun participantMatches(): Set<String> =
+                dev.ipf.whitenoise.android.core.chatFolderChatIds(
+                    items = snapshot.chatListItems(emptyList()),
+                    manualChatIds = emptySet(),
+                    rule = ChatFolderRule(includeMemberPubkeys = setOf(PEER_B), includeMuted = true),
+                    activeAccountIdHex = ACCOUNT_HEX,
+                    isMuted = { false },
+                    displayTitle = { it.id },
+                )
+            assertTrue(participantMatches().isEmpty())
+            val hydration = async { snapshot.resolveChatListMembers(setOf(BEYOND)) }
+            started.await()
+            assertEquals(setOf(BEYOND), snapshot.resolveChatListMembers(setOf(BEYOND)))
+            assertFalse(controller.hasMemberSnapshot(BEYOND))
+            release.complete(Unit)
+            assertTrue(hydration.await().isEmpty())
+            assertEquals(setOf(BEYOND), participantMatches())
+            assertEquals(1, reads)
+        }
+
+    @Test
+    fun failedRetainedRosterRemainsAnUnresolvedFullChatListRow() =
+        runBlocking {
+            val controller = rosterController { _, _ -> error("roster unavailable") }
+            controller.applyChatListRow(chatRow(BEYOND))
+            val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+            assertEquals(setOf(BEYOND), snapshot.resolveChatListMembers(setOf(BEYOND)))
+            assertFalse(controller.hasMemberSnapshot(BEYOND))
         }
 
     /** Uses a real controller lifetime with a scripted local roster reader and one off-window native row. */

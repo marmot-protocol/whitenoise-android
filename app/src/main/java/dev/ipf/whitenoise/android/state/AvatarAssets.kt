@@ -82,18 +82,20 @@ internal fun AvatarBytesFfi.matchesAvatarAsset(asset: AvatarAssetFfi): Boolean {
 private suspend fun WhiteNoiseAppState.readDurableAvatarBytes(
     account: String,
     asset: AvatarAssetFfi,
+    maxBytes: ULong = DURABLE_AVATAR_MAX_BYTES,
 ): ByteArray? {
     val payload =
         runCatchingCancellable {
-            marmotIo { readAvatarAssets(account, listOf(checkNotNull(asset.reference)), DURABLE_AVATAR_MAX_BYTES) }
+            marmotIo { readAvatarAssets(account, listOf(checkNotNull(asset.reference)), maxBytes) }
         }.getOrNull()?.singleOrNull()
-    return payload?.takeIf { it.matchesAvatarAsset(asset) }?.bytes
+    return payload?.takeIf { it.matchesAvatarAsset(asset) && it.bytes.size.toULong() <= maxBytes }?.bytes
 }
 
 /** Captures an export of the original retained image, without acquisition or cross-owner completion. */
 internal fun WhiteNoiseAppState.retainedAvatarBytesReader(
     asset: AvatarAssetFfi?,
     accountRef: String?,
+    maxBytes: ULong = DURABLE_AVATAR_MAX_BYTES,
 ): (suspend () -> ByteArray?)? {
     val selected = asset?.takeIf { it.isRenderable() }?.copy()
     val account = accountRef
@@ -102,7 +104,7 @@ internal fun WhiteNoiseAppState.retainedAvatarBytesReader(
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     return {
         if (ownsHostPerformanceRuntimeOwner(owner) && AvatarImageLoader.currentCacheLifetime() == lifetime) {
-            readDurableAvatarBytes(account, selected)?.takeIf {
+            readDurableAvatarBytes(account, selected, maxBytes)?.takeIf {
                 ownsHostPerformanceRuntimeOwner(owner) && AvatarImageLoader.currentCacheLifetime() == lifetime
             }
         } else {

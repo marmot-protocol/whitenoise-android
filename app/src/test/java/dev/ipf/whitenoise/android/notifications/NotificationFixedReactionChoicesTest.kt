@@ -13,6 +13,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,9 +21,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class NotificationFixedReactionChoicesTest {
     private val context get() = RuntimeEnvironment.getApplication()
     private val choices = listOf(":marmot:", ":wn:", "👍", ":unknown:", "❤️", "😂")
@@ -223,7 +226,10 @@ class NotificationFixedReactionChoicesTest {
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .build()
         val longView = assertControlsPrecedeContent(longCard, R.id.reaction_choices_body)
-        assertEquals(body, longView.findViewById<TextView>(R.id.reaction_choices_body).text.toString())
+        val retainedBody = checkNotNull(longCard.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)).toString()
+        assertTrue(retainedBody.isNotBlank())
+        assertTrue(body.startsWith(retainedBody))
+        assertEquals(retainedBody, longView.findViewById<TextView>(R.id.reaction_choices_body).text.toString())
         val sender = Person.Builder().setName("Fixture contact").build()
         val history = style(body)
         notificationEmojiMessages("second logical message", 2L, sender, null).forEach(history::addMessage)
@@ -232,14 +238,47 @@ class NotificationFixedReactionChoicesTest {
         val historyView = assertControlsPrecedeContent(historyCard, R.id.reaction_choices_messages)
         val rows = historyView.findViewById<android.widget.LinearLayout>(R.id.reaction_choices_messages)
         assertEquals(3, rows.childCount)
+        val retainedFirstMessage =
+            checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(historyCard))
+                .messages
+                .first()
+                .text
+                .toString()
+        assertTrue(retainedFirstMessage.isNotBlank())
+        assertTrue(body.startsWith(retainedFirstMessage))
         assertTrue(
             rows
                 .getChildAt(0)
                 .findViewById<TextView>(R.id.reaction_message_body)
                 .text
                 .toString()
-                .contains(body),
+                .contains(retainedFirstMessage),
         )
+    }
+
+    @Test
+    @Config(sdk = [30])
+    fun api30ReplyHistorySurvivesExpansionAndClearWithoutStructuredHistoryItems() {
+        RecentEmojiPreferences.saveQuickReactions(context, choices)
+        val reply =
+            NotificationCompat
+                .Builder(context, card("message"))
+                .setRemoteInputHistory(arrayOf("sent reply"))
+                .build()
+                .withoutApi30RemoteInputHistoryItems()
+        val expanded = withExpandedReactionChoices(context, reply, "card", 7)
+        assertTrue(expanded.extras.getBoolean(EXTRA_EXPANDED_REACTION_CHOICES))
+        assertNotNull(expanded.bigContentView)
+        val cleared = clearExpandedReactionChoices(context, expanded)
+        assertFalse(cleared.extras.getBoolean(EXTRA_EXPANDED_REACTION_CHOICES))
+        assertNull(cleared.bigContentView)
+        listOf(expanded, cleared).forEach { value ->
+            assertEquals(
+                listOf("sent reply"),
+                value.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.toList(),
+            )
+            assertFalse(value.extras.containsKey(EXTRA_REMOTE_INPUT_HISTORY_ITEMS))
+        }
     }
 
     /** Real app RemoteViews inflation/order, without claiming SystemUI height or device rendering. */

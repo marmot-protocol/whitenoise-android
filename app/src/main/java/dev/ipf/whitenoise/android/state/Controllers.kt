@@ -3720,7 +3720,7 @@ class ChatsController private constructor(
     ) {
         if (accountRef == null) return
         val rowKey = chatRowKey(record.groupIdHex)
-        if (groupRecordsById[record.groupIdHex] == null && !chatRowsByGroup.containsKey(rowKey)) return
+        val retained = groupRecordsById[record.groupIdHex] != null || chatRowsByGroup.containsKey(rowKey)
         if (members != null) {
             memberCacheLifetime.advance()
             presentationMembersByGroup = presentationMembersByGroup - record.groupIdHex
@@ -3743,6 +3743,12 @@ class ChatsController private constructor(
             memberCacheByGroup = updated.memberCacheByGroup
             removedGroupIds = updated.removedGroupIds
             memberSnapshotsRevision += 1L
+        }
+        // Off-window profile management uses the same authoritative roster cache. Updating it must
+        // not insert a chat into the retained native window or create a second group projection.
+        if (!retained) {
+            if (members != null) scheduleRecompute()
+            return
         }
         // chatListItemFromProjection reads row.archived / row.pendingConfirmation
         // (not just the group record), so patch both the chat row and the group
@@ -4333,6 +4339,13 @@ class ChatsController private constructor(
         )
     }
 
+    /** Captures rollback state and hides the row together at admitted local-removal time. */
+    private fun removeChatRowOptimistically(groupIdHex: String): RemovedChatRowSnapshot? {
+        val snapshot = snapshotChatRowForRemoval(groupIdHex)
+        removeChatRow(groupIdHex, optimistic = true)
+        return snapshot
+    }
+
     private fun removeChatRow(
         groupIdHex: String,
         optimistic: Boolean = false,
@@ -4343,9 +4356,11 @@ class ChatsController private constructor(
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
             if (!optimistic) finishRemovedChatRowClientState(removedRow.groupIdHex)
-            noteMaterializedGroupMembershipChanged()
-            scheduleRecompute()
         }
+        // Off-window rows can still belong to a mounted full-list read. Every removal invalidates
+        // those extras and schedules its replacement, even when this bounded window held no row.
+        noteMaterializedGroupMembershipChanged()
+        scheduleRecompute()
     }
 
     private fun finishRemovedChatRowClientState(groupIdHex: String) {
@@ -4372,6 +4387,19 @@ class ChatsController private constructor(
         }
         noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
+    }
+
+    /** Waits for admitted removals without serializing independent full native reads. */
+    internal suspend fun readAfterRemovals(read: suspend () -> List<PresentedChatRowFfi>?): List<PresentedChatRowFfi>? {
+        val runtime = appState.runtimeGeneration
+        val sameRuntime =
+            appState.localGroupDeleteCleanupMutex.withLock {
+                appState.runtimeGeneration == runtime
+            }
+        // A deletion admitted after this barrier changes the revision captured by the caller before
+        // admission, so its in-flight snapshot cannot restore pre-delete rows. The native read itself
+        // must remain concurrent with other readers, including a superseding profile request.
+        return if (sameRuntime) read().takeIf { appState.runtimeGeneration == runtime } else null
     }
 
     private fun noteMaterializedGroupMembershipChanged() {
@@ -4554,6 +4582,37 @@ class ChatsController private constructor(
         return archiveActions.setArchived(account, bindEpoch, groupIds, archived, notify)
     }
 
+    /**
+     * Resolves rows beyond the retained window before installing this presentation's archive intents.
+     * Admission follows the view owner; already-started native commits settle against its session fence.
+     */
+    internal suspend fun setArchivedForOwner(
+        groupIds: Collection<String>,
+        archived: Boolean,
+        notify: Boolean,
+        owner: ChatListActionOwner,
+    ): Int {
+        if (!chatListActionIsCurrent(owner)) return 0
+        val rows =
+            groupIds.distinctBy(String::lowercase).mapNotNull { id ->
+                chatRowsByGroup[chatRowKey(id)] ?: resolveChatListActionRow(id, owner)
+                    ?.takeIf {
+                        if (archived) it.actions.canArchive else it.actions.canRestore
+                    }?.row
+            }
+        return if (chatListActionIsCurrent(owner)) {
+            val resolved =
+                ResolvedArchiveRows(
+                    rows,
+                    isCurrent = { chatListActionIsCurrent(owner) },
+                    completionIsCurrent = { chatListActionSessionIsCurrent(owner) },
+                )
+            archiveActions.setArchivedRows(owner.accountRef, owner.bindEpoch, resolved, archived, notify)
+        } else {
+            0
+        }
+    }
+
     /** Admits only the current intent under the group lock; native work already started keeps its completion path. */
     private suspend fun applyArchiveMutation(
         account: String,
@@ -4564,7 +4623,7 @@ class ChatsController private constructor(
         appState.withGroupCommitLock(account, groupIdHex) {
             if (!archiveActions.ownsIntent(groupIdHex, intent)) return@withGroupCommitLock false
             val updated = groupArchivedUpdater(account, groupIdHex, archived)
-            if (isActiveBindEpoch(intent.bindEpoch)) {
+            if (archiveActions.ownsCompletion(groupIdHex, intent)) {
                 applyLocalGroupUpdate(updated)
                 true
             } else {
@@ -4904,8 +4963,7 @@ class ChatsController private constructor(
                 chatListDepartureIsCurrent(account, epoch, runtime) && appState.retainedAccountReactivationRef == null
             }
             if (!isCurrent()) return@let false
-            val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-            removeChatRow(groupIdHex, optimistic = true)
+            var removedSnapshot: RemovedChatRowSnapshot? = null
             var nativeCommitted = false
             val wipe =
                 runCatching {
@@ -4913,6 +4971,9 @@ class ChatsController private constructor(
                         LocalGroupRemovalRequest(account, groupIdHex, forgetProtocol),
                         isCurrent,
                         observer.readinessBudget,
+                        onAdmitted = {
+                            removedSnapshot = removeChatRowOptimistically(groupIdHex)
+                        },
                     ) {
                         nativeCommitted = true
                         if (isCurrent()) observer.onNativeCommitted()
@@ -5093,6 +5154,81 @@ class ChatsController private constructor(
         recompute()
     }
 
+    /** Pins the controller binding, active account and runtime together with the caller's view lifetime. */
+    internal fun captureChatListActionOwner(presentationIsCurrent: () -> Boolean = { true }): ChatListActionOwner? =
+        accountRef?.let {
+            ChatListActionOwner(
+                accountRef = it,
+                bindEpoch = bindEpoch,
+                runtimeGeneration = appState.runtimeGeneration,
+                activeAccountRef = appState.activeAccountRef,
+                presentationIsCurrent = presentationIsCurrent,
+            )
+        }
+
+    /** Requires both the captured session and its presentation before admitting queued row actions. */
+    internal fun chatListActionIsCurrent(owner: ChatListActionOwner): Boolean {
+        val ownsSession = chatListActionSessionIsCurrent(owner)
+        return ownsSession && owner.presentationIsCurrent()
+    }
+
+    /** Native work already admitted belongs to its account/binding, even after a folder or search changes. */
+    internal fun chatListActionSessionIsCurrent(owner: ChatListActionOwner): Boolean {
+        val ownsBoundReference =
+            boundAccountRef == owner.accountRef || (owner.activeAccountRef == null && boundAccountRef == null)
+        val ownsBinding =
+            accountRef == owner.accountRef && ownsBoundReference && isActiveBindEpoch(owner.bindEpoch)
+        val ownsSession =
+            appState.runtimeGeneration == owner.runtimeGeneration &&
+                appState.activeAccountRef == owner.activeAccountRef
+        val selectedOrLegacy = owner.activeAccountRef == null || owner.activeAccountRef == owner.accountRef
+        val available = !appState.signOutInProgress && !appState.wipeInProgress
+        val eligibleOwner = ownsBinding && ownsSession
+        val eligibleSession = selectedOrLegacy && available
+        return eligibleOwner && eligibleSession
+    }
+
+    /** Resolves a displayed full-list row without materializing it into the bounded controller window. */
+    internal suspend fun resolveChatListActionItem(
+        groupIdHex: String,
+        owner: ChatListActionOwner,
+    ): ChatListItem? {
+        if (!chatListActionIsCurrent(owner)) return null
+        return chatItemForGroup(groupIdHex) ?: resolveChatListActionRow(groupIdHex, owner)?.let {
+            projectPresentedRow(it, appState.activeAccount?.accountIdHex)
+        }
+    }
+
+    private suspend fun resolveChatListActionRow(
+        groupIdHex: String,
+        owner: ChatListActionOwner,
+    ): PresentedChatRowFfi? {
+        val lookup =
+            liveSubscriptions.presentedRowByGroup?.takeIf {
+                chatListActionIsCurrent(owner) && owner.activeAccountRef == owner.accountRef
+            } ?: return null
+        val revision = materializedGroupsRevision
+        val rows =
+            runCatchingCancellable {
+                readAfterRemovals { listOfNotNull(lookup(owner.accountRef, groupIdHex)) }
+            }.getOrNull()
+        return rows?.singleOrNull()?.takeIf {
+            chatListActionIsCurrent(owner) &&
+                materializedGroupsRevision == revision &&
+                it.row.groupIdHex.equals(groupIdHex, ignoreCase = true)
+        }
+    }
+
+    /** Reprojects a committed command for the same session even if its original view has retired. */
+    internal fun refreshChatListActionProjection(owner: ChatListActionOwner) {
+        if (chatListActionSessionIsCurrent(owner)) scheduleRecompute()
+    }
+
+    /** Updates retained native rows without inserting an off-window command result into the bounded list. */
+    private fun applyChatListActionRow(row: ChatListRowFfi?) {
+        if (row != null && containsGroup(row.groupIdHex)) applyChatListRow(row) else scheduleRecompute()
+    }
+
     /**
      * Mark the chat's unread count to zero by advancing the read pointer to
      * its latest projected message. Without a known message id, the explicit
@@ -5101,61 +5237,93 @@ class ChatsController private constructor(
      * action — the per-conversation scroll-driven path remains the
      * normal mechanism while a chat is open.
      */
-    suspend fun markAllRead(item: ChatListItem): Boolean {
-        val account = accountRef ?: return false
+    internal suspend fun markAllRead(
+        item: ChatListItem,
+        owner: ChatListActionOwner? = captureChatListActionOwner(),
+    ): Boolean {
+        if (owner == null || !chatListActionIsCurrent(owner)) return false
+        val account = owner.accountRef
         val lastId =
             item.projection
                 ?.lastMessage
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() }
-        if (lastId == null && item.projection?.manuallyMarkedUnread != true) return false
-        return runCatchingCancellable {
-            val row =
-                appState.marmotIo {
-                    if (lastId != null) {
-                        markTimelineMessageRead(account, item.group.groupIdHex, lastId)
-                    } else {
-                        setChatManuallyUnread(account, item.group.groupIdHex, false)
+        val hasReadTarget = lastId != null || item.projection?.manuallyMarkedUnread == true
+        return hasReadTarget &&
+            runCatchingCancellable {
+                var admitted = false
+                val row =
+                    appState.marmotIo {
+                        if (!chatListActionIsCurrent(owner)) return@marmotIo null
+                        admitted = true
+                        if (lastId != null) {
+                            markTimelineMessageRead(account, item.group.groupIdHex, lastId)
+                        } else {
+                            setChatManuallyUnread(account, item.group.groupIdHex, false)
+                        }
                     }
-                }
-            row?.let(::applyChatListRow)
-            appState.dismissConversationNotifications(account, item.group.groupIdHex)
-            true
-        }.onFailure {
-            // Quiet for the user (marking read is an idempotent
-            // affordance and surfacing a toast on every flake would be
-            // noisy) — but still log the failure so the trace surfaces
-            // in `adb logcat` when someone reports "mark read does
-            // nothing". `take(8)` on the group id keeps the privacy
-            // posture: no full ids in logs.
-            if (BuildConfig.DEBUG) Log.w("DMChatsController", "markAllRead failed", it)
-        }.getOrDefault(false)
+                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
+                applyChatListActionRow(row)
+                appState.dismissConversationNotifications(account, item.group.groupIdHex)
+                true
+            }.onFailure {
+                // Quiet for the user (marking read is an idempotent
+                // affordance and surfacing a toast on every flake would be
+                // noisy) — but still log the failure so the trace surfaces
+                // in `adb logcat` when someone reports "mark read does
+                // nothing". `take(8)` on the group id keeps the privacy
+                // posture: no full ids in logs.
+                if (BuildConfig.DEBUG) Log.w("DMChatsController", "markAllRead failed", it)
+            }.getOrDefault(false)
     }
 
     /** Flag the chat unread until it is next read; the engine owns the clear. */
-    suspend fun markUnread(item: ChatListItem): Boolean {
-        // A left/removed/leave-pending chat offers no unread affordances.
-        val account =
-            accountRef?.takeUnless { item.removedFromGroup(appState.activeAccount?.accountIdHex) } ?: return false
-        return runCatchingCancellable {
-            val row = appState.marmotIo { setChatManuallyUnread(account, item.group.groupIdHex, true) }
-            row?.let(::applyChatListRow)
-            true
-        }.onFailure {
-            // Same quiet posture as markAllRead: log-only, no toast.
-            if (BuildConfig.DEBUG) Log.w("DMChatsController", "markUnread failed", it)
-        }.getOrDefault(false)
+    internal suspend fun markUnread(
+        item: ChatListItem,
+        owner: ChatListActionOwner? = captureChatListActionOwner(),
+    ): Boolean {
+        if (owner == null || !chatListActionIsCurrent(owner)) return false
+        val account = owner.accountRef
+        return !item.removedFromGroup(appState.activeAccount?.accountIdHex) &&
+            runCatchingCancellable {
+                var admitted = false
+                val row =
+                    appState.marmotIo {
+                        if (chatListActionIsCurrent(owner)) {
+                            admitted = true
+                            setChatManuallyUnread(account, item.group.groupIdHex, true)
+                        } else {
+                            null
+                        }
+                    }
+                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
+                applyChatListActionRow(row)
+                true
+            }.onFailure {
+                // Same quiet posture as markAllRead: log-only, no toast.
+                if (BuildConfig.DEBUG) Log.w("DMChatsController", "markUnread failed", it)
+            }.getOrDefault(false)
     }
 
     /** Pin or unpin one chat; newly pinned chats enter at the top of the pinned block. */
-    suspend fun setPinned(
+    internal suspend fun setPinned(
         item: ChatListItem,
         pinned: Boolean,
+        owner: ChatListActionOwner? = captureChatListActionOwner(),
     ): Boolean {
-        val account = accountRef ?: return false
+        if (owner == null || !chatListActionIsCurrent(owner)) return false
         return runCatchingCancellable {
-            val state = appState.marmotIo { setChatPinned(account, item.group.groupIdHex, pinned) }
+            val state =
+                appState.marmotIo {
+                    if (chatListActionIsCurrent(owner)) {
+                        setChatPinned(owner.accountRef, item.group.groupIdHex, pinned)
+                    } else {
+                        null
+                    }
+                }
+            if (state == null || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
             applyPinState(state)
+            scheduleRecompute()
             true
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinned failed", it)
@@ -11858,11 +12026,11 @@ class ConversationController(
         val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
         if (!eligible) return false
         val beforeRead = mutationPresentation.groupAuthorityEpoch
-        refreshManagementState()
+        val applied = refreshManagementState()
         val observedMembers =
             membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
         val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
-        return mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
+        return applied && mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
     }
 
     /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */
@@ -11870,19 +12038,28 @@ class ConversationController(
         account: String,
         details: GroupDetailsFfi,
         management: GroupManagementStateFfi,
-    ) {
+    ): Boolean =
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-            if (applyMutationDetails(account, details)) {
+            val applied = applyMutationDetails(account, details)
+            if (applied) {
                 managementState = management.takeIf { group == details.group }
             }
+            applied && managementState != null
         }
-    }
 
     /** Removes [member] from the group, asking first if MDK holds the change back. True once they are gone. */
-    suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
+    suspend fun removeMember(
+        member: AppGroupMemberRecordFfi,
+        refreshAuthorityBeforeCommit: Boolean = false,
+    ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
+            val runtimeAtAdmission = appState.runtimeGeneration
+
+            fun ownsRemovalPresentation(): Boolean =
+                !refreshAuthorityBeforeCommit ||
+                    (appState.activeAccountRef == account && appState.runtimeGeneration == runtimeAtAdmission)
             // remove_members signs a roster update for a Nostr pubkey, so use the
             // stable member id. memberRef may be a local account label.
             val target = member.memberIdHex
@@ -11890,6 +12067,9 @@ class ConversationController(
                 try {
                     val outcome =
                         appState.withGroupCommitLock(account, group.groupIdHex) {
+                            if (!refreshRemovalAuthority(refreshAuthorityBeforeCommit, ::ownsRemovalPresentation)) {
+                                return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
+                            }
                             authoritativeAdministrationTarget(target)
                                 ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             val result =
@@ -11907,10 +12087,10 @@ class ConversationController(
                             GroupAdministrationCommitOutcome.COMMITTED
                         }
                     if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
-                        presentRosterChanged(R.string.toast_couldnt_remove_member)
+                        if (ownsRemovalPresentation()) presentRosterChanged(R.string.toast_couldnt_remove_member)
                         return@track false
                     }
-                    presentConversationTransient(R.string.toast_member_removed)
+                    if (ownsRemovalPresentation()) presentConversationTransient(R.string.toast_member_removed)
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
@@ -11920,15 +12100,32 @@ class ConversationController(
                     // whether this specific target remains in the local roster.
                     refreshMembers()
                     if (members.none { it.memberIdHex.equals(target, ignoreCase = true) }) {
-                        presentConversationTransient(R.string.toast_member_removed)
+                        if (ownsRemovalPresentation()) presentConversationTransient(R.string.toast_member_removed)
                         true
                     } else {
-                        recordMutationFailure(R.string.toast_couldnt_remove_member, "GROUP_REMOVE_MEMBER", throwable)
+                        if (ownsRemovalPresentation()) {
+                            recordMutationFailure(
+                                R.string.toast_couldnt_remove_member,
+                                "GROUP_REMOVE_MEMBER",
+                                throwable,
+                            )
+                        }
                         false
                     }
                 }
             }
         }
+
+    /** Called inside the existing commit lock; a failed read never reuses the previous permission frontier. */
+    private suspend fun refreshRemovalAuthority(
+        refresh: Boolean,
+        ownsPresentation: () -> Boolean,
+    ): Boolean {
+        if (!refresh) return true
+        val epoch = mutationPresentation.groupAuthorityEpoch
+        val applied = refreshManagementState()
+        return applied && mutationPresentation.groupAuthorityEpoch != epoch && ownsPresentation()
+    }
 
     /** Promotes or demotes [member], asking first if MDK holds the change back. True once committed. */
     suspend fun setMemberAdmin(
@@ -12049,8 +12246,9 @@ class ConversationController(
     private val managementStateLifetime = StalenessGuard()
 
     /** Details and capabilities share one native frontier; later group updates supersede this read. */
-    suspend fun refreshManagementState() {
-        val account = conversationAccountRef ?: return
+    suspend fun refreshManagementState(): Boolean {
+        val account = conversationAccountRef ?: return false
+        var applied = false
         val requestToken = managementStateLifetime.advance()
         val authorityEpoch = mutationPresentation.groupAuthorityEpoch
         val rosterGeneration = memberRosterRefreshGeneration.capture()
@@ -12072,11 +12270,12 @@ class ConversationController(
                         !refreshed.managementState.myAccountIdHex.equals(conversationAccountIdHex, ignoreCase = true) ||
                         !matchesConversation(account, groupId)
                 if (staleRead || changedOwner || wrongTarget) return@runIfCurrent
-                applyManagementSnapshot(account, refreshed.details, refreshed.managementState)
+                applied = applyManagementSnapshot(account, refreshed.details, refreshed.managementState)
             }
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMConversation", "management state refresh failed", it)
         }
+        return applied
     }
 
     /** Install and require the lifecycle component in one admin commit. */

@@ -123,14 +123,39 @@ internal sealed class ImageUploadPreparationException : Exception() {
 }
 
 /**
- * Converts a user-selected public image URL into bounded, metadata-stripped
- * JPEG bytes suitable for MDK's encrypted group-image or public profile-image
- * upload APIs.
+ * Prepares bounded, metadata-stripped image drafts for MDK upload APIs. Group selections can retain
+ * sanitized GIF animation; ordinary static and public profile-image preparation produces JPEG bytes.
  */
 internal object GroupImageDraftProcessor {
     private const val CONNECT_TIMEOUT_MS = 5_000
     private const val READ_TIMEOUT_MS = 10_000
     private const val ACCEPT_HEADER = "image/avif,image/webp,image/apng,image/png,image/jpeg,image/gif,*/*;q=0.8"
+
+    /** Group picks retain sanitized GIF frames; other identity surfaces keep their own policy. */
+    suspend fun fromGroupRemoteUrl(rawUrl: String): ImageUploadDraft =
+        withContext(Dispatchers.IO) {
+            val (url, source) = fetchRemoteImage(rawUrl)
+            fromGroupBytes(source, url)
+        }
+
+    /** Preserves sanitized GIF frames for group picks; other formats use the existing static-image preparation. */
+    internal fun fromGroupBytes(
+        source: ByteArray,
+        sourceUrl: String?,
+    ): ImageUploadDraft =
+        if (isGif(source)) {
+            validateGroupGif(ProfilePictureDraftProcessor.animatedGifDraft(source, sourceUrl))
+        } else {
+            fromBytes(source, sourceUrl)
+        }
+
+    /** Rejects sanitized GIF drafts outside the shared animation-source bounds before upload is admitted. */
+    private fun validateGroupGif(draft: ImageUploadDraft): ImageUploadDraft {
+        if (admitAnimationSource(draft.plaintext) !is AnimationSourceAdmission.Admitted) {
+            throw ImageUploadPreparationException.UnsupportedImage
+        }
+        return draft
+    }
 
     /** Fetches [rawUrl] within the bounded, SSRF-hardened policy and prepares it as a JPEG draft. */
     suspend fun fromRemoteUrl(rawUrl: String): ImageUploadDraft =
@@ -187,7 +212,9 @@ internal object GroupImageDraftProcessor {
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ): ImageUploadDraft =
         withContext(ioDispatcher) {
-            if (isGroupSvgDocument(contentResolver, uri)) {
+            if (ProfilePictureDraftProcessor.isGifSource(contentResolver, uri)) {
+                validateGroupGif(ProfilePictureDraftProcessor.fromContentUri(contentResolver, uri))
+            } else if (isGroupSvgDocument(contentResolver, uri)) {
                 fromBytes(readGroupIdentityImageSource(contentResolver, uri), sourceUrl = null)
             } else {
                 fromContentUri(contentResolver, uri)

@@ -7,15 +7,22 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
@@ -65,42 +72,69 @@ internal fun SetupEditorContent(
     fields: SetupEditorFields,
     busy: Boolean,
     randomName: (String?) -> String,
+    findings: List<OnboardingFindingFfi> = emptyList(),
 ) {
     if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
         SetupProfileFields(fields, busy, randomName)
     } else {
+        var advanced by remember(fields) { mutableStateOf(false) }
         val discovery = editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
-            Text(stringResource(editor.relayEditHelp()))
+            if (!editor.canEditRelayDeclaration) Text(stringResource(editor.relayEditHelp()))
+            SetupRelayEditorRows(editor, fields, busy, findings)
+            val addressState =
+                stringResource(
+                    if (advanced) R.string.onboarding_details_expanded else R.string.onboarding_details_collapsed,
+                )
+            TextButton(
+                onClick = { advanced = !advanced },
+                modifier = Modifier.testTag("setup.relay.edit_addresses").semantics { stateDescription = addressState },
+            ) {
+                Text(stringResource(R.string.setup_edit_addresses))
+            }
+            if (!editor.canEditRelayDeclaration) {
+                editor.relayDeclaration?.let { SetupRelayRepairContent(it, findings) }
+            }
         } else {
             Text(stringResource(R.string.setup_discovery_help))
         }
-        WhiteNoiseTextField(
-            state = fields.reads,
-            enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),
-            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-            label = {
-                Text(
-                    stringResource(
-                        when {
-                            discovery -> R.string.setup_discovery_list
-                            editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_inbox_list
-                            else -> R.string.setup_read_list
-                        },
-                    ),
-                )
-            },
-            modifier = Modifier.fillMaxWidth().testTag("setup.editor.reads"),
-        )
-        if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
-            WhiteNoiseTextField(
-                state = fields.writes,
-                enabled = !busy && editor.canEditRelayDeclaration,
-                lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-                label = { Text(stringResource(R.string.setup_write_list)) },
-                modifier = Modifier.fillMaxWidth().testTag("setup.editor.writes"),
+        if (discovery || advanced) SetupRelayAddressFields(editor, fields, busy, discovery)
+    }
+}
+
+/** Existing multiline controls remain available for discovery and advanced relay edits. */
+@Composable
+private fun SetupRelayAddressFields(
+    editor: SetupEditor,
+    fields: SetupEditorFields,
+    busy: Boolean,
+    discovery: Boolean,
+) {
+    WhiteNoiseTextField(
+        state = fields.reads,
+        enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),
+        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
+        label = {
+            Text(
+                stringResource(
+                    when {
+                        discovery -> R.string.setup_discovery_list
+                        editor.step == OnboardingStepFfi.INBOX_RELAYS -> R.string.setup_inbox_list
+                        else -> R.string.setup_read_list
+                    },
+                ),
             )
-        }
+        },
+        modifier = Modifier.fillMaxWidth().testTag("setup.editor.reads"),
+    )
+    if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
+        WhiteNoiseTextField(
+            state = fields.writes,
+            enabled = !busy && editor.canEditRelayDeclaration,
+            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
+            label = { Text(stringResource(R.string.setup_write_list)) },
+            modifier = Modifier.fillMaxWidth().testTag("setup.editor.writes"),
+        )
     }
 }
 

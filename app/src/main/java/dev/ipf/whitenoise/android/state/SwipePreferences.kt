@@ -11,12 +11,13 @@ internal enum class SwipeBinding { MessageLeft, MessageRight, ChatLeft, ChatRigh
 /** Only local interaction choices; commands continue to use their existing native eligibility. */
 internal enum class SwipeAction { Default, Off, Reply, Forward, React, ReadUnread, MuteUnmute, PinUnpin }
 
-/** Four app-wide interaction preferences, with no conversation or protocol data. */
+/** App-wide gesture preferences, with no conversation or protocol data. */
 internal data class SwipePreferenceState(
     val messageLeft: SwipeAction = SwipeAction.Default,
     val messageRight: SwipeAction = SwipeAction.Default,
     val chatLeft: SwipeAction = SwipeAction.Off,
     val chatRight: SwipeAction = SwipeAction.Off,
+    val pullUnread: Boolean = true,
 ) {
     /** Returns the stored choice, before resolving the mirrored default. */
     fun choice(binding: SwipeBinding): SwipeAction =
@@ -56,9 +57,20 @@ internal class SwipePreferences(
         state = read()
     }
 
-    /** Removes only these four UI settings and restores upgrade-compatible behavior. */
+    /** Persists the pull-to-unread gesture independently of the four horizontal swipe bindings. */
+    fun setPullUnread(enabled: Boolean) {
+        preferences.edit().putBoolean("pull_unread", enabled).apply()
+        state = read()
+    }
+
+    /** Removes only these gesture preferences and restores upgrade-compatible behavior. */
     fun reset() {
-        preferences.edit().also { edit -> SwipeBinding.entries.forEach { edit.remove(key(it)) } }.apply()
+        preferences
+            .edit()
+            .also { edit ->
+                SwipeBinding.entries.forEach { edit.remove(key(it)) }
+                edit.remove("pull_unread")
+            }.apply()
         state = SwipePreferenceState()
     }
 
@@ -74,6 +86,7 @@ internal class SwipePreferences(
             value(SwipeBinding.MessageRight),
             value(SwipeBinding.ChatLeft),
             value(SwipeBinding.ChatRight),
+            runCatching { preferences.getBoolean("pull_unread", true) }.getOrDefault(true),
         )
     }
 

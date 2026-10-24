@@ -454,6 +454,7 @@ internal fun ProfileSheet(
     // members-list row), which keeps those sheets byte-identical to before.
     adminController: ConversationController? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
+    openGroupsInCommon: Boolean = false,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -561,7 +562,9 @@ internal fun ProfileSheet(
     // conversation opens.
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
-    var page by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
+    var page by remember(npub) {
+        mutableStateOf(if (openGroupsInCommon) ProfileSheetPage.GROUPS_IN_COMMON else ProfileSheetPage.PROFILE)
+    }
     var notificationEntry by remember(npub) { mutableStateOf(Any()) }
     var pickerParent by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
@@ -951,7 +954,12 @@ internal fun ProfileSheet(
                     appState,
                     shared.groups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.selectedAvatarAsset },
                 ) {
-                    PersonSharedGroupAvatars(sharedRows) { id ->
+                    PersonSharedGroupAvatars(
+                        sharedRows,
+                        groupAnimation = { id ->
+                            sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).groupAnimation }
+                        },
+                    ) { id ->
                         sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image }
                     }
                 }
@@ -1072,7 +1080,17 @@ internal fun ProfileSheet(
                         appState,
                         shared.groups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.selectedAvatarAsset },
                     ) {
-                        PersonGroupsInCommonContent(
+                        PersonGroupsMembershipContent(
+                            appState = appState,
+                            account = accountAtOpen,
+                            personHex = hex,
+                            personName = displayTitle,
+                            groups = shared.groups,
+                            ownerIsCurrent = { owner.canAct() && page == ProfileSheetPage.GROUPS_IN_COMMON },
+                            onFeedback = { if (owner.canAct()) feedback = it },
+                            onMembershipChanged = {
+                                if (owner.canAct()) accountWideGroups.refreshAfterMembershipChange()
+                            },
                             rows = sharedRows,
                             unresolved = shared.incomplete,
                             onBack = { page = ProfileSheetPage.PROFILE },
@@ -1097,6 +1115,9 @@ internal fun ProfileSheet(
                                 }
                             },
                             avatar = { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
+                            groupAnimation = { id ->
+                                sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).groupAnimation }
+                            },
                         )
                     }
                 ProfileSheetPage.NOTIFICATIONS -> {
@@ -1466,6 +1487,7 @@ internal fun ProfileAddToGroupsContent(
                         avatarSeed = groupId,
                         avatarUrl = avatar.pictureUrl,
                         avatarImage = avatar.image,
+                        groupAnimation = avatar.groupAnimation,
                         enabled = !busy,
                         onClick = {
                             if (isSelected) selected.remove(groupId) else selected.add(groupId)
@@ -1505,6 +1527,7 @@ internal fun ProfileAddToGroupsContent(
                     chatListItemDisplayTitle(item, appState, groupTitleCopy),
                     avatar.pictureUrl,
                     avatar.image,
+                    groupAnimation = avatar.groupAnimation,
                 )
             }
         GroupMembersReviewDialog(
@@ -1639,6 +1662,7 @@ internal fun ProfileMakeAdminContent(
                             avatarSeed = item.group.groupIdHex,
                             avatarUrl = avatar.pictureUrl,
                             avatarImage = avatar.image,
+                            groupAnimation = avatar.groupAnimation,
                             enabled = !busy,
                             onClick = { selectedGroupId = item.group.groupIdHex },
                             trailing = { SelectionIndicator(selected = selected) },
@@ -1672,6 +1696,7 @@ internal fun ProfileMakeAdminContent(
                         chatListItemDisplayTitle(group, appState, groupTitleCopy),
                         avatar.pictureUrl,
                         avatar.image,
+                        groupAnimation = avatar.groupAnimation,
                     ),
                 ),
             members = listOf(target),
@@ -1817,6 +1842,7 @@ private fun ProfileSheetAdminActions(
             controller.title(rememberGroupTitleCopy()),
             groupAvatar.pictureUrl,
             groupAvatar.image,
+            groupAnimation = groupAvatar.groupAnimation,
         )
     val reviewMember =
         RecipientSearch.Candidate(

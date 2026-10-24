@@ -39,6 +39,7 @@ FIXTURE_ONLY = (
 
 # Production and build inputs the fixture exercises alongside other device tests.
 FIXTURE_SHARED = (
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnostics.kt',
     '.github/workflows/android-instrumented.yml',
     'scripts/select_instrumented_lanes.py',
     'app/build.gradle.kts',

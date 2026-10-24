@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupPage.kt",
+  "legacy_sha256": "b606aac6cab5c6acc5feb4201994b051e662531e93d51595ba01f24ece7be63e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SetupPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupPage.kt",
+        "anchor": "fun SetupPage(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: AccountSetupPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupPage.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

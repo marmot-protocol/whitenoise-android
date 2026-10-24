@@ -102,7 +102,12 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue(
             "mark-read overflow must route to controller.markAllRead",
             "markChatRead(item, unread = false)" in markReadHandler &&
-                "controller.markAllRead(item)" in markReadHelper,
+                "controller.markAllRead(current, owner)" in markReadHelper,
+        )
+        assertTrue(
+            "selection actions must resolve the current row with the captured presentation owner",
+            "controller.captureChatListActionOwner { actionScope.get() }" in markReadHelper &&
+                "controller.resolveChatListActionItem(item.id, owner)" in markReadHelper,
         )
         assertTrue(
             "mark-read overflow must exit selection mode",
@@ -111,7 +116,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue(
             "mark-unread overflow must route to controller.markUnread",
             "markChatRead(item, unread = true)" in markUnreadHandler &&
-                "controller.markUnread(item)" in markReadHelper,
+                "controller.markUnread(current, owner)" in markReadHelper,
         )
         assertTrue(
             "mark-unread overflow must exit selection mode",
@@ -188,7 +193,12 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue(
             "pin overflow must route to controller.setPinned",
             "toggleChatPin(item)" in pinHandler &&
-                "controller.setPinned(item, nextPinned)" in pinHelper,
+                "controller.setPinned(current, nextPinned, owner)" in pinHelper,
+        )
+        assertTrue(
+            "selection actions must resolve the current row with the captured presentation owner",
+            "controller.captureChatListActionOwner { actionScope.get() }" in pinHelper &&
+                "controller.resolveChatListActionItem(item.id, owner)" in pinHelper,
         )
         assertTrue(
             "pin overflow must exit selection mode",

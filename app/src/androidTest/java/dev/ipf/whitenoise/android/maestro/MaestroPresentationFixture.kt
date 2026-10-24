@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -97,7 +98,7 @@ internal class MaestroPresentationFixture(
                 )
         }
         if (scenario == "surface-onboarding-signup") appState.beginProfileSignUp()
-        if (scenario == "surface-animated-avatar") installAnimatedAvatar()
+        if (scenario in setOf("surface-animated-avatar", "surface-animated-group-avatar")) installAnimatedAvatar()
         if (scenario.startsWith("preview-")) {
             val file = File.createTempFile("maestro-preview-", ".png", activity.cacheDir)
             imageFile = file
@@ -141,7 +142,13 @@ internal class MaestroPresentationFixture(
                     "ACH5BAAKAAAALAAAAAABAAEAAAICTAEAOw==",
                 Base64.DEFAULT,
             )
-        AvatarImageLoader.putCachedAnimated("https://fixture.example.invalid/animated", image, source)
+        val retained =
+            if (scenario == "surface-animated-group-avatar") {
+                checkNotNull(MediaPipeline.stripOriginalImageMetadata(source))
+            } else {
+                source
+            }
+        AvatarImageLoader.putCachedAnimated("https://fixture.example.invalid/animated", image, retained)
     }
 
     @Composable
@@ -215,7 +222,7 @@ internal class MaestroPresentationFixture(
 
     override fun close() {
         nativeController?.onCleared()
-        if (scenario == "surface-animated-avatar") AvatarImageLoader.clear()
+        if (scenario in setOf("surface-animated-avatar", "surface-animated-group-avatar")) AvatarImageLoader.clear()
         emojiDirectory?.let { check(it.deleteRecursively() && !it.exists()) { "Emoji fixture cleanup failed" } }
         bitmap.recycle()
         imageFile?.let { check(!it.exists() || it.delete()) { "Generated preview file cleanup failed" } }

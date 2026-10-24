@@ -50,7 +50,16 @@
           "CHL-028",
           "FIND-003",
           "FIND-015",
-          "GRP-034"
+          "GRP-034",
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "ChatListUnreadHint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListUnreadHint(",
+        "test_ids": [
+          "CHL-031"
         ]
       }
     ],
@@ -261,6 +270,54 @@
           "CHL-017"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"
+      },
+      {
+        "surface": "R.string.pull_unread_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_hint",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.pull_unread_release",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_release",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.pull_unread_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_only",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.pull_unread_show_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_show_all",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.pull_unread_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_retry",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.pull_unread_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_load_failed",
+        "test_ids": [
+          "CHL-031"
+        ]
       }
     ]
   },

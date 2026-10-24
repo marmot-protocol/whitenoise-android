@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_technical_details">技术详情</string>
+    <string name="setup_relay_publication_scope">更改也会影响使用此账号的其他 Nostr 应用。</string>
+    <string name="setup_relay_remove_scope">从两个列表中移除此地址。保存前请检查。</string>
+    <string name="setup_undo_removal">撤销移除</string>
+</resources>
