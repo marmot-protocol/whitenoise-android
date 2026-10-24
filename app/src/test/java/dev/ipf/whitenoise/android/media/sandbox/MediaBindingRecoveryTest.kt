@@ -20,6 +20,7 @@ import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -277,6 +278,68 @@ class MediaBindingRecoveryTest {
                 .apply { isAccessible = true }
                 .get(instance),
         )
+
+    @Test
+    fun retiredProviderReadFailureCannotEscapeOrBlockTheReplacementSession() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext())
+        val transport = IsolatedMediaTransport(context)
+        val sources = field(field(transport, "session"), "sources") as MediaSourceAccess
+        val reading = CountDownLatch(1)
+        val capabilityClosed = CountDownLatch(1)
+        val outcome = AtomicReference<Result<Boolean?>>()
+        val old =
+            Thread {
+                outcome.set(
+                    runCatching {
+                        sources.withProviderDeadline<Boolean> { _, opened ->
+                            opened.set(AutoCloseable { capabilityClosed.countDown() })
+                            reading.countDown()
+                            check(capabilityClosed.await(2, TimeUnit.SECONDS))
+                            throw java.io.IOException("Retired provider capability closed during read")
+                        }
+                    },
+                )
+            }
+        var next: Call? = null
+        old.start()
+        try {
+            assertTrue(reading.await(2, TimeUnit.SECONDS))
+            transport.activateSession()
+            old.join(2_000)
+            assertFalse("Retired read must finish after actual capability closure", old.isAlive)
+            assertEquals(0L, capabilityClosed.count)
+            assertNull(checkNotNull(outcome.get()).getOrThrow())
+            assertTrue("Retired source must never bind a worker", context.bindings.isEmpty())
+            next = start(transport, 2)
+            val current = context.next()
+            assertTrue(current.remote.retired.await(2, TimeUnit.SECONDS))
+            assertEquals(1, current.remote.requests)
+            current.remote.die()
+            next.join()
+        } finally {
+            old.interrupt()
+            old.join(2_000)
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    @Test
+    fun activeProviderReadFailurePropagatesAndReleasesAdmission() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext())
+        val transport = IsolatedMediaTransport(context)
+        val sources = field(field(transport, "session"), "sources") as MediaSourceAccess
+        val failure = java.io.IOException("Active provider read failed")
+        try {
+            val result = runCatching { sources.withProviderDeadline<Boolean> { _, _ -> throw failure } }
+            assertSame(failure, result.exceptionOrNull())
+            assertEquals(true, sources.withProviderDeadline { _, _ -> true })
+            assertTrue("Provider failures must never bind a worker", context.bindings.isEmpty())
+        } finally {
+            transport.close()
+        }
+    }
 
     @Test
     fun heldUriAcquisitionCannotAdoptTheReplacementSession() {
