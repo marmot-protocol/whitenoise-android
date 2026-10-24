@@ -49,6 +49,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Production-path coverage for retracting deleted or hidden content (#3323) and withholding a read message's
@@ -965,6 +966,7 @@ class NotificationContentRetractionTest {
         runBlocking {
             val entered = CountDownLatch(1)
             val completed = CountDownLatch(1)
+            val completedAtNanos = AtomicLong(0L)
             val release = CountDownLatch(1)
             val nextGroup = "a1b2c3d4"
             val fixture =
@@ -981,7 +983,10 @@ class NotificationContentRetractionTest {
                         null
                     },
                     notificationFirstPostTimingObserver = { event ->
-                        if (event.stage == NotificationFirstPostTimingStage.CandidateGateComplete) completed.countDown()
+                        if (event.stage == NotificationFirstPostTimingStage.CandidateGateComplete) {
+                            completedAtNanos.compareAndSet(0L, System.nanoTime())
+                            completed.countDown()
+                        }
                     },
                 )
             try {
@@ -991,7 +996,7 @@ class NotificationContentRetractionTest {
                 awaitLatch(entered)
                 if (checkNextConversation) fixture.emitUpdate(fixture.update.copy(groupIdHex = nextGroup))
                 withTimeout(4_500L) { awaitLatch(completed) }
-                val elapsed = (System.nanoTime() - started) / 1_000_000
+                val elapsed = (completedAtNanos.get() - started) / 1_000_000
                 assertTrue("the first gate must finish near its 3s budget, actual=$elapsed", elapsed < 4_500L)
                 assertFalse(manager().activeNotifications.any { it.tag == cardKey.tag && it.id == cardKey.id })
                 if (checkNextConversation) {
