@@ -8202,35 +8202,61 @@ class WhiteNoiseAppState private constructor(
         persistHostSetting { putString(THEME_MODE_KEY, mode.preferenceValue) }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun updateFontScale(scale: AppFontScale) {
         if (fontScale == scale) return
         fontScale = scale
         val revision = ++fontScaleSaveRevision
         val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
         mutationsScope
-            .launch {
-                hostPreferenceCommitMutex.withLock {
-                    val saved =
-                        withContext(Dispatchers.IO) {
-                            runCatchingCancellable {
-                                val editor = preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue)
-                                var committed = false
-                                completeHostPreferenceCommit(attempt) { editor.commit().also { committed = it } }
-                                committed
-                            }.onFailure { attempt.failure() }.getOrDefault(false)
-                        }
-                    if (saved) {
-                        durableFontScale = scale
-                    } else {
-                        // SharedPreferences changes its memory map even when the disk commit fails.
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                preferences.edit().putString(FONT_SCALE_KEY, durableFontScale.preferenceValue).commit()
+            .launch(start = CoroutineStart.ATOMIC) {
+                var reconciled = false
+                try {
+                    hostPreferenceCommitMutex.withLock {
+                        var committed = false
+                        var commitAttempted = false
+                        try {
+                            withContext(Dispatchers.IO) {
+                                runCatchingCancellable {
+                                    val editor = preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue)
+                                    commitAttempted = true
+                                    completeHostPreferenceCommit(attempt) { editor.commit().also { committed = it } }
+                                }.onFailure { attempt.failure() }
+                            }
+                        } finally {
+                            // The dispatcher may discard a completed IO result on cancellation.
+                            // Finalize the actual commit while still owning its serialization lock.
+                            withContext(NonCancellable) {
+                                if (committed) {
+                                    durableFontScale = scale
+                                } else {
+                                    if (commitAttempted) {
+                                        // A failed disk commit can still change SharedPreferences' memory map.
+                                        withContext(Dispatchers.IO) {
+                                            runCatching {
+                                                preferences
+                                                    .edit()
+                                                    .putString(FONT_SCALE_KEY, durableFontScale.preferenceValue)
+                                                    .commit()
+                                            }
+                                        }
+                                    }
+                                    if (revision == fontScaleSaveRevision) {
+                                        fontScale = durableFontScale
+                                        if (commitAttempted) presentTransient(R.string.font_size_save_failed)
+                                    }
+                                }
+                                reconciled = true
                             }
                         }
-                        if (revision == fontScaleSaveRevision) {
-                            fontScale = durableFontScale
-                            presentTransient(R.string.font_size_save_failed)
+                    }
+                } finally {
+                    if (!reconciled) {
+                        // Cancellation before acquiring the mutex must wait for prior saves to settle.
+                        withContext(NonCancellable) {
+                            hostPreferenceCommitMutex.withLock {
+                                if (revision == fontScaleSaveRevision) fontScale = durableFontScale
+                            }
                         }
                     }
                 }

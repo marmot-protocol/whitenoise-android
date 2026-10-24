@@ -434,6 +434,14 @@
         "test_ids": [
           "CHL-031"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "surface": "Font-scale cancellation reconciles actual commit and latest visible selection",
+        "anchor": "fun updateFontScale(",
+        "test_ids": [
+          "SET-006"
+        ]
       }
     ]
   },
