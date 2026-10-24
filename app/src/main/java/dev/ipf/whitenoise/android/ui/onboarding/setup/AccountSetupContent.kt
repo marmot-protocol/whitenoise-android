@@ -232,6 +232,10 @@ private fun SetupDirectRelayRemoval(
     val revision = snapshot.revision
     val recoveryEpoch = snapshot.recoveryEpoch
     Text(endpoint, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
+    step.findings
+        .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint }
+        .distinct()
+        .forEach { SetupFindingEvidence(it) }
     WhiteNoiseButton(
         onClick = { onRemoveRelay(step.step, endpoint, revision, recoveryEpoch) },
         enabled = !state.busy && !state.error && !state.disconnected && !state.staleDecision,

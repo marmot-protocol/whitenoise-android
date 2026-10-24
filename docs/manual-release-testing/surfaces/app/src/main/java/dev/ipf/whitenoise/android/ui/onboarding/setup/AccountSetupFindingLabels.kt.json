@@ -1,0 +1,128 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_context_approval",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_context_approval",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_context_declaration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_context_declaration",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_context_discovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_context_discovery",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_context_publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_context_publication",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_context_route",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_context_route",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_context_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_context_unknown",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_outcome_failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_outcome_failure",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_outcome_success",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_outcome_success",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_outcome_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_outcome_unknown",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_purpose_directory",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_purpose_directory",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_purpose_freshness",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_purpose_freshness",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_purpose_lookup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_purpose_lookup",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_purpose_publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_purpose_publication",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_purpose_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_purpose_unknown",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_purpose_validation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupFindingLabels.kt",
+        "anchor": "R.string.setup_finding_purpose_validation",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ]
+  }
+}

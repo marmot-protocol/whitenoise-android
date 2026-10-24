@@ -122,6 +122,7 @@ private fun SetupRelayChange(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         findings.filter { it.endpoint != null && it.endpoint == change.endpoint }.distinct().forEach {
+            SetupFindingEvidence(it)
             Text(stringResource(setupFindingTitle(it.issue)), style = MaterialTheme.typography.bodySmall)
         }
     }
