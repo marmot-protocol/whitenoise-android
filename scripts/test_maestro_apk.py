@@ -278,19 +278,38 @@ class MaestroWorkflowTest(unittest.TestCase):
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
     def enabled(self, name, event, selected, responsiveness=False, media_sandbox=False, outbound_share=False,
-                mdk_adoption=False, mdk_qualification=False, mdk_preview_qualification=False, range_selection=False):
+                mdk_adoption=False, startup_trace=False, mdk_qualification=False, mdk_preview_qualification=False, range_selection=False):
         """Evaluate the trusted job condition with restricted event/input fixtures.
 
         Lane narrowing is tested in test_select_instrumented_lanes.py; here the
         selector reports both emulator lanes as affected.
         """
         expression = re.search(r'^    if: (.+)$', self.job(name), re.MULTILINE).group(1)
+        if expression.startswith('${{') and expression.endswith('}}'):
+            expression = expression[3:-2].strip()
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         lanes = SimpleNamespace(outputs=SimpleNamespace(attachment_fixture='true', connected='true'))
         return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness, media_sandbox_only=media_sandbox, outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption, mdk_qualification=mdk_qualification, mdk_preview_qualification=mdk_preview_qualification, range_selection_only=range_selection),
+                    {'github': SimpleNamespace(event_name=event),
+                     'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding',
+                         responsiveness_only=responsiveness, media_sandbox_only=media_sandbox,
+                         outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption,
+                         media_startup_trace=startup_trace, range_selection_only=range_selection, mdk_qualification=mdk_qualification,
+                          mdk_preview_qualification=mdk_preview_qualification),
                      'needs': SimpleNamespace(changes=lanes),
                      'startsWith': lambda value, prefix: value.startswith(prefix)})
+
+    def test_startup_trace_cannot_mix_with_mdk_campaigns(self):
+        for name in ('mdk-qualification', 'mdk-signed-preview'):
+            job = self.job(name)
+            reject = job.split('      - name: Reject mixed campaigns\n', 1)[1].split('      - name:', 1)[0]
+            self.assertIn('if: inputs.media_startup_trace || ', reject)
+            self.assertIn('run: exit 2', reject)
+        for name in ('instrumented', 'attachment-fixture', 'maestro-pilot', 'maestro-runtime-build'):
+            self.assertFalse(self.enabled(name, 'workflow_dispatch', False, startup_trace=True,
+                                          mdk_qualification=True))
+            self.assertFalse(self.enabled(name, 'workflow_dispatch', False, startup_trace=True,
+                                          mdk_preview_qualification=True))
 
     def test_range_selection_excludes_unrelated_campaigns(self):
         """A held-pointer dispatch admits one connected lane without the other emulator campaigns."""
@@ -380,11 +399,59 @@ class MaestroWorkflowTest(unittest.TestCase):
         self.assertNotIn('secrets.', job)
         self.assertIn('actions: read', job)
         self.assertIn("&& 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}'", self.workflow)
-        self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.mdk_qualification || inputs.mdk_preview_qualification)) }}", self.workflow)
+        self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.media_startup_trace || inputs.mdk_qualification || inputs.mdk_preview_qualification)) }}", self.workflow)
         self.assertIn('if: always()', job)
         self.assertIn('retention-days: 7', job)
         self.assertIn('timeout-minutes: 15', job)
         self.assertNotIn('maestro_apk.py idle', job)
+
+    def test_startup_trace_selects_only_connected_lane_and_rejects_conflicts(self):
+        """Keep opt-in trace routing separate while invalid inputs reach explicit rejection."""
+        for event in ('push', 'pull_request', 'workflow_dispatch'):
+            for selected in (False, True):
+                with self.subTest(event=event, maestro_pilot=selected):
+                    self.assertTrue(self.enabled('instrumented', event, selected,
+                                                 media_sandbox=True, startup_trace=True))
+                    for excluded in ('attachment-fixture', 'maestro-pilot', 'maestro-runtime-build',
+                                     'maestro-runtime', 'maestro-runtime-summary'):
+                        self.assertFalse(self.enabled(excluded, event, selected,
+                                                      media_sandbox=True, startup_trace=True))
+        # Non-manual or conflicting selections must fail before running a trace.
+        rejection = self.job('instrumented').split('      - name: Reject incompatible startup trace inputs', 1)[1]
+        rejection = rejection.split('      - name:', 1)[0]
+        self.assertIn("github.event_name != 'workflow_dispatch'", rejection)
+        for field in ('media_sandbox_only', 'media_sandbox_api', 'maestro_pilot',
+                      'responsiveness_only', 'outbound_share_only', 'mdk_adoption_only',
+                      'review_demo_e2e', 'document_provider_matrix'):
+            self.assertIn('inputs.' + field, rejection)
+        self.assertIn('exit 2', rejection)
+
+    def test_trace_rejection_and_cancellation_follow_dispatch_flags(self):
+        """Evaluate actual workflow guards for valid, conflicting and default inputs."""
+        rejection = self.job('instrumented').split('      - name: Reject incompatible startup trace inputs', 1)[1]
+        reject = re.search(r'^        if: (.+)$', rejection, re.MULTILINE).group(1)
+        cancel = re.search(r'^  cancel-in-progress: \$\{\{ (.+) \}\}$', self.workflow, re.MULTILINE).group(1)
+        def evaluate(expression, event, fields):
+            expression = expression.replace('&&', ' and ').replace('||', ' or ')
+            expression = expression.replace('!inputs.', 'not inputs.').replace('!(', 'not (')
+            return eval(expression, {'__builtins__': {}},
+                        {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(**fields)})
+        defaults = dict(media_startup_trace=False, media_sandbox_only=True, media_sandbox_api='30',
+                        maestro_pilot=False, responsiveness_only=False, outbound_share_only=False,
+                        mdk_adoption_only=False, mdk_qualification=False, mdk_preview_qualification=False,
+                        review_demo_e2e=False, document_provider_matrix=False)
+        conflicts = ({}, {'media_sandbox_only': False}, {'media_sandbox_api': '34'},
+                     *({field: True} for field in ('maestro_pilot', 'responsiveness_only',
+                       'outbound_share_only', 'mdk_adoption_only', 'review_demo_e2e', 'document_provider_matrix')))
+        for event in ('push', 'pull_request', 'workflow_dispatch'):
+            for trace in (False, True):
+                for conflict in conflicts:
+                    fields = {**defaults, 'media_startup_trace': trace, **conflict}
+                    with self.subTest(event=event, trace=trace, conflict=conflict):
+                        self.assertEqual(evaluate(reject, event, fields),
+                                         trace and (event != 'workflow_dispatch' or bool(conflict)))
+                        self.assertEqual(evaluate(cancel, event, fields),
+                                         not (event == 'workflow_dispatch' and (fields['maestro_pilot'] or trace)))
 
     def test_real_journey_and_negative_control_keep_assertions(self):
         """Check real UI assertions, offline installation and observable failure control."""

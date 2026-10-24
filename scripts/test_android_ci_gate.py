@@ -454,7 +454,7 @@ class AndroidCiGateTest(unittest.TestCase):
         step = self.named_step(job, 'Require the committed dependency trust root for qualification')
         self.assertIn("if: matrix.phase == 'tooling'", step)
         self.assertIn("RESTORE_CAPTURE: ${{ github.event_name == 'workflow_dispatch' && "
-                      "inputs.capture_dependency_inputs }}", step)
+                      "(inputs.capture_dependency_inputs || inputs.capture_benchmark_dependency_inputs) }}", step)
         self.assertIn('./scripts/require-committed-dependency-trust-root.sh', step)
 
     def test_trust_root_check_restores_capture_rewrites_and_rejects_them_otherwise(self):
@@ -523,10 +523,11 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(len(tooling), 4)
         capture = self.named_step(self.build_contracts, 'Capture dependency-control bootstrap candidates')
         self.assertIn("if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' "
-                      "&& inputs.capture_dependency_inputs", capture)
+                      "&& (inputs.capture_dependency_inputs || inputs.capture_benchmark_dependency_inputs)", capture)
         self.assertNotIn('assemble', capture)
         retained = self.named_step(self.build_contracts, 'Retain dependency-control bootstrap candidates')
-        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs", retained)
+        self.assertIn("github.event_name == 'workflow_dispatch' && "
+                      "(inputs.capture_dependency_inputs || inputs.capture_benchmark_dependency_inputs)", retained)
         self.assertIn('--write-locks --write-verification-metadata sha256', capture)
         self.assertIn('--no-daemon', capture)
         label_step = self.named_step(self.build_contracts,
