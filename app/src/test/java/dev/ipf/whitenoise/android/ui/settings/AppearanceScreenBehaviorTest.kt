@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
@@ -11,7 +12,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontFamily
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppFont
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppThemeMode
@@ -19,6 +25,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.ui.theme.fontFamilyOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
@@ -61,7 +68,7 @@ class AppearanceScreenBehaviorTest {
                 activeAccountRef = "missing-account",
             )
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false, fontScale = appState.fontScale.factor) {
+            WhiteNoiseTheme(darkTheme = false, fontScale = appState.fontScale.factor, appFont = appState.appFont) {
                 AppearanceScreen(
                     appState = appState,
                     onBack = { backCount++ },
@@ -142,14 +149,46 @@ class AppearanceScreenBehaviorTest {
         composeRule.onNodeWithTag("font_size.preview").assertDoesNotExist()
     }
 
-    /** The app font dialog writes the chosen family and closes; the system face is the default. */
+    /** Every font restyles the actual live sample; System restores the platform face before Done. */
     @Test
-    fun appFontSheetWritesFontAndCloses() {
+    fun appFontSheetPreviewsEveryFamilyUntilDone() {
         assertEquals(AppFont.System, appState.appFont)
         composeRule.onNodeWithText("App font").performClick()
-        composeRule.onNodeWithText("Outfit").performClick()
-        composeRule.runOnIdle { assertEquals(AppFont.Outfit, appState.appFont) }
-        composeRule.onNodeWithText("Urbanist").assertDoesNotExist()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val sampleText = context.getString(R.string.font_size_sample_received)
+
+        fun sampleFamily(): FontFamily? {
+            val layouts = mutableListOf<TextLayoutResult>()
+            composeRule
+                .onNodeWithText(sampleText, useUnmergedTree = true)
+                .performScrollTo()
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            return layouts
+                .single()
+                .layoutInput
+                .style
+                .fontFamily
+        }
+
+        val systemFamily = sampleFamily()
+        for (font in AppFont.entries) {
+            composeRule
+                .onNodeWithTag("font_family.${font.name}")
+                .performScrollTo()
+                .performClick()
+            composeRule.runOnIdle { assertEquals(font, appState.appFont) }
+            composeRule.onNodeWithTag("font_family.preview").assertExists()
+            composeRule.onNodeWithTag("font_family.${font.name}").assertIsSelected()
+            assertEquals(font.fontFamilyOrNull() ?: systemFamily, sampleFamily())
+        }
+        composeRule
+            .onNodeWithTag("font_family.System")
+            .performScrollTo()
+            .performClick()
+        composeRule.runOnIdle { assertEquals(AppFont.System, appState.appFont) }
+        assertEquals(systemFamily, sampleFamily())
+        composeRule.onNodeWithText("Done").performClick()
+        composeRule.onNodeWithTag("font_family.preview").assertDoesNotExist()
     }
 
     /** The Enter key dialog explains Shift+Enter, applies on tap, and Cancel keeps the stored choice. */

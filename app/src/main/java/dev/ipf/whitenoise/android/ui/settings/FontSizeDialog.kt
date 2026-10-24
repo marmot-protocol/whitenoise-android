@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppFont
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
@@ -44,7 +45,7 @@ internal fun FontSizeDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(stringResource(R.string.font_size_preview), style = MaterialTheme.typography.labelMedium)
-                FontSizeSample(theme, mineArgb, otherArgb)
+                FontAppearanceSample(theme, mineArgb, otherArgb, Modifier.testTag("font_size.preview"))
                 Column(Modifier.selectableGroup()) {
                     AppFontScale.entries.forEach { scale ->
                         WhiteNoiseDialogChoiceRow(
@@ -68,13 +69,59 @@ internal fun FontSizeDialog(
     )
 }
 
-/** Inert localized sample; inherits the current theme/font/density without applying scale a second time. */
+/** Font choices reuse the same live theme sample and persistent preference owner as font size. */
 @Composable
 @Suppress("FunctionNaming")
-private fun FontSizeSample(
+internal fun FontFamilyDialog(
+    selected: AppFont,
+    label: (AppFont) -> String,
+    onSelect: (AppFont) -> Unit,
+    onDismiss: () -> Unit,
     theme: BubbleTheme,
     mineArgb: Long?,
     otherArgb: Long?,
+) {
+    WhiteNoiseAlertDialog(
+        modifier = Modifier.testTag("font_family.dialog"),
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.app_font)) },
+        text = {
+            Column(
+                Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(R.string.font_size_preview), style = MaterialTheme.typography.labelMedium)
+                FontAppearanceSample(theme, mineArgb, otherArgb, Modifier.testTag("font_family.preview"))
+                Column(Modifier.selectableGroup()) {
+                    AppFont.entries.forEach { font ->
+                        WhiteNoiseDialogChoiceRow(
+                            title = label(font),
+                            selected = selected == font,
+                            highlightSelected = false,
+                            onClick = { if (selected != font) onSelect(font) },
+                            modifier = Modifier.testTag("font_family.${font.name}"),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
+        dismissButton = {
+            TextButton(onClick = { onSelect(AppFont.System) }) {
+                Text(stringResource(R.string.appearance_font_system))
+            }
+        },
+    )
+}
+
+/** Inert localized sample; inherits the current theme/font/density without applying scale a second time. */
+@Composable
+@Suppress("FunctionNaming")
+private fun FontAppearanceSample(
+    theme: BubbleTheme,
+    mineArgb: Long?,
+    otherArgb: Long?,
+    modifier: Modifier,
 ) {
     val tokens = previewBubbleTokens()
     val amoled = theme == BubbleTheme.Amoled
@@ -94,7 +141,7 @@ private fun FontSizeSample(
             mineArgb,
             tokens,
         )
-    Column(Modifier.fillMaxWidth().testTag("font_size.preview"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PreviewBubble(
             text = stringResource(R.string.font_size_sample_received),
             presentation = other,

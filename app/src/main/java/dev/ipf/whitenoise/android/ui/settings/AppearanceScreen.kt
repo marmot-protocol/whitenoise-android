@@ -83,16 +83,15 @@ internal fun AppearanceScreen(
     val amoled = appState.themeMode == AppThemeMode.Amoled
     val language = languageOptions.firstOrNull { it.tag == appState.languageTag } ?: languageOptions.first()
     if (fontFamilyOpen) {
-        ChoiceDialog(
-            title = stringResource(R.string.app_font),
-            values = AppFont.entries,
+        val sampleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
+        FontFamilyDialog(
             selected = appState.appFont,
             label = familyLabels::getValue,
+            onSelect = appState::updateAppFont,
             onDismiss = { fontFamilyOpen = false },
-            onSelect = {
-                fontFamilyOpen = false
-                appState.updateAppFont(it)
-            },
+            theme = sampleTheme,
+            mineArgb = appState.globalBubbleColorArgb(sampleTheme, BubbleSide.Mine),
+            otherArgb = appState.globalBubbleColorArgb(sampleTheme, BubbleSide.Other),
         )
     }
     if (fontSizeOpen) {

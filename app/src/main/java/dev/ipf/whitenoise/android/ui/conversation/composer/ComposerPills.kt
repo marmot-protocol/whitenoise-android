@@ -680,7 +680,7 @@ internal fun ComposerPill(
         derivedStateOf { composerScrollState.value > 0 }
     }
     val leadingControlsWidth = (if (hasAttachmentAction) 80.dp else 40.dp) + 48.dp
-    val compactEditorStartInset = (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp
+    val compactEditorStartInset = (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp + 8.dp
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
             (if (trailingAction != null) 40.dp else 0.dp)
@@ -1552,6 +1552,18 @@ internal fun ComposerPill(
                                         attachmentMenu?.invoke(attachmentAnchorBounds)
                                     }
                                 }
+                                TextEntryEmojiAction(
+                                    pickerOpen = emojiPickerOpen,
+                                    enabled = inputContentVisible,
+                                    onClick = {
+                                        selectingWithoutKeyboard = false
+                                        onEmojiPickerToggle()
+                                    },
+                                    togglesKeyboard = true,
+                                    modifier = Modifier.width(32.dp).height(48.dp).focusRequester(defaultActionFocus),
+                                    iconSize = 24.dp,
+                                    emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
+                                )
                                 key(scrollOwnerKey, pasteTargetKey, inputContentVisible, inputFocusEnabled) {
                                     SystemPasteIconButton(
                                         onPaste = tryPasteFromClipboard,
@@ -1566,18 +1578,6 @@ internal fun ComposerPill(
                                         )
                                     }
                                 }
-                                TextEntryEmojiAction(
-                                    pickerOpen = emojiPickerOpen,
-                                    enabled = inputContentVisible,
-                                    onClick = {
-                                        selectingWithoutKeyboard = false
-                                        onEmojiPickerToggle()
-                                    },
-                                    togglesKeyboard = true,
-                                    modifier = Modifier.width(32.dp).height(48.dp).focusRequester(defaultActionFocus),
-                                    iconSize = 24.dp,
-                                    emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
-                                )
                             }
                         }
                         Row(
