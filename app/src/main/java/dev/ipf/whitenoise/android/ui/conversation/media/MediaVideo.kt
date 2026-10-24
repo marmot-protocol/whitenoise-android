@@ -293,8 +293,9 @@ internal fun MediaVideoGridTile(
     val materializationLock = remember(messageIdHex, attachmentIndex, epoch) { Mutex() }
 
     /**
-     * Handles a tap on the tile. A downloaded clip opens the viewer, and the "+N" overflow always opens the album. A
-     * clip that is not on the device yet is only downloaded, in place: it never opens once it arrives, and a later tap
+     * Handles a tap on the tile. A clip on the device, downloaded or the reader's own still held in memory for its
+     * upload, opens the viewer, and the "+N" overflow always opens the album. A clip that is not on the device yet is
+     * only downloaded, in place: it never opens once it arrives, and a later tap
      * opens it. While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart that
      * transfer, and a video still being sent from its staged file has nothing to download yet.
      */
@@ -314,6 +315,8 @@ internal fun MediaVideoGridTile(
             controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
         }
         when {
+            // The reader's own clip still held in memory for its upload is on the device whatever its file did.
+            retainedPlaintextOnEntry -> onTap()
             localFile != null && !retry -> onTap()
             retry ->
                 controller.retryAttachmentTransfer(
@@ -969,6 +972,8 @@ internal fun MediaVideoBubble(
                                     when {
                                         uploadFailed -> onRetryUpload?.invoke()
                                         localFile != null -> scope.launch { dispatchReadyVideo() }
+                                        // The reader's own clip still held in memory for its upload is on the device.
+                                        retainedPlaintextOnEntry -> dispatchViewerOpen()
                                         // Nothing is playable until the staged file is sent, and the ring shows it.
                                         sendingFromStagedFile -> Unit
                                         else -> requestDownload()

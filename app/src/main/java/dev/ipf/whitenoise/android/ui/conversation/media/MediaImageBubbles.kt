@@ -903,6 +903,9 @@ internal fun MediaImageGridTile(
                                 onFailure = { markFailed(it) },
                             )
                         presentation != null -> onTap()
+                        // Bytes already on the device, cached or the reader's own still held for upload, are only
+                        // being read, so the tap opens the viewer now rather than downloading.
+                        cachedPlaintextOnEntry || retainedPlaintextOnEntry -> onTap()
                         else -> controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
                     }
                 },
