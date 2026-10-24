@@ -29,12 +29,37 @@ class ConversationScrollCoordinatorTest {
                     ConversationForegroundGeometry(720, 0, 96),
                 ),
             )
-        assertFalse(restore.releaseMeasuredFrame(false))
+        assertFalse(restore.releaseMeasuredFrame(true, false))
         assertTrue(coordinator.foregroundRestoreInProgress)
         assertTrue(coordinator.foregroundRestorePending)
-        assertTrue(restore.releaseMeasuredFrame(true))
+        assertTrue(restore.releaseMeasuredFrame(true, true))
         assertFalse(coordinator.foregroundRestoreInProgress)
         assertTrue(coordinator.foregroundRestorePending)
+    }
+
+    @Test
+    fun retainedPresentationRequiresSafeCurrentOwnerAndMeasurement() {
+        val oldOwner = ConversationScrollCoordinator(RecordingScrollWriter())
+        val currentOwner = ConversationScrollCoordinator(RecordingScrollWriter())
+        val restore =
+            ConversationForegroundRestoreBinding.begin(
+                oldOwner,
+                ConversationForegroundSnapshot(
+                    oldOwner.bookmark(anchor(messageId = "reader", listIndex = 4)),
+                    ConversationForegroundGeometry(720, 0, 96),
+                ),
+            )
+        assertTrue(ConversationForegroundRestoreBinding.canPresentRetainedFrame(null, currentOwner, true))
+        assertFalse(ConversationForegroundRestoreBinding.canPresentRetainedFrame(null, currentOwner, false))
+        assertTrue(ConversationForegroundRestoreBinding.canPresentRetainedFrame(restore, oldOwner, true))
+        assertFalse(ConversationForegroundRestoreBinding.canPresentRetainedFrame(restore, oldOwner, false))
+        assertFalse(ConversationForegroundRestoreBinding.canPresentRetainedFrame(restore, currentOwner, true))
+        assertFalse(restore.releaseMeasuredFrame(false, true))
+        assertTrue(oldOwner.foregroundRestoreInProgress)
+        assertTrue(oldOwner.foregroundRestorePending)
+        assertTrue(restore.releaseMeasuredFrame(true, true))
+        assertFalse(oldOwner.foregroundRestoreInProgress)
+        assertTrue(oldOwner.foregroundRestorePending)
     }
 
     @Test
@@ -1959,7 +1984,10 @@ class ConversationScrollCoordinatorTest {
         val owner = sourceFile("ConversationViewportRestorationOwner.kt").readText()
         val presentation = sourceFile("ConversationForegroundPresentation.kt").readText()
 
-        assertTrue(effects.contains("scrollCoordinator.beginForegroundRestore("))
+        val binding = sourceFile("ConversationForegroundRestoreBinding.kt").readText()
+        assertTrue(effects.contains("ConversationForegroundRestoreBinding.begin("))
+        assertTrue(effects.contains("pausedRestore?.resume(scrollCoordinator)"))
+        assertTrue(binding.contains("owner.beginForegroundRestore(snapshot)"))
         assertTrue(effects.contains("scrollCoordinator.completeForegroundRestore("))
         assertTrue(screen.contains("ConversationViewportRestorationEffects("))
         assertTrue(screen.contains("ConversationViewportStructureEffect("))

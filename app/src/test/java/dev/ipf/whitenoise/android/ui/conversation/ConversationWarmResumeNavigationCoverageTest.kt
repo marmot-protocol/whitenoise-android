@@ -118,13 +118,19 @@ class ConversationWarmResumeNavigationCoverageTest {
                 }.first(File::isFile)
                 .readText()
         val resume = source.substringAfter("onResume = { restoreFocus, clearFocus ->")
-        val release = resume.indexOf("scrollCoordinator.releaseForegroundRestoreGate(restoreToken)")
+        val binding =
+            sequenceOf(File("src/main"), File("app/src/main"))
+                .map {
+                    File(it, "java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt")
+                }.first(File::isFile)
+                .readText()
+        val release = resume.indexOf("restore?.releaseMeasuredFrame(")
         assertTrue(release >= 0)
         assertTrue(release < resume.indexOf("awaitConversationForegroundPresentation("))
         assertTrue(
             resume
                 .substringBefore("val pendingLocalTimeline")
-                .contains("if (restoreToken != null && retainedPresentationSafe)"),
+                .contains("currentForegroundSettleStateProvider().timelineMeasured"),
         )
         // Admission is captured by the live provider before resume, then rechecked before correction.
         val admissionProvider = source.substringBefore("ConversationForegroundDrawGateEffect(")
@@ -132,7 +138,10 @@ class ConversationWarmResumeNavigationCoverageTest {
             admissionProvider.contains("ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation"),
         )
         assertTrue(admissionProvider.contains("lockVisible = controller.appState.appLockScreenVisible"))
-        assertTrue(resume.contains("val retainedPresentationSafe = currentCanPresentRetainedFrame()"))
+        assertTrue(resume.contains("ConversationForegroundRestoreBinding.canPresentRetainedFrame("))
+        assertTrue(binding.contains("currentPresentationSafe && (paused == null || paused.owner === currentOwner)"))
+        assertTrue(binding.contains("if (!retainedPresentationSafe || !timelineMeasured) return false"))
+        assertTrue(binding.contains("owner.releaseForegroundRestoreGate(token)"))
         assertTrue(resume.contains("if (!currentCanPresentRetainedFrame())"))
         assertTrue(resume.contains("awaitConversationForegroundAdmission("))
     }

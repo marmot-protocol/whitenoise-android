@@ -26,6 +26,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+        "surface": "Current exact owner safety before measured retained frame release",
+        "anchor": "fun canPresentRetainedFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

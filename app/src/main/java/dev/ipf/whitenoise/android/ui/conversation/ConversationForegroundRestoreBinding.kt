@@ -5,8 +5,11 @@ internal class ConversationForegroundRestoreBinding private constructor(
     val owner: ConversationScrollCoordinator,
     val token: ConversationForegroundRestoreToken,
 ) {
-    fun releaseMeasuredFrame(timelineMeasured: Boolean): Boolean {
-        if (!timelineMeasured) return false
+    fun releaseMeasuredFrame(
+        retainedPresentationSafe: Boolean,
+        timelineMeasured: Boolean,
+    ): Boolean {
+        if (!retainedPresentationSafe || !timelineMeasured) return false
         owner.releaseForegroundRestoreGate(token)
         return true
     }
@@ -25,6 +28,12 @@ internal class ConversationForegroundRestoreBinding private constructor(
     }
 
     companion object {
+        fun canPresentRetainedFrame(
+            paused: ConversationForegroundRestoreBinding?,
+            currentOwner: ConversationScrollCoordinator,
+            currentPresentationSafe: Boolean,
+        ): Boolean = currentPresentationSafe && (paused == null || paused.owner === currentOwner)
+
         fun begin(
             owner: ConversationScrollCoordinator,
             snapshot: ConversationForegroundSnapshot,

@@ -230,7 +230,6 @@ internal fun ConversationForegroundRestoreEffects(
             scope.launch { controller.retryInviteAcceptanceAuthority() }
             foregroundPreDrawSignals.tryReceive()
             val pausedRestore = foregroundRestore
-            val ownerReplaced = pausedRestore != null && pausedRestore.owner !== scrollCoordinator
             val restore =
                 pausedRestore?.resume(scrollCoordinator) {
                     ConversationForegroundSnapshot(
@@ -246,10 +245,16 @@ internal fun ConversationForegroundRestoreEffects(
                 imeRequested = restoreToken?.expectedImeVisible == true || restoreFocus,
                 imeObserved = currentForegroundGeometryProvider().imeBottomPx > 0,
             )
-            val retainedPresentationSafe = !ownerReplaced && currentCanPresentRetainedFrame()
-            if (restore != null &&
-                retainedPresentationSafe &&
-                restore.releaseMeasuredFrame(currentForegroundSettleStateProvider().timelineMeasured)
+            val retainedPresentationSafe =
+                ConversationForegroundRestoreBinding.canPresentRetainedFrame(
+                    pausedRestore,
+                    scrollCoordinator,
+                    currentCanPresentRetainedFrame(),
+                )
+            if (restore?.releaseMeasuredFrame(
+                    retainedPresentationSafe,
+                    currentForegroundSettleStateProvider().timelineMeasured,
+                ) == true
             ) {
                 WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.RetainedFrameReleased)
                 requestConversationForegroundFrame(rootView)
