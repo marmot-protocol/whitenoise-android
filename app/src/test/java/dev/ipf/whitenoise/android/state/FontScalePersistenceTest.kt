@@ -220,6 +220,7 @@ class FontScalePersistenceTest {
                 assertTrue(entered.await(5, TimeUnit.SECONDS))
                 val job =
                     state.mutationsScope.coroutineContext.job.children
+                        .filterNot(existingChildren::contains)
                         .single()
                 job.cancel()
             } finally {
@@ -255,6 +256,7 @@ class FontScalePersistenceTest {
             try {
                 assertTrue(entered.await(5, TimeUnit.SECONDS))
                 state.mutationsScope.coroutineContext.job.children
+                    .filterNot(existingChildren::contains)
                     .single()
                     .cancel()
                 state.updateFontScale(AppFontScale.ExtraLarge)
