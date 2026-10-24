@@ -180,8 +180,12 @@ private fun addExpandedReactionMessages(
             notificationLogicalMessageGroups(content.messages).forEach { group ->
                 val message = group.lastOrNull { it.dataUri == null } ?: group.first()
                 val row = RemoteViews(context.packageName, R.layout.notification_reaction_message)
-                val sender = message.person?.name.orEmpty()
-                row.setTextViewText(R.id.reaction_message_body, "$sender: ${message.text.orEmpty()}")
+                val sender =
+                    message.person
+                        ?.name
+                        ?.toString()
+                        .orEmpty()
+                row.setTextViewText(R.id.reaction_message_body, "$sender: ${message.text?.toString().orEmpty()}")
                 group.firstNotNullOfOrNull { it.dataUri }?.let { uri ->
                     row.setImageViewUri(R.id.reaction_message_artwork, uri)
                 } ?: row.setViewVisibility(R.id.reaction_message_artwork, View.GONE)
