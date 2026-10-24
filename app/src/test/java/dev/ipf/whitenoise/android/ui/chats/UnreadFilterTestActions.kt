@@ -8,5 +8,6 @@ import androidx.compose.ui.test.junit4.ComposeTestRule
 internal fun SemanticsNodeInteraction.performUnreadFilterAction(rule: ComposeTestRule): SemanticsNodeInteraction {
     val action = fetchSemanticsNode().config[SemanticsActions.CustomActions].single().action
     rule.runOnUiThread { check(action()) }
+    rule.waitForIdle()
     return this
 }
