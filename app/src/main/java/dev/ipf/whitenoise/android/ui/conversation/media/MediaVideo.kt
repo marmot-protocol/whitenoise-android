@@ -241,6 +241,7 @@ internal fun MediaVideoGridTile(
         failed = true
     }
     var tileDurationMs by remember(messageIdHex, attachmentIndex, epoch) { mutableLongStateOf(0L) }
+    val tapScope = rememberCoroutineScope()
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
@@ -295,9 +296,10 @@ internal fun MediaVideoGridTile(
     /**
      * Handles a tap on the tile. A clip on the device, downloaded or the reader's own still held in memory for its
      * upload, opens the viewer, and the "+N" overflow always opens the album. A clip that is not on the device yet is
-     * only downloaded, in place: it never opens once it arrives, and a later tap
-     * opens it. While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart that
-     * transfer, and a video still being sent from its staged file has nothing to download yet.
+     * only downloaded, in place: it never opens once it arrives, and a later tap opens it. A downloaded file is checked
+     * again at tap time, off the main thread, so one the cache evicted while the tile stayed on screen is downloaded
+     * again rather than opened. While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot
+     * restart that transfer, and a video still being sent from its staged file has nothing to download yet.
      */
     fun onTileTap(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
         if (transfer.cancelling) return
@@ -317,7 +319,17 @@ internal fun MediaVideoGridTile(
         when {
             // The reader's own clip still held in memory for its upload is on the device whatever its file did.
             retainedPlaintextOnEntry -> onTap()
-            localFile != null && !retry -> onTap()
+            localFile != null && !retry ->
+                tapScope.launch {
+                    val playable = withContext(Dispatchers.IO) { validatedAttachmentCacheFile(localFile) }
+                    if (playable != null) {
+                        onTap()
+                    } else {
+                        localFile = null
+                        reloadToken++
+                        download()
+                    }
+                }
             retry ->
                 controller.retryAttachmentTransfer(
                     messageIdHex,
@@ -845,6 +857,8 @@ internal fun MediaVideoBubble(
             localFile = null
             posterBitmap = null
             durationMs = 0L
+            // The intent may already be interactive, so the token restarts the materialization this file ended.
+            reloadToken++
             requestDownload()
             return
         }

@@ -346,6 +346,38 @@ class DownloadNeverOpensTest {
         composeRule.onAllNodesWithContentDescription(download).assertCountEquals(0)
     }
 
+    /**
+     * A video tile whose downloaded file the cache evicted while the tile stayed on screen checks the file again at
+     * tap time: that tap downloads it again in place and opens nothing, and only the next tap opens it.
+     */
+    @Test
+    fun aVideoTileWhoseFileWasEvictedDownloadsAgainInsteadOfOpening() {
+        val clip = reference(0).copy(mediaType = "video/mp4", fileName = "clip.mp4")
+        composeRule.setContent { WhiteNoiseTheme { VideoTile() } }
+        awaitDescribed(text(R.string.media_tap_to_download))
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+        awaitSingleTransfer()
+        composeRule.runOnIdle { fixture.calls.single().succeed(byteArrayOf(1, 2, 3, 4)) }
+        awaitDescribed(text(R.string.reply_media_video))
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val cached = requireNotNull(cachedVideoAttachmentFile(context, request(0).messageIdHex, 0, clip))
+
+        composeRule.runOnIdle { assertTrue("the cached clip could not be evicted", cached.delete()) }
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            cachedVideoAttachmentFile(context, request(0).messageIdHex, 0, clip) != null
+        }
+        awaitDescribed(text(R.string.reply_media_video))
+        composeRule.runOnIdle { assertEquals("a tap on an evicted clip opened the viewer", 0, opens) }
+
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            opens == 1
+        }
+    }
+
     /** Taps the idle Download action, then completes the one transfer it starts with [bytes]. */
     private fun tapDownloadAndDeliver(bytes: ByteArray) {
         val download = text(R.string.media_tap_to_download)

@@ -431,6 +431,8 @@ internal fun MediaVoiceBubble(
             if (playableFile == null) {
                 localFile = null
                 totalDurationMs = 0
+                // The intent may already be interactive, so the token restarts the materialization this file ended.
+                reloadToken++
                 controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
                 return
             }

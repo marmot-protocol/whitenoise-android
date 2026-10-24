@@ -97,6 +97,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwa
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
+import dev.ipf.whitenoise.android.ui.conversation.media.validatedAttachmentCacheFile
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -858,6 +859,19 @@ private fun rememberLibraryClipOnDevice(
     return onDevice
 }
 
+/**
+ * Checks a Shared media clip at tap time, off the main thread. Returns the file the cache still holds, or null once
+ * it was evicted, and whether the clip is on the device: an evicted file also outdates the earlier cache probe, so
+ * that probe counts only while nothing had been loaded yet.
+ */
+private suspend fun libraryClipAtTap(
+    loaded: java.io.File?,
+    probedOnDevice: Boolean,
+): Pair<java.io.File?, Boolean> {
+    val current = loaded?.let { withContext(Dispatchers.IO) { validatedAttachmentCacheFile(it) } }
+    return current to (current != null || (loaded == null && probedOnDevice))
+}
+
 /** One voice row with playback. */
 @Composable
 internal fun VoiceLibraryRow(
@@ -919,9 +933,12 @@ internal fun VoiceLibraryRow(
                             VoicePlaybackController.pause()
                             return@clickable
                         }
-                        // A clip that is not on the device yet is only downloaded; the next tap plays it.
-                        val downloaded = playable
+                        // A clip that is not on the device yet is only downloaded; the next tap plays it. A file the
+                        // cache evicted since it was loaded is checked again here, so it is downloaded, not played.
+                        val probedOnDevice = onDevice == true
                         scope.launch {
+                            val (current, downloaded) = libraryClipAtTap(localFile, probedOnDevice)
+                            localFile = current
                             val file =
                                 localFile ?: runCatching {
                                     loading = true
