@@ -1,0 +1,67 @@
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
+
+abstract class StartupTraceExecution {
+    @Inject
+    abstract ExecOperations getExecOperations()
+}
+
+// This init script is passed only by the fixed healthy startup-trace command.
+// Select the existing release-derived app variant before AGP creates test variants.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { android ->
+                android.testBuildType = 'benchmarkRelease'
+                // This opt-in APK runs only the existing healthy timing fixture.
+                // Debug-only capability and notification fixtures remain in the
+                // normal debug test suite, never in the minified app under test.
+                def traceSources = [
+                    'dev/ipf/whitenoise/android/ManualDeviceFixture.kt',
+                    'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerHealthyBaselineDeviceTest.kt',
+                    'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerBaseline.kt',
+                    'dev/ipf/whitenoise/android/media/sandbox/MediaWorkerBaselineBinding.kt',
+                ]
+                def instrumented = android.sourceSets.getByName('androidTest')
+                instrumented.java.setIncludes(traceSources)
+                instrumented.kotlin.setIncludes(traceSources)
+                def benchmark = android.buildTypes.getByName('benchmarkRelease')
+                // Only this explicit trace command needs release-derived optimization.
+                // Reapply the existing benchmark identity/selectors after initWith resets them.
+                benchmark.initWith(android.buildTypes.getByName('release'))
+                benchmark.signingConfig = android.signingConfigs.getByName('debug')
+                benchmark.buildConfigField('boolean', 'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true')
+                // The runner shares Trace with the minified app under test.
+                benchmark.proguardFiles(project.rootProject.file('scripts/hosted-startup-trace.pro'))
+                if (benchmark.debuggable || !benchmark.minifyEnabled || !benchmark.shrinkResources) {
+                    throw new GradleException(
+                        'Startup timing requires the nondebuggable minified benchmarkRelease variant')
+                }
+            }
+        }
+    }
+}
+
+// Opt-in only: start after compilation dependencies, before the connected test task.
+gradle.projectsEvaluated {
+    def selected = gradle.rootProject.findProject(':app')
+    def execution = selected.objects.newInstance(StartupTraceExecution)
+    def workspace = gradle.rootProject.projectDir
+    selected.tasks.named('compileDevZapstoreBenchmarkReleaseAndroidTestKotlin').configure {
+        doFirst {
+            def report = new File(workspace, 'app/build/reports/media-startup-trace/compiled-test-inputs.json')
+            report.parentFile.mkdirs()
+            def sources = inputs.files.files.findAll { it.isFile() && (it.name.endsWith('.kt') || it.name.endsWith('.java')) }
+                .collect { workspace.toPath().relativize(it.toPath()).toString() }.sort()
+            report.text = groovy.json.JsonOutput.toJson([task: path, sources: sources]) + '\n'
+        }
+    }
+    selected.tasks.named('connectedDevZapstoreBenchmarkReleaseAndroidTest').configure {
+        doFirst {
+            execution.execOperations.exec { spec ->
+                spec.commandLine 'python3', 'scripts/hosted-startup-trace.py', 'start'
+                spec.workingDir(workspace)
+            }
+        }
+    }
+}

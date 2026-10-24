@@ -9,7 +9,9 @@ import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -107,8 +109,11 @@ class NewGroupNotificationDefaultsTest {
                 }
                 assertEquals(listOf(true, false, true, false), gateway.commands)
             } finally {
-                state.mutationsScope.cancel()
-                Dispatchers.resetMain()
+                try {
+                    requireNotNull(state.mutationsScope.coroutineContext[Job]).cancelAndJoin()
+                } finally {
+                    Dispatchers.resetMain()
+                }
             }
         }
 

@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/ReusableMediaTransport.kt",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Production reusable isolated still-image worker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/ReusableMediaTransport.kt",
+        "anchor": "internal class ReusableMediaTransport(",
+        "test_ids": [
+          "MED-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

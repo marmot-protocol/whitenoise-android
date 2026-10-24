@@ -109,6 +109,8 @@ internal suspend fun ConversationController.loadOlderPageInternal(
             is TimelinePageOutcome.Unchanged ->
                 unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER, origin, priorOldestId)
             is TimelinePageOutcome.Advanced -> {
+                // Outside the paging lock and before the apply timing: the page's cards are read first (#2238).
+                val olderPage = warmLaterPageEventCards(outcome.page)
                 val appliedAtMs = SystemClock.elapsedRealtime()
                 var committed = false
                 tracedPagingSection(ConversationPagingTraceSection.APPLY) {
@@ -116,7 +118,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
                         appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
                     ) { onCommitted ->
                         applyTimelinePage(
-                            outcome.page,
+                            olderPage,
                             replaceWindow = false,
                             updatePagination = true,
                             onCommitted = {
@@ -249,6 +251,8 @@ private suspend fun ConversationController.applyNewerPage(
     priorMessageIds: Set<String>,
     trace: PerformanceTrace?,
 ): ConversationPageLoad {
+    // Outside the paging lock and before the apply timing: the page's cards are read first (#2238).
+    val newerPage = warmLaterPageEventCards(page)
     val appliedAtMs = SystemClock.elapsedRealtime()
     var committed = false
     tracedPagingSection(ConversationPagingTraceSection.APPLY) {
@@ -256,7 +260,7 @@ private suspend fun ConversationController.applyNewerPage(
             appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
         ) { onCommitted ->
             applyTimelinePage(
-                page,
+                newerPage,
                 replaceWindow = false,
                 updatePagination = true,
                 reconcileNewExtendedRecords = true,
@@ -314,11 +318,15 @@ private suspend fun ConversationController.pageOlderIfActive(
             // would put a stale window on screen until the new subscription's snapshot lands.
             if (!retainsSubscription(handle)) return@withLock null
             if (anchored != null) {
+                // The anchor and the page after it must share this lock, so its card read runs inside it: only
+                // when the re-centred window brings card rows not on screen, typically 23–36 ms, at most the budget.
+                val anchoredPage = warmLaterPageEventCards(anchored, anchorMessageId = anchorId)
+                if (!retainsSubscription(handle)) return@withLock null
                 measureHostPerformanceCommit(
                     appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY),
                 ) { onCommitted ->
                     applyTimelinePage(
-                        anchored,
+                        anchoredPage,
                         replaceWindow = false,
                         updatePagination = true,
                         onCommitted = onCommitted,

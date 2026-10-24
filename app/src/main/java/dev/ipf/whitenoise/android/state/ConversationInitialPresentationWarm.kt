@@ -175,7 +175,7 @@ internal suspend fun warmInitialEventCardSnapshots(
             .orEmpty()
             .associateBy(TimelineMessageRecordFfi::messageIdHex)
     val records = work.eventCardRecords.map { record -> hydrated[record.messageIdHex] ?: record }
-    return snapshots.warm(records, readCached)
+    return snapshots.warm(records, readCached = readCached)
 }
 
 internal const val INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS = 100L
@@ -192,3 +192,9 @@ internal const val INITIAL_PRESENTATION_PROFILE_WARM_BUDGET_MILLIS = 100L
  */
 internal const val INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS = 1_000L
 private const val INITIAL_PRESENTATION_PROFILE_LIMIT = 12
+
+/**
+ * How long a later page waits for its cached event cards before it is applied — the first page's card budget, so no
+ * page waits longer for a card than an open does. A warm read settles in a few milliseconds, a cold one in tens.
+ */
+internal const val LATER_PAGE_EVENT_CARD_WARM_BUDGET_MILLIS = INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS

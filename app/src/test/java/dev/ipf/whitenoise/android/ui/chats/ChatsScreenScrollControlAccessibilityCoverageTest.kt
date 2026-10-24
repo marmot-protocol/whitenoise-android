@@ -11,7 +11,7 @@ class ChatsScreenScrollControlAccessibilityCoverageTest {
         val scrollControl =
             source.requiredSection(
                 start = "val scrollToTopLabel = stringResource(R.string.scroll_to_top)",
-                end = "\n                        contentAlignment = Alignment.Center,",
+                end = "contentAlignment = Alignment.Center,",
             )
 
         assertTrue(
