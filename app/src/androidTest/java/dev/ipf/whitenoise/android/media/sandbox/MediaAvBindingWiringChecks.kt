@@ -84,6 +84,13 @@ private fun checkAvBindingMode(
             check(result.observation.getBoolean("worker_soft_timeout"))
             check(!result.observation.getBoolean("success") && !result.observation.getBoolean("output_read"))
             check(result.observation.getBoolean("death_observed") && owner.unbinds == 1)
+        } else if (mode == AvWiringMode.SOFT_EXPIRED_CALLBACK) {
+            val result = binding.run(fixture, request)
+            check(result is AvCapabilityCase.ReplyDeadline)
+            check(!result.observation.getBoolean("output_read"))
+            check(!result.observation.getBoolean("terminal_reply_seen"))
+            check(result.observation.getBoolean("death_observed"))
+            check(owner.unbinds == 1)
         } else if (mode == AvWiringMode.DEADLINE_DEATH) {
             val result = binding.run(fixture, request)
             check(result is AvCapabilityCase.ReplyDeadline)
@@ -103,7 +110,9 @@ private fun checkAvBindingMode(
                     } else {
                         "Current terminal protocol or identity rejected"
                     }
-                check(result.exceptionOrNull()?.message == expected)
+                check(result.exceptionOrNull()?.message == expected) {
+                    "Mode=$mode expected=$expected actual=${result.exceptionOrNull()}"
+                }
                 check(owner.unbinds == 1)
             }
         }
@@ -119,6 +128,7 @@ private enum class AvWiringMode {
     SOFT_WRONG_TUPLE,
     SOFT_DUPLICATE,
     SOFT_LATE,
+    SOFT_EXPIRED_CALLBACK,
     BAD_READY,
     DUPLICATE_READY,
     BAD_TERMINAL,
@@ -211,8 +221,12 @@ private class AvWiringEndpoint(
                 sendAvProbeReady(callback, tuple)
                 when (mode) {
                     AvWiringMode.SOFT_TIMEOUT, AvWiringMode.SOFT_LATE -> {
-                        if (mode == AvWiringMode.SOFT_LATE) clock.set(MediaDecodePolicy.DEADLINE_MS + 1)
                         sendAvProbeSoftTimeout(callback, timeoutFrame(tuple))
+                        if (mode == AvWiringMode.SOFT_LATE) clock.set(MediaDecodePolicy.DEADLINE_MS + 1)
+                    }
+                    AvWiringMode.SOFT_EXPIRED_CALLBACK -> {
+                        clock.set(MediaDecodePolicy.DEADLINE_MS + 1)
+                        check(runCatching { sendAvProbeSoftTimeout(callback, timeoutFrame(tuple)) }.isFailure)
                     }
                     AvWiringMode.SOFT_WRONG_PID -> {
                         identity = identity.copy(pid = 4_243)

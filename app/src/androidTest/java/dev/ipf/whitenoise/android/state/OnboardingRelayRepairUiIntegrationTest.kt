@@ -4,7 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,6 +18,7 @@ import dev.ipf.marmotkit.OnboardingOptionsFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
 import dev.ipf.whitenoise.android.ui.onboarding.setup.MarmotAccountSetupClient
@@ -91,6 +92,7 @@ class OnboardingRelayRepairUiIntegrationTest {
         relay: LoopbackNostrRelay,
         account: String,
     ) {
+        val cancelLabel = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.cancel)
         compose.setContent {
             WhiteNoiseTheme { AccountSetupScreen(setup, { "Fixture" }, {}) }
         }
@@ -103,25 +105,25 @@ class OnboardingRelayRepairUiIntegrationTest {
                 step?.step == OnboardingStepFfi.RELAYS &&
                 OnboardingActionFfi.USE_RECOMMENDED_RELAYS in actions &&
                 OnboardingActionFfi.EDIT_RELAYS in actions &&
-                compose.onAllNodesWithText("Fix relay setup").fetchSemanticsNodes().size == 1 &&
-                compose.onAllNodesWithText("Review relays").fetchSemanticsNodes().size == 1
+                compose.onAllNodesWithTag("setup-action-USE_RECOMMENDED_RELAYS").fetchSemanticsNodes().size == 1 &&
+                compose.onAllNodesWithTag("setup-action-EDIT_RELAYS").fetchSemanticsNodes().size == 1
         }
-        compose.onNodeWithText("Fix relay setup").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").performScrollTo().assertIsDisplayed()
         compose
-            .onNodeWithText("Review relays")
+            .onNodeWithTag("setup-action-EDIT_RELAYS")
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         compose.waitUntil(30_000L) { setup.state.value.editor != null && !setup.state.value.busy }
         compose.onNodeWithTag("setup-editor-save").assertIsNotEnabled()
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
-        compose.onNodeWithText("Cancel").performScrollTo().performClick()
+        compose.onNodeWithText(cancelLabel).performScrollTo().performClick()
         compose.waitUntil(30_000L) { setup.state.value.editor == null && !setup.state.value.busy }
         assertNull(requireNotNull(native.onboardingSnapshot(account)).proposal)
-        compose.onNodeWithText("Fix relay setup").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Review relays").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-action-EDIT_RELAYS").performScrollTo().assertIsDisplayed()
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
-        compose.onNodeWithText("Fix relay setup").performClick()
+        compose.onNodeWithTag("setup-action-USE_RECOMMENDED_RELAYS").performClick()
         compose.waitUntil(30_000L) {
             setup.state.value.snapshot
                 ?.proposal != null &&
@@ -134,7 +136,7 @@ class OnboardingRelayRepairUiIntegrationTest {
                     ?.relayRepair,
             )
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
-        compose.onNodeWithText("Save changes").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-action-APPROVE_REPAIR").performScrollTo().performClick()
         awaitIdle(setup)
         assertTrue("The controller must surface native errors", !setup.state.value.error)
         assertEquals(1, relay.publicationAttempts(RELAY_LIST).size)
