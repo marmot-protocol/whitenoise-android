@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">No se pudieron cargar las conversaciones sin leer. Inténtalo de nuevo.</string>
     <string name="pull_unread_hint">Desliza para mostrar las conversaciones sin leer</string>
     <string name="pull_unread_release">Suelta para mostrar las conversaciones sin leer</string>
+    <string name="pull_unread_filtered">Filtrado por no leídos</string>
 </resources>

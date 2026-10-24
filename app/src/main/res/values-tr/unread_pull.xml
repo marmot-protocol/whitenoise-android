@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">Okunmamış sohbetler yüklenemedi. Yeniden deneyin.</string>
     <string name="pull_unread_hint">Okunmamış sohbetleri göstermek için çek</string>
     <string name="pull_unread_release">Okunmamış sohbetleri göstermek için bırak</string>
+    <string name="pull_unread_filtered">Okunmamışlara göre filtrelendi</string>
 </resources>

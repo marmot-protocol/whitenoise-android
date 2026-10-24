@@ -129,6 +129,15 @@ dev.ipf.whitenoise.android.media.sandbox.MediaCodecCorpusDeviceTest#realHeifFixt
 dev.ipf.whitenoise.android.media.sandbox.MediaCodecCorpusDeviceTest#platformAnimationCorpusStreamsChangingPixelsWithinAdmission
 dev.ipf.whitenoise.android.media.sandbox.MediaCodecCorpusDeviceTest#rotatedWebpIsQualifiedOrSafelyRefusedWithoutDisablingOrdinaryAnimation
 
+# Fixed-corpus still-worker characterization; focused containment and full suites, never PR smoke.
+dev.ipf.whitenoise.android.media.sandbox.MediaWorkerBaselineDeviceTest#characterizeDirectStillTransportWithFixedSyntheticCorpus
+
+# Still-worker death witness: PR smoke and focused containment.
+dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#eachStillInputWaitsForItsExactBinderDeathBeforeReturningPixels
+
+# Debug-only selected-descriptor A/V capability capture; focused containment and full suites.
+dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityDeviceTest#characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid
+
 # Reply constraint overflow on the native Android layout pipeline (#3387).
 dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroidTest#oversizedReplyBodyFitsAndReturnsToNormalSize
 dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroidTest#oversizedMarkdownBlockquoteFitsAndReturnsToNormalSize

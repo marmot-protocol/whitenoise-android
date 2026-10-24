@@ -10,10 +10,20 @@ responsiveness_only="${4:-false}"
 media_sandbox_only="${5:-false}"
 outbound_share_only="${6:-false}"
 mdk_adoption_only="${7:-false}"
-range_selection_only="${8:-false}"
+media_startup_trace="${8:-false}"
+media_startup_api="${9:-30}"
+range_selection_only="${10:-false}"
+
+if [[ "$media_startup_trace" == "true" ]]; then
+  if [[ "$range_selection_only" == "true" || "$event_name" != "workflow_dispatch" || "$media_sandbox_only" != "true" || "$media_startup_api" != "30" || "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$outbound_share_only" == "true" || "$mdk_adoption_only" == "true" ]]; then
+    echo "Startup tracing requires the exclusive hosted API 30 media dispatch" >&2
+    exit 2
+  fi
+  exec python3 scripts/hosted-startup-trace.py run
+fi
 
 if [[ "$event_name" == "workflow_dispatch" && "$range_selection_only" == "true" ]]; then
-  if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$media_sandbox_only" == "true" || "$outbound_share_only" == "true" || "$mdk_adoption_only" == "true" ]]; then
+  if [[ "$media_startup_trace" == "true" || "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$media_sandbox_only" == "true" || "$outbound_share_only" == "true" || "$mdk_adoption_only" == "true" ]]; then
     echo "Select one focused instrumented suite per dispatch" >&2
     exit 2
   fi
@@ -63,7 +73,7 @@ if [[ "$event_name" == "workflow_dispatch" && "$media_sandbox_only" == "true" ]]
     --no-daemon --stacktrace
   required_file="$(mktemp)"
   trap 'rm -f "$required_file"' EXIT
-  grep -E '\.(IsolatedMediaDecoderDeviceTest|AnimationSourceAdmissionDeviceTest|MediaCodecCorpusDeviceTest)#' config/instrumented-required-cases.txt > "$required_file"
+  grep -E '\.(IsolatedMediaDecoderDeviceTest|AnimationSourceAdmissionDeviceTest|MediaCodecCorpusDeviceTest|MediaWorkerBaselineDeviceTest|MediaAvCapabilityDeviceTest)#' config/instrumented-required-cases.txt > "$required_file"
   python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected --required "$required_file"
   exit 0
 fi

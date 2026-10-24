@@ -24,7 +24,7 @@ internal data class ChatListPreviewInput(
     override fun toString(): String = "ChatListPreviewInput(redacted)"
 }
 
-/** Shared row and selection renderer; fallback callbacks retain the row's lazy precedence. */
+/** Chat-row preview renderer; fallback callbacks retain the row's lazy precedence. */
 @Suppress("LongParameterList")
 internal fun projectedChatListPreviewText(
     preview: ChatListPreviewInput?,

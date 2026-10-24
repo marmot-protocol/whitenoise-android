@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">無法載入未讀聊天，請重試。</string>
     <string name="pull_unread_hint">下拉以顯示未讀聊天</string>
     <string name="pull_unread_release">放開以顯示未讀聊天</string>
+    <string name="pull_unread_filtered">已篩選未讀聊天</string>
 </resources>

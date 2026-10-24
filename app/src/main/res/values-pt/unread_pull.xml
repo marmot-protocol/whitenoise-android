@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">Não foi possível carregar as conversas não lidas. Tente novamente.</string>
     <string name="pull_unread_hint">Puxe para mostrar conversas não lidas</string>
     <string name="pull_unread_release">Solte para mostrar conversas não lidas</string>
+    <string name="pull_unread_filtered">Filtrado por não lidas</string>
 </resources>
