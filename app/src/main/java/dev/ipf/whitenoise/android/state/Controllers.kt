@@ -10584,12 +10584,6 @@ class ConversationController(
         attachmentIndex: Int,
     ): AttachmentOpenRequest? = attachmentPresentation.attachmentOpenRequest(messageIdHex, attachmentIndex)
 
-    /** Whether this attachment still has an unconsumed open intent. */
-    internal fun hasAttachmentOpenIntent(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): Boolean = attachmentPresentation.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)
-
     /** Whether this attachment still has an armed in-place download. */
     internal fun hasAttachmentDownloadIntent(
         messageIdHex: String,

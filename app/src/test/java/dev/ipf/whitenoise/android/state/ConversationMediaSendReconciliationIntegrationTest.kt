@@ -245,7 +245,8 @@ class ConversationMediaSendReconciliationIntegrationTest {
                         state.toast?.title,
                     )
                 }
-                assertFalse(controller.hasAttachmentOpenIntent(CONFIRMED_MESSAGE_ID, 0))
+                val openRequest = controller.attachmentOpenRequest(CONFIRMED_MESSAGE_ID, 0)
+                assertFalse(openRequest?.let(state.attachmentOpens::hasIntent) == true)
                 assertFalse(controller.hasAttachmentDownloadIntent(CONFIRMED_MESSAGE_ID, 0))
                 controller.onCleared()
                 val accepted =

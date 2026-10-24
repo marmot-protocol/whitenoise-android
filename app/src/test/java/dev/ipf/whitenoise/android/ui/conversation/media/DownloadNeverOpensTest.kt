@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -164,7 +165,7 @@ class DownloadNeverOpensTest {
 
         composeRule.runOnIdle {
             assertEquals("a download tap requested an open", revision, fixture.state.attachmentOpens.revision)
-            assertFalse(controller.hasAttachmentOpenIntent(request(0).messageIdHex, 0))
+            assertFalse(hasOpenIntent())
         }
         composeRule.onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0)).performClick()
         composeRule.runOnIdle {
@@ -188,6 +189,8 @@ class DownloadNeverOpensTest {
 
         composeRule.onNodeWithTag(videoAttachmentOpenTestTag(request(0).messageIdHex, 0)).performClick()
         awaitSingleTransfer()
+        // The play disc's progress ring is named, so TalkBack never reads a nameless control while it downloads.
+        awaitDescribed(text(R.string.media_downloading))
         composeRule.runOnIdle { shown = false }
         composeRule.runOnIdle { fixture.calls.single().succeed(byteArrayOf(1, 2, 3, 4)) }
         composeRule.runOnIdle { shown = true }
@@ -311,6 +314,38 @@ class DownloadNeverOpensTest {
         composeRule.runOnIdle { VoicePlaybackController.stop() }
     }
 
+    /**
+     * A Shared media voice row for a clip already on the device never offers Download, not even for the frame before
+     * its cache probe answers, so its first tap plays it.
+     */
+    @Test
+    fun aSharedMediaVoiceRowForACachedClipNeverOffersDownload() {
+        val row = sharedMediaRow(reference(0).copy(mediaType = "audio/ogg", fileName = "note.ogg"))
+        var generation by mutableStateOf(0)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                key(generation) {
+                    VoiceLibraryRow(row, controller, fixture.state, onJumpToMessage = {})
+                }
+            }
+        }
+        val download = text(R.string.media_tap_to_download)
+        awaitDescribed(download)
+        composeRule.onNodeWithContentDescription(download).performClick()
+        awaitSingleTransfer()
+        composeRule.runOnIdle { fixture.calls.single().succeed(byteArrayOf(1, 2, 3, 4)) }
+        awaitDescribed(text(R.string.voice_message_play))
+
+        // Look at the recreated row's first frame, before its cache probe can have answered.
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread { generation++ }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onAllNodesWithContentDescription(download).assertCountEquals(0)
+        composeRule.mainClock.autoAdvance = true
+        awaitDescribed(text(R.string.voice_message_play))
+        composeRule.onAllNodesWithContentDescription(download).assertCountEquals(0)
+    }
+
     /** Taps the idle Download action, then completes the one transfer it starts with [bytes]. */
     private fun tapDownloadAndDeliver(bytes: ByteArray) {
         val download = text(R.string.media_tap_to_download)
@@ -326,7 +361,7 @@ class DownloadNeverOpensTest {
             assertEquals("a completed download opened the attachment", 0, opens)
             assertFalse(
                 "a download recorded an open",
-                controller.hasAttachmentOpenIntent(request(0).messageIdHex, 0),
+                hasOpenIntent(),
             )
             assertFalse(
                 "a completed download left its intent pending",
@@ -334,6 +369,12 @@ class DownloadNeverOpensTest {
             )
         }
         assertEquals("the download started more than one transfer", 1, fixture.calls.size)
+    }
+
+    /** Whether the open coordinator holds an open intent for the first attachment, as a launch would claim. */
+    private fun hasOpenIntent(): Boolean {
+        val openRequest = controller.attachmentOpenRequest(request(0).messageIdHex, 0) ?: return false
+        return fixture.state.attachmentOpens.hasIntent(openRequest)
     }
 
     /** Waits until the production surface has asked the native boundary once. */

@@ -994,12 +994,7 @@ internal fun MediaVideoBubble(
                                     contentDescription = stringResource(R.string.media_tap_to_download),
                                     modifier = Modifier.size(24.dp),
                                 )
-                            loading ->
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp,
-                                    color = LocalContentColor.current,
-                                )
+                            loading -> VideoDownloadingRing()
                             failed ->
                                 Icon(
                                     Icons.Default.Refresh,
@@ -1010,12 +1005,7 @@ internal fun MediaVideoBubble(
                                             .clickable(enabled = !loading) { retryFailedPlayback() },
                                 )
                             // An accepted download that has not started yet is still a download, never Play.
-                            localFile == null && !sendingFromStagedFile ->
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp,
-                                    color = LocalContentColor.current,
-                                )
+                            localFile == null && !sendingFromStagedFile -> VideoDownloadingRing()
                             else ->
                                 Icon(
                                     painter = painterResource(R.drawable.ic_play_arrow),
@@ -1733,4 +1723,16 @@ internal fun VideoUploadIndicator(progress: () -> FileUploadProgress?) {
             color = LocalContentColor.current,
         )
     }
+}
+
+/** The video play disc's progress ring while its clip downloads, named as the voice note's Downloading state is. */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun VideoDownloadingRing() {
+    val downloading = stringResource(R.string.media_downloading)
+    CircularProgressIndicator(
+        modifier = Modifier.size(24.dp).semantics { contentDescription = downloading },
+        strokeWidth = 2.dp,
+        color = LocalContentColor.current,
+    )
 }

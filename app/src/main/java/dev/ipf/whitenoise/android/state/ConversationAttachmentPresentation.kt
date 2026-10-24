@@ -189,15 +189,6 @@ internal class ConversationAttachmentPresentation(
         )
     }
 
-    /** Whether an unconsumed open intent still belongs to this attachment. */
-    fun hasAttachmentOpenIntent(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): Boolean {
-        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
-        return appState.attachmentOpens.hasIntent(request)
-    }
-
     /** Upgrade an optimistic imeta fallback before download/save uses its epoch. */
     suspend fun authoritativeAttachmentReference(
         messageIdHex: String,

@@ -834,6 +834,30 @@ private fun VoiceLibraryActionIcon(
     }
 }
 
+/**
+ * Whether a Shared media clip is on the device, or null until the cache probe answers. The reader's own clip still
+ * held in memory for its upload counts at once, as it does for a file row.
+ */
+@Composable
+private fun rememberLibraryClipOnDevice(
+    controller: ConversationController,
+    row: SharedMediaRow,
+    pillKey: String,
+): Boolean? {
+    val retainedOwnClip =
+        remember(pillKey, row.mine) {
+            row.mine &&
+                controller
+                    .pendingAttachmentsList(row.messageIdHex)
+                    .getOrNull(row.attachmentIndex)
+                    ?.inMemoryBytes != null
+        }
+    val onDevice by produceState<Boolean?>(initialValue = true.takeIf { retainedOwnClip }, pillKey, retainedOwnClip) {
+        value = retainedOwnClip || controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
+    }
+    return onDevice
+}
+
 /** One voice row with playback. */
 @Composable
 internal fun VoiceLibraryRow(
@@ -855,20 +879,11 @@ internal fun VoiceLibraryRow(
         )
     var localFile by remember(pillKey) { mutableStateOf<java.io.File?>(null) }
     var loading by remember(pillKey) { mutableStateOf(false) }
-    // Whether the clip is on the device, resolved when the row composes: the reader's own clip still held in memory
-    // for its upload counts, as for a file row. Until it is, the control offers Download rather than Play.
-    val retainedOwnClip =
-        remember(pillKey, row.mine) {
-            row.mine &&
-                controller
-                    .pendingAttachmentsList(row.messageIdHex)
-                    .getOrNull(row.attachmentIndex)
-                    ?.inMemoryBytes != null
-        }
-    val onDevice by produceState(initialValue = retainedOwnClip, pillKey, retainedOwnClip) {
-        value = retainedOwnClip || controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
-    }
-    val playable = onDevice || localFile != null
+    // The control stays hidden and inert until the cache probe answers, so a cached clip never flashes Download; it
+    // then offers Download until the clip is local, and Play after.
+    val onDevice = rememberLibraryClipOnDevice(controller, row, pillKey)
+    val playable = onDevice == true || localFile != null
+    val actionReady = onDevice != null || localFile != null
 
     val isPlayingThis by remember(pillKey) {
         VoicePlaybackController.state
@@ -899,7 +914,7 @@ internal fun VoiceLibraryRow(
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clickable(enabled = !loading) {
+                    .clickable(enabled = !loading && actionReady) {
                         if (isPlayingThis) {
                             VoicePlaybackController.pause()
                             return@clickable
@@ -939,7 +954,7 @@ internal fun VoiceLibraryRow(
                         }
                     },
         ) {
-            VoiceLibraryActionIcon(loading = loading, playable = playable, playing = isPlayingThis)
+            if (actionReady) VoiceLibraryActionIcon(loading = loading, playable = playable, playing = isPlayingThis)
         }
         SenderAvatar(sender = row.sender, appState = appState)
         Column(modifier = Modifier.weight(1f)) {

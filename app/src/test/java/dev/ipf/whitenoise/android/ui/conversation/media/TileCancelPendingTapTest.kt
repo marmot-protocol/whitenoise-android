@@ -163,7 +163,9 @@ class TileCancelPendingTapTest {
 
     /** True once a tap has persisted the reader's intent to open or download the first attachment. */
     private fun hasOpenIntent(): Boolean =
-        controller.hasAttachmentOpenIntent(request(0).messageIdHex, 0) ||
+        controller
+            .attachmentOpenRequest(request(0).messageIdHex, 0)
+            ?.let(fixture.state.attachmentOpens::hasIntent) == true ||
             controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
 
     /** Production image tile for the first fixture attachment. */

@@ -85,6 +85,22 @@
         "test_ids": [
           "MED-037"
         ]
+      },
+      {
+        "surface": "VideoDownloadingRing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "fun VideoDownloadingRing(",
+        "test_ids": [
+          "MED-037"
+        ]
+      },
+      {
+        "surface": "Downloading video accessibility state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-037"
+        ]
       }
     ],
     "settings_controls": [
