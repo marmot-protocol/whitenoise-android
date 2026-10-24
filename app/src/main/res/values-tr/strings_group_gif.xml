@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">Bu GIF grup için kullanılsın mı?</string>
+    <string name="group_gif_upload_notice">Animasyonlu GIF herkese açık bir görsel sunucusuna yüklenecek. Bağlantıya sahip herkes görüntüleyebilir. GIF kırpılmadan, tamamı kullanılacak.</string>
+    <string name="group_gif_upload_confirm">GIF yükle</string>
+</resources>

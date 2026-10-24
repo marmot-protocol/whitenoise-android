@@ -144,6 +144,7 @@ internal fun ChatAbandonmentHost(
                     request.target.conversationTitle,
                     avatar.pictureUrl,
                     avatar.image,
+                    groupAnimation = avatar.groupAnimation,
                 ),
             )
         },

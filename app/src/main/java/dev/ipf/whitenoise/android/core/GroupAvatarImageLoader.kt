@@ -59,10 +59,21 @@ internal object GroupAvatarImageLoader {
     // returning these bytes. Serialize group-avatar fetches so a custom client
     // cannot multiply that temporary allocation on Android.
     private val loadPermits = Semaphore(permits = 1)
+
+    private data class CachedAvatar(
+        val image: ImageBitmap,
+        val animation: ByteArray?,
+    )
+
     private val cache =
-        ByteSizeLruCache<String, ImageBitmap>(
+        ByteSizeLruCache<String, CachedAvatar>(
             maxBytes = CACHE_SIZE_BYTES.toLong(),
-            sizeOf = { image -> image.asAndroidBitmap().byteCount.coerceAtLeast(1) },
+            sizeOf = { entry ->
+                entry.image
+                    .asAndroidBitmap()
+                    .byteCount
+                    .coerceAtLeast(1) + (entry.animation?.size ?: 0)
+            },
             onEvicted = {
                 AvatarCacheDiagnostics.evicted(AvatarCacheKind.GROUP)
                 AvatarCacheChanges.published()
@@ -75,9 +86,12 @@ internal object GroupAvatarImageLoader {
     /** Returns already decoded pixels without starting a group-image fetch. */
     fun peek(key: String?): ImageBitmap? =
         key?.let {
-            synchronized(lock) { cache.get(it) }
+            synchronized(lock) { cache.get(it)?.image }
                 .also { image -> AvatarCacheDiagnostics.lookup(AvatarCacheKind.GROUP, image != null) }
         }
+
+    /** Original GIF bytes retained by the first-frame load, within the same bitmap/source byte budget. */
+    fun peekAnimatedSource(key: String?): ByteArray? = key?.let { synchronized(lock) { cache.get(it)?.animation } }
 
     /** Test-only injection for deterministic first-frame composition coverage. */
     internal fun putCached(
@@ -87,7 +101,7 @@ internal object GroupAvatarImageLoader {
         val cacheKey = key.trim()
         if (cacheKey.isEmpty()) return
         synchronized(lock) {
-            cache.put(cacheKey, image)
+            cache.put(cacheKey, CachedAvatar(image, null))
             AvatarCacheChanges.published()
         }
     }
@@ -102,7 +116,7 @@ internal object GroupAvatarImageLoader {
             synchronized(lock) {
                 cache.get(key)?.let {
                     AvatarCacheDiagnostics.lookup(AvatarCacheKind.GROUP, true)
-                    return@synchronized CompletedGroupAvatarRequest(it)
+                    return@synchronized CompletedGroupAvatarRequest(it.image)
                 }
                 AvatarCacheDiagnostics.lookup(AvatarCacheKind.GROUP, false)
                 inFlight[key]?.let {
@@ -115,6 +129,7 @@ internal object GroupAvatarImageLoader {
                 val launchedGeneration = cacheLifetime.capture()
                 val launchedRequest = requestLifetime.capture()
                 scope.launch {
+                    var animation: ByteArray? = null
                     val image =
                         runCatching {
                             loadPermits.withPermit {
@@ -123,6 +138,7 @@ internal object GroupAvatarImageLoader {
                                 val bytes = fetchBytes()
                                 if (!isCurrentGeneration(launchedGeneration, launchedRequest)) return@withPermit null
                                 if (!isGroupAvatarPayloadAccepted(bytes)) return@withPermit null
+                                animation = profileAvatarAnimationSource(bytes)
                                 AvatarCacheDiagnostics.decode(AvatarCacheKind.GROUP)
                                 MediaPipeline
                                     .decodeSampledBitmap(bytes, MAX_EDGE_PX)
@@ -132,7 +148,7 @@ internal object GroupAvatarImageLoader {
                     synchronized(lock) {
                         val current = isCurrentGeneration(launchedGeneration, launchedRequest)
                         if (current && image != null) {
-                            cache.put(key, image)
+                            cache.put(key, CachedAvatar(image, animation))
                             AvatarCacheChanges.published()
                         }
                         inFlight.remove(key, deferred)

@@ -116,10 +116,11 @@ internal object IsolatedMediaDecoder {
     fun animation(
         bytes: ByteArray,
         edge: Int,
+        decorative: Boolean = false,
     ): android.graphics.drawable.Drawable? =
         safely {
             if (it is IsolatedMediaTransport) {
-                installedContext?.let { context -> IsolatedAnimationSession.create(context, bytes, edge) }
+                installedContext?.let { context -> IsolatedAnimationSession.create(context, bytes, edge, decorative) }
             } else {
                 it.animation(bytes, edge)
             }

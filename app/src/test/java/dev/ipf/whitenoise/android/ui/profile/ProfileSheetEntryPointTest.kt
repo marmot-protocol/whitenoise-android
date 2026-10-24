@@ -73,6 +73,13 @@ class ProfileSheetEntryPointTest {
         composeRule.onNodeWithText(app.getString(R.string.profile_follow)).assertDoesNotExist()
     }
 
+    @Test
+    fun directMembershipEntryOpensTheExistingGroupsDestination() {
+        renderProfile { it.presentProfile(TARGET_NPROFILE, groupsInCommon = true) }
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.onNodeWithTag("groups_in_common.add").assertExists()
+    }
+
     private fun renderProfile(present: (WhiteNoiseAppState) -> Unit): WhiteNoiseAppState {
         val appState =
             WhiteNoiseAppState(

@@ -1,0 +1,97 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+  "legacy_sha256": "f5efcc00c2a705b1cbf692f1d2fd1370ccd4b98e0b7f89ecd4f292b4fbaa61c9",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PersonGroupsInCommonContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "fun PersonGroupsInCommonContent(",
+        "test_ids": [
+          "ACC-008",
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "PersonSharedGroupAvatars",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "fun PersonSharedGroupAvatars(",
+        "test_ids": [
+          "ACC-008"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.members_count",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_add_to_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_add_to_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_group_memberships_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_group_memberships_unavailable",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_groups_in_common",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_groups_in_common",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_no_groups_in_common",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.person_no_groups_in_common",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.profile_add_to_another_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.profile_add_to_another_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "ACC-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: PersonGroupsInCommonContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
