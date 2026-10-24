@@ -5966,6 +5966,28 @@
         }
       ],
       "remaining": "Live all-four selection, persistence/failure recovery, font/RTL/AMOLED layout, lifecycle and accessibility qualification remain required. A registered direct assertion is not executed Maestro or physical proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+      "symbol": "FontFamilyDialog",
+      "bindings": [
+        {
+          "case": "preferences-font-cancel",
+          "entry_assertion": {
+            "id": "font_family.preview.viewport"
+          },
+          "opened_by": {
+            "tapOn": {
+              "text": "App font"
+            }
+          },
+          "selector": {
+            "id": "font_family.system"
+          },
+          "scope": "The existing runtime preferences fixture opens the real App font dialog, directly asserts its preview viewport and fixed System/Done actions, then dismisses with Done without changing the selected family. Source registration only; actual Maestro execution remains separately required."
+        }
+      ],
+      "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
     }
   ]
 }
