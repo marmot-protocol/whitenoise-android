@@ -35,7 +35,7 @@ still have their existing behavior.
 ## Runtime integration that must precede the controls
 
 The inspected Android base is
-[`b76ad1dcf`](https://github.com/marmot-protocol/whitenoise-android/tree/b76ad1dcf).
+[`b76ad1dcf`](https://github.com/marmot-protocol/whitenoise-android/tree/b76ad1dcf513e76e74a140187e4292cfb8c24bd8).
 Its pinned MDK is
 [`3fb4b4759ac676b0c21c4c3527074866c9fa4c89`](https://github.com/marmot-protocol/mdk/tree/3fb4b4759ac676b0c21c4c3527074866c9fa4c89).
 Source inspection establishes these constraints; no physical-device observation
@@ -63,10 +63,13 @@ is claimed:
 A correct implementation needs explicit ownership for bounded native work and
 safe retirement/reopening of the one process runtime. It must account for
 foreground UI, notification actions, transfers and dictation, reject stale
-callbacks, and rebind subscriptions after replacement. Alternatively, a reviewed
-MDK messaging-network suspension contract could preserve local access and
-independent attachment work. The current source does not establish either
-integration. Do not solve this by constructing a second concurrent runtime,
+callbacks, and rebind subscriptions after replacement. Runtime leases alone are
+insufficient: keeping a started runtime alive for a transfer also keeps its
+message workers alive. Skipping `start()` is not a verified messaging-free media
+path either: native `download_media` routes through account-worker reconciliation.
+A reviewed MDK messaging-network suspension contract could preserve local access
+and independent attachment work. Any alternative must demonstrate that same
+separation; the current source does not establish it. Do not solve this by constructing a second concurrent runtime,
 calling `shutdown()` followed by `start()` on the same handle, or claiming a
 coroutine timeout bounds native work.
 
@@ -74,8 +77,10 @@ coroutine timeout bounds native work.
 
 1. Establish and test native/runtime ownership, including foreground arrival
    during close, worker cancellation during bootstrap/catch-up, replacement
-   failure, and active attachment/notification-action leases. Keep attachment
-   consent independent. If the required capability belongs in MDK, adopt its
+   failure, and active attachment/notification-action leases. Explicitly test
+   **background attachment active + message sync disabled + no autonomous
+   message/invite relay work**. Do not call leases alone sufficient, and keep
+   attachment consent independent. If the required capability belongs in MDK, adopt its
    reviewed published artifact before using it in Android.
 2. Persist independent sync consent after authoritative migration. Retain the
    selected transport, including multi-account native-push intent. Use the
