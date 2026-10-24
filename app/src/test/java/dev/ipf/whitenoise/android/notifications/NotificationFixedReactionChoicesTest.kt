@@ -177,7 +177,7 @@ class NotificationFixedReactionChoicesTest {
 
     @Test
     fun actualEmojiMessagePairStaysOneLogicalRowAndKeepsItsNativeUri() =
-        kotlinx.coroutines.runBlocking {
+        kotlinx.coroutines.runBlocking<Unit> {
             RecentEmojiPreferences.saveQuickReactions(context, choices)
             val sender =
                 Person
