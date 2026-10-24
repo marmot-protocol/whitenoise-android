@@ -22,6 +22,54 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ViewerGroupImageControllerTest {
+    @Test
+    fun multiDeviceDirectRosterCannotAdmitViewerGroupImageMutation() =
+        runTest {
+            val native = NativeImageFixture()
+            native.group = native.group.copy(name = "")
+            val self = native.members.single()
+            val peer =
+                self.copy(
+                    memberIdHex = ConversationTimelineTestIds.SENDER_ID,
+                    isSelf = false,
+                    local = false,
+                    account = null,
+                )
+            native.members = listOf(self, self, self, self, peer)
+            val state =
+                WhiteNoiseAppState(
+                    context = ApplicationProvider.getApplicationContext(),
+                    draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
+                    accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
+                    accounts =
+                        listOf(
+                            AccountSummaryFfi(
+                                label = ACCOUNT,
+                                accountIdHex = ConversationTimelineTestIds.ACCOUNT_ID,
+                                localSigning = true,
+                                externalSigning = false,
+                                signedOut = false,
+                                running = true,
+                            ),
+                        ),
+                    activeAccountRef = ACCOUNT,
+                    initialMarmotRuntime = AppMarmotRuntime("test", native.proxy()),
+                    marmotIoDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            val draft = ImageUploadDraft(PICTURE, "image/jpeg", null, "20x20", null)
+
+            val admission =
+                admitViewerGroupImageMutation(
+                    state,
+                    ScopedGroupImageMutation(draft) { true }.forViewer(false),
+                    ACCOUNT,
+                    native.group.groupIdHex,
+                )
+
+            assertFalse(admission.allowed)
+            assertEquals(0, native.uploads)
+        }
+
     /** A matching cleanup ticket cannot overrule changed/removed authoritative pixels on viewer retry. */
     @Test
     fun partialCleanupRetryReconcilesCurrentNativeImageAndRefreshesAuthoritativeState() =
@@ -118,6 +166,7 @@ class ViewerGroupImageControllerTest {
         var current: ByteArray? = null
         var failCleanup = true
         var rejectCommittedProjection = false
+        var members = conversationTimelineGroupRoster().members
         var uploads = 0
         var cleanups = 0
 
@@ -139,7 +188,7 @@ class ViewerGroupImageControllerTest {
                                     AppProtocolProfileFfi.LEGACY,
                                     GroupLifecycleStateFfi.STABLE,
                                     0uL,
-                                    1u,
+                                    members.size.toUInt(),
                                     false,
                                     emptyList(),
                                     false,
@@ -152,7 +201,7 @@ class ViewerGroupImageControllerTest {
                                 if (rejectCommittedProjection && uploads > 0) {
                                     emptyList()
                                 } else {
-                                    conversationTimelineGroupRoster().members
+                                    members
                                 },
                         )
                     "downloadGroupBlossomImage" -> requireNotNull(current)

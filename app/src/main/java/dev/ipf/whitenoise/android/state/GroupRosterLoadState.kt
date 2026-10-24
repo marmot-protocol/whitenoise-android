@@ -138,8 +138,9 @@ internal fun resolveAuthoritativeGroupRoster(
             !activeJoinedGroup -> null
             uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
             !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
-            details.members.size.toLong() !=
-                details.mlsState.memberCount.toLong() -> GroupRosterInvariant.MEMBER_COUNT_MISMATCH
+            // MDK may return one row per leaf or one row per account.
+            uniqueMemberCount.toLong() > details.mlsState.memberCount.toLong() ->
+                GroupRosterInvariant.MEMBER_COUNT_MISMATCH
             else -> null
         }
     return GroupRosterResolution(
@@ -201,7 +202,8 @@ internal fun resolveAuthoritativeGroupRoster(
             !activeJoinedGroup -> null
             uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
             !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
-            uniqueMemberCount.toLong() != roster.memberCount.toLong() ->
+            // MDK may return one row per leaf or one row per account.
+            uniqueMemberCount.toLong() > roster.memberCount.toLong() ->
                 GroupRosterInvariant.MEMBER_COUNT_MISMATCH
             else -> null
         }
