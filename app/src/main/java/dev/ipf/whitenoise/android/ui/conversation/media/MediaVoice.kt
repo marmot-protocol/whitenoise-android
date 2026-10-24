@@ -415,7 +415,10 @@ internal fun MediaVoiceBubble(
             AttachmentMaterializationIntent.Idle.withPolicyAllowed(retryAllowedByPolicy)
     }
 
-    /** Plays a materialized voice file after validating the cache entry. */
+    /**
+     * Plays a materialized voice file after validating the cache entry. A file evicted since it was downloaded is
+     * downloaded again in place, and a later tap plays it.
+     */
     suspend fun playReadyVoice(file: java.io.File) {
         // Held until the player has opened the file, so another publication in the voice cache cannot delete it
         // between this check and the player's open.
@@ -428,7 +431,7 @@ internal fun MediaVoiceBubble(
             if (playableFile == null) {
                 localFile = null
                 totalDurationMs = 0
-                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
                 return
             }
             localFile = playableFile
@@ -494,7 +497,8 @@ internal fun MediaVoiceBubble(
         loading = false
     }
 
-    persistedAttachmentOpenEffect(
+    // A tapped download completes in place and never starts playback; the play button plays it afterwards.
+    persistedAttachmentDownloadEffect(
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         sourceEpoch = epoch,
@@ -507,14 +511,6 @@ internal fun MediaVoiceBubble(
                 reloadToken++
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
-        },
-        dispatchOpen = {
-            val file = localFile
-            if (file == null) {
-                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-            } else {
-                playReadyVoice(file)
-            }
         },
     )
 
@@ -557,7 +553,7 @@ internal fun MediaVoiceBubble(
             controller.retryAttachmentTransfer(
                 messageIdHex,
                 attachmentIndex,
-                onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
                 onFailure = { markFailed(it) },
             )
         },
@@ -567,11 +563,11 @@ internal fun MediaVoiceBubble(
                     controller.retryAttachmentTransfer(
                         messageIdHex,
                         attachmentIndex,
-                        onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                        onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
                         onFailure = { markFailed(it) },
                     )
                 loading || localFile == null ->
-                    controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                    controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
                 isPlayingThis -> {
                     failed = false
                     presentationRuntime.pause()

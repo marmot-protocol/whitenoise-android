@@ -293,7 +293,10 @@ class FreshSweepCoverageTest {
         assertEquals(1L, relativeTimeRefreshDelayMillis(Instant.ofEpochMilli(179_999L)))
     }
 
-    /** Keeps retained-file revalidation wired through the row-independent video open owner. */
+    /**
+     * Keeps retained-file revalidation wired: an evicted voice or video file is downloaded again in place and is never
+     * opened or played once it returns.
+     */
     @Test
     fun retainedMediaFilesAreRevalidatedBeforePlayback() {
         val voice = source("ui/conversation/media/MediaVoice.kt")
@@ -306,23 +309,23 @@ class FreshSweepCoverageTest {
             "voice playback must rematerialize a retained file that LRU eviction removed",
             "validatedAttachmentCacheFile(file)" in voiceBubble &&
                 "localFile = null" in voiceBubble &&
-                "controller.requestAttachmentOpen(messageIdHex, attachmentIndex)" in voiceBubble &&
-                "persistedAttachmentOpenEffect(" in voiceBubble,
+                "controller.requestAttachmentDownload(messageIdHex, attachmentIndex)" in voiceBubble &&
+                "persistedAttachmentDownloadEffect(" in voiceBubble &&
+                "requestAttachmentOpen(" !in voiceBubble,
         )
         assertTrue(
-            "video playback must rematerialize through the conversation-owned viewer after LRU eviction",
+            "video playback must download an evicted file again in place rather than open it",
             "validatedAttachmentCacheFile(localFile)" in videoBubble &&
                 "localFile = null" in videoBubble &&
-                "dispatchViewerOpen()" in videoBubble &&
-                "persistedAttachmentOpenEffect(" in videoBubble,
+                "requestDownload()" in videoBubble &&
+                "persistedAttachmentDownloadEffect(" in videoBubble,
         )
         assertTrue(
-            "album video tiles must rematerialize an evicted retained file before opening",
-            "validatedAttachmentCacheFile(localFile)" in videoGridTile &&
-                "localFile = null" in videoGridTile &&
-                "controller.requestAttachmentOpen(messageIdHex, attachmentIndex)" in videoGridTile &&
-                "persistedAttachmentOpenEffect(" in videoGridTile &&
-                "dispatchViewerOpen()" in videoGridTile,
+            "album video tiles must download in place and open only from a tap",
+            "controller.requestAttachmentDownload(messageIdHex, attachmentIndex)" in videoGridTile &&
+                "persistedAttachmentDownloadEffect(" in videoGridTile &&
+                "localFile != null && !retry -> onTap()" in videoGridTile &&
+                "requestAttachmentOpen(" !in videoGridTile,
         )
     }
 

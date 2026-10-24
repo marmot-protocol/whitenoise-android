@@ -163,7 +163,7 @@ class TileTransferDeviceTest {
         HeldAttachmentCancellationProbe.control(blobPort, "/__hold-resumable-acquisition")
         driver.host(tile)
         val row = scenario("known-cancel-again", tile)
-        row.put("idle_download_seen", driver.waitFor { driver.idleDownload(tile) })
+        row.put("idle_download_seen", driver.waitFor { driver.idleDownload() })
         driver.tapDownload(tile)
         val bytes = driver.waitForDescription(" of ")
         row.put("bytes_text", bytes.orEmpty())
@@ -193,7 +193,7 @@ class TileTransferDeviceTest {
         HeldAttachmentCancellationProbe.control(blobPort, "/__acquisition-not-found")
         driver.host(tile)
         val row = scenario("failed-then-retried", tile)
-        row.put("idle_download_seen", driver.waitFor { driver.idleDownload(tile) })
+        row.put("idle_download_seen", driver.waitFor { driver.idleDownload() })
         driver.tapDownload(tile)
         val retry = driver.string(R.string.media_tap_to_retry)
         val failedSeen = driver.waitFor(FAILURE_TIMEOUT_MILLIS) { driver.descriptionIs(retry) }
@@ -214,7 +214,7 @@ class TileTransferDeviceTest {
         HeldAttachmentCancellationProbe.control(blobPort, "/__hold-unknown-acquisition")
         driver.host(tile)
         val row = scenario("unknown-length", tile)
-        row.put("idle_download_seen", driver.waitFor { driver.idleDownload(tile) })
+        row.put("idle_download_seen", driver.waitFor { driver.idleDownload() })
         driver.tapDownload(tile)
         val received = driver.waitForDescription(" received")
         row.put("bytes_text", received.orEmpty())
@@ -294,8 +294,8 @@ private class TileDriver(
     fun node(text: String) = rule.onNode(hasContentDescription(text))
 
     /** The idle Download action: a labelled node that is not itself clickable, in the unmerged tree. */
-    fun idleDownload(tile: TransferTile): Boolean {
-        val label = string(if (tile.media == "video") R.string.media_open else R.string.media_tap_to_download)
+    fun idleDownload(): Boolean {
+        val label = string(R.string.media_tap_to_download)
         return rule
             .onAllNodes(hasContentDescription(label) and !hasClickAction(), useUnmergedTree = true)
             .fetchSemanticsNodes()
@@ -304,7 +304,7 @@ private class TileDriver(
 
     /** One tap on the tile's idle Download action, once the tile has actually presented it to touch. */
     suspend fun tapDownload(tile: TransferTile) {
-        val label = string(if (tile.media == "video") R.string.media_open else R.string.media_tap_to_download)
+        val label = string(R.string.media_tap_to_download)
         val present = waitFor { rule.onAllNodes(hasContentDescription(label)).fetchSemanticsNodes().isNotEmpty() }
         check(present) { "no Download action to tap; the tile shows: ${snapshot()}" }
         if (tile.media == "video") {

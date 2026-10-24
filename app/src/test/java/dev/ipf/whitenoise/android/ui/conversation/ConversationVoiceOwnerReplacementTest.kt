@@ -157,6 +157,9 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
         assertFalse(scenario.oldControl.durationStarted.isCompleted)
         scenario.newControl.releaseHydration()
         scenario.newControl.awaitHydrationCompleted()
+        // The completed download is playable in place, and only the reader's Play tap starts it.
+        awaitVoiceAction(scenario.voiceId, R.string.voice_message_play)
+        clickVoiceAction(scenario.voiceId, R.string.voice_message_play)
         awaitVoiceAction(scenario.voiceId, R.string.voice_message_pause)
         assertViewportStayedFixed("serialized owner replacement", newOwnerAnchor, scenario.newEvidence, checkpoint)
         assertNoScrollWrites("serialized owner replacement", scenario.newEvidence)

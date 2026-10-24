@@ -136,6 +136,16 @@ internal class ConversationAttachmentPresentation(
         )
     }
 
+    /**
+     * Records a durable, interactive download of a visible attachment that is not yet on the device. The intent keeps
+     * the in-place download armed across rotation and process recreation and is retired once the bytes are ready,
+     * without opening anything: a download never opens what it fetched.
+     */
+    fun requestAttachmentDownload(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean = requestAttachmentOpen(messageIdHex, attachmentIndex)
+
     /** Captures a visible open request through the app-owned delivery coordinator. */
     fun requestAttachmentOpen(
         messageIdHex: String,

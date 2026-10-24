@@ -851,6 +851,10 @@ private fun VoiceLibraryRow(
                             return@clickable
                         }
                         scope.launch {
+                            // A clip that is not on the device yet is only downloaded; the next tap plays it.
+                            val downloaded =
+                                localFile != null ||
+                                    controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
                             val file =
                                 localFile ?: runCatching {
                                     loading = true
@@ -872,6 +876,7 @@ private fun VoiceLibraryRow(
                                 }.also { loading = false }
                                     .getOrNull() ?: return@launch
                             localFile = file
+                            if (!downloaded) return@launch
                             val source =
                                 controller.voicePlaybackSource(
                                     appState,
@@ -951,6 +956,45 @@ private fun FileLibraryTab(
     }
 }
 
+/** Reports a library file open that did not reach an app, with the conversation file card's messages. */
+internal fun WhiteNoiseAppState.presentLibraryFileOpenOutcome(outcome: OpenAttachmentResult) {
+    when (outcome) {
+        OpenAttachmentResult.Opened,
+        OpenAttachmentResult.DestinationNotVisible,
+        -> Unit
+        OpenAttachmentResult.NoHandler -> present(R.string.media_no_app_to_open)
+        OpenAttachmentResult.NoInstaller -> present(R.string.media_apk_no_installer)
+        OpenAttachmentResult.InstallPermissionDenied,
+        OpenAttachmentResult.InstallPermissionRequired,
+        -> present(R.string.media_apk_permission_denied)
+        OpenAttachmentResult.InstallPermissionUnavailable -> present(R.string.media_apk_permission_unavailable)
+        OpenAttachmentResult.InstallUnsupported -> present(R.string.media_apk_install_unsupported)
+        OpenAttachmentResult.InvalidPackage -> present(R.string.media_apk_invalid)
+        OpenAttachmentResult.MissingArtifact,
+        OpenAttachmentResult.SecurityFailure,
+        OpenAttachmentResult.Error,
+        ->
+            presentFailure(
+                R.string.media_couldnt_open,
+                "MEDIA_LIBRARY_FILE_OPEN",
+                IllegalStateException("attachment open returned $outcome"),
+            )
+    }
+}
+
+/**
+ * Downloads a library file that is not on the device yet without opening it, reporting a failed download. The row
+ * opens it from a later tap, once it is cached.
+ */
+internal suspend fun downloadLibraryFile(
+    appState: WhiteNoiseAppState,
+    fetch: suspend () -> Any,
+) {
+    runCatchingCancellable { fetch() }.onFailure { error ->
+        appState.presentFailure(R.string.media_couldnt_load, "MEDIA_LIBRARY_FILE_DOWNLOAD", error)
+    }
+}
+
 /** One file row with open and save actions. */
 @Composable
 internal fun FileLibraryRow(
@@ -963,12 +1007,6 @@ internal fun FileLibraryRow(
     val scope = rememberCoroutineScope()
     var inFlight by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     var menuOpen by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
-    val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
-    val noInstallerMessage = stringResource(R.string.media_apk_no_installer)
-    val installPermissionDeniedMessage = stringResource(R.string.media_apk_permission_denied)
-    val installPermissionUnavailableMessage = stringResource(R.string.media_apk_permission_unavailable)
-    val installUnsupportedMessage = stringResource(R.string.media_apk_install_unsupported)
-    val invalidPackageMessage = stringResource(R.string.media_apk_invalid)
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
     val presentation =
         remember(row.reference.mediaType, row.reference.fileName) {
@@ -978,8 +1016,9 @@ internal fun FileLibraryRow(
     val openAttachment = rememberAttachmentOpener()
 
     // The tap is the user-initiated download trigger — files never auto-fetch
-    // in the library. Prefer retained bytes for own in-flight sends, mirroring
-    // the conversation file bubble.
+    // in the library. A file that is not on the device yet is only downloaded,
+    // and the next tap opens it. Prefer retained bytes for own in-flight sends,
+    // mirroring the conversation file bubble.
 
     /** The sender's in-memory retry bytes for this row, or null so the attachment is read from MDK. */
     fun retainedBytes(): ByteArray? =
@@ -1025,6 +1064,14 @@ internal fun FileLibraryRow(
                 .clickable(enabled = !inFlight) {
                     inFlight = true
                     scope.launch {
+                        val downloaded =
+                            retainedBytes() != null ||
+                                controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
+                        if (!downloaded) {
+                            downloadLibraryFile(appState) { fetchFile() }
+                            inFlight = false
+                            return@launch
+                        }
                         val outcome =
                             runCatchingCancellable {
                                 openAttachment(
@@ -1043,30 +1090,7 @@ internal fun FileLibraryRow(
                                 inFlight = false
                                 return@launch
                             }
-                        when (outcome) {
-                            OpenAttachmentResult.Opened,
-                            OpenAttachmentResult.DestinationNotVisible,
-                            -> Unit
-                            OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                            OpenAttachmentResult.NoInstaller -> appState.present(noInstallerMessage)
-                            OpenAttachmentResult.InstallPermissionDenied,
-                            OpenAttachmentResult.InstallPermissionRequired,
-                            -> appState.present(installPermissionDeniedMessage)
-                            OpenAttachmentResult.InstallPermissionUnavailable -> {
-                                appState.present(installPermissionUnavailableMessage)
-                            }
-                            OpenAttachmentResult.InstallUnsupported -> appState.present(installUnsupportedMessage)
-                            OpenAttachmentResult.InvalidPackage -> appState.present(invalidPackageMessage)
-                            OpenAttachmentResult.MissingArtifact,
-                            OpenAttachmentResult.SecurityFailure,
-                            OpenAttachmentResult.Error,
-                            ->
-                                appState.presentFailure(
-                                    R.string.media_couldnt_open,
-                                    "MEDIA_LIBRARY_FILE_OPEN",
-                                    IllegalStateException("attachment open returned $outcome"),
-                                )
-                        }
+                        appState.presentLibraryFileOpenOutcome(outcome)
                         inFlight = false
                     }
                 }.padding(8.dp),

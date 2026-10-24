@@ -247,7 +247,9 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 }
                 assertFalse(controller.hasAttachmentOpenIntent(CONFIRMED_MESSAGE_ID, 0))
                 controller.onCleared()
-                assertFalse(controller.retryAttachmentTransfer(CONFIRMED_MESSAGE_ID, 0, {}, {}))
+                val accepted =
+                    controller.retryAttachmentTransfer(CONFIRMED_MESSAGE_ID, 0, onAccepted = {}, onFailure = {})
+                assertFalse(accepted)
             } finally {
                 try {
                     finishMediaFixture(controller, state)

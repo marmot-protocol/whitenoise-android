@@ -216,10 +216,11 @@ internal fun MediaFileBubble(
         )
     }
 
-    // A tap is persisted as scheduling identity before work starts. This effect
-    // is therefore re-created by rotation or process recreation within the
-    // same visible destination, joins the same transfer, and atomically
-    // consumes the intent immediately before the one external viewer launch.
+    // A tap on a downloaded file is persisted as scheduling identity before work
+    // starts. This effect is therefore re-created by rotation or process
+    // recreation within the same visible destination, joins the same transfer,
+    // and atomically consumes the intent immediately before the one external
+    // viewer launch. A file that is not downloaded yet records no open intent.
     LaunchedEffect(
         controller,
         pillKey,
@@ -397,12 +398,22 @@ internal fun MediaFileBubble(
                     onLongClick = onLongPress,
                     onClick = {
                         if (opening) return@combinedClickable
+                        // A file that is not on the device yet is only downloaded, in place: the reader, installer
+                        // or viewer opens only from a tap once it has arrived.
+                        val downloaded = transferState == AttachmentTransferState.Available
                         controller.performAttachmentUserAction(
                             messageIdHex,
                             attachmentIndex,
                             transferState,
                             onAccepted = {
-                                if (textCandidate != null) {
+                                if (!downloaded) {
+                                    controller.requestAttachmentTransfer(
+                                        messageIdHex,
+                                        attachmentIndex,
+                                        reference,
+                                        priority = AttachmentDownloadPriority.Interactive,
+                                    )
+                                } else if (textCandidate != null) {
                                     readerOpen = true
                                 } else if (usesDurableInstallerHandoff) {
                                     controller.requestAttachmentInstallerHandoff(

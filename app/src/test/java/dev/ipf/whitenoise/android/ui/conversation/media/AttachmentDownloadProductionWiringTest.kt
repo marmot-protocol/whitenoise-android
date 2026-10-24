@@ -44,8 +44,9 @@ class AttachmentDownloadProductionWiringTest {
     }
 
     /**
-     * Verifies every visual-media tap promotes transfer work before delegating viewer ownership, and that each surface
-     * restores a download MDK still holds parked for storage when its chat is reopened.
+     * Verifies every visual-media tap on an attachment that is not on the device promotes an in-place download that
+     * never opens it, and that each surface restores a download MDK still holds parked for storage when its chat is
+     * reopened.
      */
     @Test
     fun visibleMediaPromotesAnAutomaticTransferWhenTheUserTapsIt() {
@@ -56,7 +57,7 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(2, occurrences(image, "afterInteractiveRequest()"))
         assertEquals(4, occurrences(video, "afterInteractiveRequest()"))
         assertEquals(1, occurrences(voice, "afterInteractiveRequest()"))
-        assertEquals(2, occurrences(image, "persistedAttachmentOpenEffect("))
+        assertEquals(2, occurrences(image, "persistedAttachmentDownloadEffect("))
         // Reopening a chat restores a download MDK still holds parked for storage, once per surface.
         assertEquals(2, occurrences(image, "restoreParkedDownloadOnEntry("))
         assertEquals(2, occurrences(video, "restoreParkedDownloadOnEntry("))
@@ -66,12 +67,39 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(2, occurrences(image, readerPark))
         assertEquals(2, occurrences(video, readerPark))
         assertEquals(1, occurrences(voice, readerPark))
-        assertEquals(2, occurrences(video, "persistedAttachmentOpenEffect("))
-        assertEquals(1, occurrences(voice, "persistedAttachmentOpenEffect("))
-        assertTrue(occurrences(image, "requestAttachmentOpen(") >= 5)
-        assertTrue(occurrences(video, "requestAttachmentOpen(") >= 1)
-        assertTrue(occurrences(video, "dispatchViewerOpen()") >= 4)
-        assertTrue(occurrences(voice, "requestAttachmentOpen(") >= 2)
+        assertEquals(2, occurrences(video, "persistedAttachmentDownloadEffect("))
+        assertEquals(1, occurrences(voice, "persistedAttachmentDownloadEffect("))
+        assertTrue(occurrences(image, "requestAttachmentDownload(") >= 5)
+        assertTrue(occurrences(video, "requestAttachmentDownload(") >= 2)
+        assertTrue(occurrences(voice, "requestAttachmentDownload(") >= 3)
+        // A download never opens: no visual surface records an open intent or hands the effect an open.
+        listOf(image, video, voice).forEach { surface ->
+            assertEquals(0, occurrences(surface, "requestAttachmentOpen("))
+            assertEquals(0, occurrences(surface, "dispatchOpen ="))
+        }
+    }
+
+    /**
+     * A file card or library row tapped before its attachment is on the device only downloads it: the reader,
+     * installer, external app and voice playback are reached only from a later tap on a downloaded attachment.
+     */
+    @Test
+    fun fileAndLibraryTapsOnAnAttachmentNotOnTheDeviceOnlyDownloadIt() {
+        val fileCard = source("MediaFileBubble.kt").normalized()
+        val library = projectSource("ui/medialibrary/MediaLibrary.kt").normalized()
+
+        val downloadBranch = fileCard.indexOf("if (!downloaded) { controller.requestAttachmentTransfer(")
+        assertTrue("the file card must download before any open", downloadBranch >= 0)
+        assertTrue(downloadBranch < fileCard.indexOf("} else if (textCandidate != null) {"))
+        assertTrue(downloadBranch < fileCard.indexOf("controller.requestAttachmentInstallerHandoff("))
+        assertTrue("val downloaded = transferState == AttachmentTransferState.Available" in fileCard)
+
+        val fileDownload = library.indexOf("if (!downloaded) { downloadLibraryFile(appState) { fetchFile() }")
+        assertTrue("the library file row must download without opening", fileDownload >= 0)
+        assertTrue(fileDownload < library.indexOf("openAttachment( fetchFile(),"))
+        val voiceDownload = library.indexOf("if (!downloaded) return@launch")
+        assertTrue("the library voice row must download without playing", voiceDownload >= 0)
+        assertTrue(voiceDownload < library.indexOf("VoicePlaybackController.play(pillKey, file, source = source)"))
     }
 
     @Test
@@ -88,15 +116,20 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(1, occurrences(voice, "afterProducerCancellation("))
     }
 
-    /** Local image preparation announces opening and preserves its accessible viewer action. */
+    /**
+     * Reading an image already on the device announces opening and keeps its accessible viewer action, while a
+     * download in progress announces downloading and offers no open.
+     */
     @Test
     fun clickableImageLoadingProgressHasAnAccessibleName() {
         val image = source("MediaImageBubbles.kt").normalized()
 
         assertTrue(
-            ".semantics { contentDescription = openingLabel } .clickable( " +
-                "onClickLabel = openLabel," in image,
+            "if (cachedPlaintextOnEntry || retainedPlaintextOnEntry) { Modifier " +
+                ".semantics { contentDescription = openingLabel } " +
+                ".clickable(onClickLabel = openLabel, onClick = ::dispatchViewerOpen)" in image,
         )
+        assertTrue("} else { Modifier.semantics { contentDescription = downloadingLabel } }" in image)
     }
 
     /** Guards file-open work against restarting for unrelated cache revisions. */

@@ -293,30 +293,39 @@ internal fun MediaVideoGridTile(
     val materializationLock = remember(messageIdHex, attachmentIndex, epoch) { Mutex() }
 
     /**
-     * Promotes the tap to interactive priority and delegates ownership before this tile can dispose. While the reader's
-     * Cancel awaits acknowledgement a tap anywhere on the tile does nothing, so it cannot restart that transfer. A
-     * video still being sent from its staged file has nothing to open yet, so a tap on it is not promoted. Only its
-     * "+N" overflow still opens the album, at the next item that can be shown.
+     * Handles a tap on the tile. A downloaded clip opens the viewer, and the "+N" overflow always opens the album. A
+     * clip that is not on the device yet is only downloaded, in place: it never opens once it arrives, and a later tap
+     * opens it. While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart that
+     * transfer, and a video still being sent from its staged file has nothing to download yet.
      */
-    fun dispatchViewerOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
+    fun onTileTap(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
         if (transfer.cancelling) return
         if (sendingFromStagedFile) {
             if (overflowCount > 0) onTap()
             return
         }
-        val open = {
+        val download = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
             if (retry) {
                 failed = false
                 reloadToken++
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
-            onTap()
+            controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
         }
-        if (retry) {
-            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { markFailed(it) })
-        } else {
-            open()
+        when {
+            localFile != null && !retry -> onTap()
+            retry ->
+                controller.retryAttachmentTransfer(
+                    messageIdHex,
+                    attachmentIndex,
+                    onAccepted = { download() },
+                    onFailure = { markFailed(it) },
+                )
+            else -> {
+                download()
+                if (overflowCount > 0) onTap()
+            }
         }
     }
 
@@ -358,24 +367,7 @@ internal fun MediaVideoGridTile(
         }
     }
 
-    /** Revalidates a cached tile before handing its logical attachment to the viewer owner. */
-    suspend fun dispatchReadyVideo() {
-        val playableFile =
-            withContext(Dispatchers.IO) {
-                validatedAttachmentCacheFile(localFile)
-            }
-        if (playableFile == null) {
-            localFile = null
-            posterBitmap = null
-            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-            return
-        }
-        localFile = playableFile
-        failed = false
-        dispatchViewerOpen()
-    }
-
-    persistedAttachmentOpenEffect(
+    persistedAttachmentDownloadEffect(
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         sourceEpoch = epoch,
@@ -392,7 +384,6 @@ internal fun MediaVideoGridTile(
                 materializationIntent = materializationIntent.afterInteractiveRequest()
             }
         },
-        dispatchOpen = { dispatchReadyVideo() },
     )
 
     // The retained upload bytes are read in memory, so the pending bubble paints
@@ -445,7 +436,7 @@ internal fun MediaVideoGridTile(
                 .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     onLongClick = onLongPress,
-                    onClick = ::dispatchViewerOpen,
+                    onClick = { onTileTap() },
                 ),
     ) {
         val poster = posterBitmap
@@ -470,7 +461,7 @@ internal fun MediaVideoGridTile(
         if (transferShown) {
             TileTransferControl(
                 transfer = transfer,
-                onRetry = { dispatchViewerOpen(retry = true) },
+                onRetry = { onTileTap(retry = true) },
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -502,7 +493,7 @@ internal fun MediaVideoGridTile(
                         !startDownload && localFile == null ->
                             Icon(
                                 Icons.Default.Download,
-                                contentDescription = stringResource(R.string.media_open),
+                                contentDescription = stringResource(R.string.media_tap_to_download),
                                 modifier = Modifier.size(24.dp),
                             )
                         localFile == null ->
@@ -797,37 +788,51 @@ internal fun MediaVideoBubble(
     }
 
     /**
-     * Opens the logical video immediately so materialization can continue after bubble disposal. A video still being
-     * sent from its staged file has nothing to open yet, so it never opens.
+     * Downloads a clip that is not on the device yet, in place. It never opens once it arrives; a later tap opens it.
+     * A video still being sent from its staged file has nothing to download yet.
      */
-    fun dispatchViewerOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
+    fun requestDownload(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
         if (transfer.cancelling || sendingFromStagedFile) return
-        val open = {
+        val download = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
             if (retry) {
                 failed = false
                 reloadToken++
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
-            onOpenConversationMedia(
-                ConversationMediaViewerOpenRequest(
-                    messageIdHex = messageIdHex,
-                    attachments = listOf(IndexedValue(attachmentIndex, reference)),
-                    tappedAttachmentIndex = attachmentIndex,
-                    sender = record.sender,
-                    recordedAt = record.recordedAt,
-                    mine = mine,
-                ),
-            )
+            controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
         }
         if (retry) {
-            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { markFailed(it) })
+            controller.retryAttachmentTransfer(
+                messageIdHex,
+                attachmentIndex,
+                onAccepted = { download() },
+                onFailure = { markFailed(it) },
+            )
         } else {
-            open()
+            download()
         }
     }
 
-    /** Revalidates a cached bubble before handing its logical attachment to the viewer owner. */
+    /** Hands a downloaded clip to the conversation-owned viewer. */
+    fun dispatchViewerOpen() {
+        if (transfer.cancelling || sendingFromStagedFile) return
+        onOpenConversationMedia(
+            ConversationMediaViewerOpenRequest(
+                messageIdHex = messageIdHex,
+                attachments = listOf(IndexedValue(attachmentIndex, reference)),
+                tappedAttachmentIndex = attachmentIndex,
+                sender = record.sender,
+                recordedAt = record.recordedAt,
+                mine = mine,
+            ),
+        )
+    }
+
+    /**
+     * Revalidates a cached bubble before handing its logical attachment to the viewer owner. A file evicted since it
+     * was downloaded is downloaded again in place rather than opened once it returns.
+     */
     suspend fun dispatchReadyVideo() {
         val playableFile =
             withContext(Dispatchers.IO) {
@@ -837,7 +842,7 @@ internal fun MediaVideoBubble(
             localFile = null
             posterBitmap = null
             durationMs = 0L
-            dispatchViewerOpen()
+            requestDownload()
             return
         }
         localFile = playableFile
@@ -845,7 +850,7 @@ internal fun MediaVideoBubble(
         dispatchViewerOpen()
     }
 
-    persistedAttachmentOpenEffect(
+    persistedAttachmentDownloadEffect(
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         sourceEpoch = epoch,
@@ -862,7 +867,6 @@ internal fun MediaVideoBubble(
                 materializationIntent = materializationIntent.afterInteractiveRequest()
             }
         },
-        dispatchOpen = { dispatchReadyVideo() },
     )
 
     // The retained upload bytes are read in memory, so the pending bubble paints
@@ -941,11 +945,12 @@ internal fun MediaVideoBubble(
             // triangle. While uploading we replace the triangle with a spinner
             // so the user sees the send is in flight (matches the image bubble).
             // When startDownload is gated off (policy says no auto-fetch), the
-            // triangle becomes a download icon and tap consents to the fetch.
+            // triangle becomes a download icon and tap consents to the fetch,
+            // which completes in place without opening the viewer.
             if (transferShown) {
                 TileTransferControl(
                     transfer = transfer,
-                    onRetry = { dispatchViewerOpen(retry = true) },
+                    onRetry = { requestDownload(retry = true) },
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -966,7 +971,7 @@ internal fun MediaVideoBubble(
                                         localFile != null -> scope.launch { dispatchReadyVideo() }
                                         // Nothing is playable until the staged file is sent, and the ring shows it.
                                         sendingFromStagedFile -> Unit
-                                        else -> dispatchViewerOpen()
+                                        else -> requestDownload()
                                     }
                                 },
                             ),
@@ -986,7 +991,7 @@ internal fun MediaVideoBubble(
                             !startDownload && localFile == null ->
                                 Icon(
                                     Icons.Default.Download,
-                                    contentDescription = stringResource(R.string.media_open),
+                                    contentDescription = stringResource(R.string.media_tap_to_download),
                                     modifier = Modifier.size(24.dp),
                                 )
                             loading ->

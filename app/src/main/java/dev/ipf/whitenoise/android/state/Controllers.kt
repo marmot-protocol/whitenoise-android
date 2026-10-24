@@ -10556,6 +10556,12 @@ class ConversationController(
             priority,
         )
 
+    /** Starts a durable in-place download of a visible attachment that never opens it once it arrives. */
+    internal fun requestAttachmentDownload(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean = attachmentPresentation.requestAttachmentDownload(messageIdHex, attachmentIndex)
+
     /** Captures an open intent for the visible attachment destination. */
     internal fun requestAttachmentOpen(
         messageIdHex: String,
