@@ -23,6 +23,14 @@
       {
         "surface": "FontFamilyDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "fun FontFamilyDialog(",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "FontFamilyPreviewViewport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
         "anchor": ".testTag(\"font_family.preview.viewport\")",
         "test_ids": [
           "SET-007"
