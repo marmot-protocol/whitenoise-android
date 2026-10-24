@@ -1,9 +1,10 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.state.TransientNotice
@@ -33,33 +34,33 @@ internal fun MainShellNoticeLayout(
             appLockScreenVisible = appLockScreenVisible,
             recoveryHandedToComposer = dictationController.recoveryHandedToComposer,
         )
-    CompositionLocalProvider(LocalShellPlaybackHost provides playbackHost) {
-        ShellTransientNoticeLayout(
-            notice = notice,
-            // Consume once above both the persistent strip and a destination chat's own composer.
-            modifier =
-                if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
-                    Modifier.imePadding()
-                } else {
-                    Modifier
+    val anchor = remember { FloatingDictationAnchor() }
+    CompositionLocalProvider(
+        LocalShellPlaybackHost provides playbackHost,
+        LocalFloatingDictationAnchor provides anchor,
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            ShellTransientNoticeLayout(
+                notice = notice,
+                persistentTopContent = persistentTopContent,
+                persistentTopContentConsumesStatusBars = persistentTopContentConsumesStatusBars,
+                persistentBottomContent = {
+                    if (!appLockScreenVisible) {
+                        if (dictationController.hasDurableSession && dictationController.completionControlsRequired) {
+                            Box(Modifier.floatingDictationAnchor()) { ConversationDictationNotificationNotice() }
+                        }
+                    }
                 },
-            persistentTopContent = persistentTopContent,
-            persistentTopContentConsumesStatusBars = persistentTopContentConsumesStatusBars,
-            persistentBottomContent = {
-                if (!appLockScreenVisible) {
-                    if (dictationController.hasDurableSession && dictationController.completionControlsRequired) {
-                        ConversationDictationNotificationNotice()
-                    }
-                    if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
-                        ConversationDictationPersistentControl(
-                            state = dictationController.state,
-                            controller = dictationController,
-                            modifier = Modifier.navigationBarsPadding(),
-                        )
-                    }
+                content = { content(dictationControlOwner) },
+            )
+            if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
+                FloatingDictationLayout(anchor) {
+                    ConversationDictationPersistentControl(
+                        state = dictationController.state,
+                        controller = dictationController,
+                    )
                 }
-            },
-            content = { content(dictationControlOwner) },
-        )
+            }
+        }
     }
 }

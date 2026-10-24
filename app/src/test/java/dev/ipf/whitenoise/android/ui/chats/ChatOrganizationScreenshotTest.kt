@@ -64,6 +64,10 @@ class ChatOrganizationScreenshotTest {
     /** Plain fab. */
     @Test fun plainFab() = fab("chats_fab_plain", missing = false)
 
+    @Test fun plainFabDark() = fab("chats_fab_plain_dark", missing = false, dark = true)
+
+    @Test fun plainFabAmoled() = fab("chats_fab_plain_amoled", missing = false, amoled = true)
+
     /** Warning fab. */
     @Test fun warningFab() = fab("chats_fab_warning", missing = true)
 
@@ -130,13 +134,13 @@ class ChatOrganizationScreenshotTest {
         name: String,
         missing: Boolean,
         amoled: Boolean = false,
+        dark: Boolean = false,
     ) {
-        val app = chatOrganizationAppState(context)
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = amoled, amoled = amoled) {
+            WhiteNoiseTheme(darkTheme = dark || amoled, amoled = amoled) {
                 Surface(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomEnd) {
-                        ChatsNewMessageFabContent(app, missing) {}
+                        ChatsNewMessageFabContent(missing) {}
                     }
                 }
             }
