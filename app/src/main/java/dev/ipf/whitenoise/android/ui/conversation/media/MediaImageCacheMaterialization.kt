@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.cachedAttachmentPlaintext
@@ -56,12 +57,16 @@ internal suspend fun imageAttachmentBytes(
     return localAttachmentBytes(controller, messageIdHex, attachmentIndex, mine)
 }
 
-/** Reads bytes this device already holds for an attachment, never starting a transfer. */
+/**
+ * Reads bytes this device already holds for an attachment, never starting a transfer, and never copies more than
+ * [maxBytes] from a file lease or MDK's retention onto the heap.
+ */
 internal suspend fun localAttachmentBytes(
     controller: ConversationController,
     messageIdHex: String,
     attachmentIndex: Int,
     mine: Boolean,
+    maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
 ): ByteArray? {
     val retained =
         if (mine) {
@@ -75,6 +80,6 @@ internal suspend fun localAttachmentBytes(
     // Host copies come first. MDK's own retention is the last local source, so media it holds still renders when
     // automatic downloads are off or the network is unavailable, without starting any transfer.
     return retained
-        ?: controller.cachedAttachmentPlaintext(messageIdHex, attachmentIndex)
-        ?: controller.retainedNativeAttachmentBytes(messageIdHex, attachmentIndex)
+        ?: controller.cachedAttachmentPlaintext(messageIdHex, attachmentIndex, maxBytes)
+        ?: controller.retainedNativeAttachmentBytes(messageIdHex, attachmentIndex, maxBytes)
 }

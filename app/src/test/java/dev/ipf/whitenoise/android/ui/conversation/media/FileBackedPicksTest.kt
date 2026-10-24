@@ -118,10 +118,11 @@ class FileBackedPicksTest {
         assertEquals(1, reclaims)
     }
 
-    /** An unknown size is rechecked after the copy; a snapshot that leaves no room for MDK's copies is deleted. */
+    /** An unknown size is rechecked after the copy; a snapshot that leaves no room for MDK's staged copy is deleted. */
     @Test
     fun unknownSizeWithoutRoomAfterCopyDeletesTheSnapshot() {
-        val budget = budget(perFileBytes = 1_000, batchCiphertextBytes = 10_000, usableBytes = 64L * 1024L * 1024L + 15)
+        // 10 bytes need 10 more for MDK's staged copy, one byte more than is free.
+        val budget = budget(perFileBytes = 1_000, batchCiphertextBytes = 10_000, usableBytes = 64L * 1024L * 1024L + 9)
 
         val pick = budget.stage(declaredSize = -1) { ByteArrayInputStream(ByteArray(10)) }
 
@@ -187,7 +188,7 @@ class FileBackedPicksTest {
             FileBackedPickBudget(
                 directory = File(temporary.root, "tight"),
                 limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 10_000),
-                usableBytes = { 64L * 1024L * 1024L + 15 },
+                usableBytes = { 64L * 1024L * 1024L + 9 },
                 staging = FileBackedSendStaging(reported::add),
             )
 
@@ -209,28 +210,28 @@ class FileBackedPicksTest {
             FileBackedPickBudget(
                 directory = File(temporary.root, "album"),
                 limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 10_000),
-                usableBytes = { APP_RESERVE_BYTES + 55 - written },
+                usableBytes = { APP_RESERVE_BYTES + 35 - written },
             )
 
         val first = checkNotNull(budget.stage(10) { ByteArrayInputStream(ByteArray(10)) }.source)
         written += first.byteCount
 
         assertEquals(
-            "10 more bytes need 30 for their own copies plus 20 still owed to the first item",
+            "10 more bytes need 10 for their snapshot beside 20 of staged copies with the first item's, only 25 free",
             FileBackedPickFailure.STORAGE,
             budget.stage(10) { ByteArrayInputStream(ByteArray(10)) }.failure,
         )
         first.close()
     }
 
-    /** An item past the message bound is refused; an admitted in-memory item reserves its three disk copies. */
+    /** An item past the message bound is refused; an admitted in-memory item reserves its two disk copies. */
     @Test
     fun admitRefusesItemsPastTheBoundAndReservesInMemoryCopies() {
         val budget =
             FileBackedPickBudget(
                 directory = File(temporary.root, "admit"),
                 limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 100),
-                usableBytes = { APP_RESERVE_BYTES + 100 },
+                usableBytes = { APP_RESERVE_BYTES + 67 },
             )
 
         assertNull(budget.admit(30, inMemory = true))
@@ -240,7 +241,7 @@ class FileBackedPicksTest {
             budget.admit(39, inMemory = true),
         )
         assertEquals(
-            "4 bytes need 12 for their copies plus the 90 reserved for the in-memory item",
+            "4 bytes need 8 for their copies beside the 60 reserved for the in-memory item, one more than is free",
             FileBackedPickFailure.STORAGE,
             budget.stage(4) { ByteArrayInputStream(ByteArray(4)) }.failure,
         )
@@ -248,7 +249,7 @@ class FileBackedPicksTest {
 
     /**
      * Once a message uploads from files, an in-memory item that follows a staged one must fit its own
-     * three copies beside the copies still owed to the staged item, or it is refused for storage and
+     * two copies beside the staged copy still owed to the staged item, or it is refused for storage and
      * charges nothing.
      */
     @Test
@@ -258,19 +259,19 @@ class FileBackedPicksTest {
             FileBackedPickBudget(
                 directory = File(temporary.root, "mixed"),
                 limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 10_000),
-                usableBytes = { APP_RESERVE_BYTES + 37 - written },
+                usableBytes = { APP_RESERVE_BYTES + 25 - written },
             )
         val video = checkNotNull(budget.stage(10) { ByteArrayInputStream(ByteArray(10)) }.source)
         written += video.byteCount
         val roomBefore = budget.nextPickMaxBytes()
 
         assertEquals(
-            "3 bytes need 9 for their copies plus 20 still owed to the video, and only 27 are free",
+            "3 bytes need 6 for their copies plus 10 still owed to the video, and only 15 are free",
             FileBackedPickFailure.STORAGE,
             budget.admit(3, inMemory = true),
         )
         assertEquals("a refused item charges nothing", roomBefore, budget.nextPickMaxBytes())
-        assertNull("2 bytes need 6 beside the 20 owed, which fits in 27", budget.admit(2, inMemory = true))
+        assertNull("2 bytes need 4 beside the 10 owed, which fits in 15", budget.admit(2, inMemory = true))
         video.close()
     }
 
@@ -286,7 +287,7 @@ class FileBackedPicksTest {
             FileBackedPickBudget(
                 directory = File(temporary.root, "deferred"),
                 limits = generousLimits(),
-                usableBytes = { APP_RESERVE_BYTES + 60 - written },
+                usableBytes = { APP_RESERVE_BYTES + 41 - written },
                 staging = staging,
             )
         assertNull(budget.admit(10, inMemory = true))
@@ -295,9 +296,9 @@ class FileBackedPicksTest {
         val video = checkNotNull(budget.stage(-1) { ByteArrayInputStream(ByteArray(10)) }.source)
         written += video.byteCount
 
-        assertEquals("20 owed to the video plus the photo's 30", 50L, staging.largestUploadWriteBytes)
+        assertEquals("10 owed to the video plus the photo's 20", 30L, staging.largestUploadWriteBytes)
         assertEquals(
-            "1 more byte needs 3 beside the 50 owed, and only 50 are free",
+            "1 more byte needs 2 beside the 30 owed, and only 31 are free",
             FileBackedPickFailure.STORAGE,
             budget.admit(1, inMemory = true),
         )
@@ -343,21 +344,21 @@ class FileBackedPicksTest {
 
     /**
      * A document staged after an album must leave room for the album's upload beside its own snapshot,
-     * even when the document's own three copies would fit on their own.
+     * even when the document's own two copies would fit on their own.
      */
     @Test
     fun aLaterMessageLeavesRoomForTheLargestUploadOfTheSend() {
         var written = 0L
         val staging = FileBackedSendStaging()
-        val free = { APP_RESERVE_BYTES + 32 - written }
+        val free = { APP_RESERVE_BYTES + 22 - written }
         val album = FileBackedPickBudget(File(temporary.root, "send"), generousLimits(), free, staging)
         val document = FileBackedPickBudget(File(temporary.root, "send"), generousLimits(), free, staging)
         val video = checkNotNull(album.stage(10) { ByteArrayInputStream(ByteArray(10)) }.source)
         written += video.byteCount
 
-        assertEquals(20L, staging.largestUploadWriteBytes)
+        assertEquals(10L, staging.largestUploadWriteBytes)
         assertEquals(
-            "4 bytes of snapshot beside the album's 20-byte upload need 24, and only 22 are free",
+            "4 bytes of snapshot beside the album's 10-byte upload need 14, and only 12 are free, though 8 would do",
             FileBackedPickFailure.STORAGE,
             document.stage(4) { ByteArrayInputStream(ByteArray(4)) }.failure,
         )
@@ -365,14 +366,15 @@ class FileBackedPicksTest {
     }
 
     /**
-     * Messages upload one at a time and MDK deletes each message's copies when its upload ends, so a
-     * document needs room for the larger of its own upload and the album's, not for both together.
+     * Messages upload one at a time, and each upload ends with this app deleting the message's snapshot while
+     * MDK keeps its staged copy, so a document needs room for the larger of its own staged copy and the
+     * album's, not for both together.
      */
     @Test
     fun messagesOfOneSendAreNotSummed() {
         var written = 0L
         val staging = FileBackedSendStaging()
-        val free = { APP_RESERVE_BYTES + 40 - written }
+        val free = { APP_RESERVE_BYTES + 28 - written }
         val album = FileBackedPickBudget(File(temporary.root, "send"), generousLimits(), free, staging)
         val document = FileBackedPickBudget(File(temporary.root, "send"), generousLimits(), free, staging)
         val video = checkNotNull(album.stage(10) { ByteArrayInputStream(ByteArray(10)) }.source)
@@ -380,8 +382,8 @@ class FileBackedPicksTest {
 
         val staged = document.stage(6) { ByteArrayInputStream(ByteArray(6)) }
 
-        assertNull("6 + the larger of 20 and 12 is 26, within the 30 free; summed it would be 38", staged.failure)
-        assertEquals(20L, staging.largestUploadWriteBytes)
+        assertNull("6 + the larger of 10 and 6 is 16, within the 18 free; summed it would be 22", staged.failure)
+        assertEquals(10L, staging.largestUploadWriteBytes)
         checkNotNull(staged.source).close()
         video.close()
     }

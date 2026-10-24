@@ -101,16 +101,17 @@ internal class ForwardDiagnostics private constructor(
         result: PerformanceResult,
     ) = phase(PerformancePhase.MEDIA_PUBLISH_RETURN, result, PerformanceLayer.MDK, since(startedAtMs))
 
-    /** Marks the start of uncertain-publication convergence on a retry. */
-    fun convergenceStart() {
-        phase(PerformancePhase.CONVERGENCE_START, PerformanceResult.PENDING, PerformanceLayer.MDK)
-    }
-
-    /** Closes the convergence call with its outcome shape. */
-    fun convergenceReturn(
-        startedAtMs: Long,
-        result: PerformanceResult,
-    ) = phase(PerformancePhase.CONVERGENCE_RETURN, result, PerformanceLayer.MDK, since(startedAtMs))
+    /**
+     * Records how long one destination message took to reach MDK's durable local admission, measured from the start
+     * of its publish, so a report can tell a slow admission from a slow engine handoff.
+     */
+    fun admissionAccepted(startedAtMs: Long) =
+        phase(
+            PerformancePhase.DURABLE_ACCEPTED,
+            PerformanceResult.SUCCESS,
+            PerformanceLayer.MDK,
+            since(startedAtMs),
+        )
 
     /** Records a terminal operation snapshot: completed, cancelled (dropped) or failed, with completed targets. */
     fun terminal(snapshot: ForwardOperationSnapshot) {

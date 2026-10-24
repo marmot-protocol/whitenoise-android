@@ -28,7 +28,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
-import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
@@ -78,7 +78,7 @@ internal fun ChatsNewMessageFab(
             }
         if (current()) missing = chatsFabNeedsRelays(result)
     }
-    ChatsNewMessageFabContent(appState, missing, onClick = {
+    ChatsNewMessageFabContent(missing, onClick = {
         if (current()) {
             if (missing) relayOpening = Any() else onNewMessage()
         }
@@ -109,26 +109,28 @@ internal fun ChatsNewMessageFab(
 }
 
 /**
- * Prototype 24 dp edit/warning icon, adaptive pane placement and AMOLED outline; action colors retain native
- * preferences.
+ * Composer-colored edit/warning button, with adaptive pane placement and the AMOLED outline.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatsNewMessageFabContent(
-    appState: WhiteNoiseAppState,
     missingRelays: Boolean,
     onClick: () -> Unit,
 ) {
-    val colors = accountActionColors(appState)
     val outline = amoledOutlineBorder()
     BoxWithConstraints {
         val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
-        val modifier = Modifier.padding(end = paneInset).performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
+        val modifier =
+            Modifier
+                .padding(end = paneInset)
+                .floatingDictationAnchor()
+                .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         FloatingActionButton(
             onClick = onClick,
             modifier = if (outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape),
-            containerColor = if (outline == null) colors.container else MaterialTheme.colorScheme.surface,
-            contentColor = if (outline == null) colors.content else MaterialTheme.colorScheme.onSurface,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
         ) {
             Icon(
                 painterResource(if (missingRelays) R.drawable.ic_warning else R.drawable.ic_edit),

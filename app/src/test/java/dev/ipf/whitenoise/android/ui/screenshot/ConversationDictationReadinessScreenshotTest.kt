@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
@@ -20,9 +21,11 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
+import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNoticeContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,6 +75,20 @@ class ConversationDictationReadinessScreenshotTest {
         val fixture = fixture(appOwned = true)
         fixture.platform.listener.onReady()
         capture(fixture, "dictation_bottom_bar_listening_large_font_rtl_dark.png", darkTheme = true)
+    }
+
+    @Test
+    fun listeningThreeActionsAmoled() {
+        val fixture = fixture(appOwned = true)
+        fixture.platform.listener.onReady()
+        capture(
+            fixture,
+            "dictation_floating_listening_amoled.png",
+            darkTheme = true,
+            amoled = true,
+            fontScale = 1f,
+            rtl = false,
+        )
     }
 
     @Test
@@ -254,6 +271,7 @@ class ConversationDictationReadinessScreenshotTest {
         fontScale: Float = 2f,
         rtl: Boolean = true,
         darkTheme: Boolean = false,
+        amoled: Boolean = false,
         state: ConversationDictationState = fixture.controller.state,
     ) {
         composeRule.setContent {
@@ -262,7 +280,7 @@ class ConversationDictationReadinessScreenshotTest {
                 LocalDensity provides Density(density.density, fontScale),
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = darkTheme) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                     Box(Modifier.width(268.dp)) {
                         ConversationDictationPersistentControl(
                             state = state,
@@ -273,6 +291,12 @@ class ConversationDictationReadinessScreenshotTest {
             }
         }
 
+        val height =
+            composeRule
+                .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue("All tested capture/recovery states retain a 48dp capsule: $height", height <= 48f)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName")
     }
 

@@ -34,10 +34,13 @@ class FileUploadFitsTest {
         assertFalse(fileUploadFits(listOf(item(BYTES)), BYTES + TAG_BYTES - 1, ROOMY_DISK))
     }
 
-    /** Too little free disk for the staged copies and the app's reserve keeps the in-memory upload. */
+    /**
+     * Too little free disk for the staged copies and the app's reserve keeps the in-memory upload. An in-memory item
+     * costs exactly two copies, this app's snapshot and MDK's single staged file, since MDK streams the ciphertext.
+     */
     @Test
     fun tooLittleDiskDoesNotFit() {
-        val needed = BYTES * FILE_BACKED_DISK_COPIES + FILE_BACKED_DISK_RESERVE_BYTES
+        val needed = 2L * BYTES + FILE_BACKED_DISK_RESERVE_BYTES
 
         assertTrue(fileUploadFits(listOf(item(BYTES)), BATCH, needed))
         assertFalse(fileUploadFits(listOf(item(BYTES)), BATCH, needed - 1))
@@ -83,14 +86,14 @@ class FileUploadFitsTest {
         assertNotNull(claims.claimIf(copies, usableAfterSnapshot) { fileUploadFits(attachments, BATCH, it) })
     }
 
-    /** An item already in a private file is not copied again by this app, so only MDK's two copies are claimed. */
+    /** An item already in a private file is not copied again by this app, so only MDK's one staged copy is claimed. */
     @Test
     fun aFileBackedItemClaimsOnlyMdksCopies() {
         val file = File.createTempFile("forward", ".bin").apply { deleteOnExit() }
         val source = StagedUploadSource(file, 1_000L)
         val fileBacked = PendingAttachment(ByteArray(0), "text/plain", "notes.txt", sourceFile = source)
 
-        assertEquals(1_000L * (FILE_BACKED_DISK_COPIES - 1), fileUploadCopyBytes(listOf(fileBacked)))
+        assertEquals(1_000L, fileUploadCopyBytes(listOf(fileBacked)))
         assertEquals(0L, fileUploadSnapshotBytes(listOf(fileBacked)))
     }
 

@@ -336,8 +336,8 @@ class CustomEmojiSendTest {
                     "media reference was encrypted at epoch 3 but the group is at epoch 4; upload it again",
                 )
             val policy = MarmotKitException.InvalidMediaReference("no locator this client may fetch")
-            assertTrue(isStaleEmojiReference(stale))
-            assertFalse(isStaleEmojiReference(policy))
+            assertTrue(isStaleMediaReferenceEpoch(stale))
+            assertFalse(isStaleMediaReferenceEpoch(policy))
             val calls = mutableListOf<Pair<String, List<Any?>>>()
             val engine = recordingEngine(calls) { throw policy }
             val failure = runCatching { engine.send(listOf(artwork("party"))) }.exceptionOrNull()

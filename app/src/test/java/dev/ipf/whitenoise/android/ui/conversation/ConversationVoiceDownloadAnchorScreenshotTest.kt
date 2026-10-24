@@ -115,7 +115,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             val host = showConversation(fixture, runtime, evidence, historyAnchorMessageId = voiceId)
 
             clickVoiceAction(voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(fixture.controller, voiceId)
+            awaitAttachmentDownloadIntent(fixture.controller, voiceId)
             control.awaitMaterializationAttempt(0)
             composeRule.waitForIdle()
 
@@ -126,6 +126,10 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
 
             control.succeedMaterialization(0)
             control.awaitHydrationStarted()
+            // The download completes in place and never starts playback; the reader's Play tap does.
+            awaitVoiceAction(voiceId, R.string.voice_message_play)
+            assertVoiceActionTarget(voiceId, R.string.voice_message_play)
+            clickVoiceAction(voiceId, R.string.voice_message_play)
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertViewportStayedFixed("materialization", downloading, evidence, transitionStart)
@@ -187,7 +191,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             assertVoiceBubbleFullyVisible(voiceId)
 
             activateVoiceActionForScreenshot(voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(fixture.controller, voiceId)
+            awaitAttachmentDownloadIntent(fixture.controller, voiceId)
             control.awaitMaterializationAttempt(0)
             assertVoiceActionTarget(voiceId, R.string.media_downloading)
             assertVoiceBubbleFullyVisible(voiceId)
@@ -197,6 +201,9 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
 
             control.succeedMaterialization(0)
             control.awaitHydrationStarted()
+            // The download completes in place and never starts playback; the reader's Play tap does.
+            awaitVoiceAction(voiceId, R.string.voice_message_play)
+            activateVoiceActionForScreenshot(voiceId, R.string.voice_message_play)
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertVoiceBubbleFullyVisible(voiceId)
@@ -315,7 +322,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             awaitConversationCondition { fixture.controller.timeline.size == fixture.records.size }
             showConversation(fixture, runtime, evidence, historyAnchorMessageId = null)
             clickVoiceAction(voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(fixture.controller, voiceId)
+            awaitAttachmentDownloadIntent(fixture.controller, voiceId)
             control.awaitMaterializationAttempt(0)
             evidence.awaitVisibleMessage(voiceId)
             evidence.clearWrites()
@@ -375,7 +382,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
                 layoutDirection = LayoutDirection.Rtl,
             )
             clickVoiceAction(voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(fixture.controller, voiceId)
+            awaitAttachmentDownloadIntent(fixture.controller, voiceId)
             control.awaitMaterializationAttempt(0)
             val downloading = evidence.awaitAnchor(voiceId)
             assertVoiceActionTarget(voiceId, R.string.media_downloading)
@@ -407,6 +414,9 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
                 composeRule.onAllNodesWithText("59:59", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
+            // The retried download completes in place and never starts playback; the reader's Play tap does.
+            awaitVoiceAction(voiceId, R.string.voice_message_play)
+            clickVoiceAction(voiceId, R.string.voice_message_play)
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertViewportStayedFixed("retry and hydration", downloading, evidence, retryStart)
@@ -453,7 +463,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             assertVoiceBubbleFullyVisible(voiceId)
 
             activateVoiceActionForScreenshot(voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(fixture.controller, voiceId)
+            awaitAttachmentDownloadIntent(fixture.controller, voiceId)
             control.awaitMaterializationAttempt(0)
             control.succeedMaterialization(0)
             control.awaitHydrationStarted()
@@ -462,6 +472,9 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
                 composeRule.onAllNodesWithText("59:59", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
+            // The download completes in place and never starts playback; the reader's Play tap does.
+            awaitVoiceAction(voiceId, R.string.voice_message_play)
+            activateVoiceActionForScreenshot(voiceId, R.string.voice_message_play)
             awaitVoiceAction(voiceId, R.string.voice_message_pause)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertVoiceBubbleFullyVisible(voiceId)
@@ -577,7 +590,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
     ): ConversationViewportEvidence {
         fixture.voiceMessageIds.forEach { voiceId ->
             clickVoiceAction(voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(fixture.controller, voiceId)
+            awaitAttachmentDownloadIntent(fixture.controller, voiceId)
             controls.getValue(voiceId).awaitMaterializationAttempt(0)
         }
         val downloading = evidence.awaitAnchor(fixture.voiceMessageIds.last())
@@ -939,13 +952,13 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
         assertTrue("voice action height must remain at least 48dp", action.touchBoundsInRoot.height >= minimumTargetPx)
     }
 
-    /** Waits for the durable open intent that drives materialization and replay. */
-    protected fun awaitAttachmentOpenIntent(
+    /** Waits for the durable download intent that keeps materialization armed until the bytes are ready. */
+    protected fun awaitAttachmentDownloadIntent(
         controller: ConversationController,
         messageId: String,
     ) {
         composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
-            controller.hasAttachmentOpenIntent(messageId, attachmentIndex = 0)
+            controller.hasAttachmentDownloadIntent(messageId, attachmentIndex = 0)
         }
     }
 

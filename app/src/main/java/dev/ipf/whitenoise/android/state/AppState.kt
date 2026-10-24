@@ -4182,7 +4182,7 @@ class WhiteNoiseAppState private constructor(
             sourceAccount != null && account != null && messages.isNotEmpty() && targets.isNotEmpty()
         if (!startable || sourceAccount == null || account == null) return false
         val diagnostics = ForwardDiagnostics.begin()
-        val transport = forwardTransport(sourceAccount, account, messages.size, diagnostics)
+        val transport = forwardTransport(sourceAccount, account, diagnostics)
         val session =
             ForwardSession(
                 scope = mutationsScope,
