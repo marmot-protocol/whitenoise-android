@@ -212,7 +212,7 @@ class PersonGroupsMembershipAuthorityTest {
 
     /** Waits on actual row semantics rather than assuming the main clock drains native IO. */
     private fun awaitMenu(id: String) {
-        rule.waitUntil(5_000) { rule.onAllNodesWithTag("groups_in_common.menu.$id").fetchSemanticsNodes().isNotEmpty() }
+        awaitAuthority { rule.onAllNodesWithTag("groups_in_common.menu.$id").fetchSemanticsNodes().isNotEmpty() }
     }
 
     /** Mounts the shipped entry point with the real active account, state owner and native controller reader. */

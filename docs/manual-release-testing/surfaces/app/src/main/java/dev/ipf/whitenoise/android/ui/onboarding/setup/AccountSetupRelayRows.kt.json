@@ -70,6 +70,14 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "Separate native relay check provenance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "SetupFindingEvidence(it)",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   }

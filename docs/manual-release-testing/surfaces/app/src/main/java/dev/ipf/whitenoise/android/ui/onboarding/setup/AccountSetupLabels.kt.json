@@ -397,6 +397,14 @@
         "test_ids": [
           "ONB-018"
         ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_inspection_completed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupLabels.kt",
+        "anchor": "R.string.setup_finding_inspection_completed",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   },

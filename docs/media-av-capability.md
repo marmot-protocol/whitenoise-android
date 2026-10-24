@@ -2,7 +2,9 @@
 
 This debug-only experiment measures Android media API access from the app's
 permissionless isolated UID. Attachment decoding, playback,
-voice playback and fallback retain their existing production routes. API30 and API36 results are pending.
+voice playback and fallback retain their existing production routes. Earlier API30
+and API34 campaigns failed their A/V reply-deadline observations; these failures
+remain part of the evidence. New-source qualification remains pending.
 Issue3374 remains open.
 
 ## Fixed inputs and phases
@@ -41,7 +43,27 @@ The fixture treats disconnect, unbind, a retirement request and elapsed time as
 unresolved lifetime observations.
 
 Probe requests retain the existing 8-second deadline and 6-second watchdog.
-Waveform requests retain their 40-second ceiling. After a timely reply, the fixture
+Waveform requests retain their 40-second ceiling and have no soft refusal.
+For other probes, an explicit debug-only soft refusal starts at 5 seconds. This
+shortens the observation opportunity before the existing hard kill; it does not
+establish that the platform operation would fail with a longer budget. A separate
+notification thread sends a bounded typed negative frame only after acknowledged
+READY and actual pre-parser isolation, canary and selected-input checks. The
+synchronous callback validates the kernel caller UID and PID, request tuple and
+current endpoint. It signals the parent and returns immediately; Binder dispatch
+never waits for worker death. The parent awaits exact death separately.
+
+One atomic winner owns both the terminal diagnostic and its send attempt. A late
+parser completion cannot emit a second terminal record. The independent hard-kill
+thread performs no logging or Binder send, and normal completion or a blocked
+notification never cancels it. The parent still requires a timely authentic frame,
+exact endpoint death and complete cleanup. A typed `worker_soft_timeout_no_result`
+records `capability_status=unqualified_timeout` and `production_route=false`; it
+reads no shared output. Missing or late replies retain the failing deadline path.
+This negative characterization is distinct from successful media parsing, just
+as an attributable parser IOException can produce a timely `no_result`.
+
+After a timely reply, the fixture
 allows a separate 2-second grace period for the exact Binder-death witness. Missing
 or late replies remain unqualified. Missing death keeps the worker generation held.
 The result records operation and retirement durations separately; total elapsed time

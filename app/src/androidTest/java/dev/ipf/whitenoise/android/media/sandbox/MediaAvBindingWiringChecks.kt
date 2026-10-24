@@ -78,7 +78,13 @@ private fun checkAvBindingMode(
             putInt("requestId", 1)
         }
     try {
-        if (mode == AvWiringMode.DEADLINE_DEATH) {
+        if (mode == AvWiringMode.SOFT_TIMEOUT) {
+            val result = binding.run(fixture, request)
+            check(result is AvCapabilityCase.Terminal)
+            check(result.observation.getBoolean("worker_soft_timeout"))
+            check(!result.observation.getBoolean("success") && !result.observation.getBoolean("output_read"))
+            check(result.observation.getBoolean("death_observed") && owner.unbinds == 1)
+        } else if (mode == AvWiringMode.DEADLINE_DEATH) {
             val result = binding.run(fixture, request)
             check(result is AvCapabilityCase.ReplyDeadline)
             check(!result.observation.getBoolean("output_read"))
@@ -91,7 +97,13 @@ private fun checkAvBindingMode(
                 check(runCatching { binding.run(fixture, request) }.isFailure)
                 check(owner.binds == 1)
             } else {
-                check(result.exceptionOrNull()?.message == "Current terminal protocol or identity rejected")
+                val expected =
+                    if (mode == AvWiringMode.SOFT_LATE) {
+                        "Late reply remains unqualified"
+                    } else {
+                        "Current terminal protocol or identity rejected"
+                    }
+                check(result.exceptionOrNull()?.message == expected)
                 check(owner.unbinds == 1)
             }
         }
@@ -102,6 +114,11 @@ private fun checkAvBindingMode(
 }
 
 private enum class AvWiringMode {
+    SOFT_TIMEOUT,
+    SOFT_WRONG_PID,
+    SOFT_WRONG_TUPLE,
+    SOFT_DUPLICATE,
+    SOFT_LATE,
     BAD_READY,
     DUPLICATE_READY,
     BAD_TERMINAL,
@@ -193,6 +210,22 @@ private class AvWiringEndpoint(
             } else {
                 sendAvProbeReady(callback, tuple)
                 when (mode) {
+                    AvWiringMode.SOFT_TIMEOUT, AvWiringMode.SOFT_LATE -> {
+                        if (mode == AvWiringMode.SOFT_LATE) clock.set(MediaDecodePolicy.DEADLINE_MS + 1)
+                        sendAvProbeSoftTimeout(callback, timeoutFrame(tuple))
+                    }
+                    AvWiringMode.SOFT_WRONG_PID -> {
+                        identity = identity.copy(pid = 4_243)
+                        check(runCatching { sendAvProbeSoftTimeout(callback, timeoutFrame(tuple)) }.isFailure)
+                    }
+                    AvWiringMode.SOFT_WRONG_TUPLE -> {
+                        val foreign = timeoutFrame(tuple.copy(request = 2))
+                        check(runCatching { sendAvProbeSoftTimeout(callback, foreign) }.isFailure)
+                    }
+                    AvWiringMode.SOFT_DUPLICATE -> {
+                        sendAvProbeSoftTimeout(callback, timeoutFrame(tuple))
+                        check(runCatching { sendAvProbeSoftTimeout(callback, timeoutFrame(tuple)) }.isFailure)
+                    }
                     AvWiringMode.DUPLICATE_READY -> check(runCatching { sendAvProbeReady(callback, tuple) }.isFailure)
                     AvWiringMode.BAD_TERMINAL -> malformed(callback, IBinder.FIRST_CALL_TRANSACTION)
                     AvWiringMode.FD_TERMINAL -> descriptorTerminal(callback)
@@ -205,6 +238,16 @@ private class AvWiringEndpoint(
             request.getParcelable<SharedMemory>("output")?.close()
         }
     }
+
+    private fun timeoutFrame(tuple: AvProbeTuple): AvProbeSoftTimeout =
+        AvProbeSoftTimeout(
+            tuple,
+            true,
+            false,
+            false,
+            android.system.OsConstants.EACCES,
+            android.system.OsConstants.EBADF,
+        )
 
     private fun wrongUid(callback: IBinder) {
         identity = identity.copy(uid = 99_002)

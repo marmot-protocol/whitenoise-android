@@ -118,7 +118,15 @@ private class AvCapabilityCampaign(
                 row.put("worker_diagnostics", logs).put("diagnostics_qualified", true)
                 when (observed) {
                     is AvCapabilityCase.Terminal -> {
-                        row.put("outcome", if (evidence.getBoolean("success")) "success" else "no_result")
+                        if (evidence.getBoolean("worker_soft_timeout")) {
+                            row
+                                .put("outcome", "worker_soft_timeout_no_result")
+                                .put("capability_status", "unqualified_timeout")
+                                .put("production_route", false)
+                                .put("soft_refusal_ms", AV_SOFT_REFUSAL_MS)
+                        } else {
+                            row.put("outcome", if (evidence.getBoolean("success")) "success" else "no_result")
+                        }
                     }
                     is AvCapabilityCase.ReplyDeadline -> {
                         row.put("outcome", "reply_deadline_unqualified")

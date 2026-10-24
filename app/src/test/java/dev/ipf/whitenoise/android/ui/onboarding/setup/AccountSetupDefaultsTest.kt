@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
@@ -71,7 +70,7 @@ class AccountSetupDefaultsTest {
             )) {
                 val snapshot = missing(OnboardingStepFfi.RELAYS)
                 snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.apply {
-                    findings += OnboardingFindingFfi(issue, null)
+                    findings += setupFinding(issue, null)
                 }
                 assertEquals(snapshot, advance(snapshot))
             }
@@ -90,7 +89,7 @@ class AccountSetupDefaultsTest {
     private fun missing(step: OnboardingStepFfi): OnboardingSnapshotFfi =
         setupSnapshot(step, listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS)).also { snapshot ->
             snapshot.steps.first { it.step == step }.findings =
-                listOf(OnboardingFindingFfi(OnboardingIssueFfi.MISSING, null))
+                listOf(setupFinding(OnboardingIssueFfi.MISSING, null))
         }
 
     /** Models the durable proposal whose revision must be passed unchanged to native approval. */

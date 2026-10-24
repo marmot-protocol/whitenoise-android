@@ -402,6 +402,7 @@ private class AvCapabilityWorker(
                 when (code) {
                     AV_READY_TRANSACTION -> ready(data, response, flags)
                     IBinder.FIRST_CALL_TRANSACTION -> terminal(data)
+                    AV_SOFT_TIMEOUT_TRANSACTION -> softTimeout(data, response, flags)
                     else -> super.onTransact(code, data, response, flags)
                 }
 
@@ -451,6 +452,35 @@ private class AvCapabilityWorker(
                 return aborted
             }
 
+            private fun softTimeout(
+                data: Parcel,
+                response: Parcel?,
+                flags: Int,
+            ): Boolean {
+                val frame =
+                    try {
+                        require(response != null && flags and IBinder.FLAG_ONEWAY == 0)
+                        readAvProbeSoftTimeout(data).also { require(it.tuple == tuple) }
+                    } catch (_: RuntimeException) {
+                        return rejectTerminal()
+                    }
+                val identity = callerIdentity()
+                val accepted =
+                    withCurrent(this@AvCapabilityWorker) {
+                        if (identity.pid != control.identity?.pid) {
+                            abortTerminal()
+                            false
+                        } else {
+                            acceptTerminal(frame.evidence(), identity.uid)
+                        }
+                    }
+                if (accepted) {
+                    checkNotNull(response).writeNoException()
+                    response.writeInt(1)
+                }
+                return accepted
+            }
+
             private fun terminal(data: Parcel): Boolean {
                 val parsed =
                     try {
@@ -462,17 +492,21 @@ private class AvCapabilityWorker(
                         return rejectTerminal()
                     }
                 val uid = callerIdentity().uid
-                return withCurrent(this@AvCapabilityWorker) {
-                    if (readyEndpoint !== remote || !control.terminal(tuple.request, uid)) {
-                        abortTerminal()
-                        false
-                    } else {
-                        parsed.putInt("uid", uid)
-                        result = parsed
-                        replied.countDown()
-                        true
-                    }
+                return withCurrent(this@AvCapabilityWorker) { acceptTerminal(parsed, uid) }
+            }
+
+            private fun acceptTerminal(
+                parsed: Bundle,
+                uid: Int,
+            ): Boolean {
+                if (readyEndpoint !== remote || !control.terminal(tuple.request, uid)) {
+                    abortTerminal()
+                    return false
                 }
+                parsed.putInt("uid", uid)
+                result = parsed
+                replied.countDown()
+                return true
             }
         }
 
@@ -535,6 +569,8 @@ private object AvCapabilityEvidence {
             .put("operation_elapsed_ms", operationElapsed)
             .put("retirement_elapsed_ms", retirementElapsed)
             .put("pixels", result.getBoolean("pixels"))
+            .put("worker_soft_timeout", result.getBoolean("avSoftTimeout"))
+            .put("output_read", result.getBoolean("pixels"))
             .put("duration_ms", result.getLong("duration"))
             .put("waveform_bars", result.getFloatArray("waveform")?.size ?: 0)
             .put("input_write_errno", result.getInt("inputWriteErrno"))

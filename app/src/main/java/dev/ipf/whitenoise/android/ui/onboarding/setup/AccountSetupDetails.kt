@@ -27,7 +27,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
+import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
+import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
@@ -240,6 +243,7 @@ internal fun SetupFindingContent(finding: OnboardingFindingFfi) {
                         ),
                 )
             }
+            SetupFindingEvidence(finding)
             Text(
                 stringResource(setupFindingTitle(finding.issue)),
                 style = MaterialTheme.typography.bodyMedium,
@@ -247,6 +251,27 @@ internal fun SetupFindingContent(finding: OnboardingFindingFfi) {
             )
         }
     }
+}
+
+/** Preserves each native check's provenance; legacy unknown records do not acquire invented evidence. */
+@Composable
+internal fun SetupFindingEvidence(finding: OnboardingFindingFfi) {
+    if (finding.context == OnboardingFindingContextFfi.UNKNOWN &&
+        finding.purpose == OnboardingCheckPurposeFfi.UNKNOWN &&
+        finding.outcome == OnboardingCheckOutcomeFfi.UNKNOWN
+    ) {
+        return
+    }
+    Text(
+        stringResource(
+            R.string.setup_finding_check,
+            stringResource(setupFindingContextTitle(finding.context)),
+            stringResource(setupFindingPurposeTitle(finding.purpose)),
+            stringResource(setupFindingOutcomeTitle(finding.outcome)),
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** Current checkpoint is immediately inspectable without a full checklist. */

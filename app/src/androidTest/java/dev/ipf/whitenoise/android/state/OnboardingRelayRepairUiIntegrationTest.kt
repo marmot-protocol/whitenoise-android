@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -94,8 +95,17 @@ class OnboardingRelayRepairUiIntegrationTest {
             WhiteNoiseTheme { AccountSetupScreen(setup, { "Fixture" }, {}) }
         }
         compose.runOnIdle { setup.reconnect() }
-        awaitIdle(setup)
-        compose.onNodeWithTag("setup-step-RELAYS").performClick()
+        compose.waitUntil(30_000L) {
+            val state = setup.state.value
+            val step = state.currentStep
+            val actions = step?.actions.orEmpty()
+            !state.busy &&
+                step?.step == OnboardingStepFfi.RELAYS &&
+                OnboardingActionFfi.USE_RECOMMENDED_RELAYS in actions &&
+                OnboardingActionFfi.EDIT_RELAYS in actions &&
+                compose.onAllNodesWithText("Fix relay setup").fetchSemanticsNodes().size == 1 &&
+                compose.onAllNodesWithText("Review relays").fetchSemanticsNodes().size == 1
+        }
         compose.onNodeWithText("Fix relay setup").performScrollTo().assertIsDisplayed()
         compose
             .onNodeWithText("Review relays")

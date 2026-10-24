@@ -11,7 +11,7 @@ import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.os.SharedMemory
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 private const val AV_EDGE = 128
 private const val AV_ERROR_CHARS = 64
@@ -19,7 +19,7 @@ private const val AV_ERROR_CHARS = 64
 /** Debug-only descriptor experiment; no production caller routes through this component. */
 class MediaAvCapabilityService : Service() {
     private val work = Executors.newSingleThreadExecutor()
-    private val watchdog = Executors.newSingleThreadScheduledExecutor()
+    private val watchdog = AvProbeDeadlines { Process.killProcess(Process.myPid()) }
     private val messenger = Messenger(Handler(Looper.getMainLooper(), ::accept))
     private var admitted = false
 
@@ -56,11 +56,13 @@ class MediaAvCapabilityService : Service() {
             } else {
                 MediaDecodePolicy.WATCHDOG_MS
             }
-        val killer =
-            watchdog.schedule({
-                trace.record("watchdog", "timeout")
-                Process.killProcess(Process.myPid())
-            }, ceiling, TimeUnit.MILLISECONDS)
+        val timeoutEvidence = AtomicReference<AvProbeSoftTimeout?>()
+        val softMs = if (data.getString("probeStage") == "waveform") null else AV_SOFT_REFUSAL_MS
+        watchdog.arm(ceiling, softMs) {
+            timeoutEvidence.get()?.let { frame ->
+                trace.terminal("watchdog", "timeout") { sendAvProbeSoftTimeout(checkNotNull(reply), frame) }
+            }
+        }
         try {
             val tuple =
                 AvProbeTuple(
@@ -69,17 +71,15 @@ class MediaAvCapabilityService : Service() {
                     requestId,
                 )
             sendAvProbeReady(checkNotNull(reply), tuple)
-            val result = descriptors(data, trace)
-            reply?.let { sendMediaDecodeReply(it, requestId, result) }
+            val result = descriptors(data, trace) { timeoutEvidence.set(AvProbeSoftTimeout.observed(tuple, it)) }
+            trace.complete(result) { reply?.let { sendMediaDecodeReply(it, requestId, result) } }
         } catch (failure: Exception) {
-            trace.record("reply", "exception", failure)
-        } finally {
-            killer.cancel(false)
+            trace.terminal("reply", "exception", failure) {}
         }
     }
 
     @Suppress("DEPRECATION") // The debug Binder envelope contains only these two selected handles.
-    private fun descriptors(data: Bundle, trace: AvCapabilityTrace): Bundle {
+    private fun descriptors(data: Bundle, trace: AvCapabilityTrace, admitted: (Bundle) -> Unit): Bundle {
         val result = isolation(data)
         val input = checkNotNull(data.getParcelable<ParcelFileDescriptor>("input"))
         input.use {
@@ -88,7 +88,8 @@ class MediaAvCapabilityService : Service() {
                 require(data.getInt("version") == MediaDecodePolicy.VERSION)
                 require(validMediaRange(input.statSize, data.getLong("offset"), data.getLong("length")))
                 result.putInt("inputWriteErrno", writeErrno(input))
-                trace.run(result) { AvCapabilityOperations.run(input, output, data, result, trace) }
+                admitted(result)
+                trace.run { AvCapabilityOperations.run(input, output, data, result, trace) }
             }
         }
         return result
@@ -140,7 +141,7 @@ class MediaAvCapabilityService : Service() {
 
     override fun onDestroy() {
         work.shutdownNow()
-        watchdog.shutdownNow()
+        watchdog.close()
         super.onDestroy()
         if (Process.isIsolated()) Process.killProcess(Process.myPid())
     }
@@ -153,6 +154,8 @@ internal class AvCapabilityTrace private constructor(
     private val request: Int,
 ) {
     private var phase = "admission"
+    private var failure: Exception? = null
+    private val terminalGate = AvProbeTerminalGate()
 
     fun phase(value: String) {
         phase = value
@@ -161,15 +164,38 @@ internal class AvCapabilityTrace private constructor(
 
     // Experimental probe boundary retains only the Exception class/code, excluding messages and Throwable.
     @Suppress("TooGenericExceptionCaught")
-    fun run(
-        result: Bundle,
-        action: () -> Unit,
-    ) {
+    fun run(action: () -> Unit) {
         try {
             action()
-            record(phase, if (result.getBoolean("success")) "success" else "no_result")
         } catch (failure: Exception) {
-            record(phase, "exception", failure)
+            this.failure = failure
+        }
+    }
+
+    fun complete(
+        result: Bundle,
+        send: () -> Unit,
+    ) {
+        val outcome =
+            if (failure != null) {
+                "exception"
+            } else if (result.getBoolean("success")) {
+                "success"
+            } else {
+                "no_result"
+            }
+        terminal(phase, outcome, failure, send)
+    }
+
+    fun terminal(
+        phase: String,
+        outcome: String,
+        failure: Exception? = null,
+        send: () -> Unit,
+    ) {
+        if (terminalGate.claim()) {
+            record(phase, outcome, failure)
+            send()
         }
     }
 

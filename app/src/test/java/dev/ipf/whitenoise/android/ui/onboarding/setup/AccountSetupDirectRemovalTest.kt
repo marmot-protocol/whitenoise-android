@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayTagFfi
 import dev.ipf.marmotkit.OnboardingRelayTagRoleFfi
@@ -18,6 +17,58 @@ import org.junit.Test
 
 /** The direct Remove gesture prepares a native proposal but never grants publication. */
 class AccountSetupDirectRemovalTest {
+    /** A step-wide Edit action does not grant a shortcut for an ungranted native finding. */
+    @Test fun missingFindingGrantCannotStartInlineRemoval() =
+        runTest {
+            val decision = retiredDecision()
+            decision.steps
+                .first { it.step == OnboardingStepFfi.RELAYS }
+                .findings
+                .single()
+                .actions = emptyList()
+            val client = FakeSetupClient(decision)
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            controller.reconnect()
+            runCurrent()
+            assertNull(controller.state.value.directRemovalEndpoint())
+            controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED)
+            runCurrent()
+            assertTrue(client.requests.isEmpty())
+            controller.close()
+        }
+
+    /** A grant withdrawn on the native reread cannot be recovered from the stale rendered decision. */
+    @Test fun freshFindingGrantIsRequiredBeforePreview() =
+        runTest {
+            val client = FakeSetupClient(retiredDecision())
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            controller.reconnect()
+            runCurrent()
+            client.snapshotOverride =
+                client.current.copy(
+                    steps =
+                        client.current.steps.map { step ->
+                            step.copy(findings = step.findings.map { it.copy(actions = emptyList()) })
+                        },
+                )
+            controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED)
+            runCurrent()
+            assertTrue(client.requests.isEmpty())
+            assertTrue(controller.state.value.staleDecision)
+            controller.close()
+        }
+
+    /** Another endpoint's grant cannot be borrowed by an ungranted retired endpoint. */
+    @Test fun anotherFindingGrantDoesNotAuthorizeRemoval() {
+        val decision = retiredDecision()
+        decision.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(
+                setupFinding(OnboardingIssueFfi.RETIRED_RELAY, RETIRED),
+                setupFinding(OnboardingIssueFfi.TIMED_OUT, KEPT, actions = listOf(OnboardingActionFfi.EDIT_RELAYS)),
+            )
+        assertNull(AccountSetupState(snapshot = decision).directRemovalEndpoint())
+    }
+
     @Test fun oneRemoveStagesExactEndpointAndRequiresSeparateApproval() =
         runTest {
             val preview = removablePreview()
@@ -276,7 +327,13 @@ class AccountSetupDirectRemovalTest {
     private fun retiredDecision() =
         relayDecision().apply {
             steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
-                listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, RETIRED))
+                listOf(
+                    setupFinding(
+                        OnboardingIssueFfi.RETIRED_RELAY,
+                        RETIRED,
+                        actions = listOf(OnboardingActionFfi.EDIT_RELAYS),
+                    ),
+                )
         }
 
     private fun removablePreview(): OnboardingSnapshotFfi {

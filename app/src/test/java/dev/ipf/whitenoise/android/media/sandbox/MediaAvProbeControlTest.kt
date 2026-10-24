@@ -170,6 +170,129 @@ class MediaAvProbeControlTest {
         }
     }
 
+    /** A blocked notification is not the hard-kill scheduler and cannot cancel it. */
+    @Test
+    fun blockedSoftNotificationCannotPreventIndependentHardKill() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val killed = CountDownLatch(1)
+        val timers = AvProbeDeadlines { killed.countDown() }
+        try {
+            timers.arm(200, 1) {
+                entered.countDown()
+                check(release.await(2, TimeUnit.SECONDS))
+            }
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            assertTrue(killed.await(2, TimeUnit.SECONDS))
+            assertEquals(1L, release.count)
+        } finally {
+            release.countDown()
+            timers.close()
+        }
+    }
+
+    @Test
+    fun normalTerminalWinnerDoesNotCancelHardKillAndLateTimeoutCannotSend() {
+        val terminal = AvProbeTerminalGate()
+        assertTrue(terminal.claim())
+        val soft = CountDownLatch(1)
+        val killed = CountDownLatch(1)
+        val timers = AvProbeDeadlines { killed.countDown() }
+        try {
+            timers.arm(200, 1) {
+                assertFalse(terminal.claim())
+                soft.countDown()
+            }
+            assertTrue(soft.await(2, TimeUnit.SECONDS))
+            assertTrue(killed.await(2, TimeUnit.SECONDS))
+        } finally {
+            timers.close()
+        }
+    }
+
+    @Test
+    fun racingNormalAndSoftTerminalHaveExactlyOneDiagnosticAndSendOwner() {
+        val gate = AvProbeTerminalGate()
+        val start = CountDownLatch(1)
+        val winners =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        val attempts =
+            List(2) {
+                Thread {
+                    check(start.await(2, TimeUnit.SECONDS))
+                    if (gate.claim()) winners.incrementAndGet()
+                }.also { it.start() }
+            }
+        start.countDown()
+        attempts.forEach {
+            it.join(2_000)
+            assertFalse(it.isAlive)
+        }
+        assertEquals(1, winners.get())
+        assertFalse(gate.claim())
+    }
+
+    @Test
+    fun typedSoftRefusalHasOnlyNegativeAdmissionEvidenceAndRejectsTrailingBytes() {
+        val frame = softTimeoutFrame()
+        for (trailing in listOf(false, true)) {
+            val parcel = Parcel.obtain()
+            try {
+                writeAvProbeSoftTimeout(parcel, frame)
+                if (trailing) parcel.writeInt(7)
+                parcel.setDataPosition(0)
+                val parsed = runCatching { readAvProbeSoftTimeout(parcel) }
+                if (trailing) {
+                    assertTrue(parsed.isFailure)
+                } else {
+                    assertEquals(frame, parsed.getOrThrow())
+                    val evidence = parsed.getOrThrow().evidence()
+                    assertTrue(evidence.getBoolean("avSoftTimeout"))
+                    assertFalse(evidence.getBoolean("success"))
+                    assertFalse(evidence.getBoolean("pixels"))
+                }
+            } finally {
+                parcel.recycle()
+            }
+        }
+    }
+
+    @Test
+    fun typedSoftRefusalRejectsDescriptorsAndInvalidAdmissionFacts() {
+        val descriptors = ParcelFileDescriptor.createPipe()
+        val parcel = Parcel.obtain()
+        try {
+            writeAvProbeSoftTimeout(parcel, softTimeoutFrame())
+            parcel.writeFileDescriptor(descriptors[0].fileDescriptor)
+            parcel.setDataPosition(0)
+            assertTrue(runCatching { readAvProbeSoftTimeout(parcel) }.isFailure)
+        } finally {
+            parcel.recycle()
+            descriptors.forEach { it.close() }
+        }
+        for (bad in listOf(softTimeoutFrame().copy(isolated = false), softTimeoutFrame().copy(inputWriteErrno = 0))) {
+            val data = Parcel.obtain()
+            try {
+                writeAvProbeSoftTimeout(data, bad)
+                data.setDataPosition(0)
+                assertTrue(runCatching { readAvProbeSoftTimeout(data) }.isFailure)
+            } finally {
+                data.recycle()
+            }
+        }
+    }
+
+    private fun softTimeoutFrame(): AvProbeSoftTimeout =
+        AvProbeSoftTimeout(
+            tuple,
+            true,
+            false,
+            false,
+            android.system.OsConstants.EACCES,
+            android.system.OsConstants.EBADF,
+        )
+
     private fun readyCleanup(): AvProbeCleanup =
         AvProbeCleanup().apply {
             revoked()
