@@ -165,6 +165,23 @@ class ConversationDictationPersistentControlTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_paste_editable.png")
     }
 
+    /** Plain dark keeps the selected Send processing state and both choices readable. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun processingSendPlainDarkKeepsBothChoicesUsable() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture, darkTheme = true, amoled = false)
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.onNodeWithContentDescription("Paste").assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Send")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Send")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_send_editable_dark.png")
+    }
+
     /** Pending processing advertises its selected action while both choices stay usable. */
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
