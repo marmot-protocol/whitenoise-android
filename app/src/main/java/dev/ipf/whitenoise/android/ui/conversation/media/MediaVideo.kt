@@ -85,6 +85,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 
 private val videoMaterializations = SingleFlight<String, java.io.File>()
@@ -1365,7 +1366,7 @@ private fun rememberCachedVideoAttachmentFileState(
 }
 
 /** Keeps a resolver's newly materialized file observable even when it reuses the same cache path. */
-internal fun newVideoAttachmentCacheFileState(): MutableState<java.io.File?> = mutableStateOf(null, referentialEqualityPolicy())
+internal fun newVideoAttachmentCacheFileState(): MutableState<File?> = mutableStateOf(null, referentialEqualityPolicy())
 
 /** Publishes a disk probe only while no resolver has replaced the state it observed. */
 internal fun publishVideoAttachmentCacheProbe(
