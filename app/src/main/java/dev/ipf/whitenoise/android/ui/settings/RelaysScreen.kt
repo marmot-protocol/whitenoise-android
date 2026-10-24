@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,11 +36,11 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.RelayUrlValidationResult
+import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.canRemoveRelay
 import dev.ipf.whitenoise.android.state.publishMissingRelayLists
-import dev.ipf.whitenoise.android.state.relayUrlValidationResult
+import dev.ipf.whitenoise.android.state.relayAddressAttention
 import dev.ipf.whitenoise.android.state.restoreDefaultAccountRelays
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
@@ -226,12 +227,14 @@ internal fun RelaysContent(
     val busy = state.busy || state.publication.running != null
     SettingsScaffold(title = stringResource(R.string.relays), onBack = onBack) {
         SettingsList {
-            if (relays.any(AccountRelay::needsAttention)) {
+            // One callout per kind of concern, so an onion relay is never described as an insecure connection.
+            relays.map(AccountRelay::attention).distinct().sorted().forEach { attention ->
+                val callout = attention.callout() ?: return@forEach
                 item {
                     SettingsCallout(
-                        text = stringResource(R.string.relay_imported_issue_detail),
-                        modifier = Modifier.testTag("relays.imported.issue"),
-                        title = stringResource(R.string.relay_imported_issue_title),
+                        text = stringResource(callout.detailRes),
+                        modifier = Modifier.testTag(callout.testTag),
+                        title = stringResource(callout.titleRes),
                         icon = R.drawable.ic_warning,
                     )
                 }
@@ -479,8 +482,11 @@ internal fun AddRelaySheet(
     val value: TextFieldState = rememberTextFieldState()
     var roles by rememberSaveable { mutableStateOf(AccountRelayRole.entries.toSet()) }
     val currentValue = value.text.toString().trim()
-    val acceptable =
-        currentValue.isNotEmpty() && relayUrlValidationResult(currentValue) == RelayUrlValidationResult.Acceptable
+    val attention = relayAddressAttention(currentValue)
+    val onion = attention == RelayAddressAttention.OnionRequiresTor
+    // Mirrors MarmotKit, which refuses onion endpoints at classify/publish: None is a structurally acceptable
+    // secure address that is not an onion relay, so an onion address is never offered for publication.
+    val acceptable = currentValue.isNotEmpty() && attention == RelayAddressAttention.None
     val duplicate = acceptable && roles.isNotEmpty() && missingRelayRoles(existing, currentValue, roles).isEmpty()
     val rejected = rejectedUrl != null && rejectedUrl == currentValue
     val canAdd = acceptable && !duplicate && roles.isNotEmpty() && !busy
@@ -497,8 +503,9 @@ internal fun AddRelaySheet(
                             .testTag("relay.add.url"),
                     label = { Text(stringResource(R.string.relay_url)) },
                     placeholder = { Text("wss://relay.example.com") },
-                    supportingText = { Text(stringResource(R.string.relay_url_help)) },
-                    errorMessage = if (duplicate || rejected) stringResource(R.string.relay_unique_url_error) else null,
+                    // An onion address needs visible guidance, not only the error announcement.
+                    supportingText = { Text(stringResource(addRelayHelpRes(onion))) },
+                    errorMessage = addRelayErrorRes(onion, duplicate || rejected)?.let { stringResource(it) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     lineLimits = TextFieldLineLimits.SingleLine,
                 )
@@ -531,9 +538,34 @@ internal fun AddRelaySheet(
     }
 }
 
-/** Host and, when the address is not a secure wss:// URL, the needs-attention note. */
+/** Visible guidance under the URL field: why an onion address cannot be added, else the wss:// hint. */
+@StringRes
+private fun addRelayHelpRes(onion: Boolean): Int =
+    when {
+        onion -> R.string.relay_onion_add_error
+        else -> R.string.relay_url_help
+    }
+
+/**
+ * The short error announcement; an onion address announces "Needs Tor" while its full explanation stays in the
+ * visible supporting text, so TalkBack does not read the same sentence twice. Null when the field has no error.
+ */
+@StringRes
+private fun addRelayErrorRes(
+    onion: Boolean,
+    duplicateOrRejected: Boolean,
+): Int? =
+    when {
+        onion -> R.string.relay_onion_needs_tor
+        duplicateOrRejected -> R.string.relay_unique_url_error
+        else -> null
+    }
+
+/** Address and, when it is not a usable secure wss:// URL, the note naming its kind of concern. */
 @Composable
-private fun relaySummary(relay: AccountRelay): String =
-    if (relay.needsAttention) "${relay.url} · ${stringResource(R.string.relay_needs_attention)}" else relay.url
+private fun relaySummary(relay: AccountRelay): String {
+    val note = relay.attention.summaryNoteRes() ?: return relay.url
+    return "${relay.url} · ${stringResource(note)}"
+}
 
 private val RelayProgressSize = 20.dp
