@@ -7,6 +7,14 @@ import dev.ipf.marmotkit.ChatListRowFfi
 internal class OptimisticArchiveIntent(
     val bindEpoch: Long,
     val archived: Boolean,
+    val ownerIsCurrent: () -> Boolean = { true },
+    val completionIsCurrent: () -> Boolean = ownerIsCurrent,
+)
+
+internal class ResolvedArchiveRows(
+    val rows: Collection<ChatListRowFfi>,
+    val isCurrent: () -> Boolean,
+    val completionIsCurrent: () -> Boolean = isCurrent,
 )
 
 /**
@@ -33,8 +41,30 @@ internal class ChatListArchiveActions(
         groupIds: Collection<String>,
         archived: Boolean,
         notify: Boolean,
+    ): Int = commit(account, begin(groupIds, archived, epoch), archived, notify)
+
+    /** Uses resolved off-window rows while preserving distinct admission and committed-completion fences. */
+    suspend fun setArchivedRows(
+        account: String,
+        epoch: Long,
+        resolved: ResolvedArchiveRows,
+        archived: Boolean,
+        notify: Boolean,
     ): Int {
-        val intents = begin(groupIds, archived, epoch)
+        val intents = beginRows(resolved.rows, archived, epoch, resolved.isCurrent, resolved.completionIsCurrent)
+        return commit(account, intents, archived, notify)
+    }
+
+    /**
+     * Settles each overlay by identity after its native attempt; cancellation also retires unstarted overlays.
+     * Errors and success feedback remain scoped to a current presentation, independently of committed work.
+     */
+    private suspend fun commit(
+        account: String,
+        intents: List<Pair<String, OptimisticArchiveIntent>>,
+        archived: Boolean,
+        notify: Boolean,
+    ): Int {
         if (intents.isEmpty()) return 0
         var succeeded = 0
         try {
@@ -43,7 +73,7 @@ internal class ChatListArchiveActions(
                     runCatchingCancellable {
                         updateGroup(account, groupIdHex, archived, intent)
                     }.onFailure { error ->
-                        if (isCurrent(epoch)) onFailure(error)
+                        if (isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()) onFailure(error)
                     }.getOrDefault(false)
                 if (applied) succeeded += 1
                 finish(groupIdHex, intent)
@@ -52,7 +82,10 @@ internal class ChatListArchiveActions(
             // Cancellation retires unstarted overlays without rolling back native work.
             intents.forEach { (groupIdHex, intent) -> finish(groupIdHex, intent) }
         }
-        if (notify && succeeded > 0 && isCurrent(epoch)) onSuccess(archived)
+        val shouldNotify = notify && succeeded > 0
+        if (shouldNotify && intents.any { isCurrent(it.second.bindEpoch) && it.second.ownerIsCurrent() }) {
+            onSuccess(archived)
+        }
         return succeeded
     }
 
@@ -62,20 +95,28 @@ internal class ChatListArchiveActions(
         archived: Boolean,
         epoch: Long,
     ): List<Pair<String, OptimisticArchiveIntent>> {
+        val rows = groupIds.map(String::trim).filter(String::isNotEmpty).mapNotNull(rowForGroup)
+        return beginRows(rows, archived, epoch, { true }, { true })
+    }
+
+    /** Deduplicates resolved rows and publishes only changed archive intents before any native call starts. */
+    private fun beginRows(
+        rows: Collection<ChatListRowFfi>,
+        archived: Boolean,
+        epoch: Long,
+        ownerIsCurrent: () -> Boolean,
+        completionIsCurrent: () -> Boolean,
+    ): List<Pair<String, OptimisticArchiveIntent>> {
+        if (!ownerIsCurrent()) return emptyList()
         val intents =
-            groupIds
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-                .distinctBy { it.lowercase() }
-                .mapNotNull { groupIdHex ->
-                    val rowKey = groupIdHex.lowercase()
-                    val currentRow = rowForGroup(groupIdHex) ?: return@mapNotNull null
-                    val currentArchived = intentsByGroup[rowKey]?.archived ?: currentRow.archived
-                    if (currentArchived == archived) return@mapNotNull null
-                    val intent = OptimisticArchiveIntent(bindEpoch = epoch, archived = archived)
-                    intentsByGroup[rowKey] = intent
-                    groupIdHex to intent
-                }
+            rows.distinctBy { it.groupIdHex.lowercase() }.mapNotNull { row ->
+                val key = row.groupIdHex.lowercase()
+                val currentArchived = intentsByGroup[key]?.archived ?: row.archived
+                if (currentArchived == archived) return@mapNotNull null
+                val intent = OptimisticArchiveIntent(epoch, archived, ownerIsCurrent, completionIsCurrent)
+                intentsByGroup[key] = intent
+                row.groupIdHex to intent
+            }
         if (intents.isNotEmpty()) onChanged()
         return intents
     }
@@ -86,7 +127,7 @@ internal class ChatListArchiveActions(
         intent: OptimisticArchiveIntent,
     ) {
         val rowKey = groupIdHex.lowercase()
-        if (ownsIntent(groupIdHex, intent)) {
+        if (intentsByGroup[rowKey] === intent) {
             intentsByGroup.remove(rowKey)
             onChanged()
         }
@@ -96,7 +137,19 @@ internal class ChatListArchiveActions(
     fun ownsIntent(
         groupIdHex: String,
         intent: OptimisticArchiveIntent,
-    ): Boolean = isCurrent(intent.bindEpoch) && intentsByGroup[groupIdHex.lowercase()] === intent
+    ): Boolean {
+        val ownsBinding = isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()
+        return ownsBinding && intentsByGroup[groupIdHex.lowercase()] === intent
+    }
+
+    /** Settles committed work only for the same binding and exact overlay identity. */
+    fun ownsCompletion(
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent,
+    ): Boolean =
+        isCurrent(intent.bindEpoch) &&
+            intent.completionIsCurrent() &&
+            intentsByGroup[groupIdHex.lowercase()] === intent
 
     /** Applies the temporary archive flag without changing the authoritative row. */
     fun projectRow(row: ChatListRowFfi): ChatListRowFfi =

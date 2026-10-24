@@ -9,11 +9,100 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.FolderField
+import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
+import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ChatFolderRulesTest {
+    /** Read, excluded, archived and wrong-category rows cannot poison another folder's roster read. */
+    @Test fun unreadMemberHydrationUsesOnlyPossibleFolderCandidates() {
+        val rule = ChatFolderRule(includeMemberPubkeys = setOf("cc"), groupsOnly = true)
+        val rows =
+            listOf(
+                item("candidate", unread = true),
+                item("read"),
+                item("excluded", unread = true),
+                item("direct", unread = true, dm = true),
+                item("archived", unread = true, archived = true),
+                item("manual", unread = true),
+            )
+        assertEquals(
+            setOf("candidate"),
+            rule.unreadMemberCandidateIds(
+                rows,
+                setOf("manual"),
+                setOf("excluded"),
+                "self",
+            ) { "Group" },
+        )
+    }
+
+    /** Existing keyword/counterpart evidence can establish a match without a redundant roster request. */
+    @Test fun knownFolderMatchesDoNotRequireMissingRosters() {
+        val rule = ChatFolderRule(includeMemberPubkeys = setOf("cc"), keyword = "work")
+        val rows =
+            listOf(
+                item("peer", unread = true, dm = true, presentationOtherMember = "cc"),
+                item("title", unread = true),
+                item("unknown", unread = true),
+            )
+        assertEquals(
+            setOf("unknown"),
+            rule.unreadMemberCandidateIds(rows, emptySet(), emptySet(), "self") {
+                if (it.id == "title") "Work" else "Home"
+            },
+        )
+    }
+
+    /** Three-valued smart matching retains unknown participant candidates but rejects proven nonmatches. */
+    @Test fun smartUnreadHydrationHonorsOtherPredicatesBeforeResolvingParticipants() {
+        val wanted = "cc".repeat(32)
+        val filter =
+            SmartFolderFilter.Group(
+                children =
+                    listOf(
+                        SmartFolderFilter.Condition(FolderField.TYPE, FolderMode.GROUP),
+                        SmartFolderFilter.Condition(FolderField.PARTICIPANTS, FolderMode.ANY_OF, setOf(wanted)),
+                    ),
+            )
+        val rule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(filter))
+        val rows =
+            listOf(
+                item("candidate", unread = true),
+                item("read"),
+                item("direct", unread = true, dm = true),
+                item("excluded", unread = true),
+            )
+        assertEquals(
+            setOf("candidate"),
+            rule.unreadMemberCandidateIds(
+                rows,
+                emptySet(),
+                setOf("excluded"),
+                "self",
+            ) { "Group" },
+        )
+    }
+
+    /** Advanced rules replace legacy criteria, including legacy participant fields left in the same record. */
+    @Test fun advancedNonParticipantUnknownDoesNotHydrateDormantLegacyMemberRule() {
+        val filter = SmartFolderFilter.Group(children = listOf(SmartFolderFilter.Condition(FolderField.PENDING_SEND)))
+        val rule = ChatFolderRule(includeMemberPubkeys = setOf("cc"), smartFilter = SmartFolderCodec.encode(filter))
+        assertEquals(
+            emptySet<String>(),
+            rule.unreadMemberCandidateIds(
+                listOf(item("unknown", unread = true)),
+                emptySet(),
+                emptySet(),
+                "self",
+            ) { "Group" },
+        )
+    }
+
     /** Exact overrides win even over manual membership and malformed advanced rules. */
     @Test fun exclusionsWinForEveryRulePathAndIncludeAllUsesNativeRows() {
         val items = listOf(item("g1", unread = true), item("g2"))

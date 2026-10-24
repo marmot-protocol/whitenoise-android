@@ -103,6 +103,27 @@ class ScreenProofTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Invalid default remaining'):
                 screen_bindings(root, [screen], cases)
 
+    def test_explicit_unbound_audit_never_inherits_unrelated_campaign_credit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'config').mkdir()
+            (root / 'screen.kt').write_text('@Composable fun Screen() {}')
+            screen = {'source': 'screen.kt', 'symbol': 'Screen'}
+            remaining = 'Direct modal entry and exact target assertions still need a maintained flow'
+            mapping = {'schema': 1, 'screens': [{**screen, 'bindings': [], 'remaining': remaining}]}
+            (root / 'config/maestro-screen-assertions.json').write_text(json.dumps(mapping))
+            audited = screen_bindings(root, [screen], {})
+            source = 'a' * 40
+            campaign = {'source_sha': source, 'errors': [], 'results': [
+                {'case': 'other-surface', 'passed': True,
+                 'flow_sha256': {'.maestro/other.yaml': 'b' * 64}},
+            ]}
+            proof = executed_screens(audited, campaign, source)[0]
+            self.assertEqual(proof['remaining'], remaining)
+            self.assertEqual(proof['bindings'], [])
+            self.assertEqual(proof['executed_cases'], [])
+            self.assertFalse(proof['execution_verified'])
+
     def test_failed_missing_and_foreign_execution_get_no_screen_credit(self):
         hashes = {'.maestro/real.yaml': 'b' * 64}
         screens = [{'source': 'screen.kt', 'symbol': 'Screen', 'bindings': [{'case': 'real', 'flow_sha256': hashes}]}]

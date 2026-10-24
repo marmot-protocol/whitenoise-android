@@ -2396,4 +2396,20 @@
     <string name="search_message_content_failed">無法搜尋訊息內容。</string>
     <string name="document_save_interrupted">身分驗證中斷了此次儲存。請再次選擇「儲存」以選擇目的地。</string>
     <string name="avatar_preparation_interrupted">圖片更新已中斷。請先檢查目前的圖片，再重新選擇。</string>
+    <string name="setup_finding_inspection_completed">檢查已完成。僅憑這一點無法確認中繼支援寫入。</string>
+    <string name="setup_finding_context_unknown">來源未指定</string>
+    <string name="setup_finding_context_discovery">紀錄探索</string>
+    <string name="setup_finding_context_declaration">已發布的宣告</string>
+    <string name="setup_finding_context_route">已宣告的中繼</string>
+    <string name="setup_finding_context_approval">修復核准</string>
+    <string name="setup_finding_context_publication">修復發布</string>
+    <string name="setup_finding_purpose_unknown">檢查未指定</string>
+    <string name="setup_finding_purpose_lookup">紀錄查找</string>
+    <string name="setup_finding_purpose_validation">宣告驗證</string>
+    <string name="setup_finding_purpose_directory">目錄查詢</string>
+    <string name="setup_finding_purpose_freshness">來源時效性</string>
+    <string name="setup_finding_purpose_publication">事件發布</string>
+    <string name="setup_finding_outcome_unknown">結果未知</string>
+    <string name="setup_finding_outcome_success">檢查成功</string>
+    <string name="setup_finding_outcome_failure">檢查失敗</string>
 </resources>

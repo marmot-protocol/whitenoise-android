@@ -2430,4 +2430,20 @@
     <string name="search_message_content_failed">Impossible de rechercher dans le contenu des messages.</string>
     <string name="document_save_interrupted">L’authentification a interrompu cet enregistrement. Choisis à nouveau Enregistrer pour sélectionner une destination.</string>
     <string name="avatar_preparation_interrupted">La mise à jour de l’image a été interrompue. Vérifie l’image actuelle avant de la sélectionner à nouveau.</string>
+    <string name="setup_finding_inspection_completed">Inspection terminée. Cela ne suffit pas à confirmer que le relais accepte les écritures.</string>
+    <string name="setup_finding_context_unknown">Source non précisée</string>
+    <string name="setup_finding_context_discovery">Découverte des enregistrements</string>
+    <string name="setup_finding_context_declaration">Déclaration publiée</string>
+    <string name="setup_finding_context_route">Relais déclaré</string>
+    <string name="setup_finding_context_approval">Approbation de la réparation</string>
+    <string name="setup_finding_context_publication">Publication de la réparation</string>
+    <string name="setup_finding_purpose_unknown">Vérification non précisée</string>
+    <string name="setup_finding_purpose_lookup">Recherche des enregistrements</string>
+    <string name="setup_finding_purpose_validation">Validation de la déclaration</string>
+    <string name="setup_finding_purpose_directory">Requête dans le répertoire</string>
+    <string name="setup_finding_purpose_freshness">Actualité de la source</string>
+    <string name="setup_finding_purpose_publication">Publication de l’événement</string>
+    <string name="setup_finding_outcome_unknown">Résultat inconnu</string>
+    <string name="setup_finding_outcome_success">Vérification réussie</string>
+    <string name="setup_finding_outcome_failure">Échec de la vérification</string>
 </resources>

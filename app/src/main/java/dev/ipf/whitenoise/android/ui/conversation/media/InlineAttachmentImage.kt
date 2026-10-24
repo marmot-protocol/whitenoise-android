@@ -72,7 +72,7 @@ internal fun rememberInlineAnimationSource(
 /** Opens admitted bytes only through the permissionless frame worker, with thumbnail-sized output. */
 internal suspend fun decodeInlineAttachmentAnimation(bytes: ByteArray): Drawable? =
     decodeOwnedMedia(
-        decode = { MediaPipeline.decodeAnimatedDrawable(bytes, INLINE_ANIMATION_MAX_EDGE_PX) },
+        decode = { MediaPipeline.decodeAnimatedDrawable(bytes, INLINE_ANIMATION_MAX_EDGE_PX, decorative = true) },
         discard = { (it as? java.io.Closeable)?.close() },
     )
 

@@ -55,6 +55,80 @@ import kotlin.coroutines.startCoroutine
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class GroupAvatarRecoveryTest {
+    @Test
+    fun legacyGroupOutsideRetainedWindowUsesNativeSelectionBeforeAndAfterRead() =
+        runBlocking {
+            var snapshots = 0
+            val bytes = imageBytes()
+            val result =
+                dev.ipf.whitenoise.android.ui.common.readLegacyGroupAvatarBytes(
+                    expected = group(),
+                    accountRef = "owner",
+                    ownerIsCurrent = { true },
+                    currentGroup = { null },
+                    readSnapshotGroup = {
+                        snapshots++
+                        group()
+                    },
+                    readBytes = { bytes },
+                )
+            org.junit.Assert.assertArrayEquals(bytes, result)
+            org.junit.Assert.assertEquals(2, snapshots)
+        }
+
+    @Test
+    fun removedOrReplacedOffWindowGroupCannotPublishOldBytes() =
+        runBlocking {
+            var current = group()
+            val result =
+                dev.ipf.whitenoise.android.ui.common.readLegacyGroupAvatarBytes(
+                    expected = current,
+                    accountRef = "owner",
+                    ownerIsCurrent = { true },
+                    currentGroup = { null },
+                    readSnapshotGroup = { current },
+                    readBytes = {
+                        current = current.copy(imageHashHex = "new-hash")
+                        imageBytes()
+                    },
+                )
+            assertNull(result)
+        }
+
+    @Test
+    fun accountChangeDuringLegacyReadRejectsCompletion() =
+        runBlocking {
+            var owned = true
+            val result =
+                dev.ipf.whitenoise.android.ui.common.readLegacyGroupAvatarBytes(
+                    expected = group(),
+                    accountRef = "owner",
+                    ownerIsCurrent = { owned },
+                    currentGroup = { group() },
+                    readSnapshotGroup = { error("retained selection should suffice") },
+                    readBytes = {
+                        owned = false
+                        imageBytes()
+                    },
+                )
+            assertNull(result)
+        }
+
+    @Test
+    fun missingNativeGroupNeverReadsLegacyBytes() =
+        runBlocking {
+            val result =
+                dev.ipf.whitenoise.android.ui.common.readLegacyGroupAvatarBytes(
+                    expected = group(),
+                    accountRef = "owner",
+                    ownerIsCurrent = { true },
+                    currentGroup = { null },
+                    readSnapshotGroup = { null },
+                    readBytes = { error("deleted group must not acquire bytes") },
+                )
+            assertNull(result)
+        }
+
     @get:Rule
     val composeRule = createComposeRule()
 

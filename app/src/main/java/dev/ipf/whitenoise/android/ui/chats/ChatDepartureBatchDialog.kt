@@ -411,7 +411,13 @@ private fun ChatDepartureReviewTargets(
         val item = request.reviewItems.first { it.group.groupIdHex == target.groupId }
         val avatar = rememberChatListGroupAvatar(appState, item)
         GroupReviewDestinationIdentity(
-            MemberReviewGroup(target.groupId, target.title, avatar.pictureUrl, avatar.image),
+            MemberReviewGroup(
+                target.groupId,
+                target.title,
+                avatar.pictureUrl,
+                avatar.image,
+                groupAnimation = avatar.groupAnimation,
+            ),
             actionLabel =
                 stringResource(
                     when {

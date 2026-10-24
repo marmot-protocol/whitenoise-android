@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_group_remove_person">Удалить %1$s из %2$s</string>
+    <string name="shared_group_remove_confirmation">Удалить %1$s (%2$s) из %3$s?\nОт имени: %4$s (%5$s).\n\nДоступ этого участника к группе будет отозван.</string>
+</resources>

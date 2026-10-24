@@ -24,7 +24,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
         "anchor": "fun GroupReviewDestinationIdentity(",
         "test_ids": [
-          "GRP-034"
+          "GRP-034",
+          "GRP-035"
         ]
       },
       {

@@ -477,11 +477,12 @@ object MediaPipeline {
     fun decodeAnimatedDrawable(
         bytes: ByteArray,
         maxEdgePx: Int = ANIMATED_IMAGE_MAX_EDGE_PX,
+        decorative: Boolean = false,
     ): Drawable? {
         if (bytes.isEmpty()) return null
         return decodeAdmittedNativeAnimation(bytes) {
             dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                .animation(bytes, maxEdgePx)
+                .animation(bytes, maxEdgePx, decorative)
         }
     }
 

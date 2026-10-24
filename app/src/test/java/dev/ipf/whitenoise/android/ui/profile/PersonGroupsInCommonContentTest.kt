@@ -57,4 +57,52 @@ class PersonGroupsInCommonContentTest {
         composeRule.onNodeWithTag("groups_in_common.retry").performClick()
         assertEquals(1, retries)
     }
+
+    @Test fun removalOverflowNeverNavigatesOrAddsAndNamesItsExactTarget() {
+        var opens = 0
+        var adds = 0
+        val removals = mutableListOf<String>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                PersonGroupsInCommonContent(
+                    rows = listOf(PersonSharedGroupRow("friends", "Friends", 3)),
+                    unresolved = false,
+                    onBack = {},
+                    onOpen = { opens++ },
+                    onAdd = { adds++ },
+                    onRetry = {},
+                    removeLabel = { "Remove River from ${it.title}" },
+                    onRemove = removals::add,
+                    canRemove = { true },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("groups_in_common.menu.friends").performClick()
+        composeRule.onNodeWithText("Remove River from Friends").performClick()
+        assertEquals(listOf("friends"), removals)
+        assertEquals(0, opens)
+        assertEquals(0, adds)
+    }
+
+    @Test fun unauthorizedGroupKeepsSafeNavigationWithoutRemovalMenu() {
+        var opens = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                PersonGroupsInCommonContent(
+                    rows = listOf(PersonSharedGroupRow("friends", "Friends", 3)),
+                    unresolved = false,
+                    onBack = {},
+                    onOpen = { opens++ },
+                    onAdd = {},
+                    onRetry = {},
+                    removeLabel = { "Remove River from ${it.title}" },
+                    onRemove = {},
+                    canRemove = { false },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("groups_in_common.menu.friends").assertDoesNotExist()
+        composeRule.onNodeWithTag("groups_in_common.group.friends").performClick()
+        assertEquals(1, opens)
+    }
 }

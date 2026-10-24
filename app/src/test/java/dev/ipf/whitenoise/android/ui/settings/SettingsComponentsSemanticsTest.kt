@@ -133,6 +133,7 @@ class SettingsComponentsSemanticsTest {
                             onClick = { activations++ },
                             busy = busy.value,
                             modifier = Modifier.testTag(LINK),
+                            trailing = { Text("Custom end control", Modifier.testTag("custom-end")) },
                         )
                     }
                 }
@@ -148,7 +149,10 @@ class SettingsComponentsSemanticsTest {
             busy.value = true
         }
         composeRule.onNodeWithTag(LINK).assertIsNotEnabled().performTouchInput { click() }
+        composeRule.onNodeWithTag("custom-end", useUnmergedTree = true).assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(1, activations) }
+        composeRule.runOnIdle { busy.value = false }
+        composeRule.onNodeWithTag("custom-end", useUnmergedTree = true).assertExists()
     }
 
     /** Removing an earlier visible entry retains the surviving row's keyed composition identity. */

@@ -15,7 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
-/** Candidate-only assertions for the published raw-key cutover and migration 0116 on the populated fixture. */
+/** Reopens retained raw-key and migration-0116 state; a baseline already past the cutover proves compatibility. */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class MarmotKeyMigrationQualificationTest {

@@ -14,6 +14,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +28,7 @@ import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
+import dev.ipf.whitenoise.android.media.ProfilePictureDraftProcessor
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -52,6 +54,7 @@ import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 private fun WhiteNoiseAppState.abandonGroupCreateTiming(stage: String) {
     abandonChatCreateOpenTiming(stage)
@@ -264,7 +267,7 @@ internal fun NewGroupSetupScreen(
     onCreateSubmitted: () -> Long = { 0L },
     initialRetryGroupIdHex: String? = null,
     draft: NewGroupDraft? = null,
-    prepareRemoteImage: suspend (String) -> ImageUploadDraft = GroupImageDraftProcessor::fromRemoteUrl,
+    prepareRemoteImage: suspend (String) -> ImageUploadDraft = GroupImageDraftProcessor::fromGroupRemoteUrl,
     onRemoveMember: (String) -> Unit = {},
 ) {
     if (appState.signOutInProgress || appState.wipeInProgress) return
@@ -500,16 +503,32 @@ private fun NewGroupSetupAccountScreen(
         }
     }
 
+    val imagePickerScope = rememberCoroutineScope()
+    var imagePickGeneration by remember { mutableStateOf(0) }
+
+    fun pickGroupImage(uri: Uri) {
+        val generation = ++imagePickGeneration
+        imagePickerScope.launch {
+            val gif = ProfilePictureDraftProcessor.isGifSource(context.contentResolver, uri)
+            if (generation != imagePickGeneration || !(detailsEditableNow() && owner.isCurrent())) return@launch
+            if (gif) {
+                prepareImage { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, uri) }
+            } else {
+                pendingCropUri = uri
+            }
+        }
+    }
+
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null && detailsEditableNow()) {
-                pendingCropUri = uri
+                pickGroupImage(uri)
             }
         }
     val filePicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null && detailsEditableNow()) {
-                pendingCropUri = uri
+                pickGroupImage(uri)
             }
         }
     val displayedRecovery = recovery
@@ -658,7 +677,7 @@ private fun NewGroupSetupAccountScreen(
                 if (!detailsEditableNow()) return@ImageSearchSheet
                 imageFailureScope.clear()
                 imageError = false
-                pendingCropUri = uri
+                pickGroupImage(uri)
             },
             onPickEmoji = {
                 if (!detailsEditableNow()) return@ImageSearchSheet

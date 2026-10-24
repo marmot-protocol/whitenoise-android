@@ -149,11 +149,19 @@ class MarkReadChatListProjectionTest {
 
     @Test
     fun markAllRead_foldsReturnedChatListRowIntoChatsController() {
-        val body = controllersSource().readText().kotlinFunctionBody("markAllRead")
+        val source = controllersSource().readText()
+        val body = source.kotlinFunctionBody("markAllRead")
+        val fold = source.kotlinFunctionBody("applyChatListActionRow")
 
         assertTrue(
-            "markAllRead must apply markTimelineMessageRead's returned ChatListRowFfi to the chat list",
-            "applyChatListRow" in body || "foldChatRow" in body,
+            "markAllRead must route the returned native row through the retention-aware fold",
+            "applyChatListActionRow(row)" in body,
+        )
+        assertTrue(
+            "retained rows must fold immediately; off-window rows must refresh without growing the retained window",
+            "containsGroup(row.groupIdHex)" in fold &&
+                "applyChatListRow(row)" in fold &&
+                "else scheduleRecompute()" in fold,
         )
     }
 

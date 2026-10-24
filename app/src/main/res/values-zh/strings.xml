@@ -2395,4 +2395,20 @@
     <string name="search_message_content_failed">无法搜索消息内容。</string>
     <string name="document_save_interrupted">身份验证中断了此次保存。请再次选择“保存”以选择目标位置。</string>
     <string name="avatar_preparation_interrupted">图片更新已中断。请先检查当前图片，再重新选择。</string>
+    <string name="setup_finding_inspection_completed">检查已完成。仅凭这一点无法确认中继支持写入。</string>
+    <string name="setup_finding_context_unknown">来源未指定</string>
+    <string name="setup_finding_context_discovery">记录发现</string>
+    <string name="setup_finding_context_declaration">已发布的声明</string>
+    <string name="setup_finding_context_route">已声明的中继</string>
+    <string name="setup_finding_context_approval">修复批准</string>
+    <string name="setup_finding_context_publication">修复发布</string>
+    <string name="setup_finding_purpose_unknown">检查未指定</string>
+    <string name="setup_finding_purpose_lookup">记录查找</string>
+    <string name="setup_finding_purpose_validation">声明验证</string>
+    <string name="setup_finding_purpose_directory">目录查询</string>
+    <string name="setup_finding_purpose_freshness">来源时效性</string>
+    <string name="setup_finding_purpose_publication">事件发布</string>
+    <string name="setup_finding_outcome_unknown">结果未知</string>
+    <string name="setup_finding_outcome_success">检查成功</string>
+    <string name="setup_finding_outcome_failure">检查失败</string>
 </resources>

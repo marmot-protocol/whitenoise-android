@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Puxe para baixo para mostrar conversas não lidas</string>
+    <string name="pull_unread_only">Somente não lidas</string>
+    <string name="pull_unread_show_all">Mostrar todas</string>
+    <string name="pull_unread_retry">Tentar carregar conversas não lidas novamente</string>
+    <string name="pull_unread_load_failed">Não foi possível carregar as conversas não lidas. Tente novamente.</string>
+    <string name="pull_unread_hint">Puxe para mostrar conversas não lidas</string>
+    <string name="pull_unread_release">Solte para mostrar conversas não lidas</string>
+</resources>

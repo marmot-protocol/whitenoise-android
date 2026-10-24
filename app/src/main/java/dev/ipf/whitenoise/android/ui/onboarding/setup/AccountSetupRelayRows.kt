@@ -76,6 +76,7 @@ internal fun SetupRelayEditorRows(
                         style = MaterialTheme.typography.labelSmall,
                     )
                     findings.filter { it.endpoint == endpoint }.distinct().forEach {
+                        SetupFindingEvidence(it)
                         Text(stringResource(setupFindingTitle(it.issue)), style = MaterialTheme.typography.bodySmall)
                     }
                 }

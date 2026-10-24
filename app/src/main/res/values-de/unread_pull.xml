@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Nach unten ziehen, um ungelesene Unterhaltungen anzuzeigen</string>
+    <string name="pull_unread_only">Nur ungelesen</string>
+    <string name="pull_unread_show_all">Alle anzeigen</string>
+    <string name="pull_unread_retry">Ungelesene Unterhaltungen erneut laden</string>
+    <string name="pull_unread_load_failed">Ungelesene Unterhaltungen konnten nicht geladen werden. Versuche es erneut.</string>
+    <string name="pull_unread_hint">Ziehen, um ungelesene Unterhaltungen anzuzeigen</string>
+    <string name="pull_unread_release">Loslassen, um ungelesene Unterhaltungen anzuzeigen</string>
+</resources>
