@@ -6,4 +6,5 @@
     <string name="pull_unread_load_failed">Unread chats could not be loaded. Try again.</string>
     <string name="pull_unread_hint">Pull to show unread</string>
     <string name="pull_unread_release">Release to show unread</string>
+    <string name="pull_unread_filtered">Filtered by unread</string>
 </resources>

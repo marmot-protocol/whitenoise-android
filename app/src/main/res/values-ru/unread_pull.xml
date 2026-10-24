@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">Не удалось загрузить непрочитанные чаты. Повторите попытку.</string>
     <string name="pull_unread_hint">Потяните, чтобы показать непрочитанные чаты</string>
     <string name="pull_unread_release">Отпустите, чтобы показать непрочитанные чаты</string>
+    <string name="pull_unread_filtered">Только непрочитанные</string>
 </resources>
