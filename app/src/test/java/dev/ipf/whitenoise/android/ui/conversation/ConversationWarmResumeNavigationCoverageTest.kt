@@ -117,7 +117,12 @@ class ConversationWarmResumeNavigationCoverageTest {
                     File(it, "java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt")
                 }.first(File::isFile)
                 .readText()
-        val resume = source.substringAfter("onResume = { restoreFocus, clearFocus ->")
+        val resume =
+            source.substringAfter("val resumeRestoration:").substringBefore("ConversationComposerLifecycleEffect(")
+        val actualResume = source.substringAfter("onResume = { restoreFocus, clearFocus ->")
+        assertTrue(actualResume.contains("resumeRestoration(restoreFocus)"))
+        assertTrue(actualResume.contains("controller.retryInviteAcceptanceAuthority()"))
+        assertTrue(resume.contains("onHandoff = { resumeRestoration(false) { } }"))
         val binding =
             sequenceOf(File("src/main"), File("app/src/main"))
                 .map {

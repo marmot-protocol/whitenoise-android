@@ -1,5 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+
 /** A restore revision is meaningful only within its exact coordinator owner. */
 internal class ConversationForegroundRestoreBinding private constructor(
     val owner: ConversationScrollCoordinator,
@@ -42,5 +47,26 @@ internal class ConversationForegroundRestoreBinding private constructor(
                 owner,
                 owner.beginForegroundRestore(snapshot),
             )
+    }
+}
+
+/** Transfers only restoration when runtime recomposition follows the actual resume event. */
+@Composable
+internal fun ConversationForegroundOwnerHandoffEffect(
+    currentOwner: ConversationScrollCoordinator,
+    retained: ConversationForegroundRestoreBinding?,
+    lifecycleOwner: LifecycleOwner?,
+    onHandoff: () -> Unit,
+) {
+    DisposableEffect(currentOwner) {
+        if (
+            retained != null &&
+            retained.owner !== currentOwner &&
+            lifecycleOwner?.lifecycle?.currentState == Lifecycle.State.RESUMED
+        ) {
+            onHandoff()
+        }
+        // The existing controller-owned lifecycle observer owns cancellation and true teardown.
+        onDispose { }
     }
 }
