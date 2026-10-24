@@ -71,4 +71,5 @@ internal fun setupFindingTitle(value: OnboardingIssueFfi): Int =
         OnboardingIssueFfi.MULTI_DEVICE_UNSUPPORTED -> R.string.setup_finding_multi_device_unsupported
         OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE -> R.string.setup_finding_other_installation_possible
         OnboardingIssueFfi.DISCOVERY_INCOMPLETE -> R.string.setup_finding_discovery_incomplete
+        OnboardingIssueFfi.INSPECTION_COMPLETED -> R.string.setup_finding_inspection_completed
     }

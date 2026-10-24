@@ -2501,4 +2501,20 @@
     <string name="avatar_preparation_interrupted">Обновление изображения прервано. Проверьте текущее изображение, прежде чем выбирать его снова.</string>
     <string name="dictation_interrupted">Диктовка прервана. Перед отправкой проверьте восстановленный текст и оставшиеся аудиозаписи.</string>
     <string name="dictation_waiting_for_unlock">Диктовка временно сохранена. Разблокируйте приложение, чтобы вставить текст.</string>
+    <string name="setup_finding_inspection_completed">Проверка завершена. Само по себе это не подтверждает, что реле поддерживает запись.</string>
+    <string name="setup_finding_context_unknown">Источник не указан</string>
+    <string name="setup_finding_context_discovery">Обнаружение записей</string>
+    <string name="setup_finding_context_declaration">Опубликованная декларация</string>
+    <string name="setup_finding_context_route">Заявленное реле</string>
+    <string name="setup_finding_context_approval">Одобрение исправления</string>
+    <string name="setup_finding_context_publication">Публикация исправления</string>
+    <string name="setup_finding_purpose_unknown">Проверка не указана</string>
+    <string name="setup_finding_purpose_lookup">Поиск записей</string>
+    <string name="setup_finding_purpose_validation">Проверка декларации</string>
+    <string name="setup_finding_purpose_directory">Запрос к каталогу</string>
+    <string name="setup_finding_purpose_freshness">Актуальность источника</string>
+    <string name="setup_finding_purpose_publication">Публикация события</string>
+    <string name="setup_finding_outcome_unknown">Результат неизвестен</string>
+    <string name="setup_finding_outcome_success">Проверка успешна</string>
+    <string name="setup_finding_outcome_failure">Проверка не пройдена</string>
 </resources>

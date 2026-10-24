@@ -17,7 +17,7 @@ internal fun AccountSetupState.directRemovalEndpoint(): String? {
         OnboardingActionFfi.EDIT_RELAYS in step.actions
     ) {
         step.findings
-            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY }
+            .filter { it.issue == OnboardingIssueFfi.RETIRED_RELAY && OnboardingActionFfi.EDIT_RELAYS in it.actions }
             .mapNotNull { it.endpoint?.takeIf(String::isNotBlank) }
             .distinct()
             .singleOrNull()

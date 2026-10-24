@@ -595,6 +595,14 @@
         "test_ids": [
           "ONB-013"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "surface": "Direct removal preserves native finding provenance",
+        "anchor": ".forEach { SetupFindingEvidence(it) }",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ]
   }

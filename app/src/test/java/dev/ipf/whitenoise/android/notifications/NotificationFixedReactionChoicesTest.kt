@@ -130,8 +130,15 @@ class NotificationFixedReactionChoicesTest {
                 .Builder(
                     context,
                     card("message"),
-                ).setRemoteInputHistory(arrayOf("sent reply"))
+                ).apply {
+                    extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+                    extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
+                }.setRemoteInputHistory(arrayOf("sent reply"))
                 .build()
+        assertEquals(
+            listOf("sent reply"),
+            reply.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.toList(),
+        )
         val expandedReply = withExpandedReactionChoices(context, reply, "card", 7)
         assertEquals(
             listOf("sent reply"),

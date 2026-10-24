@@ -2427,4 +2427,20 @@
     <string name="avatar_preparation_interrupted">Se interrumpió la actualización de la imagen. Revisa la imagen actual antes de seleccionarla de nuevo.</string>
     <string name="dictation_interrupted">Dictado interrumpido. Revisa el texto recuperado y cualquier audio restante antes de enviar.</string>
     <string name="dictation_waiting_for_unlock">Dictado guardado temporalmente. Desbloquea la aplicación para pegarlo.</string>
+    <string name="setup_finding_inspection_completed">Inspección completada. Esto por sí solo no confirma que el relé admita escritura.</string>
+    <string name="setup_finding_context_unknown">Origen no especificado</string>
+    <string name="setup_finding_context_discovery">Descubrimiento de registros</string>
+    <string name="setup_finding_context_declaration">Declaración publicada</string>
+    <string name="setup_finding_context_route">Relé declarado</string>
+    <string name="setup_finding_context_approval">Aprobación de la reparación</string>
+    <string name="setup_finding_context_publication">Publicación de la reparación</string>
+    <string name="setup_finding_purpose_unknown">Comprobación no especificada</string>
+    <string name="setup_finding_purpose_lookup">Búsqueda de registros</string>
+    <string name="setup_finding_purpose_validation">Validación de la declaración</string>
+    <string name="setup_finding_purpose_directory">Consulta del directorio</string>
+    <string name="setup_finding_purpose_freshness">Vigencia del origen</string>
+    <string name="setup_finding_purpose_publication">Publicación del evento</string>
+    <string name="setup_finding_outcome_unknown">Resultado desconocido</string>
+    <string name="setup_finding_outcome_success">Comprobación correcta</string>
+    <string name="setup_finding_outcome_failure">Comprobación fallida</string>
 </resources>

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
+import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -129,7 +130,9 @@ private fun OnboardingSnapshotFfi.matchesRenderedRelayRemoval(
 ): Boolean {
     val endpointCurrent =
         steps.firstOrNull { it.step == request.step }?.findings?.any {
-            it.issue == OnboardingIssueFfi.RETIRED_RELAY && it.endpoint == endpoint
+            it.issue == OnboardingIssueFfi.RETIRED_RELAY &&
+                it.endpoint == endpoint &&
+                OnboardingActionFfi.EDIT_RELAYS in it.actions
         } == true
     return matchesDecision(account, request) && sameRemovalSource(displayed) && endpointCurrent
 }

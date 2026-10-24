@@ -248,6 +248,14 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "SetupFindingEvidence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "fun SetupFindingEvidence(",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ],
     "source_coverage": [
@@ -286,6 +294,14 @@
           "ONB-015",
           "ONB-016",
           "ONB-018"
+        ]
+      },
+      {
+        "surface": "Native finding evidence: R.string.setup_finding_check",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
+        "anchor": "R.string.setup_finding_check",
+        "test_ids": [
+          "ONB-017"
         ]
       }
     ]

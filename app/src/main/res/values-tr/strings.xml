@@ -2425,4 +2425,20 @@
     <string name="avatar_preparation_interrupted">Görüntü güncellemesi kesintiye uğradı. Tekrar seçmeden önce mevcut görüntüyü kontrol edin.</string>
     <string name="dictation_interrupted">Dikte kesintiye uğradı. Göndermeden önce kurtarılan metni ve kalan ses kayıtlarını gözden geçirin.</string>
     <string name="dictation_waiting_for_unlock">Dikte geçici olarak kaydedildi. Yapıştırmak için uygulamanın kilidini açın.</string>
+    <string name="setup_finding_inspection_completed">İnceleme tamamlandı. Bu tek başına rölenin yazmayı desteklediğini doğrulamaz.</string>
+    <string name="setup_finding_context_unknown">Kaynak belirtilmemiş</string>
+    <string name="setup_finding_context_discovery">Kayıt keşfi</string>
+    <string name="setup_finding_context_declaration">Yayımlanan bildirim</string>
+    <string name="setup_finding_context_route">Bildirilen röle</string>
+    <string name="setup_finding_context_approval">Onarım onayı</string>
+    <string name="setup_finding_context_publication">Onarımın yayımlanması</string>
+    <string name="setup_finding_purpose_unknown">Kontrol belirtilmemiş</string>
+    <string name="setup_finding_purpose_lookup">Kayıt arama</string>
+    <string name="setup_finding_purpose_validation">Bildirim doğrulama</string>
+    <string name="setup_finding_purpose_directory">Dizin sorgusu</string>
+    <string name="setup_finding_purpose_freshness">Kaynağın güncelliği</string>
+    <string name="setup_finding_purpose_publication">Olay yayımlama</string>
+    <string name="setup_finding_outcome_unknown">Sonuç bilinmiyor</string>
+    <string name="setup_finding_outcome_success">Kontrol başarılı</string>
+    <string name="setup_finding_outcome_failure">Kontrol başarısız</string>
 </resources>

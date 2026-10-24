@@ -2444,4 +2444,20 @@
     <string name="avatar_preparation_interrupted">Die Bildänderung wurde unterbrochen. Prüfe das aktuelle Bild, bevor du es erneut auswählst.</string>
     <string name="dictation_interrupted">Diktat unterbrochen. Prüfe den wiederhergestellten Text und alle verbleibenden Audioaufnahmen vor dem Senden.</string>
     <string name="dictation_waiting_for_unlock">Diktat vorübergehend gespeichert. Entsperre die App, um es einzufügen.</string>
+    <string name="setup_finding_inspection_completed">Prüfung abgeschlossen. Dies allein bestätigt nicht, dass das Relay Schreibzugriffe unterstützt.</string>
+    <string name="setup_finding_context_unknown">Quelle nicht angegeben</string>
+    <string name="setup_finding_context_discovery">Datensatzsuche</string>
+    <string name="setup_finding_context_declaration">Veröffentlichte Deklaration</string>
+    <string name="setup_finding_context_route">Deklariertes Relay</string>
+    <string name="setup_finding_context_approval">Freigabe der Reparatur</string>
+    <string name="setup_finding_context_publication">Veröffentlichung der Reparatur</string>
+    <string name="setup_finding_purpose_unknown">Prüfung nicht angegeben</string>
+    <string name="setup_finding_purpose_lookup">Datensatzabfrage</string>
+    <string name="setup_finding_purpose_validation">Prüfung der Deklaration</string>
+    <string name="setup_finding_purpose_directory">Verzeichnisabfrage</string>
+    <string name="setup_finding_purpose_freshness">Aktualität der Quelle</string>
+    <string name="setup_finding_purpose_publication">Veröffentlichung des Ereignisses</string>
+    <string name="setup_finding_outcome_unknown">Ergebnis unbekannt</string>
+    <string name="setup_finding_outcome_success">Prüfung erfolgreich</string>
+    <string name="setup_finding_outcome_failure">Prüfung fehlgeschlagen</string>
 </resources>

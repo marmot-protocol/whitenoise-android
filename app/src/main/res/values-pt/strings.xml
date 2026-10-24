@@ -2427,4 +2427,20 @@
     <string name="avatar_preparation_interrupted">A atualização da imagem foi interrompida. Confira a imagem atual antes de selecioná-la novamente.</string>
     <string name="dictation_interrupted">Ditado interrompido. Reveja o texto recuperado e qualquer áudio restante antes de enviar.</string>
     <string name="dictation_waiting_for_unlock">Ditado salvo temporariamente. Desbloqueie o app para colá-lo.</string>
+    <string name="setup_finding_inspection_completed">Inspeção concluída. Isto, por si só, não confirma que o relay aceita escrita.</string>
+    <string name="setup_finding_context_unknown">Origem não especificada</string>
+    <string name="setup_finding_context_discovery">Descoberta de registos</string>
+    <string name="setup_finding_context_declaration">Declaração publicada</string>
+    <string name="setup_finding_context_route">Relay declarado</string>
+    <string name="setup_finding_context_approval">Aprovação da reparação</string>
+    <string name="setup_finding_context_publication">Publicação da reparação</string>
+    <string name="setup_finding_purpose_unknown">Verificação não especificada</string>
+    <string name="setup_finding_purpose_lookup">Pesquisa de registos</string>
+    <string name="setup_finding_purpose_validation">Validação da declaração</string>
+    <string name="setup_finding_purpose_directory">Consulta do diretório</string>
+    <string name="setup_finding_purpose_freshness">Atualidade da origem</string>
+    <string name="setup_finding_purpose_publication">Publicação do evento</string>
+    <string name="setup_finding_outcome_unknown">Resultado desconhecido</string>
+    <string name="setup_finding_outcome_success">Verificação concluída com sucesso</string>
+    <string name="setup_finding_outcome_failure">Falha na verificação</string>
 </resources>
