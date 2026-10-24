@@ -48,7 +48,21 @@ def failure_diagnostics(output):
         r"\(IncomingAttachmentBackgroundDownloadAndroidTest\.kt:(\d{1,5})\)$",
         output, re.MULTILINE,
     )
-    return {"kind": failure_kind(output), "fixture_lines": sorted({int(line) for line in frames})[:6]}
+    result = {"kind": failure_kind(output), "fixture_lines": sorted({int(line) for line in frames})[:6]}
+    # Suspend helper frames may omit the owning test frame; keep only these closed fixture boundaries.
+    allowed = {"AndroidAttachmentFixtureSender": "sender-publication",
+               "MediaLifecycleAttachmentProbe": "receiver-projection",
+               "BackgroundReceiptFixtureSupport": "network-policy"}
+    boundaries = []
+    for source, label in allowed.items():
+        lines = re.findall(
+            rf"^\s*at dev\.ipf\.whitenoise\.android\.media\.{source}(?:Kt)?(?:\$[\w$]+)?"
+            rf"\.[\w$]+\({source}\.kt:(\d{{1,5}})\)$", output, re.MULTILINE,
+        )
+        boundaries.extend({"boundary": label, "line": int(line)} for line in set(lines))
+    if boundaries:
+        result["boundary_lines"] = sorted(boundaries, key=lambda row: (row["boundary"], row["line"]))[:6]
+    return result
 
 
 def ended_abruptly(output):

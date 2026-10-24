@@ -14,22 +14,33 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Group
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -56,6 +67,11 @@ internal fun PersonGroupsInCommonContent(
     onAdd: () -> Unit,
     onRetry: () -> Unit,
     avatar: @Composable (String) -> ImageBitmap? = { null },
+    removeLabel: ((PersonSharedGroupRow) -> String)? = null,
+    onRemove: ((String) -> Unit)? = null,
+    canRemove: (String) -> Boolean = { false },
+    busy: Boolean = false,
+    groupAnimation: @Composable (String) -> GroupAvatarAnimation? = { null },
 ) {
     SettingsScaffold(
         title = stringResource(R.string.person_groups_in_common),
@@ -97,7 +113,54 @@ internal fun PersonGroupsInCommonContent(
                                 onClick = { onOpen(group.id) },
                                 subtitle = stringResource(R.string.members_count, group.memberCount),
                                 modifier = Modifier.testTag("groups_in_common.group.${group.id}"),
-                                leading = { Avatar(group.title, group.id, 48.dp, picture = avatar(group.id)) },
+                                leading = {
+                                    Avatar(
+                                        group.title,
+                                        group.id,
+                                        48.dp,
+                                        picture = avatar(group.id),
+                                        groupAnimation = groupAnimation(group.id),
+                                    )
+                                },
+                                trailing =
+                                    if (canRemove(group.id) && onRemove != null && removeLabel != null) {
+                                        {
+                                            var expanded by remember(group.id) { mutableStateOf(false) }
+                                            Box {
+                                                IconButton(
+                                                    onClick = { expanded = true },
+                                                    enabled = !busy,
+                                                    modifier = Modifier.testTag("groups_in_common.menu.${group.id}"),
+                                                ) {
+                                                    Icon(
+                                                        painterResource(R.drawable.ic_more_vert),
+                                                        contentDescription = removeLabel(group),
+                                                    )
+                                                }
+                                                val menuScrollState = rememberScrollState()
+                                                DropdownMenu(
+                                                    expanded,
+                                                    onDismissRequest = { expanded = false },
+                                                    scrollState = menuScrollState,
+                                                    modifier =
+                                                        Modifier.scrollEdgeFade(
+                                                            menuScrollState,
+                                                            stableRenderTarget = true,
+                                                        ),
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text(removeLabel(group)) },
+                                                        onClick = {
+                                                            expanded = false
+                                                            onRemove(group.id)
+                                                        },
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        null
+                                    },
                             )
                         }
                     }
@@ -125,6 +188,7 @@ internal fun PersonGroupsInCommonContent(
 @Composable
 internal fun PersonSharedGroupAvatars(
     rows: List<PersonSharedGroupRow>,
+    groupAnimation: @Composable (String) -> GroupAvatarAnimation? = { null },
     avatar: @Composable (String) -> ImageBitmap? = { null },
 ) {
     if (rows.isEmpty()) {
@@ -141,7 +205,7 @@ internal fun PersonSharedGroupAvatars(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
-                Avatar(row.title, row.id, 32.dp, picture = avatar(row.id))
+                Avatar(row.title, row.id, 32.dp, picture = avatar(row.id), groupAnimation = groupAnimation(row.id))
             }
         }
         if (remaining > 0) {

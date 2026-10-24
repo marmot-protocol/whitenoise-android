@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Потяните вниз, чтобы показать непрочитанные чаты</string>
+    <string name="pull_unread_only">Только непрочитанные</string>
+    <string name="pull_unread_show_all">Показать все</string>
+    <string name="pull_unread_retry">Повторить загрузку непрочитанных чатов</string>
+    <string name="pull_unread_load_failed">Не удалось загрузить непрочитанные чаты. Повторите попытку.</string>
+    <string name="pull_unread_hint">Потяните, чтобы показать непрочитанные чаты</string>
+    <string name="pull_unread_release">Отпустите, чтобы показать непрочитанные чаты</string>
+</resources>

@@ -137,7 +137,7 @@ class MediaBindingRecoveryTest {
             fields.filterKeys { it != "lastIsolation" }.values.forEach { it.set(IsolatedMediaDecoder, null) }
             IsolatedMediaDecoder.install(context)
             val owner = field(IsolatedMediaDecoder, "transport") as ReusableMediaTransport
-            assertNull(field(IsolatedMediaDecoder, "imageOwner"))
+            assertNull(fields.getValue("imageOwner").get(IsolatedMediaDecoder))
             start(owner, 1).join()
             context.next()
             start(owner, 2).join()
@@ -151,7 +151,7 @@ class MediaBindingRecoveryTest {
             val replacement = field(IsolatedMediaDecoder, "transport")
             assertTrue(replacement is ReusableMediaTransport)
             assertFalse(owner === replacement)
-            assertNull(field(IsolatedMediaDecoder, "imageOwner"))
+            assertNull(fields.getValue("imageOwner").get(IsolatedMediaDecoder))
             IsolatedMediaDecoder.installForLifetimeQualification(context)
             val candidate = field(IsolatedMediaDecoder, "transport") as IsolatedMediaTransport
             experimental = candidate

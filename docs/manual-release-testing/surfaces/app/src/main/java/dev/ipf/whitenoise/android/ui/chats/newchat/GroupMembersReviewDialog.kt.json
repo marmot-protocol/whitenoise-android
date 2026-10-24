@@ -9,7 +9,8 @@
         "anchor": "fun GroupMembersReviewDialog(",
         "test_ids": [
           "GRP-030",
-          "GRP-034"
+          "GRP-034",
+          "GRP-035"
         ]
       },
       {

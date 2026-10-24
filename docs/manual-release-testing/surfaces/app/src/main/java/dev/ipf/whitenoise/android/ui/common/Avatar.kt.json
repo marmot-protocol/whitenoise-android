@@ -20,6 +20,14 @@
           "INT-011",
           "PRO-006"
         ]
+      },
+      {
+        "surface": "AvatarAnimationLayers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+        "anchor": "fun AvatarAnimationLayers(",
+        "test_ids": [
+          "GRP-035"
+        ]
       }
     ]
   },

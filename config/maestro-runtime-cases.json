@@ -904,9 +904,10 @@
     "profiles-shared-groups": {
       "suite": "profiles",
       "manual_ids": [
-        "ACC-001"
+        "ACC-001",
+        "ACC-022"
       ],
-      "assertions": "Groups in Common shows the actual generated shared group and Back restores Bob profile.",
+      "assertions": "Real generated shared group and creator-admin owner enter Bob Groups in Common, open the authorized group overflow, inspect production confirmation person/group/full identity fields, Cancel without submitting removal, and return to Bob profile. No removal-commit or broad authorization/edge-case execution credit.",
       "postcondition": "none"
     },
     "profiles-admin-confirm-back": {
@@ -3475,6 +3476,7 @@
     "groups-members-expanded":{"suite":"groups","manual_ids":["GRP-001","GRP-004","GRP-006","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual six-account native group opens the expanded roster, sees the sixth member and returns without membership mutation.","postcondition":"none","fixture":"large-roster"},
     "groups-transfer-admin-cancel":{"suite":"groups","manual_ids":["GRP-001","MSG-037","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual native owner/member group opens the administration handover sheet and cancels without changing administrators.","postcondition":"none","fixture":"basic"},
     "groups-edit-photo-menu-cancel":{"suite":"groups","manual_ids":["GRP-001","GRP-002","GRP-003","GRP-025","PRO-010","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual group photo menu shows its platform-source options and Back leaves the original native group image untouched.","postcondition":"none","fixture":"basic"},
+    "presentation-surface-animated-group-avatar":{"suite":"presentation","manual_ids":["GRP-035"],"assertions":"Production group-thumbnail admission renders its isolated decoded GIF layer from generated sanitized retained bytes under controlled enabled motion, then dismisses. No upload, acquisition, account-switch or system-motion qualification is claimed.","postcondition":"presentation-checked","presentation":"surface-animated-group-avatar","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-surface-animated-avatar":{"suite":"presentation","manual_ids":["PRO-006"],"assertions":"Actual row overlay stays static, then explicit viewer intent opens the production GIF decoder and visible animation layer. Generated cached bytes avoid URL fetches; motion and cache are restored at cleanup.","postcondition":"presentation-checked","presentation":"surface-animated-avatar","presentation_actions":["open-viewer","dismiss"],"layer":"production-presentation-ui"},
     "presentation-extra-modal-backup-cancel":{"suite":"presentation","manual_ids":["ACC-009","ACC-010","ACC-011","ACC-013","ACC-014","ACC-020","ONB-009","SCR-001","SCR-002","SCR-003","SCR-004","SET-001"],"assertions":"Actual encrypted-result dialog renders synthetic preview text and verifies copy/export/dismiss dispatch. It does not generate or decode a native encrypted backup or certify clipboard/file export.","postcondition":"presentation-checked","presentation":"extra-modal-backup-cancel","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-extra-modal-backup-copy":{"suite":"presentation","manual_ids":["ACC-009","ACC-010","ACC-011","ACC-013","ACC-014","ACC-020","ONB-009","SCR-001","SCR-002","SCR-003","SCR-004","SET-001"],"assertions":"Actual encrypted-result dialog renders synthetic preview text and verifies copy/export/dismiss dispatch. It does not generate or decode a native encrypted backup or certify clipboard/file export.","postcondition":"presentation-checked","presentation":"extra-modal-backup-copy","presentation_actions":["copy-handoff","dismiss"],"layer":"production-presentation-ui"},

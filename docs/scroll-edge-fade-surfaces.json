@@ -992,7 +992,8 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
       "calls": {
-        "WhiteNoiseLazyColumn": 1
+        "WhiteNoiseLazyColumn": 1,
+        "DropdownMenu": 1
       },
       "family": "profile",
       "policy": "ordinary",
@@ -1000,7 +1001,8 @@
         "SCR-001",
         "SCR-002",
         "SCR-003",
-        "SCR-004"
+        "SCR-004",
+        "ACC-022"
       ]
     },
     {

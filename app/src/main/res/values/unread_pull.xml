@@ -1,0 +1,9 @@
+<resources>
+    <string name="pull_unread_setting">Pull down to show unread chats</string>
+    <string name="pull_unread_only">Unread only</string>
+    <string name="pull_unread_show_all">Show all</string>
+    <string name="pull_unread_retry">Retry unread chats</string>
+    <string name="pull_unread_load_failed">Unread chats could not be loaded. Try again.</string>
+    <string name="pull_unread_hint">Pull to show unread</string>
+    <string name="pull_unread_release">Release to show unread</string>
+</resources>

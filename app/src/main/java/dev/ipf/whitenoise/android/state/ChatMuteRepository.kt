@@ -67,8 +67,10 @@ internal class ChatMuteRepository(
         accountRef: String,
         groupIdHex: String,
         mutedUntilMs: Long?,
+        isCurrent: () -> Boolean = { true },
     ): Result<ChatNotificationSettingsFfi> =
         command(accountRef, groupIdHex) {
+            if (!isCurrent()) throw CancellationException("Chat action owner retired")
             resolveAmbiguous(
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,
@@ -79,8 +81,10 @@ internal class ChatMuteRepository(
     suspend fun clearMuted(
         accountRef: String,
         groupIdHex: String,
+        isCurrent: () -> Boolean = { true },
     ): Result<ChatNotificationSettingsFfi> =
         command(accountRef, groupIdHex) {
+            if (!isCurrent()) throw CancellationException("Chat action owner retired")
             resolveAmbiguous(
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,

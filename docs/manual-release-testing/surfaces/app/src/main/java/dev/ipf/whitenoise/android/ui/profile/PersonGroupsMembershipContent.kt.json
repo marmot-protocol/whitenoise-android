@@ -1,0 +1,107 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PersonGroupsMembershipContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "fun PersonGroupsMembershipContent(",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "MembershipControllersEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "fun MembershipControllersEffect(",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "MembershipControllerEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "fun MembershipControllerEffect(",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "MembershipRemovalConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "fun MembershipRemovalConfirmation(",
+        "test_ids": [
+          "ACC-022"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.remove_from_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.remove_from_group",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "R.string.shared_group_remove_confirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.shared_group_remove_confirmation",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "R.string.shared_group_remove_person",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.shared_group_remove_person",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_remove_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.toast_couldnt_remove_member",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "R.string.toast_group_roster_changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.toast_group_roster_changed",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "R.string.toast_member_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.toast_member_removed",
+        "test_ids": [
+          "ACC-022"
+        ]
+      },
+      {
+        "surface": "R.string.group_identifiers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.group_identifiers",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "R.string.person_group_memberships_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+        "anchor": "R.string.person_group_memberships_unavailable",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
