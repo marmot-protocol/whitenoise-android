@@ -158,6 +158,7 @@ internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
 internal const val COMPOSER_RESIZE_ACCESSIBILITY_TAG = "composer-resize-accessibility"
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
+internal const val COMPOSER_EDITOR_VIEWPORT_TAG = "composer-editor-viewport"
 internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
 
 private val CompactEditorStartInset = 72.dp
@@ -380,6 +381,9 @@ internal fun ComposerPill(
     // outer trailing reservation. Measure the threshold against the compact
     // pill width so the chosen mode cannot invalidate its own line count.
     compactMeasurementWidth: Dp? = null,
+    // The bar owns the automatic destination viewport after its final chrome and accessory budget.
+    automaticTextHeightCeilingPx: Int? = null,
+    actionRowAccessoryHeightPx: Int = 0,
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
@@ -801,9 +805,15 @@ internal fun ComposerPill(
     // and for the ~60ms the insets kept animating it asserted a height the narrower editor could not
     // honour yet — a draft that wraps to three compact lines but two editing ones sat in a two-line box
     // with a third still in it. Finishing together, the height only claims to be final once the width is.
+    // Tween the visible destination, not the overflowing draft: clamping an unbounded tween only
+    // after interpolation reaches the ceiling early while the controls are still moving.
+    val renderedTextHeightTarget =
+        (compactTextLayout?.size?.height ?: 0).let { naturalHeight ->
+            automaticTextHeightCeilingPx?.let { naturalHeight.coerceAtMost(it) } ?: naturalHeight
+        }
     val animatedTextHeight =
         animateIntAsState(
-            targetValue = compactTextLayout?.size?.height ?: 0,
+            targetValue = renderedTextHeightTarget,
             animationSpec =
                 composerGeometrySpec(
                     collapsedBySend = collapsedBySend,
@@ -818,17 +828,6 @@ internal fun ComposerPill(
         compactTextLayout != null &&
             expansionMode == ComposerExpansionMode.Automatic &&
             !multilineControlsSuppressed
-    val automaticTextHeight =
-        if (usesAnimatedTextHeight) {
-            Modifier.layout { measurable, constraints ->
-                textHeightBounds.value = constraints.minHeight..constraints.maxHeight
-                val height = animatedTextHeight.value.coerceIn(constraints.minHeight, constraints.maxHeight)
-                val child = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
-                layout(child.width, child.height) { child.placeRelative(0, 0) }
-            }
-        } else {
-            Modifier
-        }
     val visualMultilineControls =
         when {
             multilineControlsSuppressed -> false
@@ -891,7 +890,7 @@ internal fun ComposerPill(
     // reached the target it snapped to, so a later dismiss or refocus of the
     // empty field tweens again. Geometry the send left unchanged settles at once.
     val latestOnSendCollapseApplied by rememberUpdatedState(onSendCollapseApplied)
-    val textHeightTarget by rememberUpdatedState(compactTextLayout?.size?.height ?: 0)
+    val textHeightTarget by rememberUpdatedState(renderedTextHeightTarget)
     val editingTarget by rememberUpdatedState(if (editingLayout) 1f else 0f)
     val expansionTarget by rememberUpdatedState(if (expandedLayout) 1f else 0f)
     val textHeightGeometrySettled by remember(scrollOwnerKey, usesAnimatedTextHeight, animatedTextHeight) {
@@ -946,6 +945,67 @@ internal fun ComposerPill(
     val compactTrailingReserve =
         4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth + expandedTrailingActionInset +
             (if (trailingAction != null) 40.dp else 0.dp)
+    val automaticTextHeight =
+        if (usesAnimatedTextHeight) {
+            Modifier.layout { measurable, constraints ->
+                textHeightBounds.value = constraints.minHeight..constraints.maxHeight
+                val height = animatedTextHeight.value.coerceIn(constraints.minHeight, constraints.maxHeight)
+                val progress = editingProgress.value
+                val topInset = CompactEditorTopInset.roundToPx()
+                val bottomInset =
+                    interpolateDp(12.dp, ExpandedEditorBottomInset + extraControlsHeight, progress).roundToPx()
+                val rowHeight = ComposerActionRowHeight.roundToPx()
+                val boxHeight = maxOf(rowHeight, height + topInset + bottomInset)
+                val leadingRowTop = composerActionRowTop(boxHeight, rowHeight, progress)
+                val trailingRowTop =
+                    composerActionRowTop(boxHeight + actionRowAccessoryHeightPx, rowHeight, progress) -
+                        actionRowAccessoryHeightPx
+                val heightAboveActions =
+                    minOf(leadingRowTop, trailingRowTop) - extraControlsHeight.roundToPx() - topInset
+                val lineHeight =
+                    compactTextLayout?.let { layout ->
+                        if (layout.lineCount > 0) (layout.getLineBottom(0) - layout.getLineTop(0)).roundToInt() else 1
+                    } ?: 1
+                val viewportHeight = composerEditorViewportHeight(height, heightAboveActions, lineHeight)
+                // At the start there is no separate text row yet. Keep one usable inline field outside
+                // both action columns, then expose the full width once a complete line fits above them.
+                val inline = heightAboveActions < lineHeight
+                val startClearance =
+                    if (inline) {
+                        (
+                            leadingControlsWidth -
+                                interpolateDp(compactEditorStartInset, EditingEditorStartInset, progress)
+                        ).roundToPx()
+                            .coerceIn(0, constraints.maxWidth)
+                    } else {
+                        0
+                    }
+                val endClearance =
+                    if (inline) {
+                        (
+                            compactTrailingReserve -
+                                interpolateDp(compactTrailingReserve, ExpandedEditorEndInset, progress)
+                        ).roundToPx()
+                            .coerceIn(0, constraints.maxWidth - startClearance)
+                    } else {
+                        0
+                    }
+                val child =
+                    measurable.measure(
+                        constraints.copy(
+                            minWidth = (constraints.minWidth - startClearance - endClearance).coerceAtLeast(0),
+                            maxWidth = constraints.maxWidth - startClearance - endClearance,
+                            minHeight = viewportHeight,
+                            maxHeight = viewportHeight,
+                        ),
+                    )
+                // Retain the animated outer reservation: reducing the actual scroll viewport must not
+                // change the parent height that places these same controls, or create a feedback loop.
+                layout(constraints.maxWidth, height) { child.placeRelative(startClearance, 0) }
+            }
+        } else {
+            Modifier
+        }
     LaunchedEffect(collapsedBySend) {
         if (!collapsedBySend) return@LaunchedEffect
         snapshotFlow {
@@ -1251,6 +1311,7 @@ internal fun ComposerPill(
                                             .fillMaxWidth()
                                             .then(expandedHeightModifier)
                                             .then(automaticTextHeight)
+                                            .testTag(COMPOSER_EDITOR_VIEWPORT_TAG)
                                             // Drawn outside the scroll modifier so the thumb
                                             // paints in viewport coordinates over the clipped
                                             // editor, only while the draft overflows it.
