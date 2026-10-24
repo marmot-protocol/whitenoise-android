@@ -9,14 +9,17 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -114,7 +117,7 @@ class DownloadNeverOpensTest {
 
         assertStillClosed()
         composeRule.onNodeWithContentDescription(reference(0).fileName).performClick()
-        composeRule.runOnIdle { assertEquals("a tap on the downloaded image must open it", 1, opens) }
+        awaitOpens(1, "a tap on the downloaded image must open it")
     }
 
     /** An image album tile downloads in place from its Download action and opens only from a later tap. */
@@ -127,7 +130,7 @@ class DownloadNeverOpensTest {
 
         assertStillClosed()
         composeRule.onNodeWithTag(TILE_TAG).performClick()
-        composeRule.runOnIdle { assertEquals("a tap on the downloaded tile must open it", 1, opens) }
+        awaitOpens(1, "a tap on the downloaded tile must open it")
     }
 
     /** A video album tile tapped before its clip is on the device downloads it in place and opens on the next tap. */
@@ -143,8 +146,9 @@ class DownloadNeverOpensTest {
         awaitDescribed(text(R.string.reply_media_video))
 
         assertStillClosed()
+        // The tile checks its file off the main thread before it opens, so the open is awaited, then counted.
         composeRule.onNodeWithTag(TILE_TAG).performClick()
-        composeRule.runOnIdle { assertEquals("a tap on the downloaded clip must open it", 1, opens) }
+        awaitOpens(1, "a tap on the downloaded clip must open it")
     }
 
     /**
@@ -198,10 +202,7 @@ class DownloadNeverOpensTest {
 
         assertStillClosed()
         composeRule.onNodeWithTag(videoAttachmentOpenTestTag(request(0).messageIdHex, 0)).performClick()
-        composeRule.waitUntil(WAIT_MILLIS) {
-            composeRule.waitForIdle()
-            opens == 1
-        }
+        awaitOpens(1, "a tap on the downloaded clip must open it")
     }
 
     /**
@@ -245,8 +246,9 @@ class DownloadNeverOpensTest {
         composeRule.onNodeWithContentDescription(text(R.string.voice_message_play)).performClick()
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
-            runtime.plays == 1
+            runtime.plays >= 1
         }
+        composeRule.runOnIdle { assertEquals("the Play tap must start playback exactly once", 1, runtime.plays) }
     }
 
     /** A Shared media file row not on the device downloads on its first tap and attempts its open only on the next. */
@@ -372,10 +374,46 @@ class DownloadNeverOpensTest {
         composeRule.runOnIdle { assertEquals("a tap on an evicted clip opened the viewer", 0, opens) }
 
         composeRule.onNodeWithTag(TILE_TAG).performClick()
-        composeRule.waitUntil(WAIT_MILLIS) {
-            composeRule.waitForIdle()
-            opens == 1
+        awaitOpens(1, "a tap on the downloaded clip must open it")
+    }
+
+    /** The "+N" video tile opens the album even after its own download failed, instead of retrying that video. */
+    @Test
+    fun anOverflowVideoTileOpensTheAlbumAfterAFailedDownload() {
+        var overflow by mutableStateOf(0)
+        composeRule.setContent { WhiteNoiseTheme { VideoTile(overflowCount = overflow) } }
+        awaitDescribed(text(R.string.media_tap_to_download))
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+        awaitSingleTransfer()
+        composeRule.runOnIdle { fixture.calls.single().fail(java.io.IOException("download failed")) }
+        awaitDescribed(text(R.string.media_tap_to_retry))
+
+        composeRule.runOnIdle { overflow = 2 }
+        composeRule.onNodeWithTag(TILE_TAG).performTouchInput { click(Offset(CORNER_PX, CORNER_PX)) }
+        awaitOpens(1, "the overflow tile did not open the album after a failed download")
+        assertEquals("the overflow tap retried the tile's download", 0, fixture.retryDemands.get())
+    }
+
+    /** The "+N" video tile opens the album even when its own downloaded clip was evicted from the cache. */
+    @Test
+    fun anOverflowVideoTileOpensTheAlbumAfterItsClipWasEvicted() {
+        val clip = reference(0).copy(mediaType = "video/mp4", fileName = "clip.mp4")
+        var overflow by mutableStateOf(0)
+        composeRule.setContent { WhiteNoiseTheme { VideoTile(overflowCount = overflow) } }
+        awaitDescribed(text(R.string.media_tap_to_download))
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+        awaitSingleTransfer()
+        composeRule.runOnIdle { fixture.calls.single().succeed(byteArrayOf(1, 2, 3, 4)) }
+        awaitDescribed(text(R.string.reply_media_video))
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val cached = requireNotNull(cachedVideoAttachmentFile(context, request(0).messageIdHex, 0, clip))
+
+        composeRule.runOnIdle {
+            assertTrue("the cached clip could not be evicted", cached.delete())
+            overflow = 2
         }
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+        awaitOpens(1, "the overflow tile did not open the album after its clip was evicted")
     }
 
     /** Taps the idle Download action, then completes the one transfer it starts with [bytes]. */
@@ -407,6 +445,18 @@ class DownloadNeverOpensTest {
     private fun hasOpenIntent(): Boolean {
         val openRequest = controller.attachmentOpenRequest(request(0).messageIdHex, 0) ?: return false
         return fixture.state.attachmentOpens.hasIntent(openRequest)
+    }
+
+    /** Waits for [count] opens, which may land after an off-main-thread file check, then asserts exactly [count]. */
+    private fun awaitOpens(
+        count: Int,
+        message: String,
+    ) {
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            opens >= count
+        }
+        composeRule.runOnIdle { assertEquals(message, count, opens) }
     }
 
     /** Waits until the production surface has asked the native boundary once. */
@@ -455,9 +505,9 @@ class DownloadNeverOpensTest {
         )
     }
 
-    /** The production video album tile for the fixture's first attachment. */
+    /** The production video album tile for the first attachment, the "+N" tile when [overflowCount] is set. */
     @Composable
-    private fun VideoTile() {
+    private fun VideoTile(overflowCount: Int = 0) {
         MediaVideoGridTile(
             messageIdHex = request(0).messageIdHex,
             attachmentIndex = 0,
@@ -466,7 +516,7 @@ class DownloadNeverOpensTest {
             appState = fixture.state,
             mine = false,
             onTap = { opens++ },
-            overflowCount = 0,
+            overflowCount = overflowCount,
             modifier = Modifier.size(TILE_SIZE).testTag(TILE_TAG),
         )
     }
@@ -613,6 +663,7 @@ class DownloadNeverOpensTest {
 
     private companion object {
         const val VOICE_DURATION_MS = 1_000
+        const val CORNER_PX = 6f
         const val TILE_TAG = "download-never-opens-tile"
         const val WAIT_MILLIS = 20_000L
         const val IMAGE_EDGE = 16

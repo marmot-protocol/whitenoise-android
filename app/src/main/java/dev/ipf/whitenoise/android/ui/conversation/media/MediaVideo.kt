@@ -294,19 +294,11 @@ internal fun MediaVideoGridTile(
     val materializationLock = remember(messageIdHex, attachmentIndex, epoch) { Mutex() }
 
     /**
-     * Handles a tap on the tile. A clip on the device, downloaded or the reader's own still held in memory for its
-     * upload, opens the viewer, and the "+N" overflow always opens the album. A clip that is not on the device yet is
-     * only downloaded, in place: it never opens once it arrives, and a later tap opens it. A downloaded file is checked
-     * again at tap time, off the main thread, so one the cache evicted while the tile stayed on screen is downloaded
-     * again rather than opened. While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot
-     * restart that transfer, and a video still being sent from its staged file has nothing to download yet.
+     * Opens a clip on the device or downloads one that is not, in place. The explicit Retry control lands here
+     * directly, so it retries this tile's download even on the "+N" overflow tile.
      */
-    fun onTileTap(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
-        if (transfer.cancelling) return
-        if (sendingFromStagedFile) {
-            if (overflowCount > 0) onTap()
-            return
-        }
+    fun downloadOrOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
+        if (transfer.cancelling || sendingFromStagedFile) return
         val download = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
             if (retry) {
@@ -337,11 +329,23 @@ internal fun MediaVideoGridTile(
                     onAccepted = { download() },
                     onFailure = { markFailed(it) },
                 )
-            else -> {
-                download()
-                if (overflowCount > 0) onTap()
-            }
+            else -> download()
         }
+    }
+
+    /**
+     * Handles a tap on the tile. The "+N" overflow always opens the album, whether this tile's own download failed,
+     * was cancelled or was evicted. Any other tile opens a clip on the device, downloaded or the reader's own still
+     * held in memory for its upload, and only downloads one that is not, in place: it never opens once it arrives,
+     * and a later tap opens it. A downloaded file is checked again at tap time, off the main thread, so one the cache
+     * evicted while the tile stayed on screen is downloaded again rather than opened. While the reader's Cancel awaits
+     * acknowledgement a tap does nothing, so it cannot restart that transfer, and a video still being sent from its
+     * staged file has nothing to download yet.
+     */
+    fun onTileTap() {
+        if (transfer.cancelling) return
+        // The "+N" overflow is album navigation, so it opens the album whatever this tile's own download did.
+        if (overflowCount > 0) onTap() else downloadOrOpen()
     }
 
     LaunchedEffect(
@@ -476,7 +480,7 @@ internal fun MediaVideoGridTile(
         if (transferShown) {
             TileTransferControl(
                 transfer = transfer,
-                onRetry = { onTileTap(retry = true) },
+                onRetry = { downloadOrOpen(retry = true) },
                 modifier = Modifier.align(Alignment.Center),
             )
         }

@@ -151,11 +151,13 @@ class VideoTileRetryRaceTest {
         }
         // The old progress observer still reports Failed; a verified local Open must not admit another retry.
         tapVideo(album)
+        // The tile checks its file off the main thread before it opens, so the open is awaited, then counted.
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
-            opens == 1
+            opens >= 1
         }
         composeRule.runOnIdle {
+            assertEquals("the next tap must open the video exactly once", 1, opens)
             assertEquals(1, fixture.retryDemands.get())
             assertEquals(2, resolutions)
         }
