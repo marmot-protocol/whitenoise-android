@@ -2162,8 +2162,10 @@ internal fun ChatsScreen(
                                     state = chatListState,
                                 ) {
                                     controller.error
-                                        ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline && visibleItems.isNotEmpty() }
-                                        ?.let { failure ->
+                                        ?.takeIf {
+                                            loadFailurePlacement == LoadFailurePlacement.Inline &&
+                                                visibleItems.isNotEmpty()
+                                        }?.let { failure ->
                                             item(key = "chat-list-load-error") {
                                                 InlineErrorBanner(
                                                     error = failure,
@@ -2191,7 +2193,10 @@ internal fun ChatsScreen(
                                                 chatRowContent(item, targetIndex, null)
                                             }
                                         }
-                                        if (visibleItems.isNotEmpty() && (bodySearchLoading || bodySearchFailure != null)) {
+                                        if (
+                                            visibleItems.isNotEmpty() &&
+                                            (bodySearchLoading || bodySearchFailure != null)
+                                        ) {
                                             item(key = "global-search-body-stage") {
                                                 GlobalSearchBodyStage(
                                                     loading = bodySearchLoading,

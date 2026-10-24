@@ -341,7 +341,11 @@ class ChatsScreenUnreadReadLifetimeTest {
     @Test fun mountedPendingUnreadKeepsListAndRejectsLateResultAfterClear() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
         val release = CompletableDeferred<Unit>().also { releaseRead = it }
-        model.beforeSnapshotRead = { kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { release.await() } }
+        model.beforeSnapshotRead = {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                release.await()
+            }
+        }
         mount(model)
         val listId = rule.onNodeWithTag("chats.list").fetchSemanticsNode().id
         rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
@@ -367,17 +371,27 @@ class ChatsScreenUnreadReadLifetimeTest {
         )
         mount(model, folder.id)
         rule.onNodeWithTag("chats.list").assertDoesNotExist()
-        assertEquals(1, rule.onAllNodesWithText(rule.activity.getString(R.string.error_try_again)).fetchSemanticsNodes().size)
+        assertEquals(
+            1,
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.error_try_again))
+                .fetchSemanticsNodes()
+                .size,
+        )
         assertEquals(1, rule.onAllNodesWithText(rule.activity.getString(R.string.retry)).fetchSemanticsNodes().size)
     }
 
-    /** A failed body lookup with no name matches has one full-screen recovery owner. */
-    @Test fun mountedEmptyBodySearchFailureHasOneRecovery() {
+    /** Per-chat search failures complete as no matches without a top-level recovery action. */
+    @Test fun mountedPerChatBodySearchFailureCompletesEmptySearch() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
         mount(model, globalSearchState = GlobalSearchState(isOpen = true, query = "no-matching-conversation"))
-        awaitProgress { rule.onAllNodesWithText(rule.activity.getString(R.string.retry)).fetchSemanticsNodes().isNotEmpty() }
-        assertEquals(1, rule.onAllNodesWithText(rule.activity.getString(R.string.retry)).fetchSemanticsNodes().size)
-        rule.onNodeWithText(rule.activity.getString(R.string.couldnt_load_chats)).assertExists()
+        awaitProgress {
+            rule.onAllNodesWithText(rule.activity.getString(R.string.no_results)).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_results_detail)).assertExists()
+        rule.onNodeWithTag("chats.list").assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.retry)).assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.couldnt_load_chats)).assertDoesNotExist()
         rule.onNodeWithText(rule.activity.getString(R.string.search_message_content_failed)).assertDoesNotExist()
     }
 
@@ -400,8 +414,19 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertDoesNotExist()
         assertEquals(listId, rule.onNodeWithTag("chats.list").fetchSemanticsNode().id)
         release.complete(Unit)
-        awaitProgress { rule.onAllNodesWithText(rule.activity.getString(R.string.pull_unread_load_failed)).fetchSemanticsNodes().isNotEmpty() }
-        assertEquals(1, rule.onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry)).fetchSemanticsNodes().size)
+        awaitProgress {
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_load_failed))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        assertEquals(
+            1,
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry))
+                .fetchSemanticsNodes()
+                .size,
+        )
         rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
         rule.onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
         rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertDoesNotExist()
@@ -418,7 +443,14 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.setContent {
             if (mounted.value) {
                 WhiteNoiseTheme {
-                    ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> }, selectedFolderId = folderId, globalSearchState = globalSearchState)
+                    ChatsScreen(
+                        model.state,
+                        model.controller,
+                        {},
+                        { _, _, _, _ -> },
+                        selectedFolderId = folderId,
+                        globalSearchState = globalSearchState,
+                    )
                 }
             }
         }

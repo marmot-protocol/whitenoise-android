@@ -205,7 +205,10 @@ class ChatListUnreadStatesScreenshotTest {
                 rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
                 assertEquals(
                     1,
-                    rule.onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry)).fetchSemanticsNodes().size,
+                    rule
+                        .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry))
+                        .fetchSemanticsNodes()
+                        .size,
                 )
             }
             State.Empty ->
