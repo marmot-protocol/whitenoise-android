@@ -418,6 +418,14 @@
         "test_ids": [
           "NTF-044"
         ]
+      },
+      {
+        "surface": "Unread chat mute failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_update_notifications",
+        "test_ids": [
+          "CHL-031"
+        ]
       }
     ]
   },

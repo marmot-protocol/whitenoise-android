@@ -523,6 +523,20 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedGroupAvatar.kt",
+      "symbol": "AnimatedGroupAvatarOverlay",
+      "bindings": [
+        {
+          "case": "presentation-surface-animated-group-avatar",
+          "selector": {
+            "id": "animated-profile-avatar"
+          },
+          "scope": "Assertions cover production group-thumbnail admission, its isolated decoded GIF layer from generated sanitized retained bytes under controlled motion, and fixture dismissal. No upload, source acquisition, resource-pressure, account-switch or reduced-motion proof."
+        }
+      ],
+      "remaining": "Real group selection/upload, exact native source ownership, multiple-avatar pressure, off-screen/background/reduced-motion release and device visuals remain covered separately by JVM regressions and GRP-035 pending runtime execution."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
       "symbol": "AnimatedProfileAvatarOverlay",
       "bindings": [
@@ -2218,9 +2232,16 @@
           "selector": {
             "id": "group_edit.photoAction"
           },
-          "scope": "group edit destination exposes photo action; Cancel preserves native group name."
+          "scope": "Generated group editor opens its photo action; Back returns to group info with the fixture title unchanged. This journey never selects a file or opens GIF upload consent.",
+          "entry_assertion": {
+            "id": "group_edit.photoAction"
+          },
+          "opened_by": {
+            "text": "Edit Group"
+          }
         }
-      ]
+      ],
+      "remaining": "GRP-035 still requires real file/photo selection, GIF public-hosting consent, cancel/confirm and retired account/group/picker callbacks on a qualified APK. This fixture journey provides no GIF-dialog, upload, cropping, native mutation or physical-device execution proof."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
@@ -2739,6 +2760,48 @@
           "visible_on_entry": true
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+      "symbol": "PersonGroupsInCommonContent",
+      "bindings": [
+        {
+          "case": "profiles-shared-groups",
+          "selector": {
+            "id": "groups_in_common\\.menu\\..+",
+            "enabled": true
+          },
+          "entry_assertion": {
+            "id": "groups_in_common.list"
+          },
+          "opened_by": {
+            "text": "Groups in Common"
+          },
+          "scope": "Actual generated native group from Bob profile: production list and creator-admin authorized overflow. Cancellation only; no removal commit or broad native permission-matrix credit."
+        }
+      ],
+      "remaining": "Exact-source campaign execution and remaining ACC-022 account/authority/interruption/physical checks remain unproven."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsMembershipContent.kt",
+      "symbol": "MembershipRemovalConfirmation",
+      "bindings": [
+        {
+          "case": "profiles-shared-groups",
+          "selector": {
+            "text": "(?s)Remove Maestro Bob \\(npub1[a-z0-9]+\\) from Maestro group\\?\\nGroup: [0-9a-fA-F]+\\nActing as: [^\\n]+ \\(npub1[a-z0-9]+\\)\\.\\n\\nTheir access to this group will be removed\\."
+          },
+          "entry_assertion": {
+            "id": "confirmation.confirm",
+            "enabled": true
+          },
+          "opened_by": {
+            "text": "Remove Maestro Bob from Maestro group"
+          },
+          "scope": "Actual production confirmation reached from real native creator-admin group overflow: Bob/group labels, full person/group/acting-account reference fields, enabled removal control, then Cancel. No submitted membership mutation credit."
+        }
+      ],
+      "remaining": "Exact-source campaign execution and remaining ACC-022 commit/revoked-authority/account-switch/physical checks remain unproven."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileFeedbackDialog.kt",

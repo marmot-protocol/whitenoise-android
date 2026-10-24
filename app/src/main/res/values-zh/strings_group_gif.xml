@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">将此 GIF 用于群组？</string>
+    <string name="group_gif_upload_notice">动画 GIF 将上传至公开的图片服务器。任何拥有链接的人都可以查看。将使用完整 GIF，不进行裁剪。</string>
+    <string name="group_gif_upload_confirm">上传 GIF</string>
+</resources>

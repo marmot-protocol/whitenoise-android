@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Desliza hacia abajo para mostrar las conversaciones sin leer</string>
+    <string name="pull_unread_only">Solo sin leer</string>
+    <string name="pull_unread_show_all">Mostrar todas</string>
+    <string name="pull_unread_retry">Volver a cargar las conversaciones sin leer</string>
+    <string name="pull_unread_load_failed">No se pudieron cargar las conversaciones sin leer. Inténtalo de nuevo.</string>
+    <string name="pull_unread_hint">Desliza para mostrar las conversaciones sin leer</string>
+    <string name="pull_unread_release">Suelta para mostrar las conversaciones sin leer</string>
+</resources>

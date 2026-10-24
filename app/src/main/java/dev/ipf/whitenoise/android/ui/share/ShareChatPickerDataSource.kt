@@ -122,10 +122,10 @@ internal fun rememberShareChatPickerDataSource(
         accountController != null ->
             ShareChatPickerDataSource(
                 controller = accountController,
-                targets = mergeForwardTargets(accountController.forwardTargets(), accountWideTargets.items()),
-                isLoading = accountController.isLoading,
-                targetsComplete = accountWideTargets.complete && accountWideTargets.snapshot?.isCurrent == true,
-                error = accountController.error,
+                targets = accountWideTargets.mergeRetained(accountController.forwardTargets()),
+                isLoading = !accountWideTargets.ownsSelectedAccount || accountController.isLoading,
+                targetsComplete = accountWideTargets.isComplete,
+                error = accountController.error.takeIf { accountWideTargets.ownsSelectedAccount },
                 memberSnapshotsRevision = accountController.memberSnapshotsRevision,
                 targetsRevision = accountController.forwardTargetsRevision,
                 retryLoad = {
@@ -136,10 +136,10 @@ internal fun rememberShareChatPickerDataSource(
         else ->
             ShareChatPickerDataSource(
                 controller = null,
-                targets = mergeForwardTargets(appState.forwardTargets(), accountWideTargets.items()),
-                isLoading = appState.forwardTargetsLoading,
-                targetsComplete = accountWideTargets.complete && accountWideTargets.snapshot?.isCurrent == true,
-                error = appState.forwardTargetsError,
+                targets = accountWideTargets.mergeRetained(appState.forwardTargets()),
+                isLoading = !accountWideTargets.ownsSelectedAccount || appState.forwardTargetsLoading,
+                targetsComplete = accountWideTargets.isComplete,
+                error = appState.forwardTargetsError.takeIf { accountWideTargets.ownsSelectedAccount },
                 memberSnapshotsRevision = appState.forwardTargetMembersRevision,
                 targetsRevision = appState.forwardTargetsRevision,
                 retryLoad = {
@@ -167,29 +167,31 @@ private fun rememberAccountWideForwardTargets(
 ): AccountWidePickerTargets {
     // The controller has no account to read for until its bind has started, which is when it publishes
     // boundAccountRef; the merge prefers retained rows, so reading before the first window frame is safe.
-    val boundAccountRef = accountController?.boundAccountRef ?: appState.activeAccountRef
+    val sourceController = accountController ?: appState.groupPresentationChatsController
+    val membershipRevision = sourceController?.materializedGroupsRevision ?: 0L
+    val runtime = appState.runtimeGeneration
+    val boundAccountRef = sourceController?.boundAccountRef
+    val ownsSelectedAccount =
+        selectedAccountRef != null &&
+            boundAccountRef == selectedAccountRef &&
+            sourceController?.accountRef == selectedAccountRef
     val targets =
-        remember(appState, accountController, selectedAccountRef, boundAccountRef) {
+        remember(appState, sourceController, selectedAccountRef, boundAccountRef, runtime) {
             mutableStateOf(AccountWidePickerTargets())
         }
-    LaunchedEffect(accountController, selectedAccountRef, boundAccountRef, retryRevision) {
-        if (selectedAccountRef == null || boundAccountRef != selectedAccountRef) return@LaunchedEffect
+    LaunchedEffect(sourceController, selectedAccountRef, boundAccountRef, membershipRevision, retryRevision, runtime) {
+        if (!ownsSelectedAccount) return@LaunchedEffect
         targets.value = targets.value.copy(complete = false)
         // A bound controller is authoritative for its account: a null read must not fall back to the active
         // account's rows, which would list another account's chats under this selection.
-        val loaded =
-            if (accountController != null) {
-                accountController.loadAccountWideForwardTargets()
-            } else {
-                appState.loadAccountWideForwardTargets()
-            }
+        val loaded = sourceController?.loadAccountWideForwardTargets()
         targets.value = AccountWidePickerTargets(loaded ?: targets.value.snapshot, loaded != null)
     }
     val revision = accountController?.memberSnapshotsRevision ?: appState.forwardTargetMembersRevision
     val targetRevision = accountController?.forwardTargetsRevision ?: appState.forwardTargetsRevision
-    val snapshot = targets.value.snapshot
+    val snapshot = targets.value.snapshot?.takeIf { ownsSelectedAccount }
     val missingMembers =
-        remember(snapshot, revision, targetRevision) {
+        remember(snapshot, revision, targetRevision, membershipRevision) {
             snapshot
                 ?.items()
                 .orEmpty()
@@ -199,14 +201,26 @@ private fun rememberAccountWideForwardTargets(
     LaunchedEffect(snapshot, missingMembers, retryRevision) {
         snapshot?.resolveMembers(missingMembers)
     }
-    return targets.value
+    return targets.value.copy(ownsSelectedAccount = ownsSelectedAccount)
 }
 
 /** Transient picker projection and whether its latest account-wide read completed successfully. */
 private data class AccountWidePickerTargets(
     val snapshot: AccountWideForwardTargets? = null,
     val complete: Boolean = false,
+    val ownsSelectedAccount: Boolean = false,
 ) {
+    /** Membership changes invalidate completeness synchronously, before the replacement read starts. */
+    val isComplete: Boolean get() = ownsSelectedAccount && complete && snapshot?.hasCurrentMembership == true
+
+    /** An old attached controller cannot expose even its retained rows under a newly selected account. */
+    fun mergeRetained(retained: List<ChatListItem>): List<ChatListItem> =
+        if (ownsSelectedAccount) {
+            mergeForwardTargets(retained, items())
+        } else {
+            emptyList()
+        }
+
     /** Reprojects the native snapshot after observed member and target revisions, without another row read. */
     fun items(): List<ChatListItem>? = snapshot?.items()
 }

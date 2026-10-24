@@ -104,7 +104,7 @@ internal fun SetupStatusIcon(status: OnboardingStatusFfi) {
 /** Separates publication consequences and recovery guidance from the surrounding form fields. */
 @Composable
 internal fun SetupNotice(text: String) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.medium) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium) {
         Text(
             text,
             Modifier.fillMaxWidth().padding(Dimens.spaceMd),

@@ -1149,6 +1149,14 @@
           "GRP-030",
           "GRP-034"
         ]
+      },
+      {
+        "surface": "R.string.person_groups_in_common",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.person_groups_in_common",
+        "test_ids": [
+          "ACC-022"
+        ]
       }
     ]
   },

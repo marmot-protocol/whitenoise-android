@@ -436,6 +436,7 @@ internal fun GroupDetailsScreen(
                         conversationTitle,
                         avatar.pictureUrl,
                         avatar.image,
+                        groupAnimation = avatar.groupAnimation,
                     ),
                 member = RecipientSearch.Candidate(memberHex, "", appState.npubForDisplay(memberHex)),
             )
@@ -900,6 +901,7 @@ internal fun GroupDetailsScreen(
                         conversationTitle,
                         reviewAvatar.pictureUrl,
                         reviewAvatar.image,
+                        groupAnimation = reviewAvatar.groupAnimation,
                     ),
                 appState = appState,
                 title = stringResource(R.string.add_member),
@@ -997,6 +999,7 @@ internal fun GroupDetailsScreen(
                                         conversationTitle,
                                         reviewAvatar.pictureUrl,
                                         reviewAvatar.image,
+                                        groupAnimation = reviewAvatar.groupAnimation,
                                     ),
                                 member = member,
                                 busy = true,
@@ -1579,6 +1582,7 @@ internal fun GroupDetailsScreen(
                                         size = 32.dp,
                                         pictureUrl = groupAvatar.pictureUrl.takeIf { encryptedGroupAvatar == null },
                                         picture = encryptedGroupAvatar,
+                                        groupAnimation = groupAvatar.groupAnimation,
                                     )
                                 }
                                 Text(
@@ -1646,6 +1650,7 @@ internal fun GroupDetailsScreen(
                     seed = controller.avatarAccount ?: controller.group.groupIdHex,
                     pictureUrl = groupAvatar.pictureUrl,
                     picture = encryptedGroupAvatar,
+                    groupAnimation = groupAvatar.groupAnimation,
                     archived = controller.presentedArchived,
                     readLocalBytes = groupAvatar.readOriginalBytes,
                     onEdit =
@@ -1726,6 +1731,15 @@ internal fun GroupDetailsScreen(
                                 },
                                 leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
                                 modifier = Modifier.testTag("chat_info.start_group"),
+                            )
+                        }
+                        row("groups_in_common") { rowContext ->
+                            SettingsAction(
+                                context = rowContext,
+                                title = stringResource(R.string.person_groups_in_common),
+                                onClick = { appState.presentProfile(dmPeerNpub, groupsInCommon = true) },
+                                leading = { Icon(painterResource(R.drawable.ic_group), contentDescription = null) },
+                                modifier = Modifier.testTag("chat_info.groups_in_common"),
                             )
                         }
                         row("add_to_group") { rowContext ->
@@ -2319,6 +2333,7 @@ internal fun GroupDetailsHeader(
     seed: String,
     pictureUrl: String?,
     picture: ImageBitmap? = null,
+    groupAnimation: dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation? = null,
     archived: Boolean,
     onEdit: (() -> Unit)? = null,
     editEnabled: Boolean = true,
@@ -2363,6 +2378,7 @@ internal fun GroupDetailsHeader(
                     size = avatarSize,
                     pictureUrl = safePictureUrl?.takeIf { picture == null },
                     picture = picture,
+                    groupAnimation = groupAnimation,
                 )
             }
             if (onEdit == null) {

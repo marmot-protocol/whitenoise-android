@@ -79,6 +79,30 @@ class GroupAvatarImageLoaderTest {
             }
         }
 
+    /** Re-entering a thumbnail consumes retained source bytes, never another MDK download. */
+    @Test
+    fun encryptedAnimationSharesTheFirstFrameCacheLifetime() =
+        runBlocking {
+            val gif = twoFrameGif()
+            var reads = 0
+            assertNotNull(
+                GroupAvatarImageLoader.load("encrypted-gif") {
+                    reads++
+                    gif
+                },
+            )
+            assertNotNull(GroupAvatarImageLoader.peekAnimatedSource("encrypted-gif"))
+            repeat(3) {
+                assertNotNull(GroupAvatarImageLoader.load("encrypted-gif") { error("warm thumbnail refetch") })
+                assertNotNull(GroupAvatarImageLoader.peekAnimatedSource("encrypted-gif"))
+            }
+            assertEquals(1, reads)
+            GroupAvatarImageLoader.prepareForRecovery()
+            assertNotNull(GroupAvatarImageLoader.peekAnimatedSource("encrypted-gif"))
+            GroupAvatarImageLoader.clear()
+            assertNull(GroupAvatarImageLoader.peekAnimatedSource("encrypted-gif"))
+        }
+
     @Test
     fun encryptedAvatarPayloadMustFitThePreparedImageLimit() {
         assertTrue(isGroupAvatarPayloadAccepted(ByteArray(GROUP_AVATAR_MAX_PAYLOAD_BYTES)))

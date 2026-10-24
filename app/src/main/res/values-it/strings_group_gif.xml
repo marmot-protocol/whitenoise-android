@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">Usare questa GIF per il gruppo?</string>
+    <string name="group_gif_upload_notice">La GIF animata verrà caricata su un server di immagini pubblico. Chiunque abbia il link potrà visualizzarla. Verrà usata la GIF intera, senza ritaglio.</string>
+    <string name="group_gif_upload_confirm">Carica GIF</string>
+</resources>

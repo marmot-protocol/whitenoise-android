@@ -155,6 +155,16 @@
           "SET-032"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.pull_unread_setting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.pull_unread_setting",
+        "test_ids": [
+          "CHL-031"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

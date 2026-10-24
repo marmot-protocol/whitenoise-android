@@ -30,7 +30,8 @@
           "GRP-001",
           "GRP-025",
           "PRO-010",
-          "GRP-034"
+          "GRP-034",
+          "GRP-035"
         ]
       }
     ],
@@ -222,6 +223,30 @@
         "test_ids": [
           "GRP-001",
           "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_gif_upload_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_gif_upload_confirm",
+        "test_ids": [
+          "GRP-035"
+        ]
+      },
+      {
+        "surface": "string:group_gif_upload_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_gif_upload_notice",
+        "test_ids": [
+          "GRP-035"
+        ]
+      },
+      {
+        "surface": "string:group_gif_upload_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_gif_upload_title",
+        "test_ids": [
+          "GRP-035"
         ]
       }
     ],

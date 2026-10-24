@@ -20,7 +20,9 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectedMembersReviewScreen
+import dev.ipf.whitenoise.android.ui.common.AnimatedGroupAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
+import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
@@ -42,6 +44,7 @@ internal fun MaestroPickerPresentation(fixture: MaestroPresentationFixture) {
         fixture.scenario.startsWith("surface-contact-") -> ContactPresentation(fixture, candidate)
         fixture.scenario.startsWith("surface-review-") -> ReviewPresentation(fixture, candidate)
         fixture.scenario == "surface-animated-avatar" -> AnimatedAvatarPresentation(fixture)
+        fixture.scenario == "surface-animated-group-avatar" -> AnimatedGroupAvatarPresentation(fixture)
         else ->
             Box(Modifier.size(48.dp)) {
                 KeyboardPreservingDropdownMenu(
@@ -85,6 +88,27 @@ private fun AnimatedAvatarPresentation(fixture: MaestroPresentationFixture) {
                 },
             ) { Text("Open animated avatar") }
         }
+    }
+}
+
+/** Retained sanitized GIF bytes exercise production group admission and the isolated decoder. */
+@Composable
+@Suppress("FunctionNaming")
+private fun AnimatedGroupAvatarPresentation(fixture: MaestroPresentationFixture) {
+    val animation =
+        remember(fixture) {
+            GroupAvatarAnimation("fixture-group-avatar") {
+                AvatarImageLoader.peekAnimatedSource("https://fixture.example.invalid/animated")
+            }
+        }
+    Column {
+        AnimatedGroupAvatarOverlay(
+            animation = animation,
+            modifier = Modifier.size(96.dp).testTag("avatar.group.overlay"),
+            maxEdgePx = 96,
+            animationsEnabled = true,
+        )
+        Button(onClick = { fixture.finish("dismiss") }) { Text("Dismiss group avatar") }
     }
 }
 

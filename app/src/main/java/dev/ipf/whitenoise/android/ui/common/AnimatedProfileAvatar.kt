@@ -91,6 +91,16 @@ internal suspend fun decodeAnimatedProfileAvatar(
         discard = { (it as? java.io.Closeable)?.close() },
     )
 
+/** Decorative thumbnails yield the single isolated worker to explicit media use. */
+internal suspend fun decodeAnimatedGroupThumbnail(
+    source: ByteArray,
+    maxEdgePx: Int,
+): Drawable? =
+    dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+        decode = { MediaPipeline.decodeAnimatedDrawable(source, maxEdgePx, decorative = true) },
+        discard = { (it as? java.io.Closeable)?.close() },
+    )
+
 /**
  * Overlays the cached animation for [url] at no more than [maxEdgePx], on top of the first frame the
  * caller already draws. Static, uncached and evicted avatars compose nothing, and an account clear drops
@@ -133,6 +143,8 @@ internal fun AnimatedProfileAvatarLayer(
     modifier: Modifier = Modifier,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     explicitViewer: Boolean = false,
+    groupThumbnail: Boolean = false,
+    onDecodeUnavailable: () -> Unit = {},
     decode: suspend (ByteArray, Int) -> Drawable? = ::decodeAnimatedProfileAvatar,
 ) {
     // Not keyed on the source: the visibility node only reports changes, so a reset here would leave a
@@ -142,12 +154,18 @@ internal fun AnimatedProfileAvatarLayer(
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
         .collectAsState()
     val foreground = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
-    val animate = explicitViewer && shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
+    val animate =
+        (explicitViewer || groupThumbnail) && shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
     val drawable by produceState<Drawable?>(null, source, maxEdgePx, animate) {
         value = null
         if (animate) {
-            val produced = decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))
+            val produced =
+                dev.ipf.whitenoise.android.state
+                    .runCatchingCancellable {
+                        decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))
+                    }.getOrNull()
             value = produced
+            if (produced == null) onDecodeUnavailable()
             awaitDispose { (produced as? java.io.Closeable)?.close() }
         }
     }

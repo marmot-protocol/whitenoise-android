@@ -723,6 +723,7 @@ internal fun ForwardTargetRow(
         avatarUrl = avatar.pictureUrl,
         avatarImage = avatar.image,
         avatarAnimationKey = avatar.animationKey,
+        groupAnimation = avatar.groupAnimation,
         modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(item.group.groupIdHex) },
         trailing = { SelectionIndicator(selected = selected) },

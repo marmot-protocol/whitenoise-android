@@ -24,6 +24,8 @@ internal fun rememberSearchFolderContext(
     controller: ChatsController,
     titleCopy: GroupTitleCopy,
     accountRef: String?,
+    activeItems: List<dev.ipf.whitenoise.android.state.ChatListItem> = controller.items,
+    archivedItems: List<dev.ipf.whitenoise.android.state.ChatListItem> = controller.archivedItems,
 ): SearchFolderContext {
     val storeState by appState.chatFolderPreferences.state.collectAsState()
     val account = accountRef
@@ -32,8 +34,8 @@ internal fun rememberSearchFolderContext(
         remember(
             storeState,
             account,
-            controller.items,
-            controller.archivedItems,
+            activeItems,
+            archivedItems,
             titleCopy,
             appState.profileRevisionForCompose,
         ) {
@@ -41,7 +43,7 @@ internal fun rememberSearchFolderContext(
                 account
                     ?.let { owner ->
                         val rule = appState.chatFolderPreferences.folderRule(owner, folderId)
-                        val items = chatFolderSource(rule, controller.items, controller.archivedItems)
+                        val items = chatFolderSource(rule, activeItems, archivedItems)
                         val mutedIds = items.filter { it.engineMuted() }.mapTo(mutableSetOf()) { it.group.groupIdHex }
                         chatFolderChatIds(
                             items = items,
