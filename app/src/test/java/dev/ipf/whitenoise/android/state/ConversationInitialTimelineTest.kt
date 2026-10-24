@@ -44,6 +44,8 @@ class ConversationInitialTimelineTest {
                 preview(deliveryState = ChatListMessageDeliveryStateFfi.FAILED),
                 // A seeded event card would paint as Loading before the first page can warm it (#2238).
                 preview(plaintext = "look nostr:note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv"),
+                // An escaped link destination still renders a card, so it waits for the page too.
+                preview(plaintext = "[post](https\\://njump.me/note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv)"),
             )
 
         rejected.forEach { candidate ->
@@ -56,6 +58,22 @@ class ConversationInitialTimelineTest {
             "non-hex group id must be rejected",
             initialConversationTimeline(preview(), "not-hex", false, emptyList()).isEmpty(),
         )
+    }
+
+    /** Prose that only looks like an event reference renders no card, so it still seeds the opening row. */
+    @Test
+    fun cardLookalikePreviewStillSeeds() {
+        listOf(
+            "see footnote1 below",
+            "bare note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv",
+            "njump.me/note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv",
+        ).forEach { plaintext ->
+            assertEquals(
+                "lookalike must seed: $plaintext",
+                1,
+                initialConversationTimeline(preview(plaintext = plaintext), GROUP_ID, false, emptyList()).size,
+            )
+        }
     }
 
     @Test

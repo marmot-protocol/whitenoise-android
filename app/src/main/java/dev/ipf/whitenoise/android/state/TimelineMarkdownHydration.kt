@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -80,3 +81,28 @@ internal fun publishTimelineBeforeMarkdownHydration(
 }
 
 private const val CHAT_MESSAGE_KIND = 9uL
+
+/**
+ * [this] page with the Markdown of [parsed] copied onto each message that lacks it and has the same id and text, so a
+ * parse made before the commit is the one the commit installs. Only the tokens are carried: every other field stays
+ * this page's, which may be newer than the record that was parsed. Returns [this] when nothing changes.
+ */
+internal fun TimelinePageFfi.withParsedRecords(parsed: List<TimelineMessageRecordFfi>): TimelinePageFfi {
+    // Keyed by text as well as id, so an edited message never takes the parse of its earlier text.
+    val byContent =
+        parsed
+            .filter { it.contentTokens.blocks.isNotEmpty() }
+            .associateBy { it.messageIdHex to it.plaintext }
+    if (byContent.isEmpty()) return this
+    var changed = false
+    val merged =
+        messages.map { message ->
+            val tokens =
+                byContent[message.messageIdHex to message.plaintext]
+                    ?.takeIf { needsTimelineMarkdownHydration(message) }
+                    ?.contentTokens
+            if (tokens != null) changed = true
+            tokens?.let(message::withMarkdownTokens) ?: message
+        }
+    return if (changed) copy(messages = merged) else this
+}

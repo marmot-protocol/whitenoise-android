@@ -60,6 +60,12 @@ internal class ScriptedConversationTimelineSubscription(
     /** Holds an anchor reply while its controller retires the visible window owner. */
     var beforeAnchorReply: suspend () -> Unit = {}
 
+    /** The newest window a test installed, which a controller commits in place of the page it was handed. */
+    @Volatile var installedWindow: InstalledConversationWindow? = null
+
+    /** Returns [installedWindow], as a real window handle returns its newest installed replacement. */
+    override fun latestInstalledWindow(): InstalledConversationWindow? = installedWindow
+
     /** Optional command outcomes, including a null native timeout/not-ready reply. */
     val anchorReplies = mutableListOf<TimelinePageFfi?>()
 
