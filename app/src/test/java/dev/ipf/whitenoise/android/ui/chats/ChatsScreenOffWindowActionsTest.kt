@@ -293,7 +293,7 @@ class ChatsScreenOffWindowActionsTest {
             }
         }
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertDoesNotExist()
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads >= 1 }
         settle()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()

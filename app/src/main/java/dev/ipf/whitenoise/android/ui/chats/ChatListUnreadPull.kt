@@ -11,6 +11,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import kotlin.math.abs
 
+private const val UNREAD_PULL_HAPTIC_REARM_RATIO = 0.9f
+
 /** A pull must begin at the logical head; scrolling or flinging into it never arms the action. */
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "NestedBlockDepth")
 internal fun Modifier.chatListUnreadPull(
@@ -60,7 +62,9 @@ internal fun Modifier.chatListUnreadPull(
                             val delta = change.positionChange()
                             distance += delta.y
                             horizontal += delta.x
-                            if (!claimed && unreadPullDirectionRejected(horizontal, distance, viewConfiguration.touchSlop)) {
+                            if (!claimed &&
+                                unreadPullDirectionRejected(horizontal, distance, viewConfiguration.touchSlop)
+                            ) {
                                 rejected = true
                             }
                             if (!rejected && (claimed || distance > viewConfiguration.touchSlop)) {
@@ -68,7 +72,7 @@ internal fun Modifier.chatListUnreadPull(
                                 change.consume()
                                 currentProgress((distance / thresholdPx).coerceIn(0f, 1f))
                                 currentDistance((distance / thresholdPx).coerceAtLeast(0f))
-                                if (distance < thresholdPx * 0.9f) thresholdLatched = false
+                                if (distance < thresholdPx * UNREAD_PULL_HAPTIC_REARM_RATIO) thresholdLatched = false
                                 if (distance >= thresholdPx && !thresholdLatched) {
                                     thresholdLatched = true
                                     currentThreshold()

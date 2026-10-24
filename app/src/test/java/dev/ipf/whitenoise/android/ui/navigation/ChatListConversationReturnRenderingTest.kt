@@ -139,7 +139,7 @@ class ChatListConversationReturnRenderingTest {
     fun unreadFilterSurvivesConversationBackUntilShowAll() {
         val fixture = ReturnFixture(unreadTarget = true)
         withMountedUnreadShell(fixture) { holder ->
-            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
             awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
             composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Filtered by unread")
             composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
@@ -159,7 +159,7 @@ class ChatListConversationReturnRenderingTest {
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Filtered by unread")
             composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
-            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
             composeRule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
             composeRule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertIsDisplayed()
         }
@@ -185,14 +185,14 @@ class ChatListConversationReturnRenderingTest {
             ),
         )
         withMountedUnreadShell(fixture) {
-            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
             awaitCondition { fixture.unreadSnapshotReads.get() > 0 }
             composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag("chats.folder.${folder.id}"))
             composeRule.onNodeWithTag("chats.folder.${folder.id}").performClick()
             composeRule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
             composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag("chats.scope.chats"))
             composeRule.onNodeWithTag("chats.scope.chats").performClick()
-            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
             composeRule.onNodeWithTag("chats.unread_filter").assertTextContains("Filtered by unread")
             composeRule.runOnIdle { replaceUnreadAccount(fixture.appState, "other-unread-account") }
             composeRule.waitForIdle()

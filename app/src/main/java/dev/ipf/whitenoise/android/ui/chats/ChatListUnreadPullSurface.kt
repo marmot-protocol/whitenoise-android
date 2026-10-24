@@ -40,8 +40,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 
-private const val UnreadPullTrackingResistance = 0.8f
-private const val UnreadPullExtraResistance = 0.7f
+private const val UNREAD_PULL_TRACKING_RESISTANCE = 0.8f
+private const val UNREAD_PULL_EXTRA_RESISTANCE = 0.7f
 
 /** The pointer viewport stays stationary while the body follows the resisted pull. */
 @Composable
@@ -146,8 +146,8 @@ internal fun unreadPullDisplacement(
     threshold: Float,
 ): Float {
     val distance = progress.coerceAtLeast(0f) * threshold
-    if (distance <= threshold) return distance * UnreadPullTrackingResistance
+    if (distance <= threshold) return distance * UNREAD_PULL_TRACKING_RESISTANCE
     val extra = distance - threshold
-    return threshold * UnreadPullTrackingResistance +
-        threshold * UnreadPullExtraResistance * extra / (threshold + extra)
+    return threshold * UNREAD_PULL_TRACKING_RESISTANCE +
+        threshold * UNREAD_PULL_EXTRA_RESISTANCE * extra / (threshold + extra)
 }

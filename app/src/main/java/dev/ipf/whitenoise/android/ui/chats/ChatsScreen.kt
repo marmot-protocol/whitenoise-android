@@ -2113,7 +2113,9 @@ internal fun ChatsScreen(
                             }
                             val failedUnreadSnapshot = unreadReadFailed && unreadOnly && displayUnreadSnapshot != null
                             if (failedUnreadSnapshot && visibleItems.isNotEmpty()) {
-                                TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
+                                TextButton(onClick = { unreadRetry++ }) {
+                                    Text(stringResource(R.string.pull_unread_retry))
+                                }
                             }
                         },
                     ) {
@@ -2133,16 +2135,22 @@ internal fun ChatsScreen(
                                     onOpenMessage = { groupIdHex, messageIdHex ->
                                         openSearchMessage(groupIdHex, messageIdHex)
                                     },
-                                    thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
+                                    thumbnail = { item ->
+                                        libraryThumbnail(appState, controller.boundAccountRef, item)
+                                    },
                                     selectionOwner = searchViewport?.selection,
                                     gridState =
                                         searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
                                             .rememberLazyGridState(),
                                 )
-                            unreadOnly && unreadReadFailed && (displayUnreadSnapshot == null || visibleItems.isEmpty()) ->
+                            unreadOnly &&
+                                unreadReadFailed &&
+                                (displayUnreadSnapshot == null || visibleItems.isEmpty()) ->
                                 Column(Modifier.fillMaxSize().padding(16.dp)) {
                                     Text(stringResource(R.string.pull_unread_load_failed))
-                                    TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
+                                    TextButton(onClick = { unreadRetry++ }) {
+                                        Text(stringResource(R.string.pull_unread_retry))
+                                    }
                                 }
                             unreadOnly &&
                                 currentUnreadSnapshot == null &&
@@ -2283,7 +2291,11 @@ internal fun ChatsScreen(
                                                     contentType = CHAT_LIST_ROW_CONTENT_TYPE,
                                                 ) {
                                                     val bodyMatch = bodyMatches[canonicalId]
-                                                    chatRowContent(item, searchSections.groups.size + messageIndex, bodyMatch)
+                                                    chatRowContent(
+                                                        item,
+                                                        searchSections.groups.size + messageIndex,
+                                                        bodyMatch,
+                                                    )
                                                 }
                                             }
                                         } else {
@@ -2344,7 +2356,10 @@ internal fun ChatsScreen(
                                                 // near-top index first, then animate the final
                                                 // viewport so the motion stays short and smooth
                                                 // regardless of how far down the user was.
-                                                if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
+                                                if (
+                                                    chatListState.firstVisibleItemIndex >
+                                                    CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX
+                                                ) {
                                                     chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
                                                 }
                                                 chatListState.animateScrollToItem(0)

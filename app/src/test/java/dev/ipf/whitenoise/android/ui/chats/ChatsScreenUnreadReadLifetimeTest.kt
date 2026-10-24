@@ -79,7 +79,7 @@ class ChatsScreenUnreadReadLifetimeTest {
             }
         }
         mount(model)
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads == 1 }
         repeat(4) { index ->
             rule.runOnIdle {
@@ -134,7 +134,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         model.controller.applyChatListRow(model.retainedRow.get())
         settle()
         mount(model)
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads >= 1 }
         rule.waitForIdle()
         rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertExists()
@@ -179,7 +179,7 @@ class ChatsScreenUnreadReadLifetimeTest {
             ChatFolderRule(includeMemberPubkeys = setOf(member), includeMuted = true),
         )
         mount(model, folder.id)
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads >= 1 && model.controller.hasMemberSnapshot(ACTION_TARGET) }
         settle()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
@@ -214,7 +214,7 @@ class ChatsScreenUnreadReadLifetimeTest {
             ChatFolderRule(includeMemberPubkeys = setOf(member), includeMuted = true),
         )
         mount(model, folder.id)
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.controller.hasMemberSnapshot(ACTION_TARGET) }
         settle()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
@@ -229,7 +229,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         val release = CompletableDeferred<Unit>().also { releaseRead = it }
         model.beforeSnapshotRead = { if (model.snapshotReads == 1) release.await() }
         mount(model)
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads == 1 }
         val rebound = scope.launch { model.controller.bind(null) }
         awaitProgress { rebound.isCompleted }

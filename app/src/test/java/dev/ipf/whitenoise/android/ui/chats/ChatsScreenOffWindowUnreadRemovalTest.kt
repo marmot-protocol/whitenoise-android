@@ -49,7 +49,7 @@ class ChatsScreenOffWindowUnreadRemovalTest {
             composeRule.setContent {
                 WhiteNoiseTheme { ChatsScreen(fixture.state, fixture.controller, {}, { _, _, _, _ -> }) }
             }
-            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+            composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
             awaitNativeProgress(nativeScope) { reads == 1 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertExists()

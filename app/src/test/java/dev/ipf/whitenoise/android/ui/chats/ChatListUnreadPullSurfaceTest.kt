@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import android.os.Looper
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -105,12 +106,13 @@ class ChatListUnreadPullSurfaceTest {
         rule.setContent {
             WhiteNoiseTheme {
                 ChatListUnreadPullSurface(unread.value, true, false, { true }, {
+                    assertEquals(Looper.getMainLooper(), Looper.myLooper())
                     unread.value = it
                     changes++
                 }) { Text("No chats") }
             }
         }
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         rule.onNodeWithTag("chats.unread_filter").performClick()
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         assertEquals(2, changes)

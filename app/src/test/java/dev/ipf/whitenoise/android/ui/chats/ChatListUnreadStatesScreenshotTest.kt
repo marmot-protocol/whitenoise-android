@@ -95,6 +95,7 @@ class ChatListUnreadStatesScreenshotTest {
         }
     }
 
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun capture(
         name: String,
         state: State,
@@ -140,7 +141,7 @@ class ChatListUnreadStatesScreenshotTest {
             if (state == State.HeldPull) rule.onNodeWithTag("chats.unread_surface").performTouchInput { cancel() }
             return
         }
-        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction()
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads >= 1 }
         rule.waitForIdle()
         rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertIsDisplayed()
