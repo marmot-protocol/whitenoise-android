@@ -3,18 +3,21 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -32,10 +35,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -116,23 +119,38 @@ internal fun ChatListUnreadPullSurface(
                 Modifier.fillMaxWidth().onSizeChanged { pillHeight = it.height.toFloat() },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Button(
-                    onClick = { onUnreadOnlyChange(false) },
-                    shape = CircleShape,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                    modifier =
-                        Modifier
-                            .padding(horizontal = 16.dp)
-                            .heightIn(min = 48.dp)
-                            .testTag("chats.unread_filter")
-                            .semantics { onClick(label = actionLabel, action = null) },
+                Box(
+                    Modifier
+                        .padding(horizontal = 16.dp)
+                        .minimumInteractiveComponentSize()
+                        .testTag("chats.unread_filter")
+                        .clickable(
+                            onClickLabel = actionLabel,
+                            role = Role.Button,
+                            onClick = { onUnreadOnlyChange(false) },
+                        ).padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(stringResource(R.string.pull_unread_filtered), Modifier.weight(1f, fill = false))
-                    Text("×", Modifier.padding(start = 8.dp).clearAndSetSemantics { })
+                    Row(
+                        Modifier
+                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), CircleShape)
+                            .heightIn(min = 32.dp)
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.pull_unread_filtered),
+                            Modifier.weight(1f, fill = false),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Text(
+                            "×",
+                            Modifier.padding(start = 8.dp).clearAndSetSemantics { },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
                 }
                 status()
             }

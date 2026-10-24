@@ -13,6 +13,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -113,7 +114,7 @@ class ChatListUnreadPullSurfaceTest {
             }
         }
         rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
-        rule.onNodeWithTag("chats.unread_filter").performClick()
+        rule.onNodeWithTag("chats.unread_filter").assertHeightIsAtLeast(48.dp).performClick()
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         assertEquals(2, changes)
         assertEquals(false, unread.value)
