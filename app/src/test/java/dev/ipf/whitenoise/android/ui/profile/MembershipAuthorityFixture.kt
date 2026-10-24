@@ -126,6 +126,25 @@ internal class MembershipAuthorityFixture {
         return result
     }
 
+    /** Reads the same gated native snapshot while keeping proxy dispatch complexity bounded. */
+    private fun readNativeSnapshot(args: Array<out Any?>?): GroupConversationSnapshotFfi {
+        check(args!![0] == account)
+        val id = args[1] as String
+        reads += id
+        recordAuthorityEvent(id, "native-enter")
+        return try {
+            entered[id]?.countDown()
+            check(releases[id]?.await(10, TimeUnit.SECONDS) != false) { "Native snapshot gate timed out" }
+            check(id !in failures) { "Native authority unavailable" }
+            snapshot(listOf(fast, slow).single { it.id == id }).also {
+                recordAuthorityEvent(id, "native-return")
+            }
+        } catch (failure: Throwable) {
+            recordAuthorityEvent(id, "native-failure:${failure.javaClass.simpleName}")
+            throw failure
+        }
+    }
+
     /** Uses the actual MarmotInterface method consumed by WhiteNoiseAppState.profileMembershipController. */
     private fun native(): MarmotInterface =
         Proxy.newProxyInstance(
@@ -133,23 +152,7 @@ internal class MembershipAuthorityFixture {
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, args ->
             when (val name = method.name.substringBefore('-')) {
-                "groupConversationSnapshot" -> {
-                    check(args!![0] == account)
-                    val id = args[1] as String
-                    reads += id
-                    recordAuthorityEvent(id, "native-enter")
-                    try {
-                        entered[id]?.countDown()
-                        check(releases[id]?.await(10, TimeUnit.SECONDS) != false) { "Native snapshot gate timed out" }
-                        check(id !in failures) { "Native authority unavailable" }
-                        snapshot(listOf(fast, slow).single { it.id == id }).also {
-                            recordAuthorityEvent(id, "native-return")
-                        }
-                    } catch (failure: Throwable) {
-                        recordAuthorityEvent(id, "native-failure:${failure.javaClass.simpleName}")
-                        throw failure
-                    }
-                }
+                "groupConversationSnapshot" -> readNativeSnapshot(args)
                 "removeMembersDetailed" -> {
                     check(args!![0] == account)
                     val id = args[1] as String
