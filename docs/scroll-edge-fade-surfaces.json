@@ -1743,12 +1743,13 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
       "calls": {
-        "fadingVerticalScroll": 2
+        "fadingVerticalScroll": 3
       },
       "family": "settings",
       "policy": "ordinary",
       "test_ids": [
-        "SET-006"
+        "SET-006",
+        "SET-007"
       ]
     }
   ],

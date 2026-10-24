@@ -87,12 +87,25 @@ internal fun FontFamilyDialog(
         title = { Text(stringResource(R.string.app_font)) },
         text = {
             Column(
-                Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(stringResource(R.string.font_size_preview), style = MaterialTheme.typography.labelMedium)
-                FontAppearanceSample(theme, mineArgb, otherArgb, Modifier.testTag("font_family.preview"))
-                Column(Modifier.selectableGroup()) {
+                Column(
+                    Modifier
+                        .weight(1f, fill = false)
+                        .testTag("font_family.preview.viewport")
+                        .fadingVerticalScroll(rememberScrollState()),
+                ) {
+                    FontAppearanceSample(theme, mineArgb, otherArgb, Modifier.testTag("font_family.preview"))
+                }
+                Column(
+                    Modifier
+                        .weight(1f, fill = false)
+                        .testTag("font_family.choices")
+                        .fadingVerticalScroll(rememberScrollState())
+                        .selectableGroup(),
+                ) {
                     AppFont.entries.forEach { font ->
                         WhiteNoiseDialogChoiceRow(
                             title = label(font),
@@ -105,9 +118,13 @@ internal fun FontFamilyDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("font_family.done")) {
+                Text(stringResource(R.string.done))
+            }
+        },
         dismissButton = {
-            TextButton(onClick = { onSelect(AppFont.System) }) {
+            TextButton(onClick = { onSelect(AppFont.System) }, modifier = Modifier.testTag("font_family.system")) {
                 Text(stringResource(R.string.appearance_font_system))
             }
         },
