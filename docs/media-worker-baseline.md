@@ -93,6 +93,10 @@ manual IDs and unchecked results are retained.
 The [still-image lifetime candidate](media-worker-lifetime.md) documents the
 successor owner and its separate qualification requirements.
 
+Production installation uses the current reusable worker. The per-input lifetime
+transport remains explicit qualification code; its timing and failure evidence
+do not approve production adoption.
+
 ## Healthy startup timing
 
 The opt-in hosted API 30 startup trace runs

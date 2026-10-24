@@ -124,6 +124,60 @@ class MediaBindingRecoveryTest {
     }
 
     @Test
+    fun defaultFacadeReusesItsWorkerAndAccountResetKeepsTheDefault() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = true)
+        val fields =
+            listOf("transport", "mediaTransport", "installedContext", "imageOwner", "lastIsolation")
+                .associateWith { name ->
+                    IsolatedMediaDecoder::class.java.getDeclaredField(name).apply { isAccessible = true }
+                }
+        val previous = fields.mapValues { (_, member) -> member.get(IsolatedMediaDecoder) }
+        var experimental: IsolatedMediaTransport? = null
+        try {
+            fields.filterKeys { it != "lastIsolation" }.values.forEach { it.set(IsolatedMediaDecoder, null) }
+            IsolatedMediaDecoder.install(context)
+            val owner = field(IsolatedMediaDecoder, "transport") as ReusableMediaTransport
+            assertNull(field(IsolatedMediaDecoder, "imageOwner"))
+            start(owner, 1).join()
+            context.next()
+            start(owner, 2).join()
+            assertEquals(1, context.bindings.size)
+            val reused = context.bindings.single().remote
+            assertEquals(2, reused.requests)
+            assertEquals(1L, reused.retired.count)
+            assertNull(IsolatedMediaDecoder.decode(byteArrayOf(3), 1))
+            assertEquals(2, reused.requests)
+            IsolatedMediaDecoder.resetForAccount()
+            val replacement = field(IsolatedMediaDecoder, "transport")
+            assertTrue(replacement is ReusableMediaTransport)
+            assertFalse(owner === replacement)
+            assertNull(field(IsolatedMediaDecoder, "imageOwner"))
+            IsolatedMediaDecoder.installForLifetimeQualification(context)
+            val candidate = field(IsolatedMediaDecoder, "transport") as IsolatedMediaTransport
+            experimental = candidate
+            val call = start(candidate, 4)
+            try {
+                val qualification = context.next()
+                assertEquals(2, context.instanceNames.size)
+                assertFalse(context.instanceNames[0] == context.instanceNames[1])
+                assertTrue(context.instanceNames[1].startsWith("lifetime_images_"))
+                qualification.remote.die()
+                call.join()
+            } finally {
+                call.interruptAndJoin()
+            }
+        } finally {
+            try {
+                IsolatedMediaDecoder.clear()
+                context.dieAll()
+                experimental?.close()
+            } finally {
+                fields.forEach { (name, member) -> member.set(IsolatedMediaDecoder, previous[name]) }
+            }
+        }
+    }
+
+    @Test
     fun facadeClearInstallAndAccountResetKeepTheSameDeathWitness() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext())
         val fields =
@@ -137,14 +191,14 @@ class MediaBindingRecoveryTest {
         try {
             // Keep prior owners referenced and untouched; this fixture owns only the replacement below.
             fields.filterKeys { it != "lastIsolation" }.values.forEach { it.set(IsolatedMediaDecoder, null) }
-            IsolatedMediaDecoder.install(context)
+            IsolatedMediaDecoder.installForLifetimeQualification(context)
             val owner = field(IsolatedMediaDecoder, "imageOwner") as IsolatedMediaTransport
             owned = owner
             call = start(owner, 1)
             val first = context.next()
             assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
             IsolatedMediaDecoder.clear()
-            IsolatedMediaDecoder.install(context)
+            IsolatedMediaDecoder.installForLifetimeQualification(context)
             IsolatedMediaDecoder.resetForAccount()
             assertTrue(owner === field(IsolatedMediaDecoder, "imageOwner"))
             call.interruptAndJoin()
@@ -583,7 +637,7 @@ class MediaBindingRecoveryTest {
     }
 
     private fun start(
-        transport: IsolatedMediaTransport,
+        transport: MediaDecodeTransport,
         value: Int,
     ): Call {
         val result = AtomicReference<android.graphics.Bitmap?>()
@@ -676,6 +730,7 @@ class MediaBindingRecoveryTest {
     ) : ContextWrapper(base) {
         var acceptBind = true
         val bindings = mutableListOf<Bound>()
+        val instanceNames = mutableListOf<String>()
         val unbound = mutableListOf<ServiceConnection>()
         val component = ComponentName(base, MediaDecodeService::class.java)
         private val arrivals = LinkedBlockingQueue<Bound>()
@@ -693,7 +748,10 @@ class MediaBindingRecoveryTest {
         ): Boolean {
             beforeBind()
             val bound = Bound(conn, ReplyingBinder(reply, failLink))
-            synchronized(bindings) { bindings += bound }
+            synchronized(bindings) {
+                bindings += bound
+                instanceNames += instanceName
+            }
             if (acceptBind && connect) conn.onServiceConnected(component, bound.remote)
             arrivals.put(bound)
             if (!acceptBind) return false

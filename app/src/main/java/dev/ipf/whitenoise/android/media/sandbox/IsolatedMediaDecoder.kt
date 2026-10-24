@@ -33,16 +33,33 @@ internal object IsolatedMediaDecoder {
     }
 
     @Synchronized
-    fun install(context: Context) {
+    fun install(context: Context) = installSelected(context, lifetimeQualification = false)
+
+    /** Explicit debug qualification only; normal installation keeps the existing reusable worker. */
+    @Synchronized
+    internal fun installForLifetimeQualification(context: Context) {
+        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
+        installSelected(context, lifetimeQualification = true)
+    }
+
+    private fun installSelected(
+        context: Context,
+        lifetimeQualification: Boolean,
+    ) {
         if (!Process.isIsolated()) {
             clear()
             installedContext = context.applicationContext
-            val owner =
-                imageOwner ?: IsolatedMediaTransport(context.applicationContext, "images").also {
-                    imageOwner = it
+            transport =
+                if (lifetimeQualification) {
+                    val owner =
+                        imageOwner ?: IsolatedMediaTransport(context.applicationContext, "lifetime_images").also {
+                            imageOwner = it
+                        }
+                    owner.activateSession()
+                    owner
+                } else {
+                    ReusableMediaTransport(context.applicationContext, "images")
                 }
-            owner.activateSession()
-            transport = owner
             mediaTransport = PlatformMediaTransport(context.applicationContext)
         }
     }
@@ -50,6 +67,7 @@ internal object IsolatedMediaDecoder {
     /** Explicit test seam; production initialization always installs the real IPC transport. */
     @Synchronized
     internal fun installTestTransport(next: MediaDecodeTransport?) {
+        (transport as? ReusableMediaTransport)?.close()
         imageOwner?.invalidateSession()
         transport = next
         mediaTransport = next
@@ -57,10 +75,11 @@ internal object IsolatedMediaDecoder {
 
     @Synchronized
     internal fun resetForAccount() {
-        if (transport is IsolatedMediaTransport) {
+        if (transport is IsolatedMediaTransport || transport is ReusableMediaTransport) {
             val currentContext = installedContext ?: return
+            val lifetimeQualification = transport === imageOwner
             clear()
-            install(currentContext)
+            installSelected(currentContext, lifetimeQualification)
         }
     }
 
@@ -133,7 +152,7 @@ internal object IsolatedMediaDecoder {
         edge: Int,
     ): android.graphics.drawable.Drawable? =
         safely {
-            if (it is IsolatedMediaTransport) {
+            if (it is IsolatedMediaTransport || it is ReusableMediaTransport) {
                 installedContext?.let { context -> IsolatedAnimationSession.create(context, bytes, edge) }
             } else {
                 it.animation(bytes, edge)
@@ -148,7 +167,7 @@ internal object IsolatedMediaDecoder {
 
     private fun <T> safely(block: (MediaDecodeTransport) -> T?): T? =
         try {
-            if (transport is IsolatedMediaTransport &&
+            if ((transport is IsolatedMediaTransport || transport is ReusableMediaTransport) &&
                 Looper.myLooper() == Looper.getMainLooper()
             ) {
                 null

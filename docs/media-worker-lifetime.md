@@ -1,5 +1,11 @@
 # Still-image worker lifetime candidate
 
+Production installation retains the existing reusable isolated worker. Per-input
+retirement is an off-default experimental transport, selected only by the debug
+`installForLifetimeQualification` seam or direct qualification fixtures. The
+facade preserves that explicit selection across account reset; normal install
+always selects the reusable transport. No in-process decoding fallback is added.
+
 Each admitted still-image operation uses one binding generation. The parent
 registers its exact Binder death recipient before admitting input and output
 descriptors. A terminal reply revokes the reply capability, requests retirement
