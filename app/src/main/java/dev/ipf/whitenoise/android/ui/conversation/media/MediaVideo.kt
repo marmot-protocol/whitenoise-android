@@ -1009,6 +1009,13 @@ internal fun MediaVideoBubble(
                                             .size(28.dp)
                                             .clickable(enabled = !loading) { retryFailedPlayback() },
                                 )
+                            // An accepted download that has not started yet is still a download, never Play.
+                            localFile == null && !sendingFromStagedFile ->
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = LocalContentColor.current,
+                                )
                             else ->
                                 Icon(
                                     painter = painterResource(R.drawable.ic_play_arrow),

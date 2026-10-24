@@ -138,13 +138,34 @@ internal class ConversationAttachmentPresentation(
 
     /**
      * Records a durable, interactive download of a visible attachment that is not yet on the device. The intent keeps
-     * the in-place download armed across rotation and process recreation and is retired once the bytes are ready,
-     * without opening anything: a download never opens what it fetched.
+     * the in-place download armed across rotation and process recreation and is retired once the bytes are ready. It
+     * is stored apart from open intents, so no open dispatcher can claim it: a download never opens what it fetched.
      */
     fun requestAttachmentDownload(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean = requestAttachmentOpen(messageIdHex, attachmentIndex)
+    ): Boolean {
+        val account = accountRef ?: return false
+        return appState.attachmentOpens.requestDownload(attachmentRequest(account, messageIdHex, attachmentIndex))
+    }
+
+    /** Whether an in-place download of this attachment is still armed. */
+    fun hasAttachmentDownloadIntent(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
+        return appState.attachmentOpens.hasDownloadIntent(request)
+    }
+
+    /** Retires an in-place download once its bytes are ready, without opening anything. */
+    suspend fun consumeAttachmentDownloadIntent(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
+        return appState.attachmentOpens.consumeDownload(request)
+    }
 
     /** Captures a visible open request through the app-owned delivery coordinator. */
     fun requestAttachmentOpen(
@@ -175,24 +196,6 @@ internal class ConversationAttachmentPresentation(
     ): Boolean {
         val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
         return appState.attachmentOpens.hasIntent(request)
-    }
-
-    /** Consumes one open intent after native bytes become available. */
-    suspend fun consumeAttachmentOpenIntent(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): Boolean {
-        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return false
-        return appState.attachmentOpens.consume(request)
-    }
-
-    /** Restores an interrupted platform open under its existing delivery owner. */
-    fun restoreAttachmentOpenIntent(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ) {
-        val request = attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return
-        appState.attachmentOpens.restore(request)
     }
 
     /** Upgrade an optimistic imeta fallback before download/save uses its epoch. */

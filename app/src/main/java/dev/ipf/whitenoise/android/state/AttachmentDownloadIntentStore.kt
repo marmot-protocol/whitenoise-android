@@ -243,6 +243,29 @@ internal class AttachmentDownloadIntentStore(
     fun hasOpenIntent(request: AttachmentOpenRequest): Boolean = openRequestToken(request) in readSet(OPEN_IDENTITIES)
 
     /**
+     * Persists a reader's in-place download of a visible attachment. It is kept apart from open intents, so no open
+     * dispatcher can ever claim it and launch what the download fetched.
+     */
+    fun markDownloadIntent(request: AttachmentOpenRequest) {
+        updateSet(DOWNLOAD_IDENTITIES) { it + openRequestToken(request) }
+    }
+
+    /** Whether an in-place download of this attachment is still armed for its destination. */
+    fun hasDownloadIntent(request: AttachmentOpenRequest): Boolean {
+        val token = openRequestToken(request)
+        return token in readSet(DOWNLOAD_IDENTITIES)
+    }
+
+    /** Atomically retires a finished in-place download, so only one owner settles it. */
+    fun consumeDownloadIntent(request: AttachmentOpenRequest): Boolean =
+        synchronized(LOCK) {
+            val current = readSet(DOWNLOAD_IDENTITIES)
+            val token = openRequestToken(request)
+            if (token !in current) return@synchronized false
+            commitRemoval(DOWNLOAD_IDENTITIES, current, token)
+        }
+
+    /**
      * A permission handoff remains durable while Settings owns the foreground.
      * The in-process owner suppresses sibling Compose effects; after process
      * recreation that volatile owner is gone and the persisted recovery becomes
@@ -341,7 +364,13 @@ internal class AttachmentDownloadIntentStore(
         superseded: () -> Boolean,
     ): Boolean =
         synchronized(LOCK) {
-            if (superseded()) false else consumeOpenIntent(request)
+            if (superseded()) {
+                false
+            } else {
+                // A cancelled transfer also disarms its in-place download, so nothing re-arms what the reader stopped.
+                consumeDownloadIntent(request)
+                consumeOpenIntent(request)
+            }
         }
 
     /** Atomically fences repeated/late viewer dispatch before the external launch. */
@@ -367,16 +396,19 @@ internal class AttachmentDownloadIntentStore(
             val destination = currentDestination()
             val prefix = destination?.let { "${destinationToken(it)}$OPEN_TOKEN_SEPARATOR" }
             val open = readSet(OPEN_IDENTITIES)
+            val download = readSet(DOWNLOAD_IDENTITIES)
             val permission = readSet(INSTALL_PERMISSION_IDENTITIES)
             val retainedOpen = open.filterTo(mutableSetOf()) { prefix != null && it.startsWith(prefix) }
+            val retainedDownload = download.filterTo(mutableSetOf()) { prefix != null && it.startsWith(prefix) }
             val retainedPermission =
                 permission.filterTo(mutableSetOf()) { prefix != null && it.startsWith(prefix) }
-            if (retainedOpen == open && retainedPermission == permission) return
+            if (retainedOpen == open && retainedDownload == download && retainedPermission == permission) return
 
             val committed =
                 preferences
                     .edit()
                     .putStringSet(OPEN_IDENTITIES, retainedOpen)
+                    .putStringSet(DOWNLOAD_IDENTITIES, retainedDownload)
                     .putStringSet(INSTALL_PERMISSION_IDENTITIES, retainedPermission)
                     .commit()
             if (committed) {
@@ -385,6 +417,7 @@ internal class AttachmentDownloadIntentStore(
                 preferences
                     .edit()
                     .putStringSet(OPEN_IDENTITIES, open)
+                    .putStringSet(DOWNLOAD_IDENTITIES, download)
                     .putStringSet(INSTALL_PERMISSION_IDENTITIES, permission)
                     .apply()
                 Log.w(TAG, "navigation-session cleanup failed; stale attachment opens remain fenced")
@@ -474,6 +507,7 @@ internal class AttachmentDownloadIntentStore(
         const val CANCELLED = "attachment_download_cancelled_identities"
         const val TRANSIENT_RETRY_SPENT = "attachment_download_transient_retry_spent_identities"
         const val OPEN_IDENTITIES = "attachment_download_open_identities"
+        const val DOWNLOAD_IDENTITIES = "attachment_download_in_place_identities"
         const val INSTALL_PERMISSION_IDENTITIES = "attachment_install_permission_identities"
         val ACTIVE_INSTALL_PERMISSION_IDENTITIES = mutableSetOf<String>()
         val ACTIVE_INSTALLER_PERMISSION_HANDOFFS = mutableSetOf<String>()

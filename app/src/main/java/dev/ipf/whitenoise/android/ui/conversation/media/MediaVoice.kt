@@ -905,7 +905,10 @@ private enum class VoiceActionVisual(
     PLAY(R.string.voice_message_play),
 }
 
-/** Resolves one action variant without coupling presentation to materialization owners. */
+/**
+ * Resolves one action variant without coupling presentation to materialization owners. A clip that is not on the
+ * device yet never reads as Play: it offers Download, or shows loading once its download is accepted.
+ */
 private fun voiceActionVisual(
     loading: Boolean,
     failed: Boolean,
@@ -919,6 +922,7 @@ private fun voiceActionVisual(
         failed && storageBlocked -> VoiceActionVisual.STORAGE_BLOCKED
         failed -> VoiceActionVisual.FAILED
         !startDownload && !localFileAvailable -> VoiceActionVisual.DOWNLOAD
+        !localFileAvailable -> VoiceActionVisual.LOADING
         isPlaying -> VoiceActionVisual.PAUSE
         else -> VoiceActionVisual.PLAY
     }

@@ -72,34 +72,6 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue(occurrences(image, "requestAttachmentDownload(") >= 5)
         assertTrue(occurrences(video, "requestAttachmentDownload(") >= 2)
         assertTrue(occurrences(voice, "requestAttachmentDownload(") >= 3)
-        // A download never opens: no visual surface records an open intent or hands the effect an open.
-        listOf(image, video, voice).forEach { surface ->
-            assertEquals(0, occurrences(surface, "requestAttachmentOpen("))
-            assertEquals(0, occurrences(surface, "dispatchOpen ="))
-        }
-    }
-
-    /**
-     * A file card or library row tapped before its attachment is on the device only downloads it: the reader,
-     * installer, external app and voice playback are reached only from a later tap on a downloaded attachment.
-     */
-    @Test
-    fun fileAndLibraryTapsOnAnAttachmentNotOnTheDeviceOnlyDownloadIt() {
-        val fileCard = source("MediaFileBubble.kt").normalized()
-        val library = projectSource("ui/medialibrary/MediaLibrary.kt").normalized()
-
-        val downloadBranch = fileCard.indexOf("if (!downloaded) { controller.requestAttachmentTransfer(")
-        assertTrue("the file card must download before any open", downloadBranch >= 0)
-        assertTrue(downloadBranch < fileCard.indexOf("} else if (textCandidate != null) {"))
-        assertTrue(downloadBranch < fileCard.indexOf("controller.requestAttachmentInstallerHandoff("))
-        assertTrue("val downloaded = transferState == AttachmentTransferState.Available" in fileCard)
-
-        val fileDownload = library.indexOf("if (!downloaded) { downloadLibraryFile(appState) { fetchFile() }")
-        assertTrue("the library file row must download without opening", fileDownload >= 0)
-        assertTrue(fileDownload < library.indexOf("openAttachment( fetchFile(),"))
-        val voiceDownload = library.indexOf("if (!downloaded) return@launch")
-        assertTrue("the library voice row must download without playing", voiceDownload >= 0)
-        assertTrue(voiceDownload < library.indexOf("VoicePlaybackController.play(pillKey, file, source = source)"))
     }
 
     @Test

@@ -161,8 +161,10 @@ class TileCancelPendingTapTest {
         composeRule.waitForIdle()
     }
 
-    /** True once a tap has persisted the reader's intent to open the first attachment. */
-    private fun hasOpenIntent(): Boolean = controller.hasAttachmentOpenIntent(request(0).messageIdHex, 0)
+    /** True once a tap has persisted the reader's intent to open or download the first attachment. */
+    private fun hasOpenIntent(): Boolean =
+        controller.hasAttachmentOpenIntent(request(0).messageIdHex, 0) ||
+            controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
 
     /** Production image tile for the first fixture attachment. */
     @Composable

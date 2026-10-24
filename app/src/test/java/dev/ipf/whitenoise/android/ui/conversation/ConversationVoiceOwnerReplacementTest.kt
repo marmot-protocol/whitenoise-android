@@ -106,7 +106,7 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
             scenario.voiceId,
         ).also {
             clickVoiceAction(scenario.voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(scenario.oldFixture.controller, scenario.voiceId)
+            awaitAttachmentDownloadIntent(scenario.oldFixture.controller, scenario.voiceId)
             scenario.oldControl.awaitMaterializationAttempt(0)
         }
     }
@@ -126,7 +126,7 @@ internal class ConversationVoiceOwnerReplacementTest : ConversationVoiceDownload
             assertEquals("account-b", newOwnerAnchor.accountRef)
             assertVoiceActionTarget(scenario.voiceId, R.string.media_tap_to_download)
             clickVoiceAction(scenario.voiceId, R.string.media_tap_to_download)
-            awaitAttachmentOpenIntent(scenario.newFixture.controller, scenario.voiceId)
+            awaitAttachmentDownloadIntent(scenario.newFixture.controller, scenario.voiceId)
             assertVoiceActionTarget(scenario.voiceId, R.string.media_downloading)
             assertEquals(1, scenario.oldControl.materializationAttempts)
             assertEquals(0, scenario.newControl.materializationAttempts)

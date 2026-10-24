@@ -8,7 +8,6 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
@@ -44,7 +43,7 @@ internal fun persistedAttachmentDownloadEffect(
         sourceEpoch,
         appState.attachmentOpens.revision,
     ) {
-        if (!controller.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)) {
+        if (!controller.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)) {
             return@LaunchedEffect
         }
         val transferState =
@@ -69,7 +68,7 @@ internal fun persistedAttachmentDownloadEffect(
                         ensureMaterialization = { currentEnsureMaterialization.value() },
                     )
                 },
-                consume = { controller.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex) },
+                consume = { controller.consumeAttachmentDownloadIntent(messageIdHex, attachmentIndex) },
             )
         } finally {
             cacheProbe.cancel()
@@ -104,35 +103,3 @@ internal suspend fun awaitAttachmentReadyAfterDurableCompletion(
             }
         }.first { (ready, _) -> ready }
 }
-
-/** Claims a typed persisted phase and restores it when final platform dispatch fails. */
-internal suspend fun <Claim : Any> claimAndDispatchAttachmentOpen(
-    claim: suspend () -> Claim?,
-    restore: suspend () -> Unit,
-    dispatch: suspend (Claim) -> Unit,
-): Boolean =
-    withContext(NonCancellable) {
-        val claimed = claim() ?: return@withContext false
-        val failure = runCatching { dispatch(claimed) }.exceptionOrNull() ?: return@withContext true
-        runCatching { restore() }
-            .exceptionOrNull()
-            ?.let(failure::addSuppressed)
-        throw failure
-    }
-
-/** Typed variant used when an installer-permission recovery is claimed. */
-@Suppress("TooGenericExceptionCaught")
-internal suspend fun <Claim : Any> claimAndDispatchAttachmentOpenReportingFailure(
-    claim: suspend () -> Claim?,
-    restore: suspend () -> Unit,
-    dispatch: suspend (Claim) -> Unit,
-    onFailure: (Throwable) -> Unit,
-): Boolean =
-    try {
-        claimAndDispatchAttachmentOpen(claim, restore, dispatch)
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (failure: Throwable) {
-        onFailure(failure)
-        false
-    }

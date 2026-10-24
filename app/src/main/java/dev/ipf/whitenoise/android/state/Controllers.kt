@@ -10590,17 +10590,17 @@ class ConversationController(
         attachmentIndex: Int,
     ): Boolean = attachmentPresentation.hasAttachmentOpenIntent(messageIdHex, attachmentIndex)
 
-    /** Consumes the matching platform-open intent after bytes arrive. */
-    internal suspend fun consumeAttachmentOpenIntent(
+    /** Whether this attachment still has an armed in-place download. */
+    internal fun hasAttachmentDownloadIntent(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean = attachmentPresentation.consumeAttachmentOpenIntent(messageIdHex, attachmentIndex)
+    ): Boolean = attachmentPresentation.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)
 
-    /** Restores an interrupted platform-open intent under its existing owner. */
-    internal fun restoreAttachmentOpenIntent(
+    /** Retires an in-place download once its bytes are ready, without opening anything. */
+    internal suspend fun consumeAttachmentDownloadIntent(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Unit = attachmentPresentation.restoreAttachmentOpenIntent(messageIdHex, attachmentIndex)
+    ): Boolean = attachmentPresentation.consumeAttachmentDownloadIntent(messageIdHex, attachmentIndex)
 
     /** Resolves an optimistic reference before native download/save admission. */
     internal suspend fun authoritativeAttachmentReference(

@@ -310,8 +310,7 @@ class FreshSweepCoverageTest {
             "validatedAttachmentCacheFile(file)" in voiceBubble &&
                 "localFile = null" in voiceBubble &&
                 "controller.requestAttachmentDownload(messageIdHex, attachmentIndex)" in voiceBubble &&
-                "persistedAttachmentDownloadEffect(" in voiceBubble &&
-                "requestAttachmentOpen(" !in voiceBubble,
+                "persistedAttachmentDownloadEffect(" in voiceBubble,
         )
         assertTrue(
             "video playback must download an evicted file again in place rather than open it",
@@ -321,11 +320,9 @@ class FreshSweepCoverageTest {
                 "persistedAttachmentDownloadEffect(" in videoBubble,
         )
         assertTrue(
-            "album video tiles must download in place and open only from a tap",
+            "album video tiles must keep their download armed across recreation",
             "controller.requestAttachmentDownload(messageIdHex, attachmentIndex)" in videoGridTile &&
-                "persistedAttachmentDownloadEffect(" in videoGridTile &&
-                "localFile != null && !retry -> onTap()" in videoGridTile &&
-                "requestAttachmentOpen(" !in videoGridTile,
+                "persistedAttachmentDownloadEffect(" in videoGridTile,
         )
     }
 

@@ -246,6 +246,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
                     )
                 }
                 assertFalse(controller.hasAttachmentOpenIntent(CONFIRMED_MESSAGE_ID, 0))
+                assertFalse(controller.hasAttachmentDownloadIntent(CONFIRMED_MESSAGE_ID, 0))
                 controller.onCleared()
                 val accepted =
                     controller.retryAttachmentTransfer(CONFIRMED_MESSAGE_ID, 0, onAccepted = {}, onFailure = {})

@@ -28,6 +28,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,7 +39,10 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.io.IOException
 
-/** Native failure and a tile's old plaintext waiter may arrive on opposite sides of the user's Retry. */
+/**
+ * Native failure and a tile's old plaintext waiter may arrive on opposite sides of the user's Retry. A tap or Retry
+ * on a video that is not on the device only downloads it in place; only a later tap opens it.
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-rUS-w320dp-h640dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -105,7 +109,7 @@ class VideoTileRetryRaceTest {
     @Test
     fun albumRetryAfterLocalFailureAdmitsOnce() = assertRetry(album = true, lateFailure = false)
 
-    /** Rejected admission must retain the failed bubble and must not open a viewer or start another waiter. */
+    /** Rejected admission must retain the failed bubble and must neither open a viewer nor start another waiter. */
     @Test
     fun bubbleRejectedRetryDoesNotRestartOrOpen() = assertRejectedRetry(album = false)
 
@@ -113,7 +117,10 @@ class VideoTileRetryRaceTest {
     @Test
     fun albumRejectedRetryDoesNotRestartOrOpen() = assertRejectedRetry(album = true)
 
-    /** Forces the old result to arrive before or after admission, then checks readiness and the exact handoff count. */
+    /**
+     * Forces the old result to arrive before or after admission, then checks that the retried download lands in place
+     * without opening, and that the next tap opens it once without another retry.
+     */
     private fun assertRetry(
         album: Boolean,
         lateFailure: Boolean,
@@ -126,25 +133,32 @@ class VideoTileRetryRaceTest {
         composeRule.onNodeWithContentDescription(text(R.string.media_tap_to_retry)).performClick()
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
-            opens == 2
+            fixture.retryDemands.get() == 1
         }
         if (lateFailure) {
             composeRule.runOnIdle { oldResult.completeExceptionally(IOException("late old local failure")) }
         }
-        composeRule.waitUntil(WAIT_MILLIS) { resolutions == 2 && shows(R.string.reply_media_video) }
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            shows(R.string.reply_media_video)
+        }
         composeRule.onNodeWithContentDescription(text(R.string.reply_media_video)).assertIsDisplayed()
         composeRule.runOnIdle {
-            assertEquals(1, fixture.retryDemands.get())
-            assertEquals(2, opens)
-            assertEquals(2, resolutions)
+            assertEquals("the retry was admitted more than once", 1, fixture.retryDemands.get())
+            assertEquals("the retried download opened the video", 0, opens)
+            assertEquals("the retry did not replace the old waiter exactly once", 2, resolutions)
+            assertFalse(controller.hasAttachmentDownloadIntent(request.messageIdHex, 0))
         }
         // The old progress observer still reports Failed; a verified local Open must not admit another retry.
         tapVideo(album)
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
-            opens == 3
+            opens == 1
         }
-        composeRule.runOnIdle { assertEquals(1, fixture.retryDemands.get()) }
+        composeRule.runOnIdle {
+            assertEquals(1, fixture.retryDemands.get())
+            assertEquals(2, resolutions)
+        }
     }
 
     /** Rejects the native command after presentation and proves that rejection cannot create a new loader. */
@@ -159,7 +173,7 @@ class VideoTileRetryRaceTest {
                     .isEmpty()
         }
         composeRule.runOnIdle {
-            assertEquals(1, opens)
+            assertEquals(0, opens)
             assertEquals(1, resolutions)
         }
         composeRule.onNodeWithContentDescription(text(R.string.media_tap_to_retry)).assertIsDisplayed()
@@ -204,9 +218,10 @@ class VideoTileRetryRaceTest {
         }
         tapVideo(album)
         composeRule.waitUntil(WAIT_MILLIS) { resolutions == 1 && shows(R.string.media_tap_to_retry) }
+        composeRule.runOnIdle { assertEquals("a download tap opened the video", 0, opens) }
     }
 
-    /** Uses the same open affordance before downloading and after the video becomes local. */
+    /** Taps the same affordance that downloads a video not on the device and opens one that is. */
     private fun tapVideo(album: Boolean) {
         if (album) {
             composeRule.onNodeWithTag(TILE_TAG).performTouchInput { click() }

@@ -100,6 +100,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Language
 import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
 import dev.ipf.whitenoise.android.ui.icons.filled.Pause
@@ -794,9 +795,48 @@ private fun VoiceLibraryTab(
     }
 }
 
+/**
+ * The Shared media voice control's glyph: progress while loading, Download until the clip is on the device, then Play
+ * or Pause, so the control never announces an action its tap does not perform.
+ */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun VoiceLibraryActionIcon(
+    loading: Boolean,
+    playable: Boolean,
+    playing: Boolean,
+) {
+    Box(contentAlignment = Alignment.Center) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        } else if (!playable) {
+            Icon(
+                imageVector = Icons.Default.Download,
+                contentDescription = stringResource(R.string.media_tap_to_download),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp),
+            )
+        } else {
+            Icon(
+                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription =
+                    stringResource(
+                        if (playing) R.string.voice_message_pause else R.string.voice_message_play,
+                    ),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
+
 /** One voice row with playback. */
 @Composable
-private fun VoiceLibraryRow(
+internal fun VoiceLibraryRow(
     row: SharedMediaRow,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
@@ -815,6 +855,20 @@ private fun VoiceLibraryRow(
         )
     var localFile by remember(pillKey) { mutableStateOf<java.io.File?>(null) }
     var loading by remember(pillKey) { mutableStateOf(false) }
+    // Whether the clip is on the device, resolved when the row composes: the reader's own clip still held in memory
+    // for its upload counts, as for a file row. Until it is, the control offers Download rather than Play.
+    val retainedOwnClip =
+        remember(pillKey, row.mine) {
+            row.mine &&
+                controller
+                    .pendingAttachmentsList(row.messageIdHex)
+                    .getOrNull(row.attachmentIndex)
+                    ?.inMemoryBytes != null
+        }
+    val onDevice by produceState(initialValue = retainedOwnClip, pillKey, retainedOwnClip) {
+        value = retainedOwnClip || controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
+    }
+    val playable = onDevice || localFile != null
 
     val isPlayingThis by remember(pillKey) {
         VoicePlaybackController.state
@@ -850,11 +904,9 @@ private fun VoiceLibraryRow(
                             VoicePlaybackController.pause()
                             return@clickable
                         }
+                        // A clip that is not on the device yet is only downloaded; the next tap plays it.
+                        val downloaded = playable
                         scope.launch {
-                            // A clip that is not on the device yet is only downloaded; the next tap plays it.
-                            val downloaded =
-                                localFile != null ||
-                                    controller.hasCachedAttachmentAfterHydration(row.messageIdHex, row.attachmentIndex)
                             val file =
                                 localFile ?: runCatching {
                                     loading = true
@@ -887,25 +939,7 @@ private fun VoiceLibraryRow(
                         }
                     },
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription =
-                            stringResource(
-                                if (isPlayingThis) R.string.voice_message_pause else R.string.voice_message_play,
-                            ),
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
+            VoiceLibraryActionIcon(loading = loading, playable = playable, playing = isPlayingThis)
         }
         SenderAvatar(sender = row.sender, appState = appState)
         Column(modifier = Modifier.weight(1f)) {
