@@ -128,6 +128,71 @@ class ForwardProgressScreenshotTest {
         )
     }
 
+    /** A send past the slow threshold keeps its spinner and says it can no longer be cancelled or sent twice. */
+    @Test
+    fun slowSendLight() {
+        capture(
+            name = "forward_progress_slow_send_light",
+            snapshot =
+                snapshot(
+                    phase = ForwardOperationPhase.Running,
+                    ForwardTargetProgress("family", ForwardTargetPhase.Sending, 1, 1, 0, 1, slow = true),
+                    ForwardTargetProgress("work", ForwardTargetPhase.Uploading, 0, 1, 0, 1, slow = true),
+                ),
+        )
+    }
+
+    /** The slow notices stay readable at large text in a right-to-left dark layout. */
+    @Test
+    fun slowSendDarkLargeTextRtl() {
+        capture(
+            name = "forward_progress_slow_send_dark_large_rtl",
+            darkTheme = true,
+            fontScale = 1.6f,
+            layoutDirection = LayoutDirection.Rtl,
+            snapshot =
+                snapshot(
+                    phase = ForwardOperationPhase.Running,
+                    ForwardTargetProgress("family", ForwardTargetPhase.Sending, 1, 1, 0, 1, slow = true),
+                ),
+        )
+    }
+
+    /** Slow source preparation replaces the attachment count under the preparation bar. */
+    @Test
+    fun slowPreparationLight() {
+        capture(
+            name = "forward_progress_slow_preparation_light",
+            snapshot =
+                snapshot(
+                    phase = ForwardOperationPhase.Preparing,
+                    ForwardTargetProgress("family", ForwardTargetPhase.Waiting, 0, 2, 0, 1),
+                ).copy(preparationSlow = true),
+        )
+    }
+
+    /** An upload that never started shows its own actionable failure text. */
+    @Test
+    fun uploadTimeoutDark() {
+        capture(
+            name = "forward_progress_upload_timeout_dark",
+            darkTheme = true,
+            snapshot =
+                snapshot(
+                    phase = ForwardOperationPhase.Failed,
+                    ForwardTargetProgress(
+                        "family",
+                        ForwardTargetPhase.Failed,
+                        0,
+                        1,
+                        0,
+                        1,
+                        ForwardFailureStage.UploadTimeout,
+                    ),
+                ),
+        )
+    }
+
     private fun capture(
         name: String,
         snapshot: ForwardOperationSnapshot,

@@ -52,7 +52,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -157,14 +156,14 @@ class ConversationVideoRotationAndroidTest {
     }
 
     /**
-     * Opens through the production row/session/dialog chain, disposes the origin, then rotates
+     * Downloads in place, opens through the production row/session/dialog chain, disposes the origin, then rotates
      * during active playback, pause, and end-of-stream without replacing session, page, or player.
      */
     @Test
     fun productionOwnerChainKeepsPlayerSessionPageAndPositionAcrossRotation() {
         val materializationGate = CompletableDeferred<Unit>()
         mountProductionOwnerChain(materializationGate)
-        val opened = openViewerAfterOriginDisposal(materializationGate)
+        val opened = openViewerAfterInPlaceDownload(materializationGate)
 
         assertPlayingStateSurvivesRotation(opened)
         val paused = assertPausedStateSurvivesRotation(opened.player)
@@ -330,8 +329,20 @@ class ConversationVideoRotationAndroidTest {
         }
     }
 
-    /** Opens the dialog, disposes its source row, and releases delayed materialization. */
-    private fun openViewerAfterOriginDisposal(materializationGate: CompletableDeferred<Unit>): OwnerChainOpenResult {
+    /**
+     * Downloads the clip in place with a first tap, which must not open the viewer, then opens the dialog with a
+     * second tap and disposes its source row.
+     */
+    private fun openViewerAfterInPlaceDownload(materializationGate: CompletableDeferred<Unit>): OwnerChainOpenResult {
+        composeRule
+            .onNodeWithTag(videoAttachmentOpenTestTag(MESSAGE_ID, ATTACHMENT_INDEX), useUnmergedTree = true)
+            .performClick()
+        composeRule.waitForIdle()
+        assertNull("a download tap opened the viewer", activeSessionId)
+        materializationGate.complete(Unit)
+        awaitLocalPlayAffordance()
+        assertTrue("the in-place download did not publish the clip", cacheFile.isFile)
+        assertNull("a completed download opened the viewer", activeSessionId)
         composeRule
             .onNodeWithTag(videoAttachmentOpenTestTag(MESSAGE_ID, ATTACHMENT_INDEX), useUnmergedTree = true)
             .performClick()
@@ -346,9 +357,6 @@ class ConversationVideoRotationAndroidTest {
         composeRule
             .onNodeWithTag(videoAttachmentOpenTestTag(MESSAGE_ID, ATTACHMENT_INDEX), useUnmergedTree = true)
             .assertDoesNotExist()
-        assertFalse("originating row materialized bytes before disposal", cacheFile.exists())
-        assertNull("pending viewer materialization must not create a player", activePlayer)
-        materializationGate.complete(Unit)
         composeRule.waitUntil(PLAYER_TIMEOUT_MS) { activePlayer != null }
 
         val original = requireNotNull(firstPlayer)

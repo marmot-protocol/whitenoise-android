@@ -122,6 +122,41 @@ class AttachmentDownloadIntentStoreTest {
         assertTrue(store.isInteractive(REQUEST_A))
     }
 
+    /**
+     * An in-place download intent is never an open: no open claim, check or consume sees it, it is retired exactly
+     * once, and it survives recreation of the store.
+     */
+    @Test
+    fun aDownloadIntentCanNeverBeClaimedAsAnOpen() {
+        AttachmentDownloadIntentStore(preferences).markDownloadIntent(OPEN_REQUEST_A)
+        val store = intentStore()
+
+        assertTrue(store.hasDownloadIntent(OPEN_REQUEST_A))
+        assertFalse(store.hasDownloadIntent(OPEN_REQUEST_B))
+        assertFalse(store.hasDispatchableOpenIntent(OPEN_REQUEST_A))
+        assertNull(store.claimOpenIntent(OPEN_REQUEST_A))
+        assertFalse(store.consumeOpenIntent(OPEN_REQUEST_A))
+        assertTrue(store.hasDownloadIntent(OPEN_REQUEST_A))
+        assertTrue(store.consumeDownloadIntent(OPEN_REQUEST_A))
+        assertFalse(store.consumeDownloadIntent(OPEN_REQUEST_A))
+        assertFalse(intentStore().hasDownloadIntent(OPEN_REQUEST_A))
+    }
+
+    /** Leaving the destination or cancelling the transfer disarms its in-place download, as it does an open. */
+    @Test
+    fun navigationAndCancellationDisarmADownloadIntent() {
+        val store = intentStore()
+        store.markDownloadIntent(OPEN_REQUEST_A)
+        store.retainOpenIntentsForDestination(OPEN_REQUEST_B.destination)
+        assertFalse(store.hasDownloadIntent(OPEN_REQUEST_A))
+
+        store.markDownloadIntent(OPEN_REQUEST_A)
+        store.retainOpenIntentsForDestination(OPEN_REQUEST_A.destination)
+        assertTrue(store.hasDownloadIntent(OPEN_REQUEST_A))
+        store.consumeOpenIntentUnlessSuperseded(OPEN_REQUEST_A) { false }
+        assertFalse(store.hasDownloadIntent(OPEN_REQUEST_A))
+    }
+
     /** Installer handoff is app-owned and must not be pruned with route-scoped viewers. */
     @Test
     fun installerHandoffSurvivesNavigationCleanupAndProcessRecreation() {

@@ -7,19 +7,15 @@ import java.io.File
 
 /** Source-level guards that action and bubble colours flow from the account token and per-account drafts. */
 class ActionColorSurfaceCoverageTest {
-    /** Every named action and unread surface resolves its colours through the account action token. */
+    /** Account actions and unread markers resolve their colours through the account action token. */
     @Test
-    fun namedActionAndUnreadSurfacesConsumeTheAccountActionToken() {
-        val chats = source("chats/ChatsNewMessageFab.kt")
+    fun accountActionsAndUnreadSurfacesConsumeTheAccountActionToken() {
+        // Neutral New Message appearance is covered by rendered theme goldens.
         val composer = source("conversation/composer/ComposerBar.kt")
         val chatRow = source("chats/ChatRow.kt")
         val topBar = source("chats/ChatListTopBar.kt")
         val accountSwitcher = source("account/AccountSwitcher.kt")
         val accountSelector = source("account/AccountSelectorSheet.kt")
-
-        assertTrue("New message must resolve the active account token", "accountActionColors(appState)" in chats)
-        assertTrue("New message must use the resolved container", "colors.container" in chats)
-        assertTrue("New message must use the resolved foreground", "colors.content" in chats)
 
         assertEquals(
             "Both text Send and locked-voice Send must use the resolved container",

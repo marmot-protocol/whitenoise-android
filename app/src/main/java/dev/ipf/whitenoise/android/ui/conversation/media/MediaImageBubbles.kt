@@ -335,13 +335,13 @@ internal fun MediaImageBubble(
         }
     }
 
-    persistedAttachmentOpenEffect(
+    persistedAttachmentDownloadEffect(
         messageIdHex = key,
         attachmentIndex = attachmentIndex,
         sourceEpoch = epoch,
         controller = controller,
         appState = appState,
-        // A pending open of an image that turned out too large to preview still opens the viewer.
+        // A download of an image that turned out too large to preview is settled once that is known.
         isReady = { presentation != null || tooLargeToPreview },
         ensureMaterialization = {
             if (failed) {
@@ -350,7 +350,6 @@ internal fun MediaImageBubble(
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
         },
-        dispatchOpen = ::dispatchViewerOpen,
     )
 
     // A GIF is framed by the prototype's fixed banner instead of its own aspect ratio.
@@ -377,6 +376,7 @@ internal fun MediaImageBubble(
     ) {
         Box(contentAlignment = Alignment.Center) {
             val downloadLabel = stringResource(R.string.media_tap_to_download)
+            val downloadingLabel = stringResource(R.string.media_downloading)
             val openingLabel = stringResource(R.string.media_opening)
             val openLabel = stringResource(R.string.media_open)
             val current = presentation
@@ -434,7 +434,7 @@ internal fun MediaImageBubble(
                                     controller.retryAttachmentTransfer(
                                         key,
                                         attachmentIndex,
-                                        onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
+                                        onAccepted = { controller.requestAttachmentDownload(key, attachmentIndex) },
                                         onFailure = { markFailed(it) },
                                     )
                                 },
@@ -448,7 +448,7 @@ internal fun MediaImageBubble(
                                     controller.retryAttachmentTransfer(
                                         key,
                                         attachmentIndex,
-                                        onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
+                                        onAccepted = { controller.requestAttachmentDownload(key, attachmentIndex) },
                                         onFailure = { markFailed(it) },
                                     )
                                 },
@@ -460,7 +460,7 @@ internal fun MediaImageBubble(
                                     controller.retryAttachmentTransfer(
                                         key,
                                         attachmentIndex,
-                                        onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
+                                        onAccepted = { controller.requestAttachmentDownload(key, attachmentIndex) },
                                         onFailure = { markFailed(it) },
                                     )
                                 },
@@ -473,20 +473,24 @@ internal fun MediaImageBubble(
                                 icon = Icons.Default.ArrowDownward,
                                 contentDescription = downloadLabel,
                                 onClick = {
-                                    controller.requestAttachmentOpen(key, attachmentIndex)
+                                    controller.requestAttachmentDownload(key, attachmentIndex)
                                 },
                             )
+                        // Bytes already on the device are only being read, so a tap opens the viewer now. A download
+                        // runs in place instead, and the image opens only from a tap once it has arrived.
                         else ->
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier =
                                     Modifier
                                         .size(48.dp)
-                                        .semantics { contentDescription = openingLabel }
-                                        .clickable(
-                                            onClickLabel = openLabel,
-                                            onClick = {
-                                                controller.requestAttachmentOpen(key, attachmentIndex)
+                                        .then(
+                                            if (cachedPlaintextOnEntry || retainedPlaintextOnEntry) {
+                                                Modifier
+                                                    .semantics { contentDescription = openingLabel }
+                                                    .clickable(onClickLabel = openLabel, onClick = ::dispatchViewerOpen)
+                                            } else {
+                                                Modifier.semantics { contentDescription = downloadingLabel }
                                             },
                                         ),
                             ) {
@@ -861,13 +865,13 @@ internal fun MediaImageGridTile(
         }
     }
 
-    persistedAttachmentOpenEffect(
+    persistedAttachmentDownloadEffect(
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         sourceEpoch = reference.sourceEpoch,
         controller = controller,
         appState = appState,
-        // A pending open of an image that turned out too large to preview still opens the viewer.
+        // A download of an image that turned out too large to preview is settled once that is known.
         isReady = { presentation != null || tooLargeToPreview },
         ensureMaterialization = {
             if (failed) {
@@ -876,7 +880,6 @@ internal fun MediaImageGridTile(
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
         },
-        dispatchOpen = { onTap() },
     )
 
     Box(
@@ -885,8 +888,8 @@ internal fun MediaImageGridTile(
                 onLongClick = onLongPress,
                 // Two modes:
                 //   - Bytes ready (`bitmap != null`): tap opens the viewer.
-                //   - Bytes pending: tap persists interactive open intent, so
-                //     the promoted transfer opens once after verified decode.
+                //   - Bytes pending: tap persists an interactive download that
+                //     decodes in place and never opens the viewer by itself.
                 // While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart it.
                 onClick = {
                     when {
@@ -896,11 +899,14 @@ internal fun MediaImageGridTile(
                             controller.retryAttachmentTransfer(
                                 messageIdHex,
                                 attachmentIndex,
-                                onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                                onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
                                 onFailure = { markFailed(it) },
                             )
                         presentation != null -> onTap()
-                        else -> controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                        // Bytes already on the device, cached or the reader's own still held for upload, are only
+                        // being read, so the tap opens the viewer now rather than downloading.
+                        cachedPlaintextOnEntry || retainedPlaintextOnEntry -> onTap()
+                        else -> controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
                     }
                 },
             ),
@@ -946,7 +952,9 @@ internal fun MediaImageGridTile(
                                 controller.retryAttachmentTransfer(
                                     messageIdHex,
                                     attachmentIndex,
-                                    onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                                    onAccepted = {
+                                        controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
+                                    },
                                     onFailure = { markFailed(it) },
                                 )
                             },
@@ -958,7 +966,9 @@ internal fun MediaImageGridTile(
                                 controller.retryAttachmentTransfer(
                                     messageIdHex,
                                     attachmentIndex,
-                                    onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                                    onAccepted = {
+                                        controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
+                                    },
                                     onFailure = { markFailed(it) },
                                 )
                             },
@@ -970,7 +980,7 @@ internal fun MediaImageGridTile(
                             icon = Icons.Default.ArrowDownward,
                             contentDescription = stringResource(R.string.media_tap_to_download),
                             onClick = {
-                                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                                controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
                             },
                         )
                     else ->

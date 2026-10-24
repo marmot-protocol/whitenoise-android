@@ -148,6 +148,8 @@ class MessageBubbleCaptionedFileScreenshotTest : MessageBubbleFileAttachmentFixt
         assertNodeBelowCard(receivedCard, text = RECEIVED_TIME)
         assertCardNamesOnlyTheFile(sentCard, SENT_FILE)
         assertCardNamesOnlyTheFile(receivedCard, RECEIVED_FILE)
+        // The received card stays hidden until its cache refresh answers, which Compose idleness does not await.
+        composeRule.awaitFileCardsVisible(expectedCards = 2)
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
     }
 

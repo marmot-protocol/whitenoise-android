@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ringFraction
 import dev.ipf.whitenoise.android.ui.conversation.media.videoAttachmentOpenTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
@@ -330,6 +331,68 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
         composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, 1)).performClick()
         composeRule.waitForIdle()
         assertEquals(listOf(1), opened.single().attachments.map { it.index })
+    }
+
+    /**
+     * The reader's own single video, still held in memory for its upload, is already on the device: one tap on its
+     * bubble opens the viewer rather than downloading it, even before its local file has been materialized.
+     */
+    @Test
+    fun anOwnVideoBubbleHeldInMemoryOpensOnTheFirstTap() {
+        val pending = queueFileBacked(smallVideo())
+        val opened = mutableListOf<ConversationMediaViewerOpenRequest>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MediaVideoBubble(
+                    item = pending,
+                    attachmentIndex = 0,
+                    reference = pendingVisual(pending).value,
+                    controller = controller,
+                    appState = appState,
+                    onOpenConversationMedia = { opened += it },
+                    mine = true,
+                    // The local file never arrives, so only the bytes held in memory can make the clip openable.
+                    videoFileResolver = { _, _, _, _, _, _, _ -> awaitCancellation() },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, 0)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(0), opened.single().attachments.map { it.index })
+    }
+
+    /**
+     * In a pending album, the tile of the reader's own video held in memory opens the viewer on its first tap, even
+     * before its local file has been materialized.
+     */
+    @Test
+    fun anOwnAlbumVideoHeldInMemoryOpensOnTheFirstTap() {
+        val pending = queueFileBacked(stagedVideo(), smallVideo())
+        val entry = pendingVisual(pending, position = 1)
+        val taps = AtomicInteger()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MediaVideoGridTile(
+                    messageIdHex = pending.record.messageIdHex,
+                    attachmentIndex = entry.index,
+                    reference = entry.value,
+                    controller = controller,
+                    appState = appState,
+                    mine = true,
+                    onTap = { taps.incrementAndGet() },
+                    overflowCount = 0,
+                    modifier = Modifier.size(160.dp),
+                    uploading = true,
+                    // The local file never arrives, so only the bytes held in memory can make the clip openable.
+                    videoFileResolver = { _, _, _, _, _, _, _ -> awaitCancellation() },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, entry.index)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, taps.get())
     }
 
     /** Byte progress describes one file, so two pending documents keep their spinning rings without bytes. */

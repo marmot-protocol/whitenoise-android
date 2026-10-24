@@ -208,9 +208,7 @@ internal fun TextAttachmentReaderDialog(
                     bytes = loadBytes(),
                     parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
                 )
-            }.getOrElse {
-                TextAttachmentReaderState.Unavailable(TextAttachmentUnavailableReason.DownloadFailed)
-            }
+            }.getOrElse(::textAttachmentLoadFailureState)
         if (actions.isCurrent()) state = loaded
     }
 

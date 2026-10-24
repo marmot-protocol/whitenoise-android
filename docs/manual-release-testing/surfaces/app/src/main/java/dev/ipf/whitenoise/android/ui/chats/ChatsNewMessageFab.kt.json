@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+  "legacy_sha256": "1d2cf52eac2ae8d75d6136ef352a333706087d02699af3e01e9a583cfec1c2bc",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatsNewMessageFab",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "fun ChatsNewMessageFab(",
+        "test_ids": [
+          "NCH-001",
+          "SET-004",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ChatsNewMessageFabContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "fun ChatsNewMessageFabContent(",
+        "test_ids": [
+          "NCH-001",
+          "DIC-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.chats_check_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "R.string.chats_check_relays",
+        "test_ids": [
+          "NCH-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "R.string.new_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "R.string.new_message",
+        "test_ids": [
+          "NCH-001",
+          "DIC-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Chat FAB uses native receiving relay evidence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "internal fun chatsFabNeedsRelays(",
+        "test_ids": [
+          "NCH-001",
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

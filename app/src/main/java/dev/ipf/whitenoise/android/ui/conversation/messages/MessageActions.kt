@@ -416,6 +416,7 @@ private fun LazyListScope.forwardFolderSection(
     }
 }
 
+/** Forward details: the operation summary, slow-aware preparation progress and one row per destination. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod") // Exhaustive operation phases stay beside their progress semantics.
 internal fun ForwardProgressContent(
@@ -461,10 +462,13 @@ internal fun ForwardProgressContent(
             )
             Text(
                 text =
-                    stringResource(
-                        R.string.forward_preparing_attachments,
-                        snapshot.preparedAttachments,
-                        snapshot.totalAttachments,
+                    withSlowNotice(
+                        stringResource(
+                            R.string.forward_preparing_attachments,
+                            snapshot.preparedAttachments,
+                            snapshot.totalAttachments,
+                        ),
+                        stringResource(R.string.forward_preparing_slow).takeIf { snapshot.preparationSlow },
                     ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -487,6 +491,12 @@ internal fun ForwardProgressContent(
     }
 }
 
+/** Appends a slow-phase [notice] on its own line beneath the progress [count], or returns the count alone. */
+private fun withSlowNotice(
+    count: String,
+    notice: String?,
+): String = if (notice == null) count else "$count\n$notice"
+
 /** Projects a destination's transfer phase and actionable failure reason into one accessible row. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
@@ -497,17 +507,25 @@ private fun ForwardTargetProgressRow(
     val supportingText =
         when (progress.phase) {
             ForwardTargetPhase.Waiting -> stringResource(R.string.forward_waiting)
+            // A slow phase keeps its count and spinner and adds the notice beneath, so real progress stays visible.
             ForwardTargetPhase.Uploading ->
-                stringResource(
-                    R.string.forward_uploading_attachments,
-                    progress.uploadedAttachments,
-                    progress.totalAttachments,
+                withSlowNotice(
+                    stringResource(
+                        R.string.forward_uploading_attachments,
+                        progress.uploadedAttachments,
+                        progress.totalAttachments,
+                    ),
+                    stringResource(R.string.forward_uploading_slow).takeIf { progress.slow },
                 )
+            // A slow send also says it can no longer be cancelled and will not be sent twice.
             ForwardTargetPhase.Sending ->
-                stringResource(
-                    R.string.forward_sending_messages,
-                    progress.sentMessages,
-                    progress.totalMessages,
+                withSlowNotice(
+                    stringResource(
+                        R.string.forward_sending_messages,
+                        progress.sentMessages,
+                        progress.totalMessages,
+                    ),
+                    stringResource(R.string.forward_sending_slow).takeIf { progress.slow },
                 )
             ForwardTargetPhase.Completed -> stringResource(R.string.forward_sent)
             ForwardTargetPhase.Cancelled ->
@@ -524,10 +542,12 @@ private fun ForwardTargetProgressRow(
             ForwardTargetPhase.Failed -> {
                 val failure =
                     when (progress.failureStage) {
-                        ForwardFailureStage.Upload,
-                        ForwardFailureStage.UploadTimeout,
-                        -> stringResource(R.string.forward_failed_upload)
-                        ForwardFailureStage.Publish -> stringResource(R.string.forward_failed_publish)
+                        ForwardFailureStage.Upload -> stringResource(R.string.forward_failed_upload)
+                        ForwardFailureStage.UploadTimeout -> stringResource(R.string.forward_failed_upload_timeout)
+                        ForwardFailureStage.PublishTimeout -> stringResource(R.string.forward_failed_publish_timeout)
+                        ForwardFailureStage.Publish,
+                        ForwardFailureStage.PublishRejected,
+                        -> stringResource(R.string.forward_failed_publish)
                         ForwardFailureStage.PayloadTooLarge -> stringResource(R.string.forward_payload_too_large)
                         ForwardFailureStage.Expired -> stringResource(R.string.forward_failed_expired)
                         ForwardFailureStage.SessionChanged -> stringResource(R.string.forward_failed_session_changed)
@@ -556,7 +576,8 @@ private fun ForwardTargetProgressRow(
             },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { EmojiLabel(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(supportingText, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        // Uncapped so slow and failure explanations stay readable in full at large text in every locale.
+        supportingContent = { Text(supportingText) },
         leadingContent = {
             when (progress.phase) {
                 ForwardTargetPhase.Uploading,

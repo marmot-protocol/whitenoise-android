@@ -161,21 +161,37 @@ class MediaTileLifecycleTest {
         assertEquals(0, fixture.calls.size)
     }
 
-    /** One tap on a retained video opens it once, before and after recreation, and never starts a transfer. */
+    /**
+     * One tap on a retained video opens it once, before and after recreation, and never starts a transfer. The tap
+     * checks the file off the main thread first, so each open is awaited before it is counted.
+     */
     @Test
     fun aRetainedVideoOpensOnOneTapBeforeAndAfterRecreation() {
         show()
         awaitTilesShown()
         composeRule.onNodeWithTag(videoTag()).performClick()
+        awaitVideoTaps(1)
         assertEquals(1, videoTaps)
 
         scenario.recreate()
         show()
         awaitTilesShown()
         composeRule.onNodeWithTag(videoTag()).performClick()
+        awaitVideoTaps(2)
 
         assertEquals("one tap on a retained video must open it exactly once each time", 2, videoTaps)
         assertEquals(0, fixture.calls.size)
+    }
+
+    /** Waits until the video tile has opened [count] times, then lets any extra open land before it is counted. */
+    private fun awaitVideoTaps(count: Int) {
+        val deadline = System.nanoTime() + WAIT_NANOS
+        while (videoTaps < count) {
+            composeRule.waitForIdle()
+            check(System.nanoTime() < deadline) { "the retained video did not open in time" }
+            Thread.sleep(POLL_MILLIS)
+        }
+        composeRule.waitForIdle()
     }
 
     /** Sets the tiles as the Activity's content, as a freshly created Activity does. */

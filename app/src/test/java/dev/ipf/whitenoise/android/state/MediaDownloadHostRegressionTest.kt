@@ -447,7 +447,7 @@ class MediaDownloadHostRegressionTest {
                 .downloadAttachmentPlaintextSource(request(0), reference(0), AttachmentDownloadPriority.Automatic)
                 .use { source ->
                     assertEquals(oversized.size.toLong(), source.size)
-                    assertArrayEquals(oversized, source.toByteArrayWithin(ATTACHMENT_EXPLICIT_READ_MAX_BYTES))
+                    assertArrayEquals(oversized, source.toByteArrayWithin(oversized.size.toLong()))
                 }
             assertEquals(emptyList<String>(), leaseFileNames())
             assertEquals(1, fixture.calls.size)

@@ -15,11 +15,16 @@ private val DELIBERATE_RECOVERY_STATES =
         AttachmentTransferState.NotRetained,
     )
 
-/** Admits a visible Retry/Download again gesture once, fencing delivery after navigation or cancellation. */
+/**
+ * Admits a visible Retry/Download again gesture once, fencing delivery after navigation or cancellation. When the
+ * engine has not projected the attachment's reference yet, [onReferenceNotReady] re-arms the download instead of
+ * reporting a failure; by default that is the durable in-place download, which never opens the attachment.
+ */
 internal fun ConversationController.retryAttachmentTransfer(
     messageIdHex: String,
     attachmentIndex: Int,
     onAccepted: () -> Unit,
+    onReferenceNotReady: () -> Boolean = { requestAttachmentDownload(messageIdHex, attachmentIndex) },
     onFailure: (Throwable) -> Unit,
 ): Boolean {
     val request =
@@ -50,7 +55,7 @@ internal fun ConversationController.retryAttachmentTransfer(
             if (current && canDeliver()) {
                 deliverAttachmentRetryFailure(
                     failure,
-                    reopen = { destination != null && requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                    rearmDownload = { destination != null && onReferenceNotReady() },
                     notify = {
                         appState.present(R.string.media_couldnt_load)
                         onFailure(failure)
@@ -106,7 +111,10 @@ internal suspend fun ConversationController.readerDownloadParkedForStorage(
     return appState.readerDownloadParkedForStorage(request)
 }
 
-/** An actual Retry/Download again gesture may recover terminal work; ordinary Open/Save only joins. */
+/**
+ * An actual Retry/Download again gesture may recover terminal work; ordinary Open/Save only joins. A reference the
+ * engine has not projected yet re-runs [onAccepted], the caller's own download, rather than reporting a failure.
+ */
 internal fun ConversationController.performAttachmentUserAction(
     messageIdHex: String,
     attachmentIndex: Int,
@@ -115,7 +123,15 @@ internal fun ConversationController.performAttachmentUserAction(
     onFailure: () -> Unit,
 ) {
     if (attachmentActionNeedsRetry(state, automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex))) {
-        retryAttachmentTransfer(messageIdHex, attachmentIndex, onAccepted) { onFailure() }
+        retryAttachmentTransfer(
+            messageIdHex,
+            attachmentIndex,
+            onAccepted = onAccepted,
+            onReferenceNotReady = {
+                onAccepted()
+                true
+            },
+        ) { onFailure() }
     } else {
         onAccepted()
     }
@@ -157,11 +173,11 @@ internal fun attachmentFilePresentationState(
                 ).toPresentationState()
     }
 
-/** An unresolved projection needs the existing open/reload path; other failures remain visible to the user. */
+/** An unresolved projection re-arms the in-place download; other failures remain visible to the user. */
 internal fun deliverAttachmentRetryFailure(
     failure: Throwable,
-    reopen: () -> Boolean,
+    rearmDownload: () -> Boolean,
     notify: () -> Unit,
 ) {
-    if (failure !is AttachmentReferenceNotReadyException || !reopen()) notify()
+    if (failure !is AttachmentReferenceNotReadyException || !rearmDownload()) notify()
 }

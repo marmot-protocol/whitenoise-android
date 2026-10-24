@@ -1,10 +1,10 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
-import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
@@ -15,8 +15,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileUploadSnapshotBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -25,7 +27,7 @@ import kotlinx.coroutines.withContext
  * Builds the production [ForwardTransport] for one forwarding operation with
  * explicit account ownership. Source attachment lookup and plaintext
  * materialization run only under [sourceAccount]; destination upload, commit
- * locking, publish, convergence recovery, and retries run only under
+ * locking, token-bound publish with its engine handoff, and retries run only under
  * [account]. Neither boundary ever re-reads the live active account: each
  * revalidates that its own bound owner is still a signed-in signing account,
  * so removal or sign-out of either owner stops the operation without falling
@@ -36,7 +38,6 @@ import kotlinx.coroutines.withContext
 internal fun WhiteNoiseAppState.forwardTransport(
     sourceAccount: String,
     account: String,
-    batchMessageCount: Int,
     diagnostics: ForwardDiagnostics? = null,
 ): ForwardTransport {
     /** Rejects source reads after their explicitly bound signing account leaves the runtime. */
@@ -51,6 +52,15 @@ internal fun WhiteNoiseAppState.forwardTransport(
 
     // Disk this forward's concurrent destination uploads hold for staged copies, so they never count on the same space.
     val diskClaims = StagedDiskClaims()
+
+    // Native calls a publish deadline may stop waiting for. A call is abandoned, not cancelled: when the wait ends it
+    // keeps running, and may hold one marmotIo thread until the native call returns. Status reads and admission run
+    // one at a time, so at most one such call is outstanding per message per attempt. Its result is never observed
+    // and writes nothing back. An abandoned admission may still land after the user dismissed the forward, which
+    // matches MDK's outlives-cancellation contract; its client token keeps it from becoming a second message on a
+    // retry. The blocking call itself runs on marmotIo's dispatcher; this scope only owns the detached wait, so it
+    // starts undispatched.
+    val nativeCalls = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     return object : ForwardTransport {
         /** Resolves and decrypts one attachment strictly through the source account. */
@@ -195,36 +205,18 @@ internal fun WhiteNoiseAppState.forwardTransport(
                 ).attachments.map { it.reference }
             }
 
-        /** Reads enough recent destination history to classify an uncertain batch publication. */
-        private suspend fun recentForwardTimeline(
-            targetGroupIdHex: String,
-            batchMessageCount: Int,
-        ): List<TimelineMessageRecordFfi> {
-            requireDestinationAccount()
-            val limit = maxOf(100u, batchMessageCount.toUInt() + 100u)
-            return marmotIo {
-                timelineMessages(
-                    account,
-                    TimelineMessageQueryFfi(
-                        groupIdHex = targetGroupIdHex,
-                        search = null,
-                        before = null,
-                        beforeMessageId = null,
-                        after = null,
-                        afterMessageId = null,
-                        limit = limit,
-                    ),
-                ).messages
-            }.also { requireDestinationAccount() }
-        }
-
-        /** Serializes a destination batch and records exact evidence around uncertain commits. */
-        @Suppress("LongMethod", "ThrowsCount", "TooGenericExceptionCaught")
+        /**
+         * Publishes each message under its stable client token while holding the destination commit lock, and counts
+         * it as sent only once MDK's engine owns it. A retry re-checks the token first, so an earlier admission is
+         * waited on rather than repeated, and the whole of each message is bounded by
+         * [FORWARD_PUBLISH_ADMISSION_MILLIS] (#2556).
+         */
         override suspend fun publishBatch(
             targetGroupIdHex: String,
             messages: List<PreparedForwardMessage>,
             uploadedReferences: Map<Int, List<MediaAttachmentReferenceFfi>>,
             startIndex: Int,
+            clientTokenFor: (messageIndex: Int) -> String,
             onBeforeMessagePublished: (messageIndex: Int) -> Unit,
             onMessagePublished: (messageIndex: Int) -> Unit,
         ) {
@@ -232,145 +224,77 @@ internal fun WhiteNoiseAppState.forwardTransport(
             val lockRequestedAtMs = diagnostics?.startSpan()
             withGroupCommitLock(account, targetGroupIdHex) {
                 if (lockRequestedAtMs != null) diagnostics?.commitLockAcquired(lockRequestedAtMs)
-                val knownMessageIds =
-                    recentForwardTimeline(targetGroupIdHex, messages.size)
-                        .mapTo(mutableSetOf(), TimelineMessageRecordFfi::messageIdHex)
                 for (messageIndex in startIndex until messages.size) {
                     currentCoroutineContext().ensureActive()
                     onBeforeMessagePublished(messageIndex)
                     requireDestinationAccount()
                     val message = messages[messageIndex]
                     val references = uploadedReferences[messageIndex].orEmpty()
-                    val evidenceBefore = knownMessageIds.toSet()
-                    try {
-                        val publishedMessageIds =
-                            diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
-                                when (message) {
-                                    is PreparedForwardMessage.Text ->
-                                        marmotIo { sendText(account, targetGroupIdHex, message.text) }.messageIds
-                                    is PreparedForwardMessage.Media -> {
-                                        check(references.isNotEmpty()) { "missing destination media references" }
-                                        marmotIo {
-                                            sendMediaAttachments(
-                                                account,
-                                                targetGroupIdHex,
-                                                references,
-                                                message.caption,
-                                            )
-                                        }.messageIds
-                                    }
-                                }
-                            }
-                        knownMessageIds += publishedMessageIds
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (failure: Exception) {
-                        val recoveryEvidence =
-                            ForwardPublishRecoveryEvidence(
-                                messageIndex = messageIndex,
-                                knownMessageIdsBefore = evidenceBefore,
-                                pendingMessageIdHex = null,
-                            )
-                        val timelineAfter =
-                            try {
-                                recentForwardTimeline(targetGroupIdHex, messages.size)
-                            } catch (cancellation: CancellationException) {
-                                throw cancellation
-                            } catch (evidenceFailure: Exception) {
-                                failure.addSuppressed(evidenceFailure)
-                                throw ForwardPublishUncertainException(recoveryEvidence, failure)
-                            }
-                        val projectionsAfter = forwardProjectionRecords(timelineAfter, message, references)
-                        val newProjectionIds = projectionsAfter.keys - evidenceBefore
-                        val newProjection = newProjectionIds.singleOrNull()?.let(projectionsAfter::get)
-                        when {
-                            newProjection?.sourceMessageIdHex != null &&
-                                newProjection.invalidationStatus == null ->
-                                knownMessageIds += newProjection.messageIdHex
-                            newProjection != null &&
-                                !newProjection.deleted &&
-                                newProjection.invalidationStatus == null ->
-                                throw ForwardPublishUncertainException(
-                                    recoveryEvidence.copy(pendingMessageIdHex = newProjection.messageIdHex),
-                                    cause = failure,
-                                )
-                            newProjectionIds.isEmpty() ->
-                                throw ForwardPublishNotCommittedException(failure)
-                            else ->
-                                throw ForwardPublishUncertainException(recoveryEvidence, failure)
-                        }
+                    if (message is PreparedForwardMessage.Media) {
+                        check(references.isNotEmpty()) { "missing destination media references" }
                     }
+                    publishOne(targetGroupIdHex, messageIndex, message, references, clientTokenFor(messageIndex))
+                    requireDestinationAccount()
                     onMessagePublished(messageIndex)
                 }
             }
         }
 
-        /** Reconciles one uncertain destination publication without risking a duplicate send. */
-        @Suppress("ThrowsCount")
-        override suspend fun recoverPendingPublish(
+        /**
+         * Admits one message and waits for the engine to own it. Every status read and the admission run detached, so
+         * the deadline can stop waiting while a blocking native call is still running. The publish span covers
+         * admission and engine handoff, with admission timed on its own. A healthy forward never asks for
+         * convergence, matching the attachment fixture's contract; stalled and rejected publishes are resolved from
+         * the token's status instead.
+         */
+        private suspend fun publishOne(
+            targetGroupIdHex: String,
+            messageIndex: Int,
+            message: PreparedForwardMessage,
+            references: List<MediaAttachmentReferenceFfi>,
+            token: String,
+        ) {
+            val admissionStartedAtMs = diagnostics?.startSpan()
+            diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
+                admitForwardPublish(
+                    messageIndex = messageIndex,
+                    token = token,
+                    probe = { detachedNative { localSendStatus(account, targetGroupIdHex, token) } },
+                    beforeAdmit = ::requireDestinationAccount,
+                    admit = { detachedNative { admit(targetGroupIdHex, message, references, token) } },
+                    onAdmitted = {
+                        if (admissionStartedAtMs != null) diagnostics?.admissionAccepted(admissionStartedAtMs)
+                    },
+                )
+            }
+        }
+
+        /** Admits [message] to [targetGroupIdHex] under [token] through MDK's matching token-bound send. */
+        private suspend fun MarmotInterface.admit(
             targetGroupIdHex: String,
             message: PreparedForwardMessage,
-            uploadedReferences: List<MediaAttachmentReferenceFfi>,
-            evidence: ForwardPublishRecoveryEvidence,
-        ): ForwardPublishRecoveryResult {
-            requireDestinationAccount()
-            val recovered =
-                withGroupCommitLock(account, targetGroupIdHex) {
-                    val timeline =
-                        try {
-                            recentForwardTimeline(targetGroupIdHex, batchMessageCount)
-                        } catch (cancellation: CancellationException) {
-                            throw cancellation
-                        } catch (invalidated: ForwardSessionInvalidatedException) {
-                            throw invalidated
-                        } catch (_: Exception) {
-                            return@withGroupCommitLock ForwardPublishRecoveryResult.Unavailable
-                        }
-                    val newProjections =
-                        forwardProjectionRecords(timeline, message, uploadedReferences)
-                            .filterKeys { it !in evidence.knownMessageIdsBefore }
-                    val candidate =
-                        evidence.pendingMessageIdHex
-                            ?.let { pendingId -> newProjections[pendingId] }
-                            ?: newProjections.values.singleOrNull()
-                    if (candidate == null) {
-                        return@withGroupCommitLock if (
-                            evidence.pendingMessageIdHex == null && newProjections.isEmpty()
-                        ) {
-                            ForwardPublishRecoveryResult.NotCommitted
-                        } else {
-                            ForwardPublishRecoveryResult.Unavailable
-                        }
-                    }
-                    if (candidate.invalidationStatus != null || candidate.deleted) {
-                        return@withGroupCommitLock ForwardPublishRecoveryResult.Unavailable
-                    }
-                    if (candidate.sourceMessageIdHex != null) {
-                        return@withGroupCommitLock ForwardPublishRecoveryResult.Published
-                    }
-                    diagnostics.span(ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn) {
-                        marmotIo { retryGroupConvergence(account, targetGroupIdHex) }
-                    }
-                    val delivered =
-                        try {
-                            recentForwardTimeline(targetGroupIdHex, batchMessageCount)
-                                .firstOrNull { it.messageIdHex == candidate.messageIdHex }
-                        } catch (cancellation: CancellationException) {
-                            throw cancellation
-                        } catch (invalidated: ForwardSessionInvalidatedException) {
-                            throw invalidated
-                        } catch (_: Exception) {
-                            null
-                        }
-                    if (delivered?.sourceMessageIdHex != null && delivered.invalidationStatus == null) {
-                        ForwardPublishRecoveryResult.Published
-                    } else {
-                        ForwardPublishRecoveryResult.Unavailable
-                    }
-                }
-            requireDestinationAccount()
-            return recovered
-        }
+            references: List<MediaAttachmentReferenceFfi>,
+            token: String,
+        ): LocalSendAcceptanceFfi =
+            when (message) {
+                is PreparedForwardMessage.Text ->
+                    sendTextWithClientToken(account, targetGroupIdHex, message.text, token)
+                is PreparedForwardMessage.Media ->
+                    sendPreparedMediaWithClientToken(
+                        account,
+                        targetGroupIdHex,
+                        references,
+                        message.caption,
+                        token,
+                        null,
+                    )
+            }
+
+        /** Runs [block] on the native dispatcher outside this coroutine, so cancelling the wait never blocks on it. */
+        private suspend fun <T> detachedNative(block: suspend MarmotInterface.() -> T): T =
+            nativeCalls
+                .async { marmotIo(block) }
+                .await()
     }
 }
 

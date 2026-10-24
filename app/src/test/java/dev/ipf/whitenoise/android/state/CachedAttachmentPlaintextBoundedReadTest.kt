@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
+import dev.ipf.whitenoise.android.ui.conversation.media.localAttachmentBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -98,6 +99,78 @@ class CachedAttachmentPlaintextBoundedReadTest {
 
             assertArrayEquals(bytes, read)
             assertEquals(emptyList<String>(), leaseFileNames())
+        }
+
+    /**
+     * A cache-only read for a small file type, such as a vCard, passes its own budget through, so an oversized
+     * entry is rejected by its size instead of being copied up to the general preview budget.
+     */
+    @Test
+    fun aLocalReadWithACallerBudgetRejectsAnOversizedEntry() =
+        runTest(dispatcher) {
+            fixture.state.diskMediaCache.put(request(0).cacheKey(), ByteArray(LARGE_ENTRY_BYTES) { it.toByte() })
+
+            val failure =
+                runCatching {
+                    localAttachmentBytes(controller, request(0).messageIdHex, 0, mine = false, maxBytes = BUDGET_BYTES)
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(BUDGET_BYTES, (failure as AttachmentTooLargeToPresentException).limitBytes)
+            assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
+        }
+
+    /**
+     * An entry small enough for the L1 path but larger than the caller's budget is rejected by its size rather than
+     * decrypted whole, as a vCard bigger than its parse limit but under the L1 entry ceiling would otherwise be.
+     */
+    @Test
+    fun aSmallDiskEntryAboveTheCallerBudgetIsRejected() =
+        runTest(dispatcher) {
+            val tightBudget = SMALL_ENTRY_BYTES / 4L
+            fixture.state.diskMediaCache.put(request(0).cacheKey(), ByteArray(SMALL_ENTRY_BYTES / 2) { it.toByte() })
+
+            val failure =
+                runCatching {
+                    localAttachmentBytes(controller, request(0).messageIdHex, 0, mine = false, maxBytes = tightBudget)
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(tightBudget, (failure as AttachmentTooLargeToPresentException).limitBytes)
+            assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
+        }
+
+    /**
+     * An over-budget entry is rejected from its indexed size without decrypting anything. The ciphertext is
+     * corrupted first, so any read that decrypted the entry would fail authentication instead of reporting the size.
+     */
+    @Test
+    fun anOverBudgetEntryIsRejectedWithoutDecryptingIt() =
+        runTest(dispatcher) {
+            fixture.state.diskMediaCache.put(request(0).cacheKey(), ByteArray(LARGE_ENTRY_BYTES) { it.toByte() })
+            File(cacheRoot, "encrypted")
+                .listFiles()
+                .orEmpty()
+                .filter { it.isFile && "lease" !in it.name && it.length() > 0 }
+                .forEach { entry -> entry.writeBytes(ByteArray(entry.length().toInt()) { 0x5A }) }
+
+            val failure =
+                runCatching {
+                    localAttachmentBytes(controller, request(0).messageIdHex, 0, mine = false, maxBytes = BUDGET_BYTES)
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(LARGE_ENTRY_BYTES.toLong(), (failure as AttachmentTooLargeToPresentException).declaredBytes)
+            assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
         }
 
     /** An entry small enough for L1 is still read directly. */

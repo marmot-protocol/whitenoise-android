@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DiagnosticFormatter
+import dev.ipf.whitenoise.android.ui.conversation.media.UploadStagingStorageFullException
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.IOException
@@ -13,6 +15,15 @@ class SendFailureMessageTest {
         val refused = MarmotKitException.StorageFull("synthetic native reserve")
 
         assertEquals(R.string.toast_send_storage_full, sendFailureMessageRes(refused))
+    }
+
+    /** Running out of room for an upload's own snapshot reads and reports as storage, like the native refusal. */
+    @Test
+    fun anUploadSnapshotThatRanOutOfStorageExplainsThatSpaceMustBeFreed() {
+        val refused = UploadStagingStorageFullException()
+
+        assertEquals(R.string.toast_send_storage_full, sendFailureMessageRes(refused))
+        assertEquals("STORAGE_FULL", DiagnosticFormatter.errorCode(refused))
     }
 
     @Test
