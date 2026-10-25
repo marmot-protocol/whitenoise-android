@@ -94,94 +94,6 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
-    /** New groups keep All; independent device switches can retain mentions-only and restore All. */
-    @Test
-    fun newGroupStartsWithAllAndCanChooseOnlyMentions() = verifyCategoryControls()
-
-    @Test
-    fun notificationCategoryControlsDark() = verifyCategoryControls(darkTheme = true, suffix = "_dark")
-
-    @Test
-    fun notificationCategoryControlsAmoled() {
-        verifyCategoryControls(darkTheme = true, amoled = true, suffix = "_amoled")
-    }
-
-    private fun verifyCategoryControls(
-        darkTheme: Boolean = false,
-        amoled: Boolean = false,
-        suffix: String = "",
-    ) {
-        listOf("whitenoise.chat_mute", "whitenoise.conversation_alerts").forEach { name ->
-            context
-                .getSharedPreferences(name, Context.MODE_PRIVATE)
-                .edit()
-                .clear()
-                .commit()
-        }
-        val fixture = controller(group())
-        val groupId = fixture.controller.group.groupIdHex
-        render(fixture, darkTheme = darkTheme, amoled = amoled)
-        composeRule
-            .onNodeWithText(context.getString(R.string.sounds_and_notifications))
-            .performScrollTo()
-            .performClick()
-        val messagesTag = "conversation-alert-messages_group"
-        val reactionsTag = "conversation-alert-reactions_v2"
-        // Capture the prepared category rows, not the transient delivery-only fallback.
-        composeRule.waitUntil(5_000) {
-            composeRule
-                .onAllNodesWithTag("open-conversation-notification-messages_group")
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOn()
-        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
-        visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all$suffix.png")
-        }
-        composeRule.onNodeWithTag(messagesTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false &&
-                alertControlReady(messagesTag, ToggleableState.Off)
-        }
-        composeRule.onNodeWithTag(reactionsTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false &&
-                alertControlReady(reactionsTag, ToggleableState.Off)
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOff()
-        composeRule.onNodeWithTag(reactionsTag).assertIsOff()
-        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
-        visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions$suffix.png")
-        }
-        val restored = ConversationAlertPreferences(context)
-        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES))
-        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS))
-        composeRule.onNodeWithTag(messagesTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == true &&
-                alertControlReady(messagesTag, ToggleableState.On)
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOn()
-    }
-
-    private fun alertControlReady(
-        tag: String,
-        state: ToggleableState,
-    ): Boolean {
-        val node =
-            composeRule
-                .onAllNodesWithTag(tag)
-                .fetchSemanticsNodes()
-                .singleOrNull()
-                ?.config ?: return false
-        return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
-    }
-
     /** Unavailable call actions do not occupy the primary action row. */
     @Test
     fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
@@ -726,6 +638,127 @@ class GroupDetailsEditNavigationTest {
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+class GroupDetailsNotificationControlsTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @get:Rule
+    val visualErrors = ErrorCollector()
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
+
+    /** New groups keep All; independent device switches can retain mentions-only and restore All. */
+    @Test
+    fun newGroupStartsWithAllAndCanChooseOnlyMentions() = verifyCategoryControls()
+
+    @Test
+    fun notificationCategoryControlsDark() = verifyCategoryControls(darkTheme = true, suffix = "_dark")
+
+    @Test
+    fun notificationCategoryControlsAmoled() {
+        verifyCategoryControls(darkTheme = true, amoled = true, suffix = "_amoled")
+    }
+
+    private fun verifyCategoryControls(
+        darkTheme: Boolean = false,
+        amoled: Boolean = false,
+        suffix: String = "",
+    ) {
+        listOf("whitenoise.chat_mute", "whitenoise.conversation_alerts").forEach { name ->
+            context
+                .getSharedPreferences(name, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit()
+        }
+        val fixture = controller(group())
+        val groupId = fixture.controller.group.groupIdHex
+        render(fixture, darkTheme = darkTheme, amoled = amoled)
+        composeRule
+            .onNodeWithText(context.getString(R.string.sounds_and_notifications))
+            .performScrollTo()
+            .performClick()
+        val messagesTag = "conversation-alert-messages_group"
+        val reactionsTag = "conversation-alert-reactions_v2"
+        // Capture the prepared category rows, not the transient delivery-only fallback.
+        composeRule.waitUntil(5_000) {
+            composeRule
+                .onAllNodesWithTag("open-conversation-notification-messages_group")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag(messagesTag).assertIsOn()
+        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
+        visualErrors.checkSucceeds {
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all$suffix.png")
+        }
+        composeRule.onNodeWithTag(messagesTag).performClick()
+        composeRule.waitUntil(5_000) {
+            ConversationAlertPreferences(context)
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false &&
+                alertControlReady(messagesTag, ToggleableState.Off)
+        }
+        composeRule.onNodeWithTag(reactionsTag).performClick()
+        composeRule.waitUntil(5_000) {
+            ConversationAlertPreferences(context)
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false &&
+                alertControlReady(reactionsTag, ToggleableState.Off)
+        }
+        composeRule.onNodeWithTag(messagesTag).assertIsOff()
+        composeRule.onNodeWithTag(reactionsTag).assertIsOff()
+        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
+        visualErrors.checkSucceeds {
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions$suffix.png")
+        }
+        val restored = ConversationAlertPreferences(context)
+        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES))
+        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS))
+        composeRule.onNodeWithTag(messagesTag).performClick()
+        composeRule.waitUntil(5_000) {
+            ConversationAlertPreferences(context)
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == true &&
+                alertControlReady(messagesTag, ToggleableState.On)
+        }
+        composeRule.onNodeWithTag(messagesTag).assertIsOn()
+    }
+
+    private fun alertControlReady(
+        tag: String,
+        state: ToggleableState,
+    ): Boolean {
+        val node =
+            composeRule
+                .onAllNodesWithTag(tag)
+                .fetchSemanticsNodes()
+                .singleOrNull()
+                ?.config ?: return false
+        return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
+    }
+
+    private fun render(
+        testController: GroupDetailsTestController,
+        darkTheme: Boolean,
+        amoled: Boolean,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                GroupDetailsScreen(
+                    appState = testController.appState,
+                    controller = testController.controller,
+                    onBack = {},
+                    onLeft = {},
+                    onOpenSearch = null,
+                    onStartGroupWithPeer = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
     }
 }
 
