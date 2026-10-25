@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -19,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -42,7 +44,9 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.coroutineContext
 import kotlin.math.abs
+import kotlin.math.ceil
 
 internal const val COMPOSER_SEND_MOTION_MILLIS = 280
 private const val MAX_COMPOSER_MOTION_CHARACTERS = 4096
@@ -257,20 +261,7 @@ internal class ComposerSendMotion {
         LaunchedEffect(active) {
             if (active == null) return@LaunchedEffect
             try {
-                // One deadline shares the existing 80 ms overhead between admission and final native settlement.
-                withTimeoutOrNull(COMPOSER_SEND_MOTION_MILLIS + DESTINATION_MEASURE_WAIT_MILLIS) flightWork@{
-                    val measured =
-                        withTimeoutOrNull(DESTINATION_MEASURE_WAIT_MILLIS) {
-                            while (!canRender()) withFrameNanos { }
-                            true
-                        } == true
-                    if (!measured) return@flightWork
-                    progress.animateTo(1f, tween(COMPOSER_SEND_MOTION_MILLIS, easing = FastOutSlowInEasing)) {
-                        if (!canRender()) throw CancellationException("Send presentation invalidated")
-                        if (hasPaintedLanding) throw CancellationException("Accepted copy handed off")
-                    }
-                    awaitComposerSendLanding(::canRender) { hasPaintedLanding }
-                }
+                ComposerSendFlightTiming.run(progress, ::canRender) { hasPaintedLanding }
             } finally {
                 if (flight === active) clear()
             }
@@ -330,6 +321,43 @@ internal class ComposerSendMotion {
                 destinationStrokeWidth,
             )
             clipPath(path) { drawFlightText(source, layout, textTarget, p, fill) }
+        }
+    }
+}
+
+internal object ComposerSendFlightTiming {
+    /** Invalid or impractically slow custom scales use the normal presentation without retaining draft ink. */
+    fun timeoutMillis(scale: Float): Long? {
+        val animationMillis = COMPOSER_SEND_MOTION_MILLIS.toDouble() * scale
+        if (!scale.isFinite() || scale < 0f || animationMillis > MAX_SCALED_SEND_MOTION_MILLIS) return null
+        return ceil(animationMillis).toLong() + DESTINATION_MEASURE_WAIT_MILLIS
+    }
+
+    private const val MAX_SCALED_SEND_MOTION_MILLIS = 10_000L
+
+    /** The animation allowance scales with Compose; the missing-target wait remains at most 80 ms. */
+    suspend fun run(
+        progress: Animatable<Float, AnimationVector1D>,
+        canRender: () -> Boolean,
+        hasPaintedLanding: () -> Boolean,
+    ) {
+        val motionScale = coroutineContext[MotionDurationScale]
+        val initialScale = motionScale?.scaleFactor ?: 1f
+        val deadline = timeoutMillis(initialScale) ?: return
+        val current = { canRender() && (motionScale?.scaleFactor ?: 1f) == initialScale }
+        // Admission and final native settlement still share one unscaled 80 ms overhead.
+        withTimeoutOrNull(deadline) flightWork@{
+            val measured =
+                withTimeoutOrNull(DESTINATION_MEASURE_WAIT_MILLIS) {
+                    while (!current()) withFrameNanos { }
+                    true
+                } == true
+            if (!measured) return@flightWork
+            progress.animateTo(1f, tween(COMPOSER_SEND_MOTION_MILLIS, easing = FastOutSlowInEasing)) {
+                if (!current()) throw CancellationException("Send presentation invalidated")
+                if (hasPaintedLanding()) throw CancellationException("Accepted copy handed off")
+            }
+            awaitComposerSendLanding(current, hasPaintedLanding)
         }
     }
 }
