@@ -6,9 +6,12 @@ internal interface AnimationSessionControl : java.io.Closeable {
     val preempted: kotlinx.coroutines.flow.StateFlow<Boolean>?
         get() = null
 
+    /** Requests bounded frame delivery from the already-admitted isolated worker. */
     fun play()
 
+    /** Stops future frame requests without releasing admission or the displayed first-frame fallback. */
     fun pause()
 
+    /** False once this capability is retired, even if the worker's death acknowledgement is pending. */
     fun isOpen(): Boolean
 }

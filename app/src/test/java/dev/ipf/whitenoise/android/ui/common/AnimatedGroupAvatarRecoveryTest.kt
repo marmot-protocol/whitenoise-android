@@ -136,10 +136,12 @@ class AnimatedGroupAvatarRecoveryTest {
         val preempted = CompletableDeferred<Unit>()
         var closed = false
 
+        /** Suspends until the test explicitly models a viewer takeover, independently of codec timing. */
         override suspend fun awaitPreemption() {
             preempted.await()
         }
 
+        /** Records disposal so lifecycle and owner-change assertions can detect a leaked drawable. */
         override fun close() {
             closed = true
         }

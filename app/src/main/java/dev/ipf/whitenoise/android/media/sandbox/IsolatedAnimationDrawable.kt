@@ -29,29 +29,37 @@ internal class IsolatedAnimationDrawable(
     private val width = frame.width
     private val height = frame.height
 
+    /** Keeps layout tied to the first validated frame, even after later frames replace its pixels. */
     override fun getIntrinsicWidth() = width
 
+    /** Reports the same fixed decode geometry that [accept] enforces for every subsequent frame. */
     override fun getIntrinsicHeight() = height
 
+    /** Draws only the owned raw frame; retired or recycled pixels never reach the host canvas. */
     override fun draw(canvas: Canvas) {
         if (!closed && !frame.isRecycled) canvas.drawBitmap(frame, null, bounds, paint)
     }
 
+    /** Applies presentation opacity without changing the isolated decoder or its frame ownership. */
     override fun setAlpha(alpha: Int) {
         paint.alpha = alpha
         invalidateSelf()
     }
 
+    /** Applies a host paint filter to already-decoded pixels without rewriting the retained frame. */
     override fun setColorFilter(colorFilter: ColorFilter?) {
         paint.colorFilter = colorFilter
         invalidateSelf()
     }
 
+    /** Decoded frames may contain alpha, so callers must not assume an opaque background. */
     @Deprecated("Legacy Drawable opacity")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 
+    /** Reports this drawable's playback request, without treating it as proof of worker liveness. */
     override fun isRunning() = running && !closed
 
+    /** Starts frame delivery only for an open session; a retired drawable cannot resurrect its worker. */
     override fun start() {
         if (!closed && session.isOpen()) {
             running = true
@@ -59,6 +67,7 @@ internal class IsolatedAnimationDrawable(
         }
     }
 
+    /** Pauses production while retaining the last displayed frame until ownership is closed. */
     override fun stop() {
         running = false
         session.pause()
@@ -69,6 +78,7 @@ internal class IsolatedAnimationDrawable(
         session.preempted?.first { it } ?: awaitCancellation()
     }
 
+    /** Takes ownership of one validated frame and recycles late, mismatched or superseded pixels. */
     fun accept(next: Bitmap) {
         // The worker may finish its one outstanding frame after PAUSE. ACK still happens in
         // the session, but a stopped drawable must retain the pixels already on screen.
@@ -84,6 +94,7 @@ internal class IsolatedAnimationDrawable(
         previous.recycle()
     }
 
+    /** Retires the session once and releases its final bitmap/callback on the drawing thread. */
     override fun close() {
         if (closed) return
         closed = true
