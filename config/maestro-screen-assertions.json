@@ -1070,8 +1070,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
       "symbol": "ComposerSendingIdentity",
-      "bindings": [],
-      "remaining": "Needs a controlled multi-signing-account fixture: open the draft owner avatar, assert its identity with a different globally active account, dismiss with Back while preserving draft and keyboard, then switch owner. Native unit snapshots do not establish Maestro execution."
+      "bindings": [
+        {
+          "case": "presentation-extra-composer-sending-identity",
+          "selector": {"text": "Sending as"},
+          "scope": "Actual composer opens the nonactive native draft owner popover; Back retains its draft and active account. Does not certify keyboard or account-switch lifecycle execution.",
+          "entry_assertion": {"id": "composer-sending-identity-popup"},
+          "opened_by": {"id": "composer-sending-identity"}
+        }
+      ],
+      "remaining": "Exact-source campaign execution, keyboard continuity and owner-switch lifecycle remain separate qualification."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",

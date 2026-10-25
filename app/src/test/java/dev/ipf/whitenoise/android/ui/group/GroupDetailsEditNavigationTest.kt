@@ -96,7 +96,21 @@ class GroupDetailsEditNavigationTest {
 
     /** New groups keep All; independent device switches can retain mentions-only and restore All. */
     @Test
-    fun newGroupStartsWithAllAndCanChooseOnlyMentions() {
+    fun newGroupStartsWithAllAndCanChooseOnlyMentions() = verifyCategoryControls()
+
+    @Test
+    fun notificationCategoryControlsDark() = verifyCategoryControls(darkTheme = true, suffix = "_dark")
+
+    @Test
+    fun notificationCategoryControlsAmoled() {
+        verifyCategoryControls(darkTheme = true, amoled = true, suffix = "_amoled")
+    }
+
+    private fun verifyCategoryControls(
+        darkTheme: Boolean = false,
+        amoled: Boolean = false,
+        suffix: String = "",
+    ) {
         listOf("whitenoise.chat_mute", "whitenoise.conversation_alerts").forEach { name ->
             context
                 .getSharedPreferences(name, Context.MODE_PRIVATE)
@@ -106,7 +120,7 @@ class GroupDetailsEditNavigationTest {
         }
         val fixture = controller(group())
         val groupId = fixture.controller.group.groupIdHex
-        render(fixture)
+        render(fixture, darkTheme = darkTheme, amoled = amoled)
         composeRule
             .onNodeWithText(context.getString(R.string.sounds_and_notifications))
             .performScrollTo()
@@ -123,7 +137,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag(messagesTag).assertIsOn()
         composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
         visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all.png")
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all$suffix.png")
         }
         composeRule.onNodeWithTag(messagesTag).performClick()
         composeRule.waitUntil(5_000) {
@@ -141,7 +155,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag(reactionsTag).assertIsOff()
         composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
         visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions.png")
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions$suffix.png")
         }
         val restored = ConversationAlertPreferences(context)
         assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES))
@@ -636,9 +650,11 @@ class GroupDetailsEditNavigationTest {
         onOpenSearch: (() -> Unit)? = null,
         onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
         controllerState: androidx.compose.runtime.State<ConversationController>? = null,
+        darkTheme: Boolean = false,
+        amoled: Boolean = false,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 GroupDetailsScreen(
                     appState = testController.appState,
                     controller = controllerState?.value ?: testController.controller,

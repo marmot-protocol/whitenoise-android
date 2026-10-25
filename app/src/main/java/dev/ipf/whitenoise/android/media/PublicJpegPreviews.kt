@@ -112,6 +112,7 @@ internal class PublicJpegPreviewPreferences(
         MutableStateFlow(preferences.all.mapNotNull { (k, v) -> (v as? Boolean)?.let { k to it } }.toMap())
     val state = choices.asStateFlow()
     private var retainedAccountIds: Set<String>? = null
+    private val consentRevisions = mutableMapOf<String, Long>()
 
     fun enabled(accountRef: String): Boolean = choices.value[accountRef] == true
 
@@ -121,23 +122,37 @@ internal class PublicJpegPreviewPreferences(
             val keep = accountIds.toSet()
             retainedAccountIds = keep
             val removed = choices.value.keys - keep
+            (choices.value.keys + consentRevisions.keys - keep).forEach { id ->
+                consentRevisions[id] = (consentRevisions[id] ?: 0L) + 1
+            }
             choices.value = choices.value.filterKeys { it in keep }
             preferences.edit().also { editor -> removed.forEach(editor::remove) }.apply()
             removed
         }
 
-    /** Synchronous OFF admission barrier before the UI launches its durable write. */
+    /** Revoke immediately and schedule persistence independently of the settings screen lifetime. */
     fun revoke(accountId: String) {
-        synchronized(this) { choices.value = choices.value + (accountId to false) }
+        synchronized(this) {
+            if (retainedAccountIds?.contains(accountId) == false) return
+            consentRevisions[accountId] = (consentRevisions[accountId] ?: 0L) + 1
+            choices.value = choices.value + (accountId to false)
+            preferences.edit().putBoolean(accountId, false).apply()
+        }
     }
 
     suspend fun setEnabled(
         accountRef: String,
         enabled: Boolean,
-    ): Boolean =
-        withContext(Dispatchers.IO) {
+    ): Boolean {
+        val revision =
+            synchronized(this) {
+                ((consentRevisions[accountRef] ?: 0L) + 1).also { consentRevisions[accountRef] = it }
+            }
+        return withContext(Dispatchers.IO) {
             synchronized(this@PublicJpegPreviewPreferences) {
-                if (retainedAccountIds?.contains(accountRef) == false) return@synchronized false
+                if (retainedAccountIds?.contains(accountRef) == false || consentRevisions[accountRef] != revision) {
+                    return@synchronized false
+                }
                 val previous = this@PublicJpegPreviewPreferences.enabled(accountRef)
                 // Revoke before disk I/O so queued work observes OFF immediately.
                 if (!enabled) choices.value = choices.value + (accountRef to false)
@@ -151,6 +166,7 @@ internal class PublicJpegPreviewPreferences(
                 saved
             }
         }
+    }
 }
 
 /**

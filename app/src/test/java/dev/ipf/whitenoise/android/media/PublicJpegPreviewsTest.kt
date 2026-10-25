@@ -222,6 +222,72 @@ class PublicJpegPreviewsTest {
         }
 
     @Test
+    fun queuedEnableCannotUndoNewerConsentIntents() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            for (intent in listOf("revoke", "disable", "remove-and-readd")) {
+                context
+                    .getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
+                    .edit()
+                    .clear()
+                    .commit()
+                val preferences = PublicJpegPreviewPreferences(context)
+                preferences.retainAccounts(listOf("alice", "bob"))
+                val pending =
+                    synchronized(preferences) {
+                        val enable =
+                            async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                                preferences.setEnabled("alice", true)
+                            }
+                        // Both IO writers wait while the newer intent is recorded on the same real monitor.
+                        val disable =
+                            when (intent) {
+                                "disable" ->
+                                    async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                                        preferences.setEnabled("alice", false)
+                                    }
+                                "remove-and-readd" -> {
+                                    preferences.retainAccounts(listOf("bob"))
+                                    preferences.retainAccounts(listOf("alice", "bob"))
+                                    null
+                                }
+                                else -> {
+                                    preferences.revoke("alice")
+                                    null
+                                }
+                            }
+                        enable to disable
+                    }
+                assertFalse(pending.first.await())
+                pending.second?.let { assertTrue(it.await()) }
+                assertFalse(preferences.enabled("alice"))
+                assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
+            }
+        }
+
+    @Test
+    fun revocationUpdatesPreferencesWithoutTheScreenCoroutine() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            context
+                .getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit()
+            val preferences = PublicJpegPreviewPreferences(context)
+            assertTrue(preferences.setEnabled("alice", true))
+            preferences.revoke("alice")
+            // No setEnabled(false): leaving the screen may cancel that coroutine before it starts.
+            assertFalse(preferences.enabled("alice"))
+            assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
+            preferences.retainAccounts(emptyList())
+            preferences.revoke("alice")
+            assertFalse(preferences.state.value.containsKey("alice"))
+            val stored = context.getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
+            assertFalse(stored.contains("alice"))
+        }
+
+    @Test
     fun consentIsAccountScopedDurableAndDefaultsOff() =
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()

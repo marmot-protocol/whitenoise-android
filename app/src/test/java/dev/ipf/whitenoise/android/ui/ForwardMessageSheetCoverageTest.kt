@@ -97,12 +97,15 @@ class ForwardMessageSheetCoverageTest {
 
     /** Forwarding delegates presentation to Home with the originating owner, including private nickname resolution. */
     @Test
-    fun groupMemberPreviewsUsePrivateContactNicknames() {
+    fun forwardingTitlesUseTheDestinationOwnersNameResolution() {
         val body = forwardPickerSource().readText().functionBody("ForwardTargetRow")
 
         assertTrue("accountRef = ownerAccountRef" in body && "ownerAccountIdHex = ownerAccountIdHex" in body)
-        val home = sourceFile("ui/chats/ChatRow.kt").readText()
-        assertTrue("appState.contactDisplayNameCached(accountRef, it)" in home)
+        val picker = forwardPickerSource().readText()
+        assertTrue("forwardTargetDisplayTitle(it, appState, destination.selectedAccountRef, titleCopy)" in picker)
+        assertTrue("titleOverride = title" in body)
+        val resolver = messageActionsSource().readText().functionBody("forwardTargetDisplayTitle")
+        assertTrue("appState.contactDisplayNameCached(ownerAccountRef, it)" in resolver)
         assertFalse("appState.chatMemberTitleCached(" in body)
     }
 

@@ -8928,6 +8928,11 @@ class WhiteNoiseAppState private constructor(
             hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
         )
 
+    internal fun publicJpegPreviewNetworkAllowed(): Boolean =
+        hasValidatedInternet() &&
+            activeNetworkTypesSnapshot == setOf(MediaAutoDownloadNetwork.WiFi) &&
+            shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
+
     /**
      * Every [MediaAutoDownloadNetwork] the active connection currently matches.
      * A single connection can match several at once (e.g. cellular that is both
@@ -8939,18 +8944,13 @@ class WhiteNoiseAppState private constructor(
      * inline (getSystemService/activeNetwork/getNetworkCapabilities) is three
      * synchronous binder IPCs per call (#984).
      */
-    internal fun publicJpegPreviewNetworkAllowed(): Boolean =
-        hasValidatedInternet() &&
-            activeNetworkTypesSnapshot == setOf(MediaAutoDownloadNetwork.WiFi) &&
-            shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
-
     private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> = activeNetworkTypesSnapshot
 
-    // Callback-maintained mirror of the default network's state, volatile so
-    // composition-time reads see the connectivity thread's latest write.
     private val previewNetworkTypesMutable = MutableStateFlow<Set<MediaAutoDownloadNetwork>>(emptySet())
     internal val publicJpegPreviewNetworkTypes = previewNetworkTypesMutable.asStateFlow()
 
+    // Callback-maintained mirror of the default network's state, volatile so
+    // composition-time reads see the connectivity thread's latest write.
     @Volatile
     private var activeNetworkTypesSnapshot: Set<MediaAutoDownloadNetwork> = emptySet()
         set(value) {
