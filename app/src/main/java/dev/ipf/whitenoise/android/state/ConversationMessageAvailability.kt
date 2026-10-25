@@ -60,8 +60,9 @@ private fun ConversationController.currentMessageAvailability(messageIdHex: Stri
     }
 
 /** Availability is actionable only once the row belongs to the published transcript. */
-private fun ConversationController.isMessagePublished(messageIdHex: String): Boolean =
-    timeline.any { it.record.messageIdHex == messageIdHex }
+private fun ConversationController.isMessagePublished(messageIdHex: String): Boolean {
+    return timeline.any { it.record.messageIdHex == messageIdHex }
+}
 
 /** Compatibility boolean for callers that do not present a missing-target error themselves. */
 suspend fun ConversationController.loadUntilMessageAvailable(

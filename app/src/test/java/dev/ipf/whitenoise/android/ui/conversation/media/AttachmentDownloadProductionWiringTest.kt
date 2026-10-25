@@ -13,13 +13,15 @@ class AttachmentDownloadProductionWiringTest {
         val effect =
             source("MediaVideo.kt")
                 .substringAfter("private fun rememberCachedVideoAttachmentFileState(")
-                .substringBefore("return cachedFile")
+                .substringBefore("internal fun shouldStartVideoAttachmentDownload(")
                 .normalized()
 
         assertTrue(
             "The cache probe and retained-file validation must share the IO context",
-            "val (file, retained) = withContext(Dispatchers.IO) { val probed = cachedVideoAttachmentFile(" in effect,
+            "val (file, retained) = withContext(Dispatchers.IO) { " +
+                "val probed = probe(context, messageIdHex, attachmentIndex, reference)" in effect,
         )
+        assertTrue("probe: VideoAttachmentCacheProbe = ::cachedVideoAttachmentFile" in effect)
         assertTrue(
             "Retained-file validation must run before IO exits and Compose state is published",
             "probed to validatedAttachmentCacheFile(cachedFile.value) } cachedFile.value =" in effect,
