@@ -8,7 +8,6 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -248,7 +247,8 @@ class PersonGroupsMembershipAuthorityTest {
                         .getOrElse { "Native diagnostics unavailable: ${it.javaClass.simpleName}" }
                 failure.addSuppressed(
                     AssertionError(
-                        "Authority menu $id: $native\nLast completed poll menuNodes=$lastMenuNodeCount $lastAuthorityStatus",
+                        "Authority menu $id: $native\n" +
+                            "Last completed poll menuNodes=$lastMenuNodeCount $lastAuthorityStatus",
                     ),
                 )
             }

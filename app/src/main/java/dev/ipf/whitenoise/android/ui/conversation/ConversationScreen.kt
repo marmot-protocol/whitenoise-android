@@ -4092,7 +4092,11 @@ internal fun ConversationScreen(
                         accountRef = draftAccountRef,
                         groupIdHex = controller.group.groupIdHex,
                         presentationRevision = composerDictationRevision,
-                        write = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
+                        write = {
+                            // A local edit is not a newly restored navigation-entry draft.
+                            composerAutoFocusConsumed.value = true
+                            appState.setDraft(draftAccountRef, controller.group.groupIdHex, it)
+                        },
                     ),
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,

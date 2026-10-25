@@ -102,7 +102,9 @@ class ChatFolderManageRouteTest {
                 if (editExisting) {
                     composeRule.onNodeWithTag("folder.row.${folder.id}").performClick()
                 } else {
-                    composeRule.onNodeWithContentDescription(context.getString(R.string.folder_new_title)).performClick()
+                    composeRule
+                        .onNodeWithContentDescription(context.getString(R.string.folder_new_title))
+                        .performClick()
                 }
                 composeRule.onNodeWithTag("folder.name").performTextReplacement("Unsaved name")
                 composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }

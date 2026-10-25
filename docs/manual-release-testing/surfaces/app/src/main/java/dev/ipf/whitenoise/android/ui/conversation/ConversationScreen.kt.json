@@ -260,6 +260,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Local clipboard draft persistence does not consume a new navigation-entry keyboard restore",
+        "anchor": "composerAutoFocusConsumed.value = true",
+        "test_ids": [
+          "CON-013"
+        ]
       }
     ]
   },
