@@ -15,12 +15,12 @@ import android.os.Messenger
 import android.os.Parcel
 import android.os.Process
 import android.os.SharedMemory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /** One outstanding frame and one actual isolated process across account generations. */
 @Suppress("TooManyFunctions") // One capability/binding lifetime, never a second decode or image cache.

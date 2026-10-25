@@ -37,10 +37,10 @@ import dev.ipf.whitenoise.android.core.MAX_ANIMATED_PROFILE_AVATAR_EDGE
 import dev.ipf.whitenoise.android.core.PROFILE_AVATAR_MAX_DIMENSION
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.PreemptibleAnimation
-import kotlin.math.roundToInt
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlin.math.roundToInt
 
 /** Test tag on the animated layer, present only while a decoded animation is attached. */
 internal const val ANIMATED_PROFILE_AVATAR_TAG = "animated-profile-avatar"
@@ -212,7 +212,8 @@ private suspend fun playAvatarAnimation(
     while (true) {
         val produced =
             dev.ipf.whitenoise.android.state
-                .runCatchingCancellable { decode() }.getOrNull()
+                .runCatchingCancellable { decode() }
+                .getOrNull()
         try {
             currentCoroutineContext().ensureActive()
             publish(produced)
