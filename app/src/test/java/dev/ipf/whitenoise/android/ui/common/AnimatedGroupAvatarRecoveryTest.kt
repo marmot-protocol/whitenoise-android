@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -93,35 +94,40 @@ class AnimatedGroupAvatarRecoveryTest {
         var oldWaitCancelled = false
         composeRule.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
-                val current = key
-                AnimatedGroupAvatarOverlay(
-                    GroupAvatarAnimation(current) { twoFrameGif() },
-                    Modifier.size(40.dp),
-                    maxEdgePx = 40,
-                    animationsEnabled = true,
-                    decode = { _, _ ->
-                        if (current == "new") {
-                            newDecodes++
-                            replacement
-                        } else if (++oldDecodes == 1) {
-                            first
-                        } else {
-                            try {
-                                viewerReleased.await()
-                                error("retired owner must not resume")
-                            } finally {
-                                oldWaitCancelled = true
+                Box(Modifier.size(200.dp)) {
+                    val current = key
+                    AnimatedGroupAvatarOverlay(
+                        GroupAvatarAnimation(current) { twoFrameGif() },
+                        Modifier.size(40.dp),
+                        maxEdgePx = 40,
+                        animationsEnabled = true,
+                        decode = { _, _ ->
+                            if (current == "new") {
+                                newDecodes++
+                                replacement
+                            } else if (++oldDecodes == 1) {
+                                first
+                            } else {
+                                try {
+                                    viewerReleased.await()
+                                    error("retired owner must not resume")
+                                } finally {
+                                    oldWaitCancelled = true
+                                }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
             }
         }
         composeRule.waitUntil { oldDecodes == 1 }
         composeRule.runOnIdle { first.preempted.complete(Unit) }
         composeRule.waitUntil { oldDecodes == 2 }
         composeRule.runOnIdle { key = "new" }
-        composeRule.waitUntil { newDecodes == 1 && oldWaitCancelled }
+        // The replacement needs Robolectric's measure/layout pass before visibility can admit it.
+        composeRule.waitForIdle()
+        assertTrue("Replacing the owner cancels its pending decode", oldWaitCancelled)
+        composeRule.waitUntil { newDecodes == 1 }
         composeRule.runOnIdle { viewerReleased.complete(Unit) }
         composeRule.waitForIdle()
         assertEquals(2, oldDecodes)
