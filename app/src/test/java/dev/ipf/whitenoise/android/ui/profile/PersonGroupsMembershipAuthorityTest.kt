@@ -26,6 +26,12 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
+/**
+ * Wall-clock bound for waits on real native reads. A cold native start on a loaded CI runner stretched these past the
+ * former five seconds while the same reads finish in about 0.1 s locally, so a passing run never waits this long.
+ */
+private const val NATIVE_AUTHORITY_TIMEOUT_MILLIS = 30_000L
+
 /** Mounted default administration UI, with authority failure/latency injected at the native binding only. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -39,7 +45,8 @@ class PersonGroupsMembershipAuthorityTest {
         fixture.hold(fixture.slow.id)
         try {
             mount(fixture, mutableStateOf(listOf(fixture.slow, fixture.fast)), mounted)
-            assertTrue(fixture.entered.getValue(fixture.slow.id).await(5, TimeUnit.SECONDS))
+            val slowReadEntered = fixture.entered.getValue(fixture.slow.id)
+            assertTrue(slowReadEntered.await(NATIVE_AUTHORITY_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
             awaitMenu(fixture.fast.id)
             rule.onNodeWithTag("groups_in_common.menu.${fixture.slow.id}").assertDoesNotExist()
             assertEquals(1L, fixture.releases.getValue(fixture.slow.id).count)
@@ -58,7 +65,7 @@ class PersonGroupsMembershipAuthorityTest {
         try {
             mount(fixture, mutableStateOf(listOf(fixture.slow, fixture.fast)), mounted)
             awaitMenu(fixture.fast.id)
-            rule.waitUntil(5_000) {
+            rule.waitUntil(NATIVE_AUTHORITY_TIMEOUT_MILLIS) {
                 rule.onAllNodesWithTag("groups_in_common.retry").fetchSemanticsNodes().isNotEmpty()
             }
             rule.onNodeWithText("Slow group").assertIsDisplayed()
@@ -133,7 +140,7 @@ class PersonGroupsMembershipAuthorityTest {
         try {
             mount(fixture, mutableStateOf(listOf(fixture.fast, fixture.slow)), mounted)
             awaitMenu(fixture.fast.id)
-            rule.waitUntil(5_000) {
+            rule.waitUntil(NATIVE_AUTHORITY_TIMEOUT_MILLIS) {
                 rule.onAllNodesWithTag("groups_in_common.retry").fetchSemanticsNodes().isNotEmpty()
             }
             val retry = rule.onNodeWithTag("groups_in_common.retry").captureClickCallbackForReplay()
@@ -201,9 +208,12 @@ class PersonGroupsMembershipAuthorityTest {
         rule.onNodeWithText(fixture.fast.id).assertDoesNotExist()
     }
 
-    /** Native IO resumes the process mutation scope on Android Main, outside the Compose clock. */
+    /**
+     * Native IO resumes the process mutation scope on Android Main, outside the Compose clock. The wait returns as
+     * soon as [condition] holds, within [NATIVE_AUTHORITY_TIMEOUT_MILLIS] of wall-clock time.
+     */
     private fun awaitAuthority(condition: () -> Boolean) {
-        rule.waitUntil(5_000) {
+        rule.waitUntil(NATIVE_AUTHORITY_TIMEOUT_MILLIS) {
             Shadows.shadowOf(Looper.getMainLooper()).idle()
             rule.waitForIdle()
             condition()
