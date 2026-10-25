@@ -141,6 +141,8 @@ class ConversationTailEntranceTest {
 
     /** Mutable inputs of the reversed-list harness, driven from the test thread. */
     private class TailHarness {
+        var motionEnabled by mutableStateOf(true)
+        var owner by mutableStateOf("account-a")
         var rows by mutableStateOf(listOf("m3", "m2", "m1"))
         var latestId by mutableStateOf("m3")
         var followedId by mutableStateOf<String?>("m3")
@@ -161,6 +163,8 @@ class ConversationTailEntranceTest {
                     followingTail = true,
                     initialTimelineAnchored = true,
                     rowSpacingPx = 0f,
+                    motionEnabled = harness.motionEnabled,
+                    ownerKey = harness.owner,
                 )
             LazyColumn(
                 state = harness.listState,
@@ -181,6 +185,30 @@ class ConversationTailEntranceTest {
                 }
             }
         }
+    }
+
+    @Test fun liveMotionDisableSettlesAndOwnerReplacementDropsOldEntrance() {
+        val harness = TailHarness()
+        setTailContent(harness)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            harness.rows = listOf("m4") + harness.rows
+            harness.latestId = "m4"
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { harness.motionEnabled = false }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(0f, harness.entrance.shiftPx, 0f)
+        assertEquals(null, harness.entrance.enteringItemId)
+        composeRule.runOnIdle {
+            harness.followedId = "m4"
+            harness.owner = "account-b"
+            harness.motionEnabled = true
+        }
+        composeRule.mainClock.advanceTimeBy(500)
+        assertEquals(0f, harness.entrance.shiftPx, 0f)
+        assertEquals(null, harness.entrance.enteringItemId)
     }
 
     /** A row that is not entering never starts the motion, so paging and keyboard tracking stay untouched. */

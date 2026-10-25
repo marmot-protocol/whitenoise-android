@@ -12,6 +12,7 @@ internal class GroupSystemRowActions(
     val owner: GroupSystemReactionOwner,
     private val readOnly: () -> Boolean,
     private val item: () -> TimelineMessage,
+    private val onLocalIntent: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     val hidden: Boolean
         get() =
@@ -33,7 +34,9 @@ internal class GroupSystemRowActions(
         appState.launchMutation {
             if (canReact) {
                 currentGroupSystemReactionTarget(controller, owner)?.let { target ->
-                    controller.toggleReaction(emoji, target.record) {
+                    controller.toggleReaction(emoji, target.record, onLocalIntent = { added ->
+                        onLocalIntent(emoji, added)
+                    }) {
                         canReact
                     }
                 }

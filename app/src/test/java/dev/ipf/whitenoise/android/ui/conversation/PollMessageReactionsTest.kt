@@ -164,6 +164,19 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         assertQueuedReactionDiscarded(item.record.messageIdHex)
     }
 
+    @Test fun localIntentCallbackRunsAtOptimisticAcceptanceBeforeNativeMutation() =
+        runTest {
+            val item = render()
+            val accepted = mutableListOf<Boolean>()
+            pollController.toggleReaction("👍", item.record, onLocalIntent = { added ->
+                accepted += added
+                assertTrue(pollController.reactions[item.record.messageIdHex].orEmpty().any { it.mine })
+                assertTrue(recordedCalls().none { it.first == "reactToMessage" })
+            })
+            assertEquals(listOf(true), accepted)
+            assertEquals(1, recordedCalls().count { it.first == "reactToMessage" })
+        }
+
     @Test fun queuedRemovalRechecksAvailabilityBeforeDeletingReactionEvent() =
         runTest {
             val item = render()

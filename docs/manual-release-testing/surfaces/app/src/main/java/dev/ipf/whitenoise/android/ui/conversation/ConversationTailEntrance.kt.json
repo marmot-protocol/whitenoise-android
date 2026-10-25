@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailEntrance.kt",
+  "legacy_sha256": "50b1cbb86f416a6b313c220248b4a4022bc5b5b15756df8fd5731bef1b99ff3d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "conversationTailEntranceMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailEntrance.kt",
+        "anchor": "fun Modifier.conversationTailEntranceMotion(",
+        "test_ids": [
+          "CON-004",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "Tail motion interruption",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailEntrance.kt",
+        "anchor": "rememberConversationTailEntrance(",
+        "test_ids": [
+          "CON-036"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

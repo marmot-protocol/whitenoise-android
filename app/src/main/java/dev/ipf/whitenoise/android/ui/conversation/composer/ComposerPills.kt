@@ -412,12 +412,10 @@ internal fun ComposerPill(
     // Back has asked the keyboard to hide: the editing row collapses now, in the
     // same frame, instead of waiting for focus to clear once the IME inset lands.
     dismissInProgress: Boolean = false,
-    // An accepted send has just emptied the field: the pill takes its one-line
-    // geometry in the same frame, so the bubble it produced lands where it will
-    // stay instead of riding the shrinking pill down.
+    // An accepted send has emptied the field. Height, row insets and corner radii
+    // converge together; the transcript retains its existing scroll owner.
     collapsedBySend: Boolean = false,
-    // Reports that the send collapse has taken its snap so the owner can let
-    // later geometry, a dismiss or a refocus of the empty field, tween again.
+    // Reports settlement so later editing uses its ordinary geometry timing.
     onSendCollapseApplied: () -> Unit = {},
     // The owner places the trailing Send/voice action outside this pill, so it needs the same animated
     // editing progress to stay centered with the text while resting. Read it during layout, never composition.
@@ -425,6 +423,7 @@ internal fun ComposerPill(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val sendMotion = dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val textToolbar = LocalTextToolbar.current
     val clipboardManager = remember(context) { context.getSystemService(android.content.ClipboardManager::class.java) }
@@ -887,7 +886,7 @@ internal fun ComposerPill(
             label = "composer layout progress",
         )
     // Release the one-shot send collapse once every piece of geometry has
-    // reached the target it snapped to, so a later dismiss or refocus of the
+    // reached its target, so a later dismiss or refocus of the
     // empty field tweens again. Geometry the send left unchanged settles at once.
     val latestOnSendCollapseApplied by rememberUpdatedState(onSendCollapseApplied)
     val textHeightTarget by rememberUpdatedState(renderedTextHeightTarget)
@@ -1081,8 +1080,12 @@ internal fun ComposerPill(
             },
         )
     val latestOnExpansionToggle by rememberUpdatedState(onExpansionToggle)
+    // Resetting the retained expansion is a logical change, not the end of the
+    // visible transition. Keep the pill attached to the bar's animated viewport
+    // until that owner settles; wrapping content here would snap the surface
+    // to its compact height while its outer bar was still gradually shrinking.
     val expandedHeightModifier =
-        if (expansionMode == ComposerExpansionMode.Automatic) {
+        if (expansionMode == ComposerExpansionMode.Automatic && !geometryTransitionActive) {
             Modifier
         } else {
             Modifier.fillMaxHeight()
@@ -1168,6 +1171,15 @@ internal fun ComposerPill(
                     },
                 ),
     ) {
+        val sourceFill = MaterialTheme.colorScheme.surfaceContainerHigh
+        val sourceBorder = MaterialTheme.colorScheme.outlineVariant
+        SideEffect {
+            sendMotion?.sourceFill = sourceFill
+            sendMotion?.sourceBorder = sourceBorder
+            sendMotion?.sourceTopRadius = with(density) { 24.dp.toPx() }
+            sendMotion?.sourceBottomRadius = with(density) { 24.dp.toPx() }
+            sendMotion?.sourceStrokeWidth = with(density) { ComposerOutlineThickness.toPx() }
+        }
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(24.dp),
@@ -1176,7 +1188,8 @@ internal fun ComposerPill(
                 Modifier
                     .fillMaxWidth()
                     .then(expandedHeightModifier)
-                    .testTag(COMPOSER_PILL_SURFACE_TAG),
+                    .testTag(COMPOSER_PILL_SURFACE_TAG)
+                    .onGloballyPositioned { sendMotion?.sourceSurface = it },
         ) {
             Box {
                 // Keep resize semantics inside the surface; an underlying sibling is pruned by Android.
@@ -1381,8 +1394,10 @@ internal fun ComposerPill(
                                                 composerScrollState,
                                                 fadeEnabled = !composerFocused && textFieldValue.selection.collapsed,
                                             ).verticalScroll(composerScrollState)
-                                            .onGloballyPositioned { editorBounds = it.boundsInWindow() }
-                                            .pointerInput(
+                                            .onGloballyPositioned {
+                                                editorBounds = it.boundsInWindow()
+                                                sendMotion?.sourceEditor = it
+                                            }.pointerInput(
                                                 inputContentVisible,
                                                 inputFocusEnabled,
                                                 observeSelectionTouch,
@@ -1523,6 +1538,7 @@ internal fun ComposerPill(
                                     keyboardActions = KeyboardActions(onSend = { onImeSend() }),
                                     maxLines = Int.MAX_VALUE,
                                     onTextLayout = { layout ->
+                                        sendMotion?.sourceLayout = layout
                                         if (compactLineCount == null) updateMultilineControls(layout.lineCount)
                                         val nextSnapshot =
                                             ComposerTextLayoutSnapshot(

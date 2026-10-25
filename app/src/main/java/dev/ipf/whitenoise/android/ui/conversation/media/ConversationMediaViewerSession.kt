@@ -57,6 +57,8 @@ internal class ConversationMediaViewerSessionState(
     var active by mutableStateOf<ConversationMediaViewerActiveSession?>(null)
         private set
 
+    val thumbnails = MediaViewerThumbnailRegistry()
+
     private var nextSessionId = 0L
 
     /** Opens a valid request, or refreshes the same logical opening attachment without replacing its session. */

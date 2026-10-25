@@ -402,6 +402,7 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
+                                .mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
                                 .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
                                     onLongClick = onLongPress,
@@ -416,6 +417,7 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
+                                .mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
                                 .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
                                     onLongClick = onLongPress,
@@ -538,58 +540,60 @@ internal fun MasonryImageLayout(
     tile: @Composable (index: Int, tileModifier: Modifier) -> Unit,
 ) {
     val gap = ConversationMessageMetrics.GallerySpacing
-    when (visibleCount) {
-        2 ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_TWO_HEIGHT),
-            ) {
-                tile(0, Modifier.weight(1f).fillMaxHeight())
-                tile(1, Modifier.weight(1f).fillMaxHeight())
-            }
-        3 ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_THREE_HEIGHT),
-            ) {
-                tile(0, Modifier.width(GALLERY_THREE_HEIGHT).fillMaxHeight())
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+    MediaThumbnailCanvas {
+        when (visibleCount) {
+            2 ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(GALLERY_TWO_HEIGHT),
                 ) {
-                    tile(1, Modifier.weight(1f).fillMaxWidth())
-                    tile(2, Modifier.weight(1f).fillMaxWidth())
-                }
-            }
-        4 ->
-            Column(
-                verticalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
                     tile(0, Modifier.weight(1f).fillMaxHeight())
                     tile(1, Modifier.weight(1f).fillMaxHeight())
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    tile(2, Modifier.weight(1f).fillMaxHeight())
-                    tile(3, Modifier.weight(1f).fillMaxHeight())
-                }
-            }
-        else ->
-            Column(
-                verticalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_FIVE_HEIGHT),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
-                    tile(0, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
-                    tile(1, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
-                    for (index in 2 until visibleCount.coerceAtMost(MAX_VISIBLE_GALLERY_FRAMES)) {
-                        tile(index, Modifier.weight(1f).height(GALLERY_FIVE_SECOND_ROW_HEIGHT))
+            3 ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(GALLERY_THREE_HEIGHT),
+                ) {
+                    tile(0, Modifier.width(GALLERY_THREE_HEIGHT).fillMaxHeight())
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(gap),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    ) {
+                        tile(1, Modifier.weight(1f).fillMaxWidth())
+                        tile(2, Modifier.weight(1f).fillMaxWidth())
                     }
                 }
-            }
+            4 ->
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        tile(0, Modifier.weight(1f).fillMaxHeight())
+                        tile(1, Modifier.weight(1f).fillMaxHeight())
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        tile(2, Modifier.weight(1f).fillMaxHeight())
+                        tile(3, Modifier.weight(1f).fillMaxHeight())
+                    }
+                }
+            else ->
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(GALLERY_FIVE_HEIGHT),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
+                        tile(0, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
+                        tile(1, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
+                        for (index in 2 until visibleCount.coerceAtMost(MAX_VISIBLE_GALLERY_FRAMES)) {
+                            tile(index, Modifier.weight(1f).height(GALLERY_FIVE_SECOND_ROW_HEIGHT))
+                        }
+                    }
+                }
+        }
     }
 }
 
@@ -929,14 +933,22 @@ internal fun MediaImageGridTile(
                     source = animationSource,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().reportMediaApplyAfterDraw(mediaApplyHostAttempt),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
+                            .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                 )
             is DecodedAttachmentPresentation.Animated ->
                 AnimatedDrawableAttachmentImage(
                     drawable = current.drawable,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().reportMediaApplyAfterDraw(mediaApplyHostAttempt),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
+                            .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                 )
             null ->
                 when {

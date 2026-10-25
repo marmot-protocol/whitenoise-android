@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Visible thumbnail expansion and selected attachment return continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaViewerMotion(",
+        "test_ids": [
+          "MED-038"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "MediaViewerMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaViewerMotion(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "MediaViewerThumbnailHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaViewerThumbnailHost(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Modifier.mediaViewerThumbnail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun Modifier.mediaViewerThumbnail(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "MediaThumbnailCanvas",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaThumbnailCanvas(",
+        "test_ids": [
+          "MED-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

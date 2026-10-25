@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.group
 import android.app.Application
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -88,9 +87,9 @@ class GroupDetailsAbandonmentTest {
         assertFalse(controller.mutationInFlight)
         assertEquals(priorError, controller.lastMutationError)
         composeRule.onNodeWithTag("group.abandon.error").assertDoesNotExist()
-        composeRule.onNodeWithTag("group.abandon.confirm").assertIsNotEnabled()
-        composeRule.onNodeWithTag("group.abandon.cancel").performClick()
-        composeRule.onNodeWithTag("chat_info.reset").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithTag("group.abandon.confirm").assertDoesNotExist()
+        composeRule.onNodeWithTag("group.abandon.cancel").assertDoesNotExist()
+        composeRule.onNodeWithTag("chat_info.reset").assertDoesNotExist()
     }
 
     /** A direct chat's details list the Abandon chat on this device row in the light theme. */

@@ -3057,7 +3057,7 @@ class WhiteNoiseAppState private constructor(
         val replyTarget = controller.replyingTo
         var durablyAccepted = false
         return try {
-            durablyAccepted = sendConversationText(controller, request.payload, request.onPendingShown)
+            durablyAccepted = sendConversationText(controller, request.payload, onAccepted = request.onPendingShown)
             durablyAccepted
         } finally {
             if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
@@ -3132,6 +3132,7 @@ class WhiteNoiseAppState private constructor(
     internal suspend fun sendConversationText(
         controller: ConversationController,
         text: String,
+        onPresentationAccepted: (String) -> Unit = {},
         onAccepted: () -> Unit = {},
     ): Boolean {
         val pendingClear = captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
@@ -3139,6 +3140,7 @@ class WhiteNoiseAppState private constructor(
         var durablyAccepted = false
         controller.send(
             text = text,
+            onPresentationAccepted = onPresentationAccepted,
             onAccepted = {
                 accepted = true
                 pendingClear?.let(composerDraftExpansionBridge::hideForPendingSend)

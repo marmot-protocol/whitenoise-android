@@ -106,6 +106,7 @@ internal fun MessageActionMenu(
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
+    onReactionOrigin: ((String, androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     onOpenEmojiPicker: () -> Unit,
     onReply: () -> Unit,
     onEdit: () -> Unit,
@@ -222,6 +223,7 @@ internal fun MessageActionMenu(
         previewReady = previewReady,
         preview = preview,
         onReact = onReact,
+        onReactionOrigin = onReactionOrigin,
         onMoreReactions = onOpenEmojiPicker,
         onDismiss = onDismissRequest,
     )

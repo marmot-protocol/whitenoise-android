@@ -7999,6 +7999,7 @@ class ConversationController(
         text: String,
         onAccepted: () -> Unit = {},
         onTerminalFailure: () -> Unit = {},
+        onPresentationAccepted: (String) -> Unit = {},
         onDurablyAccepted: () -> Unit = {},
     ) {
         val trimmed = text.trim()
@@ -8146,6 +8147,7 @@ class ConversationController(
         // draft (issue #264): clearing earlier, synchronously in the UI on the
         // mere act of dispatching this coroutine, lost the text whenever a
         // guard above bailed before this point.
+        onPresentationAccepted(optimisticKey)
         onAccepted()
         // The optimistic bubble is now published: the pending clock is on
         // screen. The chat-list order is reserved, but its preview waits for
@@ -9645,6 +9647,7 @@ class ConversationController(
     suspend fun toggleReaction(
         emoji: String,
         message: AppMessageRecordFfi,
+        onLocalIntent: (Boolean) -> Unit = {},
         stillAvailable: () -> Boolean = { true },
     ) {
         val account = reactionAccountIfAccepted() ?: return
@@ -9660,6 +9663,8 @@ class ConversationController(
         optimisticReactionChanges[optimisticId] = OptimisticReactionChange(target, emoji, add = desiredMine)
         recomputeReactions(setOf(target))
         val submission = reactionIntentConflator.submit(key, desiredMine)
+        // Local presentation acceptance is distinct from native/remote completion.
+        onLocalIntent(desiredMine)
         if (!submission.shouldDrain) return
 
         val outcome =

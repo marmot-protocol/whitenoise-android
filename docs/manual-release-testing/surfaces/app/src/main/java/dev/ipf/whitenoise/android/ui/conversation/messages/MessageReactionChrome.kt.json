@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReactionChrome.kt",
+  "legacy_sha256": "b9be41798ffaa6f0db7b88ca46672fd57c4da6007f8ba386286ffb11f59be1d1",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ColumnScope.MessageReactionSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReactionChrome.kt",
+        "anchor": "fun ColumnScope.MessageReactionSummary(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "RowScope.MessageSenderAvatarSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReactionChrome.kt",
+        "anchor": "fun RowScope.MessageSenderAvatarSlot(",
+        "test_ids": [
+          "CON-002"
+        ]
+      },
+      {
+        "surface": "Local reaction summary feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReactionChrome.kt",
+        "anchor": "localMotion = localMotion",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

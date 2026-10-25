@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,6 +23,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -45,6 +47,8 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -60,6 +64,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.state.notifiedMessagePreview
+import dev.ipf.whitenoise.android.state.projectedTimelineMessage
+import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
@@ -546,6 +552,208 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 message.record.messageIdHex == CONFIRMED_MESSAGE_ID && message.status == MessageStatus.Sent
             }
         }
+    }
+
+    /** The shipped route must animate the retained viewport, not only a fixed leaf target. */
+    @Test
+    @Suppress("LongMethod") // One paused-clock lifecycle binds acceptance, viewport frames and confirmation.
+    fun expandedAcceptedSendCollapsesGraduallyAndPreservesTheNextDraft() {
+        val publisherStarted = CompletableDeferred<Unit>()
+        val releaseSuccess = CompletableDeferred<Unit>()
+        val draftStore = DraftStore(InMemoryDraftPersistence())
+        val appState = appState(draftStore)
+        val sentDraft = "A message ready to fly.\nSmooth corners, steady text."
+        val nextDraft = "The next draft stays editable."
+        draftStore.set(ACCOUNT_A, DICTATION_GROUP, TextFieldValue(sentDraft))
+        appState.composerExpansionStateRetention.update(
+            ACCOUNT_A,
+            DICTATION_GROUP,
+            manualPreference(240f),
+            draftGeneration = appState.composerDraftGeneration(ACCOUNT_A, DICTATION_GROUP),
+        )
+        // A normal fully read chat-list open includes its cached projection. The
+        // matching authoritative upsert below keeps this peer after sending.
+        val peerPreview =
+            notifiedMessagePreview().copy(
+                messageIdHex = "b4".repeat(32),
+                sender = ACCOUNT_B_ID,
+                plaintext = "Ready when you are.",
+                timelineAt = (DICTATION_TIMESTAMP_MILLIS / 1_000L - 60L).toULong(),
+            )
+        val fixture =
+            productionConversation(
+                appState = appState,
+                accountRef = ACCOUNT_A,
+                groupIdHex = DICTATION_GROUP,
+                initialPreview = peerPreview,
+                clockMillis = { DICTATION_TIMESTAMP_MILLIS },
+            ) { _, _, _, _ ->
+                publisherStarted.complete(Unit)
+                releaseSuccess.await()
+                successfulSendSummary()
+            }
+        // Also seed authoritative history so retiring the preview cannot remove this
+        // peer when a real row is accepted. Both messages share one stable date bucket.
+        val peerRecord =
+            timelineAppMessage(
+                id = peerPreview.messageIdHex,
+                recordedAt = peerPreview.timelineAt,
+            ).copy(groupIdHex = DICTATION_GROUP, sender = peerPreview.sender, plaintext = peerPreview.plaintext)
+        fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(
+            listOf(
+                TimelineMessageChangeFfi.Upsert(
+                    trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                    message = checkNotNull(projectedTimelineMessage(peerRecord).projected),
+                ),
+            ),
+        )
+        var observedMotion: ComposerSendMotion? = null
+        val routeSurface = ConversationSurfaceState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ConversationScreen(
+                    appState = appState,
+                    chat = fixture.chat,
+                    controller = fixture.controller,
+                    onBack = {},
+                    surfaceState = routeSurface,
+                    // This existing composable slot is invoked inside the real header/host.
+                    // Observe its presentation owner without adding UI or a production test hook.
+                    playbackTransport = {
+                        val motion = LocalComposerSendMotion.current
+                        SideEffect { observedMotion = motion }
+                    },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        // Initial transcript admission commits after a real draw, then a queued frame.
+        // Keep auto advancement enabled until that normal route gate has settled.
+        composeRule.onRoot().captureToImage()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Ready when you are.").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(peerRecord.messageIdHex), useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onRoot().captureToImage()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            val motion = checkNotNull(observedMotion)
+            assertTrue("The real visible/follow-tail route must admit motion before sending", motion.enabled)
+            assertTrue(
+                "The fully visible expanded editor must support the selected flight",
+                motion.capture(sentDraft) != null,
+            )
+        }
+        val expandedHeight = productionComposerPillContentHeight()
+        assertTrue("Fixture starts manually expanded", expandedHeight > 180f)
+        val frames =
+            if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
+                java.io.File("build/composer-send-route-frames").apply { mkdirs() }
+            } else {
+                null
+            }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_send_route_expanded_first.png")
+        frames?.let { composeRule.onRoot().captureRoboImage(java.io.File(it, "frame-000.png").path) }
+        composeRule.mainClock.autoAdvance = false
+        lateinit var acceptedPresentationId: String
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
+            acceptedPresentationId =
+                composeRule.runOnIdle {
+                    fixture.controller.timeline
+                        .single { it.record.plaintext == sentDraft }
+                        .presentationId
+                }
+            composeRule.runOnIdle {
+                assertEquals(
+                    "Actual controller acceptance must arm the exact row before drawing",
+                    acceptedPresentationId,
+                    checkNotNull(observedMotion).activePresentationId,
+                )
+            }
+            val heights = mutableListOf(expandedHeight, productionComposerPillContentHeight())
+            // The publisher is reached synchronously after model acceptance, but a paused
+            // Compose clock leaves EditableText semantics in the previous rendered frame.
+            // Flush exactly one frame before reading the UI, retaining the pre-frame height
+            // above so an immediate viewport snap still fails the gradual-collapse checks.
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            assertEquals("", productionComposerText())
+            composeRule.runOnIdle {
+                assertTrue(
+                    "The landed row/footer must remain hidden during the initial copy flight",
+                    checkNotNull(observedMotion).hides(acceptedPresentationId),
+                )
+            }
+            heights += productionComposerPillContentHeight()
+            frames?.let {
+                composeRule.onRoot().captureRoboImage(java.io.File(it, "frame-001.png").path)
+            }
+            repeat(36) { index ->
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.waitForIdle()
+                heights += productionComposerPillContentHeight()
+                frames?.let {
+                    composeRule.onRoot().captureRoboImage(java.io.File(it, "frame-%03d.png".format(index + 2)).path)
+                }
+                if (index == 8) {
+                    composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_send_route_expanded_mid.png")
+                }
+            }
+            val compactHeight = heights.last()
+            assertTrue("Accepted composer must reach its compact viewport", compactHeight < expandedHeight - 80f)
+            assertTrue(
+                "At least one frame must be strictly between expanded and compact",
+                heights.any {
+                    it > compactHeight + 4f && it < expandedHeight - 4f
+                },
+            )
+            assertTrue(
+                "No frame may snap most of the expanded viewport away: $heights",
+                heights.zipWithNext().all { (before, after) ->
+                    before - after < (expandedHeight - compactHeight) * .65f
+                },
+            )
+            val sent = fixture.controller.timeline.single { it.record.plaintext == sentDraft }
+            val bubble =
+                composeRule
+                    .onNodeWithTag(
+                        messageBubbleRowTestTag(sent.record.messageIdHex),
+                        useUnmergedTree = true,
+                    ).assertIsDisplayed()
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            val composer = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue("The actual tail owner lands above the shrinking input", bubble.bottom <= composer.top)
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_send_route_expanded_settled.png")
+            composeRule.onNode(hasSetTextAction()).performTextReplacement(nextDraft)
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            releaseSuccess.complete(Unit)
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            fixture.controller.timeline.any {
+                it.record.messageIdHex == CONFIRMED_MESSAGE_ID && it.status == MessageStatus.Sent
+            }
+        }
+        assertEquals(nextDraft, productionComposerText())
+        val confirmed = fixture.controller.timeline.single { it.record.messageIdHex == CONFIRMED_MESSAGE_ID }
+        assertEquals(
+            "Confirmation must retain the accepted presentation identity",
+            acceptedPresentationId,
+            confirmed.presentationId,
+        )
+        assertEquals(
+            "A confirmation must not insert a replay row",
+            1,
+            fixture.controller.timeline.count {
+                it.record.plaintext == sentDraft
+            },
+        )
     }
 
     /**

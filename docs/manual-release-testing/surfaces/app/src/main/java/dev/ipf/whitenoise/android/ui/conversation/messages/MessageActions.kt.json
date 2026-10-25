@@ -63,6 +63,14 @@
           "MSG-010",
           "MSG-011"
         ]
+      },
+      {
+        "surface": "Reaction origin handoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "onReactionOrigin",
+        "test_ids": [
+          "MSG-041"
+        ]
       }
     ],
     "source_coverage": [

@@ -2747,13 +2747,15 @@ class ConversationSendRetryIntegrationTest {
     fun acceptedPendingSeparatesOptimisticAndDurableAcceptanceCallbacks() =
         runTest {
             val callbacks = mutableListOf<String>()
-            val controller =
+            lateinit var controller: ConversationController
+            var acceptedPresentationId: String? = null
+            controller =
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        assertEquals(listOf("optimistic"), callbacks)
+                        assertEquals(listOf("presentation", "optimistic"), callbacks)
                         SendSummaryFfi(
                             published = 0u,
                             messageIds = listOf(CONFIRMED_MESSAGE_ID),
@@ -2765,11 +2767,23 @@ class ConversationSendRetryIntegrationTest {
 
             controller.send(
                 text = "hello",
+                onPresentationAccepted = { id ->
+                    assertEquals("The exact row is already published", id, controller.timeline.single().presentationId)
+                    assertEquals(
+                        "hello",
+                        controller.timeline
+                            .single()
+                            .record.plaintext,
+                    )
+                    acceptedPresentationId = id
+                    callbacks += "presentation"
+                },
                 onAccepted = { callbacks += "optimistic" },
                 onDurablyAccepted = { callbacks += "durable" },
             )
 
-            assertEquals(listOf("optimistic", "durable"), callbacks)
+            assertEquals(listOf("presentation", "optimistic", "durable"), callbacks)
+            assertEquals(acceptedPresentationId, controller.timeline.single().presentationId)
             assertEquals(MessageStatus.Pending, controller.timeline.single().status)
         }
 

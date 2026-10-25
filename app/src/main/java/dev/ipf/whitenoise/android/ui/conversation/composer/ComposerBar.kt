@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -289,6 +290,7 @@ internal class ComposerTextState(
     initial: TextFieldValue,
 ) {
     private var contentRevision = 0L
+    internal val contentGeneration: Long get() = contentRevision
     val valueState: MutableState<TextFieldValue> = mutableStateOf(initial)
     val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
 
@@ -380,6 +382,7 @@ internal fun ComposerBar(
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
+    onSendWithPresentation: ((String, (String?) -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
     initialDraft: TextFieldValue = TextFieldValue(""),
     onDraftChange: (TextFieldValue) -> Unit = {},
@@ -881,6 +884,11 @@ internal fun ComposerBar(
     // death during the FFI call can erase a send MDK never accepted (#1216).
     // For an in-place edit the controller short-circuits and never calls
     // onAccepted, so the pre-edit composer is restored instead.
+    val sendMotion = dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion.current
+    SideEffect {
+        val active = sendMotion?.flight
+        if (active != null && active.inputGeneration != textState.contentGeneration) sendMotion.clear()
+    }
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
     val submitMessage: () -> Unit = {
         // An IME can commit text and request Send before the next composition.
@@ -905,18 +913,33 @@ internal fun ComposerBar(
             }
         } else if (acceptanceToken.text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
-            onSend(acceptanceToken.text) {
+            val visual = if (!sendingEdit && replyingTo == null) sendMotion?.capture(acceptanceToken.text) else null
+            val accepted: (String?) -> Unit = { presentationId ->
                 if (!sendingEdit) {
                     // onAccepted can land after the user has started typing the
                     // next message (Enter-to-send makes that common). Only the
                     // exact shared content generation may clear the field.
                     if (textState.clearAccepted(acceptanceToken)) {
+                        sendMotion?.accept(visual, presentationId, textState.contentGeneration)
+                        if (composerExpansion.mode != ComposerExpansionMode.Automatic ||
+                            (visual != null && presentationId != null)
+                        ) {
+                            // Retained draft expansion may already have reset inside the acceptance
+                            // callback. Start from the measured old viewport, not the new preference.
+                            composerHeightTransitionStartPx = visibleComposerHeightPx
+                            composerHeightTransitionEpoch += 1
+                        }
                         if (retainedExpansionOwner == null) {
                             publishComposerExpansion(ComposerExpansionState())
                         }
                     }
                     onAfterSend()
                 }
+            }
+            if (onSendWithPresentation != null) {
+                onSendWithPresentation(acceptanceToken.text, accepted)
+            } else {
+                onSend(acceptanceToken.text) { accepted(null) }
             }
         }
     }
@@ -1095,11 +1118,15 @@ internal fun ComposerBar(
                     transitionTargetHeightPx,
                     tween(
                         durationMillis =
-                            composerHeightAnimationDurationMillis(
-                                mode = composerExpansion.mode,
-                                dragActive = composerHeightDragActive,
-                                discreteTransitionActive = composerHeightTransitionActive,
-                            ),
+                            if (textState.collapsedBySend) {
+                                dev.ipf.whitenoise.android.ui.conversation.COMPOSER_SEND_MOTION_MILLIS
+                            } else {
+                                composerHeightAnimationDurationMillis(
+                                    mode = composerExpansion.mode,
+                                    dragActive = composerHeightDragActive,
+                                    discreteTransitionActive = composerHeightTransitionActive,
+                                )
+                            },
                         easing = FastOutSlowInEasing,
                     ),
                 )

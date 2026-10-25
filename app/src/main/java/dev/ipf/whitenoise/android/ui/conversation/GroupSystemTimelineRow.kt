@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +27,11 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageActions
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CompleteReactionDetailsSheet
+import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillFlow
+import dev.ipf.whitenoise.android.ui.conversation.reactions.localReactionOverlay
+import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactionMotion
+import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 
@@ -56,45 +61,68 @@ internal fun GroupSystemTimelineRow(
         remember(controller, item.record.messageIdHex) {
             GroupSystemReactionOwner(controller.boundAccountRef, item.record.groupIdHex, item.record.messageIdHex)
         }
+    val motion = rememberActivityReactionMotion(controller, appState, owner, readOnly)
     val currentReadOnly by rememberUpdatedState(readOnly)
     val currentItem by rememberUpdatedState(item)
     val actions =
-        remember(controller, owner) {
-            GroupSystemRowActions(controller, appState, owner, { currentReadOnly }, { currentItem })
+        remember(controller, owner, motion) {
+            GroupSystemRowActions(controller, appState, owner, { currentReadOnly }, { currentItem }) { emoji, added ->
+                motion.accept(emoji, added, motion.takeOrigin(emoji))
+            }
         }
     val surface = remember(owner) { GroupSystemActionSurface() }
     GroupSystemActionLifetime(owner, actions, surface, onActionMenuOpenChange)
-    GroupSystemRow(
-        record = item.record,
-        appState = appState,
-        groupSystem = item.projected?.groupSystem,
-        onWave = onWave,
-        waveAccountRef = owner.accountRef,
-        onOpenProfile = { appState.presentProfile(appState.npub(it)) },
-        onOpenActions =
-            if (actions.canReact || actions.canDelete) {
-                { text, bounds ->
-                    surface.previewText = text
-                    surface.sourceBounds = bounds
-                    onActionMenuOpenChange(true)
+    Box(Modifier.localReactionOverlay(motion)) {
+        GroupSystemRow(
+            record = item.record,
+            appState = appState,
+            groupSystem = item.projected?.groupSystem,
+            onWave = onWave,
+            waveAccountRef = owner.accountRef,
+            onOpenProfile = { appState.presentProfile(appState.npub(it)) },
+            onOpenActions =
+                if (actions.canReact || actions.canDelete) {
+                    { text, bounds ->
+                        surface.previewText = text
+                        surface.sourceBounds = bounds
+                        onActionMenuOpenChange(true)
+                    }
+                } else {
+                    null
+                },
+            reactionContent = {
+                if (actions.tallies.isNotEmpty()) {
+                    ReactionPillFlow(
+                        actions.tallies,
+                        actions::react.takeIf { actions.canReact },
+                        { surface.detailsOpen = true },
+                        localMotion = motion,
+                    )
                 }
-            } else {
-                null
             },
-        reactionContent = {
-            if (actions.tallies.isNotEmpty()) {
-                ReactionPillFlow(
-                    actions.tallies,
-                    actions::react.takeIf { actions.canReact },
-                    { surface.detailsOpen = true },
-                )
-            }
-        },
-    )
-    if (isActionMenuOpen && (actions.canReact || actions.canDelete)) {
-        GroupSystemFocusedActions(actions, surface, quickReactionEmojis, onActionMenuOpenChange)
+        )
+        if (isActionMenuOpen && (actions.canReact || actions.canDelete)) {
+            GroupSystemFocusedActions(actions, surface, quickReactionEmojis, onActionMenuOpenChange, motion)
+        }
+        GroupSystemReactionSheets(item, actions, surface, recentEmojis, onEmojiUsed)
     }
-    GroupSystemReactionSheets(item, actions, surface, recentEmojis, onEmojiUsed)
+}
+
+/** Reuses the action owner while retiring decorative callbacks on privacy or system suppression. */
+@Composable
+private fun rememberActivityReactionMotion(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    owner: GroupSystemReactionOwner,
+    readOnly: Boolean,
+): LocalReactionMotion {
+    val runtime = remember(controller) { appState.runtimeGeneration }
+    val currentOwner = !appState.appLockScreenVisible && controller.isCurrentGroupMutationOwner(appState, runtime)
+    val targetAvailable = !readOnly && currentGroupSystemReactionTarget(controller, owner) != null
+    return rememberLocalReactionMotion(
+        controller to owner,
+        enabled = rememberConversationMotionEnabled() && currentOwner && targetAvailable,
+    )
 }
 
 /** Retires row-owned overlays on disposal or when native action admission disappears. */
@@ -121,6 +149,7 @@ private fun GroupSystemFocusedActions(
     surface: GroupSystemActionSurface,
     quickReactionEmojis: List<String>,
     onMenuChange: (Boolean) -> Unit,
+    motion: LocalReactionMotion,
 ) {
     val delete =
         FocusedMessageAction(
@@ -157,6 +186,7 @@ private fun GroupSystemFocusedActions(
                 textAlign = TextAlign.Center,
             )
         },
+        onReactionOrigin = motion::choose,
         onReact = {
             onMenuChange(false)
             actions.react(it)

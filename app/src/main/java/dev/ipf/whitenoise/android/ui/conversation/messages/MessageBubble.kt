@@ -158,6 +158,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPor
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CompleteReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
+import dev.ipf.whitenoise.android.ui.conversation.reactions.localReactionOverlay
+import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactionMotion
+import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
@@ -170,6 +173,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.rememberLocalVCardContact
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
@@ -430,6 +434,17 @@ internal fun MessageBubble(
     // add a warning; only unknown reasons still take the error-styled
     // tombstone. Explicit deletion always wins.
     val invalidated = !deleted && item.projected?.invalidationStatus != null
+    val reactionMotionRuntime = remember(controller) { appState.runtimeGeneration }
+    val currentReactionOwner =
+        !appState.appLockScreenVisible &&
+            controller.isCurrentGroupMutationOwner(appState, reactionMotionRuntime) &&
+            controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
+    val reactionTargetAvailable = !deleted && !invalidated && !actionsReadOnly
+    val localReactionMotion =
+        rememberLocalReactionMotion(
+            controller to item.presentationId,
+            enabled = rememberConversationMotionEnabled() && currentReactionOwner && reactionTargetAvailable,
+        )
     val invalidationPresentation =
         if (deleted) {
             TimelineInvalidationPresentation.None
@@ -595,8 +610,10 @@ internal fun MessageBubble(
         textLayouts.selectableTextLayouts.update(textLayouts.plainTextLayoutKey, layoutResult, coordinates)
     }
 
+    val composerSendMotion = dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion.current
     val plainTextSelectionModifier =
         Modifier.onGloballyPositioned { coordinates ->
+            composerSendMotion?.destinationText(item.presentationId, coordinates)
             textLayouts.plainTextLayoutTracker.coordinates = coordinates
             reportPlainTextLayoutIfReady()
         }
@@ -1044,6 +1061,7 @@ internal fun MessageBubble(
         // the delete landed.
         if (deleted || actionsReadOnly) return
         // Route via launchMutation: same survives-navigation rationale as delete/send.
+        val reactionOrigin = localReactionMotion.takeOrigin(emoji)
         appState.launchMutation {
             val target =
                 if (isPollRecord) {
@@ -1051,7 +1069,9 @@ internal fun MessageBubble(
                 } else {
                     record
                 }
-            controller.toggleReaction(emoji, target) {
+            controller.toggleReaction(emoji, target, onLocalIntent = { added ->
+                localReactionMotion.accept(emoji, added, reactionOrigin)
+            }) {
                 !isPollRecord || currentPollActionTarget(controller, pollOwner) != null
             }
         }
@@ -1520,6 +1540,7 @@ internal fun MessageBubble(
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
+            .localReactionOverlay(localReactionMotion)
             .onGloballyPositioned {
                 if (replySwipe.atRest) replySwipe.rowBoundsInRoot = it.boundsInRoot()
             },
@@ -2316,6 +2337,7 @@ internal fun MessageBubble(
 
                 /** Records the plain-text leaf's layout and registers it for selection once positioned. */
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
+                    composerSendMotion?.destinationLayout(item.presentationId, it)
                     textLayouts.plainTextLayoutTracker.layoutResult = it
                     reportPlainTextLayoutIfReady()
                 }
@@ -2615,7 +2637,13 @@ internal fun MessageBubble(
                         modifier =
                             Modifier
                                 .then(textSelectionBoundsModifier)
-                                .then(actionAnchorBoundsModifier),
+                                .then(actionAnchorBoundsModifier)
+                                .composerSendDestination(
+                                    item.presentationId,
+                                    composerSendMotion,
+                                    bubblePresentation,
+                                    mine,
+                                ),
                         presentation = bubblePresentation,
                         highlighted = highlighted,
                         mine = mine,
@@ -2746,6 +2774,7 @@ internal fun MessageBubble(
                         ),
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
+                    onReactionOrigin = localReactionMotion::choose,
                     onReact = { emoji ->
                         if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
@@ -3099,7 +3128,11 @@ internal fun MessageBubble(
                                             onCancelReply = { controller.replyingTo = null },
                                             onSend = { text, onAccepted ->
                                                 appState.launchMutation {
-                                                    appState.sendConversationText(controller, text, onAccepted)
+                                                    appState.sendConversationText(
+                                                        controller,
+                                                        text,
+                                                        onAccepted = onAccepted,
+                                                    )
                                                 }
                                             },
                                             initialDraft =
@@ -3280,6 +3313,7 @@ internal fun MessageBubble(
                     tallies = reactionTallies,
                     mine = mine,
                     visibilityState = reactionVisibilityState,
+                    localMotion = localReactionMotion,
                     enabled = !deleted,
                     onClick = {
                         if (!deleted) {

@@ -350,6 +350,7 @@ internal fun ConversationMediaViewer(
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
     imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
+    thumbnails: MediaViewerThumbnailRegistry? = null,
 ) {
     val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
@@ -386,6 +387,7 @@ internal fun ConversationMediaViewer(
         onGoToMessage = onGoToMessage,
         forwardActions = forwardActions,
         imageBytes = imageBytes,
+        thumbnails = thumbnails,
     )
 }
 
@@ -408,6 +410,7 @@ internal fun FullScreenMediaViewer(
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
     imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
+    thumbnails: MediaViewerThumbnailRegistry? = null,
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -548,8 +551,18 @@ internal fun FullScreenMediaViewer(
             DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_ALL,
         )
 
+    var closingMotion by remember { mutableStateOf(false) }
+    val openingMotionAttachment =
+        remember {
+            ConversationMediaViewerAttachmentId(
+                pages[startIndex.coerceIn(pages.indices)].messageIdHex,
+                pages[startIndex.coerceIn(pages.indices)].attachmentIndex,
+            )
+        }
+    val dismissWithMotion: () -> Unit = { closingMotion = true }
+
     PlaybackDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismissWithMotion,
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
@@ -605,7 +618,7 @@ internal fun FullScreenMediaViewer(
                     null
                 },
             groupPictureBusy = pictureSession.busy,
-            onDismiss = onDismiss,
+            onDismiss = dismissWithMotion,
             onSave = {
                 val ref = currentReference
                 val attachmentIndex = currentAttachmentIndex
@@ -711,45 +724,69 @@ internal fun FullScreenMediaViewer(
             snackbarHostState = snackbarHostState,
             chromeVisible = chromeVisible,
         ) {
-            StableMediaViewerPager(
-                pages = pages,
-                selection = pagerSelection,
-                modifier = Modifier.fillMaxSize(),
-                pagePositionDescription = pagePositionDescription,
-                // Disable pager swipe while the visible page is zoomed in —
-                // otherwise the pan gesture and the pager's swipe both want
-                // the horizontal drag. At scale 1× the pager wins.
-                userScrollEnabled = viewerPagerScrollEnabled(scale),
-            ) { pageDescriptor, isCurrent ->
-                if (MediaReferenceSupport.isVideoMedia(pageDescriptor.reference)) {
-                    VideoViewerPage(
-                        controller = controller,
-                        messageIdHex = pageDescriptor.messageIdHex,
-                        attachmentIndex = pageDescriptor.attachmentIndex,
-                        reference = pageDescriptor.reference,
-                        isCurrent = isCurrent,
-                        mine = pageDescriptor.mine,
-                        onPlayerChanged = onVideoPlayerChanged,
-                        videoFileResolver = videoFileResolver,
-                        // One tap reveals or hides Media3's controls and the viewer chrome together, and they
-                        // time out together while playing, so the frame and time bar are never covered.
-                        onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible },
-                    )
-                } else {
-                    ViewerPage(
-                        controller = controller,
-                        messageIdHex = pageDescriptor.messageIdHex,
-                        attachmentIndex = pageDescriptor.attachmentIndex,
-                        reference = pageDescriptor.reference,
-                        scale = if (isCurrent) scale else 1f,
-                        offset = if (isCurrent) offset else Offset.Zero,
-                        onScaleChange = { if (isCurrent) scale = it },
-                        onOffsetChange = { if (isCurrent) offset = it },
-                        mine = pageDescriptor.mine,
-                        isCurrent = isCurrent,
-                        onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
-                        imageBytes = imageBytes?.let { loader -> { loader(pageDescriptor) } },
-                    )
+            MediaViewerMotion(
+                registry = thumbnails,
+                opening = openingMotionAttachment,
+                selected =
+                    ConversationMediaViewerAttachmentId(
+                        currentPage.messageIdHex,
+                        currentPage.attachmentIndex,
+                    ),
+                closing = closingMotion,
+                allowMotion =
+                    scale == 1f &&
+                        offset == Offset.Zero &&
+                        (
+                            closingMotion ||
+                                openingMotionAttachment ==
+                                ConversationMediaViewerAttachmentId(
+                                    currentPage.messageIdHex,
+                                    currentPage.attachmentIndex,
+                                )
+                        ),
+                onClosed = onDismiss,
+                selectedSourceEpoch = currentReference.sourceEpoch,
+            ) {
+                StableMediaViewerPager(
+                    pages = pages,
+                    selection = pagerSelection,
+                    modifier = Modifier.fillMaxSize(),
+                    pagePositionDescription = pagePositionDescription,
+                    // Disable pager swipe while the visible page is zoomed in —
+                    // otherwise the pan gesture and the pager's swipe both want
+                    // the horizontal drag. At scale 1× the pager wins.
+                    userScrollEnabled = viewerPagerScrollEnabled(scale),
+                ) { pageDescriptor, isCurrent ->
+                    if (MediaReferenceSupport.isVideoMedia(pageDescriptor.reference)) {
+                        VideoViewerPage(
+                            controller = controller,
+                            messageIdHex = pageDescriptor.messageIdHex,
+                            attachmentIndex = pageDescriptor.attachmentIndex,
+                            reference = pageDescriptor.reference,
+                            isCurrent = isCurrent,
+                            mine = pageDescriptor.mine,
+                            onPlayerChanged = onVideoPlayerChanged,
+                            videoFileResolver = videoFileResolver,
+                            // One tap reveals or hides Media3's controls and the viewer chrome together, and they
+                            // time out together while playing, so the frame and time bar are never covered.
+                            onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible },
+                        )
+                    } else {
+                        ViewerPage(
+                            controller = controller,
+                            messageIdHex = pageDescriptor.messageIdHex,
+                            attachmentIndex = pageDescriptor.attachmentIndex,
+                            reference = pageDescriptor.reference,
+                            scale = if (isCurrent) scale else 1f,
+                            offset = if (isCurrent) offset else Offset.Zero,
+                            onScaleChange = { if (isCurrent) scale = it },
+                            onOffsetChange = { if (isCurrent) offset = it },
+                            mine = pageDescriptor.mine,
+                            isCurrent = isCurrent,
+                            onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
+                            imageBytes = imageBytes?.let { loader -> { loader(pageDescriptor) } },
+                        )
+                    }
                 }
             }
         }
