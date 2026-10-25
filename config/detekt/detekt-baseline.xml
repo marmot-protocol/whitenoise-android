@@ -30,10 +30,10 @@
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$private suspend fun CoroutineScope.runTimelineSubscriptionPipeline</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$private suspend fun performMediaUpload</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$suspend fun send</ID>
-    <ID>CyclomaticComplexMethod:Controllers.kt:internal fun durableStreamDisplayPositions: Map&lt;String, StreamFinalDisplayPosition&gt;</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:internal fun optimisticMessageIdForProjection: String?</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
     <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
+    <ID>CyclomaticComplexMethod:ConversationStreamPresentation.kt:internal fun durableStreamDisplayPositions: Map&lt;String, StreamFinalDisplayPosition&gt;</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$fun put</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$private fun buildHydratedIndex: HydratedIndex</ID>
     <ID>CyclomaticComplexMethod:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
@@ -307,6 +307,7 @@
     <ID>LoopWithTooManyJumpStatements:Controllers.kt:ChatsController$while</ID>
     <ID>LoopWithTooManyJumpStatements:Controllers.kt:ConversationController$while</ID>
     <ID>LoopWithTooManyJumpStatements:Controllers.kt:for</ID>
+    <ID>LoopWithTooManyJumpStatements:ConversationStreamPresentation.kt:for</ID>
     <ID>LoopWithTooManyJumpStatements:ConversationTranscriptExport.kt:ConversationTranscriptExport$while</ID>
     <ID>LoopWithTooManyJumpStatements:DisappearingMessageSweep.kt:DisappearingMessageSweep$for</ID>
     <ID>LoopWithTooManyJumpStatements:DiskByteCache.kt:DiskByteCache$for</ID>
@@ -380,6 +381,8 @@
     <ID>MagicNumber:ConversationRows.kt:1000L</ID>
     <ID>MagicNumber:ConversationRows.kt:6L</ID>
     <ID>MagicNumber:ConversationScreen.kt:99</ID>
+    <ID>MagicNumber:ConversationStreamPresentation.kt:1200uL</ID>
+    <ID>MagicNumber:ConversationStreamPresentation.kt:9uL</ID>
     <ID>MagicNumber:CopyBundles.kt:60_000L</ID>
     <ID>MagicNumber:DiagnosticsScreen.kt:1000L</ID>
     <ID>MagicNumber:DiagnosticsScreen.kt:500</ID>
@@ -970,13 +973,13 @@
     <ID>ReturnCount:Controllers.kt:internal fun isDisappearingSendTimeExpiryDeferred: Boolean</ID>
     <ID>ReturnCount:Controllers.kt:internal fun optimisticMessageIdForProjection: String?</ID>
     <ID>ReturnCount:Controllers.kt:internal fun sharedChatListItemsWith: List&lt;ChatListItem&gt;</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun streamFinalDisplayPosition: StreamFinalDisplayPosition?</ID>
     <ID>ReturnCount:Controllers.kt:internal fun timelineMessageIdsExceedingLiveCap: List&lt;String&gt;</ID>
     <ID>ReturnCount:Controllers.kt:internal fun unreadCountDivergenceReport: UnreadCountDivergenceReport?</ID>
     <ID>ReturnCount:Controllers.kt:internal fun unreadReceivedMentionIds: List&lt;String&gt;</ID>
     <ID>ReturnCount:Controllers.kt:private fun messagesHaveSameRenderableSendShape: Boolean</ID>
     <ID>ReturnCount:ConversationLogic.kt:internal fun isNearBottom: Boolean</ID>
     <ID>ReturnCount:ConversationNotificationChannels.kt:ConversationNotificationChannels$private fun ensureConversationChannel: String?</ID>
+    <ID>ReturnCount:ConversationStreamPresentation.kt:internal fun streamFinalDisplayPosition: StreamFinalDisplayPosition?</ID>
     <ID>ReturnCount:DisappearingMessageSweep.kt:DisappearingMessageSweep$fun isLocallyExpired: Boolean</ID>
     <ID>ReturnCount:DisappearingMessageSweep.kt:DisappearingMessageSweep$internal fun resolveLocalExpirySeconds: ULong?</ID>
     <ID>ReturnCount:DiskByteCache.kt:DiskByteCache$fun put</ID>
