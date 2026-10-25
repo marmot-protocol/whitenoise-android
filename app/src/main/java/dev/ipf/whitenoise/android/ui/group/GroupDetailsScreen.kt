@@ -1888,6 +1888,13 @@ internal fun GroupDetailsScreen(
                             SettingsLink(
                                 context = rowContext,
                                 title = stringResource(R.string.translation_automatic),
+                                leading = {
+                                    Icon(
+                                        painterResource(R.drawable.ic_translate),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
                                 onClick = { showTranslationPicker = true },
                             )
                         }

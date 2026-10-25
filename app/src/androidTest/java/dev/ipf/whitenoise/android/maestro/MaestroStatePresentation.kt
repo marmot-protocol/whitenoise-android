@@ -68,7 +68,8 @@ private fun NotificationScopePresentation(fixture: MaestroPresentationFixture) {
     ConversationNotificationCategoriesList(
         settings = listOf(setting),
         onOpen = { error("Scope test must not open Android settings") },
-        onScopeChange = { selected, custom ->
+        alertEnabled = mapOf(setting.channel to false),
+        onAlertChange = { selected, custom ->
             check(selected == setting && custom)
             fixture.finish("scope-selected")
         },

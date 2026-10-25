@@ -1220,6 +1220,12 @@ class WhiteNoiseAppState private constructor(
     )
 
     internal val appContext = context.applicationContext
+    internal val publicJpegPreviewPreferences =
+        dev.ipf.whitenoise.android.media
+            .PublicJpegPreviewPreferences(appContext)
+    internal val publicJpegPreviewLoader =
+        dev.ipf.whitenoise.android.media
+            .PublicJpegPreviewLoader()
 
     /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
     internal val emojiUploads = EmojiUploadCache()
@@ -7556,6 +7562,8 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
+            publicJpegPreviewLoader.clearPixels()
+            publicJpegPreviewPreferences.retainAccounts(accounts.filter { it.label != wipedRef }.map { it.accountIdHex })
             withContext(NonCancellable + Dispatchers.IO) {
                 val alertsCleared =
                     runCatching {
@@ -8930,6 +8938,10 @@ class WhiteNoiseAppState private constructor(
      * inline (getSystemService/activeNetwork/getNetworkCapabilities) is three
      * synchronous binder IPCs per call (#984).
      */
+    internal fun publicJpegPreviewNetworkAllowed(): Boolean =
+        activeNetworkTypesSnapshot == setOf(MediaAutoDownloadNetwork.WiFi) &&
+            shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
+
     private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> = activeNetworkTypesSnapshot
 
     // Callback-maintained mirror of the default network's state, volatile so

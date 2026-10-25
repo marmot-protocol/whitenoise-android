@@ -1341,6 +1341,12 @@ internal fun ComposerBar(
                     // app-owned controls replace only the waveform slot, so an open IME
                     // stays open and a closed IME is never raised implicitly.
                     ComposerPill(
+                        sendingIdentity =
+                            if (appState != null && composerSendingAccount(appState, draftAccountRef) != null) {
+                                { ComposerSendingIdentity(appState, draftAccountRef, draftKey, overlayBackRegistrar) }
+                            } else {
+                                null
+                            },
                         accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
                         voiceReviewContent =
                             voiceReviewClip?.let { reviewedClip ->

@@ -2621,4 +2621,9 @@
     <string name="setup_finding_outcome_unknown">Result unknown</string>
     <string name="setup_finding_outcome_success">Check succeeded</string>
     <string name="setup_finding_outcome_failure">Check failed</string>
+    <string name="composer_sending_as">Sending as</string>
+    <string name="public_jpeg_previews_title">Inline image previews</string>
+    <string name="public_jpeg_previews_privacy">Off by default. Direct Blossom JPEG links may reveal your IP address to the image host. Previews use unmetered Wi-Fi and your photo download rules. Ordinary links remain available when off.</string>
+    <string name="public_jpeg_preview_image">Linked JPEG preview</string>
+    <string name="public_jpeg_preview_save_failed">Could not save the image preview setting. Please try again.</string>
 </resources>
