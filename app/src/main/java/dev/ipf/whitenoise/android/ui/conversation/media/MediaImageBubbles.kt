@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -564,27 +565,7 @@ internal fun MasonryImageLayout(
                         tile(2, Modifier.weight(1f).fillMaxWidth())
                     }
                 }
-            4 ->
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                    modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
-                ) {
-                    Row(
-                        horizontalArrangement =
-                            Arrangement.spacedBy(gap),
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                    ) {
-                        tile(0, Modifier.weight(1f).fillMaxHeight())
-                        tile(1, Modifier.weight(1f).fillMaxHeight())
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(gap),
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                    ) {
-                        tile(2, Modifier.weight(1f).fillMaxHeight())
-                        tile(3, Modifier.weight(1f).fillMaxHeight())
-                    }
-                }
+            4 -> masonryFourImageLayout(gap, tile)
             else ->
                 Column(
                     verticalArrangement = Arrangement.spacedBy(gap),
@@ -600,6 +581,35 @@ internal fun MasonryImageLayout(
                         }
                     }
                 }
+        }
+    }
+}
+
+/** Keeps the four-tile grid's native row and weight structure unchanged. */
+@Composable
+private fun masonryFourImageLayout(
+    gap: Dp,
+    tile: @Composable (index: Int, tileModifier: Modifier) -> Unit,
+) {
+    val bottomRight = 3
+    Column(
+        verticalArrangement = Arrangement.spacedBy(gap),
+        modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
+    ) {
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(gap),
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        ) {
+            tile(0, Modifier.weight(1f).fillMaxHeight())
+            tile(1, Modifier.weight(1f).fillMaxHeight())
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        ) {
+            tile(2, Modifier.weight(1f).fillMaxHeight())
+            tile(bottomRight, Modifier.weight(1f).fillMaxHeight())
         }
     }
 }

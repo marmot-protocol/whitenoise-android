@@ -6,7 +6,7 @@
       {
         "surface": "Activity reaction local intent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRowActions.kt",
-        "anchor": "onLocalIntent(emoji, added)",
+        "anchor": "onLocalIntent(emoji, added, origin)",
         "test_ids": [
           "MSG-041"
         ]

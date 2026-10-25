@@ -132,6 +132,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutS
 import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion
 import dev.ipf.whitenoise.android.ui.conversation.LocalPollVotesHost
 import dev.ipf.whitenoise.android.ui.conversation.PollCard
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
@@ -3109,55 +3110,61 @@ internal fun MessageBubble(
                                     )
                                 ComposerGate.COMPOSER ->
                                     if (!actionsReadOnly) {
-                                        ComposerBar(
-                                            replyingToEmoji =
-                                                rememberReplyReceivedEmoji(
-                                                    controller.replyingTo?.messageIdHex,
-                                                    controller,
-                                                    appState,
-                                                ),
-                                            replyingTo = controller.replyingTo,
-                                            replyingToMedia =
-                                                controller.replyingTo
-                                                    ?.let(controller::mediaReferencesFor)
-                                                    .orEmpty(),
-                                            replyingToDisplay =
-                                                controller.replyingTo
-                                                    ?.let { controller.replyTargetPreview(it, messageTextCopy) },
-                                            messageTextCopy = messageTextCopy,
-                                            onCancelReply = { controller.replyingTo = null },
-                                            onSend = { text, onAccepted ->
-                                                appState.launchMutation {
-                                                    appState.sendConversationText(
+                                        CompositionLocalProvider(
+                                            LocalComposerSendMotion provides null,
+                                        ) {
+                                            ComposerBar(
+                                                replyingToEmoji =
+                                                    rememberReplyReceivedEmoji(
+                                                        controller.replyingTo?.messageIdHex,
                                                         controller,
-                                                        text,
-                                                        onAccepted = onAccepted,
-                                                    )
-                                                }
-                                            },
-                                            initialDraft =
-                                                appState
-                                                    .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
-                                                    ?.textFieldValue
-                                                    ?: TextFieldValue(""),
-                                            onDraftChange = {
-                                                appState.setDraft(controller.boundAccountRef, groupIdHex, it)
-                                            },
-                                            draftKey = composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),
-                                            draftAccountRef = controller.boundAccountRef,
-                                            draftGroupIdHex = groupIdHex,
-                                            textState = composerTextState,
-                                            editingMessageId = controller.editingMessageId,
-                                            editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                            onCancelEdit = controller::cancelMessageEdit,
-                                            appState = appState,
-                                            mentionCandidates = mentionCandidates,
-                                            mentionPickerEnabled = mentionPickerEnabled,
-                                            enterKeyBehavior = appState.enterKeyBehavior,
-                                            recentEmojis = recentEmojis,
-                                            onEmojiUsed = onEmojiUsed,
-                                            onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
-                                        )
+                                                        appState,
+                                                    ),
+                                                replyingTo = controller.replyingTo,
+                                                replyingToMedia =
+                                                    controller.replyingTo
+                                                        ?.let(controller::mediaReferencesFor)
+                                                        .orEmpty(),
+                                                replyingToDisplay =
+                                                    controller.replyingTo
+                                                        ?.let { controller.replyTargetPreview(it, messageTextCopy) },
+                                                messageTextCopy = messageTextCopy,
+                                                onCancelReply = { controller.replyingTo = null },
+                                                onSend = { text, onAccepted ->
+                                                    appState.launchMutation {
+                                                        appState.sendConversationText(
+                                                            controller,
+                                                            text,
+                                                            onAccepted = onAccepted,
+                                                        )
+                                                    }
+                                                },
+                                                initialDraft =
+                                                    appState
+                                                        .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
+                                                        ?.textFieldValue
+                                                        ?: TextFieldValue(""),
+                                                onDraftChange = {
+                                                    appState.setDraft(controller.boundAccountRef, groupIdHex, it)
+                                                },
+                                                draftKey =
+                                                    composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),
+                                                draftAccountRef = controller.boundAccountRef,
+                                                draftGroupIdHex = groupIdHex,
+                                                textState = composerTextState,
+                                                editingMessageId = controller.editingMessageId,
+                                                editingInitialText =
+                                                    editingRecord?.let { controller.displayedText(it) },
+                                                onCancelEdit = controller::cancelMessageEdit,
+                                                appState = appState,
+                                                mentionCandidates = mentionCandidates,
+                                                mentionPickerEnabled = mentionPickerEnabled,
+                                                enterKeyBehavior = appState.enterKeyBehavior,
+                                                recentEmojis = recentEmojis,
+                                                onEmojiUsed = onEmojiUsed,
+                                                onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
+                                            )
+                                        }
                                     }
                             }
                         },

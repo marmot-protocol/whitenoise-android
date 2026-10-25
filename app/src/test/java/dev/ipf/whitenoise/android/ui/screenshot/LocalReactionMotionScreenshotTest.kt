@@ -139,20 +139,25 @@ class LocalReactionMotionScreenshotTest {
             }
         }
         rule.waitForIdle()
-        val root = rule.onNodeWithTag("reaction-motion-root")
         val folder = File("build/local-reaction-motion/$name").apply { mkdirs() }
-        if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") root.captureRoboImage(File(folder, "frame-000.png").path)
-        root.captureRoboImage("src/test/snapshots/local_reaction_motion_${name}_first.png")
+        if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
+            captureReactionFrame(File(folder, "frame-000.png").path)
+        }
+        captureReactionFrame("src/test/snapshots/local_reaction_motion_${name}_first.png")
         rule.onNodeWithTag("choose-reaction").performClick()
         repeat(24) { index ->
             if (name == "interrupted" && index == 6) rule.runOnIdle { animations = false }
             rule.mainClock.advanceTimeBy(16)
             rule.waitForIdle()
             if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
-                root.captureRoboImage(File(folder, "frame-%03d.png".format(index + 1)).path)
+                captureReactionFrame(File(folder, "frame-%03d.png".format(index + 1)).path)
             }
-            if (index == 6) root.captureRoboImage("src/test/snapshots/local_reaction_motion_${name}_mid.png")
+            if (index == 6) captureReactionFrame("src/test/snapshots/local_reaction_motion_${name}_mid.png")
         }
-        root.captureRoboImage("src/test/snapshots/local_reaction_motion_${name}_settled.png")
+        captureReactionFrame("src/test/snapshots/local_reaction_motion_${name}_settled.png")
+    }
+
+    private fun captureReactionFrame(path: String) {
+        rule.onNodeWithTag("reaction-motion-root").captureRoboImage(path)
     }
 }

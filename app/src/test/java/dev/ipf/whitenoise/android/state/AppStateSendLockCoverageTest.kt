@@ -24,7 +24,8 @@ class AppStateSendLockCoverageTest {
             "Mounted dictation must dispatch through the ordinary controller path",
             "sendDictationThroughMountedController(liveReply.controller, request)" in body &&
                 Regex(
-                    """sendConversationText\(\s*controller,\s*request.payload,\s*onAccepted\s*=\s*request.onPendingShown,?\s*\)""",
+                    """sendConversationText\(\s*controller,\s*request.payload,\s*""" +
+                        """onAccepted\s*=\s*request.onPendingShown,?\s*\)""",
                 ).containsMatchIn(mountedControllerBody),
         )
         assertTrue(

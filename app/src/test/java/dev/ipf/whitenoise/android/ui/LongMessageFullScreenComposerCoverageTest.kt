@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -140,6 +141,27 @@ class LongMessageFullScreenComposerCoverageTest {
                 Regex("mentionCandidates = mentionPicker.candidates").findAll(screenBody).count() >= 2 &&
                 Regex("mentionPickerEnabled = mentionPicker.enabled").findAll(screenBody).count() >= 2,
         )
+    }
+
+    /** A reader can share text ownership without overwriting the conversation's measured flight endpoints. */
+    @Test
+    fun expandedReaderCannotPublishConversationMotionGeometry() {
+        val body = messageBubbleSource().readText().functionBody("MessageBubble")
+        val readerStart = body.indexOf("MessageFullScreenView(")
+        require(readerStart >= 0) { "Missing expanded reader" }
+        val reader = body.kotlinBlockFrom(body.indexOf('(', readerStart), "reader arguments", '(', ')')
+        val local = reader.indexOf("LocalComposerSendMotion provides null")
+        require(local >= 0) { "Reader must isolate the conversation motion local" }
+        val providerStart = reader.lastIndexOf("CompositionLocalProvider(", local)
+        require(providerStart >= 0) { "Missing reader local provider" }
+        val parametersStart = reader.indexOf('(', providerStart)
+        val parameters = reader.kotlinBlockFrom(parametersStart, "reader motion local", '(', ')')
+        assertTrue("Reader must provide a null motion owner", "LocalComposerSendMotion provides null" in parameters)
+        val isolated =
+            reader.kotlinBlockFrom(parametersStart + parameters.length, "isolated reader body", searchForOpening = true)
+        assertTrue("Reader composer must be inside its isolated local", "ComposerBar(" in isolated)
+        assertFalse("Reader disposal must not clear the conversation flight", "composerSendMotion.clear()" in reader)
+        assertFalse("Reader disposal must not retire the conversation owner", "composerSendMotion.dispose()" in reader)
     }
 
     private fun messageFullScreenSource(): File =

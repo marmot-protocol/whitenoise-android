@@ -66,10 +66,17 @@ internal fun GroupSystemTimelineRow(
     val currentItem by rememberUpdatedState(item)
     val actions =
         remember(controller, owner, motion) {
-            GroupSystemRowActions(controller, appState, owner, { currentReadOnly }, { currentItem }) { emoji, added ->
-                motion.accept(emoji, added, motion.takeOrigin(emoji))
+            GroupSystemRowActions(
+                controller,
+                appState,
+                owner,
+                { currentReadOnly },
+                { currentItem },
+            ) { emoji, added, origin ->
+                motion.accept(emoji, added, origin)
             }
         }
+    val react: (String) -> Unit = { emoji -> actions.react(emoji, motion.takeOrigin(emoji)) }
     val surface = remember(owner) { GroupSystemActionSurface() }
     GroupSystemActionLifetime(owner, actions, surface, onActionMenuOpenChange)
     Box(Modifier.localReactionOverlay(motion)) {
@@ -94,7 +101,7 @@ internal fun GroupSystemTimelineRow(
                 if (actions.tallies.isNotEmpty()) {
                     ReactionPillFlow(
                         actions.tallies,
-                        actions::react.takeIf { actions.canReact },
+                        react.takeIf { actions.canReact },
                         { surface.detailsOpen = true },
                         localMotion = motion,
                     )
@@ -104,7 +111,7 @@ internal fun GroupSystemTimelineRow(
         if (isActionMenuOpen && (actions.canReact || actions.canDelete)) {
             GroupSystemFocusedActions(actions, surface, quickReactionEmojis, onActionMenuOpenChange, motion)
         }
-        GroupSystemReactionSheets(item, actions, surface, recentEmojis, onEmojiUsed)
+        GroupSystemReactionSheets(actions, surface, recentEmojis, onEmojiUsed, react)
     }
 }
 
@@ -189,7 +196,7 @@ private fun GroupSystemFocusedActions(
         onReactionOrigin = motion::choose,
         onReact = {
             onMenuChange(false)
-            actions.react(it)
+            actions.react(it, motion.takeOrigin(it))
         },
         onMoreReactions = {
             onMenuChange(false)
@@ -202,11 +209,11 @@ private fun GroupSystemFocusedActions(
 /** Uses the shared picker and live reactor details, keeping read-only history inspectable. */
 @Composable
 private fun GroupSystemReactionSheets(
-    item: TimelineMessage,
     actions: GroupSystemRowActions,
     surface: GroupSystemActionSurface,
     recentEmojis: List<String>,
     onEmojiUsed: (String) -> Unit,
+    react: (String) -> Unit,
 ) {
     if (surface.pickerOpen && actions.canReact) {
         EmojiPickerSheet(
@@ -215,16 +222,16 @@ private fun GroupSystemReactionSheets(
             onDismissRequest = { surface.pickerOpen = false },
             onEmojiPicked = {
                 surface.pickerOpen = false
-                actions.react(it)
+                react(it)
             },
         )
     }
     if (surface.detailsOpen && !actions.hidden) {
         CompleteReactionDetailsSheet(
-            item = item,
+            item = actions.currentItem,
             controller = actions.controller,
             appState = actions.appState,
-            onRemoveOwnReaction = actions::react.takeIf { actions.canReact },
+            onRemoveOwnReaction = react.takeIf { actions.canReact },
             onDismissRequest = { surface.detailsOpen = false },
         )
     }

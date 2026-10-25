@@ -590,20 +590,8 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         val releaseSuccess = CompletableDeferred<Unit>()
         val draftStore = DraftStore(InMemoryDraftPersistence())
         val appState = appState(draftStore)
-        val sentDraft =
-            when {
-                rtl -> "مرحبا"
-                expanded -> "A message ready to fly.\nSmooth corners, steady text."
-                else -> "Ready to fly."
-            }
-        val caseName =
-            if (expanded) {
-                "expanded"
-            } else if (rtl) {
-                "short_rtl_large"
-            } else {
-                "short"
-            }
+        val sentDraft = trajectoryDraft(expanded, rtl)
+        val caseName = trajectoryCaseName(expanded, rtl)
         val nextDraft = "The next draft stays editable."
         draftStore.set(ACCOUNT_A, DICTATION_GROUP, TextFieldValue(sentDraft))
         if (expanded) {
@@ -754,9 +742,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 )
             }
             heights += productionComposerPillContentHeight()
-            frames?.let {
-                composeRule.onRoot().captureRoboImage(java.io.File(it, "frame-001.png").path)
-            }
+            captureTrajectoryFrame(frames, "frame-001.png")
             repeat(36) { index ->
                 composeRule.mainClock.advanceTimeByFrame()
                 composeRule.waitForIdle()
@@ -769,38 +755,13 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 )
                 val owner = checkNotNull(observedMotion)
                 sampleAcceptedTrajectory(owner, acceptedPresentationId, trajectory)
-                if (!owner.hides(acceptedPresentationId) && firstExposedCanonical == null) {
-                    firstExposedCanonical =
-                        composeRule
-                            .onNodeWithTag(
-                                composerSendDestinationTag(acceptedPresentationId),
-                                useUnmergedTree = true,
-                            ).fetchSemanticsNode()
-                            .boundsInWindow
-                }
-                frames?.let {
-                    composeRule.onRoot().captureRoboImage(java.io.File(it, "frame-%03d.png".format(index + 2)).path)
-                }
+                firstExposedCanonical = firstVisibleCanonical(owner, acceptedPresentationId, firstExposedCanonical)
+                captureTrajectoryFrame(frames, "frame-%03d.png".format(index + 2))
                 if (index == 8) {
                     composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_send_route_${caseName}_mid.png")
                 }
             }
-            val compactHeight = heights.last()
-            if (expanded) {
-                assertTrue("Accepted composer must reach its compact viewport", compactHeight < expandedHeight - 80f)
-                assertTrue(
-                    "At least one frame must be strictly between expanded and compact",
-                    heights.any {
-                        it > compactHeight + 4f && it < expandedHeight - 4f
-                    },
-                )
-                assertTrue(
-                    "No frame may snap most of the expanded viewport away: $heights",
-                    heights.zipWithNext().all { (before, after) ->
-                        before - after < (expandedHeight - compactHeight) * .65f
-                    },
-                )
-            }
+            if (expanded) assertExpandedTrajectoryCollapse(heights, expandedHeight)
             assertTrue("Actual overlay must draw through several measured frames", trajectory.size >= 8)
             assertTrue(
                 "Accepted object's bottom must travel upward without reversal: $trajectory",
@@ -873,6 +834,67 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             1,
             fixture.controller.timeline.count {
                 it.record.plaintext == sentDraft
+            },
+        )
+    }
+
+    private fun trajectoryDraft(
+        expanded: Boolean,
+        rtl: Boolean,
+    ): String =
+        when {
+            rtl -> "مرحبا"
+            expanded -> "A message ready to fly.\nSmooth corners, steady text."
+            else -> "Ready to fly."
+        }
+
+    private fun trajectoryCaseName(
+        expanded: Boolean,
+        rtl: Boolean,
+    ): String =
+        when {
+            expanded -> "expanded"
+            rtl -> "short_rtl_large"
+            else -> "short"
+        }
+
+    private fun firstVisibleCanonical(
+        owner: ComposerSendMotion,
+        presentationId: String,
+        previous: Rect?,
+    ): Rect? =
+        previous ?: if (owner.hides(presentationId)) {
+            null
+        } else {
+            composeRule
+                .onNodeWithTag(composerSendDestinationTag(presentationId), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInWindow
+        }
+
+    private fun captureTrajectoryFrame(
+        directory: java.io.File?,
+        fileName: String,
+    ) {
+        directory?.let { composeRule.onRoot().captureRoboImage(java.io.File(it, fileName).path) }
+    }
+
+    private fun assertExpandedTrajectoryCollapse(
+        heights: List<Float>,
+        expandedHeight: Float,
+    ) {
+        val compactHeight = heights.last()
+        assertTrue("Accepted composer must reach its compact viewport", compactHeight < expandedHeight - 80f)
+        assertTrue(
+            "At least one frame must be strictly between expanded and compact",
+            heights.any {
+                it > compactHeight + 4f && it < expandedHeight - 4f
+            },
+        )
+        assertTrue(
+            "No frame may snap most of the expanded viewport away: $heights",
+            heights.zipWithNext().all { (before, after) ->
+                before - after < (expandedHeight - compactHeight) * .65f
             },
         )
     }
