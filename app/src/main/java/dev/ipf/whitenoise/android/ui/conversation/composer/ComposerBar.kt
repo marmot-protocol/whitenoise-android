@@ -1497,6 +1497,16 @@ internal fun ComposerBar(
                         inputFocusEnabled = voiceReviewClip == null,
                         expandedTrailingActionInset = trailingControlsWidth,
                         compactMeasurementWidth = maxWidth,
+                        // Navigation is admitted only after geometry settles. Its optional row stays
+                        // in the outer layout cap, never in the target that admits that same row.
+                        automaticTextHeightCeilingPx =
+                            with(density) {
+                                (
+                                    automaticComposerCeiling - ComposerManualChromeHeight -
+                                        measuredComposerAccessoryHeight
+                                ).coerceAtLeast(editorLineHeight).roundToPx()
+                            },
+                        actionRowAccessoryHeightPx = with(density) { measuredComposerAccessoryHeight.roundToPx() },
                         compactMeasurementReservesTrailingAction = false,
                         forceEditingLayout =
                             editingMessageId != null ||
@@ -1536,6 +1546,7 @@ internal fun ComposerBar(
                             }
                         },
                         scrollOwnerKey = Triple(draftKey, draftAccountRef, draftGroupIdHex),
+                        pasteTargetKey = editingMessageId,
                         multilineControlsSuppressed = compactControlLayout,
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,

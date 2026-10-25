@@ -269,11 +269,13 @@ private fun BubblePreview(
 /** Preview bubble in the editor. */
 @Suppress("FunctionNaming")
 @Composable
-private fun PreviewBubble(
+internal fun PreviewBubble(
     text: String,
     presentation: BubblePresentation,
     mine: Boolean,
     modifier: Modifier,
+    quote: String? = null,
+    time: String? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -287,13 +289,21 @@ private fun PreviewBubble(
             ),
         shape = MaterialTheme.shapes.large,
     ) {
-        Text(text, Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+        if (quote == null && time == null) {
+            Text(text, Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+        } else {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                if (quote != null) Text(quote, style = MaterialTheme.typography.bodySmall)
+                Text(text, style = MaterialTheme.typography.bodyLarge)
+                if (time != null) Text(time, style = MaterialTheme.typography.labelSmall)
+            }
+        }
     }
 }
 
 /** The theme roles a real message bubble resolves against, so the preview and the chat agree. */
 @Composable
-private fun previewBubbleTokens(): BubblePresentationTokens {
+internal fun previewBubbleTokens(): BubblePresentationTokens {
     val scheme = MaterialTheme.colorScheme
     return BubblePresentationTokens(
         errorBackgroundArgb = scheme.errorContainer.toOpaqueArgb(),

@@ -116,6 +116,14 @@
         "test_ids": [
           "MSG-004"
         ]
+      },
+      {
+        "surface": "setting:show_less",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.show_less",
+        "test_ids": [
+          "MSG-040"
+        ]
       }
     ],
     "source_coverage": [

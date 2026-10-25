@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +20,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -72,7 +75,7 @@ private const val DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP = 8f
 internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 168.dp
 private val DICTATION_PROCESSING_ACTIONS_WIDTH = 144.dp
 
-/** App-root bottom control used while the immutable dictation origin is not visible. */
+/** Floating app-root control used while the immutable dictation origin is not visible. */
 @Composable
 internal fun ConversationDictationPersistentControl(
     state: ConversationDictationState,
@@ -88,10 +91,10 @@ internal fun ConversationDictationPersistentControl(
         }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 2.dp,
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier =
             modifier
-                .fillMaxWidth()
                 .testTag(APP_DICTATION_CONTROL_TAG)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
@@ -99,26 +102,25 @@ internal fun ConversationDictationPersistentControl(
                 },
     ) {
         Row(
-            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier.widthIn(max = 288.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = status,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            ConversationDictationCompactActions(
-                state = state,
-                controller = controller,
-            )
+            // Preserve the old bar's single-line recovery explanation; active capture is icon-only.
+            if (state is ConversationDictationState.Failed) {
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                )
+            }
+            ConversationDictationCompactActions(state = state, controller = controller)
         }
     }
 }
 
-/** Compact Cancel/Paste/Send controls shared by the origin composer and app-root bar. */
+/** Compact Cancel/Paste/Send controls shared by the origin composer and floating capsule. */
 @Composable
 internal fun ConversationDictationCompactActions(
     state: ConversationDictationState,
@@ -222,7 +224,7 @@ private fun ConversationDictationActiveActions(
     controller: ConversationDictationController,
     actionColors: AccountActionColors,
 ) {
-    val pasteLabel = stringResource(R.string.paste)
+    val pasteLabel = stringResource(R.string.paste_dictation_transcript)
     val sendLabel = stringResource(R.string.send)
     if (controller.captureInProgress) {
         ConversationDictationListeningIndicator()

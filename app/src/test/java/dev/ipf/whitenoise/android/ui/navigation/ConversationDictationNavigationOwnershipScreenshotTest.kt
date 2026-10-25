@@ -1,11 +1,15 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import android.content.Context
 import android.view.View
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -19,6 +23,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
@@ -34,19 +39,27 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
+import dev.ipf.whitenoise.android.ui.conversation.compactTopClearanceFor
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,6 +80,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ConversationDictationNavigationOwnershipScreenshotTest {
+    private val transcriptPasteLabel: String
+        get() = ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_dictation_transcript)
+
     private val scheduler = TestCoroutineScheduler()
 
     @get:Rule
@@ -82,12 +98,105 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     @Test
     fun persistentActionsAboveKeyboardLargeRtlDark() = captureKeyboardActions(dark = true, largeRtl = true)
 
+    @Test
+    fun keyboardAmoled() = captureKeyboardActions(dark = true, largeRtl = false, amoled = true)
+
+    @Test
+    fun returnedComposerAmoled() = captureNavigation(dark = true, largeRtl = false, returning = true, amoled = true)
+
+    @Test
+    fun departureAmoled() = captureNavigation(dark = true, largeRtl = false, returning = false, amoled = true)
+
+    @Test
+    fun settledChatListLight() = captureChatList(dark = false, amoled = false)
+
+    @Test
+    fun settledChatListDark() = captureChatList(dark = true, amoled = false)
+
+    @Test
+    fun settledChatListAmoled() = captureChatList(dark = true, amoled = true)
+
+    private fun captureChatList(
+        dark: Boolean,
+        amoled: Boolean,
+    ) {
+        val fixture = render(dark = dark, amoled = amoled)
+        composeRule.runOnIdle { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        composeRule.waitForIdle()
+        val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+        val pen = composeRule.onNodeWithContentDescription("New Message").fetchSemanticsNode().boundsInRoot
+        assertTrue("Capsule must clear actual pen: capsule=$capsule pen=$pen", capsule.bottom <= pen.top - 10f)
+        assertSingleActionSet()
+        val theme =
+            if (amoled) {
+                "amoled"
+            } else if (dark) {
+                "dark"
+            } else {
+                "light"
+            }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_chat_list_$theme.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h480dp-mdpi")
+    fun compactExpandedOtherChatLight() = captureCompactExpanded(largeRtl = false)
+
+    @Test
+    @Config(qualifiers = "w360dp-h480dp-mdpi")
+    fun compactExpandedOtherChatLargeRtlDark() = captureCompactExpanded(largeRtl = true)
+
+    private fun captureCompactExpanded(largeRtl: Boolean) {
+        val fixture = render(dark = largeRtl, largeRtl = largeRtl, compact = true)
+        composeRule.runOnIdle {
+            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnUiThread {
+            ViewCompat.dispatchApplyWindowInsets(
+                renderedView.rootView,
+                WindowInsetsCompat
+                    .Builder()
+                    .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 24, 0, 0))
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, 280))
+                    .setVisible(WindowInsetsCompat.Type.statusBars(), true)
+                    .setVisible(WindowInsetsCompat.Type.ime(), true)
+                    .build(),
+            )
+        }
+        composeRule.waitForIdle()
+        val expand =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
+        composeRule.runOnIdle { assertTrue(expand.action()) }
+        composeRule.waitForIdle()
+
+        fun capture(phase: String) {
+            val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+            val composer = composeRule.onNodeWithTag(COMPOSER_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue("Capsule clears status bar: $capsule", capsule.top >= 24f)
+            assertTrue("Clearance: capsule=$capsule composer=$composer", capsule.bottom <= composer.top)
+            assertTrue("Compact capsule keeps its native action height", capsule.height <= 48f)
+            val variant = if (largeRtl) "large_font_rtl_dark" else "light"
+            val snapshotName = "dictation_navigation_compact_${phase}_$variant.png"
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName")
+        }
+        capture("expanded")
+        composeRule.runOnIdle { fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable) }
+        composeRule.waitForIdle()
+        capture("failure")
+    }
+
     /** MainActivity is edge-to-edge with adjustResize; dispatch its IME model and settle navigation. */
     private fun captureKeyboardActions(
         dark: Boolean,
         largeRtl: Boolean,
+        amoled: Boolean = false,
     ) {
-        val fixture = render(dark, largeRtl)
+        val fixture = render(dark, largeRtl, amoled)
         val capture = fixture.controller.state
         composeRule.runOnIdle {
             fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
@@ -107,7 +216,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         val rootBounds = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         val keyboardTop = rootBounds.bottom - observedImeBottom
-        listOf("Cancel", "Paste", "Send").forEach { label ->
+        listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
             val matcher = hasContentDescription(label) and hasAnyAncestor(hasTestTag(APP_DICTATION_CONTROL_TAG))
             composeRule.onAllNodes(matcher).assertCountEquals(1)
             val action = composeRule.onNode(matcher).assertIsDisplayed()
@@ -120,9 +229,22 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         val inputBounds = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
         val inputVisible = inputBounds.height > 0f && inputBounds.top >= rootBounds.top
         assertTrue("Destination input must remain visible", inputVisible)
-        assertTrue("Destination composer must not pad the IME twice", stripBounds.top - inputBounds.bottom in 0f..64f)
+        val composerBounds = composeRule.onNodeWithTag(COMPOSER_TAG).fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Capsule must clear the composer: capsule=$stripBounds composer=$composerBounds",
+            composerBounds.top - stripBounds.bottom in 11f..13f,
+        )
+        assertTrue("Capsule must remain physically right aligned", stripBounds.right > rootBounds.right - 40f)
+        assertTrue("Capsule must not become a full-width strip", stripBounds.width < rootBounds.width - 64f)
         assertSame(capture, fixture.controller.state)
-        val variant = if (largeRtl) "large_font_rtl_dark" else "light"
+        val variant =
+            if (amoled) {
+                "amoled"
+            } else if (largeRtl) {
+                "large_font_rtl_dark"
+            } else {
+                "light"
+            }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_keyboard_$variant.png")
     }
 
@@ -198,7 +320,12 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
             fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null)
             fixture.locked = true
         }
-        listOf("Cancel", "Paste", "Send").forEach { label ->
+        listOf(
+            "Cancel",
+            transcriptPasteLabel,
+            ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_from_clipboard),
+            "Send",
+        ).forEach { label ->
             composeRule.onAllNodesWithContentDescription(label).assertCountEquals(0)
         }
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
@@ -213,7 +340,11 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         }
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         composeRule.mainClock.autoAdvance = true
-        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule
+            .onNode(
+                hasContentDescription(transcriptPasteLabel) and
+                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+            ).performClick()
         composeRule.runOnUiThread { fixture.platform.listener.onResult("dictated words") }
         assertEquals(listOf(ACCOUNT to GROUP), fixture.writes)
         assertEquals("dictated words", fixture.draft.text)
@@ -238,9 +369,12 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     }
 
     private fun assertSingleActionSet() {
-        listOf("Cancel", "Paste", "Send").forEach { label ->
-            composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
-            composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
+        listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
+            val action =
+                hasContentDescription(label) and
+                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG))
+            composeRule.onAllNodes(action).assertCountEquals(1)
+            composeRule.onNode(action).assertIsDisplayed()
         }
     }
 
@@ -248,6 +382,8 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     private fun render(
         dark: Boolean = false,
         largeRtl: Boolean = false,
+        amoled: Boolean = false,
+        compact: Boolean = false,
     ): Fixture {
         val fixture = Fixture()
         renderedFixture = fixture
@@ -265,38 +401,24 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
                 LocalDensity provides Density(1f, if (largeRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark) {
-                    MainShellNoticeLayout(
-                        notice = null,
-                        dictationController = fixture.controller,
-                        dictationComposerRoute = fixture.route,
-                        appLockScreenVisible = fixture.locked,
-                    ) { owner ->
-                        if (!fixture.locked) {
-                            val transition = updateTransition(fixture.route.selectedChatId, label = "dictation route")
-                            ConversationRouteAnimatedContent(
-                                transition = transition,
-                                routeForwardDirection = 1,
-                                suppressMotion = false,
-                                contentKey = { it ?: "chat-list" },
-                            ) { chatId ->
-                                Box(Modifier.fillMaxSize()) {
-                                    if (chatId != null) {
-                                        val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
-                                        ComposerBar(
-                                            replyingTo = null,
-                                            messageTextCopy = MessageTextCopy.Default,
-                                            onCancelReply = {},
-                                            onSend = { _, _ -> },
-                                            dictationController = fixture.controller,
-                                            dictationAccountRef = ACCOUNT,
-                                            dictationGroupIdHex = group,
-                                            dictationControlsVisible =
-                                                owner == ConversationDictationControlOwner.Composer &&
-                                                    fixture.route.selectedChatId == chatId,
-                                            modifier = Modifier.align(Alignment.BottomCenter).testTag(COMPOSER_TAG),
-                                        )
-                                    }
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        MainShellNoticeLayout(
+                            notice = null,
+                            dictationController = fixture.controller,
+                            dictationComposerRoute = fixture.route,
+                            appLockScreenVisible = fixture.locked,
+                        ) { owner ->
+                            if (!fixture.locked) {
+                                val transition =
+                                    updateTransition(fixture.route.selectedChatId, label = "dictation route")
+                                ConversationRouteAnimatedContent(
+                                    transition = transition,
+                                    routeForwardDirection = 1,
+                                    suppressMotion = false,
+                                    contentKey = { it ?: "chat-list" },
+                                ) { chatId ->
+                                    RenderRouteContents(fixture, owner, chatId, largeRtl, compact)
                                 }
                             }
                         }
@@ -306,6 +428,50 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         }
         composeRule.waitForIdle()
         return fixture
+    }
+
+    /** Paints the actual route-specific FAB/composer inside its existing animation. */
+    @Composable
+    private fun RenderRouteContents(
+        fixture: Fixture,
+        owner: ConversationDictationControlOwner,
+        chatId: String?,
+        largeRtl: Boolean,
+        compact: Boolean,
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            if (chatId == null) {
+                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                    ChatsNewMessageFabContent(missingRelays = false) {}
+                }
+            }
+            if (chatId != null) {
+                val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
+                ComposerBar(
+                    replyingTo = null,
+                    messageTextCopy = MessageTextCopy.Default,
+                    onCancelReply = {},
+                    onSend = { _, _ -> },
+                    topInteractionClearance =
+                        if (compact) {
+                            compactTopClearanceFor(if (largeRtl) 2f else 1f)
+                        } else {
+                            64.dp
+                        },
+                    dictationController = fixture.controller,
+                    dictationAccountRef = ACCOUNT,
+                    dictationGroupIdHex = group,
+                    dictationControlsVisible =
+                        owner == ConversationDictationControlOwner.Composer &&
+                            fixture.route.selectedChatId == chatId,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .testTag(COMPOSER_TAG)
+                            .floatingDictationAnchor(),
+                )
+            }
+        }
     }
 
     @Composable
@@ -323,8 +489,9 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         dark: Boolean,
         largeRtl: Boolean,
         returning: Boolean,
+        amoled: Boolean = false,
     ) {
-        val fixture = render(dark, largeRtl)
+        val fixture = render(dark, largeRtl, amoled)
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         if (returning) {
@@ -336,7 +503,14 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         }
         assertSingleActionSet()
         val phase = if (returning) "returned_composer" else "departure_first_frame"
-        val variant = if (largeRtl) "large_font_rtl_dark" else "light"
+        val variant =
+            if (amoled) {
+                "amoled"
+            } else if (largeRtl) {
+                "large_font_rtl_dark"
+            } else {
+                "light"
+            }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_${phase}_$variant.png")
     }
 

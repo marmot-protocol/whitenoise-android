@@ -181,9 +181,10 @@
     "preferences-font-cancel": {
       "suite": "preferences",
       "manual_ids": [
-        "SET-024"
+        "SET-024",
+        "SET-007"
       ],
-      "assertions": "System Back dismisses the font-size picker and retains the default choice.",
+      "assertions": "System Back dismisses the font-size picker and retains Default; the real app-font picker exposes its preview and fixed System/Done actions, then Done dismisses it without changing the font.",
       "postcondition": "none"
     },
     "preferences-language-cancel": {

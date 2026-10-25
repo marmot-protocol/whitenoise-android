@@ -53,6 +53,14 @@
         "test_ids": [
           "MED-001"
         ]
+      },
+      {
+        "surface": "Downloading image accessibility state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-037"
+        ]
       }
     ],
     "source_coverage": [

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.runtime.Composable
@@ -87,6 +88,9 @@ internal class EdgeClipViewerFixture(
     private var scenario by mutableStateOf<EdgeClipScenario?>(null)
     private var shellTransportShown = false
 
+    @Volatile
+    private var videoResolutionStage = "not-started"
+
     /** Attachment index of the page the viewer last reported as current, or -1 before any page settles. */
     @Volatile
     var currentAttachment = -1
@@ -112,8 +116,14 @@ internal class EdgeClipViewerFixture(
                     onCurrentPageChange = { currentAttachment = it.attachmentIndex },
                     onVideoPlayerChanged = ::trackFirstFrame,
                     videoFileResolver = { resolverContext, _, messageId, index, reference, _, _ ->
-                        materializeVideoAttachment(resolverContext, messageId, index, reference) {
-                            clipBytes.getValue(EdgeClip.entries[index])
+                        videoResolutionStage = "materializing"
+                        try {
+                            materializeVideoAttachment(resolverContext, messageId, index, reference) {
+                                clipBytes.getValue(EdgeClip.entries[index])
+                            }.also { videoResolutionStage = "completed" }
+                        } catch (failure: Throwable) {
+                            videoResolutionStage = "failed:${failure.javaClass.simpleName}"
+                            throw failure
                         }
                     },
                 )
@@ -126,15 +136,31 @@ internal class EdgeClipViewerFixture(
         rule.runOnIdle {
             scenario = null
             currentAttachment = -1
+            videoResolutionStage = "on-open"
         }
         rule.runOnIdle { scenario = next }
-        awaitCondition("the first decoded frame of ${next.clips[next.startIndex]}") {
-            currentPlayerView()?.let { view -> onMain { view.player in renderedPlayers } } == true
+        try {
+            awaitCondition("the first decoded frame of ${next.clips[next.startIndex]}") {
+                currentPlayerView()?.let { view -> onMain { view.player in renderedPlayers } } == true
+            }
+        } catch (failure: AssertionError) {
+            logFirstFrameTimeout()
+            throw failure
         }
         val view = requirePlayerView()
         onMain { requireNotNull(view.player) { "The current page has no player" }.pause() }
         awaitControllerAndChrome(visible = true)
         return geometry()
+    }
+
+    /** Records bounded fixture stages without allowing diagnostics to replace the original assertion. */
+    private fun logFirstFrameTimeout() {
+        runCatching {
+            Log.e(
+                "EdgeClipViewerFixture",
+                "first_frame_timeout resolution=$videoResolutionStage page=$currentAttachment",
+            )
+        }
     }
 
     /** Dismisses the viewer and waits until its dialog and players are gone. */

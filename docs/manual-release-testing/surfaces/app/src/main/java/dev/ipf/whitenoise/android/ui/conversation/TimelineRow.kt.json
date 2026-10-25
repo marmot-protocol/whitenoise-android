@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRow.kt",
+  "legacy_sha256": "afbcb4d4fe1e49c4cfcd1839db96a8c9ea0acda8f1a34ae56352c151038e45b0",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRow.kt",
+        "anchor": "fun TimelineRow(",
+        "test_ids": [
+          "CON-002",
+          "MSG-001",
+          "MSG-040"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

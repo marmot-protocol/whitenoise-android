@@ -17,9 +17,10 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("uploadMedia(" in body)
         assertTrue("send = false" in body)
         assertTrue("uploadedReferences[messageIndex]" in body)
-        assertTrue("sendMediaAttachments(" in body)
+        assertTrue("sendPreparedMediaWithClientToken(" in body)
         assertFalse(
-            Regex("sendMediaAttachments\\([^)]*source\\.reference", RegexOption.DOT_MATCHES_ALL).containsMatchIn(body),
+            Regex("sendPreparedMediaWithClientToken\\([^)]*source\\.reference", RegexOption.DOT_MATCHES_ALL)
+                .containsMatchIn(body),
         )
     }
 
@@ -59,7 +60,7 @@ class ForwardProductionBoundaryCoverageTest {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
         val start = appStateSource().readText().functionBody("startForwardMessages")
 
-        assertTrue("forwardTransport(sourceAccount, account, messages.size, diagnostics)" in start)
+        assertTrue("forwardTransport(sourceAccount, account, diagnostics)" in start)
 
         assertTrue("fun requireSourceAccount()" in body)
         assertTrue("fun requireDestinationAccount()" in body)
@@ -85,7 +86,7 @@ class ForwardProductionBoundaryCoverageTest {
         val uploadBlock =
             body
                 .substringAfter("override suspend fun upload(")
-                .substringBefore("private suspend fun recentForwardTimeline")
+                .substringBefore("override suspend fun publishBatch(")
         assertTrue("requireDestinationAccount()" in uploadBlock)
         assertFalse("requireSourceAccount()" in uploadBlock)
         // Neither boundary may re-read the live active account inside the transport.
@@ -128,29 +129,40 @@ class ForwardProductionBoundaryCoverageTest {
     fun forwardingSessionBoundsPreparationWithoutAutomaticRestall() {
         val source = messageForwardingSource().readText()
 
-        assertTrue("withTimeoutOrNull(preparationTimeoutMillis) { materializeMessages() }" in source)
+        val bounded = source.substringAfter("withTimeoutOrNull(preparationTimeoutMillis) {").substringBefore("?: run {")
+        assertTrue("preparation must stay inside its timeout", "materializeMessages()" in bounded)
+        // The slow notice only changes what is shown inside that same bound, it never extends or restarts it.
+        assertTrue("withSlowPhaseNotice(" in bounded)
         assertTrue("throw ForwardPreparationTimeoutException()" in source)
         assertTrue("if (snapshot.canAutomaticallyRetry && retryCount < automaticRetryAttempts)" in source)
     }
 
+    /**
+     * Destination publishes are admitted by client token (#2556) and count as sent only once MDK's engine owns them:
+     * a retry probes the same token first and every native call is detached so the deadline bounds it. A healthy
+     * forward never asks for convergence, matching the attachment fixture's contract.
+     */
     @Test
-    fun uncertainPublishUsesConvergenceAndTheAppScopeOwnsCompletion() {
+    fun publishIsTokenBoundAndTheAppScopeOwnsCompletion() {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
         val start = appStateSource().readText().functionBody("startForwardMessages")
         val ownerSource = messageForwardingSource().readText()
         val owner = ownerSource.functionBody("monitor")
         val retry = ownerSource.functionBody("retryAutomatically")
 
-        assertTrue("recentForwardTimeline(targetGroupIdHex, messages.size)" in body)
-        assertTrue("val knownMessageIds =" in body)
-        assertTrue("ForwardPublishRecoveryEvidence(" in body)
-        assertTrue("recoveryEvidence.copy(pendingMessageIdHex = newProjection.messageIdHex)" in body)
-        assertTrue("ForwardPublishNotCommittedException(failure)" in body)
-        assertTrue("ForwardPublishRecoveryResult.Unavailable" in body)
-        assertTrue("it !in evidence.knownMessageIdsBefore" in body)
-        assertTrue("retryGroupConvergence(account, targetGroupIdHex)" in body)
-        assertTrue("it.messageIdHex == candidate.messageIdHex" in body)
-        assertTrue("delivered?.sourceMessageIdHex != null" in body)
+        assertTrue("clientTokenFor(messageIndex)" in body)
+        assertTrue("admitForwardPublish(" in body)
+        assertTrue("detachedNative { localSendStatus(account, targetGroupIdHex, token) }" in body)
+        assertTrue("sendTextWithClientToken(account, targetGroupIdHex, message.text, token)" in body)
+        assertTrue("sendPreparedMediaWithClientToken(" in body)
+        assertTrue("beforeAdmit = ::requireDestinationAccount" in body)
+        assertFalse("retryGroupConvergence" in transportSource().readText())
+        assertFalse("onvergence" in forwardDiagnosticsSource().readText())
+        assertTrue(".async { marmotIo(block) }" in body)
+        assertTrue("CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)" in body)
+        assertFalse("recoverPendingPublish" in body)
+        assertFalse("sendText(account" in body)
+        assertFalse("sendMediaAttachments(" in body)
         assertTrue("forwardOperationOwner.start(session)" in start)
         assertTrue("session.release()" in start)
         assertTrue("scope.launch" in owner)
@@ -174,7 +186,7 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn" in body)
         assertTrue("diagnostics?.commitLockAcquired(lockRequestedAtMs)" in body)
         assertTrue("ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn" in body)
-        assertTrue("ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn" in body)
+        assertTrue("diagnostics?.admissionAccepted(admissionStartedAtMs)" in body)
         assertTrue("diagnostics?.sourceLookup(" in isolated)
         assertTrue("hit = cached != null || retained != null" in isolated)
         assertTrue("native = retained != null" in isolated)

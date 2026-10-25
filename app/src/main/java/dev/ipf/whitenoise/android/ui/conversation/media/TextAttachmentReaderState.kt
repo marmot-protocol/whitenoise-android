@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.ui.legacyTextToSpeakableProjection
 import dev.ipf.whitenoise.android.ui.markdownDocumentToSpeakableText
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,19 @@ internal sealed interface TextAttachmentReaderState {
         val reason: TextAttachmentUnavailableReason,
     ) : TextAttachmentReaderState
 }
+
+/**
+ * A file larger than the reader may hold is too large to preview, which a retry cannot change, every other load
+ * failure is a failed download the reader offers to retry.
+ */
+internal fun textAttachmentLoadFailureState(failure: Throwable): TextAttachmentReaderState =
+    TextAttachmentReaderState.Unavailable(
+        if (failure is AttachmentTooLargeToPresentException) {
+            TextAttachmentUnavailableReason.TooLarge
+        } else {
+            TextAttachmentUnavailableReason.DownloadFailed
+        },
+    )
 
 /** Decodes bytes into a preview, parsing Markdown when the type calls for it. */
 internal suspend fun loadTextAttachmentPreview(

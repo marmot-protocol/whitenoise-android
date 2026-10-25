@@ -9,6 +9,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
@@ -201,6 +202,95 @@ class StagedDocumentReadTest {
         assertTrue(source.file.exists())
         source.close()
         assertEquals(0, root.listFiles()!!.size)
+    }
+
+    /** A snapshot that cannot be written while the disk is too full for it reports storage, not a generic failure. */
+    @Test
+    fun anUnwritableSnapshotOnAFullDiskReportsStorage() {
+        val target = temporary.newFolder("full-target")
+        val item = PendingAttachment(ByteArray(10) { 4 }, "text/plain", "note.txt")
+
+        try {
+            stageFileUploadSources(
+                listOf(item),
+                unwritableStagingDirectory(target),
+                1_000,
+                usableBytes = { 10L + FILE_BACKED_DISK_RESERVE_BYTES - 1L },
+            )
+            error("expected a storage refusal")
+        } catch (_: UploadStagingStorageFullException) {
+            assertEquals(0, target.listFiles()!!.size)
+        }
+    }
+
+    /** With the item and the app's reserve still free, an unwritable snapshot stays the generic staging failure. */
+    @Test
+    fun anUnwritableSnapshotWithRoomLeftStaysAGenericFailure() {
+        val target = temporary.newFolder("roomy-target")
+        val item = PendingAttachment(ByteArray(10) { 4 }, "text/plain", "note.txt")
+
+        val failure =
+            runCatching {
+                stageFileUploadSources(
+                    listOf(item),
+                    unwritableStagingDirectory(target),
+                    1_000,
+                    usableBytes = { 10L + FILE_BACKED_DISK_RESERVE_BYTES },
+                )
+            }.exceptionOrNull()
+
+        assertTrue("expected the generic failure, got $failure", failure is IllegalStateException)
+        assertEquals(0, target.listFiles()!!.size)
+    }
+
+    /** The send keeps its bytes after a storage refusal, so Retry stages the same item once space is freed. */
+    @Test
+    fun aRetryAfterFreeingSpaceStagesTheSameBytes() {
+        val item = PendingAttachment(ByteArray(10) { 4 }, "text/plain", "note.txt")
+        val refused =
+            runCatching {
+                stageFileUploadSources(
+                    listOf(item),
+                    unwritableStagingDirectory(temporary.newFolder("retry-target")),
+                    1_000,
+                    usableBytes = { 0L },
+                )
+            }.exceptionOrNull()
+        assertTrue(refused is UploadStagingStorageFullException)
+
+        val root = temporary.newFolder("retry-staged")
+        val batch = stageFileUploadSources(listOf(item), root, 1_000, usableBytes = { Long.MAX_VALUE / 4 })
+
+        assertEquals(listOf(10L), batch.inputs.map { it.byteCount })
+        assertTrue(File(batch.inputs.single().sourcePath).readBytes().contentEquals(ByteArray(10) { 4 }))
+        batch.close()
+        assertEquals(0, root.listFiles()!!.size)
+    }
+
+    /** Cancelling the send while it stages stays a cancellation even when the disk is full. */
+    @Test
+    fun cancellationDuringStagingIsNotReportedAsStorage() {
+        val item = PendingAttachment(ByteArray(10) { 4 }, "text/plain", "note.txt")
+
+        val failure =
+            runCatching {
+                stageFileUploadSources(
+                    listOf(item),
+                    temporary.newFolder("cancelled"),
+                    1_000,
+                    checkCancellation = { throw CancellationException("cancelled") },
+                    usableBytes = { 0L },
+                )
+            }.exceptionOrNull()
+
+        assertTrue("expected cancellation, got $failure", failure is CancellationException)
+    }
+
+    /** A staging path the reader refuses to follow, so the snapshot cannot be written there. */
+    private fun unwritableStagingDirectory(target: File): File {
+        val link = temporary.root.toPath().resolve("link-${target.name}")
+        Files.createSymbolicLink(link, target.toPath())
+        return link.toFile()
     }
 
     @Test

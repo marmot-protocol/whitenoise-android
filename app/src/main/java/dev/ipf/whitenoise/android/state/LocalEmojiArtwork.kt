@@ -292,7 +292,7 @@ private suspend fun MarmotInterface.attemptEmojiSend(
     } catch (
         @Suppress("TooGenericExceptionCaught") failure: Exception,
     ) {
-        if (failure is CancellationException || !isStaleEmojiReference(failure)) throw failure
+        if (failure is CancellationException || !isStaleMediaReferenceEpoch(failure)) throw failure
         cache.invalidate(account, group)
         throw EmojiChatChangedException(failure)
     }

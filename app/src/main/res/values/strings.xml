@@ -578,6 +578,11 @@
     <string name="forward_failed_preparing">Couldn\'t prepare attachments</string>
     <string name="forward_failed_preparation_timeout">Preparation timed out. Retry, or dismiss to stop forwarding.</string>
     <string name="forward_failed_upload">Couldn\'t upload attachments</string>
+    <string name="forward_preparing_slow">Getting the attachments is taking longer than usual</string>
+    <string name="forward_uploading_slow">Uploading is taking longer than usual</string>
+    <string name="forward_sending_slow">Sending is taking longer than usual. It can’t be cancelled now and won’t be sent twice.</string>
+    <string name="forward_failed_upload_timeout">Upload didn’t start. Retry, or dismiss to stop forwarding.</string>
+    <string name="forward_failed_publish_timeout">Sending hasn’t finished and may still go through. Retry checks it without sending it twice.</string>
     <string name="forward_failed_publish">Couldn\'t send messages</string>
     <string name="forward_payload_too_large">These attachments are too large to forward together</string>
     <string name="forward_failed_expired">The attachment expired before it could be forwarded</string>
@@ -1051,6 +1056,8 @@
     <string name="diagnostic_send_to_self_failed">Send-to-self failed: %1$s</string>
     <string name="clear">Clear</string>
     <string name="paste">Paste</string>
+    <string name="paste_from_clipboard">Paste from clipboard</string>
+    <string name="paste_dictation_transcript">Paste transcript</string>
     <string name="live">Live</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">No relay snapshot yet.</string>
@@ -2496,9 +2503,9 @@
     <string name="profile_notifications_mute">Mute notifications from this person</string>
     <string name="profile_notifications_system">Sound &amp; system behavior</string>
     <string name="profile_notifications_android_vibration">Set by Android</string>
-    <string name="profile_notification_scope_detail">Applies to messages from this person in every conversation for this account. Delivery and unread counts are unchanged.</string>
+    <string name="profile_notification_scope_detail">Custom Android settings apply to messages, invitations and group role changes attributed to this person across conversations for this account. Muting applies only to messages. Delivery and unread counts are unchanged.</string>
     <string name="profile_notification_precedence">Chat mute and mentions-only rules apply first. This person’s mute or custom Android settings apply next. Use defaults restores chat and global settings. Existing notifications keep their original channel.</string>
-    <string name="profile_notification_channel_name">%1$s · Messages across chats</string>
+    <string name="profile_notification_channel_name">%1$s · Notifications across chats</string>
     <string name="destination_filter_all">All chats</string>
     <string name="destination_filter_selected">Review selected (%1$d)</string>
     <string name="destination_filter_label">Filter chats</string>
@@ -2590,6 +2597,12 @@
     <string name="search_message_content_loading">Searching message content…</string>
     <string name="search_message_content_failed">Couldn’t search message content.</string>
     <string name="avatar_preparation_interrupted">The image update was interrupted. Check the current image before selecting it again.</string>
+    <string name="show_less">Show less</string>
+    <string name="font_size_preview">Message preview</string>
+    <string name="font_size_sample_received">Let’s meet by the station. Is the afternoon still a good time for you?</string>
+    <string name="font_size_sample_quote">Afternoon by the station</string>
+    <string name="font_size_sample_sent">Yes, see you there! I’ll send you a message when I arrive.</string>
+    <string name="font_size_save_failed">Couldn’t save the text size. The previous saved size is retained.</string>
     <string name="setup_finding_inspection_completed">Inspection completed. This alone does not confirm relay write support.</string>
     <!-- Punctuation-only format; each argument is already localized. -->
     <string name="setup_finding_check" translatable="false">%1$s · %2$s · %3$s</string>

@@ -149,6 +149,8 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
         composeRule.onNodeWithText("Custom received text").assertExists()
         composeRule.onNodeWithText("Custom sent caption").assertExists()
         composeRule.onNodeWithText("Custom received caption").assertExists()
+        // Two sent and two received PDF cards; the received ones stay hidden until their cache refresh answers.
+        composeRule.awaitFileCardsVisible(expectedCards = 4)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_custom_reply_surfaces_$name.png")
     }
 

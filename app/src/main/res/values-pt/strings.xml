@@ -442,6 +442,11 @@
     <string name="forward_failed_preparing">Não foi possível preparar os anexos</string>
     <string name="forward_failed_preparation_timeout">O tempo de preparação esgotou. Tente novamente ou dispense para parar o encaminhamento.</string>
     <string name="forward_failed_upload">Não foi possível carregar os anexos</string>
+    <string name="forward_preparing_slow">A obtenção dos anexos está demorando mais do que o normal</string>
+    <string name="forward_uploading_slow">O carregamento está demorando mais do que o normal</string>
+    <string name="forward_sending_slow">O envio está demorando mais do que o normal. Não pode mais ser cancelado e não será enviado duas vezes.</string>
+    <string name="forward_failed_upload_timeout">O carregamento não começou. Tente novamente ou dispense para parar o encaminhamento.</string>
+    <string name="forward_failed_publish_timeout">O envio não terminou e ainda pode ser concluído. Tentar novamente verifica-o sem o enviar duas vezes.</string>
     <string name="forward_failed_publish">Não foi possível enviar as mensagens</string>
     <string name="forward_payload_too_large">Estes anexos são grandes demais para serem encaminhados juntos</string>
     <string name="forward_failed_expired">O anexo expirou antes de poder ser encaminhado</string>
@@ -710,6 +715,8 @@
     <string name="diagnostic_send_to_self_failed">Falha ao enviar para si mesmo: %1$s</string>
     <string name="clear">Limpar</string>
     <string name="paste">Colar</string>
+    <string name="paste_from_clipboard">Colar da área de transferência</string>
+    <string name="paste_dictation_transcript">Colar transcrição</string>
     <string name="live">Ao vivo</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Nenhum instantâneo de retransmissão ainda.</string>
@@ -2327,9 +2334,9 @@
     <string name="profile_notifications_mute">Silenciar notificações desta pessoa</string>
     <string name="profile_notifications_system">Som e comportamento do sistema</string>
     <string name="profile_notifications_android_vibration">Definido pelo Android</string>
-    <string name="profile_notification_scope_detail">Aplica-se às mensagens desta pessoa em todas as conversas desta conta. A entrega e a contagem de mensagens não lidas permanecem iguais.</string>
+    <string name="profile_notification_scope_detail">As configurações personalizadas do Android se aplicam a mensagens, convites e mudanças de função em grupos atribuídas a esta pessoa em todas as conversas desta conta. Silenciar se aplica apenas às mensagens. A entrega e as contagens de não lidas não mudam.</string>
     <string name="profile_notification_precedence">As regras de silenciamento do chat e de apenas menções se aplicam primeiro. Depois, o silenciamento ou as configurações personalizadas do Android desta pessoa. Usar padrões restaura as configurações do chat e globais. As notificações existentes mantêm o canal original.</string>
-    <string name="profile_notification_channel_name">%1$s · Mensagens em todos os chats</string>
+    <string name="profile_notification_channel_name">%1$s · Notificações entre conversas</string>
     <string name="destination_filter_all">Todas as conversas</string>
     <string name="destination_filter_selected">Rever seleção (%1$d)</string>
     <string name="destination_filter_label">Filtrar conversas</string>
@@ -2425,6 +2432,12 @@
     <string name="search_message_content_failed">Não foi possível pesquisar o conteúdo das mensagens.</string>
     <string name="document_save_interrupted">A autenticação interrompeu este salvamento. Escolha Salvar novamente para selecionar um destino.</string>
     <string name="avatar_preparation_interrupted">A atualização da imagem foi interrompida. Confira a imagem atual antes de selecioná-la novamente.</string>
+    <string name="show_less">Mostrar menos</string>
+    <string name="font_size_preview">Prévia das mensagens</string>
+    <string name="font_size_sample_received">Vamos nos encontrar na estação. À tarde ainda está bom para você?</string>
+    <string name="font_size_sample_quote">À tarde na estação</string>
+    <string name="font_size_sample_sent">Sim, até lá! Vou mandar uma mensagem quando chegar.</string>
+    <string name="font_size_save_failed">Não foi possível salvar o tamanho do texto. O tamanho salvo anteriormente foi mantido.</string>
     <string name="setup_finding_inspection_completed">Inspeção concluída. Isto, por si só, não confirma que o relay aceita escrita.</string>
     <string name="setup_finding_context_unknown">Origem não especificada</string>
     <string name="setup_finding_context_discovery">Descoberta de registos</string>

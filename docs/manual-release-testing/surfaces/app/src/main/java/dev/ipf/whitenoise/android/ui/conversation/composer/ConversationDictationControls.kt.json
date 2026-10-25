@@ -41,7 +41,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationCompactActions(",
         "test_ids": [
-          "DIC-001"
+          "DIC-001",
+          "DIC-002"
         ]
       },
       {
@@ -49,7 +50,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationDismissAction(",
         "test_ids": [
-          "DIC-001"
+          "DIC-001",
+          "DIC-002"
         ]
       },
       {
@@ -75,7 +77,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationPrimaryAction(",
         "test_ids": [
-          "DIC-001"
+          "DIC-001",
+          "DIC-002"
         ]
       },
       {
@@ -120,7 +123,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "R.string.dictation_audio_focus_unavailable",
         "test_ids": [
-          "DIC-007"
+          "DIC-007",
+          "DIC-002"
         ]
       },
       {
@@ -158,9 +162,9 @@
         ]
       },
       {
-        "surface": "string:paste",
+        "surface": "action:paste_dictation_transcript",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "R.string.paste",
+        "anchor": "R.string.paste_dictation_transcript",
         "test_ids": [
           "DIC-001",
           "DIC-002"
