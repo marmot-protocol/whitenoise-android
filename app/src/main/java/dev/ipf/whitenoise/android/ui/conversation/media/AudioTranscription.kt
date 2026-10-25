@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
@@ -96,9 +98,15 @@ internal fun ReceivedAudioTranscription(file: File?) {
         Text(stringResource(R.string.transcribe_audio))
     }
     ui?.let { state ->
+        val listingError =
+            if (listingFailed) {
+                stringResource(R.string.dictation_ostt_recommendation_open_failed)
+            } else {
+                null
+            }
         AudioTranscriptDialog(
             state = state,
-            listingError = if (listingFailed) stringResource(R.string.dictation_ostt_recommendation_open_failed) else null,
+            listingError = listingError,
             onStart = { ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING) },
             onDismiss = {
                 request?.cancel()
@@ -140,7 +148,7 @@ internal fun AudioTranscriptDialog(
     onDismiss: () -> Unit,
     onGetProvider: () -> Unit,
 ) {
-    val working = state.phase == AudioTranscriptPhase.WORKING
+    val cancellable = state.phase == AudioTranscriptPhase.WORKING || state.phase == AudioTranscriptPhase.CONFIRM
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
@@ -149,7 +157,7 @@ internal fun AudioTranscriptDialog(
         confirmButton = { AudioTranscriptConfirm(state, onStart, onGetProvider) },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(if (working || state.phase == AudioTranscriptPhase.CONFIRM) R.string.cancel else R.string.close))
+                Text(stringResource(if (cancellable) R.string.cancel else R.string.close))
             }
         },
     )
@@ -197,7 +205,7 @@ private fun AudioTranscriptConfirm(
                 Text(stringResource(R.string.transcribe_audio))
             }
         AudioTranscriptPhase.FAILED -> {
-            if (state.failure == AttachmentSpeechFailure.PROVIDER_MISSING) {
+            if (state.failure == AttachmentSpeechFailure.PROVIDER_MISSING || state.failure == AttachmentSpeechFailure.PROVIDER_OUTDATED) {
                 TextButton(onClick = onGetProvider) {
                     Text(stringResource(R.string.dictation_ostt_recommendation_title))
                 }
@@ -213,6 +221,7 @@ private fun transcriptionFailureText(failure: AttachmentSpeechFailure): Int =
     when (failure) {
         AttachmentSpeechFailure.ANDROID_VERSION -> R.string.audio_transcription_android_version
         AttachmentSpeechFailure.PROVIDER_MISSING -> R.string.audio_transcription_provider_missing
+        AttachmentSpeechFailure.PROVIDER_OUTDATED -> R.string.audio_transcription_provider_outdated
         AttachmentSpeechFailure.PROVIDER_UNAVAILABLE -> R.string.audio_transcription_provider_unavailable
         AttachmentSpeechFailure.PERMISSION_DENIED -> R.string.audio_transcription_permission_denied
         AttachmentSpeechFailure.AUDIO_REJECTED -> R.string.audio_transcription_audio_rejected

@@ -299,6 +299,9 @@ class ConversationVoiceDownloadProductionAndroidTest {
             composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MS) {
                 composeRule.onAllNodesWithText("59:59", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
+            // Download completion must stay at Play; only this explicit action starts playback.
+            assertVoiceActionTarget(voiceId, R.string.voice_message_play)
+            clickVoiceAction(voiceId, R.string.voice_message_play)
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             evidence.assertViewportStayedFixed(composeRule, downloading, retryCheckpoint)
             assertEquals(emptyList<ConversationScrollWriteEvidence>(), evidence.writes)

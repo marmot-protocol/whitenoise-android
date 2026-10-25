@@ -50,28 +50,39 @@ class AudioTranscriptionScreenshotTest {
             Appearance.AMOLED_RTL,
         )
 
+    @Test
+    fun outdatedProviderLargeRtl() =
+        capture(
+            "outdated-amoled-rtl-large",
+            AudioTranscriptUi(AudioTranscriptPhase.FAILED, failure = AttachmentSpeechFailure.PROVIDER_OUTDATED),
+            Appearance.AMOLED_RTL,
+        )
+
     private fun capture(
         name: String,
         state: AudioTranscriptUi,
         appearance: Appearance = Appearance.LIGHT,
     ) {
+        val amoledRtl = appearance == Appearance.AMOLED_RTL
+        val direction = if (amoledRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
         composeRule.setContent {
             WhiteNoiseTheme(
                 darkTheme = appearance != Appearance.LIGHT,
-                amoled = appearance == Appearance.AMOLED_RTL,
-                fontScale = if (appearance == Appearance.AMOLED_RTL) 2f else 1f,
+                amoled = amoledRtl,
+                fontScale = if (amoledRtl) 2f else 1f,
             ) {
-                CompositionLocalProvider(
-                    LocalLayoutDirection provides if (appearance == Appearance.AMOLED_RTL) LayoutDirection.Rtl else LayoutDirection.Ltr,
-                ) {
+                CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     AudioTranscriptDialog(state, onStart = {}, onDismiss = {}, onGetProvider = {})
                 }
             }
         }
         composeRule.onNodeWithText("Audio transcript").assertIsDisplayed()
-        composeRule
-            .onNodeWithText(if (state.phase == AudioTranscriptPhase.CONFIRM || state.phase == AudioTranscriptPhase.WORKING) "Cancel" else "Close")
-            .assertIsDisplayed()
+        val dismissLabel =
+            when (state.phase) {
+                AudioTranscriptPhase.CONFIRM, AudioTranscriptPhase.WORKING -> "Cancel"
+                else -> "Close"
+            }
+        composeRule.onNodeWithText(dismissLabel).assertIsDisplayed()
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/audio-transcription-$name.png")
     }
 

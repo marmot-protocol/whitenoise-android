@@ -1,4 +1,4 @@
-@file:Suppress("TooManyFunctions") // One platform decoder owns input admission, PCM normalization and cleanup.
+@file:Suppress("TooManyFunctions", "MatchingDeclarationName") // The decoder owns its chunk type and native phases.
 
 package dev.ipf.whitenoise.android.audio
 
@@ -28,6 +28,9 @@ internal data class AttachmentPcmChunk(
 
 private const val PCM_CHUNK_SECONDS = 15
 private const val TARGET_SAMPLE_RATE_HZ = 16_000
+private const val MIN_SOURCE_SAMPLE_RATE_HZ = 8_000
+private const val MAX_SOURCE_SAMPLE_RATE_HZ = 96_000
+private const val MICROS_PER_SECOND = 1_000_000L
 private const val MAX_PCM_DURATION_SECONDS = 60L * 60
 private const val MAX_PCM_BYTES = 512L * 1024 * 1024
 private const val MAX_CODEC_BUFFER_BYTES = 8 * 1024 * 1024
@@ -38,6 +41,7 @@ private const val DEQUEUE_TIMEOUT_US = 10_000L
 // Process-owned admission remains held through cleanup, including a blocked native call.
 private val attachmentDecodeGate = Semaphore(1)
 
+@Suppress("TooGenericExceptionCaught") // Android exposes heterogeneous runtime failures for invalid media.
 internal suspend fun decodeAttachmentPcm(
     file: File,
     consume: suspend (AttachmentPcmChunk) -> Unit,
@@ -66,6 +70,7 @@ internal suspend fun decodeAttachmentPcm(
         }
     }
 
+@Suppress("ThrowsCount") // Keep each native input/output rejection explicit and fail closed.
 private class AttachmentAudioDecoder(
     private val input: ParcelFileDescriptor,
 ) {
@@ -179,7 +184,7 @@ private class AttachmentAudioDecoder(
             if (format.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
                 if (format.containsKey(MediaFormat.KEY_DURATION)) {
                     val durationUs = format.getLong(MediaFormat.KEY_DURATION)
-                    if (durationUs < 0 || durationUs > MAX_PCM_DURATION_SECONDS * 1_000_000) {
+                    if (durationUs < 0 || durationUs > MAX_PCM_DURATION_SECONDS * MICROS_PER_SECOND) {
                         throw IOException("Attachment audio exceeds duration limit")
                     }
                 }
@@ -205,14 +210,15 @@ private class AttachmentAudioDecoder(
         if (extractor.sampleSize > buffer.remaining()) {
             throw IOException("Attachment audio sample exceeds codec input capacity")
         }
-        if (extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED != 0) {
-            throw IOException("Encrypted attachment audio is unsupported")
-        }
         val size = extractor.readSampleData(buffer, 0)
         if (size < 0) {
             activeCodec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
             inputEnded = true
         } else {
+            // At EOF getSampleFlags() is -1, not a bitset describing an encrypted sample.
+            if (extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED != 0) {
+                throw IOException("Encrypted attachment audio is unsupported")
+            }
             if (size > buffer.capacity()) {
                 throw IOException("Invalid attachment audio sample")
             }
@@ -228,6 +234,7 @@ private class AttachmentAudioDecoder(
     }
 }
 
+@Suppress("ThrowsCount") // Reject raw input before output negotiation can overwrite its metadata.
 private fun requestPcm16(format: MediaFormat) {
     if (format.getString(MediaFormat.KEY_MIME) == "audio/raw") {
         val hasEncoding = format.containsKey(MediaFormat.KEY_PCM_ENCODING)
@@ -238,7 +245,7 @@ private fun requestPcm16(format: MediaFormat) {
         if (hasEncoding && format.getInteger(MediaFormat.KEY_PCM_ENCODING) != AudioFormat.ENCODING_PCM_16BIT) {
             throw IOException("Attachment raw PCM encoding is unsupported")
         }
-        if (hasBitDepth && format.getInteger("bits-per-sample") != 16) {
+        if (hasBitDepth && format.getInteger("bits-per-sample") != Short.SIZE_BITS) {
             throw IOException("Attachment raw PCM bit depth is unsupported")
         }
     }
@@ -246,6 +253,7 @@ private fun requestPcm16(format: MediaFormat) {
     format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
 }
 
+@Suppress("ThrowsCount") // Encoding, layout and midstream changes are distinct rejection boundaries.
 private fun resolvePcm(
     previous: AttachmentPcmBuffer?,
     format: MediaFormat,
@@ -262,7 +270,7 @@ private fun resolvePcm(
     if (format.getString(MediaFormat.KEY_MIME) != "audio/raw" || encoding != AudioFormat.ENCODING_PCM_16BIT) {
         throw IOException("Unsupported attachment PCM output encoding")
     }
-    if (rate !in 8_000..96_000 || channels !in 1..2) {
+    if (rate !in MIN_SOURCE_SAMPLE_RATE_HZ..MAX_SOURCE_SAMPLE_RATE_HZ || channels !in 1..2) {
         throw IOException("Unsupported attachment PCM output format")
     }
     if (previous != null) {
@@ -292,6 +300,7 @@ private class AttachmentPcmBuffer(
     var totalFrames = 0L
         private set
 
+    @Suppress("ThrowsCount") // Validate native byte ranges and resource budgets before reading samples.
     fun append(
         output: ByteBuffer,
         offset: Int,
@@ -356,7 +365,7 @@ private class AttachmentPcmBuffer(
     private fun emit(sample: Int) {
         val bytes = pending ?: ByteArray(chunkBytes).also { pending = it }
         bytes[used++] = sample.toByte()
-        bytes[used++] = (sample shr 8).toByte()
+        bytes[used++] = (sample shr Byte.SIZE_BITS).toByte()
         if (used == bytes.size) {
             addCompleted(bytes)
             pending = null

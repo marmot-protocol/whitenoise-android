@@ -30,6 +30,7 @@ import java.io.IOException
 internal enum class AttachmentSpeechFailure {
     ANDROID_VERSION,
     PROVIDER_MISSING,
+    PROVIDER_OUTDATED,
     PROVIDER_UNAVAILABLE,
     PERMISSION_DENIED,
     AUDIO_REJECTED,
@@ -45,6 +46,9 @@ private const val RECOGNITION_TIMEOUT_MS = 5L * 60L * 1_000L
 private const val PIPE_STALL_TIMEOUT_MS = 10_000L
 private const val PIPE_POLL_MS = 20L
 private const val PIPE_WRITE_BYTES = 16_384
+
+// OSTT 0.21.0 documents caller-audio ingestion through EOF without microphone endpointing.
+private const val MIN_FILE_AUDIO_VERSION = 58L
 
 /** Uses only OSTT's explicit service and the supplied PCM; never requests microphone capture. */
 internal suspend fun transcribeAttachment(
@@ -63,6 +67,7 @@ internal suspend fun transcribeAttachment(
     } ?: throw AttachmentSpeechException(AttachmentSpeechFailure.TIMEOUT)
 }
 
+@Suppress("ThrowsCount") // Distinguish missing, outdated and unusable providers before decoding.
 private fun findAttachmentService(context: Context): ComponentName {
     val providers =
         try {
@@ -73,6 +78,9 @@ private fun findAttachmentService(context: Context): ComponentName {
     val provider =
         providers.singleOrNull { it.packageName == OFFLINE_SPEECH_TO_TEXT_PACKAGE }
             ?: throw AttachmentSpeechException(AttachmentSpeechFailure.PROVIDER_MISSING)
+    if (provider.choices.any { it.versionCode < MIN_FILE_AUDIO_VERSION }) {
+        throw AttachmentSpeechException(AttachmentSpeechFailure.PROVIDER_OUTDATED)
+    }
     return provider.choices
         .mapNotNull { it.service }
         .distinct()
@@ -80,6 +88,7 @@ private fun findAttachmentService(context: Context): ComponentName {
         ?: throw AttachmentSpeechException(AttachmentSpeechFailure.PROVIDER_UNAVAILABLE)
 }
 
+@Suppress("ThrowsCount") // Every preparation or Binder failure terminates the complete descriptor lifetime.
 private suspend fun recognizeAttachment(
     context: Context,
     service: ComponentName,
@@ -104,6 +113,10 @@ private suspend fun recognizeAttachment(
                 }
             try {
                 val pcmFormat = format.await()
+                val currentService = withContext(Dispatchers.IO) { findAttachmentService(context) }
+                if (currentService != service) {
+                    throw AttachmentSpeechException(AttachmentSpeechFailure.PROVIDER_UNAVAILABLE)
+                }
                 val created =
                     try {
                         SpeechRecognizer.createSpeechRecognizer(context, service)
@@ -142,6 +155,7 @@ private data class AttachmentPcmFormat(
     val channelCount: Int,
 )
 
+@Suppress("ThrowsCount", "TooGenericExceptionCaught") // Wake both waiters on failure; never accept partial audio.
 private suspend fun feedAttachment(
     file: File,
     feed: AttachmentPcmFeed,
@@ -152,8 +166,8 @@ private suspend fun feedAttachment(
         var firstFormat: AttachmentPcmFormat? = null
         feed.prepare()
         decodeAttachmentPcm(file) { chunk ->
-            if (chunk.sampleRateHz <= 0 ||
-                chunk.channelCount <= 0 ||
+            val hasLayout = chunk.sampleRateHz > 0 && chunk.channelCount > 0
+            if (!hasLayout ||
                 chunk.bytes.isEmpty() ||
                 chunk.bytes.size.toLong() % (chunk.channelCount.toLong() * 2L) != 0L
             ) {
@@ -216,6 +230,7 @@ private class AttachmentPcmFeed(
         }
     }
 
+    @Suppress("ThrowsCount") // Preserve cancellation and distinguish blocked writes from rejected audio.
     suspend fun write(bytes: ByteArray) {
         try {
             val descriptor = sink.fileDescriptor

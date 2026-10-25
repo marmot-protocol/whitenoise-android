@@ -102,6 +102,14 @@
         ]
       },
       {
+        "surface": "Provider update required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_provider_outdated",
+        "test_ids": [
+          "MED-039"
+        ]
+      },
+      {
         "surface": "Platform permission denial",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "R.string.audio_transcription_permission_denied",

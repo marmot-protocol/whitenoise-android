@@ -1623,6 +1623,7 @@
     <string name="audio_transcription_generated">Generated transcript · not the sender’s text</string>
     <string name="audio_transcription_android_version">Transcribing recordings requires Android 13 or later.</string>
     <string name="audio_transcription_provider_missing">Install Offline Speech to Text and set up a speech model to transcribe recordings on this device.</string>
+    <string name="audio_transcription_provider_outdated">Update Offline Speech to Text to version 0.21.0 or later. Earlier builds have not been qualified for recording-only transcription.</string>
     <string name="audio_transcription_provider_unavailable">Offline Speech to Text could not start. Open it and check that a speech model is ready, then try again.</string>
     <string name="audio_transcription_permission_denied">Android denied access to the speech service. Check microphone permissions for White Noise and Offline Speech to Text in Android settings. Transcription reads the recording; it does not record your microphone.</string>
     <string name="audio_transcription_audio_rejected">This recording could not be read or delivered completely. Its audio format or size may not be supported.</string>

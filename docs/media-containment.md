@@ -32,8 +32,11 @@ Received-audio transcription reads an already materialized attachment through a
 separate serialized platform-codec adapter. It converts admitted mono/stereo
 PCM16 to 16 kHz mono, preserving the resampling phase across codec buffers, and
 feeds one continuous descriptor-backed request to the explicitly selected Offline
-Speech to Text service on Android 13+. Closing the writer after successful decoder
-EOF completes the utterance. Decode/feed errors and unrecognized audio cannot
+Speech to Text 0.21.0 or later service on Android 13+. Earlier builds require an
+update before decoding or binding: their recording-only behavior is not qualified.
+Service eligibility and the minimum version are rechecked before binding after
+decoder preparation. Closing the writer after successful decoder EOF completes
+the utterance. Decode/feed errors and unrecognized audio cannot
 produce a successful partial transcript. The provider owns its downloaded model;
 White Noise neither captures microphone audio nor falls back to another recognizer.
 Transcripts remain transient dialog state and are cleared on dismissal, background,
