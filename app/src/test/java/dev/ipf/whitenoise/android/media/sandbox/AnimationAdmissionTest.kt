@@ -4,9 +4,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 
 /** Admission remains tied to actual worker death across navigation, cancellation and viewer takeover. */
@@ -14,6 +17,12 @@ class AnimationAdmissionTest {
     /** A viewer taking over before the first drawable exists must not permanently disable its group. */
     @org.junit.Test
     fun groupPreemptedBeforeFirstFrameRetriesAfterViewerAndConfirmedDeath() {
+        assertStartupRecovery(throwOnRetirement = false)
+        assertStartupRecovery(throwOnRetirement = true)
+    }
+
+    /** Drives real admission through both normal and exceptional startup interruption without a drawable. */
+    private fun assertStartupRecovery(throwOnRetirement: Boolean) {
         val admission = AnimationAdmission()
         val started = CountDownLatch(1)
         val preempted = CountDownLatch(1)
@@ -30,6 +39,7 @@ class AnimationAdmissionTest {
                             lease.onRetire { preempted.countDown() }
                             started.countDown()
                             check(preempted.await(5, TimeUnit.SECONDS))
+                            if (throwOnRetirement) error("viewer closed the startup capability")
                             null // Startup closed before delivering pixels, but its process is still alive.
                         } else {
                             lease.release()
@@ -63,6 +73,26 @@ class AnimationAdmissionTest {
             viewer.join(2000)
             firstLease.get()?.release()
             viewerLease.get()?.release()
+        }
+    }
+
+    /** Cancellation and genuine decode failures must never become a retry merely because a viewer arrived. */
+    @org.junit.Test
+    fun startupCancellationAndUnrelatedFailureEscapeWithoutRetry() {
+        for (failure in listOf(InterruptedException(), CancellationException(), IllegalStateException())) {
+            val admission = AnimationAdmission()
+            var attempts = 0
+            val thrown =
+                assertThrows(failure.javaClass) {
+                    admission.decode<String>(true, true, 100) { lease ->
+                        attempts++
+                        if (failure is InterruptedException || failure is CancellationException) lease.retire()
+                        lease.release()
+                        throw failure
+                    }
+                }
+            assertSame(failure, thrown)
+            assertEquals(1, attempts)
         }
     }
 

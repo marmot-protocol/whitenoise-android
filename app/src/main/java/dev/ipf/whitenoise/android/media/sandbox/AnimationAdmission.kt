@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 
 /** One actual worker; decorative use never queues ahead of interactive media. */
 internal class AnimationAdmission {
@@ -65,10 +66,28 @@ internal class AnimationAdmission {
         val waitingGroup = decorative && waitForDecorativeAdmission
         do {
             val lease = if (waitingGroup) awaitDecorative() else acquire(decorative, timeoutMillis) ?: return null
-            val result = open(lease)
+            val result = openAttempt(lease, waitingGroup, open)
             if (result != null || !waitingGroup || !lease.wasPreempted()) return result
         } while (true)
     }
+
+    /** A retired startup may throw while marshalling closed capabilities; cancellation always escapes. */
+    @Suppress("TooGenericExceptionCaught") // Only an explicit viewer retirement makes startup failure retryable.
+    private fun <T : Any> openAttempt(
+        lease: Lease,
+        waitingGroup: Boolean,
+        open: (Lease) -> T?,
+    ): T? =
+        try {
+            open(lease)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (interrupted: InterruptedException) {
+            throw interrupted
+        } catch (failure: Exception) {
+            if (!waitingGroup || !lease.wasPreempted()) throw failure
+            null
+        }
 
     inner class Lease internal constructor(
         internal val decorative: Boolean,
