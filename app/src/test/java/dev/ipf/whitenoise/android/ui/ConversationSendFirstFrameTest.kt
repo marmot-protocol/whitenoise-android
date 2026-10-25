@@ -171,20 +171,27 @@ class ConversationSendFirstFrameTest {
                     }
                 }
             }
+            composeRule.waitForIdle()
             val composer = composeRule.onNode(hasSetTextAction())
             composer.assertIsNotFocused()
+            assertEquals("entry must not open the keyboard", 0, keyboard.shows)
+            // Initial lifecycle resume may clear focus before the Paste action begins.
+            val idleKeyboard = keyboard.shows to keyboard.hides
+            println("Paste IME settled-entry=$idleKeyboard")
             clipboard.setPrimaryClip(ClipData.newHtmlText("sample", "clipboard message", "<b>clipboard message</b>"))
             composeRule.onNodeWithTag("composer.paste").performClick()
             composeRule.waitForIdle()
             composer.assertIsNotFocused()
             assertEquals("clipboard message", composerText(composer))
             assertEquals("clipboard message", appState.draftSnapshotFor(ACCOUNT_REF, GROUP_ID)?.textFieldValue?.text)
-            assertEquals(0 to 0, keyboard.shows to keyboard.hides)
+            println("Paste IME after-paste=${keyboard.shows to keyboard.hides}")
+            assertEquals(idleKeyboard, keyboard.shows to keyboard.hides)
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
             composeRule.waitForIdle()
             composeRule.onNodeWithText("clipboard message").assertIsDisplayed()
             assertEquals("", composerText(composer))
-            assertEquals(0 to 0, keyboard.shows to keyboard.hides)
+            println("Paste IME after-send=${keyboard.shows to keyboard.hides}")
+            assertEquals(idleKeyboard, keyboard.shows to keyboard.hides)
 
             composer.performClick()
             composer.assertIsFocused()
@@ -194,6 +201,7 @@ class ConversationSendFirstFrameTest {
             composeRule.waitForIdle()
             composer.assertIsFocused()
             assertEquals("typing paste", composerText(composer))
+            println("Paste IME typing-before=$before after=${keyboard.shows to keyboard.hides}")
             assertEquals(before, keyboard.shows to keyboard.hides)
         } finally {
             clipboard.clearPrimaryClip()

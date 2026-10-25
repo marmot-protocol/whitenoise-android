@@ -630,6 +630,7 @@ class ConversationDictationPersistentControlTest {
             assertEquals(1, sends)
             assertEquals("Edited saved text", fixture.draft.text)
         }
+
     /** The composed editor exposes both intended paste actions without giving them the same accessible name. */
     @Test
     fun clipboardAndTranscriptPasteHaveDistinctLocalizedNamesTogether() {
@@ -661,7 +662,6 @@ class ConversationDictationPersistentControlTest {
             .assertCountEquals(1)
         composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
     }
-
 }
 
 /** Each completion choice is one labelled 48dp action; progress belongs to that action. */
