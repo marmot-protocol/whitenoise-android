@@ -543,6 +543,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
     selectionWrapper: @Composable (@Composable () -> Unit) -> Unit,
     collapsible: Boolean,
+    onCollapseEligibilityChanged: (Boolean) -> Unit = {},
     replyPreviewPresent: Boolean,
     hasMedia: Boolean,
     bubbleBackgroundColor: Color,
@@ -643,11 +644,12 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 textSelectionMode || bodyIsCollapsed || bodyCollapsePending
             }
         val bodyMeasurementModifier =
-            if (collapsible) {
-                Modifier.onSizeChanged { measuredBodyHeightPx = it.height }
-            } else {
-                Modifier
+            Modifier.onSizeChanged {
+                measuredBodyHeightPx = it.height
             }
+        androidx.compose.runtime.SideEffect {
+            onCollapseEligibilityChanged(showMessageTextBody && (measuredBodyHeightPx ?: 0) > maxBodyHeightPx)
+        }
         val highlightStyle =
             rememberTtsReadAloudHighlightStyle(
                 background = bubbleBackgroundColor,

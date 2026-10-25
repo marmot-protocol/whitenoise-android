@@ -5,13 +5,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatFolderRule
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.chatRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CancellationException
@@ -288,14 +292,165 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertDoesNotExist()
     }
 
+    /** Each production dismissal path restores read pinned predecessors above the surviving unread row. */
+    @Test fun mountedUnreadPillDismissalRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Pill)
+
+    @Test fun mountedUnreadSecondPullRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Pull)
+
+    @Test fun mountedUnreadAccessibilityDismissalRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Accessibility)
+
+    private fun assertPinnedHeadRestored(exit: Exit) {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        model.state.swipePreferences.setPullUnread(true)
+        model.retainedRow.updateAndGet { it.copy(manuallyMarkedUnread = false, pinned = true, pinnedPosition = 0u) }
+        model.controller.applyChatListRow(model.retainedRow.get())
+        model.controller.applyChatListRow(model.row.get())
+        mount(model)
+        val listId = rule.onNodeWithTag("chats.list").fetchSemanticsNode().id
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
+        awaitProgress { model.snapshotReads == 1 }
+        val row = rule.onNodeWithTag("chat.row.$ACTION_TARGET")
+        awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
+        when (exit) {
+            Exit.Pill -> rule.onNodeWithTag("chats.unread_filter").performClick()
+            Exit.Accessibility -> rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
+            Exit.Pull -> {
+                val distance = with(rule.density) { 100.dp.toPx() }
+                row.performTouchInput {
+                    down(Offset(width * 0.6f, 10f))
+                    moveBy(Offset(0f, distance), 120)
+                    up()
+                }
+            }
+        }
+        rule.waitForIdle()
+        val pinned = rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR")
+        awaitProgress {
+            pinned.fetchSemanticsNode().boundsInRoot.top ==
+                rule
+                    .onNodeWithTag("chats.list")
+                    .fetchSemanticsNode()
+                    .boundsInRoot.top
+        }
+        assertEquals(listId, rule.onNodeWithTag("chats.list").fetchSemanticsNode().id)
+        assertTrue(pinned.fetchSemanticsNode().boundsInRoot.top < row.fetchSemanticsNode().boundsInRoot.top)
+        assertTrue(model.calls.isEmpty())
+    }
+
+    /** A pending read preserves known unread rows and cannot reinstate filtering after dismissal. */
+    @Test fun mountedPendingUnreadKeepsListAndRejectsLateResultAfterClear() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        val release = CompletableDeferred<Unit>().also { releaseRead = it }
+        model.beforeSnapshotRead = {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                release.await()
+            }
+        }
+        mount(model)
+        val listId = rule.onNodeWithTag("chats.list").fetchSemanticsNode().id
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
+        awaitProgress { model.snapshotReads == 1 }
+        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertExists()
+        rule.onNodeWithTag("chats.unread_refresh").assertExists()
+        assertEquals(listId, rule.onNodeWithTag("chats.list").fetchSemanticsNode().id)
+        rule.onNodeWithTag("chats.unread_filter").performClick()
+        release.complete(Unit)
+        settle()
+        rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+        assertEquals(listId, rule.onNodeWithTag("chats.list").fetchSemanticsNode().id)
+        assertTrue(model.calls.isEmpty())
+    }
+
+    /** Ordinary empty folder overlays retain sole ownership of recovery and the list stays unmounted. */
+    @Test fun mountedEmptyFolderHasOneInlineErrorRecovery() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        val folder = model.state.chatFolderPreferences.createFolder(ACTION_ACCOUNT, "Empty selection")!!
+        model.controller.publishInitialLoadFailureForTest(
+            ErrorPresentation(AppText.Resource(R.string.error_try_again), "Synthetic list failure"),
+        )
+        mount(model, folder.id)
+        rule.onNodeWithTag("chats.list").assertDoesNotExist()
+        assertEquals(
+            1,
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.error_try_again))
+                .fetchSemanticsNodes()
+                .size,
+        )
+        assertEquals(1, rule.onAllNodesWithText(rule.activity.getString(R.string.retry)).fetchSemanticsNodes().size)
+    }
+
+    /** Per-chat search failures complete as no matches without a top-level recovery action. */
+    @Test fun mountedPerChatBodySearchFailureCompletesEmptySearch() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        mount(model, globalSearchState = GlobalSearchState(isOpen = true, query = "no-matching-conversation"))
+        awaitProgress {
+            rule.onAllNodesWithText(rule.activity.getString(R.string.no_results)).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_results_detail)).assertExists()
+        rule.onNodeWithTag("chats.list").assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.retry)).assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.couldnt_load_chats)).assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.search_message_content_failed)).assertDoesNotExist()
+    }
+
+    /** No known matches remain pending until native completion; failure must never look caught up. */
+    @Test fun mountedZeroLocalUnreadPreservesPendingAndFailureStates() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        val release = CompletableDeferred<Unit>().also { releaseRead = it }
+        model.row.updateAndGet { it.copy(manuallyMarkedUnread = false) }
+        model.retainedRow.updateAndGet { it.copy(manuallyMarkedUnread = false) }
+        model.controller.applyChatListRow(model.retainedRow.get())
+        model.beforeSnapshotRead = {
+            release.await()
+            error("Synthetic unread read refusal")
+        }
+        mount(model)
+        val listId = rule.onNodeWithTag("chats.list").fetchSemanticsNode().id
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
+        awaitProgress { model.snapshotReads == 1 }
+        rule.onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG).assertExists()
+        rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertDoesNotExist()
+        assertEquals(listId, rule.onNodeWithTag("chats.list").fetchSemanticsNode().id)
+        release.complete(Unit)
+        awaitProgress {
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_load_failed))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        assertEquals(
+            1,
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry))
+                .fetchSemanticsNodes()
+                .size,
+        )
+        rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+        rule.onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertDoesNotExist()
+        assertEquals(listId, rule.onNodeWithTag("chats.list").fetchSemanticsNode().id)
+    }
+
+    private enum class Exit { Pill, Pull, Accessibility }
+
     private fun mount(
         model: OffWindowActionFixture,
         folderId: String? = null,
+        globalSearchState: GlobalSearchState = GlobalSearchState(),
     ) {
         rule.setContent {
             if (mounted.value) {
                 WhiteNoiseTheme {
-                    ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> }, selectedFolderId = folderId)
+                    ChatsScreen(
+                        model.state,
+                        model.controller,
+                        {},
+                        { _, _, _, _ -> },
+                        selectedFolderId = folderId,
+                        globalSearchState = globalSearchState,
+                    )
                 }
             }
         }

@@ -8,7 +8,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
@@ -40,7 +42,7 @@ class PersonGroupsMembershipAuthorityTest {
         try {
             mount(fixture, mutableStateOf(listOf(fixture.slow, fixture.fast)), mounted)
             assertTrue(fixture.entered.getValue(fixture.slow.id).await(5, TimeUnit.SECONDS))
-            awaitMenu(fixture.fast.id)
+            awaitMenu(fixture, fixture.fast.id)
             rule.onNodeWithTag("groups_in_common.menu.${fixture.slow.id}").assertDoesNotExist()
             assertEquals(1L, fixture.releases.getValue(fixture.slow.id).count)
         } finally {
@@ -57,7 +59,7 @@ class PersonGroupsMembershipAuthorityTest {
         fixture.failures += fixture.slow.id
         try {
             mount(fixture, mutableStateOf(listOf(fixture.slow, fixture.fast)), mounted)
-            awaitMenu(fixture.fast.id)
+            awaitMenu(fixture, fixture.fast.id)
             rule.waitUntil(5_000) {
                 rule.onAllNodesWithTag("groups_in_common.retry").fetchSemanticsNodes().isNotEmpty()
             }
@@ -66,7 +68,7 @@ class PersonGroupsMembershipAuthorityTest {
             val fastReads = fixture.reads.count { it == fixture.fast.id }
             fixture.failures.clear()
             rule.onNodeWithTag("groups_in_common.retry").performClick()
-            awaitMenu(fixture.slow.id)
+            awaitMenu(fixture, fixture.slow.id)
             assertEquals(fastReads, fixture.reads.count { it == fixture.fast.id })
             rule.onNodeWithTag("groups_in_common.retry").assertDoesNotExist()
         } finally {
@@ -83,8 +85,8 @@ class PersonGroupsMembershipAuthorityTest {
         val groups = mutableStateOf(listOf(fixture.fast, fixture.slow))
         try {
             mount(fixture, groups, mounted)
-            awaitMenu(fixture.fast.id)
-            awaitMenu(fixture.slow.id)
+            awaitMenu(fixture, fixture.fast.id)
+            awaitMenu(fixture, fixture.slow.id)
             openConfirmation(fixture)
             val fastReads = fixture.reads.count { it == fixture.fast.id }
             rule.runOnIdle {
@@ -108,7 +110,7 @@ class PersonGroupsMembershipAuthorityTest {
         var feedback: ToastMessage? = null
         try {
             mount(fixture, mutableStateOf(listOf(fixture.fast)), mounted, onFeedback = { feedback = it })
-            awaitMenu(fixture.fast.id)
+            awaitMenu(fixture, fixture.fast.id)
             openConfirmation(fixture)
             fixture.failures += fixture.fast.id
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()
@@ -132,7 +134,7 @@ class PersonGroupsMembershipAuthorityTest {
         fixture.failures += fixture.slow.id
         try {
             mount(fixture, mutableStateOf(listOf(fixture.fast, fixture.slow)), mounted)
-            awaitMenu(fixture.fast.id)
+            awaitMenu(fixture, fixture.fast.id)
             rule.waitUntil(5_000) {
                 rule.onAllNodesWithTag("groups_in_common.retry").fetchSemanticsNodes().isNotEmpty()
             }
@@ -171,8 +173,8 @@ class PersonGroupsMembershipAuthorityTest {
                     fresh.onCleared()
                 }
             })
-            awaitMenu(fixture.fast.id)
-            awaitMenu(fixture.slow.id)
+            awaitMenu(fixture, fixture.fast.id)
+            awaitMenu(fixture, fixture.slow.id)
             openConfirmation(fixture)
             assertTrue(fixture.commits.isEmpty())
             rule.onNodeWithTag("confirmation.confirm").performClick()
@@ -211,8 +213,27 @@ class PersonGroupsMembershipAuthorityTest {
     }
 
     /** Waits on actual row semantics rather than assuming the main clock drains native IO. */
-    private fun awaitMenu(id: String) {
-        awaitAuthority { rule.onAllNodesWithTag("groups_in_common.menu.$id").fetchSemanticsNodes().isNotEmpty() }
+    private fun awaitMenu(
+        fixture: MembershipAuthorityFixture,
+        id: String,
+    ) {
+        fixture.recordAuthorityEvent(id, "menu-wait-start")
+        try {
+            awaitAuthority { rule.onAllNodesWithTag("groups_in_common.menu.$id").fetchSemanticsNodes().isNotEmpty() }
+        } catch (failure: Throwable) {
+            runCatching {
+                fixture.recordAuthorityEvent(id, "menu-wait-failed:${failure.javaClass.simpleName}")
+                val native =
+                    runCatching { fixture.authorityDiagnostics().take(MAX_AUTHORITY_DIAGNOSTIC_CHARS) }
+                        .getOrElse { "Native diagnostics unavailable: ${it.javaClass.simpleName}" }
+                val semantics =
+                    runCatching {
+                        rule.onRoot(useUnmergedTree = true).printToString().take(MAX_AUTHORITY_DIAGNOSTIC_CHARS)
+                    }.getOrElse { "Semantics unavailable: ${it.javaClass.simpleName}" }
+                failure.addSuppressed(AssertionError("Authority menu $id: $native\n$semantics"))
+            }
+            throw failure
+        }
     }
 
     /** Mounts the shipped entry point with the real active account, state owner and native controller reader. */
@@ -246,5 +267,9 @@ class PersonGroupsMembershipAuthorityTest {
                 }
             }
         }
+    }
+
+    companion object {
+        private const val MAX_AUTHORITY_DIAGNOSTIC_CHARS = 4_000
     }
 }

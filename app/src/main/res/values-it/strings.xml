@@ -715,6 +715,8 @@
     <string name="diagnostic_send_to_self_failed">Invio a se stessi non riuscito: %1$s</string>
     <string name="clear">Cancella</string>
     <string name="paste">Incolla</string>
+    <string name="paste_from_clipboard">Incolla dagli appunti</string>
+    <string name="paste_dictation_transcript">Incolla trascrizione</string>
     <string name="live">Live</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Nessuna istantanea dell’inoltro ancora.</string>
@@ -2332,9 +2334,9 @@
     <string name="profile_notifications_mute">Silenzia le notifiche di questa persona</string>
     <string name="profile_notifications_system">Suono e comportamento del sistema</string>
     <string name="profile_notifications_android_vibration">Impostato da Android</string>
-    <string name="profile_notification_scope_detail">Si applica ai messaggi di questa persona in tutte le conversazioni di questo account. La consegna e il conteggio dei messaggi non letti restano invariati.</string>
+    <string name="profile_notification_scope_detail">Le impostazioni Android personalizzate si applicano a messaggi, inviti e modifiche dei ruoli nei gruppi attribuiti a questa persona in tutte le conversazioni di questo account. Il silenziamento riguarda solo i messaggi. La consegna e i conteggi dei non letti restano invariati.</string>
     <string name="profile_notification_precedence">Si applicano prima le regole del silenziamento della chat e delle sole menzioni. Seguono il silenziamento o le impostazioni Android personalizzate di questa persona. Le impostazioni predefinite ripristinano quelle della chat e globali. Le notifiche esistenti mantengono il canale originale.</string>
-    <string name="profile_notification_channel_name">%1$s · Messaggi in tutte le chat</string>
+    <string name="profile_notification_channel_name">%1$s · Notifiche tra le chat</string>
     <string name="destination_filter_all">Tutte le chat</string>
     <string name="destination_filter_selected">Controlla selezione (%1$d)</string>
     <string name="destination_filter_label">Filtra chat</string>
@@ -2430,6 +2432,12 @@
     <string name="search_message_content_failed">Impossibile cercare nel contenuto dei messaggi.</string>
     <string name="document_save_interrupted">L’autenticazione ha interrotto il salvataggio. Scegli di nuovo Salva per selezionare una destinazione.</string>
     <string name="avatar_preparation_interrupted">L’aggiornamento dell’immagine è stato interrotto. Controlla l’immagine attuale prima di selezionarla di nuovo.</string>
+    <string name="show_less">Mostra meno</string>
+    <string name="font_size_preview">Anteprima dei messaggi</string>
+    <string name="font_size_sample_received">Incontriamoci alla stazione. Per te va ancora bene il pomeriggio?</string>
+    <string name="font_size_sample_quote">Pomeriggio alla stazione</string>
+    <string name="font_size_sample_sent">Sì, a dopo! Ti scrivo quando arrivo.</string>
+    <string name="font_size_save_failed">Impossibile salvare la dimensione del testo. È stata mantenuta la dimensione salvata in precedenza.</string>
     <string name="setup_finding_inspection_completed">Ispezione completata. Questo da solo non conferma che il relay supporti la scrittura.</string>
     <string name="setup_finding_context_unknown">Origine non specificata</string>
     <string name="setup_finding_context_discovery">Individuazione dei record</string>

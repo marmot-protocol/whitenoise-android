@@ -4588,6 +4588,48 @@ internal fun ConversationScreen(
                                         onBack = exitConversation,
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,
+                                        onBeforeBodyCollapse = {
+                                            // Collapse cancels deferred movement while preserving
+                                            // whether the viewport is following the tail.
+                                            val keepFollowingTail =
+                                                scrollCoordinator.isFollowingTail &&
+                                                    conversationLandingAtNewestEdge(
+                                                        atNaturalTail = timelineViewport.isAtNaturalTail,
+                                                        hasMoreAfter = controller.hasMoreAfterTimeline,
+                                                    )
+                                            currentTimelineListIndex(item.record.messageIdHex)?.let { index ->
+                                                // Preserve a visible top edge; a deep offset into a tall body
+                                                // must not survive after that content has been clipped away.
+                                                val visible =
+                                                    timelineViewport.readingLayoutInfo().visibleItemsInfo.firstOrNull {
+                                                        it.index == index
+                                                    }
+                                                val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
+                                                val anchor =
+                                                    ConversationScrollAnchor(
+                                                        messageId = item.record.messageIdHex,
+                                                        itemId = item.presentationId,
+                                                        listIndex = index,
+                                                        pixelOffset = offset,
+                                                    )
+                                                scrollCoordinator.settleLandingAt(
+                                                    anchor,
+                                                    atNewestEdge = keepFollowingTail,
+                                                )
+                                                if (!keepFollowingTail) {
+                                                    val bookmark = scrollCoordinator.bookmark(anchor)
+                                                    scope.launch {
+                                                        scrollCoordinator.restoreBookmark(
+                                                            bookmark,
+                                                            resolveAnchorIndex = ::resolveScrollAnchorIndex,
+                                                        )
+                                                    }
+                                                }
+                                            } ?: scrollCoordinator.settleLandingAt(
+                                                currentScrollAnchor(),
+                                                atNewestEdge = keepFollowingTail,
+                                            )
+                                        },
                                         collapseLongMessages = collapseLongMessages,
                                         ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
                                         ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,

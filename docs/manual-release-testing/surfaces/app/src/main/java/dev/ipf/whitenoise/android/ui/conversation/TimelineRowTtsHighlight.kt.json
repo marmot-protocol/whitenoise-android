@@ -1,0 +1,20 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRowTtsHighlight.kt",
+  "legacy_sha256": "e89295b7d886b13b3f7917785d3172e01d73e50abf222bddf5f37d0ea0fe99c2",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TimelineRowMessageBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRowTtsHighlight.kt",
+        "anchor": "fun TimelineRowMessageBubble(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-002",
+          "MSG-015",
+          "MSG-040"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
