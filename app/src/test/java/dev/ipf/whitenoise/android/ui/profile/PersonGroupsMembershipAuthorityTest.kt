@@ -233,8 +233,7 @@ class PersonGroupsMembershipAuthorityTest {
                             SemanticsMatcher("membership authority status") {
                                 it.config.getOrNull(SemanticsProperties.TestTag) in observedTags
                             },
-                        )
-                        .fetchSemanticsNodes()
+                        ).fetchSemanticsNodes()
                 val counts = nodes.groupingBy { it.config.getOrNull(SemanticsProperties.TestTag) }.eachCount()
                 val menuCount = counts[menuTag] ?: 0
                 lastMenuNodeCount = menuCount
