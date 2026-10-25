@@ -55,9 +55,9 @@
         ]
       },
       {
-        "surface": "ChatListUnreadHint",
+        "surface": "Unread pull surface below folders",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "fun ChatListUnreadHint(",
+        "anchor": "ChatListUnreadPullSurface(",
         "test_ids": [
           "CHL-031"
         ]
@@ -270,38 +270,6 @@
           "CHL-017"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"
-      },
-      {
-        "surface": "R.string.pull_unread_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.pull_unread_hint",
-        "test_ids": [
-          "CHL-031"
-        ]
-      },
-      {
-        "surface": "R.string.pull_unread_release",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.pull_unread_release",
-        "test_ids": [
-          "CHL-031"
-        ]
-      },
-      {
-        "surface": "R.string.pull_unread_only",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.pull_unread_only",
-        "test_ids": [
-          "CHL-031"
-        ]
-      },
-      {
-        "surface": "R.string.pull_unread_show_all",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.pull_unread_show_all",
-        "test_ids": [
-          "CHL-031"
-        ]
       },
       {
         "surface": "R.string.pull_unread_retry",

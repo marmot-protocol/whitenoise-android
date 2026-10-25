@@ -450,6 +450,11 @@
     <string name="forward_failed_preparing">Não foi possível preparar os anexos</string>
     <string name="forward_failed_preparation_timeout">O tempo de preparação esgotou. Tente novamente ou dispense para parar o encaminhamento.</string>
     <string name="forward_failed_upload">Não foi possível carregar os anexos</string>
+    <string name="forward_preparing_slow">A obtenção dos anexos está demorando mais do que o normal</string>
+    <string name="forward_uploading_slow">O carregamento está demorando mais do que o normal</string>
+    <string name="forward_sending_slow">O envio está demorando mais do que o normal. Não pode mais ser cancelado e não será enviado duas vezes.</string>
+    <string name="forward_failed_upload_timeout">O carregamento não começou. Tente novamente ou dispense para parar o encaminhamento.</string>
+    <string name="forward_failed_publish_timeout">O envio não terminou e ainda pode ser concluído. Tentar novamente verifica-o sem o enviar duas vezes.</string>
     <string name="forward_failed_publish">Não foi possível enviar as mensagens</string>
     <string name="forward_payload_too_large">Estes anexos são grandes demais para serem encaminhados juntos</string>
     <string name="forward_failed_expired">O anexo expirou antes de poder ser encaminhado</string>

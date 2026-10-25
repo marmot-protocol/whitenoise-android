@@ -160,8 +160,8 @@ class ConversationAttachmentReaderFileBackedTest {
         }
 
     /**
-     * A video small enough for memory that follows a staged one still uploads from a file, so its three
-     * disk copies must fit beside the copies owed to the first, or it is left out for storage.
+     * A video small enough for memory that follows a staged one still uploads from a file, so its two
+     * disk copies must fit beside the staged copy owed to the first, or it is left out for storage.
      */
     @Test
     fun anInMemoryVideoAfterAStagedOneIsLeftOutWhenItsCopiesDoNotFit() =
@@ -169,14 +169,14 @@ class ConversationAttachmentReaderFileBackedTest {
             val large = pick("large.mp4", "video/mp4", ByteArray(4096), declaredSize = 4096)
             val small = pick("small.mp4", "video/mp4", ByteArray(512), declaredSize = 512)
             val albumLimits = FileBackedSendLimits(perFileBytes = 8192, batchCiphertextBytes = 16_384)
-            // Room for the large video's three copies with 100 bytes to spare, shrinking as snapshots land.
-            val free = { APP_RESERVE_BYTES + 3 * 4096 + 100 - stagedBytes(uploadSources) }
+            // Room for the large video's two copies with 100 bytes to spare, shrinking as snapshots land.
+            val free = { APP_RESERVE_BYTES + 2 * 4096 + 100 - stagedBytes(uploadSources) }
             val budget = FileBackedPickBudget(uploadSources, albumLimits, usableBytes = free)
 
             val outcome = reader().readPickedImages(listOf(large, small), budget, inMemoryBytesBudget = 1024)
 
             assertEquals(listOf("large.mp4"), outcome.attachments.map { it.fileName })
-            assertTrue("the small video's 1536 bytes do not fit beside the 8192 still owed", outcome.storageUnavailable)
+            assertTrue("the small video's 1024 bytes do not fit beside the 4096 still owed", outcome.storageUnavailable)
             assertFalse(outcome.albumOverflowed)
             outcome.attachments.forEach { checkNotNull(it.sourceFile).close() }
         }

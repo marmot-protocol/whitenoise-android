@@ -450,6 +450,11 @@
     <string name="forward_failed_preparing">Impossibile preparare gli allegati</string>
     <string name="forward_failed_preparation_timeout">Tempo scaduto durante la preparazione. Riprova oppure chiudi per interrompere l’inoltro.</string>
     <string name="forward_failed_upload">Impossibile caricare gli allegati</string>
+    <string name="forward_preparing_slow">Il recupero degli allegati sta richiedendo più tempo del solito</string>
+    <string name="forward_uploading_slow">Il caricamento sta richiedendo più tempo del solito</string>
+    <string name="forward_sending_slow">L’invio sta richiedendo più tempo del solito. Ora non può essere annullato e non verrà inviato due volte.</string>
+    <string name="forward_failed_upload_timeout">Il caricamento non è iniziato. Riprova oppure chiudi per interrompere l’inoltro.</string>
+    <string name="forward_failed_publish_timeout">L’invio non è terminato e potrebbe ancora andare a buon fine. Riprova lo verifica senza inviarlo due volte.</string>
     <string name="forward_failed_publish">Impossibile inviare i messaggi</string>
     <string name="forward_payload_too_large">Questi allegati sono troppo grandi per essere inoltrati insieme</string>
     <string name="forward_failed_expired">L’allegato è scaduto prima di poter essere inoltrato</string>

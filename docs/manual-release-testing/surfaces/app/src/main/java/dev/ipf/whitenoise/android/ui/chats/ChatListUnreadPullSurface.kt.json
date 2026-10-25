@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListUnreadPullSurface.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListUnreadPullSurface.kt",
+        "surface": "Unread pull motion and active dismissal",
+        "anchor": "internal fun ChatListUnreadPullSurface(",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListUnreadPullSurface.kt",
+        "surface": "R.string.chats",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListUnreadPullSurface.kt",
+        "surface": "R.string.pull_unread_only",
+        "anchor": "R.string.pull_unread_only",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListUnreadPullSurface.kt",
+        "surface": "R.string.pull_unread_show_all",
+        "anchor": "R.string.pull_unread_show_all",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListUnreadPullSurface.kt",
+        "surface": "R.string.pull_unread_filtered",
+        "anchor": "R.string.pull_unread_filtered",
+        "test_ids": [
+          "CHL-031"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListUnreadPullSurface.kt",
+        "surface": "ChatListUnreadPullSurface",
+        "anchor": "fun ChatListUnreadPullSurface(",
+        "test_ids": [
+          "CHL-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -10,8 +11,9 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG
@@ -57,6 +59,10 @@ class ChatListUnreadStatesScreenshotTest {
     }
 
     /** A held native read shows pending content and keeps Show all usable. */
+    @Test fun inactiveLight() = capture("inactive_light", State.Inactive)
+
+    @Test fun heldPullDark() = capture("held_pull_dark", State.HeldPull, dark = true)
+
     @Test fun pendingLight() = capture("pending_light", State.Pending)
 
     /** A failed native read offers explicit recovery in the existing dark palette. */
@@ -89,6 +95,7 @@ class ChatListUnreadStatesScreenshotTest {
         }
     }
 
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun capture(
         name: String,
         state: State,
@@ -106,7 +113,7 @@ class ChatListUnreadStatesScreenshotTest {
                 model.controller.applyChatListRow(model.retainedRow.get())
                 scope.testScheduler.runCurrent()
             }
-            State.Matching -> Unit
+            State.Matching, State.Inactive, State.HeldPull -> Unit
         }
         rule.setContent {
             if (mounted.value) {
@@ -119,10 +126,25 @@ class ChatListUnreadStatesScreenshotTest {
                 }
             }
         }
-        rule.onNodeWithTag("chats.unread_filter").performClick()
+        if (state == State.Inactive || state == State.HeldPull) {
+            rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+            if (state == State.HeldPull) {
+                rule.runOnIdle { model.state.swipePreferences.setPullUnread(true) }
+                rule.waitForIdle()
+                val distance = with(rule.density) { 60.dp.toPx() }
+                rule.onNodeWithTag("chats.unread_surface").performTouchInput {
+                    down(Offset(width * 0.6f, height * 0.3f))
+                    moveBy(Offset(0f, distance), 120)
+                }
+            }
+            rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_pull_unread_$name.png")
+            if (state == State.HeldPull) rule.onNodeWithTag("chats.unread_surface").performTouchInput { cancel() }
+            return
+        }
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads >= 1 }
         rule.waitForIdle()
-        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_show_all)).assertIsDisplayed()
+        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertIsDisplayed()
         when (state) {
             State.Pending -> rule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertIsDisplayed()
             State.Failed -> {
@@ -139,6 +161,7 @@ class ChatListUnreadStatesScreenshotTest {
             State.Empty ->
                 rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertIsDisplayed()
             State.Matching -> rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertIsDisplayed()
+            State.Inactive, State.HeldPull -> error("Captured before activating unread")
         }
         rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_pull_unread_$name.png")
     }
@@ -152,5 +175,5 @@ class ChatListUnreadStatesScreenshotTest {
         }
     }
 
-    private enum class State { Pending, Failed, Empty, Matching }
+    private enum class State { Pending, Failed, Empty, Matching, Inactive, HeldPull }
 }

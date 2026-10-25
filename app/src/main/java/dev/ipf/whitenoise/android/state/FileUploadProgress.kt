@@ -4,10 +4,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_TAG_BYTES
 
 /** The stage of a single-file native upload, as MDK's transfer counter reports it. */
 internal enum class FileUploadPhase {
-    /** MDK is copying the staged file into its own private snapshot. */
+    /** MDK is copying the staged file into the account's encrypted media store. */
     PREPARING,
 
-    /** MDK is encrypting its snapshot. */
+    /** MDK is encrypting its staged copy once to fix the ciphertext's digest before sending it. */
     ENCRYPTING,
 
     /** The ciphertext is being sent to the media server. */
@@ -31,8 +31,9 @@ internal data class FileUploadProgress(
 
 /**
  * Reads MDK's transfer counter for a send of exactly one file of [plaintextBytes] bytes. MDK advances
- * one counter, keeping its maximum, across three passes: its private copy (0 to N), encryption (N to 2N),
- * then the upload of the N + 16 byte ciphertext (twice the ciphertext length plus the bytes sent). Once
+ * one counter, keeping its maximum, across three passes: the copy into its media store (0 to N), the digest
+ * pass that encrypts that copy (N to 2N), then the upload of the N + 16 byte ciphertext streamed from the copy
+ * again (twice the ciphertext length plus the bytes sent). Once
  * every ciphertext byte is sent, the rest of the native call admits and publishes the message.
  *
  * Each item writes its own pass values into that one maximum, so the counter only describes a send of a

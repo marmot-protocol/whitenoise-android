@@ -186,120 +186,86 @@ class AttachmentOpenLifecycleTest {
             assertFalse(resumed.await())
         }
 
+    /** A download intent is retired exactly once across recreated owners, and nothing is opened either time. */
     @Test
-    fun readyAttachmentDispatchesOnceAcrossRecreatedOwners() =
+    fun aDownloadIntentIsRetiredOnceAcrossRecreatedOwners() =
         runBlocking {
             var intentAvailable = true
-            var dispatchCount = 0
 
-            suspend fun dispatch(owner: AttachmentLifecycleOwner): Boolean =
-                dispatchAttachmentOpenWhenReady(
-                    lifecycle = owner.lifecycle,
+            suspend fun settle(): Boolean =
+                settleAttachmentDownloadIntent(
                     awaitReady = {},
-                    isReady = { true },
-                    consume = {
-                        if (intentAvailable) {
-                            intentAvailable = false
-                            true
-                        } else {
-                            false
-                        }
-                    },
-                    dispatch = { dispatchCount++ },
+                    consume = { intentAvailable.also { intentAvailable = false } },
                 )
 
-            val firstOwner =
-                AttachmentLifecycleOwner().apply {
-                    moveTo(Lifecycle.Event.ON_START)
-                    moveTo(Lifecycle.Event.ON_RESUME)
-                }
-            val recreatedOwner =
-                AttachmentLifecycleOwner().apply {
-                    moveTo(Lifecycle.Event.ON_START)
-                    moveTo(Lifecycle.Event.ON_RESUME)
-                }
-
-            assertTrue(dispatch(firstOwner))
-            assertFalse(dispatch(recreatedOwner))
-            assertEquals(1, dispatchCount)
+            assertTrue(settle())
+            assertFalse(settle())
+            assertFalse(intentAvailable)
         }
 
+    /** A download intent stays pending until the bytes are ready in place, then is retired. */
     @Test
-    fun attachmentWaitsForReadinessAndResumeBeforeConsumingIntent() =
+    fun aDownloadIntentIsRetiredOnlyOnceTheBytesAreReady() =
         runBlocking {
-            val owner = AttachmentLifecycleOwner().apply { moveTo(Lifecycle.Event.ON_START) }
             val ready = CompletableDeferred<Unit>()
             var consumeCount = 0
-            var dispatchCount = 0
-            val dispatched =
+            val settling =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    dispatchAttachmentOpenWhenReady(
-                        lifecycle = owner.lifecycle,
+                    settleAttachmentDownloadIntent(
                         awaitReady = { ready.await() },
-                        isReady = { ready.isCompleted },
                         consume = {
                             consumeCount++
                             true
                         },
-                        dispatch = { dispatchCount++ },
                     )
                 }
 
-            ready.complete(Unit)
-            assertFalse(dispatched.isCompleted)
+            assertFalse(settling.isCompleted)
             assertEquals(0, consumeCount)
-            owner.moveTo(Lifecycle.Event.ON_RESUME)
+            ready.complete(Unit)
 
-            assertTrue(dispatched.await())
+            assertTrue(settling.await())
             assertEquals(1, consumeCount)
-            assertEquals(1, dispatchCount)
         }
 
+    /** Once the bytes are ready, a leaving owner's cancellation cannot strand the intent mid-retirement. */
     @Test
-    fun cancellationAfterConsumptionCannotStrandTheOpenBeforeDispatchCompletes() =
+    fun cancellationAfterReadinessStillRetiresTheDownloadIntent() =
         runBlocking {
-            val dispatchStarted = CompletableDeferred<Unit>()
-            val releaseDispatch = CompletableDeferred<Unit>()
-            var consumeCount = 0
-            var dispatchCount = 0
-            val opening =
+            val consumeStarted = CompletableDeferred<Unit>()
+            val releaseConsume = CompletableDeferred<Unit>()
+            var consumed = false
+            val settling =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    consumeAndDispatchAttachmentOpen(
+                    settleAttachmentDownloadIntent(
+                        awaitReady = {},
                         consume = {
-                            consumeCount++
+                            consumeStarted.complete(Unit)
+                            releaseConsume.await()
+                            consumed = true
                             true
-                        },
-                        restore = {},
-                        dispatch = {
-                            dispatchStarted.complete(Unit)
-                            releaseDispatch.await()
-                            dispatchCount++
                         },
                     )
                 }
 
-            dispatchStarted.await()
-            opening.cancel()
-            assertEquals(1, consumeCount)
-            assertEquals(0, dispatchCount)
-
-            releaseDispatch.complete(Unit)
-            opening.join()
-            assertEquals(1, dispatchCount)
+            consumeStarted.await()
+            settling.cancel()
+            releaseConsume.complete(Unit)
+            settling.join()
+            assertTrue(consumed)
         }
 
+    /** A failed launch of an explicitly opened file restores its claimed intent for a later owner. */
     @Test
-    fun failedDispatchRestoresTheConsumedIntentForALaterOwner() =
+    fun failedDispatchRestoresTheClaimedIntentForALaterOwner() =
         runBlocking {
             var intentAvailable = true
             var restoreCount = 0
 
             val failure =
                 runCatching {
-                    consumeAndDispatchAttachmentOpen(
-                        consume = {
-                            intentAvailable.also { intentAvailable = false }
-                        },
+                    claimAndDispatchAttachmentOpen(
+                        claim = { Unit.takeIf { intentAvailable.also { intentAvailable = false } } },
                         restore = {
                             restoreCount++
                             intentAvailable = true
@@ -313,6 +279,7 @@ class AttachmentOpenLifecycleTest {
             assertEquals(1, restoreCount)
         }
 
+    /** A reported launch failure restores the intent without escaping the effect. */
     @Test
     fun reportedDispatchFailureRestoresTheIntentWithoutEscapingTheEffect() =
         runBlocking {
@@ -320,10 +287,8 @@ class AttachmentOpenLifecycleTest {
             var reportedFailure: Throwable? = null
 
             val dispatched =
-                consumeAndDispatchAttachmentOpenReportingFailure(
-                    consume = {
-                        intentAvailable.also { intentAvailable = false }
-                    },
+                claimAndDispatchAttachmentOpenReportingFailure(
+                    claim = { Unit.takeIf { intentAvailable.also { intentAvailable = false } } },
                     restore = { intentAvailable = true },
                     dispatch = { error("viewer launch failed") },
                     onFailure = { reportedFailure = it },
@@ -334,6 +299,7 @@ class AttachmentOpenLifecycleTest {
             assertTrue(reportedFailure is IllegalStateException)
         }
 
+    /** An explicit open of a file evicted since its download waits out durable work, then launches exactly once. */
     @Test
     fun foregroundFailureThenDurableCompletionDispatchesThePendingOpenExactlyOnce() =
         runBlocking {
@@ -359,10 +325,8 @@ class AttachmentOpenLifecycleTest {
                             onWaitingForDurableAvailability = { waitingForWorker = true },
                             onTerminalFailure = { failureCount++ },
                         ) ?: return@async false
-                    consumeAndDispatchAttachmentOpen(
-                        consume = {
-                            intentAvailable.also { intentAvailable = false }
-                        },
+                    claimAndDispatchAttachmentOpen(
+                        claim = { Unit.takeIf { intentAvailable.also { intentAvailable = false } } },
                         restore = { intentAvailable = true },
                         dispatch = {
                             assertEquals("cached-file", artifact)
@@ -385,8 +349,8 @@ class AttachmentOpenLifecycleTest {
             assertFalse(intentAvailable)
 
             val duplicate =
-                consumeAndDispatchAttachmentOpen(
-                    consume = { intentAvailable.also { intentAvailable = false } },
+                claimAndDispatchAttachmentOpen(
+                    claim = { Unit.takeIf { intentAvailable.also { intentAvailable = false } } },
                     restore = { intentAvailable = true },
                     dispatch = { dispatchCount++ },
                 )
@@ -497,23 +461,20 @@ class AttachmentOpenLifecycleTest {
             assertEquals(0, failureCount)
         }
 
+    /**
+     * Durable completion re-enters visual materialization so the download lands in place, then retires the intent;
+     * nothing is opened.
+     */
     @Test
-    fun durableCompletionRestartsVisualMaterializationBeforeThePendingOpenDispatches() =
+    fun durableCompletionRestartsVisualMaterializationAndRetiresTheDownloadIntent() =
         runBlocking {
-            val owner =
-                AttachmentLifecycleOwner().apply {
-                    moveTo(Lifecycle.Event.ON_START)
-                    moveTo(Lifecycle.Event.ON_RESUME)
-                }
             val transferState = MutableStateFlow(AttachmentTransferState.Failed)
             val ready = MutableStateFlow(false)
             var ensureCount = 0
             var intentAvailable = true
-            var dispatchCount = 0
-            val opening =
+            val settling =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    dispatchAttachmentOpenWhenReady(
-                        lifecycle = owner.lifecycle,
+                    settleAttachmentDownloadIntent(
                         awaitReady = {
                             awaitAttachmentReadyAfterDurableCompletion(
                                 readiness = ready,
@@ -524,29 +485,25 @@ class AttachmentOpenLifecycleTest {
                                 },
                             )
                         },
-                        isReady = { ready.value },
-                        consume = {
-                            intentAvailable.also { intentAvailable = false }
-                        },
-                        dispatch = { dispatchCount++ },
+                        consume = { intentAvailable.also { intentAvailable = false } },
                     )
                 }
 
-            assertFalse(opening.isCompleted)
+            assertFalse(settling.isCompleted)
             assertEquals(0, ensureCount)
             transferState.value = AttachmentTransferState.Available
 
-            assertTrue(opening.await())
+            assertTrue(settling.await())
             assertEquals(1, ensureCount)
-            assertEquals(1, dispatchCount)
             assertFalse(intentAvailable)
         }
 
+    /** Cancellation of an explicit launch propagates instead of being reported as a launch failure. */
     @Test(expected = CancellationException::class)
     fun dispatchCancellationStillPropagates() {
         runBlocking {
-            consumeAndDispatchAttachmentOpenReportingFailure(
-                consume = { true },
+            claimAndDispatchAttachmentOpenReportingFailure(
+                claim = { Unit },
                 restore = {},
                 dispatch = { throw CancellationException("viewer closed") },
                 onFailure = { error("cancellation must not be reported as a launch failure") },

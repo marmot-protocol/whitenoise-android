@@ -343,6 +343,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
     ): JSONObject {
         val receiverState = requireNotNull(state)
         reportBoundary(ReceiptBoundary.NETWORK_POLICY_START)
+        setWifi(receiver, enabled = true)
         setPolicy(
             BackgroundReceiptPolicyCase.NetworkHeld,
             receiver,

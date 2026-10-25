@@ -66,6 +66,46 @@
     ],
     "source_coverage": [
       {
+        "surface": "R.string.forward_failed_publish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_failed_publish",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "R.string.forward_failed_publish_timeout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_failed_publish_timeout",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "R.string.forward_preparing_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_preparing_attachments",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "R.string.forward_sending_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_sending_messages",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "R.string.forward_uploading_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_uploading_attachments",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
         "surface": "Scroll boundaries: MessageActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
         "anchor": "WhiteNoiseLazyColumn(",
@@ -79,9 +119,41 @@
     ],
     "settings_controls": [
       {
-        "surface": "Forward upload failure, including an upload that never started: R.string.forward_failed_upload",
+        "surface": "Forward upload failure: R.string.forward_failed_upload",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
         "anchor": "R.string.forward_failed_upload",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "Forward upload that never started: R.string.forward_failed_upload_timeout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_failed_upload_timeout",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "Slow forward preparation notice: R.string.forward_preparing_slow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_preparing_slow",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "Slow forward upload notice: R.string.forward_uploading_slow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_uploading_slow",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "Slow forward send notice, no cancel or resend: R.string.forward_sending_slow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_sending_slow",
         "test_ids": [
           "MSG-011"
         ]

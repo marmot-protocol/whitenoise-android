@@ -439,6 +439,11 @@
     <string name="forward_failed_preparing">無法準備附件</string>
     <string name="forward_failed_preparation_timeout">準備逾時。請重試，或關閉以停止轉寄。</string>
     <string name="forward_failed_upload">無法上傳附件</string>
+    <string name="forward_preparing_slow">取得附件的時間比平常更久</string>
+    <string name="forward_uploading_slow">上傳的時間比平常更久</string>
+    <string name="forward_sending_slow">傳送的時間比平常更久。現在無法取消，也不會重複傳送。</string>
+    <string name="forward_failed_upload_timeout">上傳未開始。請重試，或關閉以停止轉寄。</string>
+    <string name="forward_failed_publish_timeout">傳送尚未完成，仍可能成功。重試會檢查傳送狀態，不會重複傳送。</string>
     <string name="forward_failed_publish">無法傳送訊息</string>
     <string name="forward_payload_too_large">這些附件合計過大，無法轉發</string>
     <string name="forward_failed_expired">附件在轉發前已過期</string>

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.readWithin
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
@@ -140,30 +141,33 @@ internal suspend fun <T> materializePersistedAttachmentOpen(
         artifact
     }
 
-/** Loads bounded reader content while sharing the controller's durable attachment transfer. */
-internal suspend fun loadMediaFileBytes(
+/**
+ * Reads at most [maxBytes] of an attachment for the text reader, streamed from its source so a large file is never
+ * copied whole onto the heap. A source declaring or streaming more throws [AttachmentTooLargeToPresentException],
+ * which the reader presents as too large to preview rather than as a failed download.
+ */
+internal suspend fun loadTextReaderBytes(
     controller: ConversationController,
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
-): ByteArray? {
-    val retained = retainedMediaFileBytes(controller, messageIdHex, attachmentIndex, mine)
-    return runCatchingCancellable {
-        controller
-            .requestAttachmentTransfer(
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-                retainedPlaintext = retained,
-            ).await()
-    }.onFailure {
-        logMediaFileDownloadFailure()
-    }.getOrNull()
+): ByteArray {
+    val source = attachmentSource(controller, messageIdHex, attachmentIndex, reference, mine)
+    return source.use { readForTextReader(it) }
 }
 
+/**
+ * Reads one byte past the reader's preview limit, enough for the decoder to tell an over-limit file apart, and
+ * never more, so a large or misreported source is never copied whole onto the heap.
+ */
+internal suspend fun readForTextReader(source: AttachmentPlaintext): ByteArray = source.readWithin(TEXT_READ_MAX_BYTES)
+
+/** One byte past [TEXT_ATTACHMENT_PREVIEW_MAX_BYTES], the most the text reader ever reads from a source. */
+private const val TEXT_READ_MAX_BYTES = TEXT_ATTACHMENT_PREVIEW_MAX_BYTES + 1L
+
 /** The sender's own in-memory retry bytes for a pending file, or null so the caller reads MDK's copy instead. */
-private fun retainedMediaFileBytes(
+internal fun retainedMediaFileBytes(
     controller: ConversationController,
     messageIdHex: String,
     attachmentIndex: Int,

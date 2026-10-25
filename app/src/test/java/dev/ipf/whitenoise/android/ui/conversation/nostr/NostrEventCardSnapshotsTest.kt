@@ -5,8 +5,10 @@ import dev.ipf.whitenoise.android.core.NostrEventReferenceDecoder
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The conversation's first-frame card snapshots are filled from MDK's cache before rows show (#2238). */
@@ -112,6 +114,83 @@ class NostrEventCardSnapshotsTest {
             assertNull(snapshots[NostrEventReference.Event(eventId(3)).stableId])
         }
 
+    /**
+     * The default capacity covers every card a full conversation window can name, three per row, so warming the whole
+     * window keeps every snapshot it read rather than evicting its own earlier batches.
+     */
+    @Test
+    fun warmingAFullWindowKeepsEverySnapshot() =
+        runTest {
+            val rows = 200
+            val records =
+                (0 until rows).map { row ->
+                    val notes =
+                        (0 until MAX_CARDS_PER_MESSAGE).map { card ->
+                            noteBech32(eventId(row * MAX_CARDS_PER_MESSAGE + card))
+                        }
+                    eventCardTimelineRecord(
+                        messageIdHex = "m$row",
+                        plaintext = notes.joinToString(" ") { "nostr:$it" },
+                        timelineAt = row.toULong(),
+                        contentTokens = eventCardDocument(*notes.toTypedArray()),
+                    )
+                }
+            val snapshots = NostrEventCardSnapshots()
+
+            val read = snapshots.warm(records) { references -> references.map { loaded(it) } }
+
+            assertEquals(rows * MAX_CARDS_PER_MESSAGE, read)
+            (0 until rows * MAX_CARDS_PER_MESSAGE).forEach { index ->
+                val stableId = NostrEventReference.Event(eventId(index)).stableId
+                assertEquals("card $index kept", loaded(noteBech32(eventId(index))), snapshots[stableId])
+            }
+        }
+
+    /**
+     * A reference found uncached is asked about again by the next warm, since MDK may have cached it meanwhile, so a
+     * card resolved after the first read is kept when its row comes back.
+     */
+    @Test
+    fun aMissIsReadAgainByTheNextWarm() =
+        runTest {
+            val note = noteBech32(eventId(1))
+            val records =
+                listOf(
+                    eventCardTimelineRecord("m1", "nostr:$note", contentTokens = eventCardDocument(note)),
+                )
+            val snapshots = NostrEventCardSnapshots()
+            val stableId = NostrEventReference.Event(eventId(1)).stableId
+
+            snapshots.warm(records) { references -> references.map { null } }
+            assertNull(snapshots[stableId])
+            snapshots.warm(records) { references -> references.map { loaded(it) } }
+
+            assertEquals(loaded(note), snapshots[stableId])
+        }
+
+    /** A miss keeps an on-screen row from a re-read only briefly, and not at all once a resolver settles the card. */
+    @Test
+    fun aMissIsKnownOnlyUntilItExpiresOrSettles() =
+        runTest {
+            var now = 0L
+            val note = noteBech32(eventId(1))
+            val records =
+                listOf(
+                    eventCardTimelineRecord("m1", "nostr:$note", contentTokens = eventCardDocument(note)),
+                )
+            val snapshots = NostrEventCardSnapshots(nowMs = { now })
+            val stableId = NostrEventReference.Event(eventId(1)).stableId
+
+            snapshots.warm(records) { references -> references.map { null } }
+            assertTrue("a fresh miss is known", snapshots.isKnown(stableId))
+            now += MISS_EXPIRY_PROBE_MILLIS
+            assertFalse("an old miss is not", snapshots.isKnown(stableId))
+
+            snapshots.warm(records) { references -> references.map { null } }
+            snapshots.put(stableId, loaded(note))
+            assertTrue("a settled card is known by its snapshot", snapshots.isKnown(stableId))
+        }
+
     /** The snapshot keeps at most its capacity, dropping the least recently used entry first. */
     @Test
     fun snapshotsStayBounded() {
@@ -124,6 +203,11 @@ class NostrEventCardSnapshotsTest {
         assertEquals(loaded("one"), snapshots["one"])
         assertNull(snapshots["two"])
         assertEquals(loaded("three"), snapshots["three"])
+    }
+
+    private companion object {
+        /** Past the snapshots' 30-second miss memory. */
+        const val MISS_EXPIRY_PROBE_MILLIS = 30_001L
     }
 
     /** A 64-character hex event id derived from [index]. */

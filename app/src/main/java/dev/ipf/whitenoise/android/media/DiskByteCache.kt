@@ -209,17 +209,31 @@ internal class DiskByteCache(
         return contains(key)
     }
 
+    /** The plaintext size recorded for [key] in the index, read without decrypting anything, or null on a miss. */
+    fun plaintextSizeOf(key: String): Long? {
+        ensureHydrated()
+        val hashed = fileNameFor(key)
+        return synchronized(this) { index[hashed]?.plaintextSize }
+    }
+
     /** Returns an authenticated entry when its bounded allocation fits current heap headroom. */
     fun get(key: String): ByteArray? = getInternal(key, smallOnly = false)
 
-    /** Returns only entries that are safe to promote into the bounded plaintext L1. */
-    fun getIfSmall(key: String): ByteArray? = getInternal(key, smallOnly = true)
+    /**
+     * Returns only entries that are safe to promote into the bounded plaintext L1, and only when the entry also fits
+     * the caller's [maxBytes], so this read never decrypts an entry that budget would reject.
+     */
+    fun getIfSmall(
+        key: String,
+        maxBytes: Long = Long.MAX_VALUE,
+    ): ByteArray? = getInternal(key, smallOnly = true, maxBytes = maxBytes)
 
     /** Authenticates and reads one entry while preserving recoverable misses on resource pressure. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     private fun getInternal(
         key: String,
         smallOnly: Boolean,
+        maxBytes: Long = Long.MAX_VALUE,
     ): ByteArray? {
         val hashed = fileNameFor(key)
         // Look up (and LRU-promote) the entry under the lock, then read the
@@ -231,7 +245,7 @@ internal class DiskByteCache(
             synchronized(this) {
                 (index[hashed] ?: return null) to cacheLifetime.capture()
             }
-        if (smallOnly && entry.plaintextSize > maxInMemoryEntryBytes) return null
+        if (smallOnly && (entry.plaintextSize > maxInMemoryEntryBytes || entry.plaintextSize > maxBytes)) return null
         return try {
             val bytes = readEncrypted(entry.file, hashed)
             synchronized(this) {

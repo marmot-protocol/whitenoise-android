@@ -48,7 +48,14 @@ internal fun rememberLocalVCardContact(
         }
         val bytes =
             runCatchingCancellable {
-                localAttachmentBytes(controller, messageIdHex, attachment.index, mine)
+                // A vCard over the parse limit is rejected anyway, so it is never read past that limit either.
+                localAttachmentBytes(
+                    controller,
+                    messageIdHex,
+                    attachment.index,
+                    mine,
+                    maxBytes = MAX_VCARD_BYTES.toLong(),
+                )
             }.getOrNull() ?: return@LaunchedEffect
         contact = withContext(Dispatchers.Default) { parseSingleVCard(bytes) }
     }

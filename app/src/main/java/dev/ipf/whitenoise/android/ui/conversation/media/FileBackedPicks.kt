@@ -19,8 +19,9 @@ internal const val FILE_BACKED_TAG_BYTES = 16L
  */
 internal const val FILE_BACKED_ATTACHMENT_MAX_BYTES: Long = 512L * 1024L * 1024L - FILE_BACKED_TAG_BYTES
 
-// A large send holds three copies on disk at once: this snapshot, MDK's private snapshot and its ciphertext.
-internal const val FILE_BACKED_DISK_COPIES = 3L
+// A large send holds two copies on disk at once: this app's snapshot and the one file MDK stages from it. MDK
+// streams the ciphertext to the server and never writes it, or another plaintext snapshot, to disk.
+internal const val FILE_BACKED_DISK_COPIES = 2L
 
 // Headroom left for the account database and the rest of the app after the copies above.
 internal const val FILE_BACKED_DISK_RESERVE_BYTES = 64L * 1024L * 1024L
@@ -97,11 +98,10 @@ internal data class FileBackedPick(
 /**
  * The file-backed staging of one send operation, shared by its album and every document it sends.
  * [onStaged] hears about every snapshot as soon as it exists, so a caller can release it if a later
- * step of the same preparation fails. The messages of a send upload one at a time, and MDK deletes each
- * message's snapshots and ciphertext when its upload ends, so the send needs room for its largest
- * message's upload at once, beside the snapshots of every message still waiting, never the sum of all.
- * MDK may also keep a plaintext copy of an uploaded message for the sender, but only when it finds room
- * for four times that message, so that optional copy is not reserved here.
+ * step of the same preparation fails. The messages of a send upload one at a time. Each upload ends with
+ * this app deleting the message's snapshots while MDK keeps its staged copy as the sender's retained body,
+ * so one copy per message stays on disk throughout. The send therefore needs room for the snapshots of
+ * every message plus its largest message's staged copy at once, never a second copy of every message.
  */
 internal class FileBackedSendStaging(
     private val onStaged: (StagedUploadSource) -> Unit = {},
@@ -135,9 +135,9 @@ internal class FileBackedPickBudget(
 ) {
     private var remainingCiphertextBytes = limits.batchCiphertextBytes
 
-    // What this message's upload writes: MDK's snapshot and ciphertext of each staged item, and all three
-    // copies of each in-memory item it converts to a file. It costs disk only once the message uploads from
-    // files, which the first staged snapshot decides. Until then an all-in-memory message uploads from bytes.
+    // What this message's upload writes: MDK's staged copy of each staged item, and both copies of each
+    // in-memory item it converts to a file. It costs disk only once the message uploads from files, which the
+    // first staged snapshot decides. Until then an all-in-memory message uploads from bytes.
     private var uploadWriteBytes = 0L
     private var uploadsFromFiles = false
 
@@ -150,7 +150,7 @@ internal class FileBackedPickBudget(
     /**
      * Admits one album item of [byteCount] bytes and returns null, or returns why it cannot join: it no
      * longer fits this message's ciphertext bound, or it is [inMemory] in a message that uploads from
-     * files and the three disk copies its upload will write do not fit beside the rest of the send.
+     * files and the two disk copies its upload will write do not fit beside the rest of the send.
      */
     fun admit(
         byteCount: Long,
@@ -203,7 +203,7 @@ internal class FileBackedPickBudget(
     ): FileBackedPick =
         when (val read = readStagedDocument(directory, maxBytes, checkCancellation, open)) {
             is StagedDocumentRead.Success -> {
-                // The snapshot is on disk now, MDK's snapshot and ciphertext of it are still to come.
+                // The snapshot is on disk now, MDK's staged copy of it is still to come.
                 val writeAfter = uploadWriteBytes + nativeCopies(read.source.byteCount)
                 if (!accept(read.source)) {
                     read.source.closeQuietly()
@@ -232,7 +232,7 @@ internal class FileBackedPickBudget(
                 )
         }
 
-    /** MDK's private snapshot and ciphertext of a staged item of [byteCount] bytes. */
+    /** The copies MDK writes for a staged item of [byteCount] bytes: its one staged file. */
     private fun nativeCopies(byteCount: Long): Long = byteCount * (FILE_BACKED_DISK_COPIES - 1)
 
     /**

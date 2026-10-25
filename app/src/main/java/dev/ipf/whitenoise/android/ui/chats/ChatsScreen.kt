@@ -269,7 +269,6 @@ internal fun ChatsScreen(
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
     // The complete native snapshot exists only while this temporary view is open.
-    var unreadPullProgress by remember { mutableFloatStateOf(0f) }
     var localUnreadOnly by
         remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
             mutableStateOf(false)
@@ -2003,30 +2002,6 @@ internal fun ChatsScreen(
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
         ) {
-            if (!searchOpen && !selectionMode) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    ChatListUnreadHint(progress = { unreadPullProgress }, unreadOnly = unreadOnly)
-                    TextButton(
-                        onClick = { setUnreadOnly(!unreadOnly) },
-                        modifier = Modifier.testTag("chats.unread_filter"),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (unreadOnly) R.string.pull_unread_show_all else R.string.pull_unread_only,
-                            ),
-                        )
-                    }
-                    val unreadRefreshPending = unreadOnly && currentUnreadSnapshot == null
-                    val retainedUnreadVisible = !unreadReadFailed && displayUnreadSnapshot != null
-                    if (unreadRefreshPending && retainedUnreadVisible) {
-                        CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
-                    }
-                    val failedUnreadSnapshot = unreadReadFailed && unreadOnly && displayUnreadSnapshot != null
-                    if (failedUnreadSnapshot && visibleItems.isNotEmpty()) {
-                        TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
-                    }
-                }
-            }
             // Chats reset and folder management remain available with an empty list.
             // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
             // The prototype swaps the whole top column for the search bar and its mode chips, so the
@@ -2106,278 +2081,308 @@ internal fun ChatsScreen(
                     }
                 },
             ) {
-                when {
-                    browsingAttachments && libraryFailure != null ->
-                        ErrorContent(
-                            stringResource(R.string.couldnt_load_chats),
-                            libraryFailure,
-                            onRetry = { libraryRetry++ },
-                        )
-                    browsingAttachments ->
-                        GlobalAttachmentBrowser(
-                            items = libraryItems,
-                            kinds = libraryKinds,
-                            loading = libraryLoading,
-                            bottomPadding = 0.dp,
-                            onOpenMessage = { groupIdHex, messageIdHex ->
-                                openSearchMessage(groupIdHex, messageIdHex)
-                            },
-                            thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
-                            selectionOwner = searchViewport?.selection,
-                            gridState =
-                                searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
-                                    .rememberLazyGridState(),
-                        )
-                    unreadOnly && unreadReadFailed && (displayUnreadSnapshot == null || visibleItems.isEmpty()) ->
-                        Column(Modifier.fillMaxSize().padding(16.dp)) {
-                            Text(stringResource(R.string.pull_unread_load_failed))
-                            TextButton(onClick = { unreadRetry++ }) { Text(stringResource(R.string.pull_unread_retry)) }
-                        }
-                    unreadOnly &&
-                        currentUnreadSnapshot == null &&
-                        (displayUnreadSnapshot == null || visibleItems.isEmpty()) -> LoadingScreen()
-                    controller.isLoading && sourceList.isEmpty() -> {
-                        val slowCopy = stringResource(R.string.chat_list_startup_slow)
-                        LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })
-                    }
-                    loadFailurePlacement == LoadFailurePlacement.FullScreen ->
-                        ErrorContent(
-                            stringResource(R.string.couldnt_load_chats),
-                            requireNotNull(controller.error),
-                            onRetry = controller::retryLoad,
-                        )
-                    blockLocalSearchRows(
-                        loading = bodySearchLoading,
-                        hasLocalRows = visibleItems.isNotEmpty(),
-                        preservePendingAnchor = preservePendingSearchAnchor,
-                    ) ->
-                        // A restored deep anchor still waits; fresh local name matches remain usable.
-                        LoadingScreen(message = stringResource(R.string.conversation_search_loading))
-                    bodySearchFailure != null && visibleItems.isEmpty() ->
-                        ErrorContent(
-                            stringResource(R.string.couldnt_load_chats),
-                            bodySearchFailure,
-                            onRetry = { bodySearchRetry++ },
-                        )
-                    sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
-                    sourceList.isEmpty() && !unreadOnly ->
-                        EmptyChats(onCreate = openNewMessageFlow)
-                    visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
-                        controller.error
-                            ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
-                            ?.let { failure ->
-                                InlineErrorBanner(
-                                    error = failure,
-                                    onRetry = controller::retryLoad,
-                                    modifier = Modifier.align(Alignment.TopCenter),
+                val unreadOwnerAvailable =
+                    appState.activeAccountRef != null &&
+                        !appState.signOutInProgress &&
+                        !appState.wipeInProgress
+                val unreadActionsAvailable = !searchOpen && !selectionMode && unreadOwnerAvailable
+                key(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
+                    ChatListUnreadPullSurface(
+                        unreadOnly = unreadOnly,
+                        actionsAvailable = unreadActionsAvailable,
+                        gestureEnabled =
+                            unreadActionsAvailable &&
+                                appState.swipePreferences.state.pullUnread &&
+                                actionSheetChatId == null &&
+                                !actionMenuOwner.pointerHeld,
+                        atTop = {
+                            (unreadOnly && (visibleItems.isEmpty() || displayUnreadSnapshot == null)) ||
+                                (
+                                    !hasEarlierChats &&
+                                        !chatListState.isScrollInProgress &&
+                                        chatListState.firstVisibleItemIndex == 0 &&
+                                        chatListState.firstVisibleItemScrollOffset == 0
                                 )
+                        },
+                        onUnreadOnlyChange = { setUnreadOnly(it) },
+                        status = {
+                            val unreadRefreshPending = unreadOnly && currentUnreadSnapshot == null
+                            val retainedUnreadVisible = !unreadReadFailed && displayUnreadSnapshot != null
+                            if (unreadRefreshPending && retainedUnreadVisible) {
+                                CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
                             }
-                    visibleItems.isEmpty() ->
-                        Column(Modifier.fillMaxSize()) {
-                            controller.error
-                                ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
-                                ?.let { failure ->
-                                    InlineErrorBanner(
-                                        error = failure,
-                                        onRetry = controller::retryLoad,
-                                    )
+                            val failedUnreadSnapshot = unreadReadFailed && unreadOnly && displayUnreadSnapshot != null
+                            if (failedUnreadSnapshot && visibleItems.isNotEmpty()) {
+                                TextButton(onClick = { unreadRetry++ }) {
+                                    Text(stringResource(R.string.pull_unread_retry))
                                 }
-                            Box(Modifier.fillMaxWidth().weight(1f)) {
-                                ChatListNoResults(
-                                    query = searchQuery.trim(),
-                                    unreadFolderSelected = unreadFolderSelected,
-                                    filtersActive = filtersActive,
-                                )
                             }
-                        }
-                    else ->
-                        PreparedVisibleGroupAvatarContent(
-                            appState,
-                            visibleItems,
-                            chatListState,
-                            ::visibleRowId,
-                            { it.selectedAvatarAsset },
-                            accountRef = controller.boundAccountRef,
-                            surfaceIdentity = controller,
-                            retainedPreparation = retainedAvatarPreparation,
-                        ) {
-                            LazyColumn(
-                                modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .chatListUnreadPull(
-                                            enabled =
-                                                appState.swipePreferences.state.pullUnread &&
-                                                    !unreadOnly &&
-                                                    !searchOpen &&
-                                                    !selectionMode &&
-                                                    actionSheetChatId == null &&
-                                                    !actionMenuOwner.pointerHeld,
-                                            atTop = {
-                                                !hasEarlierChats &&
-                                                    !chatListState.isScrollInProgress &&
-                                                    chatListState.firstVisibleItemIndex == 0 &&
-                                                    chatListState.firstVisibleItemScrollOffset == 0
-                                            },
-                                            thresholdPx = with(LocalDensity.current) { 72.dp.toPx() },
-                                            scopeKey =
-                                                Triple(
-                                                    appState.activeAccountRef,
-                                                    appState.runtimeGeneration,
-                                                    selectedFolderId,
-                                                ),
-                                            onProgress = { unreadPullProgress = it },
-                                            onActivate = { setUnreadOnly(true) },
-                                        ).trackWhiteNoiseHeader(chatListState)
-                                        .clipToBounds()
-                                        .chatListEdgeFade(chatListState)
-                                        .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
-                                        .onGloballyPositioned { coordinates ->
-                                            chatListWindowTop = coordinates.positionInWindow().y
-                                            chatListHeightPx = coordinates.size.height.toFloat()
-                                        },
-                                state = chatListState,
-                            ) {
+                        },
+                    ) {
+                        when {
+                            browsingAttachments && libraryFailure != null ->
+                                ErrorContent(
+                                    stringResource(R.string.couldnt_load_chats),
+                                    libraryFailure,
+                                    onRetry = { libraryRetry++ },
+                                )
+                            browsingAttachments ->
+                                GlobalAttachmentBrowser(
+                                    items = libraryItems,
+                                    kinds = libraryKinds,
+                                    loading = libraryLoading,
+                                    bottomPadding = 0.dp,
+                                    onOpenMessage = { groupIdHex, messageIdHex ->
+                                        openSearchMessage(groupIdHex, messageIdHex)
+                                    },
+                                    thumbnail = { item ->
+                                        libraryThumbnail(appState, controller.boundAccountRef, item)
+                                    },
+                                    selectionOwner = searchViewport?.selection,
+                                    gridState =
+                                        searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
+                                            .rememberLazyGridState(),
+                                )
+                            unreadOnly &&
+                                unreadReadFailed &&
+                                (displayUnreadSnapshot == null || visibleItems.isEmpty()) ->
+                                Column(Modifier.fillMaxSize().padding(16.dp)) {
+                                    Text(stringResource(R.string.pull_unread_load_failed))
+                                    TextButton(onClick = { unreadRetry++ }) {
+                                        Text(stringResource(R.string.pull_unread_retry))
+                                    }
+                                }
+                            unreadOnly &&
+                                currentUnreadSnapshot == null &&
+                                (displayUnreadSnapshot == null || visibleItems.isEmpty()) -> LoadingScreen()
+                            controller.isLoading && sourceList.isEmpty() -> {
+                                val slowCopy = stringResource(R.string.chat_list_startup_slow)
+                                LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })
+                            }
+                            loadFailurePlacement == LoadFailurePlacement.FullScreen ->
+                                ErrorContent(
+                                    stringResource(R.string.couldnt_load_chats),
+                                    requireNotNull(controller.error),
+                                    onRetry = controller::retryLoad,
+                                )
+                            blockLocalSearchRows(
+                                loading = bodySearchLoading,
+                                hasLocalRows = visibleItems.isNotEmpty(),
+                                preservePendingAnchor = preservePendingSearchAnchor,
+                            ) ->
+                                // A restored deep anchor still waits; fresh local name matches remain usable.
+                                LoadingScreen(message = stringResource(R.string.conversation_search_loading))
+                            bodySearchFailure != null && visibleItems.isEmpty() ->
+                                ErrorContent(
+                                    stringResource(R.string.couldnt_load_chats),
+                                    bodySearchFailure,
+                                    onRetry = { bodySearchRetry++ },
+                                )
+                            sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
+                            sourceList.isEmpty() && !unreadOnly ->
+                                EmptyChats(onCreate = openNewMessageFlow)
+                            visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
                                     ?.let { failure ->
-                                        item(key = "chat-list-load-error") {
+                                        InlineErrorBanner(
+                                            error = failure,
+                                            onRetry = controller::retryLoad,
+                                            modifier = Modifier.align(Alignment.TopCenter),
+                                        )
+                                    }
+                            visibleItems.isEmpty() ->
+                                Column(Modifier.fillMaxSize()) {
+                                    controller.error
+                                        ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
+                                        ?.let { failure ->
                                             InlineErrorBanner(
                                                 error = failure,
                                                 onRetry = controller::retryLoad,
                                             )
                                         }
+                                    Box(Modifier.fillMaxWidth().weight(1f)) {
+                                        ChatListNoResults(
+                                            query = searchQuery.trim(),
+                                            unreadFolderSelected = unreadFolderSelected,
+                                            filtersActive = filtersActive,
+                                        )
                                     }
-                                if (searchActive) {
-                                    if (searchSections.groups.isNotEmpty()) {
-                                        item(
-                                            key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
-                                            contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
-                                        ) {
-                                            ChatListSearchSectionHeader(
-                                                title = stringResource(R.string.chat_list_filter_groups),
-                                                testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
-                                            )
-                                        }
-                                    }
-                                    searchSections.groups.forEachIndexed { targetIndex, item ->
-                                        this.item(
-                                            key = visibleRowId(item),
-                                            contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                        ) {
-                                            chatRowContent(item, targetIndex, null)
-                                        }
-                                    }
-                                    if (bodySearchLoading || bodySearchFailure != null) {
-                                        item(key = "global-search-body-stage") {
-                                            GlobalSearchBodyStage(
-                                                loading = bodySearchLoading,
-                                                failure = bodySearchFailure,
-                                                onRetry = { bodySearchRetry++ },
-                                            )
-                                        }
-                                    }
-                                    if (searchSections.messages.isNotEmpty()) {
-                                        item(
-                                            key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY,
-                                            contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
-                                        ) {
-                                            ChatListSearchSectionHeader(
-                                                title = stringResource(R.string.notification_channel_messages),
-                                                testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
-                                            )
-                                        }
-                                    }
-                                    searchSections.messages.forEachIndexed { messageIndex, item ->
-                                        val canonicalId = visibleRowId(item)
-                                        this.item(
-                                            key = canonicalId,
-                                            contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                        ) {
-                                            val bodyMatch = bodyMatches[canonicalId]
-                                            chatRowContent(item, searchSections.groups.size + messageIndex, bodyMatch)
-                                        }
-                                    }
-                                } else {
-                                    visibleItems.forEachIndexed { targetIndex, item ->
-                                        if (targetIndex == pinnedBoundary) {
-                                            this.item(
-                                                key = CHAT_LIST_PINNED_BOUNDARY_KEY,
-                                                contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
-                                            ) {
-                                                ChatListPinnedBoundary()
+                                }
+                            else ->
+                                PreparedVisibleGroupAvatarContent(
+                                    appState,
+                                    visibleItems,
+                                    chatListState,
+                                    ::visibleRowId,
+                                    { it.selectedAvatarAsset },
+                                    accountRef = controller.boundAccountRef,
+                                    surfaceIdentity = controller,
+                                    retainedPreparation = retainedAvatarPreparation,
+                                ) {
+                                    LazyColumn(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxSize()
+                                                .trackWhiteNoiseHeader(chatListState)
+                                                .clipToBounds()
+                                                .chatListEdgeFade(chatListState)
+                                                .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
+                                                .onGloballyPositioned { coordinates ->
+                                                    chatListWindowTop = coordinates.positionInWindow().y
+                                                    chatListHeightPx = coordinates.size.height.toFloat()
+                                                },
+                                        state = chatListState,
+                                    ) {
+                                        controller.error
+                                            ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
+                                            ?.let { failure ->
+                                                item(key = "chat-list-load-error") {
+                                                    InlineErrorBanner(
+                                                        error = failure,
+                                                        onRetry = controller::retryLoad,
+                                                    )
+                                                }
                                             }
-                                        }
-                                        this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
-                                            chatRowContent(item, targetIndex, null)
+                                        if (searchActive) {
+                                            if (searchSections.groups.isNotEmpty()) {
+                                                item(
+                                                    key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
+                                                    contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
+                                                ) {
+                                                    ChatListSearchSectionHeader(
+                                                        title = stringResource(R.string.chat_list_filter_groups),
+                                                        testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                                    )
+                                                }
+                                            }
+                                            searchSections.groups.forEachIndexed { targetIndex, item ->
+                                                this.item(
+                                                    key = visibleRowId(item),
+                                                    contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                                ) {
+                                                    chatRowContent(item, targetIndex, null)
+                                                }
+                                            }
+                                            if (bodySearchLoading || bodySearchFailure != null) {
+                                                item(key = "global-search-body-stage") {
+                                                    GlobalSearchBodyStage(
+                                                        loading = bodySearchLoading,
+                                                        failure = bodySearchFailure,
+                                                        onRetry = { bodySearchRetry++ },
+                                                    )
+                                                }
+                                            }
+                                            if (searchSections.messages.isNotEmpty()) {
+                                                item(
+                                                    key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY,
+                                                    contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
+                                                ) {
+                                                    ChatListSearchSectionHeader(
+                                                        title = stringResource(R.string.notification_channel_messages),
+                                                        testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
+                                                    )
+                                                }
+                                            }
+                                            searchSections.messages.forEachIndexed { messageIndex, item ->
+                                                val canonicalId = visibleRowId(item)
+                                                this.item(
+                                                    key = canonicalId,
+                                                    contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                                ) {
+                                                    val bodyMatch = bodyMatches[canonicalId]
+                                                    chatRowContent(
+                                                        item,
+                                                        searchSections.groups.size + messageIndex,
+                                                        bodyMatch,
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            visibleItems.forEachIndexed { targetIndex, item ->
+                                                if (targetIndex == pinnedBoundary) {
+                                                    this.item(
+                                                        key = CHAT_LIST_PINNED_BOUNDARY_KEY,
+                                                        contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
+                                                    ) {
+                                                        ChatListPinnedBoundary()
+                                                    }
+                                                }
+                                                this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
+                                                    chatRowContent(item, targetIndex, null)
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                            }
                         }
-                }
-                // Jump-to-top FAB (issue #413). Overlaid on the chat-list Box
-                // (a sibling of the list `when`) and aligned bottom-end so it
-                // floats above the rows. Fades + slides in from the bottom-right
-                // when the user is scrolled deep, hides near the top — the
-                // `jumpToTopVisible` hysteresis above debounces threshold
-                // jitter. Lifted by QUICK_ACTION_FAB_CLEARANCE on top of the
-                // navigation-bar inset so it clears the quick-action FAB and the
-                // nav bar (#352/#356).
-                // Fully-qualified so Kotlin binds the top-level overload rather
-                // than the ColumnScope extension (the outer Column is also an
-                // implicit receiver here) — the bottom-end alignment is carried
-                // by the Modifier in the BoxScope, not a scoped AnimatedVisibility.
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = jumpToTopVisible && !selectionMode,
-                    enter = fadeIn() + slideInHorizontally { it / 2 },
-                    exit = fadeOut() + slideOutHorizontally { it / 2 },
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .navigationBarsPadding()
-                            // end = 23dp (not 16) so this 42dp control's centre
-                            // lines up with the 56dp quick-action FAB above it,
-                            // which the Scaffold insets 16dp from the edge:
-                            // 23 + 42/2 == 16 + 56/2 (#451).
-                            .padding(end = 23.dp, bottom = QUICK_ACTION_FAB_CLEARANCE),
-                ) {
-                    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(42.dp)
-                                .semantics { contentDescription = scrollToTopLabel }
-                                .clickable(role = Role.Button) {
-                                    scope.launch {
-                                        programmaticViewportGeneration += 1L
-                                        // For a very deep scroll, animating every row to
-                                        // the top is a multi-second crawl. Snap to a
-                                        // near-top index first, then animate the final
-                                        // viewport so the motion stays short and smooth
-                                        // regardless of how far down the user was.
-                                        if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
-                                            chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
-                                        }
-                                        chatListState.animateScrollToItem(0)
-                                        controller.returnChatListToTop(chatListWindowView)
-                                    }
-                                },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            shadowElevation = 2.dp,
-                            modifier = Modifier.size(34.dp),
+                        // Jump-to-top FAB (issue #413). Overlaid on the chat-list Box
+                        // (a sibling of the list `when`) and aligned bottom-end so it
+                        // floats above the rows. Fades + slides in from the bottom-right
+                        // when the user is scrolled deep, hides near the top — the
+                        // `jumpToTopVisible` hysteresis above debounces threshold
+                        // jitter. Lifted by QUICK_ACTION_FAB_CLEARANCE on top of the
+                        // navigation-bar inset so it clears the quick-action FAB and the
+                        // nav bar (#352/#356).
+                        // Fully-qualified so Kotlin binds the top-level overload rather
+                        // than the ColumnScope extension (the outer Column is also an
+                        // implicit receiver here) — the bottom-end alignment is carried
+                        // by the Modifier in the BoxScope, not a scoped AnimatedVisibility.
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = jumpToTopVisible && !selectionMode,
+                            enter = fadeIn() + slideInHorizontally { it / 2 },
+                            exit = fadeOut() + slideOutHorizontally { it / 2 },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .navigationBarsPadding()
+                                    // end = 23dp (not 16) so this 42dp control's centre
+                                    // lines up with the 56dp quick-action FAB above it,
+                                    // which the Scaffold insets 16dp from the edge:
+                                    // 23 + 42/2 == 16 + 56/2 (#451).
+                                    .padding(end = 23.dp, bottom = QUICK_ACTION_FAB_CLEARANCE),
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    painterResource(R.drawable.ic_jump_to_edge),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
+                            val scrollToTopLabel = stringResource(R.string.scroll_to_top)
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(42.dp)
+                                        .semantics { contentDescription = scrollToTopLabel }
+                                        .clickable(role = Role.Button) {
+                                            scope.launch {
+                                                programmaticViewportGeneration += 1L
+                                                // For a very deep scroll, animating every row to
+                                                // the top is a multi-second crawl. Snap to a
+                                                // near-top index first, then animate the final
+                                                // viewport so the motion stays short and smooth
+                                                // regardless of how far down the user was.
+                                                if (
+                                                    chatListState.firstVisibleItemIndex >
+                                                    CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX
+                                                ) {
+                                                    chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
+                                                }
+                                                chatListState.animateScrollToItem(0)
+                                                controller.returnChatListToTop(chatListWindowView)
+                                            }
+                                        },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    shadowElevation = 2.dp,
+                                    modifier = Modifier.size(34.dp),
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            painterResource(R.drawable.ic_jump_to_edge),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -2671,22 +2676,4 @@ internal fun ChatListSearchSectionHeader(
                 .padding(16.dp),
         style = MaterialTheme.typography.titleSmall,
     )
-}
-
-/** Pull movement invalidates only this small feedback label, rather than the chat-list scaffold. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListUnreadHint(
-    progress: () -> Float,
-    unreadOnly: Boolean,
-) {
-    val pull = progress()
-    val label =
-        when {
-            pull >= 1f -> R.string.pull_unread_release
-            pull > 0f -> R.string.pull_unread_hint
-            unreadOnly -> R.string.pull_unread_only
-            else -> null
-        }
-    if (label != null) Text(stringResource(label), Modifier.padding(start = 16.dp))
 }

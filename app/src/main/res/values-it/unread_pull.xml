@@ -7,4 +7,5 @@
     <string name="pull_unread_load_failed">Impossibile caricare le conversazioni non lette. Riprova.</string>
     <string name="pull_unread_hint">Trascina per mostrare le conversazioni non lette</string>
     <string name="pull_unread_release">Rilascia per mostrare le conversazioni non lette</string>
+    <string name="pull_unread_filtered">Filtrato per non letti</string>
 </resources>

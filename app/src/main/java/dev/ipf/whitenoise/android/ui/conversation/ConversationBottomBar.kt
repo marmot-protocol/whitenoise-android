@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReplyReceivedEmoji
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 
 private val ConversationTopInteractionClearance = 64.dp
 
@@ -122,6 +123,7 @@ internal fun ConversationBottomBar(
         Modifier
             .fillMaxWidth()
             .testTag(CONVERSATION_BOTTOM_BAR_TAG)
+            .floatingDictationAnchor()
             .onSizeChanged { size -> onBottomChromeMeasured(size.height) },
     ) {
         when {

@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.app.NotificationManager
 import android.os.Looper
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
@@ -49,6 +50,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Production-path coverage for retracting deleted or hidden content (#3323) and withholding a read message's
@@ -965,50 +967,149 @@ class NotificationContentRetractionTest {
         runBlocking {
             val entered = CountDownLatch(1)
             val completed = CountDownLatch(1)
+            val completedAtNanos = AtomicLong(0L)
             val release = CountDownLatch(1)
+            val trace = StalledReadTrace()
             val nextGroup = "a1b2c3d4"
-            val fixture =
-                NotificationBootstrapTestFixture(
-                    context = context,
-                    groupIdHex = GROUP_ID,
-                    messageIdHex = MESSAGE_ID,
-                    emitStartupNotification = false,
-                    onChatListRow = { _, group ->
-                        if (group == GROUP_ID) {
-                            entered.countDown()
-                            check(release.await(15, TimeUnit.SECONDS))
-                        }
-                        null
-                    },
-                    notificationFirstPostTimingObserver = { event ->
-                        if (event.stage == NotificationFirstPostTimingStage.CandidateGateComplete) completed.countDown()
-                    },
-                )
+            val fixture = stalledReadFixture(entered, release, completed, completedAtNanos, trace)
+            var startedUptimeMillis = 0L
+            var started = 0L
             try {
                 fixture.bootstrap()
-                val started = System.nanoTime()
+                startedUptimeMillis = SystemClock.uptimeMillis()
+                started = System.nanoTime()
+                trace.record("emit_first")
                 fixture.emitUpdate(fixture.update)
-                awaitLatch(entered)
-                if (checkNextConversation) fixture.emitUpdate(fixture.update.copy(groupIdHex = nextGroup))
-                withTimeout(4_500L) { awaitLatch(completed) }
-                val elapsed = (System.nanoTime() - started) / 1_000_000
+                awaitStalledReadLatch(entered, startedUptimeMillis, started)
+                trace.record("entered_observed")
+                if (checkNextConversation) {
+                    trace.record("emit_second")
+                    fixture.emitUpdate(fixture.update.copy(groupIdHex = nextGroup))
+                }
+                withTimeout(4_500L) { awaitStalledReadLatch(completed, startedUptimeMillis, started) }
+                val elapsed = (completedAtNanos.get() - started) / 1_000_000
                 assertTrue("the first gate must finish near its 3s budget, actual=$elapsed", elapsed < 4_500L)
                 assertFalse(manager().activeNotifications.any { it.tag == cardKey.tag && it.id == cardKey.id })
                 if (checkNextConversation) {
                     val nextKey = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT_REF, nextGroup)
                     withTimeout(2_000L) {
                         while (manager().activeNotifications.none { it.tag == nextKey.tag && it.id == nextKey.id }) {
-                            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                            pumpStalledReadMain(startedUptimeMillis, started)
                             delay(1L)
                         }
                     }
                 }
                 assertEquals("assertions run before releasing the binding", 1L, release.count)
+            } catch (failure: Throwable) {
+                trace.reportFailure(failure) {
+                    val active = manager().activeNotifications
+                    val nextKey = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT_REF, nextGroup)
+                    "start_ns=$started start_uptime_ms=$startedUptimeMillis completion_ns=${completedAtNanos.get()} " +
+                        "latches=${entered.count}/${completed.count}/${release.count} " +
+                        "first_card=${active.any { it.tag == cardKey.tag && it.id == cardKey.id }} " +
+                        "second_card=${active.any { it.tag == nextKey.tag && it.id == nextKey.id }}"
+                }
+                throw failure
             } finally {
                 release.countDown()
                 fixture.close()
             }
         }
+
+    /** Keeps the real blocking native read and production timing observer while retaining bounded failure evidence. */
+    private fun stalledReadFixture(
+        entered: CountDownLatch,
+        release: CountDownLatch,
+        completed: CountDownLatch,
+        completedAtNanos: AtomicLong,
+        trace: StalledReadTrace,
+    ) = NotificationBootstrapTestFixture(
+        context = context,
+        groupIdHex = GROUP_ID,
+        messageIdHex = MESSAGE_ID,
+        emitStartupNotification = false,
+        onChatListRow = { _, group ->
+            val label = if (group == GROUP_ID) "first" else "second"
+            trace.record("native_${label}_enter")
+            try {
+                if (group == GROUP_ID) {
+                    entered.countDown()
+                    check(release.await(15, TimeUnit.SECONDS))
+                }
+                null
+            } catch (failure: Throwable) {
+                trace.record("native_${label}_error_${failure.javaClass.simpleName}")
+                throw failure
+            } finally {
+                trace.record("native_${label}_exit")
+            }
+        },
+        notificationFirstPostTimingObserver = { event ->
+            val observedAtNanos = System.nanoTime()
+            if (event.stage == NotificationFirstPostTimingStage.CandidateGateComplete) {
+                completedAtNanos.compareAndSet(0L, observedAtNanos)
+                completed.countDown()
+            }
+            trace.record("stage_${event.stage}_${event.outcome}")
+        },
+    )
+
+    /** Android Handler deadlines advance with real elapsed time rather than one virtual millisecond per poll. */
+    private fun pumpStalledReadMain(
+        startedUptimeMillis: Long,
+        startedNanos: Long,
+    ) {
+        val elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000
+        val remainingMillis = (startedUptimeMillis + elapsedMillis - SystemClock.uptimeMillis()).coerceAtLeast(0L)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(remainingMillis))
+    }
+
+    /** The stall checks share one clock origin; the general race-checkpoint helper remains unchanged. */
+    private suspend fun awaitStalledReadLatch(
+        latch: CountDownLatch,
+        startedUptimeMillis: Long,
+        startedNanos: Long,
+    ) {
+        withTimeout(AWAIT_TIMEOUT_MS) {
+            while (latch.count > 0L) {
+                pumpStalledReadMain(startedUptimeMillis, startedNanos)
+                delay(1L)
+            }
+        }
+    }
+
+    /** Fixed-size synthetic stage labels retain both clock domains without changing notification decisions. */
+    private class StalledReadTrace {
+        private val sequence = AtomicInteger()
+        private val events = CopyOnWriteArrayList<String>()
+
+        fun record(label: String) {
+            runCatching {
+                val index = sequence.getAndIncrement()
+                if (index < 32) {
+                    events +=
+                        "$index $label ns=${System.nanoTime()} uptime_ms=${SystemClock.uptimeMillis()} " +
+                        "thread=${Thread.currentThread().name}"
+                }
+            }
+        }
+
+        fun reportFailure(
+            failure: Throwable,
+            detail: () -> String,
+        ) {
+            runCatching {
+                record("failure_${failure.javaClass.simpleName}")
+                val diagnostic = "stalled_read ${detail()}\n${snapshot()}"
+                println(diagnostic)
+                failure.addSuppressed(AssertionError(diagnostic))
+            }
+        }
+
+        fun snapshot(): String =
+            "main=${Dispatchers.Main} now_ns=${System.nanoTime()} uptime_ms=${SystemClock.uptimeMillis()}\n" +
+                events.joinToString("\n")
+    }
 
     /** One failed read-state read is retried within the budget, so a transient failure still alerts (#2065). */
     @Test

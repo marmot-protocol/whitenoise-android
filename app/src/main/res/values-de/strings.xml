@@ -450,6 +450,11 @@
     <string name="forward_failed_preparing">Anhänge konnten nicht vorbereitet werden</string>
     <string name="forward_failed_preparation_timeout">Die Vorbereitung hat zu lange gedauert. Versuche es erneut oder schließe den Vorgang, um das Weiterleiten zu beenden.</string>
     <string name="forward_failed_upload">Anhänge konnten nicht hochgeladen werden</string>
+    <string name="forward_preparing_slow">Das Abrufen der Anhänge dauert länger als üblich</string>
+    <string name="forward_uploading_slow">Das Hochladen dauert länger als üblich</string>
+    <string name="forward_sending_slow">Das Senden dauert länger als üblich. Es kann jetzt nicht mehr abgebrochen werden und wird nicht doppelt gesendet.</string>
+    <string name="forward_failed_upload_timeout">Das Hochladen hat nicht begonnen. Versuche es erneut oder schließe den Vorgang, um das Weiterleiten zu beenden.</string>
+    <string name="forward_failed_publish_timeout">Das Senden ist noch nicht abgeschlossen und kann noch erfolgen. Ein erneuter Versuch prüft es, ohne es doppelt zu senden.</string>
     <string name="forward_failed_publish">Nachrichten konnten nicht gesendet werden</string>
     <string name="forward_payload_too_large">Diese Anhänge sind zusammen zu groß zum Weiterleiten</string>
     <string name="forward_failed_expired">Der Anhang ist vor dem Weiterleiten abgelaufen</string>

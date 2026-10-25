@@ -90,3 +90,11 @@ inspect/preview/region outcome; a safe refusal is not successful format support.
 These controlled fixtures do not replace ordinary messenger or actual camera
 corpus qualification, including 200-megapixel and ten-bit HEIF sources. MED-032
 retains the separate manual acceptance.
+
+## Worker-lifetime characterization
+
+The test-only [still-worker baseline](media-worker-baseline.md) records current
+binding reuse, request timings and bounded negative probes through the existing
+focused API30/current-API campaign. Production lifetime stays unchanged;
+worker-per-input qualification remains pending. Raw observations and matched-corpus
+performance review precede that implementation.
