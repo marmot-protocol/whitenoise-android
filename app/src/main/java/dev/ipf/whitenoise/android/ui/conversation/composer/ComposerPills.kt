@@ -1573,7 +1573,7 @@ internal fun ComposerPill(
                                                         position.y.roundToInt() + coordinates.size.height,
                                                     )
                                             },
-                                        contentAlignment = Alignment.CenterEnd,
+                                        contentAlignment = Alignment.CenterStart,
                                     ) {
                                         IconButton(
                                             onClick = onAttachmentsToggle,

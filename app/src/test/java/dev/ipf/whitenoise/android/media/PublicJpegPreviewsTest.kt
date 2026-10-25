@@ -3,9 +3,15 @@ package dev.ipf.whitenoise.android.media
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.ValidatedInternetNetworkTracker
 import dev.ipf.whitenoise.android.ui.conversation.messages.publicJpegPreviewOwnerCurrent
+import dev.ipf.whitenoise.android.ui.conversation.messages.publicJpegPreviewUrls
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import kotlinx.coroutines.CompletableDeferred
@@ -99,6 +105,55 @@ class PublicJpegPreviewsTest {
         val trailing = bytes + byteArrayOf(1, 2, 3)
         assertFalse(publicJpegPayloadMatches(trailing, hash(trailing)))
         assertFalse(publicJpegPayloadMatches(bytes, digest))
+    }
+
+    @Test
+    fun staticJpegAboveOneMebibyteIsAdmittedButFourMebibyteCeilingRemainsBounded() {
+        val accepted = jpegWithComments(18)
+        val rejected = jpegWithComments(65)
+
+        fun hash(bytes: ByteArray): String {
+            val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+            return digest.joinToString("") { "%02x".format(it) }
+        }
+        assertTrue(accepted.size > 1_048_576)
+        assertTrue(accepted.size <= PUBLIC_JPEG_MAX_BYTES)
+        assertTrue(publicJpegPayloadMatches(accepted, hash(accepted)))
+        assertTrue(rejected.size > PUBLIC_JPEG_MAX_BYTES)
+        assertFalse(publicJpegPayloadMatches(rejected, hash(rejected)))
+    }
+
+    @Test
+    fun hashtagParagraphAndBlankLineDoNotHideTheFollowingImageLink() {
+        val url = "https://images.example/$digest.jpg"
+        val link = MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI, MarkdownLinkDestinationKindFfi.WEB)
+        val document =
+            MarkdownDocumentFfi(
+                listOf(
+                    MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("#dogstr"))),
+                    MarkdownBlockFfi.Paragraph(listOf(link)),
+                ),
+                false,
+                byteArrayOf(0, 1),
+            )
+        assertEquals(listOf(url), publicJpegPreviewUrls(document))
+    }
+
+    /** Valid JPEG comment segments increase encoded size without increasing decoded pixels. */
+    private fun jpegWithComments(count: Int): ByteArray {
+        val image = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val encoded = ByteArrayOutputStream()
+        assertTrue(image.compress(Bitmap.CompressFormat.JPEG, 80, encoded))
+        image.recycle()
+        val bytes = encoded.toByteArray()
+        val output = ByteArrayOutputStream()
+        output.write(bytes, 0, 2)
+        repeat(count) {
+            output.write(byteArrayOf(-1, -2, -1, -3))
+            output.write(ByteArray(65_531))
+        }
+        output.write(bytes, 2, bytes.size - 2)
+        return output.toByteArray()
     }
 
     @Test

@@ -16,7 +16,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.net.URI
 import java.security.MessageDigest
 
-internal const val PUBLIC_JPEG_MAX_BYTES = 1_048_576L
+internal const val PUBLIC_JPEG_MAX_BYTES = 4_194_304L
 private const val MAX_EDGE = 4096
 private const val MAX_PIXELS = 4_000_000L
 private const val CACHE_BYTES = 16 * 1024 * 1024
