@@ -43,12 +43,12 @@ class ChatFolderManageRouteTest {
     @Test fun systemBackReturnsHomeAndPreservesSelectedNativeFolder() = route(teardown = false, systemBack = true)
 
     /** Existing-folder drafts consume Back before the manager returns Home. */
-    @Test fun existingFolderDraftBackKeepsManagerOpen() =
-        route(teardown = false, systemBack = true, editExisting = true)
+    @Test
+    fun existingFolderDraftBackKeepsManagerOpen() = route(teardown = false, systemBack = true, editExisting = true)
 
     /** New-folder drafts keep their discard confirmation above the manager. */
-    @Test fun newFolderDraftBackKeepsManagerOpen() =
-        route(teardown = false, systemBack = true, editExisting = false)
+    @Test
+    fun newFolderDraftBackKeepsManagerOpen() = route(teardown = false, systemBack = true, editExisting = false)
 
     /** Teardown dismisses manager and never changes folder membership. */
     @Test fun teardownDismissesManagerAndNeverChangesFolderMembership() = route(teardown = true)
@@ -111,7 +111,13 @@ class ChatFolderManageRouteTest {
                 composeRule.onNodeWithText(context.getString(R.string.folder_discard_title)).assertExists()
                 composeRule.onNodeWithText(context.getString(R.string.folder_discard)).performClick()
                 composeRule.onNodeWithTag(CHAT_FOLDERS_CONTENT_TAG).assertExists()
-                assertEquals("Work", app.chatFolderPreferences.foldersFor("a").first { it.id == folder.id }.name)
+                assertEquals(
+                    "Work",
+                    app.chatFolderPreferences
+                        .foldersFor("a")
+                        .first { it.id == folder.id }
+                        .name,
+                )
                 assertFalse(app.chatFolderPreferences.foldersFor("a").any { it.name == "Unsaved name" })
             }
             if (teardown) {
