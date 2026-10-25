@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
+import android.os.SystemClock
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.TimelineProjector
@@ -127,9 +128,20 @@ class LaterPageWarmContinuityTest {
         try {
             fixture.compose()
             fixture.awaitIdleCondition { PENDING_ID in timelineMessageIds(fixture.controller) }
+            val emittedAt = SystemClock.elapsedRealtime()
             fixture.timelineScript.emitWindow(timelinePage(newest, card, echo))
             fixture.awaitIdleCondition { fixture.drainLiveWindows() && fixture.cacheReads.get() >= 1 }
-            assertTrue(PENDING_ID in timelineMessageIds(fixture.controller))
+            // A bounded card warm can install the echo while its native cache read remains blocked.
+            val rowsDuringRead = timelineMessageIds(fixture.controller)
+            val readPhase =
+                "${fixture.describeState()} latchCount=${read.count} rows=$rowsDuringRead " +
+                    "sinceEmitMs=${SystemClock.elapsedRealtime() - emittedAt}"
+            println("own-send before cache release: $readPhase")
+            assertEquals(
+                "the send needs exactly one representation: $readPhase",
+                1,
+                rowsDuringRead.count { it == PENDING_ID || it == ECHO_ID },
+            )
 
             read.countDown()
             fixture.awaitIdleCondition { FAR_CARD_ID in timelineMessageIds(fixture.controller) }
