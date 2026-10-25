@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.reactions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createComposeRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -25,7 +26,10 @@ class LocalReactionMotionLifecycleTest {
         rule.setContent { current = rememberLocalReactionMotion("conversation", enabled) }
         rule.waitForIdle()
         val lateCallbackOwner = current
-        rule.runOnIdle { enabled = false }
+        rule.runOnIdle {
+            enabled = false
+            Snapshot.sendApplyNotifications()
+        }
         rule.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { current !== lateCallbackOwner }
         rule.waitForIdle()
         val suppressedOwner = current
@@ -33,6 +37,7 @@ class LocalReactionMotionLifecycleTest {
             assertNotSame(lateCallbackOwner, suppressedOwner)
             assertNull(lateCallbackOwner.effect)
             enabled = true
+            Snapshot.sendApplyNotifications()
         }
         rule.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { current !== suppressedOwner }
         rule.waitForIdle()
@@ -55,6 +60,7 @@ class LocalReactionMotionLifecycleTest {
         rule.runOnIdle {
             oldOwner.accept("👍", true)
             owner = "second-account"
+            Snapshot.sendApplyNotifications()
         }
         rule.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { current !== oldOwner }
         rule.waitForIdle()

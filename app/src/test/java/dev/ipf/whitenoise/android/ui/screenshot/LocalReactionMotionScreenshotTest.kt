@@ -75,64 +75,65 @@ class LocalReactionMotionScreenshotTest {
                     LocalContentColor provides MaterialTheme.colorScheme.onSurface,
                 ) {
                     val motion = rememberLocalReactionMotion(name, enabled = animations)
-                    Box(
-                        Modifier
-                            .width(360.dp)
-                            .height(640.dp)
-                            .background(MaterialTheme.colorScheme.background)
-                            .localReactionOverlay(motion)
-                            .testTag("reaction-motion-root"),
-                    ) {
-                        Column(Modifier.padding(20.dp)) {
-                            Text(
-                                "Reaction · selected control to chip",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                "Native Compose fixture · simulated local intent",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Spacer(Modifier.height(90.dp))
-                            if (!accepted) {
-                                Row {
-                                    TextButton(onClick = {
-                                        motion.choose("👍", source)
-                                        accepted = true
-                                        motion.accept("👍", true, motion.takeOrigin("👍"))
-                                    }, modifier = Modifier.testTag("choose-reaction")) {
-                                        EmojiGlyph(
-                                            "👍",
-                                            size = 28.dp,
-                                            modifier = Modifier.reactionSourceBounds { source = it },
-                                        )
+                    Box(Modifier.testTag("reaction-motion-root")) {
+                        Box(
+                            Modifier
+                                .width(360.dp)
+                                .height(640.dp)
+                                .background(MaterialTheme.colorScheme.background)
+                                .localReactionOverlay(motion),
+                        ) {
+                            Column(Modifier.padding(20.dp)) {
+                                Text(
+                                    "Reaction · selected control to chip",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    "Native Compose fixture · simulated local intent",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(Modifier.height(90.dp))
+                                if (!accepted) {
+                                    Row {
+                                        TextButton(onClick = {
+                                            motion.choose("👍", source)
+                                            accepted = true
+                                            motion.accept("👍", true, motion.takeOrigin("👍"))
+                                        }, modifier = Modifier.testTag("choose-reaction")) {
+                                            EmojiGlyph(
+                                                "👍",
+                                                size = 28.dp,
+                                                modifier = Modifier.reactionSourceBounds { source = it },
+                                            )
+                                        }
+                                        TextButton(onClick = {}) { Text("❤") }
                                     }
-                                    TextButton(onClick = {}) { Text("❤") }
-                                }
-                            } else {
-                                Spacer(Modifier.height(48.dp))
-                            }
-                            Spacer(Modifier.height(180.dp))
-                            Text(
-                                "See you at the park!",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            val existingTallies =
-                                if (name == "overflow") {
-                                    listOf("❤", "🎉", "🔥", "😂").map { ReactionTally(it, 2, false) }
                                 } else {
-                                    emptyList()
+                                    Spacer(Modifier.height(48.dp))
                                 }
-                            ReactionPillRow(
-                                tallies =
-                                    existingTallies +
-                                        (if (accepted) listOf(ReactionTally("👍", 1, true)) else emptyList()),
-                                enabled = true,
-                                onOpenDetails = {},
-                                localMotion = motion,
-                            )
+                                Spacer(Modifier.height(180.dp))
+                                Text(
+                                    "See you at the park!",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                val existingTallies =
+                                    if (name == "overflow") {
+                                        listOf("❤", "🎉", "🔥", "😂").map { ReactionTally(it, 2, false) }
+                                    } else {
+                                        emptyList()
+                                    }
+                                ReactionPillRow(
+                                    tallies =
+                                        existingTallies +
+                                            (if (accepted) listOf(ReactionTally("👍", 1, true)) else emptyList()),
+                                    enabled = true,
+                                    onOpenDetails = {},
+                                    localMotion = motion,
+                                )
+                            }
                         }
                     }
                 }
