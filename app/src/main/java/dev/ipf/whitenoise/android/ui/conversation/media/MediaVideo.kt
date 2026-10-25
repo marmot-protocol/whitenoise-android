@@ -253,8 +253,11 @@ internal fun MediaVideoGridTile(
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
     val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val cacheProbeReady =
-        cacheAvailability.resolved.value || localFile != null || cachedPlaintextOnEntry ||
-            retainedPlaintextOnEntry || sendingFromStagedFile
+        cacheAvailability.resolved.value ||
+            localFile != null ||
+            cachedPlaintextOnEntry ||
+            retainedPlaintextOnEntry ||
+            sendingFromStagedFile
     val policyAllowsMaterialization =
         cacheProbeReady &&
             shouldStartVideoAttachmentDownload(
@@ -707,8 +710,11 @@ internal fun MediaVideoBubble(
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
     val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val cacheProbeReady =
-        cacheAvailability.resolved.value || localFile != null || cachedPlaintextOnEntry ||
-            retainedPlaintextOnEntry || sendingFromStagedFile
+        cacheAvailability.resolved.value ||
+            localFile != null ||
+            cachedPlaintextOnEntry ||
+            retainedPlaintextOnEntry ||
+            sendingFromStagedFile
     val policyAllowsMaterialization =
         cacheProbeReady &&
             shouldStartVideoAttachmentDownload(
