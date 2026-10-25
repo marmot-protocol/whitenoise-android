@@ -159,7 +159,7 @@ class AnimatedGroupAvatarRecoveryTest {
         /** Provides measurable geometry without allocating a bitmap or invoking a platform decoder. */
         override fun getIntrinsicWidth(): Int = 2
 
-        /** Matches the synthetic two-frame source dimensions so layout does not require a native codec. */
+        /** Keeps the fixture square and measurable while pixel decoding is deliberately absent. */
         override fun getIntrinsicHeight(): Int = 2
     }
 
