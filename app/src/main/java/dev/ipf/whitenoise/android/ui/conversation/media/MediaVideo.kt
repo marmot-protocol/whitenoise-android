@@ -205,16 +205,20 @@ internal fun MediaVideoGridTile(
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
+    cacheFileProbe: VideoAttachmentCacheProbe = ::cachedVideoAttachmentFile,
 ) {
     val context = LocalContext.current
     val epoch = reference.sourceEpoch
-    var localFile by
+    val cacheAvailability =
         rememberCachedVideoAttachmentFileState(
             context = context,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
+            probe = cacheFileProbe,
         )
+    var localFile by cacheAvailability.file
+    val openingLabel = stringResource(R.string.media_opening)
     // MDK-retained bytes from a background download count as local, so the tile plays offline (#3308).
     val cachedPlaintextOnEntry by
         rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, epoch)
@@ -248,16 +252,20 @@ internal fun MediaVideoGridTile(
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
     val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
+    val cacheProbeReady =
+        cacheAvailability.resolved.value || localFile != null || cachedPlaintextOnEntry ||
+            retainedPlaintextOnEntry || sendingFromStagedFile
     val policyAllowsMaterialization =
-        shouldStartVideoAttachmentDownload(
-            mine = mine,
-            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video) && !cancelledByReader,
-            automaticDownloadsPaused = automaticDownloadsPaused,
-            hasCachedAttachment = cachedPlaintextOnEntry,
-            hasCachedFile = localFile != null,
-            hasRetainedPlaintext = retainedPlaintextOnEntry,
-            sendingFromStagedFile = sendingFromStagedFile,
-        )
+        cacheProbeReady &&
+            shouldStartVideoAttachmentDownload(
+                mine = mine,
+                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video) && !cancelledByReader,
+                automaticDownloadsPaused = automaticDownloadsPaused,
+                hasCachedAttachment = cachedPlaintextOnEntry,
+                hasCachedFile = localFile != null,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
+                sendingFromStagedFile = sendingFromStagedFile,
+            )
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
             identity = "$messageIdHex#$attachmentIndex",
@@ -300,7 +308,7 @@ internal fun MediaVideoGridTile(
      * directly, so it retries this tile's download even on the "+N" overflow tile.
      */
     fun downloadOrOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
-        if (transfer.cancelling || sendingFromStagedFile) return
+        if (transfer.cancelling || sendingFromStagedFile || !cacheProbeReady) return
         val download = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
             if (retry) {
@@ -511,6 +519,12 @@ internal fun MediaVideoGridTile(
                                 contentDescription = stringResource(R.string.voice_message_failed),
                                 modifier = Modifier.size(24.dp),
                             )
+                        !cacheProbeReady ->
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp).semantics { contentDescription = openingLabel },
+                                strokeWidth = 2.dp,
+                                color = LocalContentColor.current,
+                            )
                         !startDownload && localFile == null ->
                             Icon(
                                 Icons.Default.Download,
@@ -618,6 +632,7 @@ internal fun MediaVideoBubble(
     uploadFailed: Boolean = false,
     onRetryUpload: (() -> Unit)? = null,
     uploadProgress: () -> FileUploadProgress? = { null },
+    cacheFileProbe: VideoAttachmentCacheProbe = ::cachedVideoAttachmentFile,
 ) {
     val record = item.record
     val messageIdHex = record.messageIdHex
@@ -642,13 +657,16 @@ internal fun MediaVideoBubble(
     DisposableEffect(playbackRecoveryJob) {
         onDispose { playbackRecoveryJob.value?.cancel() }
     }
-    var localFile by
+    val cacheAvailability =
         rememberCachedVideoAttachmentFileState(
             context = context,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
+            probe = cacheFileProbe,
         )
+    var localFile by cacheAvailability.file
+    val openingLabel = stringResource(R.string.media_opening)
     // MDK-retained bytes from a background download count as local, so the pill plays offline (#3308).
     val cachedPlaintextOnEntry by
         rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, Pair(pillKey, epoch))
@@ -688,16 +706,20 @@ internal fun MediaVideoBubble(
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
     val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
+    val cacheProbeReady =
+        cacheAvailability.resolved.value || localFile != null || cachedPlaintextOnEntry ||
+            retainedPlaintextOnEntry || sendingFromStagedFile
     val policyAllowsMaterialization =
-        shouldStartVideoAttachmentDownload(
-            mine = mine,
-            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video) && !cancelledByReader,
-            automaticDownloadsPaused = automaticDownloadsPaused,
-            hasCachedAttachment = cachedPlaintextOnEntry,
-            hasCachedFile = localFile != null,
-            hasRetainedPlaintext = retainedPlaintextOnEntry,
-            sendingFromStagedFile = sendingFromStagedFile,
-        )
+        cacheProbeReady &&
+            shouldStartVideoAttachmentDownload(
+                mine = mine,
+                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video) && !cancelledByReader,
+                automaticDownloadsPaused = automaticDownloadsPaused,
+                hasCachedAttachment = cachedPlaintextOnEntry,
+                hasCachedFile = localFile != null,
+                hasRetainedPlaintext = retainedPlaintextOnEntry,
+                sendingFromStagedFile = sendingFromStagedFile,
+            )
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
             identity = pillKey,
@@ -813,6 +835,7 @@ internal fun MediaVideoBubble(
      * A video still being sent from its staged file has nothing to download yet.
      */
     fun requestDownload(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
+        if (!cacheProbeReady) return
         if (transfer.cancelling || sendingFromStagedFile) return
         val download = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
@@ -1013,6 +1036,12 @@ internal fun MediaVideoBubble(
                                             .clickable { onRetryUpload?.invoke() },
                                 )
                             uploading -> VideoUploadIndicator(uploadProgress)
+                            !cacheProbeReady ->
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp).semantics { contentDescription = openingLabel },
+                                    strokeWidth = 2.dp,
+                                    color = LocalContentColor.current,
+                                )
                             !startDownload && localFile == null ->
                                 Icon(
                                     Icons.Default.Download,
@@ -1339,30 +1368,27 @@ private fun rememberCachedVideoAttachmentFileState(
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
-): MutableState<java.io.File?> {
+    probe: VideoAttachmentCacheProbe = ::cachedVideoAttachmentFile,
+): VideoCacheAvailability {
     val contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference)
     val cachedFile =
         remember(contentKey) {
             newVideoAttachmentCacheFileState()
         }
-    LaunchedEffect(contentKey, reference.sourceEpoch) {
+    val resolved = remember(contentKey, reference.sourceEpoch) { mutableStateOf(false) }
+    LaunchedEffect(contentKey, reference.sourceEpoch, probe) {
         val expectedFile = cachedFile.value
         val (file, retained) =
             withContext(Dispatchers.IO) {
-                val probed =
-                    cachedVideoAttachmentFile(
-                        context = context,
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                        reference = reference,
-                    )
+                val probed = probe(context, messageIdHex, attachmentIndex, reference)
                 probed to validatedAttachmentCacheFile(expectedFile)
             }
         // A metadata-only epoch change can retain validated bytes for the same content key, but an IO probe
         // must not overwrite a file the resolver published while it was suspended.
         publishVideoAttachmentCacheProbe(cachedFile, expectedFile, file ?: retained)
+        resolved.value = true
     }
-    return cachedFile
+    return remember(cachedFile, resolved) { VideoCacheAvailability(cachedFile, resolved) }
 }
 
 /** Keeps a resolver's newly materialized file observable even when it reuses the same cache path. */
@@ -1480,7 +1506,7 @@ internal fun VideoViewerPage(
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
-        )
+        ).file
     var playbackInvalidated by remember(contentKey) {
         mutableStateOf(false)
     }
