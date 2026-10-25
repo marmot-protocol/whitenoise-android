@@ -173,7 +173,12 @@ class GroupDetailsEditNavigationTest {
         tag: String,
         state: ToggleableState,
     ): Boolean {
-        val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode().config
+        val node =
+            composeRule
+                .onAllNodesWithTag(tag)
+                .fetchSemanticsNodes()
+                .singleOrNull()
+                ?.config ?: return false
         return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
     }
 
