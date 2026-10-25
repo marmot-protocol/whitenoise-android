@@ -356,15 +356,19 @@ internal class IsolatedAnimationSession private constructor(
             val validSource =
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
                     edge in 1..AnimationFrameProtocol.MAX_EDGE
-            val admissionLease =
-                if (Looper.myLooper() == Looper.getMainLooper() || !validSource) {
-                    null
-                } else if (decorative && waitForDecorativeAdmission) {
-                    admission.awaitDecorative()
-                } else {
-                    admission.acquire(decorative, MediaDecodePolicy.DEADLINE_MS)
-                }
-            if (admissionLease == null) return null
+            if (Looper.myLooper() == Looper.getMainLooper() || !validSource) return null
+            return admission.decode(decorative, waitForDecorativeAdmission, MediaDecodePolicy.DEADLINE_MS) { lease ->
+                openAdmitted(context, bytes, edge, lease)
+            }
+        }
+
+        /** Owns one startup attempt; a preempted null result is retried by admission after retirement. */
+        private fun openAdmitted(
+            context: Context,
+            bytes: ByteArray,
+            edge: Int,
+            admissionLease: AnimationAdmission.Lease,
+        ): IsolatedAnimationDrawable? {
             var session: IsolatedAnimationSession? = null
             var delivered: IsolatedAnimationDrawable? = null
             return try {

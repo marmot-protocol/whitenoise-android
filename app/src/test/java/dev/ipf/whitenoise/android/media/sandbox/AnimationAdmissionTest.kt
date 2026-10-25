@@ -2,13 +2,88 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 
 /** Admission remains tied to actual worker death across navigation, cancellation and viewer takeover. */
 class AnimationAdmissionTest {
+    /** A viewer taking over before the first drawable exists must not permanently disable its group. */
+    @org.junit.Test
+    fun groupPreemptedBeforeFirstFrameRetriesAfterViewerAndConfirmedDeath() {
+        val admission = AnimationAdmission()
+        val started = CountDownLatch(1)
+        val preempted = CountDownLatch(1)
+        val attempts = AtomicInteger()
+        val firstLease = AtomicReference<AnimationAdmission.Lease?>()
+        val viewerLease = AtomicReference<AnimationAdmission.Lease?>()
+        val result = AtomicReference<String?>()
+        val group =
+            Thread {
+                result.set(
+                    admission.decode(true, true, 5000) { lease ->
+                        if (attempts.incrementAndGet() == 1) {
+                            firstLease.set(lease)
+                            lease.onRetire { preempted.countDown() }
+                            started.countDown()
+                            check(preempted.await(5, TimeUnit.SECONDS))
+                            null // Startup closed before delivering pixels, but its process is still alive.
+                        } else {
+                            lease.release()
+                            "resumed"
+                        }
+                    },
+                )
+            }
+        val viewer = Thread { viewerLease.set(admission.acquire(false, 5000)) }
+        try {
+            group.start()
+            assertTrue(started.await(2, TimeUnit.SECONDS))
+            viewer.start()
+            assertTrue(preempted.await(2, TimeUnit.SECONDS))
+            awaitBlocked(group)
+            assertEquals(1, attempts.get())
+            firstLease.get()!!.release()
+            viewer.join(2000)
+            val interactive = checkNotNull(viewerLease.get())
+            assertEquals(1, attempts.get())
+            assertNull(result.get())
+            interactive.release()
+            group.join(2000)
+            assertFalse(group.isAlive)
+            assertEquals("resumed", result.get())
+            assertEquals(2, attempts.get())
+        } finally {
+            group.interrupt()
+            viewer.interrupt()
+            group.join(2000)
+            viewer.join(2000)
+            firstLease.get()?.release()
+            viewerLease.get()?.release()
+        }
+    }
+
+    /** Only waiting group startup preemption retries; corrupt input and opportunistic media still stop. */
+    @org.junit.Test
+    fun unavailableAndOpportunisticDecodesDoNotRetry() {
+        for (waitForAdmission in listOf(true, false)) {
+            val admission = AnimationAdmission()
+            var attempts = 0
+            val result =
+                admission.decode<String>(true, waitForAdmission, 100) { lease ->
+                    attempts++
+                    if (!waitForAdmission) lease.retire()
+                    lease.release()
+                    null
+                }
+            assertNull(result)
+            assertEquals(1, attempts)
+        }
+    }
+
     /** A replacement group avatar waits through retirement instead of permanently treating busy as failure. */
     @org.junit.Test
     fun groupWaitsForConfirmedDeathWithoutTakingASecondLease() {

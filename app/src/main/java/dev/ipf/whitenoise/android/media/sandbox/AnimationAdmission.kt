@@ -52,12 +52,33 @@ internal class AnimationAdmission {
             Lease(true).also { current = it }
         }
 
+    /**
+     * Retries an interrupted group startup after viewer takeover, without retrying codec failures.
+     * Each attempt owns its lease cleanup; a retry still waits for confirmed death and viewer release.
+     */
+    fun <T : Any> decode(
+        decorative: Boolean,
+        waitForDecorativeAdmission: Boolean,
+        timeoutMillis: Long,
+        open: (Lease) -> T?,
+    ): T? {
+        val waitingGroup = decorative && waitForDecorativeAdmission
+        do {
+            val lease = if (waitingGroup) awaitDecorative() else acquire(decorative, timeoutMillis) ?: return null
+            val result = open(lease)
+            if (result != null || !waitingGroup || !lease.wasPreempted()) return result
+        } while (true)
+    }
+
     inner class Lease internal constructor(
         internal val decorative: Boolean,
     ) {
         private var retirementRequested = false
         private var retirement: (() -> Unit)? = null
         private var released = false
+
+        /** The request is recorded before its callback can close a startup with no drawable yet. */
+        internal fun wasPreempted(): Boolean = synchronized(lock) { retirementRequested }
 
         /** Delivers a viewer's retirement request even if it arrived before callback installation. */
         fun onRetire(callback: () -> Unit) {
