@@ -49,12 +49,15 @@ internal suspend fun ConversationController.loadMessageAvailability(
         if (loadOlderPageInternal() != ConversationPageLoad.ADVANCED) break
         loadedPageCount += 1
     }
-    return when {
+    return currentMessageAvailability(messageIdHex)
+}
+
+private fun ConversationController.currentMessageAvailability(messageIdHex: String): MessageAvailability =
+    when {
         isMessagePublished(messageIdHex) -> MessageAvailability.AVAILABLE
         olderPageBlocked || hasMoreBefore || timelineRecords.containsKey(messageIdHex) -> MessageAvailability.RETRYABLE
         else -> MessageAvailability.MISSING
     }
-}
 
 /** Availability is actionable only once the row belongs to the published transcript. */
 private fun ConversationController.isMessagePublished(messageIdHex: String): Boolean =
