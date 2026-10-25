@@ -286,10 +286,11 @@ internal fun ForwardMessagePickerContent(
             }
         }
     }
+    val titleOwner = destination.selectedAccountRef
     val titledTargets =
-        remember(targets, titleCopy, memberRevision, appState.profileRevisionForCompose) {
+        remember(targets, titleOwner, titleCopy, memberRevision, appState.profileRevisionForCompose) {
             targets.map {
-                it to forwardTargetDisplayTitle(it, appState, destination.selectedAccountRef, titleCopy)
+                it to forwardTargetDisplayTitle(it, appState, titleOwner, titleCopy)
             }
         }
     LaunchedEffect(destination.selectedAccountRef, selected, titledTargets) {

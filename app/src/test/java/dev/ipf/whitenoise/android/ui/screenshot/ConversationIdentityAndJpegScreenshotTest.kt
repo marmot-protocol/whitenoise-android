@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -99,6 +100,7 @@ class ConversationIdentityAndJpegScreenshotTest {
                 }
             }
         }
+        composeRule.onNodeWithTag("composer-sending-identity").assertContentDescriptionEquals("Sending as, alice")
         composeRule.onNodeWithTag("composer-sending-identity").performClick()
         composeRule.onNodeWithText("Sending as").assertIsDisplayed()
         composeRule.onNodeWithText("I’ll bring the route map.").assertIsDisplayed()
