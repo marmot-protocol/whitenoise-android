@@ -21,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -251,8 +250,11 @@ internal fun MediaVideoGridTile(
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
     val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val cacheProbeReady =
-        cacheAvailability.resolved.value || localFile != null || cachedPlaintextOnEntry ||
-            retainedPlaintextOnEntry || sendingFromStagedFile
+        cacheAvailability.resolved.value ||
+            localFile != null ||
+            cachedPlaintextOnEntry ||
+            retainedPlaintextOnEntry ||
+            sendingFromStagedFile
     val policyAllowsMaterialization =
         cacheProbeReady &&
             shouldStartVideoAttachmentDownload(
@@ -705,8 +707,11 @@ internal fun MediaVideoBubble(
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
     val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val cacheProbeReady =
-        cacheAvailability.resolved.value || localFile != null || cachedPlaintextOnEntry ||
-            retainedPlaintextOnEntry || sendingFromStagedFile
+        cacheAvailability.resolved.value ||
+            localFile != null ||
+            cachedPlaintextOnEntry ||
+            retainedPlaintextOnEntry ||
+            sendingFromStagedFile
     val policyAllowsMaterialization =
         cacheProbeReady &&
             shouldStartVideoAttachmentDownload(
