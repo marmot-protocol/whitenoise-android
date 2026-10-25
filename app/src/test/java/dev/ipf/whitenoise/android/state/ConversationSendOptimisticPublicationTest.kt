@@ -28,8 +28,10 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -51,50 +53,141 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationSendOptimisticPublicationTest {
-    /** Keeps the pending bubble visible while Markdown hydration is deliberately held. */
+    /** Native acceptance completes independently, but final reconciliation retains the hydrated document. */
     @Test
     fun bubblePublishesAndAcceptsBeforeTheMarkdownParseHopCompletes() =
-        runBlocking {
+        runTest {
             val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val publishCompleted = CompletableDeferred<Unit>()
+            val durablyAccepted = CompletableDeferred<Unit>()
+            val styled = styledDocument()
             var accepted = 0
+            var durableCallbacks = 0
             val controller =
                 controller(
                     markdownParser = { releaseParse.await() },
-                    textPublisher = { _, _, _, _ -> sentSummary() },
+                    textPublisher = { _, _, _, _ ->
+                        sentSummary().also { publishCompleted.complete(Unit) }
+                    },
                 )
 
             val send =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    controller.send("hello *world*", onAccepted = { accepted += 1 })
+                    controller.send(
+                        "hello *world*",
+                        onAccepted = { accepted += 1 },
+                        onDurablyAccepted = {
+                            durableCallbacks += 1
+                            durablyAccepted.complete(Unit)
+                        },
+                    )
                 }
 
-            assertEquals("the bubble must be visible while the parse hop is still pending", 1, controller.timeline.size)
-            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
-            assertEquals(
-                "hello *world*",
-                controller.timeline
-                    .single()
-                    .record.plaintext,
-            )
-            assertEquals("acceptance must not wait on the parse hop", 1, accepted)
-            assertTrue(
-                controller.timeline
-                    .single()
-                    .record.contentTokens.blocks
-                    .isEmpty(),
-            )
+            try {
+                withTimeout(5_000) {
+                    publishCompleted.await()
+                    durablyAccepted.await()
+                }
+                assertFalse("native acceptance must not release the Markdown barrier", releaseParse.isCompleted)
+                assertFalse("final reconciliation must still await the presentation", send.isCompleted)
+                assertEquals("the bubble must be visible while the parse hop is still pending", 1, controller.timeline.size)
+                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                assertEquals(
+                    "hello *world*",
+                    controller.timeline
+                        .single()
+                        .record.plaintext,
+                )
+                assertEquals("acceptance must not wait on the parse hop", 1, accepted)
+                assertTrue(
+                    controller.timeline
+                        .single()
+                        .record.contentTokens.blocks
+                        .isEmpty(),
+                )
 
-            releaseParse.complete(styledDocument())
-            send.await()
+                releaseParse.complete(styled)
+                send.await()
 
-            assertTrue(
-                "the parsed document must rebind onto the published bubble",
-                controller.timeline
-                    .single()
-                    .record.contentTokens.blocks
-                    .isNotEmpty(),
-            )
-            assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+                assertSame(
+                    "the parsed document must rebind onto the published bubble",
+                    styled,
+                    controller.timeline
+                        .single()
+                        .record.contentTokens,
+                )
+                assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
+                assertEquals("durable acceptance must run exactly once", 1, durableCallbacks)
+            } finally {
+                releaseParse.complete(styled)
+                send.cancelAndJoin()
+                controller.onCleared()
+            }
+        }
+
+    /** An ambiguous native result retires host cancellation before the presentation branch resumes. */
+    @Test
+    fun ambiguousAdmissionDuringParseCannotBeCancelledAndRemainsPending() =
+        runTest {
+            val parseStarted = CompletableDeferred<Unit>()
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val publishFailed = CompletableDeferred<Unit>()
+            val styled = styledDocument()
+            var publishCalls = 0
+            var durableCallbacks = 0
+            val controller =
+                controller(
+                    markdownParser = {
+                        parseStarted.complete(Unit)
+                        releaseParse.await()
+                    },
+                    textPublisher = { _, _, _, _ ->
+                        publishCalls += 1
+                        publishFailed.complete(Unit)
+                        throw MarmotKitException.Publish("send event timed out")
+                    },
+                )
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.send("possibly published *message*", onDurablyAccepted = { durableCallbacks += 1 })
+                }
+
+            try {
+                withTimeout(5_000) {
+                    publishFailed.await()
+                    parseStarted.await()
+                }
+                assertFalse("an ambiguous result must not abort the blocked parser", send.isCompleted)
+                assertFalse(releaseParse.isCompleted)
+                assertFalse(
+                    "host cancellation must not discard a message native may already own",
+                    controller.deleteMessage(controller.timeline.single().record, presentFailure = false),
+                )
+                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+
+                releaseParse.complete(styled)
+                send.await()
+
+                assertEquals(1, publishCalls)
+                assertEquals(0, durableCallbacks)
+                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                assertSame(
+                    styled,
+                    controller.timeline
+                        .single()
+                        .record.contentTokens,
+                )
+            } finally {
+                releaseParse.complete(styled)
+                send.cancelAndJoin()
+                controller.onCleared()
+            }
         }
 
     /** Resolves the durable Send target after its optimistic row grows the timeline during delayed transport. */
@@ -203,12 +296,12 @@ class ConversationSendOptimisticPublicationTest {
     /** Keeps the prior row visible until the optimistic send owns a completed Markdown document. */
     @Test
     fun chatListKeepsItsPriorPreviewUntilTheOptimisticMarkdownDocumentIsReady() =
-        runBlocking {
+        runTest {
             val appState = testAppState()
             val chats = attachedChats(appState)
             val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
             val publishStarted = CompletableDeferred<Unit>()
-            val releasePublish = CompletableDeferred<Unit>()
+            val durablyAccepted = CompletableDeferred<Unit>()
             val styled = styledDocument()
             val controller =
                 controller(
@@ -216,16 +309,23 @@ class ConversationSendOptimisticPublicationTest {
                     markdownParser = { releaseParse.await() },
                     textPublisher = { _, _, _, _ ->
                         publishStarted.complete(Unit)
-                        releasePublish.await()
                         sentSummary()
                     },
                 )
             try {
                 val send =
                     async(start = CoroutineStart.UNDISPATCHED) {
-                        controller.send("hello *world*")
+                        controller.send("hello *world*", onDurablyAccepted = { durablyAccepted.complete(Unit) })
                     }
 
+                withTimeout(5_000) {
+                    publishStarted.await()
+                    durablyAccepted.await()
+                }
+                assertFalse("the parser must remain blocked after native acceptance", releaseParse.isCompleted)
+                assertFalse(send.isCompleted)
+                chats.setChatListVisible(false)
+                chats.setChatListVisible(true)
                 assertEquals(
                     "a parser stall must not expose raw optimistic Markdown in the chat list",
                     "notified body",
@@ -237,10 +337,10 @@ class ConversationSendOptimisticPublicationTest {
                 )
 
                 releaseParse.complete(styled)
-                publishStarted.await()
+                send.await()
                 // The real list is hidden behind the conversation while a send
-                // starts. Returning flushes the already-folded preview into its
-                // very first frame without waiting for the network publish.
+                // starts. Returning flushes the completed styled preview into
+                // its very first frame, even if native admission finished first.
                 chats.setChatListVisible(false)
                 chats.setChatListVisible(true)
 
@@ -253,11 +353,15 @@ class ConversationSendOptimisticPublicationTest {
                         ?.plaintext,
                 )
                 assertSame(styled, chats.items.single().previewTokens)
-
-                releasePublish.complete(Unit)
-                send.await()
+                assertSame(
+                    styled,
+                    controller.timeline
+                        .single()
+                        .record.contentTokens,
+                )
             } finally {
-                releasePublish.complete(Unit)
+                releaseParse.complete(styled)
+                controller.onCleared()
                 appState.attachChatsController(null)
                 chats.onCleared()
             }
@@ -352,11 +456,12 @@ class ConversationSendOptimisticPublicationTest {
     /** Preserves acceptance order when two optimistic Markdown parses finish in reverse order. */
     @Test
     fun reverseParseCompletionKeepsTheLaterAcceptedSendOnTheChatList() =
-        runBlocking {
+        runTest {
             val appState = testAppState()
             val chats = attachedChats(appState)
             val firstParse = CompletableDeferred<MarkdownDocumentFfi>()
             val secondParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val published = mutableListOf<String>()
             val controller =
                 controller(
                     appState = appState,
@@ -364,6 +469,7 @@ class ConversationSendOptimisticPublicationTest {
                         if (text == "first") firstParse.await() else secondParse.await()
                     },
                     textPublisher = { _, _, _, text ->
+                        published += text
                         sentSummary(if (text == "first") "33".repeat(32) else "44".repeat(32))
                     },
                 )
@@ -371,10 +477,12 @@ class ConversationSendOptimisticPublicationTest {
                 val first = async(start = CoroutineStart.UNDISPATCHED) { controller.send("first") }
                 val second = async(start = CoroutineStart.UNDISPATCHED) { controller.send("second") }
 
+                assertEquals("both native sends must precede either parse completion", listOf("first", "second"), published)
                 secondParse.complete(styledDocument())
                 second.await()
                 firstParse.complete(styledDocument())
                 first.await()
+                assertEquals("reverse parsing must not reorder native publication", listOf("first", "second"), published)
                 chats.setChatListVisible(false)
                 chats.setChatListVisible(true)
 
@@ -393,6 +501,7 @@ class ConversationSendOptimisticPublicationTest {
             } finally {
                 firstParse.complete(emptyMarkdownDocument())
                 secondParse.complete(emptyMarkdownDocument())
+                controller.onCleared()
                 appState.attachChatsController(null)
                 chats.onCleared()
             }
@@ -401,22 +510,28 @@ class ConversationSendOptimisticPublicationTest {
     /** Transfers a parsed send across live controller replacement and retains terminal failure. */
     @Test
     fun controllerReplacementDuringParseRetainsTerminalFailurePreview() =
-        runBlocking {
+        runTest {
             val appState = testAppState()
             val original = attachedChats(appState)
             val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val publishFailed = CompletableDeferred<Unit>()
+            val styled = styledDocument()
             val controller =
                 controller(
                     appState = appState,
                     markdownParser = { releaseParse.await() },
                     textPublisher = { _, _, _, _ ->
+                        publishFailed.complete(Unit)
                         throw MarmotKitException.Publish("relay rejected event")
                     },
                 )
             val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("failed after replacement") }
             val replacement = replaceChats(appState, original)
             try {
-                releaseParse.complete(styledDocument())
+                withTimeout(5_000) { publishFailed.await() }
+                assertFalse("definite admission failure must not abort Markdown hydration", send.isCompleted)
+                assertFalse(releaseParse.isCompleted)
+                releaseParse.complete(styled)
                 send.await()
                 replacement.setChatListVisible(false)
                 replacement.setChatListVisible(true)
@@ -437,7 +552,17 @@ class ConversationSendOptimisticPublicationTest {
                         ?.lastMessage
                         ?.deliveryState,
                 )
+                assertSame(styled, replacement.items.single().previewTokens)
+                assertSame(
+                    styled,
+                    controller.timeline
+                        .single()
+                        .record.contentTokens,
+                )
             } finally {
+                releaseParse.complete(styled)
+                send.cancelAndJoin()
+                controller.onCleared()
                 appState.attachChatsController(null)
                 replacement.onCleared()
             }
@@ -521,6 +646,65 @@ class ConversationSendOptimisticPublicationTest {
             } finally {
                 appState.attachChatsController(null)
                 replacement.onCleared()
+            }
+        }
+
+    /** Cancelling a send cancels both its delayed parser and admission child waiting for text order. */
+    @Test
+    fun cancellingDuringParseDoesNotLeaveAnAdmissionChildBehind() =
+        runTest {
+            val appState = testAppState()
+            val releaseSendOrder = CompletableDeferred<Unit>()
+            val parseStarted = CompletableDeferred<Unit>()
+            val parseStopped = CompletableDeferred<Unit>()
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val published = mutableListOf<String>()
+            val controller =
+                controller(
+                    appState = appState,
+                    markdownParser = { text ->
+                        if (text == "cancelled") {
+                            parseStarted.complete(Unit)
+                            try {
+                                releaseParse.await()
+                            } finally {
+                                parseStopped.complete(Unit)
+                            }
+                        } else {
+                            styledDocument()
+                        }
+                    },
+                    textPublisher = { _, _, _, text ->
+                        published += text
+                        sentSummary()
+                    },
+                )
+            val holder =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    appState.withConversationTextSendOrder(ACCOUNT_REF, GROUP_ID) {
+                        releaseSendOrder.await()
+                    }
+                }
+            val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("cancelled") }
+
+            try {
+                withTimeout(5_000) { parseStarted.await() }
+                send.cancelAndJoin()
+                assertTrue("structured cancellation must stop the parser", parseStopped.isCompleted)
+                assertFalse(releaseParse.isCompleted)
+                assertTrue(published.isEmpty())
+
+                releaseSendOrder.complete(Unit)
+                holder.join()
+                controller.send("next")
+
+                assertEquals("the cancelled child must never reach native publication", listOf("next"), published)
+            } finally {
+                releaseParse.complete(emptyMarkdownDocument())
+                releaseSendOrder.complete(Unit)
+                send.cancelAndJoin()
+                holder.cancelAndJoin()
+                controller.onCleared()
             }
         }
 
