@@ -439,7 +439,12 @@ internal fun ChatRow(
                                     // Names the affected member and refreshes when their profile loads (#1581).
                                     groupSystemNames =
                                         GroupSystemPreviewNames(activeAccountIdHex) {
-                                            appState.contactDisplayNameCached(accountRef, it)
+                                            if (!selectionMode && accountRef == appState.activeAccountRef) {
+                                                // Preserve Home's existing profile hydration (#1581).
+                                                appState.chatMemberTitle(it)
+                                            } else {
+                                                appState.contactDisplayNameCached(accountRef, it)
+                                            }
                                         },
                                 )
                         },

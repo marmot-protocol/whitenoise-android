@@ -1068,6 +1068,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+      "symbol": "ComposerSendingIdentity",
+      "bindings": [],
+      "remaining": "Needs a controlled multi-signing-account fixture: open the draft owner avatar, assert its identity with a different globally active account, dismiss with Back while preserving draft and keyboard, then switch owner. Native unit snapshots do not establish Maestro execution."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
       "symbol": "ConversationDictationMicrophoneDialog",
       "bindings": [
@@ -1987,38 +1993,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
-      "symbol": "NotificationSoundScopeDialog",
-      "bindings": [
-        {
-          "case": "presentation-extra-notification-scope-cancel",
-          "selector": {
-            "text": "Custom for this chat"
-          },
-          "scope": "notification-category parent opens its scope dialog, verifies default/custom controls and exact selected category. No Android notification channel is modified.",
-          "entry_assertion": {
-            "text": "Custom for this chat"
-          },
-          "opened_by": {
-            "id": "conversation-sound-scope-messages_group"
-          }
-        },
-        {
-          "case": "presentation-extra-notification-scope-select",
-          "selector": {
-            "text": "Custom for this chat"
-          },
-          "scope": "notification-category parent opens its scope dialog, verifies default/custom controls and exact selected category. No Android notification channel is modified.",
-          "entry_assertion": {
-            "text": "Custom for this chat"
-          },
-          "opened_by": {
-            "id": "conversation-sound-scope-messages_group"
-          }
-        }
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
       "symbol": "ConversationNotificationSettingsScreen",
       "bindings": [
@@ -2077,25 +2051,6 @@
           },
           "entry_assertion": {
             "text": "Choose a pattern for new messages in this chat[.] Preview plays once[.]"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
-      "symbol": "ConversationSoundAppearanceSheet",
-      "bindings": [
-        {
-          "case": "alerts-chat-sounds-back",
-          "selector": {
-            "id": "conversation-sound-appearance-content"
-          },
-          "scope": "chat notification drawer content, app navigation and Back.",
-          "entry_assertion": {
-            "id": "conversation-sound-appearance-content"
-          },
-          "opened_by": {
-            "id": "conversation-sound-appearance-open"
           }
         }
       ]

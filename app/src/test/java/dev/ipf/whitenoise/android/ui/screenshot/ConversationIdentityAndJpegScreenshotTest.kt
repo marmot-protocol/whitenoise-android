@@ -58,7 +58,6 @@ class ConversationIdentityAndJpegScreenshotTest {
         assertEquals(alice, composerSendingAccount(state, "alice"))
     }
 
-    @Suppress("LongMethod") // One captured fixture with popup/back/draft assertions.
     private fun render(
         dark: Boolean,
         amoled: Boolean,
@@ -112,15 +111,8 @@ class ConversationIdentityAndJpegScreenshotTest {
                 "light"
             }}.png",
         )
-        composeRule.onNodeWithTag("polish-preview").captureRoboImage(
-            "src/test/snapshots/conversation_identity_jpeg_${if (amoled) {
-                "amoled_rtl_large"
-            } else if (dark) {
-                "dark"
-            } else {
-                "light"
-            }}.png",
-        )
+        // The popup capture above includes the complete window: sender, draft and JPEG decoration.
+        // Avoid a second rasterization of the same unchanged frame.
         composeRule.runOnIdle { callbacks.last().onBackInvoked() }
         composeRule.onNodeWithTag("composer-sending-identity-popup").assertDoesNotExist()
         composeRule.onNodeWithText("I’ll bring the route map.").assertIsDisplayed()

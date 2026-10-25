@@ -20,7 +20,7 @@ internal const val PUBLIC_JPEG_MAX_BYTES = 1_048_576L
 private const val MAX_EDGE = 4096
 private const val MAX_PIXELS = 4_000_000L
 private const val CACHE_BYTES = 16 * 1024 * 1024
-private const val FAILURE_ENTRIES = 128
+private const val MAX_FAILURES = 128
 private const val FAILURE_AGE_MS = 5 * 60 * 1000L
 
 private const val MAX_LOCATOR_LENGTH = 2048
@@ -169,7 +169,7 @@ internal class PublicJpegPreviewLoader {
         }
     private val failures =
         object : LinkedHashMap<String, Long>() {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>): Boolean = size > FAILURE_ENTRIES
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>): Boolean = size > MAX_FAILURES
         }
 
     fun clearPixels(accountId: String) {
