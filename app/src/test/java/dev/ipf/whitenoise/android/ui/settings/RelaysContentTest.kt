@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
@@ -131,6 +132,84 @@ class RelaysContentTest {
         composeRule.onNodeWithTag("relays.imported.issue").assertExists()
         composeRule.onNodeWithText("legacy.example.com").performScrollTo().assertExists()
         composeRule.onNodeWithText("$LEGACY · " + app.getString(R.string.relay_needs_attention)).assertExists()
+    }
+
+    /** A valid onion relay gets the Tor explanation, not the insecure-connection callout or note. */
+    @Test
+    fun importedOnionRelayExplainsTorInsteadOfInsecureTransport() {
+        render(relayLists(nip65 = listOf(POST, ONION), inbox = listOf(ONION)))
+        composeRule.onNodeWithTag("relays.imported.onion").assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.relay_onion_issue_detail)).assertExists()
+        composeRule.onNodeWithTag("relays.imported.issue").assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.relay_imported_issue_detail)).assertDoesNotExist()
+        composeRule
+            .onNodeWithText("$ONION · " + app.getString(R.string.relay_onion_needs_tor))
+            .performScrollTo()
+            .assertExists()
+        composeRule
+            .onNodeWithText("$ONION · " + app.getString(R.string.relay_needs_attention))
+            .assertDoesNotExist()
+    }
+
+    /** Onion, clearnet ws:// and unusable imports each keep their own callout and summary note. */
+    @Test
+    fun mixedImportsShowDistinctOnionInsecureAndInvalidFeedback() {
+        render(relayLists(nip65 = listOf(POST, LEGACY, ONION, DECEPTIVE, UNUSABLE), inbox = emptyList()))
+        composeRule.onNodeWithTag("relays.imported.issue").assertExists()
+        composeRule.onNodeWithTag("relays.imported.onion").assertExists()
+        composeRule.onNodeWithTag("relays.imported.unusable").assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.relay_unusable_issue_title)).assertExists()
+        composeRule
+            .onNodeWithText("$DECEPTIVE · " + app.getString(R.string.relay_needs_attention))
+            .performScrollTo()
+            .assertExists()
+        composeRule
+            .onNodeWithText("$UNUSABLE · " + app.getString(R.string.relay_unusable_address))
+            .performScrollTo()
+            .assertExists()
+        composeRule.onNodeWithText(POST).performScrollTo().assertExists()
+    }
+
+    /** Imported onion entries and their roles stay listed rather than being filtered from the projection. */
+    @Test
+    fun importedOnionEntriesKeepTheirRoles() {
+        val relays = accountRelays(relayLists(nip65 = listOf(ONION), inbox = listOf(ONION, POST)))
+        assertEquals(listOf(ONION, POST), relays.map { it.url })
+        assertEquals(setOf(AccountRelayRole.Profile, AccountRelayRole.Inbox), relays.first().roles)
+        assertTrue(relays.first().needsAttention)
+    }
+
+    /** An onion address shows the Tor explanation once, announces a short error and keeps Add disabled. */
+    @Test
+    fun addSheetExplainsOnionAddressesNeedTor() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                AddRelaySheet(
+                    existing = emptyList(),
+                    busy = false,
+                    rejectedUrl = null,
+                    onDismiss = {},
+                    onAdd = { _, _ -> },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("relay.add.url").performTextInput(ONION)
+        composeRule.onNodeWithText(app.getString(R.string.relay_onion_add_error)).assertExists()
+        // The long explanation is visible once; the announced error is only the short note, not a repeat.
+        composeRule
+            .onNodeWithTag("relay.add.url")
+            .assert(
+                SemanticsMatcher.expectValue(SemanticsProperties.Error, app.getString(R.string.relay_onion_needs_tor)),
+            )
+        composeRule.onNodeWithTag("relay.add.submit").assertIsNotEnabled()
+        composeRule.onNodeWithTag("relay.add.url").performTextClearance()
+        composeRule.onNodeWithTag("relay.add.url").performTextInput("wss://$ONION_HOST")
+        composeRule.onNodeWithText(app.getString(R.string.relay_onion_add_error)).assertExists()
+        composeRule.onNodeWithTag("relay.add.submit").assertIsNotEnabled()
+        composeRule.onNodeWithTag("relay.add.url").performTextClearance()
+        composeRule.onNodeWithTag("relay.add.url").performTextInput(LEGACY)
+        composeRule.onNodeWithText(app.getString(R.string.relay_onion_add_error)).assertDoesNotExist()
+        composeRule.onNodeWithTag("relay.add.submit").assertIsNotEnabled()
     }
 
     /** Restore default relays is disabled while both lists already equal the defaults. */
@@ -258,6 +337,10 @@ class RelaysContentTest {
         const val POST = "wss://post.example.com"
         const val INBOX = "wss://inbox.example.com"
         const val LEGACY = "ws://legacy.example.com"
+        const val ONION_HOST = "duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion"
+        const val ONION = "ws://$ONION_HOST"
+        const val DECEPTIVE = "ws://$ONION_HOST.example"
+        const val UNUSABLE = "wss://relay.example.com:7777"
     }
 }
 

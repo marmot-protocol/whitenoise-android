@@ -469,18 +469,67 @@ class GroupDetailsEditNavigationTest {
         assertEquals(0f, overviewScrollOffset(), 0f)
     }
 
-    /** The concrete relay destination reads the current native group and preserves overview restoration. */
+    /** The Group relays destination reads the current native group and preserves overview restoration. */
     @Test
     fun relaysDestinationShowsNativeEmptyStateAndReturnsToItsOverview() {
         render(controller(group()))
         composeRule.onNodeWithTag("chat_info.relays").performScrollTo()
+        composeRule.onNodeWithText(context.getString(R.string.group_relays)).assertIsDisplayed()
         val offset = overviewScrollOffset()
         composeRule.onNodeWithTag("chat_info.relays").performClick()
-        composeRule.onNodeWithText(context.getString(R.string.no_relays)).assertIsDisplayed()
+        composeRule.onNodeWithTag(GROUP_RELAYS_EMPTY_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(GROUP_RELAYS_ADMIN_TAG).performScrollTo().assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_relays_route_empty_light.png")
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         assertEquals(offset, overviewScrollOffset(), 1f)
         composeRule.onNodeWithTag("chat_info.relays").assertIsDisplayed()
+    }
+
+    /** A member opens the configured route from the record, de-duplicated, with the read-only explanation. */
+    @Test
+    fun memberRelaysDestinationListsTheRecordRoute() {
+        render(controller(group(admin = false, relays = listOf(RELAY_A, "$RELAY_A/", RELAY_B))))
+        composeRule
+            .onNodeWithTag("chat_info.relays")
+            .performScrollTo()
+            .assert(hasText(context.resources.getQuantityString(R.plurals.chat_relay_count, 2, 2)))
+            .performClick()
+        composeRule.onNodeWithText(RELAY_A).assertIsDisplayed()
+        composeRule.onNodeWithText(RELAY_B).assertIsDisplayed()
+        composeRule.onNodeWithTag(GROUP_RELAYS_MEMBER_TAG).performScrollTo().assertIsDisplayed()
+    }
+
+    /** Developer Tools keeps only identifiers, so Group relays is the single place relays are listed. */
+    @Test
+    fun developerToolsNoLongerListsRelays() {
+        render(controller(group(relays = listOf(RELAY_A))))
+        composeRule.onNodeWithTag("chat_info.developer_tools").performScrollTo().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.mls_group_id)).assertIsDisplayed()
+        composeRule.onNodeWithText(RELAY_A).assertDoesNotExist()
+    }
+
+    /** An open Group relays destination closes when another group's controller replaces the current one. */
+    @Test
+    fun switchingGroupsClosesTheRelaysDestination() {
+        val current = mutableStateOf(controller(group(relays = listOf(RELAY_A))))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupDetailsScreen(
+                    appState = current.value.appState,
+                    controller = current.value.controller,
+                    onBack = {},
+                    onLeft = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("chat_info.relays").performScrollTo().performClick()
+        composeRule.onNodeWithText(RELAY_A).assertIsDisplayed()
+        composeRule.runOnIdle {
+            current.value = controller(group(groupId = "group-b", name = "Second group", relays = listOf(RELAY_B)))
+        }
+        composeRule.onNodeWithTag(GROUP_RELAYS_SCREEN_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText(RELAY_A).assertDoesNotExist()
+        composeRule.onNode(hasText("Second group") and hasClickAction()).assertIsDisplayed()
     }
 
     /** Reads the native scrolling container's accessibility range without exposing a production test hook. */
@@ -895,12 +944,14 @@ private fun controller(
     return GroupDetailsTestController(appState, controller)
 }
 
+/** Builds a native group record fixture with the given identity, role, lifecycle and configured relays. */
 private fun group(
     groupId: String = "group-a",
     name: String = GROUP_NAME,
     admin: Boolean = true,
     pendingConfirmation: Boolean = false,
     disbanded: Boolean = false,
+    relays: List<String> = emptyList(),
 ): AppGroupRecordFfi =
     AppGroupRecordFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
@@ -911,7 +962,7 @@ private fun group(
         name = name,
         description = "",
         admins = if (admin) listOf(SELF_HEX) else listOf("member-b"),
-        relays = emptyList(),
+        relays = relays,
         nostrGroupIdHex = "nostr-$groupId",
         avatarUrl = null,
         avatarDim = null,
@@ -1003,6 +1054,8 @@ private class GroupDetailsDraftPersistence : DraftPersistence {
 private const val ACCOUNT_REF = "account-a"
 private const val SELF_HEX = "self-a"
 private const val GROUP_NAME = "Weekend hikers"
+private const val RELAY_A = "wss://relay.example.com"
+private const val RELAY_B = "wss://second.example.org"
 
 /** Optional public-identity and native-runtime fixtures for the real details-screen tests. */
 private data class GroupDetailsIdentityFixture(

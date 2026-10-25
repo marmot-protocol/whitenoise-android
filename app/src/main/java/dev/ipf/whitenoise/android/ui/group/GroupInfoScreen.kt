@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipboardManager
@@ -24,13 +22,12 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** Read-only technical facts of the group: identifiers and chat relays, each copyable in full. */
+/** Read-only technical identifiers of the group, each copyable in full; relays live on Group relays. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupInfoScreen(
     groupIdHex: String,
     nostrGroupIdHex: String,
-    relays: List<String>,
     onBack: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -43,31 +40,6 @@ internal fun GroupInfoScreen(
                     .padding(bottom = WhiteNoiseSpacing.Section),
         ) {
             GroupIdentifierGroup(groupIdHex, nostrGroupIdHex, clipboard)
-            GroupRelayGroup(relays, clipboard)
-        }
-    }
-}
-
-/** Read-only chat relays from the current native group record, with full-value copy actions. */
-@Composable
-internal fun ChatRelaysScreen(
-    relays: List<String>,
-    onBack: () -> Unit,
-    feedback: @Composable () -> Unit = {},
-) {
-    val clipboard = LocalClipboardManager.current
-    SettingsScaffold(title = stringResource(R.string.relays), onBack = onBack) {
-        Column(Modifier.fillMaxSize()) {
-            feedback()
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .whiteNoiseVerticalScroll(rememberScrollState())
-                        .padding(bottom = WhiteNoiseSpacing.Section),
-            ) {
-                GroupRelayGroup(relays, clipboard)
-            }
         }
     }
 }
@@ -94,39 +66,6 @@ private fun GroupIdentifierGroup(
                 displayValue = IdentityFormatter.short(nostrGroupIdHex, prefix = 16, suffix = 12),
                 clipboard = clipboard,
             )
-        }
-    }
-}
-
-/** Relay list of the group with copy actions. */
-@Composable
-private fun GroupRelayGroup(
-    relays: List<String>,
-    clipboard: ClipboardManager,
-) {
-    SettingsSection(stringResource(R.string.group_relays))
-    SettingsPanel {
-        Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.FormField)) {
-            Text(
-                stringResource(R.string.group_relays_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (relays.isEmpty()) {
-                Text(
-                    stringResource(R.string.no_relays),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                relays.forEachIndexed { index, relay ->
-                    CopyableValueRow(
-                        label = stringResource(R.string.relay_number, index + 1),
-                        value = relay,
-                        clipboard = clipboard,
-                    )
-                }
-            }
         }
     }
 }

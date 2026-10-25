@@ -5,14 +5,20 @@ import dev.ipf.whitenoise.android.ui.conversation.nostr.eventCardTimelineRecord
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -154,6 +160,55 @@ class ConversationInitialPresentationWarmCoordinatorTest {
             runCurrent()
 
             assertEquals(INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS, readyAt)
+        }
+
+    /** A caller waiting for readiness resumes only once onReady ran, so it sees what readiness published. */
+    @Test
+    fun awaitReadyResumesAfterReadinessIsPublished() =
+        runTest {
+            val warm = CompletableDeferred<Unit>()
+            var published = false
+            val coordinator = coordinator(warmProfiles = { warm.await() }, onReady = { published = true })
+            coordinator.prepare(InitialPresentationWarmWork(listOf("slow")))
+            var sawPublished: Boolean? = null
+            launch {
+                coordinator.awaitReady()
+                sawPublished = published
+            }
+            runCurrent()
+            assertEquals(null, sawPublished)
+
+            warm.complete(Unit)
+            runCurrent()
+
+            assertEquals(true, sawPublished)
+        }
+
+    /** A caller waiting for readiness is released when the coordinator's scope ends, since nothing can publish it. */
+    @Test
+    fun awaitReadyReturnsWhenTheScopeEnds() =
+        runTest {
+            val owner = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+            val coordinator =
+                ConversationInitialPresentationWarmCoordinator(
+                    scope = owner,
+                    warmProfiles = { awaitCancellation() },
+                    warmEventCards = {},
+                    onReady = {},
+                )
+            coordinator.prepare(InitialPresentationWarmWork(listOf("slow")))
+            var released = false
+            launch {
+                coordinator.awaitReady()
+                released = true
+            }
+            runCurrent()
+            assertFalse(released)
+
+            owner.cancel()
+            runCurrent()
+
+            assertTrue(released)
         }
 
     /** A coordinator over [this] test scope with the production budgets unless a test overrides them. */
