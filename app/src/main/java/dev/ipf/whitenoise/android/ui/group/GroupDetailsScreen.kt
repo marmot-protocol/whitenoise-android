@@ -1018,7 +1018,6 @@ internal fun GroupDetailsScreen(
             GroupInfoScreen(
                 groupIdHex = controller.group.groupIdHex,
                 nostrGroupIdHex = controller.group.nostrGroupIdHex,
-                relays = controller.group.relays,
                 onBack = { showGroupInfo = false },
             )
             return@PreparedGroupAvatarContent
@@ -1544,8 +1543,10 @@ internal fun GroupDetailsScreen(
         }
         if (showChatRelays) {
             BackHandler { showChatRelays = false }
-            ChatRelaysScreen(
+            GroupRelaySettingsScreen(
                 relays = controller.group.relays,
+                isDm = isDm,
+                isAdmin = controller.isSelfAdmin,
                 onBack = { showChatRelays = false },
                 feedback = groupFeedback,
             )
@@ -2131,17 +2132,13 @@ internal fun GroupDetailsScreen(
                     modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical"),
                 ) {
                     row("relays") { rowContext ->
+                        val relayCount = groupRelayDisplayList(controller.group.relays).size
                         SettingsLink(
                             context = rowContext,
-                            title = stringResource(R.string.relays),
+                            title = stringResource(groupRelaysTitleRes(isDm)),
                             onClick = { showChatRelays = true },
                             modifier = Modifier.testTag("chat_info.relays"),
-                            subtitle =
-                                pluralStringResource(
-                                    R.plurals.chat_relay_count,
-                                    controller.group.relays.size,
-                                    controller.group.relays.size,
-                                ),
+                            subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
                             leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
                         )
                     }

@@ -7,11 +7,11 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.RelayListKind
-import dev.ipf.whitenoise.android.state.RelayUrlValidationResult
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.normalizeRelayUrls
-import dev.ipf.whitenoise.android.state.relayUrlValidationResult
+import dev.ipf.whitenoise.android.state.relayAddressAttention
 import java.util.WeakHashMap
 
 /** Every relay in either list, in first-seen order, with the lists it serves. */
@@ -65,9 +65,53 @@ internal data class AccountRelay(
     /** The address without its scheme, the closest thing to a name a relay list carries. */
     val name: String get() = url.removePrefix("wss://").removePrefix("ws://").trimEnd('/')
 
-    /** An imported address that is not a secure wss:// URL; kept visible, flagged, never silently dropped. */
-    val needsAttention: Boolean get() = relayUrlValidationResult(url) != RelayUrlValidationResult.Acceptable
+    /** Why this imported address needs attention, judged by its parsed host, or None for a secure wss:// URL. */
+    val attention: RelayAddressAttention get() = relayAddressAttention(url)
+
+    /** An imported address that is not a usable secure wss:// URL; kept visible, flagged, never silently dropped. */
+    val needsAttention: Boolean get() = attention != RelayAddressAttention.None
 }
+
+/** The callout shown above the relay lists for one kind of imported-address concern. */
+internal data class RelayAttentionCallout(
+    @param:StringRes val titleRes: Int,
+    @param:StringRes val detailRes: Int,
+    val testTag: String,
+)
+
+/** Callout for one kind of imported-address concern; null when the address is fine. */
+internal fun RelayAddressAttention.callout(): RelayAttentionCallout? =
+    when (this) {
+        RelayAddressAttention.None -> null
+        RelayAddressAttention.InsecureTransport ->
+            RelayAttentionCallout(
+                R.string.relay_imported_issue_title,
+                R.string.relay_imported_issue_detail,
+                "relays.imported.issue",
+            )
+        RelayAddressAttention.OnionRequiresTor ->
+            RelayAttentionCallout(
+                R.string.relay_onion_issue_title,
+                R.string.relay_onion_issue_detail,
+                "relays.imported.onion",
+            )
+        RelayAddressAttention.Unusable ->
+            RelayAttentionCallout(
+                R.string.relay_unusable_issue_title,
+                R.string.relay_unusable_issue_detail,
+                "relays.imported.unusable",
+            )
+    }
+
+/** The short note appended to a flagged relay's summary; null when the address is fine. */
+@StringRes
+internal fun RelayAddressAttention.summaryNoteRes(): Int? =
+    when (this) {
+        RelayAddressAttention.None -> null
+        RelayAddressAttention.InsecureTransport -> R.string.relay_needs_attention
+        RelayAddressAttention.OnionRequiresTor -> R.string.relay_onion_needs_tor
+        RelayAddressAttention.Unusable -> R.string.relay_unusable_address
+    }
 
 /** The two lists MarmotKit publishes for an account, as the prototype's roles. */
 internal enum class AccountRelayRole(
