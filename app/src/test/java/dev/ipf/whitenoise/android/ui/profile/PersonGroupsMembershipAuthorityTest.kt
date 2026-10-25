@@ -3,8 +3,9 @@ package dev.ipf.whitenoise.android.ui.profile
 import android.os.Looper
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -26,12 +27,18 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
 /** Mounted default administration UI, with authority failure/latency injected at the native binding only. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class PersonGroupsMembershipAuthorityTest {
+    /**
+     * Queues effect continuations back onto the composition thread, as production's UI dispatcher does.
+     * The deprecated v1 rule resumed each row on its native I/O worker, so rows that returned together
+     * raced on the shared visit maps and one row's authority could be overwritten.
+     */
     @get:Rule val rule = createComposeRule()
 
     /** A pending first row cannot hide a later row's already verified admin menu. */
@@ -46,6 +53,34 @@ class PersonGroupsMembershipAuthorityTest {
             rule.onNodeWithTag("groups_in_common.menu.${fixture.slow.id}").assertDoesNotExist()
             assertEquals(1L, fixture.releases.getValue(fixture.slow.id).count)
         } finally {
+            fixture.close()
+            rule.runOnIdle { mounted.value = false }
+            rule.waitForIdle()
+        }
+    }
+
+    /** Native reads that return together publish every row, and no visit state is written from a native worker. */
+    @Test fun simultaneousNativeCompletionsPublishEveryRowFromTheCompositionThread() {
+        val fixture = MembershipAuthorityFixture()
+        val mounted = mutableStateOf(true)
+        val ids = listOf(fixture.fast.id, fixture.slow.id)
+        val workerWrites = CopyOnWriteArrayList<String>()
+        ids.forEach(fixture::hold)
+        // A global write on a native worker is a row effect resumed off the composition thread,
+        // which production's UI dispatcher never allows.
+        val observer =
+            Snapshot.registerGlobalWriteObserver {
+                if (Thread.currentThread() in fixture.nativeThreads) workerWrites += Thread.currentThread().name
+            }
+        try {
+            mount(fixture, mutableStateOf(listOf(fixture.fast, fixture.slow)), mounted)
+            ids.forEach { assertTrue(fixture.entered.getValue(it).await(5, TimeUnit.SECONDS)) }
+            ids.forEach { fixture.releases.getValue(it).countDown() }
+            awaitAuthority { workerWrites.isNotEmpty() || ids.all(::menuShown) }
+            assertEquals(emptyList<String>(), workerWrites.toList())
+            ids.forEach { awaitMenu(fixture, it) }
+        } finally {
+            observer.dispose()
             fixture.close()
             rule.runOnIdle { mounted.value = false }
             rule.waitForIdle()
@@ -219,7 +254,7 @@ class PersonGroupsMembershipAuthorityTest {
     ) {
         fixture.recordAuthorityEvent(id, "menu-wait-start")
         try {
-            awaitAuthority { rule.onAllNodesWithTag("groups_in_common.menu.$id").fetchSemanticsNodes().isNotEmpty() }
+            awaitAuthority { menuShown(id) }
         } catch (failure: Throwable) {
             runCatching {
                 fixture.recordAuthorityEvent(id, "menu-wait-failed:${failure.javaClass.simpleName}")
@@ -234,6 +269,12 @@ class PersonGroupsMembershipAuthorityTest {
             }
             throw failure
         }
+    }
+
+    /** True once the row's verified admin overflow action is in the semantics tree. */
+    private fun menuShown(id: String): Boolean {
+        val menus = rule.onAllNodesWithTag("groups_in_common.menu.$id")
+        return menus.fetchSemanticsNodes().isNotEmpty()
     }
 
     /** Mounts the shipped entry point with the real active account, state owner and native controller reader. */
