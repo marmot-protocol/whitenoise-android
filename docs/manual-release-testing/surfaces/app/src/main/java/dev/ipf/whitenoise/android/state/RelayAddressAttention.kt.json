@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RelayAddressAttention.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Relay address concern classification by parsed host",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RelayAddressAttention.kt",
+        "anchor": "internal fun relayAddressAttention(",
+        "test_ids": [
+          "SYS-002",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "Stopgap onion host rule mirroring MDK TorRequired (mdk#2588)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/RelayAddressAttention.kt",
+        "anchor": "internal fun isOnionHost(",
+        "test_ids": [
+          "SYS-014"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

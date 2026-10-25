@@ -22,11 +22,25 @@ internal enum class ConversationWindowJumpResult {
     UNSUPPORTED,
 }
 
-/** Loads one exact message without reporting a retryable window delay as a missing projection. */
-@Suppress("ReturnCount")
+/**
+ * Loads one exact message without reporting a retryable window delay as a missing projection. An available message is
+ * reported only once it is on screen, since every caller then looks it up among the shown rows: a page committed
+ * before the conversation's first presentation is ready is indexed but held unpublished for its event cards until
+ * then (#2238).
+ */
 internal suspend fun ConversationController.loadMessageAvailability(
     messageIdHex: String,
     maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
+): MessageAvailability =
+    materializeMessage(messageIdHex, maxOlderPages).also { availability ->
+        if (availability == MessageAvailability.AVAILABLE) awaitEventCardHoldReleased()
+    }
+
+/** Indexes one exact message by a window jump, or by older pages where jumps are unsupported, and classifies it. */
+@Suppress("ReturnCount")
+private suspend fun ConversationController.materializeMessage(
+    messageIdHex: String,
+    maxOlderPages: Int,
 ): MessageAvailability {
     if (timelineRecords.containsKey(messageIdHex)) {
         return if (isMessagePublished(messageIdHex)) MessageAvailability.AVAILABLE else MessageAvailability.RETRYABLE
@@ -89,6 +103,8 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
             // The reader landed somewhere else in history, so an older prefetch that stood
             // down at the previous edge may ask again from here (#2727).
             automaticPaging.older.reset()
+            // The jump must classify its target after the held page becomes the published transcript.
+            awaitEventCardHoldReleased()
         },
     )
 
