@@ -98,39 +98,6 @@ internal fun DataUsageScreen(
     val qualityDetails = MediaQuality.entries.associateWith { stringResource(it.subtitleRes) }
     SettingsScaffold(title = stringResource(R.string.data_usage_title), onBack = onBack) {
         SettingsList {
-            item {
-                SettingsGroup {
-                    row("public_jpeg_previews") { context ->
-                        SettingsSwitch(
-                            context = context,
-                            title = stringResource(R.string.public_jpeg_previews_title),
-                            subtitle = stringResource(R.string.public_jpeg_previews_privacy),
-                            checked = previewChoices[previewAccountId] == true,
-                            enabled = previewAccountId != null && !savingPreview,
-                            modifier = Modifier.testTag("data_usage.public_jpeg_previews"),
-                            onCheckedChange = { enabled ->
-                                if (previewAccountId != null && !savingPreview) {
-                                    if (!enabled) {
-                                        previewPreferences.revoke(previewAccountId)
-                                        appState.publicJpegPreviewLoader.clearPixels()
-                                    }
-                                    savingPreview = true
-                                    scope.launch {
-                                        try {
-                                            val saved = previewPreferences.setEnabled(previewAccountId, enabled)
-                                            if (!saved && appState.activeAccountRef == previewAccount) {
-                                                appState.present(R.string.public_jpeg_preview_save_failed)
-                                            }
-                                        } finally {
-                                            savingPreview = false
-                                        }
-                                    }
-                                }
-                            },
-                        )
-                    }
-                }
-            }
             item { SettingsSection(stringResource(R.string.download_automatic)) }
             item {
                 SettingsGroup(modifier = Modifier.testTag("data_usage.downloads.group")) {
@@ -194,6 +161,39 @@ internal fun DataUsageScreen(
             item {
                 SettingsExplainer(stringResource(R.string.download_quality_help))
                 SettingsExplainer(stringResource(R.string.media_quality_footer))
+            }
+            item {
+                SettingsGroup {
+                    row("public_jpeg_previews") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.public_jpeg_previews_title),
+                            subtitle = stringResource(R.string.public_jpeg_previews_privacy),
+                            checked = previewChoices[previewAccountId] == true,
+                            enabled = previewAccountId != null && !savingPreview,
+                            modifier = Modifier.testTag("data_usage.public_jpeg_previews"),
+                            onCheckedChange = { enabled ->
+                                if (previewAccountId != null && !savingPreview) {
+                                    if (!enabled) {
+                                        previewPreferences.revoke(previewAccountId)
+                                        appState.publicJpegPreviewLoader.clearPixels(previewAccountId)
+                                    }
+                                    savingPreview = true
+                                    scope.launch {
+                                        try {
+                                            val saved = previewPreferences.setEnabled(previewAccountId, enabled)
+                                            if (!saved && appState.activeAccountRef == previewAccount) {
+                                                appState.present(R.string.public_jpeg_preview_save_failed)
+                                            }
+                                        } finally {
+                                            savingPreview = false
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
             }
         }
     }

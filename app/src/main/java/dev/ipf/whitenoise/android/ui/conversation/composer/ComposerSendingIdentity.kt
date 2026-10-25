@@ -59,7 +59,7 @@ internal fun ComposerSendingIdentity(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ComposerPlatformPreImeBackHandler(showing, { showing = false }, overlayBackRegistrar)
         }
-        val sendingAs = stringResource(R.string.composer_sending_as)
+        val sendingAs = stringResource(R.string.share_sending_as)
         val popupOffset = with(LocalDensity.current) { composerSendingIdentityTargetSize.roundToPx() }
         Box {
             AccountAvatarButton(
@@ -79,8 +79,16 @@ internal fun ComposerSendingIdentity(
                     onDismissRequest = { showing = false },
                     properties = PopupProperties(focusable = false, dismissOnClickOutside = true),
                 ) {
-                    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = amoledSurfaceBorderStroke()) {
-                        Column(Modifier.padding(dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing.Section).testTag("composer-sending-identity-popup")) {
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = amoledSurfaceBorderStroke(),
+                    ) {
+                        Column(
+                            Modifier
+                                .padding(dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing.Section)
+                                .testTag("composer-sending-identity-popup"),
+                        ) {
                             Text(sendingAs, style = MaterialTheme.typography.labelMedium)
                             Text(title, style = MaterialTheme.typography.titleSmall)
                         }

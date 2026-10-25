@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.media
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
+import dev.ipf.whitenoise.android.state.ValidatedInternetNetworkTracker
 import dev.ipf.whitenoise.android.ui.conversation.messages.publicJpegPreviewOwnerCurrent
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
@@ -26,6 +28,27 @@ import java.security.MessageDigest
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PublicJpegPreviewsTest {
     private val digest = "ab".repeat(32)
+
+    @Test
+    fun wifiRequiresValidatedInternetAndRejectsMeteredNetworks() {
+        val account = testAccount("alice", "aa".repeat(32))
+        val state = emptyAppState(accounts = listOf(account), activeAccountRef = "alice")
+
+        fun field(name: String) = state.javaClass.getDeclaredField(name).apply { isAccessible = true }
+        field("hasActiveNetworkSnapshot").setBoolean(state, true)
+        field("activeNetworkTypesSnapshot").set(state, setOf(MediaAutoDownloadNetwork.WiFi))
+        val tracker = field("validatedInternetNetworks").get(state) as ValidatedInternetNetworkTracker
+        assertFalse(state.publicJpegPreviewNetworkAllowed())
+        tracker.update(1L, available = true)
+        assertTrue(state.publicJpegPreviewNetworkAllowed())
+        field("activeNetworkTypesSnapshot").set(
+            state,
+            setOf(MediaAutoDownloadNetwork.WiFi, MediaAutoDownloadNetwork.Metered),
+        )
+        assertFalse(state.publicJpegPreviewNetworkAllowed())
+        tracker.remove(1L)
+        assertFalse(state.publicJpegPreviewNetworkAllowed())
+    }
 
     @Test
     fun onlyDirectHttpsContentAddressedJpegLocatorsAreEligible() {
@@ -84,11 +107,18 @@ class PublicJpegPreviewsTest {
         val replacement = testAccount("same-label", "bb".repeat(32))
         val originalState = emptyAppState(accounts = listOf(original), activeAccountRef = "same-label")
         val replacedState = emptyAppState(accounts = listOf(replacement), activeAccountRef = "same-label")
-        assertTrue(publicJpegPreviewOwnerCurrent(originalState, "same-label", original.accountIdHex, originalState.runtimeGeneration))
-        assertFalse(publicJpegPreviewOwnerCurrent(replacedState, "same-label", original.accountIdHex, replacedState.runtimeGeneration))
-        assertFalse(publicJpegPreviewOwnerCurrent(originalState, "same-label", original.accountIdHex, originalState.runtimeGeneration + 1))
-        val signedOut = emptyAppState(accounts = listOf(original.copy(signedOut = true)), activeAccountRef = "same-label")
-        assertFalse(publicJpegPreviewOwnerCurrent(signedOut, "same-label", original.accountIdHex, signedOut.runtimeGeneration))
+        val generation = originalState.runtimeGeneration
+        assertTrue(publicJpegPreviewOwnerCurrent(originalState, "same-label", original.accountIdHex, generation))
+        val replacementGeneration = replacedState.runtimeGeneration
+        assertFalse(
+            publicJpegPreviewOwnerCurrent(replacedState, "same-label", original.accountIdHex, replacementGeneration),
+        )
+        assertFalse(publicJpegPreviewOwnerCurrent(originalState, "same-label", original.accountIdHex, generation + 1))
+        val signedOut =
+            emptyAppState(accounts = listOf(original.copy(signedOut = true)), activeAccountRef = "same-label")
+        assertFalse(
+            publicJpegPreviewOwnerCurrent(signedOut, "same-label", original.accountIdHex, signedOut.runtimeGeneration),
+        )
     }
 
     @Test
@@ -185,8 +215,10 @@ class PublicJpegPreviewsTest {
             assertFalse(preferences.setEnabled("alice", true))
             assertFalse(preferences.enabled("alice"))
             assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
+            assertEquals(emptySet<String>(), preferences.retainAccounts(listOf("bob")))
             preferences.retainAccounts(listOf("alice", "bob"))
             assertFalse(preferences.enabled("alice"))
+            assertTrue(preferences.setEnabled("alice", true))
         }
 
     @Test

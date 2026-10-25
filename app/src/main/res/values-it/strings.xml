@@ -2454,4 +2454,8 @@
     <string name="setup_finding_outcome_unknown">Risultato sconosciuto</string>
     <string name="setup_finding_outcome_success">Verifica riuscita</string>
     <string name="setup_finding_outcome_failure">Verifica non riuscita</string>
+    <string name="public_jpeg_previews_title">Anteprime delle immagini in chat</string>
+    <string name="public_jpeg_previews_privacy">Disattivate per impostazione predefinita. I link diretti a JPEG su Blossom possono rivelare il tuo indirizzo IP al server delle immagini. Le anteprime usano Wi-Fi senza limiti di dati e le tue regole di download delle foto. I normali link restano disponibili quando sono disattivate.</string>
+    <string name="public_jpeg_preview_image">Anteprima del JPEG collegato</string>
+    <string name="public_jpeg_preview_save_failed">Impossibile salvare la preferenza delle anteprime. Riprova.</string>
 </resources>

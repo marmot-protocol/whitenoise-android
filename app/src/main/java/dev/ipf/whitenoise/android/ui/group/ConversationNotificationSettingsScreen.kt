@@ -24,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.notifications.AndroidNotificationSettingsTarget
+import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsLaunchAttempt
@@ -175,6 +176,7 @@ internal fun ConversationNotificationSettingsScreen(
 }
 
 /** Resolves routing and Android-owned launch targets as one lifecycle-cancellable pass. */
+@Suppress("LongMethod") // One lifecycle-owned platform-channel preparation.
 @Composable
 private fun NotificationCategoriesSection(
     appState: WhiteNoiseAppState,
@@ -299,7 +301,8 @@ private fun NotificationCategoriesLoadingRow() {
 }
 
 /** Renders prepared category rows and coalesces taps until Android returns control. */
-@Suppress("LongMethod", "LongParameterList") // Lifecycle-owned channel launch and durable alert writes share one scope.
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+// Lifecycle-owned channel launch and durable alert writes share one scope.
 @Composable
 private fun LoadedNotificationCategories(
     appState: WhiteNoiseAppState,
@@ -342,19 +345,24 @@ private fun LoadedNotificationCategories(
                 channel to
                     when {
                         channel in blockedChannels -> stringResource(R.string.notification_system_blocked)
-                        isMuted && channel != NotificationChannelSpec.MENTIONS -> stringResource(R.string.notification_alert_paused)
+                        isMuted && channel != NotificationChannelSpec.MENTIONS ->
+                            stringResource(R.string.notification_alert_paused)
                         else -> ""
                     }
             },
         alertEnabled =
             settings
                 .map(PreparedNotificationCategorySetting::setting)
-                .filter { it.channel in dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences.supportedChannels }
-                .associate { setting ->
+                .filter {
+                    it.channel in ConversationAlertPreferences.supportedChannels
+                }.associate { setting ->
                     setting.channel to
-                        remember(alertState, accountRef, groupIdHex, setting.channel) {
+                        remember(alertState, accountRef, groupIdHex, setting.channel, legacyMode) {
                             preferences.choice(accountRef, groupIdHex, setting.channel)
-                                ?: (setting.channel == NotificationChannelSpec.MENTIONS || legacyMode == ChatNotifyMode.ALL)
+                                ?: (
+                                    setting.channel == NotificationChannelSpec.MENTIONS ||
+                                        legacyMode == ChatNotifyMode.ALL
+                                )
                         }
                 },
         onAlertChange = { setting, enabled ->

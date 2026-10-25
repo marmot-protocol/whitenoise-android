@@ -2528,4 +2528,8 @@
     <string name="setup_finding_outcome_unknown">Результат неизвестен</string>
     <string name="setup_finding_outcome_success">Проверка успешна</string>
     <string name="setup_finding_outcome_failure">Проверка не пройдена</string>
+    <string name="public_jpeg_previews_title">Предпросмотр изображений в чате</string>
+    <string name="public_jpeg_previews_privacy">По умолчанию отключён. Прямые ссылки на JPEG в Blossom могут раскрыть ваш IP-адрес серверу изображений. Предпросмотр использует Wi-Fi без лимита трафика и ваши правила загрузки фото. Обычные ссылки доступны и без предпросмотра.</string>
+    <string name="public_jpeg_preview_image">Предпросмотр JPEG по ссылке</string>
+    <string name="public_jpeg_preview_save_failed">Не удалось сохранить настройку предпросмотра изображений. Попробуйте ещё раз.</string>
 </resources>

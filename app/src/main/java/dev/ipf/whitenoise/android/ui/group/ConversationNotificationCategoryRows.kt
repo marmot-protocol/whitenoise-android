@@ -45,7 +45,9 @@ internal fun ConversationNotificationCategoriesList(
                     onClick = { onOpen(setting) },
                     modifier =
                         Modifier.testTag(
-                            if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS && setting.channel == NotificationChannelSpec.GROUP_MESSAGES) {
+                            if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
+                                setting.channel == NotificationChannelSpec.GROUP_MESSAGES
+                            ) {
                                 PerformanceTestTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS
                             } else {
                                 "open-conversation-notification-${setting.channel.id}"
@@ -64,7 +66,10 @@ internal fun ConversationNotificationCategoriesList(
                         ).joinToString(" · "),
                     busy = pendingChannel == setting.channel,
                     trailing = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             alertEnabled[setting.channel]?.let { enabled ->
                                 Switch(
                                     checked = enabled,

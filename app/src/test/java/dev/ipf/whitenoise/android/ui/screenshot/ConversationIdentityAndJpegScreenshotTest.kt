@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
@@ -57,6 +58,7 @@ class ConversationIdentityAndJpegScreenshotTest {
         assertEquals(alice, composerSendingAccount(state, "alice"))
     }
 
+    @Suppress("LongMethod") // One captured fixture with popup/back/draft assertions.
     private fun render(
         dark: Boolean,
         amoled: Boolean,
@@ -75,7 +77,8 @@ class ConversationIdentityAndJpegScreenshotTest {
                 unregister
             }
         composeRule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides direction, LocalCursorBlinkEnabled provides false) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 1.6f else 1f) {
                     Surface(Modifier.width(360.dp).testTag("polish-preview")) {
                         Column {

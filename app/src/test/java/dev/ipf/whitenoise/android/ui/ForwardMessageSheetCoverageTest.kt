@@ -79,7 +79,12 @@ class ForwardMessageSheetCoverageTest {
         assertTrue("remember(dataSource.targets, dataSource.targetsRevision, originGroupIdHex)" in content)
         assertTrue("ErrorContent(" in targetList && "InlineErrorBanner(" in targetList)
         assertTrue("onRetry = retryLoad" in targetList)
-        assertTrue("Modifier.semantics { this.selected = selected }" in targetRow)
+        assertTrue("ChatRow(" in targetRow && "selectionMode = true" in targetRow)
+        assertTrue("selected = selected" in targetRow)
+        assertTrue(
+            "Modifier.fillMaxWidth().semantics { this.selected = selected }" in
+                sourceFile("ui/chats/ChatRow.kt").readText(),
+        )
     }
 
     /** Account and chat identifiers must never enter the plain saved-state Bundle. */
@@ -90,12 +95,14 @@ class ForwardMessageSheetCoverageTest {
         assertFalse("rememberSaveable" in sheet)
     }
 
-    /** Member previews resolve through the owner-scoped nickname cache. */
+    /** Forwarding delegates presentation to Home with the originating owner, including private nickname resolution. */
     @Test
     fun groupMemberPreviewsUsePrivateContactNicknames() {
         val body = forwardPickerSource().readText().functionBody("ForwardTargetRow")
 
-        assertTrue("appState.contactDisplayNameCached(ownerAccountRef, memberIdHex)" in body)
+        assertTrue("accountRef = ownerAccountRef" in body && "ownerAccountIdHex = ownerAccountIdHex" in body)
+        val home = sourceFile("ui/chats/ChatRow.kt").readText()
+        assertTrue("appState.contactDisplayNameCached(accountRef, it)" in home)
         assertFalse("appState.chatMemberTitleCached(" in body)
     }
 

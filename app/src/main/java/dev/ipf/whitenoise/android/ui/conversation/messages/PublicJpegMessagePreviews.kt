@@ -48,9 +48,12 @@ internal fun publicJpegPreviewOwnerCurrent(
 ): Boolean =
     appState.activeAccountRef == accountRef &&
         appState.runtimeGeneration == generation &&
-        appState.accounts.any { it.label == accountRef && it.accountIdHex == accountId && it.isSignedInSigningAccount() }
+        appState.accounts.any {
+            it.label == accountRef && it.accountIdHex == accountId && it.isSignedInSigningAccount()
+        }
 
 /** Only top-level prose destinations; quotes/code/spoiler blocks never initiate automatic requests. */
+@Suppress("CyclomaticComplexMethod") // Bounded typed-inline traversal; quotes/code/spoilers are never visited.
 internal fun publicJpegPreviewUrls(document: MarkdownDocumentFfi?): List<String> {
     val urls = linkedSetOf<String>()
     var inspected = 0
@@ -96,16 +99,25 @@ internal fun PublicJpegMessagePreviews(
 ) {
     val preferences = appState.publicJpegPreviewPreferences
     val choices by preferences.state.collectAsStateWithLifecycle()
+    val networkTypes by appState.publicJpegPreviewNetworkTypes.collectAsStateWithLifecycle()
+    val connectivity by appState.connectivitySignals.collectAsStateWithLifecycle()
+    val policy =
+        listOf(
+            networkTypes,
+            connectivity.hasValidatedInternet,
+            appState.mediaAutoDownloadMatrix,
+            appState.automaticAttachmentDownloadsPaused(),
+        )
     val accountId = appState.accounts.firstOrNull { it.label == accountRef && !it.signedOut }?.accountIdHex
     val enabled = accountId != null && choices[accountId] == true
     val urls = remember(document) { publicJpegPreviewUrls(document) }
     val generation = appState.runtimeGeneration
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var images by remember(accountRef, messageId, urls, enabled, generation, accountId) {
+    var images by remember(accountRef, messageId, urls, enabled, generation, accountId, policy) {
         mutableStateOf<List<ImageBitmap>>(emptyList())
     }
-    LaunchedEffect(accountRef, messageId, urls, enabled, generation, accountId, lifecycle) {
-        if (!enabled || accountRef == null || accountId == null || urls.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(accountRef, messageId, urls, enabled, generation, accountId, lifecycle, policy) {
+        if (!enabled || accountRef == null || urls.isEmpty()) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             val jobContext = currentCoroutineContext()
             val allowed = {
@@ -122,7 +134,9 @@ internal fun PublicJpegMessagePreviews(
                                 owner = "$generation:$accountId",
                                 url = url,
                                 allowed = allowed,
-                                fetch = { target, maxBytes -> appState.marmot().downloadProfileImage(target, maxBytes) },
+                                fetch = { target, maxBytes ->
+                                    appState.marmot().downloadProfileImage(target, maxBytes)
+                                },
                             )?.asImageBitmap()
                     }
                 if (allowed()) images = loaded
@@ -140,8 +154,8 @@ internal fun PublicJpegPreviewImage(image: ImageBitmap) {
         contentScale = ContentScale.Fit,
         modifier =
             Modifier
-                .widthIn(max = 280.dp)
-                .heightIn(max = 240.dp)
+                .widthIn(max = previewWidth)
+                .heightIn(max = previewHeight)
                 .clip(MaterialTheme.shapes.medium)
                 .testTag("message-public-jpeg-preview"),
     )

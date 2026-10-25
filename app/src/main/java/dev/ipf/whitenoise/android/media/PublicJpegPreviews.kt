@@ -42,16 +42,9 @@ private val multiPictureMagic = byteArrayOf(0x4d, 0x50, 0x46, 0)
 internal fun publicJpegDigest(raw: String): String? =
     runCatching {
         val uri = URI(raw)
-        if (raw.length > MAX_LOCATOR_LENGTH ||
-            uri.scheme != "https" ||
-            uri.host.isNullOrBlank() ||
-            uri.rawUserInfo != null ||
-            uri.rawQuery != null ||
-            uri.rawFragment != null ||
-            uri.port !in listOf(-1, HTTPS_PORT)
-        ) {
-            return null
-        }
+        val publicDestination = uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.port in listOf(-1, HTTPS_PORT)
+        val unadorned = uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null
+        if (raw.length > MAX_LOCATOR_LENGTH || !publicDestination || !unadorned) return null
         Regex("^/([0-9a-fA-F]{64})(?:\\.jpe?g)?$")
             .matchEntire(uri.rawPath)
             ?.groupValues
@@ -68,7 +61,8 @@ internal fun publicJpegPayloadMatches(
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) } == digest
 
 /** Every segment and entropy escape is bounded; trailing images/data and MPO never enter a codec. */
-@Suppress("ReturnCount") // Reject malformed boundaries before the next read or codec admission.
+@Suppress("ReturnCount", "CyclomaticComplexMethod", "LoopWithTooManyJumpStatements")
+// Keep the bounded marker/entropy state machine together; every rejection precedes its next read.
 private fun isStaticJpegEnvelope(bytes: ByteArray): Boolean {
     fun byte(index: Int) = bytes[index].toInt() and JPEG_PREFIX
     if (byte(0) != JPEG_PREFIX || byte(1) != JPEG_SOI) return false
@@ -114,22 +108,23 @@ internal class PublicJpegPreviewPreferences(
     context: Context,
 ) {
     private val preferences = context.getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
-    private val choices = MutableStateFlow(preferences.all.mapNotNull { (k, v) -> (v as? Boolean)?.let { k to it } }.toMap())
+    private val choices =
+        MutableStateFlow(preferences.all.mapNotNull { (k, v) -> (v as? Boolean)?.let { k to it } }.toMap())
     val state = choices.asStateFlow()
     private var retainedAccountIds: Set<String>? = null
 
     fun enabled(accountRef: String): Boolean = choices.value[accountRef] == true
 
     /** Account removal revokes consent immediately and prunes its device-local preference. */
-    fun retainAccounts(accountIds: Collection<String>) {
+    fun retainAccounts(accountIds: Collection<String>): Set<String> =
         synchronized(this) {
             val keep = accountIds.toSet()
             retainedAccountIds = keep
             val removed = choices.value.keys - keep
             choices.value = choices.value.filterKeys { it in keep }
             preferences.edit().also { editor -> removed.forEach(editor::remove) }.apply()
+            removed
         }
-    }
 
     /** Synchronous OFF admission barrier before the UI launches its durable write. */
     fun revoke(accountId: String) {
@@ -177,8 +172,16 @@ internal class PublicJpegPreviewLoader {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>): Boolean = size > FAILURE_ENTRIES
         }
 
-    fun clearPixels() = pixels.evictAll()
+    fun clearPixels(accountId: String) {
+        pixels
+            .snapshot()
+            .keys
+            .filter { it.split(':').getOrNull(1) == accountId }
+            .forEach(pixels::remove)
+    }
 
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
+    // One serialized, cancellable acquisition and admission boundary.
     suspend fun load(
         owner: String,
         url: String,
@@ -203,16 +206,19 @@ internal class PublicJpegPreviewLoader {
                         val bytes = fetch(url, PUBLIC_JPEG_MAX_BYTES.toULong())
                         if (!admitted() || !publicJpegPayloadMatches(bytes, digest)) return@withTimeoutOrNull null
                         val info = IsolatedMediaDecoder.inspect(bytes) ?: return@withTimeoutOrNull null
-                        if (info.mime != "image/jpeg" ||
-                            info.width !in 1..MAX_EDGE ||
-                            info.height !in 1..MAX_EDGE ||
-                            info.width.toLong() * info.height > MAX_PIXELS
-                        ) {
-                            return@withTimeoutOrNull null
-                        }
+                        val dimensionsAllowed =
+                            info.width in 1..MAX_EDGE &&
+                                info.height in 1..MAX_EDGE &&
+                                info.width.toLong() * info.height <= MAX_PIXELS
+                        if (info.mime != "image/jpeg" || !dimensionsAllowed) return@withTimeoutOrNull null
                         val image = IsolatedMediaDecoder.decode(bytes, edge = PREVIEW_DECODE_EDGE, oriented = true)
-                        image?.takeIf { admitted() }?.also { pixels.put(key, it) }
-                    }.also { if (it == null && !policyRejected && allowed()) failures[key] = SystemClock.elapsedRealtime() }
+                        image?.takeIf { admitted() }?.also {
+                            pixels.put(key, it)
+                            if (!admitted()) pixels.remove(key)
+                        }
+                    }.also {
+                        if (it == null && !policyRejected && allowed()) failures[key] = SystemClock.elapsedRealtime()
+                    }
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: Exception) {

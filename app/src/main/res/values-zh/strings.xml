@@ -2419,4 +2419,8 @@
     <string name="setup_finding_outcome_unknown">结果未知</string>
     <string name="setup_finding_outcome_success">检查成功</string>
     <string name="setup_finding_outcome_failure">检查失败</string>
+    <string name="public_jpeg_previews_title">聊天内图片预览</string>
+    <string name="public_jpeg_previews_privacy">默认关闭。直接访问 Blossom JPEG 链接可能会向图片服务器透露你的 IP 地址。预览仅使用不按流量计费的 Wi-Fi，并遵循你的照片下载规则。关闭后仍可打开普通链接。</string>
+    <string name="public_jpeg_preview_image">链接的 JPEG 预览</string>
+    <string name="public_jpeg_preview_save_failed">无法保存图片预览设置，请重试。</string>
 </resources>

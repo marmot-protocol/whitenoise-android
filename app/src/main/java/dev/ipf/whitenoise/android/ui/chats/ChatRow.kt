@@ -352,7 +352,9 @@ internal fun ChatRow(
                     accountRef = accountRef,
                     fallbackPictureUrl =
                         avatarAccount?.let {
-                            appState.privateContactAvatarSource(it, accountRef) ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
+                            appState.privateContactAvatarSource(it, accountRef)
+                                ?: item.selectedAvatarUrl
+                                ?: appState.avatarUrl(it)
                         },
                     firstFrameAvatar = item.firstFrameAvatar,
                     durableAvatar = item.selectedAvatarAsset,
@@ -436,7 +438,9 @@ internal fun ChatRow(
                                     empty = stringResource(R.string.no_messages_yet),
                                     // Names the affected member and refreshes when their profile loads (#1581).
                                     groupSystemNames =
-                                        GroupSystemPreviewNames(activeAccountIdHex) { appState.contactDisplayNameCached(accountRef, it) },
+                                        GroupSystemPreviewNames(activeAccountIdHex) {
+                                            appState.contactDisplayNameCached(accountRef, it)
+                                        },
                                 )
                         },
                     )

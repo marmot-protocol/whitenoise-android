@@ -2452,4 +2452,8 @@
     <string name="setup_finding_outcome_unknown">Sonuç bilinmiyor</string>
     <string name="setup_finding_outcome_success">Kontrol başarılı</string>
     <string name="setup_finding_outcome_failure">Kontrol başarısız</string>
+    <string name="public_jpeg_previews_title">Sohbet içi görsel önizlemeleri</string>
+    <string name="public_jpeg_previews_privacy">Varsayılan olarak kapalıdır. Doğrudan Blossom JPEG bağlantıları IP adresinizi görsel sunucusuna gösterebilir. Önizlemeler, ölçülmeyen Wi-Fi bağlantısını ve fotoğraf indirme kurallarınızı kullanır. Kapalıyken normal bağlantılar kullanılabilir.</string>
+    <string name="public_jpeg_preview_image">Bağlantılı JPEG önizlemesi</string>
+    <string name="public_jpeg_preview_save_failed">Görsel önizleme ayarı kaydedilemedi. Lütfen tekrar deneyin.</string>
 </resources>

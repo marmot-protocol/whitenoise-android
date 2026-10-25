@@ -686,7 +686,8 @@ internal fun ComposerPill(
     }
     val sendingIdentityWidth = if (sendingIdentity != null) composerSendingIdentityTargetSize else 0.dp
     val leadingControlsWidth = (if (hasAttachmentAction) 80.dp else 40.dp) + 48.dp + sendingIdentityWidth
-    val compactEditorStartInset = (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp + 8.dp + sendingIdentityWidth
+    val compactEditorStartInset =
+        (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp + 8.dp + sendingIdentityWidth
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
             (if (trailingAction != null) 40.dp else 0.dp)

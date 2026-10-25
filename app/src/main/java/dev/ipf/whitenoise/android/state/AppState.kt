@@ -7562,8 +7562,9 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
-            publicJpegPreviewLoader.clearPixels()
-            publicJpegPreviewPreferences.retainAccounts(accounts.filter { it.label != wipedRef }.map { it.accountIdHex })
+            publicJpegPreviewPreferences
+                .retainAccounts(accounts.filter { it.label != wipedRef }.map { it.accountIdHex })
+                .forEach(publicJpegPreviewLoader::clearPixels)
             withContext(NonCancellable + Dispatchers.IO) {
                 val alertsCleared =
                     runCatching {
@@ -8939,15 +8940,23 @@ class WhiteNoiseAppState private constructor(
      * synchronous binder IPCs per call (#984).
      */
     internal fun publicJpegPreviewNetworkAllowed(): Boolean =
-        activeNetworkTypesSnapshot == setOf(MediaAutoDownloadNetwork.WiFi) &&
+        hasValidatedInternet() &&
+            activeNetworkTypesSnapshot == setOf(MediaAutoDownloadNetwork.WiFi) &&
             shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
 
     private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> = activeNetworkTypesSnapshot
 
     // Callback-maintained mirror of the default network's state, volatile so
     // composition-time reads see the connectivity thread's latest write.
+    private val previewNetworkTypesMutable = MutableStateFlow<Set<MediaAutoDownloadNetwork>>(emptySet())
+    internal val publicJpegPreviewNetworkTypes = previewNetworkTypesMutable.asStateFlow()
+
     @Volatile
     private var activeNetworkTypesSnapshot: Set<MediaAutoDownloadNetwork> = emptySet()
+        set(value) {
+            field = value
+            previewNetworkTypesMutable.value = value
+        }
 
     @Volatile
     private var hasActiveNetworkSnapshot = false

@@ -20,6 +20,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -112,6 +113,13 @@ class GroupDetailsEditNavigationTest {
             .performClick()
         val messagesTag = "conversation-alert-messages_group"
         val reactionsTag = "conversation-alert-reactions_v2"
+        // Capture the prepared category rows, not the transient delivery-only fallback.
+        composeRule.waitUntil(5_000) {
+            composeRule
+                .onAllNodesWithTag("open-conversation-notification-messages_group")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         composeRule.onNodeWithTag(messagesTag).assertIsOn()
         composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
         visualErrors.checkSucceeds {

@@ -43,7 +43,6 @@ class DataUsageScreenBehaviorTest {
     /** Starts from cleared preferences so the matrix is the shipped default and nothing is paused. */
     @Test
     fun publicLinkPreviewsStartOffAndPersistForOnlyTheSendingAccount() {
-        composeRule.setContent { WhiteNoiseTheme { DataUsageScreen(appState, onBack = {}) } }
         composeRule.onNodeWithTag("data_usage.public_jpeg_previews").performClick()
         composeRule.waitUntil { appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) }
         assertFalse(appState.publicJpegPreviewPreferences.enabled("another-account"))
