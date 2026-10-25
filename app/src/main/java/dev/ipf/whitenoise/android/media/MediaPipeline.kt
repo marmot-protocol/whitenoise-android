@@ -473,16 +473,18 @@ object MediaPipeline {
     /**
      * Open an isolated GIF/WebP frame stream. The returned drawable contains owned pixels only.
      * Static, unreadable and unadmitted sources never reach the native animated decoder.
+     * Only bounded group-thumbnail owners opt into interruptible waiting for decorative admission.
      */
     fun decodeAnimatedDrawable(
         bytes: ByteArray,
         maxEdgePx: Int = ANIMATED_IMAGE_MAX_EDGE_PX,
         decorative: Boolean = false,
+        waitForDecorativeAdmission: Boolean = false,
     ): Drawable? {
         if (bytes.isEmpty()) return null
         return decodeAdmittedNativeAnimation(bytes) {
             dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                .animation(bytes, maxEdgePx, decorative)
+                .animation(bytes, maxEdgePx, decorative, waitForDecorativeAdmission)
         }
     }
 

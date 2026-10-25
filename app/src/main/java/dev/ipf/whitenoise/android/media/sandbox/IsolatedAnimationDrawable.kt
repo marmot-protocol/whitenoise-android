@@ -7,13 +7,18 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
+import dev.ipf.whitenoise.android.media.PreemptibleAnimation
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.first
 
 /** Displays only owned raw pixels. No ImageDecoder or compressed bytes exist in this drawable. */
+@Suppress("TooManyFunctions") // Drawable/Animatable overrides and retirement belong to the same pixel owner.
 internal class IsolatedAnimationDrawable(
     private var frame: Bitmap,
     private val session: AnimationSessionControl,
 ) : Drawable(),
     Animatable,
+    PreemptibleAnimation,
     java.io.Closeable {
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private var running = false
@@ -57,6 +62,11 @@ internal class IsolatedAnimationDrawable(
     override fun stop() {
         running = false
         session.pause()
+    }
+
+    /** Only an explicit-viewer takeover permits the owner to request a replacement decoder. */
+    override suspend fun awaitPreemption() {
+        session.preempted?.first { it } ?: awaitCancellation()
     }
 
     fun accept(next: Bitmap) {

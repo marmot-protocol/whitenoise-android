@@ -36,7 +36,11 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.MAX_ANIMATED_PROFILE_AVATAR_EDGE
 import dev.ipf.whitenoise.android.core.PROFILE_AVATAR_MAX_DIMENSION
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.PreemptibleAnimation
 import kotlin.math.roundToInt
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** Test tag on the animated layer, present only while a decoded animation is attached. */
 internal const val ANIMATED_PROFILE_AVATAR_TAG = "animated-profile-avatar"
@@ -91,13 +95,20 @@ internal suspend fun decodeAnimatedProfileAvatar(
         discard = { (it as? java.io.Closeable)?.close() },
     )
 
-/** Decorative thumbnails yield the single isolated worker to explicit media use. */
+/** Bounded group thumbnails wait for confirmed retirement and yield the worker to explicit media use. */
 internal suspend fun decodeAnimatedGroupThumbnail(
     source: ByteArray,
     maxEdgePx: Int,
 ): Drawable? =
     dev.ipf.whitenoise.android.media.decodeOwnedMedia(
-        decode = { MediaPipeline.decodeAnimatedDrawable(source, maxEdgePx, decorative = true) },
+        decode = {
+            MediaPipeline.decodeAnimatedDrawable(
+                source,
+                maxEdgePx,
+                decorative = true,
+                waitForDecorativeAdmission = true,
+            )
+        },
         discard = { (it as? java.io.Closeable)?.close() },
     )
 
@@ -159,14 +170,12 @@ internal fun AnimatedProfileAvatarLayer(
     val drawable by produceState<Drawable?>(null, source, maxEdgePx, animate) {
         value = null
         if (animate) {
-            val produced =
-                dev.ipf.whitenoise.android.state
-                    .runCatchingCancellable {
-                        decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))
-                    }.getOrNull()
-            value = produced
-            if (produced == null) onDecodeUnavailable()
-            awaitDispose { (produced as? java.io.Closeable)?.close() }
+            playAvatarAnimation(
+                resumeAfterPreemption = groupThumbnail,
+                decode = { decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE)) },
+                publish = { value = it },
+                onDecodeUnavailable = onDecodeUnavailable,
+            )
         }
     }
     Box(
@@ -190,6 +199,36 @@ internal fun AnimatedProfileAvatarLayer(
             contentScale = contentScale,
             modifier = Modifier.matchParentSize().testTag(ANIMATED_PROFILE_AVATAR_TAG),
         )
+    }
+}
+
+/** Reopens only viewer-preempted group sessions; cancellation and failed codecs never become retry loops. */
+private suspend fun playAvatarAnimation(
+    resumeAfterPreemption: Boolean,
+    decode: suspend () -> Drawable?,
+    publish: (Drawable?) -> Unit,
+    onDecodeUnavailable: () -> Unit,
+) {
+    while (true) {
+        val produced =
+            dev.ipf.whitenoise.android.state
+                .runCatchingCancellable { decode() }.getOrNull()
+        try {
+            currentCoroutineContext().ensureActive()
+            publish(produced)
+            if (produced == null) {
+                onDecodeUnavailable()
+                return
+            }
+            if (resumeAfterPreemption && produced is PreemptibleAnimation) {
+                produced.awaitPreemption()
+            } else {
+                awaitCancellation()
+            }
+        } finally {
+            publish(null)
+            (produced as? java.io.Closeable)?.close()
+        }
     }
 }
 

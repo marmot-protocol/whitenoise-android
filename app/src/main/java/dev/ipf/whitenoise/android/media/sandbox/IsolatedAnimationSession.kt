@@ -19,6 +19,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** One outstanding frame and one actual isolated process across account generations. */
 @Suppress("TooManyFunctions") // One capability/binding lifetime, never a second decode or image cache.
@@ -27,6 +29,11 @@ internal class IsolatedAnimationSession private constructor(
     private val edge: Int,
     private val admissionLease: AnimationAdmission.Lease,
 ) : AnimationSessionControl {
+    private val viewerPreemption = MutableStateFlow(false)
+
+    /** Observers may queue a replacement after viewer takeover, never manufacture worker death. */
+    override val preempted = viewerPreemption.asStateFlow()
+
     private val id = ids.incrementAndGet()
     private val output = SharedMemory.create("animation-pixels", requireNotNull(MediaDecodePolicy.outputCapacity(edge)))
     private val lock = Any()
@@ -324,6 +331,12 @@ internal class IsolatedAnimationSession private constructor(
         // on timeout/unbind alone or fabricate a death acknowledgement.
     }
 
+    /** Retires this decorative session before allowing its still-visible owner to queue again. */
+    private fun yieldToViewer() {
+        close()
+        viewerPreemption.value = true
+    }
+
     companion object {
         private val ids = AtomicInteger()
         private val admission = AnimationAdmission()
@@ -332,11 +345,13 @@ internal class IsolatedAnimationSession private constructor(
                 .AtomicReference<IsolatedAnimationSession?>()
         private val callbackHandler by lazy { Handler(HandlerThread("animation-ipc").apply { start() }.looper) }
 
+        /** Opens one admitted worker; waiting group thumbnails remain cancellable before any binding. */
         fun create(
             context: Context,
             bytes: ByteArray,
             edge: Int,
             decorative: Boolean = false,
+            waitForDecorativeAdmission: Boolean = false,
         ): IsolatedAnimationDrawable? {
             val validSource =
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
@@ -344,6 +359,8 @@ internal class IsolatedAnimationSession private constructor(
             val admissionLease =
                 if (Looper.myLooper() == Looper.getMainLooper() || !validSource) {
                     null
+                } else if (decorative && waitForDecorativeAdmission) {
+                    admission.awaitDecorative()
                 } else {
                     admission.acquire(decorative, MediaDecodePolicy.DEADLINE_MS)
                 }
@@ -354,7 +371,7 @@ internal class IsolatedAnimationSession private constructor(
                 val created = IsolatedAnimationSession(context.applicationContext, edge, admissionLease)
                 session = created
                 active.set(created)
-                admissionLease.onRetire { created.close() }
+                admissionLease.onRetire { created.yieldToViewer() }
                 created.open(bytes).also { delivered = it }
             } finally {
                 // The facade handles failure/cancellation; this scope only owns cleanup.

@@ -147,14 +147,18 @@ internal object IsolatedMediaDecoder {
         edge: Int,
     ): Bitmap? = safely { it.region(bytes, region, edge) }
 
+    /** Preserves interactive priority while bounded group callers may wait for worker retirement. */
     fun animation(
         bytes: ByteArray,
         edge: Int,
         decorative: Boolean = false,
+        waitForDecorativeAdmission: Boolean = false,
     ): android.graphics.drawable.Drawable? =
         safely {
             if (it is IsolatedMediaTransport || it is ReusableMediaTransport) {
-                installedContext?.let { context -> IsolatedAnimationSession.create(context, bytes, edge, decorative) }
+                installedContext?.let { context ->
+                    IsolatedAnimationSession.create(context, bytes, edge, decorative, waitForDecorativeAdmission)
+                }
             } else {
                 it.animation(bytes, edge)
             }
