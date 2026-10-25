@@ -28,6 +28,19 @@ Native temporary allocations are not bounded solely by output dimensions. Worker
 
 Android media services perform platform extraction and codec work, but their JNI/Binder clients remain in the app process. Descriptor bounds and serialized deadlines reduce exposure; they do not provide the image worker’s UID/private-data/network boundary. Platform metadata is validated and waveforms must contain exactly 64 finite normalized values.
 
+Received-audio transcription reads an already materialized attachment through a
+separate serialized platform-codec adapter. It converts admitted mono/stereo
+PCM16 to 16 kHz mono, preserving the resampling phase across codec buffers, and
+feeds one continuous descriptor-backed request to the explicitly selected Offline
+Speech to Text service on Android 13+. Closing the writer after successful decoder
+EOF completes the utterance. Decode/feed errors and unrecognized audio cannot
+produce a successful partial transcript. The provider owns its downloaded model;
+White Noise neither captures microphone audio nor falls back to another recognizer.
+Transcripts remain transient dialog state and are cleared on dismissal, background,
+source disposal or account/chat replacement. This path does not add MDK persistence
+or claim permissionless decoder isolation. Run `MED-038` against the exact provider
+and candidate APK; source contracts alone do not prove recognition compatibility.
+
 HEIF/HEIC is not qualified by the JPEG/PNG tests. Some Android image implementations internally need media services unavailable to an isolated UID. Such formats fail closed if unsupported, without an app-process image fallback.
 
 ## Automatic versus explicit parsing
