@@ -41,8 +41,7 @@ class PersonGroupsMembershipAuthorityTest {
         fixture.hold(fixture.slow.id)
         try {
             mount(fixture, mutableStateOf(listOf(fixture.slow, fixture.fast)), mounted)
-            val slowReadEntered = fixture.entered.getValue(fixture.slow.id)
-            assertTrue(slowReadEntered.await(NATIVE_AUTHORITY_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+            assertTrue(fixture.entered.getValue(fixture.slow.id).await(5, TimeUnit.SECONDS))
             awaitMenu(fixture, fixture.fast.id)
             rule.onNodeWithTag("groups_in_common.menu.${fixture.slow.id}").assertDoesNotExist()
             assertEquals(1L, fixture.releases.getValue(fixture.slow.id).count)
@@ -61,7 +60,7 @@ class PersonGroupsMembershipAuthorityTest {
         try {
             mount(fixture, mutableStateOf(listOf(fixture.slow, fixture.fast)), mounted)
             awaitMenu(fixture, fixture.fast.id)
-            rule.waitUntil(NATIVE_AUTHORITY_TIMEOUT_MILLIS) {
+            rule.waitUntil(5_000) {
                 rule.onAllNodesWithTag("groups_in_common.retry").fetchSemanticsNodes().isNotEmpty()
             }
             rule.onNodeWithText("Slow group").assertIsDisplayed()
@@ -136,7 +135,7 @@ class PersonGroupsMembershipAuthorityTest {
         try {
             mount(fixture, mutableStateOf(listOf(fixture.fast, fixture.slow)), mounted)
             awaitMenu(fixture, fixture.fast.id)
-            rule.waitUntil(NATIVE_AUTHORITY_TIMEOUT_MILLIS) {
+            rule.waitUntil(5_000) {
                 rule.onAllNodesWithTag("groups_in_common.retry").fetchSemanticsNodes().isNotEmpty()
             }
             val retry = rule.onNodeWithTag("groups_in_common.retry").captureClickCallbackForReplay()
@@ -204,12 +203,9 @@ class PersonGroupsMembershipAuthorityTest {
         rule.onNodeWithText(fixture.fast.id).assertDoesNotExist()
     }
 
-    /**
-     * Native IO resumes the process mutation scope on Android Main, outside the Compose clock. The wait returns as
-     * soon as [condition] holds, within [NATIVE_AUTHORITY_TIMEOUT_MILLIS] of wall-clock time.
-     */
+    /** Native IO resumes the process mutation scope on Android Main, outside the Compose clock. */
     private fun awaitAuthority(condition: () -> Boolean) {
-        rule.waitUntil(NATIVE_AUTHORITY_TIMEOUT_MILLIS) {
+        rule.waitUntil(5_000) {
             Shadows.shadowOf(Looper.getMainLooper()).idle()
             rule.waitForIdle()
             condition()
@@ -275,12 +271,5 @@ class PersonGroupsMembershipAuthorityTest {
 
     companion object {
         private const val MAX_AUTHORITY_DIAGNOSTIC_CHARS = 4_000
-
-        /**
-         * Wall-clock bound for waits on real native reads. A cold native start on a loaded CI runner stretched these
-         * past the former five seconds while the same reads finish in about 0.1 s locally, so a passing run never
-         * waits this long, and a real hang still fails with the authority diagnostics above.
-         */
-        private const val NATIVE_AUTHORITY_TIMEOUT_MILLIS = 30_000L
     }
 }
