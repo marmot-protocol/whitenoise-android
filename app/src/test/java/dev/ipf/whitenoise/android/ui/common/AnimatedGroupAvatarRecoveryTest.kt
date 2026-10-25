@@ -138,7 +138,10 @@ class AnimatedGroupAvatarRecoveryTest {
     }
 
     /** Raw-pixel drawable whose explicit preemption and cleanup are observable without a native codec. */
-    private class TestAnimation : Drawable(), PreemptibleAnimation, java.io.Closeable {
+    private class TestAnimation :
+        Drawable(),
+        PreemptibleAnimation,
+        java.io.Closeable {
         val preempted = CompletableDeferred<Unit>()
         var closed = false
 
