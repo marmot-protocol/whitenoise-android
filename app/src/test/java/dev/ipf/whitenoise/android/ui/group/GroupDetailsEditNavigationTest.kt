@@ -6,21 +6,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -45,8 +41,6 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
-import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -644,127 +638,6 @@ class GroupDetailsEditNavigationTest {
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
-class GroupDetailsNotificationControlsTest {
-    @get:Rule
-    val composeRule = createComposeRule()
-
-    @get:Rule
-    val visualErrors = ErrorCollector()
-
-    private val context: Context = ApplicationProvider.getApplicationContext()
-
-    /** New groups keep All; independent device switches can retain mentions-only and restore All. */
-    @Test
-    fun newGroupStartsWithAllAndCanChooseOnlyMentions() = verifyCategoryControls()
-
-    @Test
-    fun notificationCategoryControlsDark() = verifyCategoryControls(darkTheme = true, suffix = "_dark")
-
-    @Test
-    fun notificationCategoryControlsAmoled() {
-        verifyCategoryControls(darkTheme = true, amoled = true, suffix = "_amoled")
-    }
-
-    private fun verifyCategoryControls(
-        darkTheme: Boolean = false,
-        amoled: Boolean = false,
-        suffix: String = "",
-    ) {
-        listOf("whitenoise.chat_mute", "whitenoise.conversation_alerts").forEach { name ->
-            context
-                .getSharedPreferences(name, Context.MODE_PRIVATE)
-                .edit()
-                .clear()
-                .commit()
-        }
-        val fixture = controller(group())
-        val groupId = fixture.controller.group.groupIdHex
-        render(fixture, darkTheme = darkTheme, amoled = amoled)
-        composeRule
-            .onNodeWithText(context.getString(R.string.sounds_and_notifications))
-            .performScrollTo()
-            .performClick()
-        val messagesTag = "conversation-alert-messages_group"
-        val reactionsTag = "conversation-alert-reactions_v2"
-        // Capture the prepared category rows, not the transient delivery-only fallback.
-        composeRule.waitUntil(5_000) {
-            composeRule
-                .onAllNodesWithTag("open-conversation-notification-messages_group")
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOn()
-        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
-        visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all$suffix.png")
-        }
-        composeRule.onNodeWithTag(messagesTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false &&
-                alertControlReady(messagesTag, ToggleableState.Off)
-        }
-        composeRule.onNodeWithTag(reactionsTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false &&
-                alertControlReady(reactionsTag, ToggleableState.Off)
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOff()
-        composeRule.onNodeWithTag(reactionsTag).assertIsOff()
-        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
-        visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions$suffix.png")
-        }
-        val restored = ConversationAlertPreferences(context)
-        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES))
-        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS))
-        composeRule.onNodeWithTag(messagesTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == true &&
-                alertControlReady(messagesTag, ToggleableState.On)
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOn()
-    }
-
-    private fun alertControlReady(
-        tag: String,
-        state: ToggleableState,
-    ): Boolean {
-        val node =
-            composeRule
-                .onAllNodesWithTag(tag)
-                .fetchSemanticsNodes()
-                .singleOrNull()
-                ?.config ?: return false
-        return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
-    }
-
-    private fun render(
-        testController: GroupDetailsTestController,
-        darkTheme: Boolean,
-        amoled: Boolean,
-    ) {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                GroupDetailsScreen(
-                    appState = testController.appState,
-                    controller = testController.controller,
-                    onBack = {},
-                    onLeft = {},
-                    onOpenSearch = null,
-                    onStartGroupWithPeer = {},
-                )
-            }
-        }
-        composeRule.waitForIdle()
-    }
-}
-
-@RunWith(RobolectricTestRunner::class)
-@GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class GroupDetailsConfirmationNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -1099,7 +972,7 @@ private fun testAppState(
         },
     )
 
-private data class GroupDetailsTestController(
+internal data class GroupDetailsTestController(
     val appState: WhiteNoiseAppState,
     val controller: ConversationController,
 )
@@ -1165,3 +1038,6 @@ private fun invokeDetachedReviewClick(action: () -> Boolean) {
         }
     }
 }
+
+/** Reuses the same controller, group and account fixture for independently selected notification tests. */
+internal fun notificationControlsFixture(): GroupDetailsTestController = controller(group())
