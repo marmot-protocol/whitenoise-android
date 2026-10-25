@@ -146,6 +146,7 @@ class AnimatedGroupAvatarRecoveryTest {
             closed = true
         }
 
+        /** Keeps pixel rendering out of this fixture; assertions observe real Compose ownership instead. */
         override fun draw(canvas: Canvas) = Unit
 
         override fun setAlpha(alpha: Int) = Unit
@@ -155,8 +156,10 @@ class AnimatedGroupAvatarRecoveryTest {
         @Deprecated("Deprecated in Java")
         override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 
+        /** Provides measurable geometry without allocating a bitmap or invoking a platform decoder. */
         override fun getIntrinsicWidth(): Int = 2
 
+        /** Matches the synthetic two-frame source dimensions so layout does not require a native codec. */
         override fun getIntrinsicHeight(): Int = 2
     }
 
