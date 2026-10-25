@@ -176,6 +176,7 @@ internal class IsolatedAnimationSession private constructor(
             }
         }
 
+    /** Stages source IO outside the capability lock and returns no drawable when startup is retired. */
     private fun open(bytes: ByteArray): IsolatedAnimationDrawable? {
         synchronized(lock) {
             if (closed) {
@@ -199,26 +200,8 @@ internal class IsolatedAnimationSession private constructor(
                 false
             }
         return if (available) {
-            sources.withInput(bytes) { input ->
-                remote?.send(
-                    Message.obtain().apply {
-                        what = AnimationFrameProtocol.OPEN
-                        arg1 = id
-                        replyTo = this@IsolatedAnimationSession.callback
-                        data =
-                            android.os.Bundle().apply {
-                                putInt("edge", edge)
-                                putParcelable("input", input)
-                                putParcelable("output", output)
-                                if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
-                                    val canary = java.io.File(context.filesDir, "media-containment-canary")
-                                    if (canary.isFile) putString("canaryPath", canary.absolutePath)
-                                }
-                            }
-                    },
-                )
-            }
-            val received = firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+            val sent = sources.withInput(bytes, ::sendOpen) == true
+            val received = sent && firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
             synchronized(lock) {
                 if (closed || !received) {
                     null
@@ -235,6 +218,33 @@ internal class IsolatedAnimationSession private constructor(
             null
         }
     }
+
+    /**
+     * Serializes OPEN with [close], so retirement cannot close shared memory during parcel marshalling.
+     * A retired startup returns false; unrelated source/IPC failures still escape without a retry.
+     */
+    private fun sendOpen(input: android.os.ParcelFileDescriptor): Boolean =
+        synchronized(lock) {
+            val target = remote?.takeUnless { closed } ?: return@synchronized false
+            target.send(
+                Message.obtain().apply {
+                    what = AnimationFrameProtocol.OPEN
+                    arg1 = id
+                    replyTo = this@IsolatedAnimationSession.callback
+                    data =
+                        android.os.Bundle().apply {
+                            putInt("edge", edge)
+                            putParcelable("input", input)
+                            putParcelable("output", output)
+                            if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
+                                val canary = java.io.File(context.filesDir, "media-containment-canary")
+                                if (canary.isFile) putString("canaryPath", canary.absolutePath)
+                            }
+                        }
+                },
+            )
+            true
+        }
 
     override fun play() = send(AnimationFrameProtocol.PLAY)
 

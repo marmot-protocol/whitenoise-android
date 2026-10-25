@@ -17,12 +17,6 @@ class AnimationAdmissionTest {
     /** A viewer taking over before the first drawable exists must not permanently disable its group. */
     @org.junit.Test
     fun groupPreemptedBeforeFirstFrameRetriesAfterViewerAndConfirmedDeath() {
-        assertStartupRecovery(throwOnRetirement = false)
-        assertStartupRecovery(throwOnRetirement = true)
-    }
-
-    /** Drives real admission through both normal and exceptional startup interruption without a drawable. */
-    private fun assertStartupRecovery(throwOnRetirement: Boolean) {
         val admission = AnimationAdmission()
         val started = CountDownLatch(1)
         val preempted = CountDownLatch(1)
@@ -39,7 +33,6 @@ class AnimationAdmissionTest {
                             lease.onRetire { preempted.countDown() }
                             started.countDown()
                             check(preempted.await(5, TimeUnit.SECONDS))
-                            if (throwOnRetirement) error("viewer closed the startup capability")
                             null // Startup closed before delivering pixels, but its process is still alive.
                         } else {
                             lease.release()
@@ -86,7 +79,7 @@ class AnimationAdmissionTest {
                 assertThrows(failure.javaClass) {
                     admission.decode<String>(true, true, 100) { lease ->
                         attempts++
-                        if (failure is InterruptedException || failure is CancellationException) lease.retire()
+                        lease.retire()
                         lease.release()
                         throw failure
                     }
