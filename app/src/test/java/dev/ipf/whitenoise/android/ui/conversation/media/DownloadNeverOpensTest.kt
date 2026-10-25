@@ -427,6 +427,11 @@ class DownloadNeverOpensTest {
 
     /** The finished download left nothing open, recorded no open and retired its download intent. */
     private fun assertStillClosed() {
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.runOnIdle {
+                !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
+            }
+        }
         composeRule.runOnIdle {
             assertEquals("a completed download opened the attachment", 0, opens)
             assertFalse(
