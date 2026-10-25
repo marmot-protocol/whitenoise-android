@@ -91,6 +91,68 @@ notification permission retained. The original release APK and all 23 original
 Owner White Noise APKs were unchanged. No application was uninstalled and no
 application data was cleared or restored.
 
+## Ten additional reconnect captures
+
+A further run on the same unchanged isolated APK completed ten unplugged
+reconnect captures, each with five messages and the same fixed 60-second
+screen-off window. No readiness probe or diagnostic hold was added to the
+measurement window. All 50 publications were acknowledged, and all 50 bodies
+appeared in notification records updated before the scheduled screen wake.
+Nine captures passed every prespecified validity check.
+
+| Row | Qualified | All five visible by window + | Coordinator return | Nested native call | Perfetto clock suspend span |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 | Yes | 18.483 s | 1,020 ms | 776 ms | 11.150 s |
+| 2 | Yes | 18.378 s | 371 ms | 124 ms | 13.524 s |
+| 3 | Yes | 22.367 s | 323 ms | 113 ms | 25.569 s |
+| 4 | Yes | 18.914 s | 297 ms | 112 ms | 44.526 s |
+| 5 | Yes | 20.957 s | 351 ms | 112 ms | 44.133 s |
+| 6 | Yes | 18.760 s | 941 ms | 630 ms | 40.781 s |
+| 7 | No: late collector check | 18.200 s | 356 ms | 112 ms | 46.722 s |
+| 8 | Yes | 21.030 s | 505 ms | 111 ms | 33.407 s |
+| 9 | Yes | 19.701 s | 384 ms | 112 ms | 23.776 s |
+| 10 | Yes | 18.663 s | 395 ms | 119 ms | 26.535 s |
+
+Row 7's initial lock-state inspection occurred 8.290 seconds after the window
+started. Although its release call preceded the window by 8.893 seconds and
+its notifications arrived on time, it is excluded from qualified results.
+Thus this run supplies nine valid successes, not ten. With the earlier four
+captures, there are 13 qualified current-runtime captures: 12 ordinary
+reconnects and one probe-assisted reconnect. None reproduced the wake-only
+delay.
+
+Each repeat row retained the same process and foreground service, and recorded
+one recovery attempt with completed callbacks. All ten rows contained 15
+performance events, including completion evidence in the last row, without a
+dropped-event marker. Coordinator returns took 297–1,020 ms; the nested native
+calls took 111–776 ms. Returns preceded the message windows by 3.402–10.155
+seconds. In rows 1 and 6, recovery started after the setup hold was released
+and still returned before the window. No persistent stalled step was observed.
+
+Clock spans cover 79.531–90.033 seconds including setup/finalization; suspend
+totals are not fixed-window totals or app-attributed energy measurements.
+Independent Batterystats elapsed-minus-uptime deltas agree within 2 ms.
+Deep-idle counters increased in nine rows. Row 3 had no light/deep idle counter
+increase and still delivered its complete burst before wake.
+
+The coarse battery-history marker in row 6 places a not-running segment across
+an observed callback return, starting 328 ms before it. These markers cannot
+be treated as exact kernel sleep boundaries. This trace configuration has no
+scheduler or kernel-suspend events, so that overlap does not locate a stalled
+native operation. The native catch-up contract limits below still apply.
+
+Restoration passed again, including the original release and all 23 original
+Owner APK hashes, network settings, notification permission and temporary hold
+release. The retained test profile was stopped and Owner restored. No APK was
+installed or removed, no app data was cleared or restored, and app code was unchanged.
+The synthetic host sender and collection helpers were stopped after retrieval.
+
+These additional successes do not establish that the intermittent release
+failure is fixed or distinguish an Android cause from an MDK cause. The earlier
+failure remains evidence against the older release, while the tested runtime,
+synthetic state and diagnostics differ. There is still no supported behavioral
+repair or battery-saving claim, and #2786 remains open.
+
 ## Interpretation limits and next reproduction
 
 Use an isolated, trusted preview built from the current master runtime. Keep
