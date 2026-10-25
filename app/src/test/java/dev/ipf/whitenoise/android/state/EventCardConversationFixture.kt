@@ -46,8 +46,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * A real conversation controller over a scripted window whose messages may name one previously resolved event card,
  * with native Markdown and a cached-card read that runs [cacheRead] first (#2238). [anchorPage] is the window MDK
  * answers a visible-row report with, [jumpOutcomes] its answers to exact-message jumps, and [seedOptimistic] puts the
- * reader's in-flight sends in place before the controller starts. [compose] draws the controller's published rows
- * the way the conversation screen does and records every card state that composes.
+ * reader's in-flight sends in place before the controller starts. [profileRead] runs before MDK's local profile read
+ * answers, so a test can keep the first presentation unprepared. [compose] draws the controller's published rows the
+ * way the conversation screen does and records every card state that composes.
  */
 internal class EventCardConversationFixture(
     private val composeRule: ComposeContentTestRule,
@@ -57,6 +58,7 @@ internal class EventCardConversationFixture(
     jumpOutcomes: MutableList<ConversationJumpOutcome> = mutableListOf(),
     seedOptimistic: (WhiteNoiseAppState) -> Unit = {},
     private val cacheRead: () -> Unit,
+    private val profileRead: () -> Unit = {},
 ) {
     val cacheReads = AtomicInteger()
 
@@ -153,7 +155,10 @@ internal class EventCardConversationFixture(
         nativeExecutor.shutdownNow()
     }
 
-    /** Answers Markdown and the cached card natively, and fails every other native call as unavailable. */
+    /**
+     * Answers Markdown and the cached card natively, runs [profileRead] before failing the local profile read, and
+     * fails every other native call as unavailable.
+     */
     private fun runtime(): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -172,6 +177,11 @@ internal class EventCardConversationFixture(
                     (args!![1] as List<String>).map(::cachedCardPreview)
                 }
                 "cachedIdentityProjections" -> emptyList<Any>()
+                "userProfile" -> {
+                    // The read the first presentation's profile warm waits on, so holding it holds readiness.
+                    profileRead()
+                    throw IllegalStateException("native call unavailable in this fixture: ${method.name}")
+                }
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "toString" -> "EventCardConversationRuntime"
                 "hashCode" -> System.identityHashCode(proxy)

@@ -12910,6 +12910,14 @@ class ConversationController(
         initialTimelineSeedActive = false
     }
 
+    /**
+     * Suspends until no page is held unpublished for its event cards (#2238). Only a page committed before the first
+     * presentation is ready is held, until readiness, which the card budget bounds, so this returns at once otherwise.
+     */
+    internal suspend fun awaitEventCardHoldReleased() {
+        if (isHoldingInitialPageForEventCards) initialPresentationWarmCoordinator.awaitReady()
+    }
+
     /** Times the page's publication now, or, for a page held for its event cards, when the hold releases it. */
     private fun recordPagePublicationUnlessHeld() {
         if (!isHoldingInitialPageForEventCards) windowPresentationTiming.timelinePublished()
