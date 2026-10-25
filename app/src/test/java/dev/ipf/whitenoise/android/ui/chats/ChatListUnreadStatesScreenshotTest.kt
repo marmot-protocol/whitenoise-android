@@ -4,13 +4,18 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -95,6 +100,50 @@ class ChatListUnreadStatesScreenshotTest {
         }
     }
 
+    /** The same list survives the real asynchronous projection while the exposed AMOLED base stays black. */
+    @Test fun amoledUnreadTransitionKeepsListAndBlackBackground() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        model.beforeSnapshotRead = { releaseRead.await() }
+        rule.setContent {
+            if (mounted.value) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                    ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> })
+                }
+            }
+        }
+        rule.waitForIdle()
+        val listId = rule.onNodeWithTag("chats.list").fetchSemanticsNode().id
+        captureTransitionFrame("before", listId)
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
+        awaitProgress { model.snapshotReads == 1 }
+        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertIsDisplayed()
+        rule.onNodeWithTag("chats.unread_refresh").assertIsDisplayed()
+        captureTransitionFrame("pending", listId)
+        releaseRead.complete(Unit)
+        awaitProgress { rule.onAllNodesWithTag("chat.row.$ACTION_TARGET").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitForIdle()
+        captureTransitionFrame("resolved", listId)
+        rule.onNodeWithTag("chats.unread_filter").performClick()
+        rule.waitForIdle()
+        captureTransitionFrame("cleared", listId)
+    }
+
+    private fun captureTransitionFrame(
+        name: String,
+        listId: Int,
+    ) {
+        assertEquals(listId, rule.onNodeWithTag("chats.list").fetchSemanticsNode().id)
+        rule.onNodeWithTag("chats.folders").assertIsDisplayed()
+        if (name == "pending" || name == "resolved") {
+            rule.onNodeWithTag("chats.unread_filter").assertIsDisplayed()
+        } else {
+            rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+        }
+        val pixels = rule.onNodeWithTag("chats.unread_surface").captureToImage().toPixelMap()
+        assertEquals("AMOLED exposed background at $name", Color.Black, pixels[1, pixels.height - 2])
+        rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_pull_unread_transition_$name.png")
+    }
+
     @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun capture(
         name: String,
@@ -146,11 +195,15 @@ class ChatListUnreadStatesScreenshotTest {
         rule.waitForIdle()
         rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertIsDisplayed()
         when (state) {
-            State.Pending -> rule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertIsDisplayed()
+            State.Pending -> {
+                rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertIsDisplayed()
+                rule.onNodeWithTag("chats.unread_refresh").assertIsDisplayed()
+                rule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
+            }
             State.Failed -> {
-                rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_load_failed)).assertIsDisplayed()
+                rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertIsDisplayed()
+                rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
                 assertEquals(
-                    "A first-read failure needs one recovery action",
                     1,
                     rule
                         .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_retry))

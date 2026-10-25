@@ -15,7 +15,24 @@ name: preferences-font-cancel
       text: "Font size"
     direction: DOWN
 - tapOn: "Font size"
+- assertVisible:
+    id: "font_size.preview"
 - assertVisible: "Extra large"
 - back
 - assertVisible: "Default"
 - assertNotVisible: "Extra large"
+- scrollUntilVisible:
+    element:
+      text: "App font"
+    direction: UP
+- tapOn: "App font"
+- assertVisible:
+    id: "font_family.preview.viewport"
+- assertVisible:
+    id: "font_family.system"
+- assertVisible:
+    id: "font_family.done"
+- tapOn:
+    id: "font_family.done"
+- assertNotVisible:
+    id: "font_family.dialog"

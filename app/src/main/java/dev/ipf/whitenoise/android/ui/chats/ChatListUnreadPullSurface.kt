@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -74,6 +75,7 @@ internal fun ChatListUnreadPullSurface(
     Box(
         Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .clipToBounds()
             .testTag("chats.unread_surface")
             .semantics {

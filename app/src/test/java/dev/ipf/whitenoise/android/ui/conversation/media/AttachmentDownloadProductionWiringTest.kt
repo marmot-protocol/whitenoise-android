@@ -13,7 +13,7 @@ class AttachmentDownloadProductionWiringTest {
         val effect =
             source("MediaVideo.kt")
                 .substringAfter("private fun rememberCachedVideoAttachmentFileState(")
-                .substringBefore("internal fun shouldStartVideoAttachmentDownload(")
+                .substringBefore("/** Keeps a resolver")
                 .normalized()
 
         assertTrue(
@@ -24,8 +24,20 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue("probe: VideoAttachmentCacheProbe = ::cachedVideoAttachmentFile" in effect)
         assertTrue(
             "Retained-file validation must run before IO exits and Compose state is published",
-            "probed to validatedAttachmentCacheFile(cachedFile.value) } cachedFile.value =" in effect,
+            "probed to validatedAttachmentCacheFile(expectedFile) }" in effect &&
+                "publishVideoAttachmentCacheProbe(cachedFile, expectedFile, file ?: retained)" in effect,
         )
+    }
+
+    /** Clearing an invalid retained file restarts the viewer resolver, while playback failure still requires Retry. */
+    @Test
+    fun viewerCacheInvalidationRestartsOnlyAdmittedMaterialization() {
+        val viewer = source("MediaVideo.kt").substringAfter("internal fun VideoViewerPage(").normalized()
+
+        assertTrue(
+            "LaunchedEffect(contentKey, reference.sourceEpoch, isCurrent, reloadToken, localFile)" in viewer,
+        )
+        assertTrue("if (playbackInvalidated) return@LaunchedEffect" in viewer)
     }
 
     /** APK installer completion is owned by the app shell, not the originating bubble. */

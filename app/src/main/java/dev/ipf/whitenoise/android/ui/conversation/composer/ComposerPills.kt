@@ -125,17 +125,20 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
+import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
@@ -155,6 +158,7 @@ internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
 internal const val COMPOSER_RESIZE_ACCESSIBILITY_TAG = "composer-resize-accessibility"
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
+internal const val COMPOSER_EDITOR_VIEWPORT_TAG = "composer-editor-viewport"
 internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
 
 private val CompactEditorStartInset = 72.dp
@@ -377,6 +381,9 @@ internal fun ComposerPill(
     // outer trailing reservation. Measure the threshold against the compact
     // pill width so the chosen mode cannot invalidate its own line count.
     compactMeasurementWidth: Dp? = null,
+    // The bar owns the automatic destination viewport after its final chrome and accessory budget.
+    automaticTextHeightCeilingPx: Int? = null,
+    actionRowAccessoryHeightPx: Int = 0,
     compactMeasurementReservesTrailingAction: Boolean = trailingAction != null,
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
@@ -391,6 +398,8 @@ internal fun ComposerPill(
     onAccessoryHeightChanged: (Dp) -> Unit = {},
     onAutomaticTextMeasured: (Int, Boolean) -> Unit = { _, _ -> },
     scrollOwnerKey: Any? = null,
+    // Replaced edit sessions must retire pending trusted-system Paste callbacks too.
+    pasteTargetKey: Any? = null,
     // Compact-height viewports cannot afford the expanded control layout, whose
     // fixed header and action-row overhead consumes the whole compact composer
     // ceiling and squeezes the editor viewport to zero, so they pin the inline
@@ -601,23 +610,32 @@ internal fun ComposerPill(
                 else -> ComposerResizeStripHeight
             },
         )
-    val pasteFromClipboard: () -> Unit = {
-        val pastedText = clipboardManager?.primaryClipPlainText(context)
-        if (!pastedText.isNullOrEmpty()) {
-            val value = latestTextFieldValue
-            val start = value.selection.min.coerceIn(0, value.text.length)
-            val end = value.selection.max.coerceIn(start, value.text.length)
-            val updated = value.text.replaceRange(start, end, pastedText)
-            latestOnValueChange(
-                value.copy(
-                    text = updated,
-                    selection = TextRange(start + pastedText.length),
-                    composition = null,
-                ),
-            )
+    val tryPasteFromClipboard: () -> Boolean = {
+        try {
+            clipboardManager.withPrimaryClipForPaste { clip ->
+                // Text only; image receive-content and attachment import keep their own routes.
+                val pastedText =
+                    if (clip.description.hasMimeType("text/*")) clip.plainText(context) else null
+                if (!pastedText.isNullOrEmpty()) {
+                    val value = latestReadAcceptedValue()
+                    val start = value.selection.min.coerceIn(0, value.text.length)
+                    val end = value.selection.max.coerceIn(start, value.text.length)
+                    latestOnValueChange(
+                        value.copy(
+                            text = value.text.replaceRange(start, end, pastedText),
+                            selection = TextRange(start + pastedText.length),
+                            composition = null,
+                        ),
+                    )
+                }
+                textToolbar.hide()
+            }
+        } catch (_: SecurityException) {
+            // A text URI can also require a platform grant during coercion.
+            false
         }
-        textToolbar.hide()
     }
+    val pasteFromClipboard: () -> Unit = { tryPasteFromClipboard() }
     val caretFollowSuspended =
         readingScrollAnchor?.matches(textFieldValue) == true
     SideEffect {
@@ -665,7 +683,8 @@ internal fun ComposerPill(
     val draftStartOffscreen by remember(composerScrollState) {
         derivedStateOf { composerScrollState.value > 0 }
     }
-    val leadingControlsWidth = if (hasAttachmentAction) 80.dp else 40.dp
+    val leadingControlsWidth = (if (hasAttachmentAction) 80.dp else 40.dp) + 48.dp
+    val compactEditorStartInset = (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp + 8.dp
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
             (if (trailingAction != null) 40.dp else 0.dp)
@@ -734,7 +753,7 @@ internal fun ComposerPill(
                 }
             val compactWidthPx =
                 with(density) {
-                    (measurementWidth - (CompactEditorStartInset + compactMeasurementTrailingReserve))
+                    (measurementWidth - (compactEditorStartInset + compactMeasurementTrailingReserve))
                         .coerceAtLeast(1.dp)
                         .roundToPx()
                 }
@@ -786,9 +805,15 @@ internal fun ComposerPill(
     // and for the ~60ms the insets kept animating it asserted a height the narrower editor could not
     // honour yet — a draft that wraps to three compact lines but two editing ones sat in a two-line box
     // with a third still in it. Finishing together, the height only claims to be final once the width is.
+    // Tween the visible destination, not the overflowing draft: clamping an unbounded tween only
+    // after interpolation reaches the ceiling early while the controls are still moving.
+    val renderedTextHeightTarget =
+        (compactTextLayout?.size?.height ?: 0).let { naturalHeight ->
+            automaticTextHeightCeilingPx?.let { naturalHeight.coerceAtMost(it) } ?: naturalHeight
+        }
     val animatedTextHeight =
         animateIntAsState(
-            targetValue = compactTextLayout?.size?.height ?: 0,
+            targetValue = renderedTextHeightTarget,
             animationSpec =
                 composerGeometrySpec(
                     collapsedBySend = collapsedBySend,
@@ -803,17 +828,6 @@ internal fun ComposerPill(
         compactTextLayout != null &&
             expansionMode == ComposerExpansionMode.Automatic &&
             !multilineControlsSuppressed
-    val automaticTextHeight =
-        if (usesAnimatedTextHeight) {
-            Modifier.layout { measurable, constraints ->
-                textHeightBounds.value = constraints.minHeight..constraints.maxHeight
-                val height = animatedTextHeight.value.coerceIn(constraints.minHeight, constraints.maxHeight)
-                val child = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
-                layout(child.width, child.height) { child.placeRelative(0, 0) }
-            }
-        } else {
-            Modifier
-        }
     val visualMultilineControls =
         when {
             multilineControlsSuppressed -> false
@@ -876,7 +890,7 @@ internal fun ComposerPill(
     // reached the target it snapped to, so a later dismiss or refocus of the
     // empty field tweens again. Geometry the send left unchanged settles at once.
     val latestOnSendCollapseApplied by rememberUpdatedState(onSendCollapseApplied)
-    val textHeightTarget by rememberUpdatedState(compactTextLayout?.size?.height ?: 0)
+    val textHeightTarget by rememberUpdatedState(renderedTextHeightTarget)
     val editingTarget by rememberUpdatedState(if (editingLayout) 1f else 0f)
     val expansionTarget by rememberUpdatedState(if (expandedLayout) 1f else 0f)
     val textHeightGeometrySettled by remember(scrollOwnerKey, usesAnimatedTextHeight, animatedTextHeight) {
@@ -931,6 +945,67 @@ internal fun ComposerPill(
     val compactTrailingReserve =
         4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth + expandedTrailingActionInset +
             (if (trailingAction != null) 40.dp else 0.dp)
+    val automaticTextHeight =
+        if (usesAnimatedTextHeight) {
+            Modifier.layout { measurable, constraints ->
+                textHeightBounds.value = constraints.minHeight..constraints.maxHeight
+                val height = animatedTextHeight.value.coerceIn(constraints.minHeight, constraints.maxHeight)
+                val progress = editingProgress.value
+                val topInset = CompactEditorTopInset.roundToPx()
+                val bottomInset =
+                    interpolateDp(12.dp, ExpandedEditorBottomInset + extraControlsHeight, progress).roundToPx()
+                val rowHeight = ComposerActionRowHeight.roundToPx()
+                val boxHeight = maxOf(rowHeight, height + topInset + bottomInset)
+                val leadingRowTop = composerActionRowTop(boxHeight, rowHeight, progress)
+                val trailingRowTop =
+                    composerActionRowTop(boxHeight + actionRowAccessoryHeightPx, rowHeight, progress) -
+                        actionRowAccessoryHeightPx
+                val heightAboveActions =
+                    minOf(leadingRowTop, trailingRowTop) - extraControlsHeight.roundToPx() - topInset
+                val lineHeight =
+                    compactTextLayout?.let { layout ->
+                        if (layout.lineCount > 0) (layout.getLineBottom(0) - layout.getLineTop(0)).roundToInt() else 1
+                    } ?: 1
+                val viewportHeight = composerEditorViewportHeight(height, heightAboveActions, lineHeight)
+                // At the start there is no separate text row yet. Keep one usable inline field outside
+                // both action columns, then expose the full width once a complete line fits above them.
+                val inline = heightAboveActions < lineHeight
+                val startClearance =
+                    if (inline) {
+                        (
+                            leadingControlsWidth -
+                                interpolateDp(compactEditorStartInset, EditingEditorStartInset, progress)
+                        ).roundToPx()
+                            .coerceIn(0, constraints.maxWidth)
+                    } else {
+                        0
+                    }
+                val endClearance =
+                    if (inline) {
+                        (
+                            compactTrailingReserve -
+                                interpolateDp(compactTrailingReserve, ExpandedEditorEndInset, progress)
+                        ).roundToPx()
+                            .coerceIn(0, constraints.maxWidth - startClearance)
+                    } else {
+                        0
+                    }
+                val child =
+                    measurable.measure(
+                        constraints.copy(
+                            minWidth = (constraints.minWidth - startClearance - endClearance).coerceAtLeast(0),
+                            maxWidth = constraints.maxWidth - startClearance - endClearance,
+                            minHeight = viewportHeight,
+                            maxHeight = viewportHeight,
+                        ),
+                    )
+                // Retain the animated outer reservation: reducing the actual scroll viewport must not
+                // change the parent height that places these same controls, or create a feedback loop.
+                layout(constraints.maxWidth, height) { child.placeRelative(startClearance, 0) }
+            }
+        } else {
+            Modifier
+        }
     LaunchedEffect(collapsedBySend) {
         if (!collapsedBySend) return@LaunchedEffect
         snapshotFlow {
@@ -1193,7 +1268,7 @@ internal fun ComposerPill(
                                     }.deferredPadding(
                                         start = {
                                             interpolateDp(
-                                                if (hasAttachmentAction) CompactEditorStartInset else 40.dp,
+                                                compactEditorStartInset,
                                                 EditingEditorStartInset,
                                                 editingProgress.value,
                                             )
@@ -1236,6 +1311,7 @@ internal fun ComposerPill(
                                             .fillMaxWidth()
                                             .then(expandedHeightModifier)
                                             .then(automaticTextHeight)
+                                            .testTag(COMPOSER_EDITOR_VIEWPORT_TAG)
                                             // Drawn outside the scroll modifier so the thumb
                                             // paints in viewport coordinates over the clipped
                                             // editor, only while the draft overflows it.
@@ -1461,6 +1537,8 @@ internal fun ComposerPill(
                             if (textFieldValue.text.isEmpty()) {
                                 Text(
                                     stringResource(R.string.message),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1547,6 +1625,20 @@ internal fun ComposerPill(
                                     iconSize = 24.dp,
                                     emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
                                 )
+                                key(scrollOwnerKey, pasteTargetKey, inputContentVisible, inputFocusEnabled) {
+                                    SystemPasteIconButton(
+                                        onPaste = tryPasteFromClipboard,
+                                        enabled = inputContentVisible && inputFocusEnabled,
+                                        modifier = Modifier.size(48.dp).testTag("composer.paste"),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_content_paste),
+                                            contentDescription = stringResource(R.string.paste_from_clipboard),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
+                                        )
+                                    }
+                                }
                             }
                         }
                         Row(

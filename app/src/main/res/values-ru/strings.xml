@@ -751,6 +751,8 @@
     <string name="diagnostic_send_to_self_failed">Не удалось отправить себе: %1$s</string>
     <string name="clear">Очистить</string>
     <string name="paste">Вставить</string>
+    <string name="paste_from_clipboard">Вставить из буфера обмена</string>
+    <string name="paste_dictation_transcript">Вставить расшифровку</string>
     <string name="live">Прямой эфир</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Снимка реле пока нет.</string>
@@ -2402,9 +2404,9 @@
     <string name="profile_notifications_mute">Отключить уведомления от этого человека</string>
     <string name="profile_notifications_system">Звук и системные настройки</string>
     <string name="profile_notifications_android_vibration">Задано в Android</string>
-    <string name="profile_notification_scope_detail">Применяется к сообщениям этого человека во всех беседах этого аккаунта. Доставка и счётчик непрочитанных сообщений не меняются.</string>
+    <string name="profile_notification_scope_detail">Настройки Android для этого человека применяются к сообщениям, приглашениям и изменениям ролей в группах, связанным с ним, во всех чатах этого аккаунта. Отключение уведомлений действует только для сообщений. Доставка и счётчики непрочитанных не меняются.</string>
     <string name="profile_notification_precedence">Сначала действуют правила отключения уведомлений чата и уведомлений только об упоминаниях. Затем — отключение уведомлений или свои настройки Android для этого человека. Настройки по умолчанию возвращают настройки чата и общие настройки. Существующие уведомления сохраняют исходный канал.</string>
-    <string name="profile_notification_channel_name">%1$s · Сообщения во всех чатах</string>
+    <string name="profile_notification_channel_name">%1$s · Уведомления во всех чатах</string>
     <string name="destination_filter_all">Все чаты</string>
     <string name="destination_filter_selected">Проверить выбранные (%1$d)</string>
     <string name="destination_filter_label">Фильтр чатов</string>
@@ -2506,6 +2508,12 @@
     <string name="avatar_preparation_interrupted">Обновление изображения прервано. Проверьте текущее изображение, прежде чем выбирать его снова.</string>
     <string name="dictation_interrupted">Диктовка прервана. Перед отправкой проверьте восстановленный текст и оставшиеся аудиозаписи.</string>
     <string name="dictation_waiting_for_unlock">Диктовка временно сохранена. Разблокируйте приложение, чтобы вставить текст.</string>
+    <string name="show_less">Показать меньше</string>
+    <string name="font_size_preview">Предпросмотр сообщений</string>
+    <string name="font_size_sample_received">Встретимся у вокзала. Днём тебе всё ещё удобно?</string>
+    <string name="font_size_sample_quote">Днём у вокзала</string>
+    <string name="font_size_sample_sent">Да, до встречи! Напишу, когда приеду.</string>
+    <string name="font_size_save_failed">Не удалось сохранить размер текста. Сохранённый ранее размер не изменён.</string>
     <string name="setup_finding_inspection_completed">Проверка завершена. Само по себе это не подтверждает, что реле поддерживает запись.</string>
     <string name="setup_finding_context_unknown">Источник не указан</string>
     <string name="setup_finding_context_discovery">Обнаружение записей</string>

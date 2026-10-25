@@ -98,6 +98,7 @@ internal fun MessageActionMenu(
     canTranslate: Boolean = false,
     canSelectText: Boolean,
     canKeepOnScreen: Boolean = false,
+    canShowLess: Boolean = false,
     canShare: Boolean = false,
     canSave: Boolean,
     canInfo: Boolean = true,
@@ -116,6 +117,7 @@ internal fun MessageActionMenu(
     onSpeakCodeLiterally: () -> Unit = {},
     onTranslate: () -> Unit = {},
     onKeepOnScreen: () -> Unit = {},
+    onShowLess: () -> Unit = {},
     onShare: () -> Unit = {},
     onSave: () -> Unit,
     onInfo: () -> Unit,
@@ -143,6 +145,7 @@ internal fun MessageActionMenu(
             canTranslate,
             showForwardAction,
             canKeepOnScreen,
+            canShowLess,
             canShare,
             canSave,
             canInfo,
@@ -159,6 +162,7 @@ internal fun MessageActionMenu(
                 canTranslate = canTranslate,
                 canForward = showForwardAction,
                 canKeepOnScreen = canKeepOnScreen,
+                canShowLess = canShowLess,
                 canShare = canShare,
                 canSave = canSave,
                 canInfo = canInfo,
@@ -195,6 +199,7 @@ internal fun MessageActionMenu(
                         MessageActionKind.SpeakCodeLiterally -> onSpeakCodeLiterally()
                         MessageActionKind.Forward -> onForward()
                         MessageActionKind.KeepOnScreen -> onKeepOnScreen()
+                        MessageActionKind.ShowLess -> onShowLess()
                         MessageActionKind.Share -> onShare()
                         MessageActionKind.Save -> onSave()
                         MessageActionKind.Info -> onInfo()

@@ -157,11 +157,28 @@ internal class ProfileNotificationOverridePreferences(
     }
 }
 
-/** Reactions, membership, invites, self messages and agent progress retain their existing category policy. */
+/** Identity for message-only muting; event sound routing has a separate eligibility rule. */
 internal fun profileNotificationAuthor(update: NotificationUpdateFfi): String? =
     when {
         update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf -> null
         update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> null
         LocalNotificationFormatter.isReaction(update) -> null
         else -> ProfileNotificationOverridePreferences.normalizedAuthor(update.sender.accountIdHex)
+    }
+
+/** Sound routing is broader than message muting; only authenticated non-self actors may select it. */
+internal fun profileNotificationSoundAuthor(update: NotificationUpdateFfi): String? =
+    when {
+        update.isFromSelf || update.sender.accountIdHex.equals(update.accountIdHex, ignoreCase = true) -> null
+        update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> null
+        update.trigger == NotificationTriggerFfi.NEW_MESSAGE -> profileNotificationAuthor(update)
+        update.trigger in
+            setOf(
+                NotificationTriggerFfi.GROUP_INVITE,
+                NotificationTriggerFfi.MADE_ADMIN,
+                NotificationTriggerFfi.REMOVED_AS_ADMIN,
+                NotificationTriggerFfi.REMOVED_FROM_GROUP,
+            )
+        -> ProfileNotificationOverridePreferences.normalizedAuthor(update.sender.accountIdHex)
+        else -> null
     }

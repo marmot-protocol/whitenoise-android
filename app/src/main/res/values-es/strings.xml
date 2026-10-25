@@ -715,6 +715,8 @@
     <string name="diagnostic_send_to_self_failed">Error al enviarse a si mismo: %1$s</string>
     <string name="clear">Borrar</string>
     <string name="paste">Pegar</string>
+    <string name="paste_from_clipboard">Pegar desde el portapapeles</string>
+    <string name="paste_dictation_transcript">Pegar transcripción</string>
     <string name="live">En vivo</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Aún no hay instantánea de retransmisión.</string>
@@ -2332,9 +2334,9 @@
     <string name="profile_notifications_mute">Silenciar notificaciones de esta persona</string>
     <string name="profile_notifications_system">Sonido y comportamiento del sistema</string>
     <string name="profile_notifications_android_vibration">Configurado por Android</string>
-    <string name="profile_notification_scope_detail">Se aplica a los mensajes de esta persona en todas las conversaciones de esta cuenta. La entrega y el recuento de mensajes sin leer no cambian.</string>
+    <string name="profile_notification_scope_detail">Los ajustes personalizados de Android se aplican a los mensajes, invitaciones y cambios de rol en grupos atribuidos a esta persona en todas las conversaciones de esta cuenta. Silenciar solo se aplica a los mensajes. La entrega y los contadores de mensajes sin leer no cambian.</string>
     <string name="profile_notification_precedence">Primero se aplican las reglas de silencio del chat y de solo menciones. Después, el silencio o los ajustes personalizados de Android de esta persona. Usar valores predeterminados restaura los ajustes del chat y globales. Las notificaciones existentes conservan su canal original.</string>
-    <string name="profile_notification_channel_name">%1$s · Mensajes en todos los chats</string>
+    <string name="profile_notification_channel_name">%1$s · Notificaciones entre chats</string>
     <string name="destination_filter_all">Todos los chats</string>
     <string name="destination_filter_selected">Revisar selección (%1$d)</string>
     <string name="destination_filter_label">Filtrar chats</string>
@@ -2432,6 +2434,12 @@
     <string name="avatar_preparation_interrupted">Se interrumpió la actualización de la imagen. Revisa la imagen actual antes de seleccionarla de nuevo.</string>
     <string name="dictation_interrupted">Dictado interrumpido. Revisa el texto recuperado y cualquier audio restante antes de enviar.</string>
     <string name="dictation_waiting_for_unlock">Dictado guardado temporalmente. Desbloquea la aplicación para pegarlo.</string>
+    <string name="show_less">Mostrar menos</string>
+    <string name="font_size_preview">Vista previa de mensajes</string>
+    <string name="font_size_sample_received">Quedemos en la estación. ¿Te sigue viniendo bien por la tarde?</string>
+    <string name="font_size_sample_quote">Por la tarde en la estación</string>
+    <string name="font_size_sample_sent">¡Sí, hasta entonces! Te escribiré cuando llegue.</string>
+    <string name="font_size_save_failed">No se pudo guardar el tamaño del texto. Se conserva el tamaño guardado anteriormente.</string>
     <string name="setup_finding_inspection_completed">Inspección completada. Esto por sí solo no confirma que el relé admita escritura.</string>
     <string name="setup_finding_context_unknown">Origen no especificado</string>
     <string name="setup_finding_context_discovery">Descubrimiento de registros</string>

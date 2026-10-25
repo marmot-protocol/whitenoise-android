@@ -44,7 +44,8 @@
           "FIND-013",
           "FIND-014",
           "FIND-016",
-          "DIC-008"
+          "DIC-008",
+          "MSG-040"
         ]
       },
       {
@@ -250,6 +251,14 @@
         "anchor": "fun messageDragSelectionEffects()",
         "test_ids": [
           "MSG-004"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Message collapse retires deferred foreground correction before viewport settlement",
+        "anchor": "onBeforeBodyCollapse = {",
+        "test_ids": [
+          "CON-033"
         ]
       }
     ]

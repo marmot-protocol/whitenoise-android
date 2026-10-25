@@ -3,8 +3,12 @@ package dev.ipf.whitenoise.android.ui.profile
 import android.os.Looper
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -217,11 +221,24 @@ class PersonGroupsMembershipAuthorityTest {
     ) {
         fixture.recordAuthorityEvent(id, "menu-wait-start")
         var lastMenuNodeCount: Int? = null
+        var lastAuthorityStatus = "not completed"
+        val menuTag = "groups_in_common.menu.$id"
+        val rowTag = "groups_in_common.group.$id"
+        val retryTag = "groups_in_common.retry"
+        val observedTags = setOf(menuTag, rowTag, retryTag)
         try {
             awaitAuthority {
-                val nodes = rule.onAllNodesWithTag("groups_in_common.menu.$id").fetchSemanticsNodes()
-                lastMenuNodeCount = nodes.size
-                nodes.isNotEmpty()
+                val nodes =
+                    rule.onAllNodes(
+                        SemanticsMatcher("membership authority status") {
+                            it.config.getOrNull(SemanticsProperties.TestTag) in observedTags
+                        },
+                    ).fetchSemanticsNodes()
+                val counts = nodes.groupingBy { it.config.getOrNull(SemanticsProperties.TestTag) }.eachCount()
+                val menuCount = counts[menuTag] ?: 0
+                lastMenuNodeCount = menuCount
+                lastAuthorityStatus = "rowNodes=${counts[rowTag] ?: 0} retryNodes=${counts[retryTag] ?: 0}"
+                menuCount > 0
             }
         } catch (failure: Throwable) {
             runCatching {
@@ -230,7 +247,9 @@ class PersonGroupsMembershipAuthorityTest {
                     runCatching { fixture.authorityDiagnostics().take(MAX_AUTHORITY_DIAGNOSTIC_CHARS) }
                         .getOrElse { "Native diagnostics unavailable: ${it.javaClass.simpleName}" }
                 failure.addSuppressed(
-                    AssertionError("Authority menu $id: $native\nLast completed poll menuNodes=$lastMenuNodeCount"),
+                    AssertionError(
+                        "Authority menu $id: $native\nLast completed poll menuNodes=$lastMenuNodeCount $lastAuthorityStatus",
+                    ),
                 )
             }
             throw failure

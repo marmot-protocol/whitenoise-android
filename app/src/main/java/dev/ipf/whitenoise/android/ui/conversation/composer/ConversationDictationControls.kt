@@ -280,7 +280,7 @@ private fun ConversationDictationActiveActions(
 
 @Composable
 private fun ConversationDictationPasteAction(controller: ConversationDictationController) {
-    val pasteLabel = stringResource(R.string.paste)
+    val pasteLabel = stringResource(R.string.paste_dictation_transcript)
     IconButton(
         onClick = controller::paste,
         enabled = controller.completionActionsEnabled,
