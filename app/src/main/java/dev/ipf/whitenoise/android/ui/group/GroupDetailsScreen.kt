@@ -285,12 +285,18 @@ internal fun GroupDetailsScreen(
         surfaceIdentity = controller,
     ) {
         val reviewRuntime = remember(controller) { appState.runtimeGeneration }
+        val detailsScrollState = key(controller) { rememberScrollState() }
+        val membersScrollState = key(controller) { rememberScrollState() }
+        var membersExpanded by remember(controller) { mutableStateOf(false) }
+        var memberSearchOpen by remember(controller) { mutableStateOf(false) }
+        var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
+        var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
+        val memberResolution =
+            rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
         // Reuse the established account/runtime admission owner for protected route drawing.
         if (appState.appLockScreenVisible || !controller.isCurrentGroupMutationOwner(appState, reviewRuntime)) {
             return@PreparedGroupAvatarContent
         }
-        val detailsScrollState = key(controller) { rememberScrollState() }
-        val membersScrollState = key(controller) { rememberScrollState() }
         var showChatRelays by remember(controller) { mutableStateOf(false) }
         var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -337,12 +343,6 @@ internal fun GroupDetailsScreen(
             mutableStateOf<Set<String>>(emptySet())
         }
         val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
-        var membersExpanded by remember(controller) { mutableStateOf(false) }
-        var memberSearchOpen by remember(controller) { mutableStateOf(false) }
-        var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
-        var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
-        val memberResolution =
-            rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
         // leave path and the Admins prompt so a trapped sole admin can hand the
         // role to another member (issue #417).
@@ -993,7 +993,9 @@ internal fun GroupDetailsScreen(
                     busy = adding || controller.mutationInFlight || !rosterReady,
                     autoSelectResolvedIdentifier = true,
                     excludeAccountIdHexes =
-                        (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
+                        (
+                            controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs
+                        ).toSet(),
                     footer = {
                         if (inviteProjection?.shouldWarn == true) {
                             LargeGroupInviteWarningBanner()
@@ -1065,7 +1067,6 @@ internal fun GroupDetailsScreen(
                 GroupInfoScreen(
                     groupIdHex = controller.group.groupIdHex,
                     nostrGroupIdHex = controller.group.nostrGroupIdHex,
-                    relays = controller.group.relays,
                     onBack = { showGroupInfo = false },
                 )
             }
@@ -1595,8 +1596,10 @@ internal fun GroupDetailsScreen(
         if (showChatRelays) {
             BackHandler { showChatRelays = false }
             detailsRoute {
-                ChatRelaysScreen(
+                GroupRelaySettingsScreen(
                     relays = controller.group.relays,
+                    isDm = isDm,
+                    isAdmin = controller.isSelfAdmin,
                     onBack = { showChatRelays = false },
                     feedback = groupFeedback,
                 )
@@ -2177,17 +2180,13 @@ internal fun GroupDetailsScreen(
                     modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical"),
                 ) {
                     row("relays") { rowContext ->
+                        val relayCount = groupRelayDisplayList(controller.group.relays).size
                         SettingsLink(
                             context = rowContext,
-                            title = stringResource(R.string.relays),
+                            title = stringResource(groupRelaysTitleRes(isDm)),
                             onClick = { showChatRelays = true },
                             modifier = Modifier.testTag("chat_info.relays"),
-                            subtitle =
-                                pluralStringResource(
-                                    R.plurals.chat_relay_count,
-                                    controller.group.relays.size,
-                                    controller.group.relays.size,
-                                ),
+                            subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
                             leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
                         )
                     }

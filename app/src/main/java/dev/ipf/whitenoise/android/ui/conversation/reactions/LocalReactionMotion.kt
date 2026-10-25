@@ -30,6 +30,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
@@ -178,7 +179,9 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
             )
         }
     val targetCellPx = with(density) { 14.dp.toPx() }
-    return reactionSourceBounds(requireFullyVisible = false) { state.origin = it.topLeft }.drawWithContent {
+    val overlayActive = state.hasVisibleFlight(effect)
+    val owner = if (overlayActive) testTag("conversation.reaction.motion.active") else this
+    return owner.reactionSourceBounds(requireFullyVisible = false) { state.origin = it.topLeft }.drawWithContent {
         drawContent()
         val current = state.effect
         if (!state.enabled || current != effect) return@drawWithContent
@@ -242,4 +245,10 @@ internal fun ReactionMotionRow(
     CompositionLocalProvider(LocalRowReactionMotion provides state) {
         Column(row, content = content)
     }
+}
+
+/** The direct owner tag follows the same endpoint eligibility as its production draw pass. */
+private fun LocalReactionMotion.hasVisibleFlight(effect: LocalReactionEffect?): Boolean {
+    val source = effect?.origin ?: return false
+    return enabled && targets[effect.emoji]?.let { canFly(source, it) } == true
 }

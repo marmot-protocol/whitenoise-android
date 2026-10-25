@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
@@ -95,13 +97,13 @@ class ProfileAddToGroupsFlowTest {
         composeRule
             .onNodeWithText(app.getString(R.string.person_groups_in_common))
             .performScrollTo()
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick) { it() }
         finishContentTransition()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_empty_shared_groups.png")
         composeRule
             .onNodeWithText(app.getString(R.string.person_add_to_group))
             .assertIsDisplayed()
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick) { it() }
         finishContentTransition()
         composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
     }

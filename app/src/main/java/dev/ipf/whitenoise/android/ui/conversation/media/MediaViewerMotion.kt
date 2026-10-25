@@ -195,12 +195,7 @@ internal fun MediaViewerMotion(
     val progress = remember { Animatable(if (enabled && initialAvailable) 0f else 1f) }
     var entrySettled by remember { mutableStateOf(!enabled || !initialAvailable) }
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val thumbnail =
-        if (closing) {
-            registry?.find(selected)?.takeIf { selectedSourceEpoch == null || it.sourceEpoch == selectedSourceEpoch }
-        } else {
-            registry?.find(opening)?.takeIf { it.token === openingToken }
-        }
+    val thumbnail = registry?.motionThumbnail(opening, selected, closing, selectedSourceEpoch, openingToken)
     val latestClosed by androidx.compose.runtime.rememberUpdatedState(onClosed)
     LaunchedEffect(closing, enabled, thumbnail) {
         if (!enabled || thumbnail == null) {
@@ -218,60 +213,94 @@ internal fun MediaViewerMotion(
     Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionOnScreen() }) {
         Box(
             Modifier.fillMaxSize().graphicsLayer {
-                alpha =
-                    if (!enabled ||
-                        thumbnail == null
-                    ) {
-                        1f
-                    } else {
-                        ((progress.value - MEDIA_CONTENT_BLEND_START) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
-                    }
+                alpha = mediaViewerContentAlpha(enabled, thumbnail != null, progress.value)
             },
         ) { content() }
-        if (thumbnail != null && enabled && progress.value < 1f) {
-            Canvas(Modifier.fillMaxSize()) {
-                // Resolve the current registration at draw time: disposed/offscreen rows never leave retained pixels.
-                val current = registry?.find(if (closing) selected else opening)
-                if (current === thumbnail) {
-                    val source = thumbnail.bounds.translate(-origin)
-                    val bounds = mediaViewerMotionBounds(source, size, progress.value)
-                    val outline =
-                        Path().apply {
-                            val corners = thumbnail.corners
-                            val remaining = 1f - progress.value
-                            addRoundRect(
-                                RoundRect(
-                                    bounds,
-                                    CornerRadius(corners.topLeft * remaining),
-                                    CornerRadius(corners.topRight * remaining),
-                                    CornerRadius(corners.bottomRight * remaining),
-                                    CornerRadius(corners.bottomLeft * remaining),
-                                ),
-                            )
-                        }
-                    clipPath(outline) {
-                        drawContext.canvas.saveLayer(
-                            bounds,
-                            Paint().apply {
-                                alpha = ((1f - progress.value) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
-                            },
+        MediaMotionVisual(
+            registry,
+            thumbnail?.takeIf { enabled && progress.value < 1f },
+            if (closing) selected else opening,
+            origin,
+            progress.value,
+        )
+    }
+}
+
+@Composable
+private fun MediaMotionVisual(
+    registry: MediaViewerThumbnailRegistry?,
+    thumbnail: MediaViewerThumbnailRegistry.Thumbnail?,
+    identity: ConversationMediaViewerAttachmentId,
+    origin: Offset,
+    progress: Float,
+) {
+    if (thumbnail != null) {
+        Canvas(Modifier.fillMaxSize()) {
+            // Resolve the current registration at draw time: disposed/offscreen rows never leave retained pixels.
+            val current = registry?.find(identity)
+            if (current === thumbnail) {
+                val source = thumbnail.bounds.translate(-origin)
+                val bounds = mediaViewerMotionBounds(source, size, progress)
+                val outline =
+                    Path().apply {
+                        val corners = thumbnail.corners
+                        val remaining = 1f - progress
+                        addRoundRect(
+                            RoundRect(
+                                bounds,
+                                CornerRadius(corners.topLeft * remaining),
+                                CornerRadius(corners.topRight * remaining),
+                                CornerRadius(corners.bottomRight * remaining),
+                                CornerRadius(corners.bottomLeft * remaining),
+                            ),
                         )
-                        translate(bounds.left, bounds.top) {
-                            scale(
-                                bounds.width / thumbnail.layer.size.width,
-                                bounds.height / thumbnail.layer.size.height,
-                                pivot = Offset.Zero,
-                            ) {
-                                drawLayer(thumbnail.layer)
-                            }
-                        }
-                        drawContext.canvas.restore()
                     }
+                clipPath(outline) {
+                    drawContext.canvas.saveLayer(
+                        bounds,
+                        Paint().apply {
+                            alpha = ((1f - progress) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
+                        },
+                    )
+                    translate(bounds.left, bounds.top) {
+                        scale(
+                            bounds.width / thumbnail.layer.size.width,
+                            bounds.height / thumbnail.layer.size.height,
+                            pivot = Offset.Zero,
+                        ) {
+                            drawLayer(thumbnail.layer)
+                        }
+                    }
+                    drawContext.canvas.restore()
                 }
             }
         }
     }
 }
+
+private fun MediaViewerThumbnailRegistry.motionThumbnail(
+    opening: ConversationMediaViewerAttachmentId,
+    selected: ConversationMediaViewerAttachmentId,
+    closing: Boolean,
+    selectedSourceEpoch: ULong?,
+    openingToken: Any?,
+): MediaViewerThumbnailRegistry.Thumbnail? =
+    if (closing) {
+        find(selected)?.takeIf { selectedSourceEpoch == null || it.sourceEpoch == selectedSourceEpoch }
+    } else {
+        find(opening)?.takeIf { it.token === openingToken }
+    }
+
+internal fun mediaViewerContentAlpha(
+    enabled: Boolean,
+    available: Boolean,
+    progress: Float,
+): Float =
+    if (!enabled || !available) {
+        1f
+    } else {
+        ((progress - MEDIA_CONTENT_BLEND_START) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
+    }
 
 /** Physical corners of the actual source tile, before it leaves the album's rounded surface. */
 internal data class MediaThumbnailCorners(
@@ -289,19 +318,20 @@ private fun mediaThumbnailCorners(
 ): MediaThumbnailCorners? {
     if (!grid) return MediaThumbnailCorners(radius, radius, radius, radius)
     // The explicit masonry host owns the outer clip; nested rows/columns are not clip bounds.
-    if (canvas?.isAttached != true) return null
-    val tile = coordinates.boundsInWindow(clipBounds = false)
-    val outer = canvas.boundsInWindow(clipBounds = false)
-    val left = tile.left <= outer.left + CORNER_EDGE_TOLERANCE_PX
-    val right = tile.right >= outer.right - CORNER_EDGE_TOLERANCE_PX
-    val top = tile.top <= outer.top + CORNER_EDGE_TOLERANCE_PX
-    val bottom = tile.bottom >= outer.bottom - CORNER_EDGE_TOLERANCE_PX
-    return MediaThumbnailCorners(
-        if (left && top) radius else 0f,
-        if (right && top) radius else 0f,
-        if (right && bottom) radius else 0f,
-        if (left && bottom) radius else 0f,
-    )
+    return canvas?.takeIf { it.isAttached }?.let { outerCanvas ->
+        val tile = coordinates.boundsInWindow(clipBounds = false)
+        val outer = outerCanvas.boundsInWindow(clipBounds = false)
+        val left = tile.left <= outer.left + CORNER_EDGE_TOLERANCE_PX
+        val right = tile.right >= outer.right - CORNER_EDGE_TOLERANCE_PX
+        val top = tile.top <= outer.top + CORNER_EDGE_TOLERANCE_PX
+        val bottom = tile.bottom >= outer.bottom - CORNER_EDGE_TOLERANCE_PX
+        MediaThumbnailCorners(
+            if (left && top) radius else 0f,
+            if (right && top) radius else 0f,
+            if (right && bottom) radius else 0f,
+            if (left && bottom) radius else 0f,
+        )
+    }
 }
 
 private const val CORNER_EDGE_TOLERANCE_PX = 0.5f

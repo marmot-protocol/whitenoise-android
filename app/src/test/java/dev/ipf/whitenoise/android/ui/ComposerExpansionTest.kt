@@ -70,7 +70,8 @@ class ComposerExpansionTest {
     @Test
     fun acceptedSendCollapseTweensEveryPieceOfPillGeometry() {
         val tweened = composerGeometrySpec<Int>(collapsedBySend = false, durationMillis = 160, easing = LinearEasing)
-        val sendCollapse = composerGeometrySpec<Int>(collapsedBySend = true, durationMillis = 160, easing = LinearEasing)
+        val sendCollapse =
+            composerGeometrySpec<Int>(collapsedBySend = true, durationMillis = 160, easing = LinearEasing)
 
         assertTrue(tweened is TweenSpec<Int>)
         assertEquals(160, (tweened as TweenSpec<Int>).durationMillis)

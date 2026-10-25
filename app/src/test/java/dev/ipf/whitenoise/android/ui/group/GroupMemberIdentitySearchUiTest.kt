@@ -203,7 +203,7 @@ class GroupMemberIdentitySearchUiTest {
     }
 
     @Test
-    fun accountSwitchDiscardsTheOldResultAndKeepsTheNewQuery() {
+    fun accountSwitchHidesForeignOwnerAndReplacementKeepsItsOwnQuery() {
         val pending = CompletableDeferred<String?>()
         val started = CompletableDeferred<Unit>()
         val current =
@@ -215,16 +215,22 @@ class GroupMemberIdentitySearchUiTest {
                     validatedFixtureIdentity(input)
                 }
             }
-        render(current)
+        val mounted = mutableStateOf(current)
+        render(mounted)
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
         composeRule.waitUntil(5_000) { started.isCompleted }
         awaitFixture { current.state.setActiveAccount("account-b") }
+        composeRule.onNodeWithTag(SEARCH).assertDoesNotExist()
+        pending.complete(MEMBER_HEX)
+        composeRule.onNodeWithTag("chat_info.member.$MEMBER_HEX").assertDoesNotExist()
+        val replacement = fixture(groupId = "replacement-owner", activeAccountRef = "account-b")
+        composeRule.runOnIdle { mounted.value = replacement }
+        openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(OTHER_HEX)
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithTag("chat_info.member.$OTHER_HEX").fetchSemanticsNodes().isNotEmpty()
         }
-        pending.complete(MEMBER_HEX)
         composeRule.onNodeWithTag("chat_info.member.$MEMBER_HEX").assertDoesNotExist()
     }
 
@@ -311,6 +317,7 @@ class GroupMemberIdentitySearchUiTest {
     private fun fixture(
         rosterFailure: Boolean = false,
         groupId: String = "group-a",
+        activeAccountRef: String = "account-a",
         decode: suspend (String) -> String? = { validatedFixtureIdentity(it) },
     ): Fixture {
         val state =
@@ -329,7 +336,7 @@ class GroupMemberIdentitySearchUiTest {
                     ),
                 accountIdHexResolver = decode,
                 accounts = accounts(),
-                activeAccountRef = "account-a",
+                activeAccountRef = activeAccountRef,
                 profileReader = { key ->
                     if (key == MEMBER_HEX) {
                         null

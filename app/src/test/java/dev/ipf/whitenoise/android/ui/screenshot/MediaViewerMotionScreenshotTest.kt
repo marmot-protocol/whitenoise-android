@@ -26,12 +26,13 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -178,7 +179,7 @@ class MediaViewerMotionScreenshotTest {
         flushInitialNativeDraw()
         assertNotNull(registry.find(id))
         composeRule.mainClock.autoAdvance = false
-        composeRule.onNodeWithTag("motion-thumbnail").performClick()
+        composeRule.onNodeWithTag("motion-thumbnail").performSemanticsAction(SemanticsActions.OnClick) { it() }
         flushQueuedComposition()
         // Recomposition creates the real viewer subtree, but Robolectric defers its native
         // measure/draw until requested. Draw at this same virtual instant before checking chrome.

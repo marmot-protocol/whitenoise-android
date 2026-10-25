@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-motion-send
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn: Start send motion
+- assertVisible:
+    id: conversation.send.motion.active
+- tapOn: Dismiss motion
+- assertVisible:
+    id: presentation.complete
+- assertNotVisible:
+    id: conversation.send.motion.active

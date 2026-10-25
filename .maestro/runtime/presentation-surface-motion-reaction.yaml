@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-motion-reaction
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn: Start reaction motion
+- assertVisible:
+    id: conversation.reaction.motion.active
+- tapOn: Dismiss motion
+- assertVisible:
+    id: presentation.complete
+- assertNotVisible:
+    id: conversation.reaction.motion.active

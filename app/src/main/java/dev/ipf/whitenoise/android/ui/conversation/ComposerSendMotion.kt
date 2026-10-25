@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.style.ResolvedTextDirection
@@ -62,13 +64,17 @@ internal data class ComposerSendSource(
     val bottomRadius: Float,
     val strokeWidth: Float,
     val paragraphDirection: ResolvedTextDirection,
+    val composer: Rect? = null,
+    val viewport: ComposerSendViewportProjection? = null,
 )
 
 internal data class ComposerSendFlight(
     val presentationId: String,
     val source: ComposerSendSource,
     val inputGeneration: Long,
-)
+) {
+    val landing = ComposerSendLanding(source.surface, source.composer, source.fill, inputGeneration, source.viewport)
+}
 
 internal class ComposerSendMotion {
     var flight: ComposerSendFlight? by mutableStateOf(null)
@@ -79,6 +85,13 @@ internal class ComposerSendMotion {
     var sourceLayout: TextLayoutResult? = null
     var sourceSurface: LayoutCoordinates? = null
     var sourceEditor: LayoutCoordinates? = null
+    var composerCoordinates: LayoutCoordinates? = null
+    var composerTarget: ComposerSendComposerTarget? = null
+    var readViewport: ((String?) -> ComposerSendViewportProjection?)? = null
+    var lastRenderedPendingSource: ComposerSendSource? = null
+        private set
+    var lastRenderedGeometry: ComposerSendFlightGeometry? = null
+        private set
     var sourceFill: Color = Color.Transparent
     var sourceBorder: Color = Color.Transparent
     var sourceTopRadius: Float = 0f
@@ -92,31 +105,35 @@ internal class ComposerSendMotion {
     private var destinationCorners = RoundRect(Rect.Zero, CornerRadius.Zero)
     private var destinationStrokeWidth = 0f
 
-    fun capture(text: String): ComposerSendSource? {
-        val layout = sourceLayout ?: return null
-        val surface = sourceSurface?.visibleMotionBounds() ?: return null
-        val editor = sourceEditor?.visibleMotionBounds() ?: return null
-        // Trimmed sends, transformed mentions, clipped drafts and enormous layouts take the normal path.
-        if (!enabled || text.isBlank()) return null
-        if (text != text.trim() || text.length > MAX_COMPOSER_MOTION_CHARACTERS) return null
-        if (layout.layoutInput.text.text != text || layout.hasVisualOverflow) return null
-        if (!layout.layoutInput.style.color.isSpecified) return null
-        val paragraphDirection = layout.uniformParagraphDirection() ?: return null
-        if (layout.size.height > editor.height + 1f || layout.size.width > editor.width + 1f) return null
-        return ComposerSendSource(
-            text,
-            ownerGeneration,
-            layout,
-            surface,
-            editor,
-            sourceFill,
-            sourceBorder,
-            sourceTopRadius,
-            sourceBottomRadius,
-            sourceStrokeWidth,
-            paragraphDirection,
-        )
-    }
+    fun capture(text: String): ComposerSendSource? =
+        sourceLayout?.let { layout ->
+            sourceSurface?.visibleMotionBounds()?.let { surface ->
+                sourceEditor?.visibleMotionBounds()?.let { editor ->
+                    layout
+                        .takeIf {
+                            validComposerCaptureText(enabled, text, layout) &&
+                                validComposerCaptureLayout(layout, editor)
+                        }?.uniformParagraphDirection()
+                        ?.let { direction ->
+                            ComposerSendSource(
+                                text,
+                                ownerGeneration,
+                                layout,
+                                surface,
+                                editor,
+                                sourceFill,
+                                sourceBorder,
+                                sourceTopRadius,
+                                sourceBottomRadius,
+                                sourceStrokeWidth,
+                                direction,
+                                composerCoordinates?.visibleMotionBounds(),
+                                readViewport?.invoke(null),
+                            )
+                        }
+                }
+            }
+        }
 
     fun accept(
         source: ComposerSendSource?,
@@ -132,6 +149,8 @@ internal class ComposerSendMotion {
     }
 
     fun clear() {
+        lastRenderedGeometry = null
+        lastRenderedPendingSource = null
         flight = null
         destinationFrame = null
         destinationText = null
@@ -145,6 +164,9 @@ internal class ComposerSendMotion {
         sourceLayout = null
         sourceSurface = null
         sourceEditor = null
+        composerCoordinates = null
+        composerTarget = null
+        readViewport = null
     }
 
     @Suppress("LongParameterList") // Measured destination paint and geometry travel together.
@@ -187,21 +209,46 @@ internal class ComposerSendMotion {
     /** The source copy holds the accepted frame until the target measures, for at most 80 ms. */
     fun hides(id: String): Boolean = enabled && activePresentationId == id
 
+    private val landingMeasurement: ComposerSendLandingMeasurement?
+        get() =
+            destinationFrame?.visibleMotionBounds()?.let { frame ->
+                destinationText?.visibleMotionBounds()?.let { text ->
+                    composerCoordinates?.visibleMotionBounds()?.let { composer ->
+                        composerTarget?.let { target ->
+                            readViewport?.invoke(activePresentationId)?.let { viewport ->
+                                ComposerSendLandingMeasurement(frame, text, composer, target, destinationFill, viewport)
+                            }
+                        }
+                    }
+                }
+            }
+
+    private val hasPaintedLanding: Boolean
+        get() =
+            lastRenderedGeometry?.let { painted ->
+                flight?.landing?.resolve(landingMeasurement, 1f)?.let { current ->
+                    painted.settled && current.settled && motionRectsMatch(painted.bounds, current.canonicalFrame)
+                }
+            } == true
+
     private fun canRender(): Boolean {
         if (!enabled || flight == null) return false
         val frameVisible = destinationFrame?.visibleMotionBounds() != null
         val textVisible = destinationText?.visibleMotionBounds() != null
-        if (!frameVisible || !textVisible) return false
-        return destinationLayout?.layoutInput?.text?.text == flight?.source?.text &&
+        val visible = frameVisible && textVisible
+        val sameText = destinationLayout?.layoutInput?.text?.text == flight?.source?.text
+        val sameStyle =
             destinationLayout
                 ?.layoutInput
                 ?.style
                 ?.color
                 ?.isSpecified == true &&
-            destinationLayout?.uniformParagraphDirection() == flight?.source?.paragraphDirection
+                destinationLayout?.uniformParagraphDirection() == flight?.source?.paragraphDirection
+        val admittedLanding = flight?.landing?.resolve(landingMeasurement, 0f) != null
+        val validDestination = visible && sameText && sameStyle
+        return validDestination && admittedLanding
     }
 
-    @Suppress("LongMethod") // One draw pass keeps the surface and text on the same motion clock.
     @Composable
     fun Overlay() {
         val active = flight
@@ -210,104 +257,91 @@ internal class ComposerSendMotion {
         LaunchedEffect(active) {
             if (active == null) return@LaunchedEffect
             try {
-                val measured =
-                    withTimeoutOrNull(DESTINATION_MEASURE_WAIT_MILLIS) {
-                        while (!canRender()) withFrameNanos { }
-                        true
-                    } == true
-                if (!measured) return@LaunchedEffect
-                progress.animateTo(1f, tween(COMPOSER_SEND_MOTION_MILLIS, easing = FastOutSlowInEasing)) {
-                    if (!canRender()) throw CancellationException("Send presentation invalidated")
+                // One deadline shares the existing 80 ms overhead between admission and final native settlement.
+                withTimeoutOrNull(COMPOSER_SEND_MOTION_MILLIS + DESTINATION_MEASURE_WAIT_MILLIS) flightWork@{
+                    val measured =
+                        withTimeoutOrNull(DESTINATION_MEASURE_WAIT_MILLIS) {
+                            while (!canRender()) withFrameNanos { }
+                            true
+                        } == true
+                    if (!measured) return@flightWork
+                    progress.animateTo(1f, tween(COMPOSER_SEND_MOTION_MILLIS, easing = FastOutSlowInEasing)) {
+                        if (!canRender()) throw CancellationException("Send presentation invalidated")
+                        if (hasPaintedLanding) throw CancellationException("Accepted copy handed off")
+                    }
+                    awaitComposerSendLanding(::canRender) { hasPaintedLanding }
                 }
             } finally {
                 if (flight === active) clear()
             }
         }
-        Canvas(Modifier.fillMaxSize().onGloballyPositioned { origin = it }) {
-            if (active == null || flight !== active) return@Canvas
-            if (!enabled || origin?.isAttached != true) return@Canvas
-            val target = destinationFrame?.takeIf { it.isAttached }?.boundsInWindow() ?: active.source.surface
-            val textTarget = destinationText?.takeIf { it.isAttached }?.boundsInWindow() ?: active.source.editor
-            val layout = destinationLayout ?: active.source.layout
-            val windowOrigin = origin?.boundsInWindow()?.topLeft ?: return@Canvas
-            val p = progress.value
-            val source = active.source
-            val bounds =
-                Rect(
-                    mix(source.surface.left, target.left, p),
-                    mix(source.surface.top, target.top, p),
-                    mix(source.surface.right, target.right, p),
-                    mix(source.surface.bottom, target.bottom, p),
-                )
-
-            fun corner(
-                from: Float,
-                target: CornerRadius,
-            ): CornerRadius = CornerRadius(mix(from, target.x, p), mix(from, target.y, p))
-            val topLeft = corner(source.topRadius, destinationCorners.topLeftCornerRadius)
-            val topRight = corner(source.topRadius, destinationCorners.topRightCornerRadius)
-            val bottomRight = corner(source.bottomRadius, destinationCorners.bottomRightCornerRadius)
-            val bottomLeft = corner(source.bottomRadius, destinationCorners.bottomLeftCornerRadius)
-            val path =
-                Path().apply {
-                    addRoundRect(RoundRect(bounds, topLeft, topRight, bottomRight, bottomLeft))
-                }
-            translate(-windowOrigin.x, -windowOrigin.y) {
-                val fill =
-                    androidx.compose.ui.graphics
-                        .lerp(source.fill, destinationFill, p)
-                drawPath(path, fill)
-                val strokeWidth = mix(source.strokeWidth, destinationStrokeWidth, p)
-                if (strokeWidth > 0f) {
-                    val inset = strokeWidth / 2f
-
-                    fun insetCorner(corner: CornerRadius) =
-                        CornerRadius(
-                            (corner.x - inset).coerceAtLeast(0f),
-                            (corner.y - inset).coerceAtLeast(0f),
-                        )
-                    val borderPath =
-                        Path().apply {
-                            addRoundRect(
-                                RoundRect(
-                                    bounds.deflate(inset),
-                                    insetCorner(topLeft),
-                                    insetCorner(topRight),
-                                    insetCorner(bottomRight),
-                                    insetCorner(bottomLeft),
-                                ),
-                            )
-                        }
-                    drawPath(
-                        borderPath,
-                        androidx.compose.ui.graphics
-                            .lerp(source.border, destinationBorder, p),
-                        style = Stroke(strokeWidth),
-                    )
-                }
-                clipPath(path) {
-                    val rightAnchored = source.paragraphDirection == ResolvedTextDirection.Rtl
-                    val anchorX =
-                        if (rightAnchored) {
-                            mix(source.editor.right, textTarget.right, p)
-                        } else {
-                            mix(source.editor.left, textTarget.left, p)
-                        }
-                    val textY = mix(source.editor.top, textTarget.top, p)
-                    val sourceOrigin = Offset(anchorX - if (rightAnchored) source.layout.size.width else 0, textY)
-                    val targetOrigin = Offset(anchorX - if (rightAnchored) layout.size.width else 0, textY)
-                    // Preserve font size. Reflowed multiline layouts crossfade without scaling letters.
-                    val blend = ((p - TEXT_REFLOW_BLEND_START) / TEXT_REFLOW_BLEND_INTERVAL).coerceIn(0f, 1f)
-                    val sourceColor = source.layout.layoutInput.style.color
-                    val targetColor =
-                        layout.layoutInput.style.color
-                            .takeOrElse { sourceColor }
-                    val foreground = composerMotionForeground(sourceColor, targetColor, fill)
-                    drawText(source.layout, color = foreground, topLeft = sourceOrigin, alpha = 1f - blend)
-                    drawText(layout, color = foreground, topLeft = targetOrigin, alpha = blend)
-                }
-            }
+        val overlayModifier =
+            if (active != null && enabled) Modifier.testTag("conversation.send.motion.active") else Modifier
+        Canvas(overlayModifier.fillMaxSize().onGloballyPositioned { origin = it }) {
+            lastRenderedGeometry = null
+            lastRenderedPendingSource = null
+            drawFlight(active, origin, progress.value)
         }
+    }
+
+    private fun DrawScope.drawFlight(
+        active: ComposerSendFlight?,
+        origin: LayoutCoordinates?,
+        progress: Float,
+    ) {
+        val canvasOrigin = origin?.takeIf { enabled && it.isAttached }
+        if (active == null || flight !== active || canvasOrigin == null) return
+        val geometry = active.landing.resolve(landingMeasurement, progress)
+        if (geometry == null) {
+            if (progress == 0f) {
+                lastRenderedPendingSource = active.source
+                drawPendingSource(active.source, canvasOrigin.boundsInWindow().topLeft)
+            }
+            return
+        }
+        val textTarget = geometry.textTarget
+        val layout = destinationLayout ?: active.source.layout
+        val windowOrigin = canvasOrigin.boundsInWindow().topLeft
+        val p = geometry.progress
+        val source = active.source
+        val bounds = geometry.bounds
+
+        fun corner(
+            from: Float,
+            target: CornerRadius,
+        ): CornerRadius = CornerRadius(mix(from, target.x, p), mix(from, target.y, p))
+        val topLeft = corner(source.topRadius, destinationCorners.topLeftCornerRadius)
+        val topRight = corner(source.topRadius, destinationCorners.topRightCornerRadius)
+        val bottomRight = corner(source.bottomRadius, destinationCorners.bottomRightCornerRadius)
+        val bottomLeft = corner(source.bottomRadius, destinationCorners.bottomLeftCornerRadius)
+        val path =
+            Path().apply {
+                addRoundRect(RoundRect(bounds, topLeft, topRight, bottomRight, bottomLeft))
+            }
+        translate(-windowOrigin.x, -windowOrigin.y) {
+            val fill = geometry.fill
+            lastRenderedGeometry = geometry
+            drawPath(path, fill)
+            drawFlightBorder(
+                RoundRect(bounds, topLeft, topRight, bottomRight, bottomLeft),
+                source,
+                p,
+                destinationBorder,
+                destinationStrokeWidth,
+            )
+            clipPath(path) { drawFlightText(source, layout, textTarget, p, fill) }
+        }
+    }
+}
+
+/** One bounded native-frame settlement wait; no new animation or resettable deadline. */
+private suspend fun awaitComposerSendLanding(
+    canRender: () -> Boolean,
+    hasPaintedLanding: () -> Boolean,
+) {
+    while (!hasPaintedLanding()) {
+        if (!canRender()) throw CancellationException("Send settlement invalidated")
+        withFrameNanos { }
     }
 }
 
@@ -364,8 +398,107 @@ private const val TEXT_CONTRAST_OFFSET = 0.05f
 private fun TextLayoutResult.uniformParagraphDirection(): ResolvedTextDirection? {
     if (lineCount == 0) return null
     val direction = getParagraphDirection(0)
-    for (line in 1 until lineCount) {
-        if (getParagraphDirection(getLineStart(line)) != direction) return null
+    return direction.takeIf {
+        (1 until lineCount).all { line -> getParagraphDirection(getLineStart(line)) == direction }
     }
-    return direction
+}
+
+// Trimmed sends, transformed mentions, clipped drafts and enormous layouts take the normal path.
+private fun validComposerCaptureText(
+    enabled: Boolean,
+    text: String,
+    layout: TextLayoutResult,
+): Boolean {
+    val plainText = text.isNotBlank() && text == text.trim()
+    val matchingText = text.length <= MAX_COMPOSER_MOTION_CHARACTERS && layout.layoutInput.text.text == text
+    return enabled && plainText && matchingText
+}
+
+private fun validComposerCaptureLayout(
+    layout: TextLayoutResult,
+    editor: Rect,
+): Boolean {
+    val fitsEditor = layout.size.height <= editor.height + 1f && layout.size.width <= editor.width + 1f
+    return !layout.hasVisualOverflow && layout.layoutInput.style.color.isSpecified && fitsEditor
+}
+
+/** Keep the captured accepted ink visible during the bounded, zero-progress measurement wait. */
+private fun DrawScope.drawPendingSource(
+    source: ComposerSendSource,
+    windowOrigin: Offset,
+) {
+    val top = CornerRadius(source.topRadius)
+    val bottom = CornerRadius(source.bottomRadius)
+    val outline = RoundRect(source.surface, top, top, bottom, bottom)
+    val path = Path().apply { addRoundRect(outline) }
+    translate(-windowOrigin.x, -windowOrigin.y) {
+        drawPath(path, source.fill)
+        drawFlightBorder(outline, source, 0f, source.border, source.strokeWidth)
+        clipPath(path) { drawFlightText(source, source.layout, source.editor, 0f, source.fill) }
+    }
+}
+
+private fun DrawScope.drawFlightBorder(
+    outline: RoundRect,
+    source: ComposerSendSource,
+    p: Float,
+    destinationBorder: Color,
+    destinationStrokeWidth: Float,
+) {
+    val strokeWidth = mix(source.strokeWidth, destinationStrokeWidth, p)
+    if (strokeWidth > 0f) {
+        val inset = strokeWidth / 2f
+
+        fun insetCorner(corner: CornerRadius) =
+            CornerRadius(
+                (corner.x - inset).coerceAtLeast(0f),
+                (corner.y - inset).coerceAtLeast(0f),
+            )
+        val borderPath =
+            Path().apply {
+                addRoundRect(
+                    RoundRect(
+                        Rect(outline.left, outline.top, outline.right, outline.bottom).deflate(inset),
+                        insetCorner(outline.topLeftCornerRadius),
+                        insetCorner(outline.topRightCornerRadius),
+                        insetCorner(outline.bottomRightCornerRadius),
+                        insetCorner(outline.bottomLeftCornerRadius),
+                    ),
+                )
+            }
+        drawPath(
+            borderPath,
+            androidx.compose.ui.graphics
+                .lerp(source.border, destinationBorder, p),
+            style = Stroke(strokeWidth),
+        )
+    }
+}
+
+private fun DrawScope.drawFlightText(
+    source: ComposerSendSource,
+    layout: TextLayoutResult,
+    textTarget: Rect,
+    p: Float,
+    fill: Color,
+) {
+    val rightAnchored = source.paragraphDirection == ResolvedTextDirection.Rtl
+    val anchorX =
+        if (rightAnchored) {
+            mix(source.editor.right, textTarget.right, p)
+        } else {
+            mix(source.editor.left, textTarget.left, p)
+        }
+    val textY = mix(source.editor.top, textTarget.top, p)
+    val sourceOrigin = Offset(anchorX - if (rightAnchored) source.layout.size.width else 0, textY)
+    val targetOrigin = Offset(anchorX - if (rightAnchored) layout.size.width else 0, textY)
+    // Preserve font size. Reflowed multiline layouts crossfade without scaling letters.
+    val blend = ((p - TEXT_REFLOW_BLEND_START) / TEXT_REFLOW_BLEND_INTERVAL).coerceIn(0f, 1f)
+    val sourceColor = source.layout.layoutInput.style.color
+    val targetColor =
+        layout.layoutInput.style.color
+            .takeOrElse { sourceColor }
+    val foreground = composerMotionForeground(sourceColor, targetColor, fill)
+    drawText(source.layout, color = foreground, topLeft = sourceOrigin, alpha = 1f - blend)
+    drawText(layout, color = foreground, topLeft = targetOrigin, alpha = blend)
 }

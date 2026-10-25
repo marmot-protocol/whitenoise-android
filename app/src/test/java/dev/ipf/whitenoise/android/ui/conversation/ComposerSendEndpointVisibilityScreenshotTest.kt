@@ -57,7 +57,10 @@ class ComposerSendEndpointVisibilityScreenshotTest {
                         Modifier
                             .size(300.dp, 200.dp)
                             .testTag("clipped-composer")
-                            .onGloballyPositioned { owner.sourceSurface = it },
+                            .onGloballyPositioned {
+                                owner.sourceSurface = it
+                                owner.composerCoordinates = it
+                            },
                 ) {
                     Column(Modifier.padding(8.dp)) {
                         Text("Clipped editor", color = Color.White)

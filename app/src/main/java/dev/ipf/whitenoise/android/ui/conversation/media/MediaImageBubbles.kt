@@ -569,11 +569,18 @@ internal fun MasonryImageLayout(
                     verticalArrangement = Arrangement.spacedBy(gap),
                     modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(gap),
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    ) {
                         tile(0, Modifier.weight(1f).fillMaxHeight())
                         tile(1, Modifier.weight(1f).fillMaxHeight())
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    ) {
                         tile(2, Modifier.weight(1f).fillMaxHeight())
                         tile(3, Modifier.weight(1f).fillMaxHeight())
                     }

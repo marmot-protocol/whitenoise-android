@@ -26,8 +26,10 @@ class LocalReactionMotionLifecycleTest {
         rule.waitForIdle()
         val lateCallbackOwner = current
         rule.runOnIdle { enabled = false }
+        rule.mainClock.advanceTimeByFrame()
         rule.waitForIdle()
         rule.runOnIdle { enabled = true }
+        rule.mainClock.advanceTimeByFrame()
         rule.waitForIdle()
         rule.runOnIdle {
             assertNotSame(lateCallbackOwner, current)
@@ -49,6 +51,7 @@ class LocalReactionMotionLifecycleTest {
             oldOwner.accept("👍", true)
             owner = "second-account"
         }
+        rule.mainClock.advanceTimeByFrame()
         rule.waitForIdle()
         rule.runOnIdle {
             assertNotSame(oldOwner, current)

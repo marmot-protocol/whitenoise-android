@@ -2289,15 +2289,29 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
-      "symbol": "ChatRelaysScreen",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+      "symbol": "GroupRelaySettingsScreen",
       "bindings": [
         {
           "case": "groups-relays",
           "selector": {
-            "text": "Relays"
+            "text": "Configured relays"
           },
-          "scope": "group relay destination reached from chat info and backed out."
+          "scope": "Group relays destination reached from chat info for a native fixture group and backed out; no route mutation."
+        },
+        {
+          "case": "presentation-group-ui-relays-member-populated",
+          "selector": {
+            "text": "Only admins can change the relays this chat uses. You can view and copy them here."
+          },
+          "scope": "configured relay row and read-only member explanation; synthetic relay values, no dial or route mutation."
+        },
+        {
+          "case": "presentation-group-ui-relays-admin-empty",
+          "selector": {
+            "text": "No relays are configured for this chat."
+          },
+          "scope": "empty configured route with the admin editing-unavailable explanation; no dial or route mutation."
         }
       ]
     },
@@ -2310,14 +2324,7 @@
           "selector": {
             "text": "MLS group ID"
           },
-          "scope": "technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation."
-        },
-        {
-          "case": "presentation-group-ui-info-empty",
-          "selector": {
-            "text": "MLS group ID"
-          },
-          "scope": "technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation."
+          "scope": "technical group identifiers only; relays moved to Group relays; synthetic values, no native identifier mutation."
         }
       ]
     },
@@ -5988,6 +5995,34 @@
         }
       ],
       "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+      "symbol": "Overlay",
+      "bindings": [
+        {
+          "case": "presentation-surface-motion-send",
+          "selector": {
+            "id": "conversation.send.motion.active"
+          },
+          "scope": "Tag emitted inside the actual production owner during controlled measured acceptance; mount/dismiss ownership only. No painted-pixel, timing or performance claim."
+        }
+      ],
+      "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+      "symbol": "Modifier.localReactionOverlay",
+      "bindings": [
+        {
+          "case": "presentation-surface-motion-reaction",
+          "selector": {
+            "id": "conversation.reaction.motion.active"
+          },
+          "scope": "Tag emitted inside the actual production owner during controlled measured acceptance; mount/dismiss ownership only. No painted-pixel, timing or performance claim."
+        }
+      ],
+      "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
     }
   ]
 }

@@ -3251,6 +3251,9 @@ internal fun ConversationScreen(
     // row is entering; the follow effect below only runs after that frame.
     val sendMotionRuntime = remember(controller) { appState.runtimeGeneration }
     val composerSendMotion = remember(controller, chat.id) { ComposerSendMotion() }
+    composerSendMotion.readViewport = { presentationId ->
+        timelineViewport.composerSendProjection(timelinePublication, presentationId)
+    }
     val motionRouteAvailable = !showDetails && !routeTransitionInProgress
     val motionOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, sendMotionRuntime) && motionRouteAvailable
     val motionTranscriptVisible = !routePresentationFrozen && transcriptReadyToReveal
@@ -4117,7 +4120,8 @@ internal fun ConversationScreen(
                                             pendingDocumentUris
                                                 .getOrNull(index)
                                                 ?.let(mediaDraftState::releasePreparedDocument)
-                                            pendingDocumentUris = pendingDocumentUris.filterIndexed { i, _ -> i != index }
+                                            pendingDocumentUris =
+                                                pendingDocumentUris.filterIndexed { i, _ -> i != index }
                                         }
                                     },
                                 )
@@ -4323,7 +4327,9 @@ internal fun ConversationScreen(
                             ) ->
                             Column(modifier = Modifier.fillMaxSize()) {
                                 ConversationGroupRecoveryCard(controller, appState)
-                                ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
+                                ConversationEmptyMessage(
+                                    conversationEmptyState(controller.group.disappearingMessageSecs),
+                                )
                             }
                         renderedTimeline.isEmpty() &&
                             controller.pendingMembershipActivity == null &&
@@ -4347,7 +4353,9 @@ internal fun ConversationScreen(
                                     },
                                 )
                             } else {
-                                ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
+                                ConversationEmptyMessage(
+                                    conversationEmptyState(controller.group.disappearingMessageSecs),
+                                )
                             }
                         }
                         else ->
@@ -4372,7 +4380,8 @@ internal fun ConversationScreen(
                                                     openActionMenuId == null,
                                         ),
                             ) {
-                                val composedTranscriptRows = ConversationTranscriptDrawProbe.composedRows(renderedTimeline)
+                                val composedTranscriptRows =
+                                    ConversationTranscriptDrawProbe.composedRows(renderedTimeline)
                                 LazyColumn(
                                     state = listState,
                                     modifier =
@@ -4452,7 +4461,10 @@ internal fun ConversationScreen(
                                         },
                                     )
                                     controller.pendingMembershipActivity?.let { activity ->
-                                        item(key = "pending-membership:${activity.id}", contentType = "pendingMembership") {
+                                        item(
+                                            key = "pending-membership:${activity.id}",
+                                            contentType = "pendingMembership",
+                                        ) {
                                             PendingGroupMembershipRow(
                                                 activity = activity,
                                                 displayName = { ref ->
@@ -4483,7 +4495,9 @@ internal fun ConversationScreen(
                                     ) { index, item ->
                                         val messageId = item.record.messageIdHex
                                         val membershipFrameModifier =
-                                            if (item.projected?.groupSystem?.systemType in MEMBERSHIP_FRAME_EVENT_TYPES) {
+                                            if (
+                                                item.projected?.groupSystem?.systemType in MEMBERSHIP_FRAME_EVENT_TYPES
+                                            ) {
                                                 Modifier.membershipVisibleDraw(timelineViewport) {
                                                     controller.membershipTimings.projectionFrame(messageId)
                                                 }
@@ -4524,11 +4538,14 @@ internal fun ConversationScreen(
                                                 },
                                                 appState = appState,
                                                 controller = controller,
-                                                onOpenConversationMedia = { request -> mediaViewerSessionState.open(request) },
+                                                onOpenConversationMedia = { request ->
+                                                    mediaViewerSessionState.open(request)
+                                                },
                                                 eventCardResolver = eventCardResolver,
                                                 documentSaveFallback = documentSaveFallback,
                                                 composerTextState = composerTextState,
-                                                highlighted = messageId == navigationState.targetHighlight.highlightedMessageId,
+                                                highlighted =
+                                                    messageId == navigationState.targetHighlight.highlightedMessageId,
                                                 selectionMode = selectionMode,
                                                 textSelectionMode =
                                                     textSelectionMessageId == messageId,
@@ -4536,7 +4553,9 @@ internal fun ConversationScreen(
                                                     if (enabled) {
                                                         ttsFollowHandle.suspendForDirectDrag(
                                                             appState.ttsController.state.value,
-                                                            appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                            appState.ownsTtsAutoReadSession(
+                                                                controller.group.groupIdHex,
+                                                            ),
                                                         )
                                                         openActionMenuId = null
                                                         textSelectionMessageId = messageId
@@ -4546,7 +4565,9 @@ internal fun ConversationScreen(
                                                     }
                                                 },
                                                 onTextSelectionBoundsChange = { bounds ->
-                                                    if (textSelectionMessageId == messageId) textSelectionBubbleBounds = bounds
+                                                    if (textSelectionMessageId == messageId) {
+                                                        textSelectionBubbleBounds = bounds
+                                                    }
                                                 },
                                                 batchSelectable =
                                                     messageId in selectableMessages &&
@@ -4571,7 +4592,9 @@ internal fun ConversationScreen(
                                                     ttsFollowHandle.suspendForDirectDrag(
                                                         state = appState.ttsController.state.value,
                                                         ownsSession =
-                                                            appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                            appState.ownsTtsAutoReadSession(
+                                                                controller.group.groupIdHex,
+                                                            ),
                                                     )
                                                     scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
                                                     controller.onOlderPagingGestureStarted()
@@ -4641,9 +4664,12 @@ internal fun ConversationScreen(
                                                         // Preserve a visible top edge; a deep offset into a tall body
                                                         // must not survive after that content has been clipped away.
                                                         val visible =
-                                                            timelineViewport.readingLayoutInfo().visibleItemsInfo.firstOrNull {
-                                                                it.index == index
-                                                            }
+                                                            timelineViewport
+                                                                .readingLayoutInfo()
+                                                                .visibleItemsInfo
+                                                                .firstOrNull {
+                                                                    it.index == index
+                                                                }
                                                         val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
                                                         val anchor =
                                                             ConversationScrollAnchor(
@@ -4677,7 +4703,9 @@ internal fun ConversationScreen(
                                                     ttsFollowHandle.onSentenceSeek(
                                                         state = state,
                                                         ownsSession =
-                                                            appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                            appState.ownsTtsAutoReadSession(
+                                                                controller.group.groupIdHex,
+                                                            ),
                                                     )
                                                 },
                                             )
@@ -4693,7 +4721,10 @@ internal fun ConversationScreen(
                                                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                                                 } else {
                                                     IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
-                                                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                                                        Icon(
+                                                            Icons.Default.Refresh,
+                                                            contentDescription = stringResource(R.string.refresh),
+                                                        )
                                                     }
                                                 }
                                             }
@@ -4777,7 +4808,8 @@ internal fun ConversationScreen(
                                         // mention and marks it read, so the count steps down.
                                         val mentionCount = unreadMentionMessageIds.size
                                         if (!selectionMode && mentionCount > 0) {
-                                            val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
+                                            val jumpToMentionLabel =
+                                                stringResource(R.string.conversation_jump_to_mention)
                                             Surface(
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.tertiaryContainer,
@@ -4819,7 +4851,8 @@ internal fun ConversationScreen(
                                                                 },
                                                                 isUnreadTopAligned = {
                                                                     val targetIndex =
-                                                                        pendingMessageId?.let(::currentTimelineListIndex)
+                                                                        pendingMessageId
+                                                                            ?.let(::currentTimelineListIndex)
                                                                     targetIndex != null &&
                                                                         isConversationItemTopAligned(
                                                                             listState,
@@ -4829,9 +4862,12 @@ internal fun ConversationScreen(
                                                                 },
                                                                 prepareTail = {
                                                                     loadConversationTimelineToNewest(
-                                                                        hasMoreAfter = { controller.hasMoreAfterTimeline },
+                                                                        hasMoreAfter = {
+                                                                            controller.hasMoreAfterTimeline
+                                                                        },
                                                                         loadNewer = controller::loadNewerTimelinePage,
-                                                                        returnToLatest = controller::returnToLatestWindow,
+                                                                        returnToLatest =
+                                                                            controller::returnToLatestWindow,
                                                                     )
                                                                 },
                                                                 resolveTailIndex = { currentTailIndex },
@@ -4860,7 +4896,10 @@ internal fun ConversationScreen(
                                 controller.timeline.firstOrNull { row ->
                                     key.groupIdHex == controller.group.groupIdHex &&
                                         row.record.messageIdHex == key.messageIdHex &&
-                                        !MessageProjector.isDeleted(row.record.messageIdHex, controller.deletedMessageIds)
+                                        !MessageProjector.isDeleted(
+                                            row.record.messageIdHex,
+                                            controller.deletedMessageIds,
+                                        )
                                 }
                             }
                         val youLabel = stringResource(R.string.you)

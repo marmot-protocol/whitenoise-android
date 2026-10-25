@@ -1113,7 +1113,8 @@ internal fun ProfileSheet(
                                         accountWideGroups.requestMembers(shared.unresolvedGroupIds, retry = true)
                                     }
                                 },
-                                avatar = { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
+                                avatar =
+                                    { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
                                 groupAnimation = { id ->
                                     sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).groupAnimation }
                                 },

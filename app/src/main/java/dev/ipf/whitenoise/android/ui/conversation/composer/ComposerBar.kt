@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -1085,6 +1086,8 @@ internal fun ComposerBar(
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
+        val renderedMotionGeneration = textState.contentGeneration
+        val renderedMotionValue = textFieldValue
         val transitionTargetHeightPx =
             composerHeightPx(
                 state = composerExpansion,
@@ -1152,7 +1155,9 @@ internal fun ComposerBar(
                                 Modifier.heightIn(max = automaticComposerCeiling)
                             else -> Modifier.height(resolvedComposerHeight)
                         },
-                    ).onSizeChanged { size ->
+                    ).onGloballyPositioned { coordinates ->
+                        sendMotion?.composerCoordinates = coordinates
+                    }.onSizeChanged { size ->
                         visibleComposerHeightPx = size.height.toFloat()
                         if (
                             composerExpansion.mode == ComposerExpansionMode.Automatic &&
@@ -1562,6 +1567,24 @@ internal fun ComposerBar(
                             val estimatePx = heightWithChrome.coerceAtMost(automaticComposerCeilingPx)
                             val estimate = textFieldValue to estimatePx
                             automaticLayoutEstimate = estimate
+                            // An older layout callback cannot label its height with a newly cleared generation.
+                            val matchingMotionInput =
+                                renderedMotionGeneration == textState.contentGeneration &&
+                                    renderedMotionValue == textState.valueState.value
+                            if (renderedMotionValue.text.isEmpty() && matchingMotionInput) {
+                                val settledHeight =
+                                    composerHeightPx(
+                                        ComposerExpansionState(),
+                                        estimatePx,
+                                        minimumRenderedComposerHeightPx,
+                                        maximumComposerHeightPx,
+                                    )
+                                sendMotion?.composerTarget =
+                                    dev.ipf.whitenoise.android.ui.conversation.ComposerSendComposerTarget(
+                                        renderedMotionGeneration,
+                                        settledHeight,
+                                    )
+                            }
                             if (composerExpansion.mode == ComposerExpansionMode.Automatic &&
                                 !composerHeightDragActive &&
                                 !composerHeightTransitionActive
