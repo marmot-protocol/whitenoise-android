@@ -30,6 +30,14 @@
           "MSG-001",
           "MSG-009"
         ]
+      },
+      {
+        "surface": "Measured long-body collapse eligibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+        "anchor": "var bodyExceedsCollapseLimit",
+        "test_ids": [
+          "MSG-040"
+        ]
       }
     ],
     "composable_surfaces": [

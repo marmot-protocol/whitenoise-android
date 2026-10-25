@@ -447,6 +447,48 @@ class ConversationScrollCoordinatorTest {
         assertEquals(ConversationScrollMode.ReadingHistory("reader", 72), snapshot.settledMode)
     }
 
+    /** The Show less landing at the native newest edge must still follow the next incoming message. */
+    @Test fun bodyCollapseAtNaturalTailKeepsIncomingFollowing() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val landing = anchor(messageId = "collapsing-newest", listIndex = 0)
+            coordinator.settleLandingAt(
+                landing,
+                atNewestEdge =
+                    coordinator.isFollowingTail &&
+                        conversationLandingAtNewestEdge(
+                            atNaturalTail = true,
+                            hasMoreAfter = false,
+                        ),
+            )
+            assertTrue(coordinator.isFollowingTail)
+            assertTrue(coordinator.followTailIfAllowed({ 0 }, ConversationScrollReason.NewMessage, frameCount = 0))
+        }
+
+    /** Collapsing history preserves its logical row instead of joining a new arrival or a clipped newer page. */
+    @Test fun bodyCollapseInHistoryKeepsItsReadingAnchorAndDoesNotFollowIncoming() =
+        runTest {
+            val coordinator =
+                ConversationScrollCoordinator(
+                    RecordingScrollWriter(),
+                    ConversationScrollMode.ReadingHistory("history", 12),
+                )
+            val landing = anchor(messageId = "history", listIndex = 8, pixelOffset = 12)
+            coordinator.settleLandingAt(
+                landing,
+                atNewestEdge =
+                    coordinator.isFollowingTail &&
+                        conversationLandingAtNewestEdge(
+                            atNaturalTail = true,
+                            hasMoreAfter = false,
+                        ),
+            )
+            assertEquals(ConversationScrollMode.ReadingHistory("history", 12), coordinator.mode)
+            assertFalse(coordinator.followTailIfAllowed({ 0 }, ConversationScrollReason.NewMessage, frameCount = 0))
+            assertEquals(landing, coordinator.bookmark(landing).anchor)
+        }
+
     /** A landing that rests at the newest edge follows the tail like a drag that ends there, and drops its anchor. */
     @Test
     fun landingAtTheNewestEdgeResumesTailFollowing() {

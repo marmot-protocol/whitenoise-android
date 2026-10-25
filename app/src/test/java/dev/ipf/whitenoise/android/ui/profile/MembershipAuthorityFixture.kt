@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.GroupConversationSnapshotFfi
@@ -31,6 +32,8 @@ internal class MembershipAuthorityFixture {
     val entered = ConcurrentHashMap<String, CountDownLatch>()
     val releases = ConcurrentHashMap<String, CountDownLatch>()
     val reads = CopyOnWriteArrayList<String>()
+    private val authorityEvents = CopyOnWriteArrayList<String>()
+    private val authorityTraceStartedAt = System.nanoTime()
     val self = ConversationTimelineTestIds.ACCOUNT_ID
     val person = "cc".repeat(32)
     val account = "membership-authority-owner"
@@ -68,6 +71,28 @@ internal class MembershipAuthorityFixture {
         state.mutationsScope.cancel()
     }
 
+    /** Diagnostic recording cannot change native completion or replace the original failure. */
+    fun recordAuthorityEvent(
+        id: String,
+        event: String,
+    ) {
+        runCatching {
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - authorityTraceStartedAt)
+            val entry =
+                "$elapsedMs ms uptime=${SystemClock.uptimeMillis()} id=$id event=$event " +
+                    "thread=${Thread.currentThread().name.take(80)} " +
+                    "account=${state.activeAccountRef} runtime=${state.runtimeGeneration}"
+            synchronized(authorityEvents) {
+                if (authorityEvents.size < MAX_AUTHORITY_EVENTS) authorityEvents += entry
+            }
+        }
+    }
+
+    /** Snapshot only fixture-owned observations; no additional native read is requested. */
+    fun authorityDiagnostics(): String =
+        "reads=${reads.take(MAX_AUTHORITY_EVENTS)} releases=${releases.mapValues { it.value.count }} " +
+            "failures=$failures events=${authorityEvents.toList()} main=${Dispatchers.Main}"
+
     /** Returns a valid joined native frontier for a real admin and non-admin target. */
     private fun snapshot(item: ChatListItem): GroupConversationSnapshotFfi {
         val result = groupConversationSnapshotFixture(item.group.name.orEmpty(), true)
@@ -101,6 +126,25 @@ internal class MembershipAuthorityFixture {
         return result
     }
 
+    /** Reads the same gated native snapshot while keeping proxy dispatch complexity bounded. */
+    private fun readNativeSnapshot(args: Array<out Any?>?): GroupConversationSnapshotFfi {
+        check(args!![0] == account)
+        val id = args[1] as String
+        reads += id
+        recordAuthorityEvent(id, "native-enter")
+        return try {
+            entered[id]?.countDown()
+            check(releases[id]?.await(10, TimeUnit.SECONDS) != false) { "Native snapshot gate timed out" }
+            check(id !in failures) { "Native authority unavailable" }
+            snapshot(listOf(fast, slow).single { it.id == id }).also {
+                recordAuthorityEvent(id, "native-return")
+            }
+        } catch (failure: Throwable) {
+            recordAuthorityEvent(id, "native-failure:${failure.javaClass.simpleName}")
+            throw failure
+        }
+    }
+
     /** Uses the actual MarmotInterface method consumed by WhiteNoiseAppState.profileMembershipController. */
     private fun native(): MarmotInterface =
         Proxy.newProxyInstance(
@@ -108,15 +152,7 @@ internal class MembershipAuthorityFixture {
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, args ->
             when (val name = method.name.substringBefore('-')) {
-                "groupConversationSnapshot" -> {
-                    check(args!![0] == account)
-                    val id = args[1] as String
-                    reads += id
-                    entered[id]?.countDown()
-                    check(releases[id]?.await(10, TimeUnit.SECONDS) != false) { "Native snapshot gate timed out" }
-                    check(id !in failures) { "Native authority unavailable" }
-                    snapshot(listOf(fast, slow).single { it.id == id })
-                }
+                "groupConversationSnapshot" -> readNativeSnapshot(args)
                 "removeMembersDetailed" -> {
                     check(args!![0] == account)
                     val id = args[1] as String
@@ -148,4 +184,8 @@ internal class MembershipAuthorityFixture {
                 else -> error("Unexpected membership authority call: $name")
             }
         } as MarmotInterface
+
+    companion object {
+        private const val MAX_AUTHORITY_EVENTS = 32
+    }
 }

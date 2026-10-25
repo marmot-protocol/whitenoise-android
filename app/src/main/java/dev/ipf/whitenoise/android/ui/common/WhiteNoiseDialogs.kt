@@ -135,6 +135,7 @@ internal fun WhiteNoiseDialogChoiceRow(
     subtitle: String? = null,
     enabled: Boolean = true,
     accessibilityLabel: String? = null,
+    highlightSelected: Boolean = true,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         Row(
@@ -143,7 +144,7 @@ internal fun WhiteNoiseDialogChoiceRow(
                     .requiredWidth(maxWidth + ChoiceDialogDefaults.RowOverhang * 2)
                     .then(modifier)
                     .heightIn(min = ChoiceDialogDefaults.RowMinHeight)
-                    .whiteNoiseDialogSelection(selected && enabled)
+                    .whiteNoiseDialogSelection(selected && enabled && highlightSelected)
                     .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
                     .then(
                         if (accessibilityLabel == null) {

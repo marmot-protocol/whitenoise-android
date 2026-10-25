@@ -367,6 +367,7 @@ internal fun MessageBubble(
     mentionPickerEnabled: Boolean,
     // The conversation's accepted-send reveal, run after a send from the Read more reader closes it (#3268).
     onReaderSendAccepted: () -> Unit = {},
+    onBeforeBodyCollapse: () -> Unit = {},
     showSenderName: Boolean = false,
     showSenderAvatar: Boolean = false,
     collapseLongMessages: Boolean = true,
@@ -489,7 +490,12 @@ internal fun MessageBubble(
     val context = LocalContext.current
     // Per-key state lives in three holders so the bubble stays within ART's compile limit (MessageBubbleState.kt).
     val pressState = remember(item.presentationId) { MessageBubblePressState() }
-    val surfaces = remember(record.messageIdHex) { MessageBubbleSurfaceState() }
+    val surfaces = remember(controller, item.presentationId) { MessageBubbleSurfaceState() }
+    var explicitlyCollapsed by androidx.compose.runtime.saveable.rememberSaveable(
+        controller.boundAccountRef,
+        controller.group.groupIdHex,
+        item.presentationId,
+    ) { mutableStateOf(false) }
     val textLayouts = remember(record.messageIdHex) { MessageBubbleTextLayouts() }
     LaunchedEffect(isActionMenuOpen) {
         if (!isActionMenuOpen) pressState.longPressTtsStart = null
@@ -2210,7 +2216,7 @@ internal fun MessageBubble(
                 // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
                 // setting disabled never collapse (#325, #1180).
-                val bodyCanCollapse = collapseLongMessages && !deleted && !persistedFailure
+                val bodyCanCollapse = (collapseLongMessages || explicitlyCollapsed) && !deleted && !persistedFailure
                 val collapsible = bodyCanCollapse && !textSelectionMode && !ttsBodyExpanded
 
                 /**
@@ -2488,6 +2494,7 @@ internal fun MessageBubble(
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
+                                    onCollapseEligibilityChanged = { surfaces.bodyExceedsCollapseLimit = it },
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
                                     bubbleBackgroundColor = bubbleBackgroundColor,
@@ -2578,6 +2585,7 @@ internal fun MessageBubble(
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
+                                    onCollapseEligibilityChanged = { surfaces.bodyExceedsCollapseLimit = it },
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
                                     bubbleBackgroundColor = bubbleBackgroundColor,
@@ -2653,6 +2661,7 @@ internal fun MessageBubble(
                             ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                             selectionWrapper = selectionWrapper,
                             collapsible = collapsible,
+                            onCollapseEligibilityChanged = { surfaces.bodyExceedsCollapseLimit = it },
                             replyPreviewPresent = replyPreview != null,
                             hasMedia = hasMedia,
                             bubbleBackgroundColor = bubbleBackgroundColor,
@@ -2699,6 +2708,19 @@ internal fun MessageBubble(
                     // Speak aloud uses the same edit-aware user-authored text as TTS
                     // projection, not the display fallback (filenames, placeholders,
                     // reactions, system copy).
+                    canShowLess =
+                        record.kind == 9uL &&
+                            item.status != MessageStatus.Failed &&
+                            !deleted &&
+                            !persistedFailure &&
+                            !collapsible &&
+                            !ttsBodyExpanded &&
+                            surfaces.bodyExceedsCollapseLimit,
+                    onShowLess = {
+                        onActionMenuOpenChange(false)
+                        onBeforeBodyCollapse()
+                        explicitlyCollapsed = true
+                    },
                     canTranslate = translationSource != null,
                     onTranslate = {
                         onActionMenuOpenChange(false)
@@ -2996,6 +3018,20 @@ internal fun MessageBubble(
                                 surfaces.emojiPickerOpen = true
                             }
                         },
+                        onShowLess =
+                            if (
+                                item.status == MessageStatus.Failed ||
+                                ttsBodyExpanded ||
+                                !surfaces.bodyExceedsCollapseLimit
+                            ) {
+                                null
+                            } else {
+                                {
+                                    onBeforeBodyCollapse()
+                                    explicitlyCollapsed = true
+                                    surfaces.expandedFullView = false
+                                }
+                            },
                         onCopy = ::copyMessageText,
                         onDelete = {
                             // Close the full view before opening the shared

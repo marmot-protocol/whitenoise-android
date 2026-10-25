@@ -222,9 +222,12 @@ class MediaTileLifecycleTest {
 
     /** No tile may offer Download or Retry while its bytes are retained locally. */
     private fun assertNoDownloadAction() {
-        val download = nodesDescribed(text(R.string.media_tap_to_download))
+        val downloadNodes =
+            composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_download)).fetchSemanticsNodes()
+        val download = downloadNodes.size
+        val observed = downloadNodes.map { "id=${it.id} semantics=${it.config}" }
         val retry = nodesDescribed(text(R.string.media_tap_to_retry))
-        assertEquals("a Download action flashed on a retained tile", 0, download)
+        assertEquals("a Download action flashed on a retained tile: $observed", 0, download)
         assertEquals("a Retry action appeared on a retained tile", 0, retry)
     }
 

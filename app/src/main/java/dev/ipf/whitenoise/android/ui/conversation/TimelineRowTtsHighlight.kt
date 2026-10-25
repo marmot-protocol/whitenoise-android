@@ -106,6 +106,7 @@ internal fun TimelineRowMessageBubble(
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
     onReaderSendAccepted: () -> Unit = {},
+    onBeforeBodyCollapse: () -> Unit = {},
     showSenderName: Boolean,
     showSenderAvatar: Boolean,
     collapseLongMessages: Boolean,
@@ -189,6 +190,7 @@ internal fun TimelineRowMessageBubble(
             ttsRowInstance = ttsRowInstance,
             parseMarkdown = parseMarkdown,
             onReaderSendAccepted = onReaderSendAccepted,
+            onBeforeBodyCollapse = onBeforeBodyCollapse,
         )
     }
 }

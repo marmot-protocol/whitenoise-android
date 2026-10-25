@@ -224,7 +224,7 @@ private fun ConversationDictationActiveActions(
     controller: ConversationDictationController,
     actionColors: AccountActionColors,
 ) {
-    val pasteLabel = stringResource(R.string.paste)
+    val pasteLabel = stringResource(R.string.paste_dictation_transcript)
     val sendLabel = stringResource(R.string.send)
     if (controller.captureInProgress) {
         ConversationDictationListeningIndicator()

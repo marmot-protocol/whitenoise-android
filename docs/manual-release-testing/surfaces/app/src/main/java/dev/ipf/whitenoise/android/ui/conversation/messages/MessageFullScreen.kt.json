@@ -25,7 +25,8 @@
         "anchor": "fun MessageFullScreenView(",
         "test_ids": [
           "MSG-013",
-          "MSG-026"
+          "MSG-026",
+          "MSG-040"
         ]
       }
     ],
@@ -115,6 +116,16 @@
         "anchor": "fun MessageFullScreenBody(",
         "test_ids": [
           "RDR-006"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:show_less",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "R.string.show_less",
+        "test_ids": [
+          "MSG-040"
         ]
       }
     ]

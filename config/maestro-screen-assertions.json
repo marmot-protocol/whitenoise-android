@@ -5951,6 +5951,50 @@
           "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified."
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+      "symbol": "FontSizeDialog",
+      "bindings": [
+        {
+          "case": "preferences-font-cancel",
+          "entry_assertion": {
+            "id": "font_size.preview"
+          },
+          "opened_by": {
+            "tapOn": {
+              "text": "Font size"
+            }
+          },
+          "selector": {
+            "text": "Extra large"
+          },
+          "scope": "Existing runtime preferences fixture enters the real FontSizeDialog, asserts its inert preview and Extra large option, then dismisses without changing Default. Source registration only; actual Maestro execution remains separately required."
+        }
+      ],
+      "remaining": "Live all-four selection, persistence/failure recovery, font/RTL/AMOLED layout, lifecycle and accessibility qualification remain required. A registered direct assertion is not executed Maestro or physical proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+      "symbol": "FontFamilyDialog",
+      "bindings": [
+        {
+          "case": "preferences-font-cancel",
+          "entry_assertion": {
+            "id": "font_family.preview.viewport"
+          },
+          "opened_by": {
+            "tapOn": {
+              "text": "App font"
+            }
+          },
+          "selector": {
+            "id": "font_family.system"
+          },
+          "scope": "The existing runtime preferences fixture opens the real App font dialog, directly asserts its preview viewport and fixed System/Done actions, then dismisses with Done without changing the selected family. Source registration only; actual Maestro execution remains separately required."
+        }
+      ],
+      "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
     }
   ]
 }

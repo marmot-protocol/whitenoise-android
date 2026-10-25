@@ -15,8 +15,13 @@ name: preferences-font-large
       text: "Font size"
     direction: DOWN
 - tapOn: "Font size"
-- tapOn: "Large"
-- assertVisible: "Large"
+- assertVisible:
+    id: "font_size.preview"
+- tapOn:
+    id: "font_size.Large"
+- assertVisible:
+    id: "font_size.Large"
+- tapOn: "Done"
 - back
 - tapOn: "Appearance"
 - scrollUntilVisible:

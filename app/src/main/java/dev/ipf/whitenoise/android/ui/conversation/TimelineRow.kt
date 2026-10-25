@@ -83,6 +83,7 @@ internal fun TimelineRow(
     onWave: (suspend (String, () -> Unit) -> Unit)? = null,
     // Reveals a send accepted from a long message's Read more reader (#3268).
     onReaderSendAccepted: () -> Unit = {},
+    onBeforeBodyCollapse: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     Column(modifier.fillMaxWidth()) {
@@ -267,6 +268,7 @@ internal fun TimelineRow(
                         mentionCandidates = mentionCandidates,
                         mentionPickerEnabled = mentionPickerEnabled,
                         onReaderSendAccepted = onReaderSendAccepted,
+                        onBeforeBodyCollapse = onBeforeBodyCollapse,
                         showSenderName = senderDecoration.showName,
                         showSenderAvatar = senderDecoration.showAvatar,
                         collapseLongMessages = collapseLongMessages,

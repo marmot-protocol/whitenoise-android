@@ -729,6 +729,8 @@
     <string name="diagnostic_send_to_self_failed">Kendine gönderme başarısız: %1$s</string>
     <string name="clear">Temizle</string>
     <string name="paste">Yapıştır</string>
+    <string name="paste_from_clipboard">Panodan yapıştır</string>
+    <string name="paste_dictation_transcript">Dökümü yapıştır</string>
     <string name="live">Canlı</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Henüz aktarma anlık görüntüsü yok.</string>
@@ -2344,9 +2346,9 @@
     <string name="profile_notifications_mute">Bu kişinin bildirimlerini sessize al</string>
     <string name="profile_notifications_system">Ses ve sistem davranışı</string>
     <string name="profile_notifications_android_vibration">Android tarafından ayarlandı</string>
-    <string name="profile_notification_scope_detail">Bu hesaptaki tüm sohbetlerde bu kişinin mesajlarına uygulanır. Teslimat ve okunmamış mesaj sayısı değişmez.</string>
+    <string name="profile_notification_scope_detail">Özel Android ayarları, bu hesabın tüm sohbetlerinde bu kişiye atfedilen mesajlar, davetler ve grup rolü değişiklikleri için geçerlidir. Sessize alma yalnızca mesajlara uygulanır. İletim ve okunmamış sayıları değişmez.</string>
     <string name="profile_notification_precedence">Önce sohbeti sessize alma ve yalnızca bahsetmeler kuralları uygulanır. Ardından bu kişinin sessize alma veya özel Android ayarları gelir. Varsayılanları kullanmak sohbet ve genel ayarları geri getirir. Mevcut bildirimler özgün kanallarını korur.</string>
-    <string name="profile_notification_channel_name">%1$s · Tüm sohbetlerdeki mesajlar</string>
+    <string name="profile_notification_channel_name">%1$s · Sohbetler genelinde bildirimler</string>
     <string name="destination_filter_all">Tüm sohbetler</string>
     <string name="destination_filter_selected">Seçilenleri incele (%1$d)</string>
     <string name="destination_filter_label">Sohbetleri filtrele</string>
@@ -2442,6 +2444,12 @@
     <string name="search_message_content_failed">Mesaj içeriğinde arama yapılamadı.</string>
     <string name="document_save_interrupted">Kimlik doğrulama bu kaydetme işlemini kesintiye uğrattı. Hedef seçmek için tekrar Kaydet’i seçin.</string>
     <string name="avatar_preparation_interrupted">Görüntü güncellemesi kesintiye uğradı. Tekrar seçmeden önce mevcut görüntüyü kontrol edin.</string>
+    <string name="show_less">Daha az göster</string>
+    <string name="font_size_preview">Mesaj önizlemesi</string>
+    <string name="font_size_sample_received">İstasyonda buluşalım. Öğleden sonra senin için hâlâ uygun mu?</string>
+    <string name="font_size_sample_quote">Öğleden sonra istasyonda</string>
+    <string name="font_size_sample_sent">Evet, görüşürüz! Varınca sana mesaj atarım.</string>
+    <string name="font_size_save_failed">Metin boyutu kaydedilemedi. Önceden kaydedilen boyut korundu.</string>
     <string name="setup_finding_inspection_completed">İnceleme tamamlandı. Bu tek başına rölenin yazmayı desteklediğini doğrulamaz.</string>
     <string name="setup_finding_context_unknown">Kaynak belirtilmemiş</string>
     <string name="setup_finding_context_discovery">Kayıt keşfi</string>

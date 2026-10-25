@@ -10,6 +10,30 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
+internal val ComposerActionRowHeight = 48.dp
+
+/** The shared placement boundary used by both action clusters and their editor viewport. */
+internal fun composerActionRowTop(
+    spaceHeight: Int,
+    rowHeight: Int,
+    editingProgress: Float,
+): Int {
+    val slack = (spaceHeight - rowHeight).coerceAtLeast(0)
+    val bias = COMPOSER_ACTION_CENTER_BIAS + (1f - COMPOSER_ACTION_CENTER_BIAS) * editingProgress.coerceIn(0f, 1f)
+    return (slack * bias).roundToInt()
+}
+
+/** Keep the protected inline editor until at least one complete line fits above the moving toolbar. */
+internal fun composerEditorViewportHeight(
+    allocatedHeight: Int,
+    heightAboveActions: Int,
+    lineHeight: Int,
+): Int =
+    if (heightAboveActions >= lineHeight.coerceAtLeast(1)) {
+        allocatedHeight.coerceAtMost(heightAboveActions.coerceAtLeast(0))
+    } else {
+        allocatedHeight
+    }
 
 /**
  * Vertical placement for the composer's action clusters, inline and trailing alike: centered with the text
@@ -27,16 +51,14 @@ internal class ComposerActionRowAlignment(
         layoutDirection: LayoutDirection,
     ): IntOffset {
         val x = horizontal.align(size.width, space.width, layoutDirection)
-        val slack = (space.height - size.height).coerceAtLeast(0)
-        val bias = COMPOSER_ACTION_CENTER_BIAS + (1f - COMPOSER_ACTION_CENTER_BIAS) * editingProgress().coerceIn(0f, 1f)
-        return IntOffset(x, (slack * bias).roundToInt())
+        return IntOffset(x, composerActionRowTop(space.height, size.height, editingProgress()))
     }
 }
 
 /** Keeps the trailing native action owner inside the shared 48dp composer toolbar. */
 internal fun Modifier.expandedComposerActionRow(): Modifier =
     layout { measurable, constraints ->
-        val rowHeight = 48.dp.roundToPx().coerceAtMost(constraints.maxHeight)
+        val rowHeight = ComposerActionRowHeight.roundToPx().coerceAtMost(constraints.maxHeight)
         val endInset = 4.dp.roundToPx()
         val placeable =
             measurable.measure(

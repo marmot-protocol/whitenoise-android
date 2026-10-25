@@ -1119,6 +1119,13 @@ internal fun ChatsScreen(
             programmaticViewportGeneration += 1L
         },
     )
+    ChatListUnreadTopResetEffect(
+        listState = chatListState,
+        datasetKey = chatListDatasetKey,
+        unreadOnly = unreadOnly,
+        searchOpen = searchOpen,
+        onScrollRequested = { programmaticViewportGeneration += 1L },
+    )
     GlobalSearchGridResetEffect(searchViewport, chatListDatasetKey, browsingAttachments)
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -2107,11 +2114,10 @@ internal fun ChatsScreen(
                         onUnreadOnlyChange = { setUnreadOnly(it) },
                         status = {
                             val unreadRefreshPending = unreadOnly && currentUnreadSnapshot == null
-                            val retainedUnreadVisible = !unreadReadFailed && displayUnreadSnapshot != null
-                            if (unreadRefreshPending && retainedUnreadVisible) {
+                            if (!unreadReadFailed && unreadRefreshPending && visibleItems.isNotEmpty()) {
                                 CircularProgressIndicator(Modifier.size(16.dp).testTag("chats.unread_refresh"))
                             }
-                            val failedUnreadSnapshot = unreadReadFailed && unreadOnly && displayUnreadSnapshot != null
+                            val failedUnreadSnapshot = unreadReadFailed && unreadOnly
                             if (failedUnreadSnapshot && visibleItems.isNotEmpty()) {
                                 TextButton(onClick = { unreadRetry++ }) {
                                     Text(stringResource(R.string.pull_unread_retry))
@@ -2119,6 +2125,129 @@ internal fun ChatsScreen(
                             }
                         },
                     ) {
+                        // Keep the list and its viewport alive across temporary unread membership changes.
+                        val keepChatListMounted =
+                            !browsingAttachments &&
+                                (unreadOnly || visibleItems.isNotEmpty()) &&
+                                loadFailurePlacement != LoadFailurePlacement.FullScreen &&
+                                !blockLocalSearchRows(
+                                    loading = bodySearchLoading,
+                                    hasLocalRows = visibleItems.isNotEmpty(),
+                                    preservePendingAnchor = preservePendingSearchAnchor,
+                                )
+                        if (keepChatListMounted) {
+                            PreparedVisibleGroupAvatarContent(
+                                appState,
+                                visibleItems,
+                                chatListState,
+                                ::visibleRowId,
+                                { it.selectedAvatarAsset },
+                                accountRef = controller.boundAccountRef,
+                                surfaceIdentity = controller,
+                                retainedPreparation = retainedAvatarPreparation,
+                            ) {
+                                LazyColumn(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .testTag("chats.list")
+                                            .trackWhiteNoiseHeader(chatListState)
+                                            .clipToBounds()
+                                            .chatListEdgeFade(chatListState)
+                                            .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
+                                            .onGloballyPositioned { coordinates ->
+                                                chatListWindowTop = coordinates.positionInWindow().y
+                                                chatListHeightPx = coordinates.size.height.toFloat()
+                                            },
+                                    state = chatListState,
+                                ) {
+                                    controller.error
+                                        ?.takeIf {
+                                            loadFailurePlacement == LoadFailurePlacement.Inline &&
+                                                visibleItems.isNotEmpty()
+                                        }?.let { failure ->
+                                            item(key = "chat-list-load-error") {
+                                                InlineErrorBanner(
+                                                    error = failure,
+                                                    onRetry = controller::retryLoad,
+                                                )
+                                            }
+                                        }
+                                    if (searchActive) {
+                                        if (searchSections.groups.isNotEmpty()) {
+                                            item(
+                                                key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
+                                                contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
+                                            ) {
+                                                ChatListSearchSectionHeader(
+                                                    title = stringResource(R.string.chat_list_filter_groups),
+                                                    testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
+                                                )
+                                            }
+                                        }
+                                        searchSections.groups.forEachIndexed { targetIndex, item ->
+                                            this.item(
+                                                key = visibleRowId(item),
+                                                contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                            ) {
+                                                chatRowContent(item, targetIndex, null)
+                                            }
+                                        }
+                                        if (
+                                            visibleItems.isNotEmpty() &&
+                                            (bodySearchLoading || bodySearchFailure != null)
+                                        ) {
+                                            item(key = "global-search-body-stage") {
+                                                GlobalSearchBodyStage(
+                                                    loading = bodySearchLoading,
+                                                    failure = bodySearchFailure,
+                                                    onRetry = { bodySearchRetry++ },
+                                                )
+                                            }
+                                        }
+                                        if (searchSections.messages.isNotEmpty()) {
+                                            item(
+                                                key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY,
+                                                contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
+                                            ) {
+                                                ChatListSearchSectionHeader(
+                                                    title = stringResource(R.string.notification_channel_messages),
+                                                    testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
+                                                )
+                                            }
+                                        }
+                                        searchSections.messages.forEachIndexed { messageIndex, item ->
+                                            val canonicalId = visibleRowId(item)
+                                            this.item(
+                                                key = canonicalId,
+                                                contentType = CHAT_LIST_ROW_CONTENT_TYPE,
+                                            ) {
+                                                val bodyMatch = bodyMatches[canonicalId]
+                                                chatRowContent(
+                                                    item,
+                                                    searchSections.groups.size + messageIndex,
+                                                    bodyMatch,
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        visibleItems.forEachIndexed { targetIndex, item ->
+                                            if (targetIndex == pinnedBoundary) {
+                                                this.item(
+                                                    key = CHAT_LIST_PINNED_BOUNDARY_KEY,
+                                                    contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
+                                                ) {
+                                                    ChatListPinnedBoundary()
+                                                }
+                                            }
+                                            this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
+                                                chatRowContent(item, targetIndex, null)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         when {
                             browsingAttachments && libraryFailure != null ->
                                 ErrorContent(
@@ -2145,7 +2274,7 @@ internal fun ChatsScreen(
                                 )
                             unreadOnly &&
                                 unreadReadFailed &&
-                                (displayUnreadSnapshot == null || visibleItems.isEmpty()) ->
+                                visibleItems.isEmpty() ->
                                 Column(Modifier.fillMaxSize().padding(16.dp)) {
                                     Text(stringResource(R.string.pull_unread_load_failed))
                                     TextButton(onClick = { unreadRetry++ }) {
@@ -2154,7 +2283,7 @@ internal fun ChatsScreen(
                                 }
                             unreadOnly &&
                                 currentUnreadSnapshot == null &&
-                                (displayUnreadSnapshot == null || visibleItems.isEmpty()) -> LoadingScreen()
+                                visibleItems.isEmpty() -> LoadingScreen()
                             controller.isLoading && sourceList.isEmpty() -> {
                                 val slowCopy = stringResource(R.string.chat_list_startup_slow)
                                 LoadingScreen(message = slowCopy.takeIf { controller.startupTakingLonger })
@@ -2209,112 +2338,7 @@ internal fun ChatsScreen(
                                         )
                                     }
                                 }
-                            else ->
-                                PreparedVisibleGroupAvatarContent(
-                                    appState,
-                                    visibleItems,
-                                    chatListState,
-                                    ::visibleRowId,
-                                    { it.selectedAvatarAsset },
-                                    accountRef = controller.boundAccountRef,
-                                    surfaceIdentity = controller,
-                                    retainedPreparation = retainedAvatarPreparation,
-                                ) {
-                                    LazyColumn(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxSize()
-                                                .trackWhiteNoiseHeader(chatListState)
-                                                .clipToBounds()
-                                                .chatListEdgeFade(chatListState)
-                                                .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
-                                                .onGloballyPositioned { coordinates ->
-                                                    chatListWindowTop = coordinates.positionInWindow().y
-                                                    chatListHeightPx = coordinates.size.height.toFloat()
-                                                },
-                                        state = chatListState,
-                                    ) {
-                                        controller.error
-                                            ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
-                                            ?.let { failure ->
-                                                item(key = "chat-list-load-error") {
-                                                    InlineErrorBanner(
-                                                        error = failure,
-                                                        onRetry = controller::retryLoad,
-                                                    )
-                                                }
-                                            }
-                                        if (searchActive) {
-                                            if (searchSections.groups.isNotEmpty()) {
-                                                item(
-                                                    key = CHAT_LIST_SEARCH_GROUPS_HEADER_KEY,
-                                                    contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
-                                                ) {
-                                                    ChatListSearchSectionHeader(
-                                                        title = stringResource(R.string.chat_list_filter_groups),
-                                                        testTag = CHAT_LIST_SEARCH_GROUPS_HEADER_TAG,
-                                                    )
-                                                }
-                                            }
-                                            searchSections.groups.forEachIndexed { targetIndex, item ->
-                                                this.item(
-                                                    key = visibleRowId(item),
-                                                    contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                                ) {
-                                                    chatRowContent(item, targetIndex, null)
-                                                }
-                                            }
-                                            if (bodySearchLoading || bodySearchFailure != null) {
-                                                item(key = "global-search-body-stage") {
-                                                    GlobalSearchBodyStage(
-                                                        loading = bodySearchLoading,
-                                                        failure = bodySearchFailure,
-                                                        onRetry = { bodySearchRetry++ },
-                                                    )
-                                                }
-                                            }
-                                            if (searchSections.messages.isNotEmpty()) {
-                                                item(
-                                                    key = CHAT_LIST_SEARCH_MESSAGES_HEADER_KEY,
-                                                    contentType = CHAT_LIST_SEARCH_HEADER_CONTENT_TYPE,
-                                                ) {
-                                                    ChatListSearchSectionHeader(
-                                                        title = stringResource(R.string.notification_channel_messages),
-                                                        testTag = CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG,
-                                                    )
-                                                }
-                                            }
-                                            searchSections.messages.forEachIndexed { messageIndex, item ->
-                                                val canonicalId = visibleRowId(item)
-                                                this.item(
-                                                    key = canonicalId,
-                                                    contentType = CHAT_LIST_ROW_CONTENT_TYPE,
-                                                ) {
-                                                    val bodyMatch = bodyMatches[canonicalId]
-                                                    chatRowContent(
-                                                        item,
-                                                        searchSections.groups.size + messageIndex,
-                                                        bodyMatch,
-                                                    )
-                                                }
-                                            }
-                                        } else {
-                                            visibleItems.forEachIndexed { targetIndex, item ->
-                                                if (targetIndex == pinnedBoundary) {
-                                                    this.item(
-                                                        key = CHAT_LIST_PINNED_BOUNDARY_KEY,
-                                                        contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
-                                                    ) {
-                                                        ChatListPinnedBoundary()
-                                                    }
-                                                }
-                                                this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
-                                                    chatRowContent(item, targetIndex, null)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            else -> Unit
                         }
                         // Jump-to-top FAB (issue #413). Overlaid on the chat-list Box
                         // (a sibling of the list `when`) and aligned bottom-end so it

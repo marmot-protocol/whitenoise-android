@@ -1,0 +1,151 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+  "legacy_sha256": "a6d9753693f40feb57dac00c0345580e8db36f3c825758b63b9f5d8d4545736c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BubblePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "fun BubblePreview(",
+        "test_ids": [
+          "SET-005",
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "ChatBubbleColorEditor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "fun ChatBubbleColorEditor(",
+        "test_ids": [
+          "SET-005",
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "ChatBubbleColorsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "fun ChatBubbleColorsScreen(",
+        "test_ids": [
+          "SET-005",
+          "SET-006"
+        ]
+      },
+      {
+        "surface": "PreviewBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "fun PreviewBubble(",
+        "test_ids": [
+          "SET-005",
+          "SET-006"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:bubble_my_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.bubble_my_messages",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:bubble_other_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.bubble_other_messages",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:bubble_preview_mine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.bubble_preview_mine",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:bubble_preview_other",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.bubble_preview_other",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors_chat_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_chat_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors_chat_amoled_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_chat_amoled_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors_global_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_global_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:chat_bubble_colors_global_amoled_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.chat_bubble_colors_global_amoled_detail",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:reset_to_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.reset_to_default",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:reset_to_global_colors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.reset_to_global_colors",
+        "test_ids": [
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "SET-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
