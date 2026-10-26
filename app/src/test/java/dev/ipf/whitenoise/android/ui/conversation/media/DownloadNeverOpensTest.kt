@@ -425,12 +425,14 @@ class DownloadNeverOpensTest {
         composeRule.runOnIdle { fixture.calls.single().succeed(bytes) }
     }
 
-    /** Awaits off-main intent retirement, then verifies the download neither requested nor performed an open. */
+    /** Awaits durable intent retirement while checking that the finished download never requests an open. */
     private fun assertStillClosed() {
-        // Rendering the ready media does not wait for the IO dispatcher to persist intent retirement.
         composeRule.waitUntil(WAIT_MILLIS) {
-            composeRule.waitForIdle()
-            !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
+            composeRule.runOnIdle {
+                assertEquals("a settling download opened the attachment", 0, opens)
+                assertFalse("a settling download recorded an open", hasOpenIntent())
+                !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
+            }
         }
         composeRule.runOnIdle {
             assertEquals("a completed download opened the attachment", 0, opens)

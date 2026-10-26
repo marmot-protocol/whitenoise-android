@@ -75,12 +75,12 @@ internal abstract class ConversationDictationForegroundTestCase {
         assertTrue(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
     }
 
-    protected fun assertCompactCompletionButtonsDisabled(
+    protected fun assertCompactButtonsDisabled(
         service: NotificationStreamForegroundService,
         notification: Notification,
     ) {
         val compact = notification.contentView.apply(service, FrameLayout(service))
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
+        assertFalse(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
         assertFalse(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
         assertFalse(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
     }

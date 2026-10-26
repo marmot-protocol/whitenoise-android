@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+        "surface": "Measured publication before immediate gate release",
+        "anchor": "fun releaseMeasuredFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+        "surface": "Exact pause owner and replacement gate admission",
+        "anchor": "fun resume(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+        "surface": "Matching owner and revision cancellation",
+        "anchor": "fun cancel(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+        "surface": "Current exact owner safety before measured retained frame release",
+        "anchor": "fun canPresentRetainedFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+        "surface": "Restoration-only coordinator replacement after the actual resume event",
+        "anchor": "fun conversationForegroundOwnerHandoffEffect(",
+        "test_ids": [
+          "CON-033"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "conversationForegroundOwnerHandoffEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreBinding.kt",
+        "anchor": "fun conversationForegroundOwnerHandoffEffect(",
+        "test_ids": [
+          "CON-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
