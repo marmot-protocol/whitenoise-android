@@ -2484,4 +2484,8 @@
     <string name="setup_finding_outcome_unknown">Resultado desconocido</string>
     <string name="setup_finding_outcome_success">Comprobación correcta</string>
     <string name="setup_finding_outcome_failure">Comprobación fallida</string>
+    <string name="public_jpeg_previews_title">Vistas previas de imágenes en el chat</string>
+    <string name="public_jpeg_previews_privacy">Desactivadas de forma predeterminada. Los enlaces directos a JPEG de Blossom pueden revelar tu dirección IP al servidor de imágenes. Las vistas previas usan Wi-Fi sin límite de datos y tus reglas de descarga de fotos. Los enlaces normales siguen disponibles cuando están desactivadas.</string>
+    <string name="public_jpeg_preview_image">Vista previa del JPEG enlazado</string>
+    <string name="public_jpeg_preview_save_failed">No se pudo guardar la configuración de las vistas previas. Inténtalo de nuevo.</string>
 </resources>
