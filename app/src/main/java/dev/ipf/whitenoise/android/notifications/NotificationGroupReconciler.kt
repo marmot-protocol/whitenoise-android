@@ -226,13 +226,18 @@ internal class NotificationGroupReconciler(
                                 ?: return@synchronized
                         if (
                             !UserEventNotificationGroup.isChildCandidate(live) ||
-                            UserEventNotificationGroup.child(live) != null
+                            UserEventNotificationGroup.child(live) != null ||
+                            !canAdoptLegacyPayload(live)
                         ) {
                             return@synchronized
                         }
                         val generation =
                             live.notification.extras.getString(EXTRA_GENERATION) ?: UUID.randomUUID().toString()
-                        val builder = legacyCardBuilder(live)
+                        val revision = ConversationCardPostedRegistry.newPayloadRevision()
+                        val builder =
+                            legacyCardBuilder(live).addExtras(
+                                android.os.Bundle().apply { putString(EXTRA_PAYLOAD_REVISION, revision) },
+                            )
                         val adopted =
                             UserEventNotificationGroup
                                 .decorateChild(
@@ -256,6 +261,7 @@ internal class NotificationGroupReconciler(
                             live.id,
                             UserEventNotificationGroup.dismissalTime(live),
                             generation,
+                            payload = ConversationCardPostedRegistry.PayloadSnapshot(revision, emptySet()),
                         )
                         changed = true
                     }
@@ -326,3 +332,12 @@ internal class NotificationGroupReconciler(
             }
     }
 }
+
+/** A retired or untrackable legacy payload cannot be republished by grouping while cancellation settles. */
+private fun canAdoptLegacyPayload(live: StatusBarNotification): Boolean =
+    ConversationCardPostedRegistry.canAcceptPost(live.tag.orEmpty(), live.id) &&
+        ConversationCardPostedRegistry.isCurrentPayload(
+            live.tag.orEmpty(),
+            live.id,
+            live.notification.extras.getString(EXTRA_PAYLOAD_REVISION),
+        )

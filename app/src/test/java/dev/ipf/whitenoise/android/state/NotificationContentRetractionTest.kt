@@ -291,9 +291,17 @@ class NotificationContentRetractionTest {
                         delay(1L)
                     }
                 }
-                val old = manager().activeNotifications.single { it.tag == cardKey.tag && it.id == cardKey.id }.notification
+                val old =
+                    manager()
+                        .activeNotifications
+                        .single { it.tag == cardKey.tag && it.id == cardKey.id }
+                        .notification
                 if (localHide) {
-                    assertTrue(fixture.runOnMainLooperPumping { fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, OLDER_ID) })
+                    val hidden =
+                        fixture.runOnMainLooperPumping {
+                            fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, OLDER_ID)
+                        }
+                    assertTrue(hidden)
                 } else {
                     fixture.emitRuntimeEvent(deletion(OLDER_ID))
                 }
@@ -329,7 +337,8 @@ class NotificationContentRetractionTest {
             while (manager().activeNotifications.none {
                     it.tag == cardKey.tag &&
                         it.id == cardKey.id &&
-                        it.notification.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX) == messageId
+                        it.notification.extras
+                            .getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX) == messageId
                 }
             ) {
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))

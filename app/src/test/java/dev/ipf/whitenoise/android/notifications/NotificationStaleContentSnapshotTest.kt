@@ -34,6 +34,8 @@ class NotificationStaleContentSnapshotTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val manager: NotificationManager = context.getSystemService(NotificationManager::class.java)
     private var visible: Array<StatusBarNotification>? = null
+    private var failNextCancel = false
+    private var cancelAttempts = 0
     private val writes = mutableListOf<Notification>()
     private val accepted = mutableMapOf<Pair<String, Int>, Notification>()
     private val presenter =
@@ -43,8 +45,13 @@ class NotificationStaleContentSnapshotTest {
             groupReconciliation = {},
             activeNotificationsProvider = { visible ?: it.activeNotifications },
             notificationCanceller = { compat, tag, id ->
+                cancelAttempts += 1
+                if (failNextCancel) {
+                    failNextCancel = false
+                    throw IllegalStateException("fixture cancellation failure")
+                }
                 accepted.remove(tag to id)
-                compat.cancel(tag, id)
+                if (visible == null) compat.cancel(tag, id)
             },
             notificationPoster = { compat, tag, id, card ->
                 writes += card
@@ -77,7 +84,9 @@ class NotificationStaleContentSnapshotTest {
         val afterCleanup = writes.size
         post(message("fresh-id", "fresh valid text"))
         assertEquals(listOf("newer valid text", "fresh valid text"), messageTexts(requireNotNull(card(ACCOUNT))))
-        writes.drop(afterCleanup).forEach { assertFalse(allText(it.extras).any { text -> "older secret text" in text }) }
+        writes.drop(afterCleanup).forEach { payload ->
+            assertFalse(allText(payload.extras).any { text -> "older secret text" in text })
+        }
     }
 
     /** Read reconciliation uses the same boundary and cannot restore a read older entry. */
@@ -102,6 +111,72 @@ class NotificationStaleContentSnapshotTest {
         assertTrue(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { _, _ -> false })
         assertNull(card(ACCOUNT))
         assertEquals(listOf("other account text"), messageTexts(requireNotNull(card(OTHER_ACCOUNT))))
+    }
+
+    /** A failed cancellation remains pending even while Android continues omitting the accepted card. */
+    @Test
+    fun absentPostCancellationRetriesAfterTheFirstCancelThrows() {
+        post(message("old-id", "older secret text"))
+        manager.cancelAll()
+        visible = emptyArray()
+        failNextCancel = true
+        assertFalse(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { _, _ -> false })
+        assertEquals(1, cancelAttempts)
+        assertTrue(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { _, _ -> false })
+        assertEquals(2, cancelAttempts)
+        assertNull(card(ACCOUNT))
+    }
+
+    /** A full pending registry refuses a new card before writing instead of evicting an unresolved cancel. */
+    @Test
+    fun pendingCancellationSurvivesCapacityPressure() {
+        post(message("old-id", "older secret text"))
+        manager.cancelAll()
+        visible = emptyArray()
+        failNextCancel = true
+        assertFalse(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { _, _ -> false })
+        try {
+            repeat(255) {
+                assertTrue(ConversationCardPostedRegistry.prepareCancellation("pending-fixture-$it", 1, true))
+            }
+            val writtenBefore = writes.size
+            assertFalse(
+                runBlocking {
+                    presenter.show(message("other-id", "other text", OTHER_ACCOUNT), shortNpub = { "npub1sender" })
+                },
+            )
+            assertEquals(writtenBefore, writes.size)
+            assertTrue(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { _, _ -> false })
+            assertEquals(2, cancelAttempts)
+            assertNull(card(ACCOUNT))
+        } finally {
+            repeat(255) { ConversationCardPostedRegistry.clearPosted("pending-fixture-$it", 1) }
+        }
+    }
+
+    /** Successfully cancelling a prior-process card must retire its stale legacy payload before fresh C arrives. */
+    @Test
+    fun cancelledPreviousProcessCardCannotReturnThroughStaleHistory() {
+        post(message("old-id", "older secret text"))
+        val original = requireNotNull(card(ACCOUNT))
+        val legacy =
+            NotificationCompat
+                .Builder(context, original)
+                .apply {
+                    extras.remove("dev.ipf.whitenoise.android.notification.PAYLOAD_REVISION")
+                }.build()
+        // A different key models a card with no accepted-write metadata in this process.
+        val legacyAccount = "previous-process-account"
+        val legacyKey = LocalNotificationFormatter.conversationDismissalKey(legacyAccount, GROUP)
+        manager.notify(legacyKey.tag, legacyKey.id, legacy)
+        accepted[legacyKey.tag to legacyKey.id] = legacy
+        visible = manager.activeNotifications
+        assertTrue(presenter.reconcileConversationContent(legacyAccount, GROUP, true) { _, _ -> false })
+        assertNull(card(legacyAccount))
+        // Android's returned snapshot remains the pre-cancel card; no new app-side mark is fabricated.
+        post(message("fresh-id", "fresh valid text", account = legacyAccount))
+        assertEquals(listOf("fresh valid text"), messageTexts(requireNotNull(card(legacyAccount))))
+        assertFalse(allText(requireNotNull(card(legacyAccount)).extras).any { "older secret text" in it })
     }
 
     /** An older platform generation cannot overwrite a newer accepted sibling during cleanup. */
