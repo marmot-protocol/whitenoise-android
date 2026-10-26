@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import dev.ipf.whitenoise.android.R
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -61,10 +62,31 @@ class NotificationLegacyReactionRailTest {
         assertFalse(cleaned.extras.containsKey(LEGACY_EXTRA_FIXED_REACTION_TARGET))
     }
 
-    /** A card with collapsed and expanded custom views plus the given extras. */
-    private fun decorated(extras: Bundle): Notification =
+    /** Cleanup keeps the card's group alert behavior: a child stays CHILDREN and a silent write stays silent. */
+    @Test
+    fun cleanupKeepsGroupAlertBehavior() {
+        val rail = Bundle().apply { putBoolean(LEGACY_EXTRA_EXPANDED_REACTION_CHOICES, true) }
+        val child = decorated(rail, groupAlert = NotificationCompat.GROUP_ALERT_CHILDREN)
+        val silent = decorated(rail, silent = true)
+
+        assertEquals(Notification.GROUP_ALERT_CHILDREN, withoutLegacyReactionRail(context, child).groupAlertBehavior)
+        val quiet = withoutLegacyReactionRail(context, silent)
+        assertTrue(quiet.wasBuiltSilent())
+        assertTrue(quiet.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+    }
+
+    /** A grouped card with collapsed and expanded custom views, the given extras and alert behavior. */
+    private fun decorated(
+        extras: Bundle,
+        silent: Boolean = false,
+        groupAlert: Int = NotificationCompat.GROUP_ALERT_ALL,
+    ): Notification =
         NotificationCompat
             .Builder(context, "fixture")
+            .setGroup("fixture-group")
+            .setGroupAlertBehavior(groupAlert)
+            .setSilent(silent)
+            .setOnlyAlertOnce(silent)
             .setSmallIcon(R.drawable.ic_stat_whitenoise)
             .setContentTitle("Fixture contact")
             .setCustomContentView(RemoteViews(context.packageName, R.layout.notification_reaction_inline))

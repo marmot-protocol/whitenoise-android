@@ -9,7 +9,7 @@ import androidx.core.app.NotificationCompat
  *
  * That build replaced the expanded card with its own image-choice layout, which hid Reply and Mark as
  * read, and stamped every conversation card with a copy of its routing target. A rewrite drops both,
- * so the card keeps its messages, actions and reply history. Any other custom view, such as the
+ * so the card keeps its messages, actions, reply history and alert behavior. Any other custom view, such as the
  * received-reaction body, is returned unchanged. Image choices still showing on an old card keep
  * reacting through the receiver's direct-value path and its current allowlist.
  */
@@ -22,8 +22,10 @@ internal fun withoutLegacyReactionRail(
     if (!rail && !extras.containsKey(LEGACY_EXTRA_FIXED_REACTION_TARGET)) return notification
     val standard =
         if (rail) {
+            // The recovered builder resets group alert behavior to ALL, so a child card would alert for its group.
             NotificationCompat
                 .Builder(context, notification)
+                .setGroupAlertBehavior(notification.groupAlertBehavior)
                 .setCustomBigContentView(null)
                 .setRemoteInputHistory(extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
                 .build()
