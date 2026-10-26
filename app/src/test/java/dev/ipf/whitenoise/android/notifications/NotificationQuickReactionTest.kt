@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.core.app.RemoteInput
 import androidx.work.BackoffPolicy
@@ -176,6 +177,22 @@ class NotificationQuickReactionTest {
 
         assertEquals("🔥", notificationReactionChoice(legacy, listOf("🥳", "🔥")))
         assertNull(notificationReactionChoice(legacy, listOf("🥳")))
+    }
+
+    /** An image choice on a card posted by the earlier expanded-choice build still sends its exact reaction. */
+    @Test
+    fun imageChoiceFromAnEarlierExpandedCardStillReacts() {
+        val earlier =
+            Intent(context, NotificationActionReceiver::class.java).also { intent ->
+                NotificationActions.applyToIntent(intent, NotificationActionKind.REACT, actionTarget())
+                intent.data = Uri.parse("whitenoise-notify://fixed-reaction/account-a/group-a/message-a/MESSAGE/17/:marmot:")
+                intent.putExtra("dev.ipf.whitenoise.android.extra.REACTION", ":marmot:")
+            }
+
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(earlier)?.kind)
+        assertEquals(actionTarget().target, NotificationActions.parse(earlier)?.target)
+        assertEquals(":marmot:", notificationReactionChoice(earlier, listOf(":marmot:", ":wn:")))
+        assertNull(notificationReactionChoice(earlier, listOf(":wn:")))
     }
 
     @Test

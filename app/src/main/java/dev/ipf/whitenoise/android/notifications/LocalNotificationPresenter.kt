@@ -1234,7 +1234,6 @@ class LocalNotificationPresenter(
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
-                                        builder.addExtras(notificationFixedReactionTargetExtras(actionTarget))
                                         decision.actions.forEach { action ->
                                             when (action) {
                                                 NotificationActionKind.REPLY ->
@@ -2268,8 +2267,7 @@ class LocalNotificationPresenter(
                     id,
                 )
             }
-            var expandedChoiceAttempted = false
-            val post = { expandedChoices: Boolean ->
+            val written =
                 NotificationGroupReconciler.postChild(
                     context,
                     notification,
@@ -2277,25 +2275,8 @@ class LocalNotificationPresenter(
                     isLive = { notificationWriteIsLive(notification, tag, id, mustBeLive, finalPostAllowed) },
                 ) {
                     val payload = previewPayload(withCurrentContactPictures(notification), tag, id, hiddenShortcut)
-                    val expanded =
-                        if (expandedChoices) {
-                            withExpandedReactionChoices(context, payload, tag, id, quickReactionChoices())
-                        } else {
-                            clearExpandedReactionChoices(context, payload)
-                        }
-                    expandedChoiceAttempted = expanded.extras.getBoolean(EXTRA_EXPANDED_REACTION_CHOICES)
-                    notificationPoster(manager, tag, id, expanded)
-                }
-            }
-            val written =
-                try {
-                    post(true)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (exception: RuntimeException) {
-                    if (!expandedChoiceAttempted) throw exception
-                    // Repeat the complete live/profile/privacy fence, never resend the prior rich payload.
-                    post(false)
+                    // Rewrites of a card posted by the earlier expanded-choice build return to the standard template.
+                    notificationPoster(manager, tag, id, withoutLegacyReactionRail(context, payload))
                 }
             if (written) {
                 ConversationCardPostedRegistry.markPosted(
@@ -2316,7 +2297,7 @@ class LocalNotificationPresenter(
             NotificationCardWriteResult.FAILED
         }
 
-    /** Same existing write predicate, rechecked independently for the optional native fallback. */
+    /** The caller's final fence still holds and, for a live-only write, the tray still shows this generation. */
     private fun notificationWriteIsLive(
         notification: Notification,
         tag: String,

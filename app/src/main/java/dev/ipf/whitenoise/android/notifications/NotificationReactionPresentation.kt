@@ -183,16 +183,15 @@ private const val REACTION_BODY_INSET_DP = 96
 private const val REACTION_BODY_MIN_WIDTH_DP = 96
 private const val REACTION_BODY_MAX_WIDTH_DP = 280
 
-/** Shared static APK artwork rendering, [tilePx] square; no device-local files or received attachment guesses. */
+/** Shared static APK artwork rendering; no device-local files or received attachment guesses. */
 internal fun notificationBuiltinEmojiBitmap(
     context: Context,
     code: String,
-    tilePx: Int = NOTIFICATION_EMOJI_TILE_PX,
 ): Bitmap? {
     val resource = EmojiShortcodes.builtinDrawable(code) ?: return null
     val region = EmojiShortcodes.builtinArtworkRegion(resource)
     return AppCompatResources.getDrawable(context, resource)?.let { drawable ->
-        Bitmap.createBitmap(tilePx, tilePx, Bitmap.Config.ARGB_8888).also { bitmap ->
+        Bitmap.createBitmap(NOTIFICATION_EMOJI_TILE_PX, NOTIFICATION_EMOJI_TILE_PX, Bitmap.Config.ARGB_8888).also { bitmap ->
             if (region == null || drawable.intrinsicWidth <= 0 || drawable.intrinsicHeight <= 0) {
                 drawable.setBounds(0, 0, bitmap.width, bitmap.height)
             } else {
