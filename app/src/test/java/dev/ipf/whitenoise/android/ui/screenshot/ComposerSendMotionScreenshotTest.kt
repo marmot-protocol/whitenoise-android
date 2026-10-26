@@ -164,7 +164,28 @@ class ComposerSendMotionScreenshotTest {
             }
         rule.onNodeWithTag("motion-root").captureRoboImage("src/test/snapshots/composer_send_motion_first$suffix.png")
         frames?.let { rule.onNodeWithTag("motion-root").captureRoboImage(File(it, "frame-000.png").path) }
-        val source = rule.runOnIdle { checkNotNull(owner.capture(text)) }
+        val source =
+            rule.runOnIdle {
+                val beforeDisable = checkNotNull(owner.capture(text))
+                val layout = owner.sourceLayout
+                val surface = owner.sourceSurface
+                val editor = owner.sourceEditor
+                val viewport = owner.readViewport
+                owner.enabled = false
+                org.junit.Assert.assertNull("Ineligible mounted composer cannot capture", owner.capture(text))
+                owner.enabled = true
+                owner.accept(beforeDisable, "late-pre-disable-acceptance", 1)
+                org.junit.Assert.assertNull(
+                    "An old acceptance cannot resume after eligibility changes",
+                    owner.activePresentationId,
+                )
+                // No text or layout callback occurs between these calls: the same mounted draft must recover.
+                org.junit.Assert.assertSame(layout, owner.sourceLayout)
+                org.junit.Assert.assertSame(surface, owner.sourceSurface)
+                org.junit.Assert.assertSame(editor, owner.sourceEditor)
+                org.junit.Assert.assertSame(viewport, owner.readViewport)
+                checkNotNull(owner.capture(text))
+            }
         rule.onNodeWithContentDescription("Send").performSemanticsAction(SemanticsActions.OnClick) { it() }
         rule.runOnIdle { org.junit.Assert.assertEquals("accepted-1", owner.activePresentationId) }
         // Deliberately withhold the destination for one actual native frame: the captured source must remain painted.

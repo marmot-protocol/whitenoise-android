@@ -179,6 +179,8 @@ internal object IsolatedMediaDecoder {
             } else {
                 transport?.let(block)
             }
+        } catch (busy: dev.ipf.whitenoise.android.media.AnimationAdmissionBusyException) {
+            throw busy
         } catch (interrupted: InterruptedException) {
             Thread.currentThread().interrupt()
             null

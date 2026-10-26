@@ -118,6 +118,14 @@
     ],
     "source_coverage": [
       {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Typing and navigation retire deferred geometry",
+        "anchor": "snapshotFlow { composerTextState.userTextEditRevision }",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
         "surface": "Share-owned attachment discard storage recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.share_import_storage",
@@ -251,6 +259,22 @@
         "anchor": "fun messageDragSelectionEffects()",
         "test_ids": [
           "MSG-004"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Message collapse retires deferred foreground correction before viewport settlement",
+        "anchor": "onBeforeBodyCollapse = {",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Local clipboard draft persistence does not consume a new navigation-entry keyboard restore",
+        "anchor": "composerAutoFocusConsumed.value = true",
+        "test_ids": [
+          "CON-013"
         ]
       }
     ]

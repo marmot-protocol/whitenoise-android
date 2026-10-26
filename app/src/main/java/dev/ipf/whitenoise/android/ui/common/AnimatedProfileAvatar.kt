@@ -210,10 +210,7 @@ private suspend fun playAvatarAnimation(
     onDecodeUnavailable: () -> Unit,
 ) {
     while (true) {
-        val produced =
-            dev.ipf.whitenoise.android.state
-                .runCatchingCancellable { decode() }
-                .getOrNull()
+        val produced = decodeAvatarWhenAvailable(decode)
         try {
             currentCoroutineContext().ensureActive()
             publish(produced)
@@ -230,6 +227,19 @@ private suspend fun playAvatarAnimation(
             publish(null)
             (produced as? java.io.Closeable)?.close()
         }
+    }
+}
+
+/** Only transient worker contention parks playback; unsupported/corrupt sources keep static fallback. */
+internal suspend fun decodeAvatarWhenAvailable(decode: suspend () -> Drawable?): Drawable? {
+    while (true) {
+        val attempt =
+            dev.ipf.whitenoise.android.state
+                .runCatchingCancellable { decode() }
+        val busy = attempt.exceptionOrNull() as? dev.ipf.whitenoise.android.media.AnimationAdmissionBusyException
+        if (busy == null) return attempt.getOrNull()
+        busy.awaitAvailability()
+        currentCoroutineContext().ensureActive()
     }
 }
 

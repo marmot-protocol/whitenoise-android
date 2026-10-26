@@ -1912,6 +1912,10 @@ internal fun ConversationScreen(
                 .PrivateShareFiles(context)
         }
     val exitConversation = {
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+            dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.NavigationRequested,
+        )
         val exitingUris = (pendingMediaSlots.map { it.uri } + pendingDocumentUris).filter(importedShareFiles::owns)
         pendingMediaSlots = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
         pendingDocumentUris = pendingDocumentUris.filterNot(importedShareFiles::owns)
@@ -2955,6 +2959,10 @@ internal fun ConversationScreen(
             onStateChange = ::updateConversationSearch,
         )
         BackHandler(enabled = !conversationSearchState.filterSheetOpen) {
+            scrollCoordinator.cancelForegroundRestoreForUserIntent()
+            dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+                dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.InputReceived,
+            )
             when (
                 conversationBackAction(
                     textSelectionActive = textSelectionMessageId != null,
@@ -3259,8 +3267,6 @@ internal fun ConversationScreen(
     val motionTranscriptVisible = !routePresentationFrozen && transcriptReadyToReveal
     val conversationMotionEnabled = rememberConversationMotionEnabled() && motionOwnerCurrent && motionTranscriptVisible
     val sendMotionEnabled = conversationMotionEnabled && timelineUnderlayEnabled && scrollCoordinator.isFollowingTail
-    if (!sendMotionEnabled) composerSendMotion.dispose()
-    composerSendMotion.enabled = sendMotionEnabled
     val tailEntrance =
         rememberConversationTailEntrance(
             latestItemId = latestTimelineItemId,
@@ -3797,6 +3803,26 @@ internal fun ConversationScreen(
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
             externalRevision = composerShareRevision to composerDictationRevision,
         )
+    // Capture the baseline during composition, before either editor can receive an input event.
+    val userTextEditRevisionOnEntry =
+        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
+    LaunchedEffect(controller, composerTextState) {
+        var observedRevision = userTextEditRevisionOnEntry
+        snapshotFlow { composerTextState.userTextEditRevision }.collect { revision ->
+            if (revision != observedRevision) {
+                observedRevision = revision
+                if (scrollCoordinator.foregroundRestorePending) {
+                    scrollCoordinator.cancelForegroundRestoreForUserIntent()
+                    dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+                        dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.InputReceived,
+                    )
+                }
+            }
+        }
+    }
+    LaunchedEffect(controller, controller.editingMessageId, controller.replyingTo, navigationState.searchOpen) {
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+    }
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the
@@ -3871,7 +3897,7 @@ internal fun ConversationScreen(
                 forwardPayloads = batchSelectionUi.forwardPayloads,
             )
     }
-    if (mediaViewerSessionState.active != null) composerSendMotion.dispose()
+    composerSendMotion.enabled = sendMotionEnabled && mediaViewerSessionState.active == null
     ComposerSendMotionHost(composerSendMotion) {
         WhiteNoiseScaffold(
             modifier =
@@ -4094,7 +4120,11 @@ internal fun ConversationScreen(
                             accountRef = draftAccountRef,
                             groupIdHex = controller.group.groupIdHex,
                             presentationRevision = composerDictationRevision,
-                            write = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
+                            write = {
+                                // A local edit is not a newly restored navigation-entry draft.
+                                composerAutoFocusConsumed.value = true
+                                appState.setDraft(draftAccountRef, controller.group.groupIdHex, it)
+                            },
                         ),
                     composerTextState = composerTextState,
                     composerAttachmentSheet = composerAttachmentSheet,
@@ -4652,6 +4682,7 @@ internal fun ConversationScreen(
                                                 mentionCandidates = mentionPicker.candidates,
                                                 mentionPickerEnabled = mentionPicker.enabled,
                                                 onBeforeBodyCollapse = {
+                                                    scrollCoordinator.cancelForegroundRestoreForUserIntent()
                                                     // Collapse cancels deferred movement while preserving
                                                     // whether the viewport is following the tail.
                                                     val keepFollowingTail =

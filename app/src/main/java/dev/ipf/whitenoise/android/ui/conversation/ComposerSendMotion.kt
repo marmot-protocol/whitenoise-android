@@ -93,7 +93,18 @@ internal class ComposerSendMotion {
         private set
     val activePresentationId: String? get() = flight?.presentationId
     private var ownerGeneration = 0L
-    var enabled: Boolean by mutableStateOf(false)
+    private var motionEnabled by mutableStateOf(false)
+
+    /** Retire old callbacks and ink while preserving measurements owned by mounted content. */
+    var enabled: Boolean
+        get() = motionEnabled
+        set(eligible) {
+            if (motionEnabled && !eligible) {
+                ownerGeneration += 1
+                clear("ineligible")
+            }
+            motionEnabled = eligible
+        }
     var sourceLayout: TextLayoutResult? = null
     var sourceSurface: LayoutCoordinates? = null
     var sourceEditor: LayoutCoordinates? = null
@@ -167,7 +178,7 @@ internal class ComposerSendMotion {
                     }
                 }
             }.also { captured ->
-                captureAttempts = (captureAttempts + 1).coerceAtMost(255)
+                captureAttempts = (captureAttempts + 1).coerceAtMost(MAX_DIAGNOSTIC_ATTEMPTS)
                 lastCaptureSucceeded = captured != null
             }
 
@@ -176,13 +187,13 @@ internal class ComposerSendMotion {
         presentationId: String?,
         inputGeneration: Long,
     ) {
-        acceptAttempts = (acceptAttempts + 1).coerceAtMost(255)
+        acceptAttempts = (acceptAttempts + 1).coerceAtMost(MAX_DIAGNOSTIC_ATTEMPTS)
         // An old pre-lock callback must not cancel a newer resumed flight either.
         if (source == null || source.ownerGeneration != ownerGeneration) return
         clear("accepted-replacement")
         if (enabled && presentationId != null) {
             flight = ComposerSendFlight(presentationId, source, inputGeneration)
-            admittedFlights = (admittedFlights + 1).coerceAtMost(255)
+            admittedFlights = (admittedFlights + 1).coerceAtMost(MAX_DIAGNOSTIC_ATTEMPTS)
         }
     }
 
@@ -465,6 +476,7 @@ internal fun composerMotionForeground(
     return if (contrast(source) >= contrast(destination)) source else destination
 }
 
+private const val MAX_DIAGNOSTIC_ATTEMPTS = 255
 private const val TEXT_CONTRAST_OFFSET = 0.05f
 
 /** Differing paragraph bases cannot share one text anchor without inventing another layout owner. */

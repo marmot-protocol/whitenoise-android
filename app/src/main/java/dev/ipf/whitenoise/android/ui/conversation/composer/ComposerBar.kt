@@ -292,6 +292,10 @@ internal class ComposerTextState(
 ) {
     private var contentRevision = 0L
     internal val contentGeneration: Long get() = contentRevision
+
+    /** Direct edits from either composer surface; selection/composition and external restoration do not advance it. */
+    var userTextEditRevision by mutableStateOf(0L)
+        private set
     val valueState: MutableState<TextFieldValue> = mutableStateOf(initial)
     val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
 
@@ -330,6 +334,13 @@ internal class ComposerTextState(
             collapsedBySend = false
         }
         valueState.value = value
+    }
+
+    /** Applies an editor-originated value, preserving a shared explicit intent signal across both composer surfaces. */
+    fun updateValueFromUser(value: TextFieldValue) {
+        val textChanged = value.text != valueState.value.text
+        updateValue(value)
+        if (textChanged) userTextEditRevision += 1L
     }
 
     /** Clears an accepted send only while its exact text generation still owns the field. */
@@ -947,7 +958,7 @@ internal fun ComposerBar(
 
     /** Updates the active text owner and publishes a draft only when this is not an edit. */
     fun applyComposerFieldValue(value: TextFieldValue) {
-        textState.updateValue(value)
+        textState.updateValueFromUser(value)
         if (editingMessageId == null) onDraftChange(value)
     }
 

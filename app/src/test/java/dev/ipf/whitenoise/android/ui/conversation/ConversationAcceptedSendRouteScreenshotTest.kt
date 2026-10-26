@@ -117,6 +117,9 @@ class ConversationAcceptedSendRouteScreenshotTest {
             )
             composeRule.waitForIdle()
             composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }
+            // FollowingTail is the initial navigation intent, before reveal/layout gates have settled.
+            // Keep driving frames until the real route admits motion, then freeze the send itself.
+            composeRule.waitUntil(5_000) { motionOwner?.enabled == true }
             boundaries += "before-send ${motionOwner?.diagnosticState}"
             composeRule.mainClock.autoAdvance = false
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()

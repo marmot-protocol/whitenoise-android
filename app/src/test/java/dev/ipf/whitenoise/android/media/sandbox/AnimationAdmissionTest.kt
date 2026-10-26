@@ -204,10 +204,16 @@ class AnimationAdmissionTest {
     /** Waits for the real blocking operation, so a returned-null regression cannot pass by scheduling luck. */
     private fun awaitBlocked(thread: Thread) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
-        while (thread.isAlive && thread.state != Thread.State.WAITING && System.nanoTime() < deadline) {
+        while (thread.isAlive &&
+            thread.state !in setOf(Thread.State.WAITING, Thread.State.TIMED_WAITING) &&
+            System.nanoTime() < deadline
+        ) {
             Thread.yield()
         }
-        assertTrue("group must wait without polling", thread.state == Thread.State.WAITING)
+        assertTrue(
+            "group must block inside its finite wait",
+            thread.state in setOf(Thread.State.WAITING, Thread.State.TIMED_WAITING),
+        )
     }
 
     /** A retirement request, late callback or timed-out viewer must never manufacture another worker slot. */

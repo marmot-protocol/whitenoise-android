@@ -6595,6 +6595,15 @@ class ConversationController(
     internal val boundAccountRef: String?
         get() = conversationAccountRef
 
+    /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
+    internal val ownsRetainedForegroundPresentation: Boolean
+        get() =
+            !controllerCleared &&
+                !isAccountTeardownRequested() &&
+                conversationAccountRef != null &&
+                appState.activeAccountRef == conversationAccountRef &&
+                appState.runtimeGeneration == conversationRuntimeGeneration
+
     // Self-identity for conversation-scoped UI ("is me", mention detection).
     // Follows the conversation's account, which the active account only lags
     // during a notification-routed early open (#586).

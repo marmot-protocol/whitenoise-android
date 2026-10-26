@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+import dev.ipf.whitenoise.android.media.AnimationAdmissionBusyException
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 
@@ -9,6 +11,8 @@ internal class AnimationAdmission {
     private val lock = Object()
     private var interactiveWaiters = 0
     private var current: Lease? = null
+    private val decorativeWaiters = ArrayDeque<Any>()
+    private val availability = MutableStateFlow(0L)
 
     /** Opportunistic thumbnails never take admission ahead of a waiting explicit viewer. */
     fun acquire(
@@ -17,7 +21,11 @@ internal class AnimationAdmission {
     ): Lease? {
         if (decorative) {
             return synchronized(lock) {
-                if (interactiveWaiters != 0 || !permit.tryAcquire()) null else Lease(true).also { current = it }
+                if (interactiveWaiters != 0 || decorativeWaiters.isNotEmpty() || !permit.tryAcquire()) {
+                    null
+                } else {
+                    Lease(true).also { current = it }
+                }
             }
         }
         val retire =
@@ -35,27 +43,51 @@ internal class AnimationAdmission {
         } finally {
             synchronized(lock) {
                 interactiveWaiters--
+                availability.value++
                 lock.notifyAll()
             }
         }
     }
 
     /**
-     * Waits without polling for confirmed worker death and all interactive waiters. Group thumbnails
-     * call this only inside their three-source budget and an interruptible, lifecycle-owned IO job.
-     * Cancellation interrupts the wait without acquiring a lease or starting another worker.
+     * One finite, interruptible wait. FIFO groups cannot barge ahead of each other or explicit viewers.
+     * Expiry is transient contention, never a codec failure or permission to release a live worker.
      */
-    fun awaitDecorative(): Lease =
+    fun awaitDecorative(timeoutMillis: Long = MediaDecodePolicy.DEADLINE_MS): Lease =
+        awaitDecorativeUntil(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis))
+
+    private fun awaitDecorativeUntil(deadlineNanos: Long): Lease =
         synchronized(lock) {
-            if (Thread.currentThread().isInterrupted) throw InterruptedException("group playback cancelled")
-            while (interactiveWaiters != 0 || !permit.tryAcquire()) lock.wait()
-            Lease(true).also { current = it }
+            val observedGeneration = availability.value
+            val waiter = Any()
+            decorativeWaiters.addLast(waiter)
+            try {
+                var admitted: Lease? = null
+                while (admitted == null) {
+                    if (Thread.currentThread().isInterrupted) throw InterruptedException("group playback cancelled")
+                    val remaining = deadlineNanos - System.nanoTime()
+                    if (remaining <= 0L) {
+                        throw AnimationAdmissionBusyException(
+                            availability,
+                            observedGeneration,
+                            interactiveWaiters == 0 && permit.availablePermits() > 0,
+                        )
+                    }
+                    val first = decorativeWaiters.first() === waiter && interactiveWaiters == 0
+                    if (first && permit.tryAcquire()) {
+                        admitted = Lease(true).also { current = it }
+                    } else {
+                        TimeUnit.NANOSECONDS.timedWait(lock, remaining)
+                    }
+                }
+                admitted
+            } finally {
+                decorativeWaiters.remove(waiter)
+                lock.notifyAll()
+            }
         }
 
-    /**
-     * Retries an interrupted group startup after viewer takeover, without retrying codec failures.
-     * Each attempt owns its lease cleanup; a retry still waits for confirmed death and viewer release.
-     */
+    /** Startup preemption shares one monotonic admission budget; genuine codec failures never retry. */
     fun <T : Any> decode(
         decorative: Boolean,
         waitForDecorativeAdmission: Boolean,
@@ -63,10 +95,16 @@ internal class AnimationAdmission {
         open: (Lease) -> T?,
     ): T? {
         val waitingGroup = decorative && waitForDecorativeAdmission
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
         do {
-            val lease = if (waitingGroup) awaitDecorative() else acquire(decorative, timeoutMillis) ?: return null
+            val lease =
+                if (waitingGroup) awaitDecorativeUntil(deadline) else acquire(decorative, timeoutMillis) ?: return null
+            val generation = availability.value
             val result = open(lease)
             if (result != null || !waitingGroup || !lease.wasPreempted()) return result
+            if (System.nanoTime() - deadline >= 0L) {
+                throw AnimationAdmissionBusyException(availability, generation)
+            }
         } while (true)
     }
 
@@ -107,6 +145,7 @@ internal class AnimationAdmission {
                 released = true
                 if (current === this) current = null
                 permit.release()
+                availability.value++
                 lock.notifyAll()
             }
         }

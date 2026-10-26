@@ -38,6 +38,8 @@ internal val groupAvatarAnimationPermits = Semaphore(MAX_PLAYING_GROUP_AVATARS)
  * Thumbnail-only admission. Invisible/background/reduced-motion avatars neither read encoded bytes nor
  * hold a decoder. Waiting surfaces retain their static first frame; a free slot admits the next one.
  * The permit covers the original-byte read and the complete mounted animation, not just decoding.
+ * Only one admitted group can play at once. Other admitted groups wait for its actual retirement;
+ * fourth and later visible groups stay static until an existing source owner becomes inactive.
  */
 @Composable
 @Suppress("FunctionNaming")
