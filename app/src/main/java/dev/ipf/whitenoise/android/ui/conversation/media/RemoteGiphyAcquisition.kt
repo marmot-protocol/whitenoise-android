@@ -39,6 +39,7 @@ internal class RemoteGiphyAcquisition(
      * Joins before waiting for capacity, then rechecks the cache and live download permission at admission.
      * A cancelled subscriber retires only itself; the last subscriber cancels the transport and its slot.
      */
+    @Suppress("ReturnCount") // Three fail-closed exits keep consent and absent-response handling explicit.
     suspend fun <T> useBytes(
         owner: Any,
         request: RemoteGiphyMedia.ImageRequest,

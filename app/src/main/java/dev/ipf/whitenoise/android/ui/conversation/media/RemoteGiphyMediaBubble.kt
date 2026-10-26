@@ -76,13 +76,14 @@ private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
 
 private val giphyByteCache = RemoteGiphyByteCache(GIPHY_MEMORY_CACHE_MAX_BYTES)
 
-/** Subscriber lifetimes own transport cancellation; this supervisor cannot fail sibling URL requests. */
-private val giphyAcquisition =
+/** Creates the supervised transport only for an actual row; pure policy/cache reads need no Android dispatcher. */
+private val giphyAcquisition by lazy {
     RemoteGiphyAcquisition(
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
         cache = giphyByteCache,
         fetch = ::fetchRemoteGiphyBytes,
     )
+}
 
 /** The message's existing metadata, placed once inside the GIPHY card footer. */
 internal class GiphyMessageFooter(
@@ -190,13 +191,7 @@ internal fun RemoteGiphyMediaBubble(
                     request,
                     mayDownload = { remoteGiphyNetworkAllowed(controller, manualRequest) },
                 ) { bytes ->
-                    if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("GIPHY owner retired")
-                    val result = decodeMessageAttachmentImage(bytes, request.mediaType, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                    if (!controller.ownsRetainedForegroundPresentation) {
-                        result?.releaseOwnedPresentation()
-                        throw CancellationException("GIPHY owner retired during decode")
-                    }
-                    result
+                    decodeOwnedGiphyPresentation(controller, request, bytes)
                 }
             try {
                 currentCoroutineContext().ensureActive()
@@ -398,6 +393,21 @@ private fun RowScope.GiphyMetadataRow(
             statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
         )
     }
+}
+
+/** Rejects retired owners before decoding and releases any result that finishes after owner retirement. */
+private suspend fun decodeOwnedGiphyPresentation(
+    controller: ConversationController,
+    request: RemoteGiphyMedia.ImageRequest,
+    bytes: ByteArray,
+): DecodedAttachmentPresentation? {
+    if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("GIPHY owner retired")
+    val result = decodeMessageAttachmentImage(bytes, request.mediaType, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+    if (!controller.ownsRetainedForegroundPresentation) {
+        result?.releaseOwnedPresentation()
+        throw CancellationException("GIPHY owner retired during decode")
+    }
+    return result
 }
 
 /** Fetches bounded encoded bytes through the existing HTTPS, host, redirect and MIME validation. */
