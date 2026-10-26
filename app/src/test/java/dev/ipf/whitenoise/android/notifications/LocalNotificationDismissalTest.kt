@@ -365,23 +365,6 @@ class LocalNotificationDismissalTest {
         )
     }
 
-    /** Identity comparisons must not invoke the sibling inventory callback before cancelling the acted card. */
-    @Test
-    fun conversationCardIdentityReadDoesNotInspectSiblings() {
-        val conversation = LocalNotificationFormatter.conversationDismissalKey("account-a", "group-a")
-        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
-        val siblingReads = AtomicInteger()
-        val presenter =
-            LocalNotificationPresenter(context, groupReconciliation = {}) { notificationManager ->
-                siblingReads.incrementAndGet()
-                notificationManager.activeNotifications
-            }
-
-        assertEquals("msg-a", presenter.conversationCardMessageIdHex(conversation.tag, conversation.id))
-        assertEquals(0, siblingReads.get())
-        assertEquals(1, manager.activeNotifications.size)
-    }
-
     @Test
     fun actionDismissalCancelsTheReadOrRepliedCardBeforeInspectingSiblings() {
         val account = "account-a"

@@ -322,20 +322,24 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             )
         }
 
-    /**
-     * Verifies thrown native sign-out retains the established local fallback without changing the completion contract.
-     */
+    /** A failed native reply is not proof that the retained identity was durably signed out. */
     @Test
-    fun transientEngineFailureRetainsTheExistingLocalSignOutFallback() =
+    fun transientEngineFailureRetainsTheActiveSessionUntilNativeSignOutIsConfirmed() =
         runBlocking {
-            signOutFailure = RuntimeException("relay unavailable")
-            val appState = appState()
+            signOutFailure = RuntimeException("native command unavailable")
+            val state = appState()
+            markReady(state)
+            retainComposerExpansion(state)
+            retainContactPictures(state)
 
-            val completion = appState.signOutActiveAccount(deleteKeyPackages = true)
-
-            assertEquals(SignOutCompletion.RelayCleanupIncomplete, completion)
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
             assertEquals(1, signOutCalls.get())
-            assertNull(appState.activeAccountRef)
-            assertTrue(appState.phase is AppPhase.Onboarding)
+            assertEquals(accountRef, state.activeAccountRef)
+            assertEquals(AppPhase.Ready, state.phase)
+            assertFalse(state.accounts.single().signedOut)
+            assertFalse(nativePushEnabled)
+            assertEquals(listOf("disable", "signOut"), nativeCallOrder)
+            assertTrue(state.contactPictureStore.reference(accountRef, "private-contact") != null)
+            assertEquals(composerExpansion, state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
         }
 }

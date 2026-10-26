@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -11,6 +12,37 @@ class ConversationCardPostedRecordTest {
     @Before
     fun setUp() {
         ConversationCardPostedRegistry.resetForTests()
+    }
+
+    /** Leaves no process retirement state for subsequent test classes. */
+    @After
+    fun tearDown() {
+        ConversationCardPostedRegistry.resetForTests()
+    }
+
+    /** Capacity pressure discards retired metadata before a live card while keeping stale content rejected. */
+    @Test
+    fun retiredRecordsAreEvictedBeforeLivePayloads() {
+        val revision = ConversationCardPostedRegistry.newPayloadRevision()
+        ConversationCardPostedRegistry.markPosted(
+            "live-card",
+            1,
+            generationId = "live-generation",
+            payload = ConversationCardPostedRegistry.PayloadSnapshot(revision, setOf("kept")),
+        )
+        assertTrue(ConversationCardPostedRegistry.prepareCancellation("pending-card", 1, true))
+        repeat(300) {
+            ConversationCardPostedRegistry.markPosted("retired-card", it)
+            assertTrue(ConversationCardPostedRegistry.clearPosted("retired-card", it))
+        }
+
+        assertTrue(ConversationCardPostedRegistry.isCurrentPayload("live-card", 1, revision))
+        assertTrue(ConversationCardPostedRegistry.canCarryEntry("live-card", 1, revision, "kept"))
+        assertTrue(ConversationCardPostedRegistry.prepareCancellation("pending-card", 1, false))
+        assertFalse(ConversationCardPostedRegistry.canCarryEntry("retired-card", 0, null, "removed"))
+        assertFalse(ConversationCardPostedRegistry.isCurrentPayload("retired-card", 0, "old-process:revision"))
+        assertTrue(ConversationCardPostedRegistry.clearPosted("live-card", 1))
+        assertTrue(ConversationCardPostedRegistry.clearPosted("pending-card", 1))
     }
 
     /** Fixture isolation clears tombstones and capacity retirement without weakening production checks. */

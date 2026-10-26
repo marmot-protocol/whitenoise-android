@@ -379,7 +379,9 @@ internal object ConversationCardPostedRegistry {
     /** Evicting a retirement record cannot make its unknown old-process payload eligible again. */
     private fun trimRecords() {
         while (postedCards.size > CAPACITY) {
-            val oldest = postedCards.entries.first { !it.value.cancellationPending }.key
+            val oldest =
+                postedCards.entries.firstOrNull { !it.value.posted && !it.value.cancellationPending }?.key
+                    ?: postedCards.entries.first { !it.value.cancellationPending }.key
             postedCards.remove(oldest)
             untrackedPreviousProcessAllowed = false
         }
