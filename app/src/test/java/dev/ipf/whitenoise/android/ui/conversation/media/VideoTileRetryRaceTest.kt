@@ -223,6 +223,8 @@ class VideoTileRetryRaceTest {
                 }
             }
         }
+        // A tap while the off-main cache probe is unresolved deliberately starts nothing.
+        composeRule.waitUntil(WAIT_MILLIS) { shows(R.string.media_tap_to_download) }
         tapVideo(album)
         composeRule.waitUntil(WAIT_MILLIS) { resolutions == 1 && shows(R.string.media_tap_to_retry) }
         composeRule.runOnIdle { assertEquals("a download tap opened the video", 0, opens) }

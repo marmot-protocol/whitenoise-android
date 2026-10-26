@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.audio.tts
 import android.speech.tts.TextToSpeech
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -13,46 +12,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
 
-/**
- * Behavior of the estimated word-timing lane through the real controller and
- * queue: synthetic range callbacks flow through the same validation as engine
- * ranges, usable engine ranges own their utterance, and the probe and calibrator
- * learn and persist per engine.
- *
- * What the harness does NOT model, so that claims resting on these are not
- * mistaken for tested ones: the engine is a fake that never delivers a callback
- * synchronously from inside speak() or stop(), never delivers one on another
- * thread, and imposes no ordering of its own. Anything asserted here about what
- * a real engine WILL do - that Android does not repeat onStart after onDone,
- * for instance - is a statement about the platform that this harness cannot
- * make, only a statement about how the controller reacts if it happens.
- */
+/** Controller-level playback timing: only native callbacks move words; ETA remains approximate. */
 @OptIn(ExperimentalCoroutinesApi::class)
-@Suppress("LargeClass") // Estimated timing, range capability, and pace calibration share one engine/controller harness.
-class TtsEstimatedTimingLaneTest {
+@Suppress("LargeClass") // Native timing, capability, and ETA calibration share one controller harness.
+class TtsPlaybackTimingCoverageTest {
     @Test
-    fun rangeSilentEngineGetsEstimatedWordHighlights() =
+    fun silentEngineKeepsSentenceAndProgressDuringFiveSecondStall() =
         runTest {
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
-
             harness.engine.start(index = 0)
-            advanceTimeBy(150)
+            val initial = harness.controller.state.value
+            advanceTimeBy(5_000)
             runCurrent()
+            assertEquals(initial, harness.controller.state.value)
+            assertEquals(emptyList<TtsVisibleTextSpan>(), initial.passage?.visibleWord)
+            assertEquals(initial.passage, timelineRowTtsHighlightPassage("m1", initial))
 
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-            assertEquals(
-                harness.controller.state.value.passage,
-                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
-            )
-
-            advanceTimeBy(600)
-            runCurrent()
-
+            harness.engine.range(index = 0, start = 6, end = 11)
             assertEquals(
                 listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
                 harness.controller.state.value.passage
@@ -61,7 +38,66 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aRealEngineRangeSilencesTheEstimateForItsUtterance() =
+    fun nativeRangesDoNotCarryIntoSilentFollowingUtterance() =
+        runTest {
+            val harness = LaneHarness(this)
+            assertTrue(harness.controller.speak(listOf(plainEntry(), plainEntry(messageIdHex = "m2")), Locale.US))
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 5)
+            harness.engine.complete(index = 0)
+            // An invalid range before onStart must not resurrect the preceding word.
+            harness.engine.range(index = 1, start = 0, end = 0)
+            assertEquals(
+                emptyList<TtsVisibleTextSpan>(),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            harness.engine.start(index = 1)
+            harness.engine.range(index = 1, start = 0, end = 0)
+            advanceTimeBy(5_000)
+            runCurrent()
+            assertEquals(
+                "m2",
+                harness.controller.state.value.passage
+                    ?.messageIdHex,
+            )
+            assertEquals(
+                emptyList<TtsVisibleTextSpan>(),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+        }
+
+    @Test
+    fun resumedUtteranceWaitsForItsOwnNativeRangeAndRejectsOldCallbacks() =
+        runTest {
+            val harness = LaneHarness(this)
+            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 5)
+            harness.controller.pause()
+            harness.controller.resume()
+            val resumedIndex = harness.engine.spoken.lastIndex
+            harness.engine.start(index = resumedIndex)
+            harness.engine.range(index = 0, start = 6, end = 11)
+            harness.engine.stopped(index = 0)
+            advanceTimeBy(5_000)
+            runCurrent()
+            assertEquals(
+                emptyList<TtsVisibleTextSpan>(),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+            harness.engine.range(index = resumedIndex, start = 6, end = 11)
+            assertEquals(
+                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
+                harness.controller.state.value.passage
+                    ?.visibleWord,
+            )
+        }
+
+    @Test
+    fun nativeWordAndProgressDoNotAdvanceWhileAudioIsStalled() =
         runTest {
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -71,96 +107,12 @@ class TtsEstimatedTimingLaneTest {
 
             assertEquals(true, harness.store.verdicts[verdictKey()])
 
-            // The estimate would move on to the second word around here; the
-            // engine's word must survive untouched.
-            advanceTimeBy(1_000)
+            val beforeStall = harness.controller.state.value
+            // No playback callback arrives while the engine is stalled.
+            advanceTimeBy(5_000)
             runCurrent()
 
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-        }
-
-    @Test
-    fun unusableEngineRangesDoNotDisableOrClobberTheEstimate() =
-        runTest {
-            val harness = LaneHarness(this)
-            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
-
-            harness.engine.start(index = 0)
-            advanceTimeBy(150)
-            runCurrent()
-            val estimatedPassage = harness.controller.state.value.passage
-            val estimatedProgress =
-                (harness.controller.state.value as TtsState.Speaking).messageProgressFraction
-
-            harness.engine.range(index = 0, start = 0, end = 0)
-
-            assertEquals(null, harness.store.verdicts[verdictKey()])
-            assertEquals(estimatedPassage, harness.controller.state.value.passage)
-            assertEquals(
-                estimatedProgress,
-                (harness.controller.state.value as TtsState.Speaking).messageProgressFraction,
-            )
-
-            advanceTimeBy(500)
-            runCurrent()
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-        }
-
-    @Test
-    fun restoredCapabilityUsesAnEstimateUntilThisUtteranceSuppliesNativeTiming() =
-        runTest {
-            val harness = LaneHarness(this)
-            harness.store.verdicts[verdictKey()] = true
-            harness.controller.detachEngine()
-            harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
-            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
-            harness.engine.start(index = 0)
-            advanceTimeBy(150)
-            runCurrent()
-            val estimated = harness.controller.state.value.passage
-            assertEquals(listOf(TtsVisibleTextSpan("b0/n0", 0, 5)), estimated?.visibleWord)
-            harness.engine.range(index = 0, start = 0, end = 0)
-            assertEquals(estimated, harness.controller.state.value.passage)
-            harness.engine.range(index = 0, start = 6, end = 11)
-            val native = harness.controller.state.value.passage
-            assertEquals(listOf(TtsVisibleTextSpan("b0/n0", 6, 11)), native?.visibleWord)
-            advanceTimeBy(2_000)
-            runCurrent()
-            assertEquals(native, harness.controller.state.value.passage)
-            assertEquals(0, harness.store.rangeVerdictWrites)
-        }
-
-    @Test
-    fun nativeTimingInOneUtteranceDoesNotHideWordsInTheNextSilentOne() =
-        runTest {
-            val harness = LaneHarness(this)
-            assertTrue(harness.controller.speak(listOf(plainEntry(), plainEntry(messageIdHex = "m2")), Locale.US))
-            val session = harness.controller.state.value.sessionId
-            harness.engine.start(index = 0)
-            harness.engine.range(index = 0, start = 0, end = 5)
-            harness.engine.complete(index = 0)
-            assertEquals(session, harness.controller.state.value.sessionId)
-            harness.engine.start(index = 1)
-            advanceTimeBy(150)
-            runCurrent()
-            val estimated = harness.controller.state.value.passage
-            assertEquals("m2", estimated?.messageIdHex)
-            assertEquals(listOf(TtsVisibleTextSpan("b0/n0", 0, 5)), estimated?.visibleWord)
-            harness.engine.range(index = 0, start = 6, end = 11)
-            assertEquals(estimated, harness.controller.state.value.passage)
-            harness.engine.range(index = 1, start = 6, end = 11)
-            val native = harness.controller.state.value.passage
-            advanceTimeBy(2_000)
-            runCurrent()
-            assertEquals(native, harness.controller.state.value.passage)
+            assertEquals(beforeStall, harness.controller.state.value)
         }
 
     @Test
@@ -207,26 +159,6 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aPersistedSilentVerdictStillRunsTheEstimate() =
-        runTest {
-            val harness = LaneHarness(this)
-            harness.store.verdicts[verdictKey()] = false
-            harness.controller.detachEngine()
-            harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
-            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
-
-            harness.engine.start(index = 0)
-            advanceTimeBy(150)
-            runCurrent()
-
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-        }
-
-    @Test
     fun enoughSilentSpeechPersistsARangeSilentVerdict() =
         runTest {
             val harness = LaneHarness(this)
@@ -256,15 +188,14 @@ class TtsEstimatedTimingLaneTest {
 
             assertEquals(false, harness.store.verdicts[verdictKey()])
 
-            // ...and the estimate takes over from the next utterance, which is
-            // the whole point of overturning it.
+            // Later silent utterances keep sentence fallback, regardless of the verdict.
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
             harness.engine.start(index = 1)
             advanceTimeBy(150)
             runCurrent()
 
             assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                emptyList<TtsVisibleTextSpan>(),
                 harness.controller.state.value.passage
                     ?.visibleWord,
             )
@@ -300,19 +231,19 @@ class TtsEstimatedTimingLaneTest {
             advanceTimeBy(150)
             runCurrent()
             assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                emptyList<TtsVisibleTextSpan>(),
                 harness.controller.state.value.passage
                     ?.visibleWord,
             )
             harness.engine.complete(index = 2)
 
-            // Returning to US keeps its historical verdict while this utterance gets its own estimate.
+            // Returning to US keeps its historical verdict without inventing word positions.
             assertTrue(harness.controller.speak(listOf(plainEntry(messageIdHex = "m4")), Locale.US))
             harness.engine.start(index = 3)
             advanceTimeBy(150)
             runCurrent()
             assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                emptyList<TtsVisibleTextSpan>(),
                 harness.controller.state.value.passage
                     ?.visibleWord,
             )
@@ -597,51 +528,6 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aGapTooSmallForTheCalibratorLeavesTheBootstrapInPlace() =
-        runTest {
-            val harness = LaneHarness(this)
-            assertTrue(harness.controller.speak(listOf(plainEntry(LONG_SHORT_THEN_EIGHT)), Locale.US))
-
-            // A long first utterance gives the bootstrap something to learn.
-            harness.engine.start(index = 0)
-            advanceTimeBy(9_000)
-            harness.engine.complete(index = 0)
-
-            // The second sentence is too short for the calibrator to believe,
-            // so its gap is measured and then rejected. The bootstrap must
-            // survive that: it is still the best thing this process knows.
-            harness.engine.start(index = 1)
-            advanceTimeBy(2_000)
-            harness.engine.complete(index = 1)
-            harness.engine.start(index = 2)
-            assertTrue(harness.store.paces.isEmpty())
-
-            val fresh = LaneHarness(this)
-            assertTrue(fresh.controller.speak(listOf(plainEntry(EIGHT_WORDS)), Locale.US))
-            fresh.engine.start(index = 0)
-            advanceTimeBy(1_500)
-            runCurrent()
-
-            val slowed =
-                harness.controller.state.value.passage
-                    ?.visibleWord
-                    .orEmpty()
-            val seeded =
-                fresh.controller.state.value.passage
-                    ?.visibleWord
-                    .orEmpty()
-            assertTrue("expected a word on both readers", slowed.isNotEmpty() && seeded.isNotEmpty())
-            // The two readers paint the same words, but one is deep inside a
-            // longer message, so compare each word offset against the start of
-            // the sentence it belongs to rather than against the payload.
-            val slowedWithinSentence = slowed.first().start - LONG_SHORT_THEN_EIGHT.indexOf(EIGHT_WORDS)
-            assertTrue(
-                "the rejected gap must not have discarded what the bootstrap learned",
-                slowedWithinSentence < seeded.first().start,
-            )
-        }
-
-    @Test
     fun anAutoReadMessageAppendedBehindASpeakingUtteranceStillMeasures() =
         runTest {
             val harness = LaneHarness(this)
@@ -683,47 +569,11 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aBootstrapSampleStillSteersTheEstimate() =
-        runTest {
-            val bootstrapped = LaneHarness(this)
-            assertTrue(bootstrapped.controller.speak(listOf(plainEntry(ONE_LONG_SENTENCE)), Locale.US))
-            bootstrapped.engine.start(index = 0)
-            advanceTimeBy(9_000)
-            bootstrapped.engine.complete(index = 0)
-
-            // A second engine that has heard nothing keeps the seeded pace.
-            val fresh = LaneHarness(this)
-            assertTrue(bootstrapped.controller.speak(listOf(plainEntry(EIGHT_WORDS)), Locale.US))
-            assertTrue(fresh.controller.speak(listOf(plainEntry(EIGHT_WORDS)), Locale.US))
-            bootstrapped.engine.start(index = 1)
-            fresh.engine.start(index = 0)
-            advanceTimeBy(1_500)
-            runCurrent()
-
-            val slowed =
-                bootstrapped.controller.state.value.passage
-                    ?.visibleWord
-                    .orEmpty()
-            val seeded =
-                fresh.controller.state.value.passage
-                    ?.visibleWord
-                    .orEmpty()
-            assertTrue("expected a word on both readers", slowed.isNotEmpty() && seeded.isNotEmpty())
-            assertTrue(
-                "a slower measured voice must not be further along than the seeded one",
-                slowed.first().start < seeded.first().start,
-            )
-        }
-
-    @Test
     fun anUtteranceReportedStartedBeforeItsPredecessorFinishedIsNotTracked() =
         runTest {
             // An engine that pipelines - reporting the next start while the
             // previous utterance is still current - fails the queue's own
-            // validation gate, so it opens no gap. It also arms no estimated
-            // schedule, and Android will not repeat the callback: that
-            // utterance simply has no word marker. Asserted so the limitation
-            // is recorded where it lives rather than in a comment.
+            // validation gate, so it opens no gap and cannot affect calibration.
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry(TWO_SENTENCES)), Locale.US))
 
@@ -743,7 +593,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun pauseFreezesThePassageAndStopsTheSchedule() =
+    fun pauseFreezesThePassage() =
         runTest {
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -762,7 +612,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aStaleSyntheticEventCannotPaintAfterNavigation() =
+    fun aStaleNativeRangeCannotPaintAfterNavigation() =
         runTest {
             val harness = LaneHarness(this)
             val first = plainEntry("Hello world.", messageIdHex = "m1")
@@ -776,8 +626,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.range(index = 0, start = 0, end = 5)
             assertEquals(null, harness.store.verdicts[verdictKey()])
 
-            // Ticks armed for the first utterance are stale for the new
-            // generation; the new message keeps its sentence-level passage.
+            // The new generation keeps its sentence-level passage.
             advanceTimeBy(2_000)
             runCurrent()
 
@@ -794,56 +643,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aLateStopFromAReplacedUtteranceCannotKillTheNewSchedule() =
-        runTest {
-            val harness = LaneHarness(this)
-            val first = plainEntry("Hello world.", messageIdHex = "m1")
-            val second = plainEntry("Goodbye world.", messageIdHex = "m2")
-            assertTrue(harness.controller.speak(listOf(first, second), Locale.US))
-            harness.engine.start(index = 0)
-            runCurrent()
-
-            assertEquals(TtsNavigationOutcome.Moved, harness.controller.skipNextMessage())
-            // The requeue re-submitted m2 as a new utterance...
-            harness.engine.start(index = harness.engine.spoken.lastIndex)
-            // ...and only then does the engine deliver the old utterance's stop.
-            harness.engine.stopped(index = 0)
-
-            advanceTimeBy(300)
-            runCurrent()
-
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 7)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-        }
-
-    @Test
-    fun resumeReArmsTheScheduleForTheResumedUtterance() =
-        runTest {
-            val harness = LaneHarness(this)
-            assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
-            harness.engine.start(index = 0)
-            advanceTimeBy(150)
-            runCurrent()
-            harness.controller.pause()
-
-            harness.controller.resume()
-            // Resume re-enqueued the chunk as a fresh utterance.
-            harness.engine.start(index = harness.engine.spoken.lastIndex)
-            advanceTimeBy(150)
-            runCurrent()
-
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-        }
-
-    @Test
-    fun anEngineErrorStopsTheScheduleWhileRetainingThePausedSession() =
+    fun anEngineErrorRetainsThePausedSession() =
         runTest {
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -868,8 +668,7 @@ class TtsEstimatedTimingLaneTest {
             harness.engine.range(index = 0, start = 0, end = 5)
             assertEquals(true, harness.store.verdicts[verdictKey()])
 
-            // A different engine must not inherit A's verdict: the estimate
-            // runs for it while its own capability is unknown.
+            // A different engine must not inherit A's verdict or word position.
             val second = FakeLaneEngine()
             harness.controller.attachEngine(second, engineKey = "com.other.tts")
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -878,7 +677,7 @@ class TtsEstimatedTimingLaneTest {
             runCurrent()
 
             assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
+                emptyList<TtsVisibleTextSpan>(),
                 harness.controller.state.value.passage
                     ?.visibleWord,
             )
@@ -935,11 +734,6 @@ class TtsEstimatedTimingLaneTest {
                 maxChunkLength = 4_000,
                 speechRate = { rate },
                 timingStore = store,
-                wordTicker =
-                    TtsEstimatedWordTicker(
-                        dispatcher = StandardTestDispatcher(scope.testScheduler),
-                        clock = { scope.testScheduler.currentTime },
-                    ),
                 clock = { scope.testScheduler.currentTime },
             )
 
@@ -1105,13 +899,5 @@ class TtsEstimatedTimingLaneTest {
 
         const val ONE_LONG_SENTENCE =
             "The quick brown fox jumps over the lazy dog while the calibrator listens carefully."
-
-        const val EIGHT_WORDS = "Alpha bravo charlie delta echo foxtrot golf hotel."
-
-        /**
-         * A long sentence for the bootstrap to learn from, then one too short
-         * for the calibrator to believe, then eight words to paint.
-         */
-        const val LONG_SHORT_THEN_EIGHT = "$ONE_LONG_SENTENCE Alpha beta. $EIGHT_WORDS"
     }
 }

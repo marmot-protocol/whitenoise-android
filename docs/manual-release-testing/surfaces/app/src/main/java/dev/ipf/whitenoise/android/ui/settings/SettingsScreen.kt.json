@@ -429,6 +429,15 @@
         "test_ids": [
           "SYS-008"
         ]
+      },
+      {
+        "surface": "AI Agents sparkle icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.drawable.ic_ai_agents",
+        "test_ids": [
+          "SET-001",
+          "NCH-007"
+        ]
       }
     ]
   },

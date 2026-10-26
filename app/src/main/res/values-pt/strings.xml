@@ -1869,6 +1869,19 @@
     <string name="composer_resize">Arraste para redimensionar o campo de mensagem</string>
     <string name="composer_expand_full_screen">Expandir campo de mensagem</string>
     <string name="composer_collapse">Recolher campo de mensagem</string>
+    <string name="transcribe_audio">Transcrever</string>
+    <string name="audio_transcription_title">Transcrição do áudio</string>
+    <string name="audio_transcription_disclosure">O Offline Speech to Text vai processar esta gravação no seu dispositivo usando o modelo de voz instalado nele. O White Noise não grava o microfone nem envia uma mensagem. O texto gerado pode conter erros e é apagado quando você o fecha ou sai desta tela.</string>
+    <string name="audio_transcription_working">Transcrevendo a gravação neste dispositivo…</string>
+    <string name="audio_transcription_generated">Transcrição gerada · não é o texto do remetente</string>
+    <string name="audio_transcription_android_version">A transcrição de gravações requer Android 13 ou posterior.</string>
+    <string name="audio_transcription_provider_missing">Instale o Offline Speech to Text e configure um modelo de voz para transcrever gravações neste dispositivo.</string>
+    <string name="audio_transcription_provider_outdated">Atualize o Offline Speech to Text para a versão 0.21.0 ou posterior. As versões anteriores não foram validadas para transcrição exclusiva de gravações.</string>
+    <string name="audio_transcription_provider_unavailable">Não foi possível iniciar o Offline Speech to Text. Abra o app e verifique se há um modelo de voz pronto para uso. Depois, tente novamente.</string>
+    <string name="audio_transcription_permission_denied">O Android negou o acesso ao serviço de voz. Verifique as permissões do microfone para o White Noise e o Offline Speech to Text nas configurações do Android. A transcrição lê a gravação; não grava o seu microfone.</string>
+    <string name="audio_transcription_audio_rejected">Não foi possível ler ou transferir esta gravação por completo. O formato ou o tamanho do áudio pode não ser compatível.</string>
+    <string name="audio_transcription_failed">Não foi possível transcrever a gravação. Verifique o Offline Speech to Text e tente novamente.</string>
+    <string name="audio_transcription_timeout">A transcrição demorou demais. Verifique se o Offline Speech to Text tem um modelo de voz pronto para uso e tente novamente.</string>
     <string name="dictate_text">Ditar texto</string>
     <string name="dictation_preparing">Preparando o ditado…</string>
     <string name="dictation_checking_service">Verificando o serviço de voz…</string>
@@ -2160,6 +2173,7 @@
     <string name="new_message_name_or_npub">Nome ou npub</string>
     <string name="new_message_connect_qr">Conectar com QR</string>
     <string name="new_message_invite_friend">Convidar um amigo</string>
+    <string name="new_message_talk_to_agent">Fale com seu agente</string>
     <string name="new_message_people">Pessoas</string>
     <string name="new_message_source_chats">Pessoas nas conversas</string>
     <string name="new_message_source_following">Seguindo</string>
@@ -2470,4 +2484,8 @@
     <string name="setup_finding_outcome_unknown">Resultado desconhecido</string>
     <string name="setup_finding_outcome_success">Verificação concluída com sucesso</string>
     <string name="setup_finding_outcome_failure">Falha na verificação</string>
+    <string name="public_jpeg_previews_title">Prévias de imagens na conversa</string>
+    <string name="public_jpeg_previews_privacy">Desativadas por padrão. Links diretos para JPEGs do Blossom podem revelar seu endereço IP ao servidor da imagem. As prévias usam Wi-Fi definido como não medido e suas regras de download de fotos. Os links comuns continuam disponíveis quando desativadas.</string>
+    <string name="public_jpeg_preview_image">Prévia de JPEG vinculado</string>
+    <string name="public_jpeg_preview_save_failed">Não foi possível salvar a configuração de prévia de imagens. Tente novamente.</string>
 </resources>

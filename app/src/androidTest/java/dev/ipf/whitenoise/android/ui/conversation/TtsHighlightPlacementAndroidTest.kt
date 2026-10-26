@@ -119,24 +119,27 @@ class TtsHighlightPlacementAndroidTest {
         appState.ttsController.detachEngine()
     }
 
-    /** The production row keeps a sentence band when an engine reports no native ranges. */
+    /** Only native ranges add a word marker; a following silent utterance keeps its own sentence band. */
     @Test
-    fun rangeSilentPlaybackKeepsTheSentenceAndMapsEstimatedWords() {
+    fun silentEngineKeepsSentenceBand() {
         startSpeaking(TWO_SENTENCES)
         assertEquals(FIRST_SENTENCE, renderedSentenceBand())
         engine.start(0)
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            appState.ttsController.state.value.passage
-                ?.visibleWord
-                .orEmpty()
-                .isNotEmpty()
-        }
         composeRule.waitForIdle()
+        // Primary highlight semantics also name the sentence fallback, not just a reported word.
+        assertTrue(checkNotNull(appState.ttsController.state.value.passage).visibleWord.isEmpty())
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+
+        rangeWithin(chunkIndex = 0, word = "first")
         val leaf = checkNotNull(leafCarryingHighlight())
         val word = checkNotNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
-        assertTrue(word.first >= 0 && word.last < FIRST_SENTENCE.length)
-        assertTrue(leaf.text().substring(word.first, word.last + 1).isNotBlank())
+        assertEquals("first", leaf.text().substring(word.first, word.last + 1))
         assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+
+        engine.advanceTo(1)
+        composeRule.waitForIdle()
+        assertEquals(SECOND_SENTENCE, renderedSentenceBand())
+        assertTrue(checkNotNull(appState.ttsController.state.value.passage).visibleWord.isEmpty())
     }
 
     /** Stopping revokes the active passage even when native callbacks arrive afterwards. */

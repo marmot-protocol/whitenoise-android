@@ -1268,6 +1268,19 @@
     <string name="voice_message_permission_denied">Autorisation du microphone requise</string>
     <string name="voice_message_recording_failed">Impossible d’enregistrer le message vocal</string>
     <string name="voice_message_microphone_busy">Le microphone est utilisé par une autre application. Fermez-la, puis réessayez.</string>
+    <string name="transcribe_audio">Transcrire</string>
+    <string name="audio_transcription_title">Transcription audio</string>
+    <string name="audio_transcription_disclosure">Offline Speech to Text traitera cet enregistrement sur votre appareil à l’aide de son modèle de reconnaissance vocale installé. White Noise n’enregistre pas le microphone et n’envoie aucun message. Le texte généré peut être inexact et sera effacé lorsque vous le fermerez ou quitterez cet écran.</string>
+    <string name="audio_transcription_working">Transcription de l’enregistrement sur cet appareil…</string>
+    <string name="audio_transcription_generated">Transcription générée · ce n’est pas le texte de l’expéditeur</string>
+    <string name="audio_transcription_android_version">La transcription d’enregistrements nécessite Android 13 ou une version ultérieure.</string>
+    <string name="audio_transcription_provider_missing">Installez Offline Speech to Text et configurez un modèle de reconnaissance vocale pour transcrire des enregistrements sur cet appareil.</string>
+    <string name="audio_transcription_provider_outdated">Mettez à jour Offline Speech to Text vers la version 0.21.0 ou une version ultérieure. Les versions antérieures n’ont pas été validées pour la transcription limitée aux enregistrements existants.</string>
+    <string name="audio_transcription_provider_unavailable">Impossible de démarrer Offline Speech to Text. Ouvrez l’application et vérifiez qu’un modèle de reconnaissance vocale est prêt, puis réessayez.</string>
+    <string name="audio_transcription_permission_denied">Android a refusé l’accès au service vocal. Vérifiez les autorisations du microphone pour White Noise et Offline Speech to Text dans les paramètres Android. La transcription lit l’enregistrement ; elle n’enregistre pas votre microphone.</string>
+    <string name="audio_transcription_audio_rejected">Cet enregistrement n’a pas pu être lu ou transmis dans son intégralité. Son format audio ou sa taille ne sont peut-être pas pris en charge.</string>
+    <string name="audio_transcription_failed">Impossible de transcrire l’enregistrement. Vérifiez Offline Speech to Text, puis réessayez.</string>
+    <string name="audio_transcription_timeout">La transcription a pris trop de temps. Vérifiez qu’Offline Speech to Text dispose d’un modèle de reconnaissance vocale prêt à l’emploi, puis réessayez.</string>
     <string name="voice_message_play">Lire le message vocal</string>
     <string name="voice_message_pause">Mettre en pause le message vocal</string>
     <string name="voice_message_speed">Vitesse de lecture %1$s</string>
@@ -2160,6 +2173,7 @@
     <string name="new_message_name_or_npub">Nom ou npub</string>
     <string name="new_message_connect_qr">Se connecter avec un QR</string>
     <string name="new_message_invite_friend">Inviter un ami</string>
+    <string name="new_message_talk_to_agent">Parler à votre agent</string>
     <string name="new_message_people">Personnes</string>
     <string name="new_message_source_chats">Personnes dans les discussions</string>
     <string name="new_message_source_following">Abonnements</string>
@@ -2470,4 +2484,8 @@
     <string name="setup_finding_outcome_unknown">Résultat inconnu</string>
     <string name="setup_finding_outcome_success">Vérification réussie</string>
     <string name="setup_finding_outcome_failure">Échec de la vérification</string>
+    <string name="public_jpeg_previews_title">Aperçus des images dans la discussion</string>
+    <string name="public_jpeg_previews_privacy">Désactivés par défaut. Les liens directs vers des JPEG Blossom peuvent révéler votre adresse IP au serveur des images. Les aperçus utilisent le Wi-Fi non limité et vos règles de téléchargement des photos. Les liens restent accessibles lorsque les aperçus sont désactivés.</string>
+    <string name="public_jpeg_preview_image">Aperçu du JPEG lié</string>
+    <string name="public_jpeg_preview_save_failed">Impossible de sauvegarder le réglage des aperçus. Veuillez réessayer.</string>
 </resources>

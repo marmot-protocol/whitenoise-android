@@ -1,23 +1,18 @@
-@file:Suppress("FunctionNaming") // Compose UI entry points intentionally use PascalCase.
+@file:Suppress("FunctionNaming")
 
 package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -29,136 +24,70 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** One settings group per category: the Android settings link and an explicit scope choice where allowed. */
+/** Channel customization and alert delivery are independent actions in one compact row. */
+@Suppress("LongParameterList") // One model with independent platform-navigation and delivery actions.
 @Composable
 internal fun ConversationNotificationCategoriesList(
     settings: List<ConversationNotificationCategorySetting>,
     pendingChannel: NotificationChannelSpec? = null,
     onOpen: (ConversationNotificationCategorySetting) -> Unit,
-    onScopeChange: (ConversationNotificationCategorySetting, Boolean) -> Unit,
+    alertEnabled: Map<NotificationChannelSpec, Boolean> = emptyMap(),
+    alertDetails: Map<NotificationChannelSpec, String> = emptyMap(),
+    onAlertChange: (ConversationNotificationCategorySetting, Boolean) -> Unit = { _, _ -> },
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+    SettingsGroup {
         settings.forEach { setting ->
-            key(setting.channel.id) {
-                ConversationNotificationCategoryGroup(
-                    setting = setting,
-                    pending = pendingChannel == setting.channel,
-                    scopeChangesEnabled = pendingChannel == null,
-                    onOpen = onOpen,
-                    onScopeChange = onScopeChange,
-                )
-            }
-        }
-    }
-}
-
-/** Settings group for one notification category: the Android settings link and the scope choice. */
-@Composable
-private fun ConversationNotificationCategoryGroup(
-    setting: ConversationNotificationCategorySetting,
-    pending: Boolean,
-    scopeChangesEnabled: Boolean,
-    onOpen: (ConversationNotificationCategorySetting) -> Unit,
-    onScopeChange: (ConversationNotificationCategorySetting, Boolean) -> Unit,
-) {
-    val usesCustom = setting.scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT
-    val title = notificationChannelTitle(setting.channel)
-    val scopeDescription = stringResource(R.string.notification_sound_scope_control, title)
-    var choosingScope by remember(setting.channel) { mutableStateOf(false) }
-    val openTag =
-        if (
-            BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
-            setting.channel == NotificationChannelSpec.GROUP_MESSAGES
-        ) {
-            PerformanceTestTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS
-        } else {
-            "open-conversation-notification-${setting.channel.id}"
-        }
-    SettingsGroup(modifier = Modifier.testTag("conversation-notification-category-${setting.channel.id}")) {
-        row("open") { context ->
-            SettingsLink(
-                context = context,
-                title = title,
-                onClick = { onOpen(setting) },
-                modifier = Modifier.testTag(openTag),
-                subtitle =
-                    stringResource(
-                        if (usesCustom) {
-                            R.string.notification_scope_custom_chat
-                        } else {
-                            R.string.notification_scope_default_all_chats
-                        },
-                    ),
-                busy = pending,
-            )
-        }
-        if (setting.canChangeScope) {
-            row("scope") { context ->
+            row(setting.channel.id) { context ->
+                val title = notificationChannelTitle(setting.channel)
                 SettingsLink(
                     context = context,
-                    title = stringResource(R.string.notification_scope_choose),
-                    value =
-                        stringResource(
-                            if (usesCustom) {
-                                R.string.notification_scope_custom_chat
+                    title = title,
+                    onClick = { onOpen(setting) },
+                    modifier =
+                        Modifier.testTag(
+                            if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
+                                setting.channel == NotificationChannelSpec.GROUP_MESSAGES
+                            ) {
+                                PerformanceTestTags.GROUP_MESSAGE_NOTIFICATION_SETTINGS
                             } else {
-                                R.string.notification_scope_default_all_chats
+                                "open-conversation-notification-${setting.channel.id}"
                             },
                         ),
-                    onClick = { choosingScope = true },
-                    modifier =
-                        Modifier
-                            .testTag("conversation-sound-scope-${setting.channel.id}")
-                            .semantics { contentDescription = scopeDescription },
-                    enabled = scopeChangesEnabled,
-                )
-            }
-        }
-    }
-    if (choosingScope) {
-        NotificationSoundScopeDialog(setting, onDismiss = { choosingScope = false }, onScopeChange = onScopeChange)
-    }
-}
-
-/** Explicit inheritance choices stay inside sound customization, away from alert switches. */
-@Composable
-private fun NotificationSoundScopeDialog(
-    setting: ConversationNotificationCategorySetting,
-    onDismiss: () -> Unit,
-    onScopeChange: (ConversationNotificationCategorySetting, Boolean) -> Unit,
-) {
-    val usesCustom = setting.scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(notificationChannelTitle(setting.channel)) },
-        text = {
-            Column {
-                listOf(false, true).forEach { custom ->
-                    TextButton(
-                        modifier =
-                            Modifier
-                                .testTag("sound-scope-choice-${setting.channel.id}-$custom")
-                                .semantics { selected = custom == usesCustom },
-                        onClick = {
-                            onDismiss()
-                            onScopeChange(setting, custom)
-                        },
-                    ) {
-                        Text(
+                    subtitle =
+                        listOfNotNull(
                             stringResource(
-                                if (custom) {
+                                if (setting.scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT) {
                                     R.string.notification_scope_custom_chat
                                 } else {
                                     R.string.notification_scope_default_all_chats
                                 },
                             ),
-                        )
-                    }
-                }
+                            alertDetails[setting.channel]?.takeIf { it.isNotBlank() },
+                        ).joinToString(" · "),
+                    busy = pendingChannel == setting.channel,
+                    trailing = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            alertEnabled[setting.channel]?.let { enabled ->
+                                Switch(
+                                    checked = enabled,
+                                    onCheckedChange = { onAlertChange(setting, it) },
+                                    enabled = pendingChannel == null,
+                                    modifier =
+                                        Modifier
+                                            .testTag("conversation-alert-${setting.channel.id}")
+                                            .semantics { contentDescription = title },
+                                )
+                            }
+                            Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null)
+                        }
+                    },
+                )
             }
-        },
-        confirmButton = {},
-    )
+        }
+    }
 }
 
 @Composable

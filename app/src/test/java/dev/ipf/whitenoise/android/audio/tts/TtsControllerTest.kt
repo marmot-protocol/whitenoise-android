@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -685,11 +683,6 @@ class TtsControllerTest {
                 audioFocus = FakeTtsAudioFocus(),
                 maxChunkLength = 500,
                 speechRate = { requestedRate },
-                wordTicker =
-                    TtsEstimatedWordTicker(
-                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
-                        clock = { now },
-                    ),
                 clock = { now },
             )
         acceleratedController.attachEngine(acceleratedEngine)
@@ -720,11 +713,6 @@ class TtsControllerTest {
                 audioFocus = FakeTtsAudioFocus(),
                 maxChunkLength = 500,
                 speechRate = { 1f },
-                wordTicker =
-                    TtsEstimatedWordTicker(
-                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
-                        clock = { now },
-                    ),
                 clock = { now },
             )
         controlController.attachEngine(controlEngine)
@@ -751,13 +739,6 @@ class TtsControllerTest {
                 audioFocus = FakeTtsAudioFocus(),
                 maxChunkLength = 4_000,
                 speechRate = { rate },
-                // A parked scheduler keeps the estimated-word ticker from advancing
-                // progress between the two reads this test compares.
-                wordTicker =
-                    TtsEstimatedWordTicker(
-                        dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
-                        clock = { now },
-                    ),
                 clock = { now },
             )
         controller.attachEngine(engine)
@@ -1027,11 +1008,6 @@ class TtsControllerTest {
         TtsController(
             audioFocus = FakeTtsAudioFocus(),
             maxChunkLength = 4_000,
-            wordTicker =
-                TtsEstimatedWordTicker(
-                    dispatcher = StandardTestDispatcher(TestCoroutineScheduler()),
-                    clock = { 0L },
-                ),
             clock = { 0L },
         )
 
