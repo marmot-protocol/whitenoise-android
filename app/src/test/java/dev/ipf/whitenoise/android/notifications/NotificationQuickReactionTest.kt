@@ -130,6 +130,42 @@ class NotificationQuickReactionTest {
         assertNull(notificationReactionChoice(freeForm, listOf("🥳", "🔥")))
     }
 
+    /** Chip names two choices would share keep their exact values, so every chip still names one reaction. */
+    @Test
+    fun sharedChipNamesKeepTheirExactShortcodes() {
+        assertEquals(
+            listOf(":party_parrot:", ":party-parrot:", "🔥", "wave"),
+            notificationQuickReactionLabels(context, listOf(":party_parrot:", ":party-parrot:", "🔥", ":wave:")),
+        )
+        assertEquals(
+            listOf(":wave:", "wave"),
+            notificationQuickReactionLabels(context, listOf(":wave:", "wave")),
+        )
+    }
+
+    /** A card posted before chips were renamed returns the raw shortcode, which still reacts with that value. */
+    @Test
+    fun rawShortcodeChipFromAnEarlierCardStillReacts() {
+        val remoteInput = RemoteInput.Builder(NotificationActions.KEY_TEXT_REPLY).build()
+        val earlier =
+            Intent().also { intent ->
+                NotificationActions.applyToIntent(
+                    intent,
+                    NotificationActionKind.REPLY,
+                    actionTarget(),
+                    acceptsInlineReactionChoices = true,
+                )
+                RemoteInput.addResultsToIntent(
+                    arrayOf(remoteInput),
+                    intent,
+                    Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, ":marmot:") },
+                )
+                RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_CHOICE)
+            }
+
+        assertEquals(":marmot:", notificationReactionChoice(earlier, listOf(":marmot:", "🔥")))
+    }
+
     @Test
     fun directReactionFromANotificationPostedBeforeUpgradeStillUsesTheCurrentAllowlist() {
         val legacy =

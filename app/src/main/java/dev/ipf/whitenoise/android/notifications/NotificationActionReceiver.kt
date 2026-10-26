@@ -188,22 +188,26 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
 
-// The reaction PendingIntent is mutable so SystemUI can attach RemoteInput
-// results. Accept only a normalized value from the current configured choices.
+/**
+ * The reaction a tapped chip chose. The reaction PendingIntent is mutable so SystemUI can attach
+ * RemoteInput results, so a renamed chip maps back to its exact reaction, and only a normalized
+ * value from the current configured choices is accepted.
+ */
 internal fun notificationReactionChoice(
     intent: Intent,
     allowedChoices: List<String>,
 ): String? {
     val results = RemoteInput.getResultsFromIntent(intent)
+    val chosen =
+        (
+            results?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
+                ?: results
+                    ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
+                    ?.takeIf { NotificationActions.isInlineReactionChoice(intent) }
+        )?.toString()?.trim()
     val reaction =
-        normalizeNotificationReaction(
-            (
-                results?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
-                    ?: results
-                        ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
-                        ?.takeIf { NotificationActions.isInlineReactionChoice(intent) }
-            )?.toString(),
-        ) ?: NotificationActions.legacyReaction(intent)
+        normalizeNotificationReaction(chosen?.let { inlineReactionValue(intent, it) })
+            ?: NotificationActions.legacyReaction(intent)
     return reaction?.takeIf { it in allowedChoices }
 }
 

@@ -157,6 +157,29 @@ class NotificationReactionArtworkTest {
             }
         }
 
+    /** Built-in tiles crop canvas padding as the in-app reaction chip does, so the Marmot is not drawn small. */
+    @Test
+    fun builtinArtworkFillsItsTileLikeTheInAppGlyph() {
+        for (code in listOf(":marmot:", ":wn:")) {
+            val tile = requireNotNull(notificationBuiltinEmojiBitmap(context, code))
+            try {
+                val opaque =
+                    (0 until tile.height).flatMap { y ->
+                        (0 until tile.width).filter { x -> Color.alpha(tile.getPixel(x, y)) > 0 }.map { x -> x to y }
+                    }
+                val edge = 2
+                assertTrue(code, opaque.minOf { it.first } <= edge && opaque.minOf { it.second } <= edge)
+                assertTrue(
+                    code,
+                    opaque.maxOf { it.first } >= tile.width - 1 - edge &&
+                        opaque.maxOf { it.second } >= tile.height - 1 - edge,
+                )
+            } finally {
+                tile.recycle()
+            }
+        }
+    }
+
     /** App-lock redaction and the persisted preview opt-out skip optional artwork entirely. */
     @Test
     fun hiddenPreviewsNeverExposeArtwork() =

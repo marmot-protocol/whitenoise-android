@@ -89,6 +89,64 @@ class LocalNotificationReactionChipsTest {
         assertEquals(NotificationActionKind.REACT, NotificationActions.parse(selectedChoice)?.kind)
     }
 
+    /** Shortcode chips show readable names, and tapping one sends its exact reaction through the posted intent. */
+    @Test
+    fun shortcodeChipsShowReadableNamesAndSendTheirExactReaction() {
+        val choices = listOf(":marmot:", ":wn:", "👍", ":party_parrot:")
+        postConversationCard(presenter(choices))
+        val reply = replyAction()
+        val remoteInput = checkNotNull(reply.remoteInputs).single()
+        val marmot = context.getString(R.string.emoji_name_marmot)
+        val whiteNoise = context.getString(R.string.white_noise)
+
+        assertEquals(
+            listOf(marmot, whiteNoise, "👍", "party parrot"),
+            remoteInput.choices?.map(CharSequence::toString),
+        )
+
+        fun tapped(
+            chip: String,
+            source: Int = RemoteInput.SOURCE_CHOICE,
+        ) = Intent(shadowOf(reply.actionIntent).savedIntent).also { intent ->
+            RemoteInput.addResultsToIntent(
+                arrayOf(remoteInput),
+                intent,
+                Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, chip) },
+            )
+            RemoteInput.setResultsSource(intent, source)
+        }
+
+        assertEquals(":marmot:", notificationReactionChoice(tapped(marmot), choices))
+        assertEquals(":wn:", notificationReactionChoice(tapped(whiteNoise), choices))
+        assertEquals("👍", notificationReactionChoice(tapped("👍"), choices))
+        assertEquals(":party_parrot:", notificationReactionChoice(tapped("party parrot"), choices))
+        // Typing the same name is still a text reply, and a choice removed since posting is refused.
+        assertEquals(
+            NotificationActionKind.REPLY,
+            NotificationActions.parse(tapped(marmot, RemoteInput.SOURCE_FREE_FORM_INPUT))?.kind,
+        )
+        assertNull(notificationReactionChoice(tapped(marmot), listOf("👍")))
+    }
+
+    /** After a shortcode chip is handled, the card's reply history repeats the chip's name, not `:marmot:`. */
+    @Test
+    fun handledShortcodeReactionHistoryRepeatsTheChipName() {
+        val presenter = presenter(listOf(":marmot:", "👍"))
+        postConversationCard(presenter, "message-a")
+        val posted = manager.activeNotifications.single()
+
+        assertTrue(presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", ":marmot:"))
+
+        assertEquals(
+            listOf(context.getString(R.string.emoji_name_marmot)),
+            manager.activeNotifications
+                .single()
+                .notification.extras
+                .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+                ?.map(CharSequence::toString),
+        )
+    }
+
     @Test
     fun reactionHandledRepostCannotAnnotateANewerMessageGeneration() {
         val presenter = presenter(defaultChoices())

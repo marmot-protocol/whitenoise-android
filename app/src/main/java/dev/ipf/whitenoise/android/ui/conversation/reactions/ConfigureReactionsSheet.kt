@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
+import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Add
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
@@ -132,7 +133,7 @@ private fun ReactionSlot(
     emoji: String,
     onClick: () -> Unit,
 ) {
-    val description = stringResource(R.string.reaction_slot_description, index + 1, emoji)
+    val description = stringResource(R.string.reaction_slot_description, index + 1, emojiPlainLabel(emoji))
     Surface(
         onClick = onClick,
         modifier = Modifier.size(ReactionSlotSize).semantics { contentDescription = description },
@@ -156,10 +157,11 @@ private fun OptionalReactionSlot(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         ReactionSlot(index = index, emoji = emoji, onClick = onReplace)
+        val removeDescription = stringResource(R.string.configure_reactions_remove, index + 1, emojiPlainLabel(emoji))
         IconButton(onClick = onRemove) {
             Icon(
                 Icons.Default.Close,
-                contentDescription = stringResource(R.string.configure_reactions_remove, index + 1, emoji),
+                contentDescription = removeDescription,
             )
         }
     }

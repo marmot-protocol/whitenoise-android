@@ -20,6 +20,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.core.app.NotificationCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import kotlin.math.roundToInt
 
 /** Android decorates the card; the body renders inline artwork while retaining complete accessible text. */
 internal fun applyReactionNotificationArtwork(
@@ -184,16 +185,26 @@ internal fun notificationBuiltinEmojiBitmap(
     context: Context,
     code: String,
 ): Bitmap? {
-    val drawable = EmojiShortcodes.builtinDrawable(code)?.let { AppCompatResources.getDrawable(context, it) }
-    return drawable?.let {
-        Bitmap
-            .createBitmap(
-                NOTIFICATION_EMOJI_TILE_PX,
-                NOTIFICATION_EMOJI_TILE_PX,
-                Bitmap.Config.ARGB_8888,
-            ).also { bitmap ->
-                it.setBounds(0, 0, bitmap.width, bitmap.height)
-                it.draw(Canvas(bitmap))
+    val resource = EmojiShortcodes.builtinDrawable(code) ?: return null
+    val region = EmojiShortcodes.builtinArtworkRegion(resource)
+    return AppCompatResources.getDrawable(context, resource)?.let { drawable ->
+        val tile = NOTIFICATION_EMOJI_TILE_PX
+        Bitmap.createBitmap(tile, tile, Bitmap.Config.ARGB_8888).also { bitmap ->
+            if (region == null || drawable.intrinsicWidth <= 0 || drawable.intrinsicHeight <= 0) {
+                drawable.setBounds(0, 0, bitmap.width, bitmap.height)
+            } else {
+                // Scale the padded canvas so its artwork region fills the tile, as the in-app glyph crops it.
+                val scale = bitmap.width.toFloat() / maxOf(region.width, region.height)
+                val left = (-region.left * scale).roundToInt()
+                val top = (-region.top * scale).roundToInt()
+                drawable.setBounds(
+                    left,
+                    top,
+                    left + (drawable.intrinsicWidth * scale).roundToInt(),
+                    top + (drawable.intrinsicHeight * scale).roundToInt(),
+                )
             }
+            drawable.draw(Canvas(bitmap))
+        }
     }
 }

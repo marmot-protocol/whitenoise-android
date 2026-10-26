@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.dismissalTime
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -2577,14 +2578,21 @@ class LocalNotificationPresenter(
      * Clear a reaction chip's direct-reply lifetime extension only while the
      * live card still represents the message that offered the chip. A newer
      * message reuses the same notification key and must not inherit the old
-     * reaction as RemoteInput history.
+     * reaction as RemoteInput history. The history line repeats the chip's
+     * readable name, never a raw `:shortcode:`.
      */
     internal fun markReactionHandledIfSameGeneration(
         notificationTag: String,
         notificationId: Int,
         reactedMessageIdHex: String?,
         reaction: String,
-    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, reactedMessageIdHex, reaction)
+    ): Boolean =
+        markRemoteInputHandled(
+            notificationTag,
+            notificationId,
+            reactedMessageIdHex,
+            EmojiShortcodes.plainLabel(reaction, context.resources),
+        )
 
     /**
      * Re-posts the live (tag, id) card with [handledText] as its RemoteInput history, ending
@@ -3075,15 +3083,17 @@ class LocalNotificationPresenter(
                 .mapNotNullTo(mutableSetOf()) { it.notification.shortcutId?.takeIf(::isConversationShortcutId) }
         }.getOrDefault(emptySet())
 
+    /** Reply with inline reaction chips; shortcode chips show a readable name and still send their exact value. */
     private fun replyNotificationAction(
         actionTarget: NotificationActionTarget,
         reactionChoices: List<String>,
     ): NotificationCompat.Action {
+        val reactionLabels = notificationQuickReactionLabels(context, reactionChoices)
         val remoteInput =
             RemoteInput
                 .Builder(NotificationActions.KEY_TEXT_REPLY)
                 .setLabel(context.getString(R.string.message))
-                .setChoices(reactionChoices.toTypedArray())
+                .setChoices(reactionLabels.toTypedArray())
                 .setAllowFreeFormInput(true)
                 .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
                 .build()
@@ -3096,6 +3106,8 @@ class LocalNotificationPresenter(
                     actionTarget,
                     NotificationActionKind.REPLY,
                     acceptsInlineReactionChoices = reactionChoices.isNotEmpty(),
+                    inlineReactionsByLabel =
+                        reactionLabels.zip(reactionChoices).filter { (label, choice) -> label != choice }.toMap(),
                 ),
             ).addRemoteInput(remoteInput)
             .setAllowGeneratedReplies(false)
@@ -3115,10 +3127,12 @@ class LocalNotificationPresenter(
             .setShowsUserInterface(false)
             .build()
 
+    /** Broadcast for one card action, carrying which reaction each renamed inline chip stands for. */
     private fun actionPendingIntent(
         actionTarget: NotificationActionTarget,
         kind: NotificationActionKind,
         acceptsInlineReactionChoices: Boolean = false,
+        inlineReactionsByLabel: Map<String, String> = emptyMap(),
     ): PendingIntent {
         val actionIntent =
             Intent(context, NotificationActionReceiver::class.java).apply {
@@ -3128,6 +3142,7 @@ class LocalNotificationPresenter(
                     actionTarget,
                     acceptsInlineReactionChoices,
                 )
+                applyInlineReactionLabels(this, inlineReactionsByLabel)
             }
         val mutableFlag =
             if (kind == NotificationActionKind.REPLY || kind == NotificationActionKind.REACT) {

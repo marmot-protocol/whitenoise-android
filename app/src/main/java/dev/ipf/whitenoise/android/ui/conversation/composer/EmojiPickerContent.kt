@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
+import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
@@ -416,7 +417,7 @@ internal fun EmojiGlyph(
                 size
             }
         Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
-            EmojiArtImage(art, contentDescription = emoji, modifier = Modifier.size(artSize))
+            EmojiArtImage(art, contentDescription = emojiPlainLabel(emoji), modifier = Modifier.size(artSize))
         }
         return
     }
