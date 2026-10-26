@@ -124,14 +124,18 @@ Activation, failure recovery and rollback are specified in the
 The core workflow always starts and reports the existing required check. Its
 `changes` job examines the **whole PR diff**, with rename detection disabled.
 A separate `tooling-contracts` job runs the non-Gradle tooling/metadata/manual-guide/
-fuzz-policy validators in parallel, including the preview security/update
-contracts; it does not delay Android job startup.
+fuzz-policy validators after classification, alongside Android jobs, including
+the preview security/update contracts. It does not delay Android job startup.
 Only ordinary non-executable Markdown blobs in the named root guides or `docs/`
 qualify. JSON inventories, source-tree Markdown, build/workflow inputs,
 executables, symlinks, deleted code and unknown paths require full Android CI.
-`docs/composer-dictation-device-matrix.md` and `docs/invariant-gates.md` are
-Kotlin-test inputs and require the full suite even when changed alone; document
-any future build/test input in the classifier.
+`docs/composer-dictation-device-matrix.md` remains a full-preflight input.
+The invariant registry and manual surface JSON inventories are test-affecting
+metadata: they never qualify as docs-only, but may use the activated PR precheck
+when the complete diff is otherwise ordinary. Their validators remain required,
+and full integration validates their Kotlin consumers. Invalid metadata fails
+validation; executable/symlink modes and unknown paths select full preflight.
+Document any future build/test input in the classifier.
 An unavailable/empty diff, missing refs or any non-PR event also requires full CI.
 
 The aggregate accepts skipped Android jobs only when classification succeeded
@@ -176,7 +180,8 @@ the full core matrix. Independent unsigned
 APK reproduction remains a supplemental campaign. A complete raw diff permits
 its deferral for
 known ordinary Kotlin/Java source, main resources, committed goldens and prose.
-Build, packaging, native pins, manifests, CI/tooling, executable/symlink changes,
+Validated invariant/manual-surface metadata also permits deferral while remaining
+non-docs-only. Build, packaging, native pins, manifests, CI/tooling, executable/symlink changes,
 unknown inputs or unavailable evidence run reproduction. In full mode, all other compilation,
 full-unit/golden/coverage, style and lint gates stay required for ready PRs.
 A mixed PR uses the most demanding classification of its entire diff.
@@ -202,4 +207,20 @@ Measure job requests, summed runner minutes, queue wait and time to final green
 checks together. Adding fewer jobs does not guarantee a particular speedup.
 This policy adds no paid runners or subscriptions. Further candidate-only release
 or security deferral requires exact-head/current-base evidence that the readiness
-and merge consumers actually enforce.
+and merge consumers enforce.
+
+## Selective host tooling regressions
+
+Every run retains actual metadata, guide, dependency, security, authorization,
+fuzz-trigger and screenshot-owner validation. Maestro tests that inspect current
+production UI source and screen coverage also remain unconditional.
+
+Only the isolated attachment-fixture suite and Maestro artifact, offline-suite,
+environment, host-pressure and SDK-image regression suites can be deferred.
+The complete PR diff must contain only known ordinary source/resources/goldens,
+prose or validated test metadata, with regular file modes. Any instrumented (`androidTest`)
+input change, tooling/scripts/workflows, `.maestro` input, build/dependency
+change, unknown/malformed diff, unavailable labels or `ci:full` runs all suites.
+Missing classifier output also runs them. Merge-group, master, nightly and
+manual events always run every host suite, independently of PR precheck mode.
+This selection does not activate merge-queue mode or change its admission gates.

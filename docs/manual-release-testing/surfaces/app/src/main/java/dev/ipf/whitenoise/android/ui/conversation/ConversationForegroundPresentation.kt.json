@@ -28,6 +28,30 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "surface": "Retained frame privacy and owner admission",
+        "anchor": "canPresentRetainedConversationFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "surface": "Captured automatic focus expectation preserves the pending resume edge",
+        "anchor": "return expected == null",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "surface": "Unsafe retained frame waits for current admission or bounded fallback",
+        "anchor": "internal suspend fun awaitConversationForegroundAdmission(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

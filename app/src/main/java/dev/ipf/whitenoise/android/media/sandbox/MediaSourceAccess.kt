@@ -48,6 +48,9 @@ internal class MediaSourceAccess(
                 }, MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
             signal.throwIfCanceled()
             if (closed) null else block(signal, source)
+        } catch (failure: java.io.IOException) {
+            // Retirement may close a provider capability while its admitted read is still unwinding.
+            if (closed) null else throw failure
         } finally {
             timer?.cancel(false)
             activeCancellation.compareAndSet(signal, null)
