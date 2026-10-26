@@ -391,6 +391,7 @@ test('the workflow runs the base-revision checker with a read-only token and no 
   const expressions = [...workflow.matchAll(/\$\{\{([^}]*)\}\}/g)].map(match => match[1].trim()).sort()
   assert.deepEqual(expressions, [
     'github.event.pull_request.base.sha',
+    `github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server"]')`,
     'github.event.pull_request.number',
     'steps.script.outputs.root',
     'steps.script.outputs.root',
