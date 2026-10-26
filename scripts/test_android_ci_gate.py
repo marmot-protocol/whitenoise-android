@@ -45,6 +45,27 @@ class AndroidCiGateTest(unittest.TestCase):
         match = re.search(r'^    needs: \[([^\]]+)\]$', cls.gate, re.MULTILINE)
         cls.dependencies = [job.strip() for job in match.group(1).split(',')]
 
+    def test_only_isolated_host_regressions_can_be_deferred(self):
+        conditional = ('Test attachment fixture HTTP ledger and cancellation contracts',
+                       'Test Maestro artifact and manual-only execution contracts')
+        for name in conditional:
+            step = self.named_step(self.tooling_contracts, name)
+            self.assertIn("if: needs.changes.outputs.tooling_regressions != 'false'", step)
+        source = self.named_step(self.tooling_contracts, 'Test Maestro production-source and screen contracts')
+        self.assertNotIn('        if:', source)
+        for suite in ('test_maestro_runtime.py', 'test_maestro_screen_coverage.py',
+                      'test_maestro_modal_discovery.py'):
+            self.assertIn(suite, source)
+        for name in ('Validate committed dependency locks and supplier evidence',
+                     'Validate fuzz PR production triggers',
+                     'Validate Actions merge authorization boundary',
+                     'Validate manual release guide',
+                     'Test preview security and update contracts',
+                     'Check committed screenshot golden owners'):
+            self.assertNotIn('        if:', self.named_step(self.tooling_contracts, name))
+        self.assertIn('    needs: changes', self.tooling_contracts)
+        self.assertIn('tooling_regressions: ${{ steps.classify.outputs.tooling_regressions }}', self.changes)
+
     @staticmethod
     def job_block(workflow, name):
         """Return one top-level job without depending on workflow job order."""
@@ -666,7 +687,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn("./gradlew", step)
 
     def test_slow_tooling_does_not_block_android_job_start(self):
-        self.assertNotIn('    needs:', self.tooling_contracts.split('    steps:', 1)[0])
+        self.assertIn('    needs: changes\n', self.tooling_contracts.split('    steps:', 1)[0])
         for name in ('offline-zsp', 'build-contracts', 'compose-compiler',
                      'compile-tests', 'static-analysis', 'tests', 'secondary-variant'):
             job = self.job_block(self.workflow, name)
