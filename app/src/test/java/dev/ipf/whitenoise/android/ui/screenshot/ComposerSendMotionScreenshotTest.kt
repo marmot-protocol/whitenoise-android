@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -70,6 +71,7 @@ class ComposerSendMotionScreenshotTest {
         rule.mainClock.autoAdvance = false
         lateinit var owner: ComposerSendMotion
         var mountDestination by mutableStateOf(false)
+        var unrelatedRowSize by mutableStateOf(1)
         rule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
@@ -94,6 +96,18 @@ class ComposerSendMotionScreenshotTest {
                             .testTag("motion-root"),
                     ) {
                         ComposerSendMotionHost(motion) {
+                            MaterialTheme(shapes = MaterialTheme.shapes.copy(large = CutCornerShape(4.dp))) {
+                                Box(
+                                    Modifier
+                                        .size(unrelatedRowSize.dp)
+                                        .composerSendDestination(
+                                            "unrelated-row",
+                                            motion,
+                                            messageBubblePresentation(deleted = false, mine = true),
+                                            true,
+                                        ),
+                                )
+                            }
                             Column(Modifier.padding(16.dp)) {
                                 Text("Copy, shrink and lift", color = MaterialTheme.colorScheme.onBackground)
                                 Spacer(Modifier.height(8.dp))
@@ -192,6 +206,16 @@ class ComposerSendMotionScreenshotTest {
         rule.mainClock.advanceTimeByFrame()
         rule.waitForIdle()
         assertPendingSourcePainted(owner, text)
+        rule.runOnIdle { unrelatedRowSize = 2 }
+        // A non-rounded unrelated row is remeasured while the accepted owner is pending.
+        rule.onNodeWithTag("motion-root").captureToImage()
+        rule.runOnIdle {
+            org.junit.Assert.assertEquals(
+                "Unrelated shape cannot clear the active copy",
+                "accepted-1",
+                owner.activePresentationId,
+            )
+        }
         rule.runOnIdle { mountDestination = true }
         repeat(36) { index ->
             rule.mainClock.advanceTimeBy(16)

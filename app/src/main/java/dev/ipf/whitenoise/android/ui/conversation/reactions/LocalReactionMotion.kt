@@ -43,7 +43,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 internal const val LOCAL_REACTION_MOTION_MILLIS = 220
-private val LocalRowReactionMotion = compositionLocalOf<LocalReactionMotion?> { null }
+internal val LocalRowReactionMotion = compositionLocalOf<LocalReactionMotion?> { null }
 
 internal data class LocalReactionEffect(
     val sequence: Long,

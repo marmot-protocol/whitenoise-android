@@ -33,24 +33,26 @@ internal fun ComposerActionDisc(
     description: String,
     @DrawableRes icon: Int,
     enabled: Boolean = true,
-    width: Dp = 40.dp,
+    width: Dp = ComposerToolbarSlotWidth,
     modifier: Modifier = Modifier,
 ) {
     val outline = amoledOutlineBorder()
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.width(width).height(48.dp)) {
-        Surface(
-            modifier = Modifier.size(32.dp),
-            shape = CircleShape,
-            color = if (outline == null) containerColor else MaterialTheme.colorScheme.surface,
-            contentColor = if (outline == null) contentColor else MaterialTheme.colorScheme.onSurface,
-            border = outline,
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(icon),
-                    contentDescription = description,
-                    modifier = Modifier.size(20.dp),
-                )
+    ComposerToolbarTargets {
+        IconButton(onClick = onClick, enabled = enabled, modifier = modifier.width(width).height(48.dp)) {
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = if (outline == null) containerColor else MaterialTheme.colorScheme.surface,
+                contentColor = if (outline == null) contentColor else MaterialTheme.colorScheme.onSurface,
+                border = outline,
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(icon),
+                        contentDescription = description,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }

@@ -1388,9 +1388,9 @@ internal fun ComposerBar(
                     if (dictationActiveInComposer) {
                         0.dp
                     } else if (showMicButton && voiceRecordingController.locked) {
-                        84.dp
+                        ComposerToolbarSlotWidth * 2
                     } else {
-                        40.dp
+                        ComposerToolbarSlotWidth
                     }
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
@@ -1657,7 +1657,7 @@ internal fun ComposerBar(
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
                         modifier =
                             Modifier
                                 .align(trailingActionAlignment)
@@ -1666,15 +1666,17 @@ internal fun ComposerBar(
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
                         if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
-                            IconButton(
-                                onClick = { voiceRecordingController.cancel() },
-                                modifier = Modifier.size(40.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = stringResource(R.string.voice_message_cancel),
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
+                            ComposerToolbarTargets {
+                                IconButton(
+                                    onClick = { voiceRecordingController.cancel() },
+                                    modifier = Modifier.width(ComposerToolbarSlotWidth).height(ComposerActionRowHeight),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = stringResource(R.string.voice_message_cancel),
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                }
                             }
                             ComposerActionDisc(
                                 onClick = { voiceRecordingController.stop() },
@@ -1706,13 +1708,8 @@ internal fun ComposerBar(
                                     .matchParentSize()
                                     .padding(
                                         end =
-                                            if (expandedControlLayout) {
-                                                if (voiceRecordingController.locked) 84.dp else 44.dp
-                                            } else if (voiceRecordingController.locked) {
-                                                92.dp
-                                            } else {
-                                                52.dp
-                                            },
+                                            primaryTrailingActionWidth +
+                                                if (expandedControlLayout) 4.dp else 12.dp,
                                     ).pointerInput(activeRecordingController) {
                                         awaitPointerEventScope {
                                             while (true) {

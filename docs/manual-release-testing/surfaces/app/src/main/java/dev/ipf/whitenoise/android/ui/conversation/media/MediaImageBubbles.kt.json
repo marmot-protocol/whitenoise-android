@@ -88,6 +88,14 @@
         "test_ids": [
           "MED-041"
         ]
+      },
+      {
+        "surface": "Single-image motion records content inside the tap indication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "fun MediaImageBubble(",
+        "test_ids": [
+          "MED-041"
+        ]
       }
     ]
   },

@@ -1,8 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -68,3 +74,20 @@ internal fun Modifier.expandedComposerActionRow(): Modifier =
             placeable.placeRelative(0, 0)
         }
     }
+
+internal val ComposerToolbarSlotWidth = 40.dp
+
+/** Scope the explicit toolbar target without changing editor, menu or popup hit areas. */
+@Composable
+internal fun ComposerToolbarTargets(content: @Composable () -> Unit) {
+    val current = LocalViewConfiguration.current
+    val targets =
+        object : ViewConfiguration by current {
+            override val minimumTouchTargetSize = DpSize(ComposerToolbarSlotWidth, ComposerActionRowHeight)
+        }
+    CompositionLocalProvider(
+        LocalViewConfiguration provides targets,
+        LocalMinimumInteractiveComponentSize provides ComposerToolbarSlotWidth,
+        content = content,
+    )
+}

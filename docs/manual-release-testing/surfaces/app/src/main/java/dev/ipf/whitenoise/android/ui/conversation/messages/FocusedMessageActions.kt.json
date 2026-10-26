@@ -144,6 +144,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Accessible full reaction picker target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "private fun FocusedMoreReactionsTarget(",
+        "test_ids": [
+          "MSG-041"
+        ]
       }
     ]
   },

@@ -43,6 +43,16 @@
           "MSG-041"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "One row owner with standalone component fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+        "anchor": "internal val LocalRowReactionMotion",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

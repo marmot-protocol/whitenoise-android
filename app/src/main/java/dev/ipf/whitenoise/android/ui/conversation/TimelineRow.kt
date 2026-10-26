@@ -324,8 +324,17 @@ private fun rememberTimelineReactionMotion(
                     item.projected?.invalidationStatus == null &&
                     !MessageProjector.isDeleted(item.record.messageIdHex, controller.deletedMessageIds)
         }
-    val currentOwner = !appState.appLockScreenVisible && controller.isCurrentGroupMutationOwner(appState, runtime)
-    val canReact = controller.canSendMessages && gate == ComposerGate.COMPOSER && !selectionMode
+    val currentOwner =
+        !appState.appLockScreenVisible &&
+            controller.isCurrentGroupMutationOwner(appState, runtime) &&
+            controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
+    val readOnly =
+        if (MessageProjector.isGroupSystem(item.record)) {
+            gate != ComposerGate.COMPOSER
+        } else {
+            controller.group.pendingConfirmation
+        }
+    val canReact = !readOnly && !selectionMode
     val available = targetAvailable && canReact && currentOwner
     return rememberLocalReactionMotion(
         controller to item.presentationId,

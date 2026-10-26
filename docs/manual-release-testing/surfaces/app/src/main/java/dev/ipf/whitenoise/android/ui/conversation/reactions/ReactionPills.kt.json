@@ -94,6 +94,16 @@
           "MSG-001"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Canonical pill toggle retains accepted pulse-only feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "onToggleReaction(emoji)",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

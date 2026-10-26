@@ -10,6 +10,14 @@
         "test_ids": [
           "MSG-042"
         ]
+      },
+      {
+        "surface": "Destination callbacks validate the exact active send owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ComposerSendDestination.kt",
+        "anchor": "if (motion.activePresentationId != presentationId)",
+        "test_ids": [
+          "CON-036"
+        ]
       }
     ]
   },

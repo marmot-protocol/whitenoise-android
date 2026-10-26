@@ -80,6 +80,42 @@ class AnimatedGroupAvatarRecoveryTest {
         assertEquals(MAX_PLAYING_GROUP_AVATARS, groupAvatarAnimationPermits.availablePermits)
     }
 
+    /** A classified bind failure recovers this mounted key from retained bytes, without another read. */
+    @Test
+    fun transientStartupRecoversSameMountedSource() {
+        val owner = TestOwner()
+        val recovered = TestAnimation()
+        var reads = 0
+        var decodes = 0
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                AnimatedGroupAvatarOverlay(
+                    GroupAvatarAnimation("transport") {
+                        reads++
+                        twoFrameGif()
+                    },
+                    Modifier.size(40.dp),
+                    maxEdgePx = 40,
+                    animationsEnabled = true,
+                    decode = { _, _ ->
+                        if (++decodes == 1) {
+                            throw dev.ipf.whitenoise.android.media.AnimationStartupException(
+                                dev.ipf.whitenoise.android.media.AnimationTermination.TransportUnavailable,
+                            )
+                        }
+                        recovered
+                    },
+                )
+            }
+        }
+        composeRule.waitUntil { recovered.callback != null }
+        assertEquals(2, decodes)
+        assertEquals(1, reads)
+        composeRule.runOnIdle { owner.registry.currentState = Lifecycle.State.CREATED }
+        composeRule.waitUntil { recovered.closed }
+        assertEquals(MAX_PLAYING_GROUP_AVATARS, groupAvatarAnimationPermits.availablePermits)
+    }
+
     /** A replaced owner cannot resume after a delayed viewer release, even if the old wait completes later. */
     @Test
     @Suppress("LongMethod") // One fixture keeps old/new ownership and delayed completion in the same scenario.

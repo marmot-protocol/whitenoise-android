@@ -6,6 +6,10 @@ internal interface AnimationSessionControl : java.io.Closeable {
     val preempted: kotlinx.coroutines.flow.StateFlow<Boolean>?
         get() = null
 
+    /** First terminal reason is retained even when no drawable was delivered yet. */
+    val termination: kotlinx.coroutines.flow.StateFlow<dev.ipf.whitenoise.android.media.AnimationTermination?>?
+        get() = null
+
     /** Requests bounded frame delivery from the already-admitted isolated worker. */
     fun play()
 

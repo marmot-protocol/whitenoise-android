@@ -59,7 +59,6 @@ import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -70,9 +69,11 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.awaitConversationCondition
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.state.notifiedMessagePreview
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.projectedTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
@@ -700,7 +701,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         var firstExposedCanonical: Rect? = null
         try {
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
+            awaitConversationCondition(timeoutMs = 5_000) { publisherStarted.isCompleted }
             acceptedPresentationId =
                 composeRule.runOnIdle {
                     fixture.controller.timeline
@@ -723,7 +724,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             )
             val heights = mutableListOf(expandedHeight, productionComposerPillContentHeight())
             val trajectory = mutableListOf<ComposerSendFlightGeometry>()
-            // The publisher is reached synchronously after model acceptance, but a paused
+            // The publisher follows model acceptance and the parser IO hop, but a paused
             // Compose clock leaves EditableText semantics in the previous rendered frame.
             // Flush exactly one frame before reading the UI, retaining the pre-frame height
             // above so an immediate viewport snap still fails the gradual-collapse checks.
@@ -1253,7 +1254,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 startOnConstruction = false,
                 clockMillis = clockMillis,
                 textPublisher = textPublisher,
-                markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
+                markdownParser = { appState.parseMarkdownOrEmpty(it) },
             ).also { controllers += it }
         controller.markAuthoritativeTimelinePublishedForTest()
         return ProductionConversation(

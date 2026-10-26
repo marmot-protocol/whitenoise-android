@@ -22,7 +22,7 @@ internal fun Modifier.composerSendDestination(
 ): Modifier =
     composed {
         val measuredSurface = testTag(composerSendDestinationTag(presentationId))
-        if (motion?.activePresentationId != presentationId) return@composed measuredSurface
+        if (motion == null) return@composed measuredSurface
         val density = LocalDensity.current
         val direction = LocalLayoutDirection.current
         val shape = MaterialTheme.shapes.large
@@ -30,6 +30,7 @@ internal fun Modifier.composerSendDestination(
         val borderColor = (border?.brush as? SolidColor)?.value ?: Color.Transparent
         measuredSurface
             .onGloballyPositioned { coordinates ->
+                if (motion.activePresentationId != presentationId) return@onGloballyPositioned
                 val outline =
                     shape.createOutline(
                         androidx.compose.ui.geometry
@@ -39,7 +40,7 @@ internal fun Modifier.composerSendDestination(
                     )
                 val corners = (outline as? Outline.Rounded)?.roundRect
                 if (corners == null) {
-                    motion.clear()
+                    if (motion.activePresentationId == presentationId) motion.clear()
                     return@onGloballyPositioned
                 }
                 motion.destinationFrame(

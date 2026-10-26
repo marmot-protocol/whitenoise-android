@@ -6,10 +6,18 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionPresentation.kt",
         "anchor": "internal fun applyReactionNotificationArtwork(",
-        "surface": "small inline received reaction artwork, accessible fallback and no custom hidden payload",
+        "surface": "emoji-sized inline received reaction artwork, accessible fallback and no custom hidden payload",
         "test_ids": [
           "NTF-034",
           "NTF-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionPresentation.kt",
+        "anchor": "EmojiShortcodes.builtinArtworkRegion(resource)",
+        "surface": "bundled notification artwork cropped like the in-app reaction chip",
+        "test_ids": [
+          "NTF-034"
         ]
       }
     ]

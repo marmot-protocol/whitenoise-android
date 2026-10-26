@@ -20,6 +20,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.core.app.NotificationCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import kotlin.math.roundToInt
 
 /** Android decorates the card; the body renders inline artwork while retaining complete accessible text. */
 internal fun applyReactionNotificationArtwork(
@@ -30,7 +31,7 @@ internal fun applyReactionNotificationArtwork(
     if (!content.isReactionPreview) return false
     var images = emptyMap<String, Bitmap>()
     return try {
-        images = reactionBodyArtwork(context, content.body)
+        images = reactionBodyArtwork(context, content.artworkSource)
         if (images.isEmpty()) {
             false
         } else {
@@ -56,6 +57,9 @@ internal fun applyReactionNotificationArtwork(
         images.values.forEach { it.recycle() }
     }
 }
+
+/** The authored sentence the inline body draws from; the readable [LocalNotificationContent.body] stays the text. */
+private val LocalNotificationContent.artworkSource: String get() = reactionArtworkBody ?: body
 
 /** Failed optional drawing leaves a plain text card with no partially configured custom views. */
 private fun clearReactionArtwork(
@@ -93,11 +97,11 @@ private fun reactionInlineView(
         setTextViewText(R.id.reaction_notification_title, content.title)
         setImageViewBitmap(
             R.id.reaction_notification_body_light,
-            reactionBodyBitmap(context, content.body, artwork, expanded, dark = false),
+            reactionBodyBitmap(context, content.artworkSource, artwork, expanded, dark = false),
         )
         setImageViewBitmap(
             R.id.reaction_notification_body_dark,
-            reactionBodyBitmap(context, content.body, artwork, expanded, dark = true),
+            reactionBodyBitmap(context, content.artworkSource, artwork, expanded, dark = true),
         )
         setContentDescription(R.id.reaction_notification, "${content.title}, ${content.body}")
     }
@@ -184,16 +188,26 @@ internal fun notificationBuiltinEmojiBitmap(
     context: Context,
     code: String,
 ): Bitmap? {
-    val drawable = EmojiShortcodes.builtinDrawable(code)?.let { AppCompatResources.getDrawable(context, it) }
-    return drawable?.let {
-        Bitmap
-            .createBitmap(
-                NOTIFICATION_EMOJI_TILE_PX,
-                NOTIFICATION_EMOJI_TILE_PX,
-                Bitmap.Config.ARGB_8888,
-            ).also { bitmap ->
-                it.setBounds(0, 0, bitmap.width, bitmap.height)
-                it.draw(Canvas(bitmap))
+    val resource = EmojiShortcodes.builtinDrawable(code) ?: return null
+    val region = EmojiShortcodes.builtinArtworkRegion(resource)
+    val tile = NOTIFICATION_EMOJI_TILE_PX
+    return AppCompatResources.getDrawable(context, resource)?.let { drawable ->
+        Bitmap.createBitmap(tile, tile, Bitmap.Config.ARGB_8888).also { bitmap ->
+            if (region == null || drawable.intrinsicWidth <= 0 || drawable.intrinsicHeight <= 0) {
+                drawable.setBounds(0, 0, bitmap.width, bitmap.height)
+            } else {
+                // Scale the padded canvas so its artwork region fills the tile, as the in-app glyph crops it.
+                val scale = bitmap.width.toFloat() / maxOf(region.width, region.height)
+                val left = (-region.left * scale).roundToInt()
+                val top = (-region.top * scale).roundToInt()
+                drawable.setBounds(
+                    left,
+                    top,
+                    left + (drawable.intrinsicWidth * scale).roundToInt(),
+                    top + (drawable.intrinsicHeight * scale).roundToInt(),
+                )
             }
+            drawable.draw(Canvas(bitmap))
+        }
     }
 }

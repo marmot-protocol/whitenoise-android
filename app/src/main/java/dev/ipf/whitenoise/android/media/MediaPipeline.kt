@@ -488,6 +488,17 @@ object MediaPipeline {
         }
     }
 
+    /** Group recovery alone receives typed startup faults and its lifecycle-owned pending ticket. */
+    internal fun decodeGroupThumbnailAnimation(
+        bytes: ByteArray,
+        maxEdgePx: Int,
+        demand: dev.ipf.whitenoise.android.media.sandbox.AnimationAdmission.GroupDemand?,
+    ): Drawable? =
+        decodeAdmittedNativeAnimation(bytes) {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .groupAnimation(bytes, maxEdgePx, demand)
+        }
+
     /**
      * Decode the image at [uri] downscaled so the longer edge is ≈
      * [maxEdgePx], preserving the source format and alpha channel. Two-pass

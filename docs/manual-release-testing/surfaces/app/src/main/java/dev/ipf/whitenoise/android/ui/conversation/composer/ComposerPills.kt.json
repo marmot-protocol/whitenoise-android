@@ -72,6 +72,15 @@
         "test_ids": [
           "CON-035"
         ]
+      },
+      {
+        "surface": "Compact toolbar target spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "val leadingControlsWidth =",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
       }
     ],
     "source_coverage": [

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -20,14 +21,19 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -38,12 +44,14 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerAttachmentId
+import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_TOP_CHROME_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MasonryImageLayout
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerMotion
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailRegistry
+import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerPlatformMotionAllowed
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerThumbnail
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
@@ -59,6 +67,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Real production draw-layer handoff with synthetic already-rendered media; no controller or network mock. */
 @RunWith(RobolectricTestRunner::class)
@@ -99,7 +109,7 @@ class MediaViewerMotionScreenshotTest {
                 LocalDensity provides Density(density.density, fontScale),
             ) {
                 WhiteNoiseTheme(darkTheme = !light, amoled = !light) {
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(top = 64.dp)) {
                         Text(
                             "Media expansion · native Compose",
                             Modifier.offset(16.dp, 32.dp),
@@ -109,65 +119,41 @@ class MediaViewerMotionScreenshotTest {
                             if (visible) {
                                 Canvas(
                                     Modifier
-                                        .offset(24.dp, 150.dp)
+                                        .offset(24.dp, 8.dp)
                                         .size(144.dp, 104.dp)
                                         .clip(ConversationRichContentShape)
-                                        .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL)
                                         .testTag("motion-thumbnail")
-                                        .clickable { open = true },
+                                        .clickable { open = true }
+                                        .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL),
                                 ) {
-                                    drawRect(Color(0xff195563))
-                                    drawCircle(
-                                        Color(0xffffc45d),
-                                        22.dp.toPx(),
-                                        Offset(size.width * .7f, size.height * .3f),
-                                    )
-                                    drawLine(
-                                        Color(0xff5bb89d),
-                                        Offset.Zero,
-                                        Offset(size.width, size.height),
-                                        35.dp.toPx(),
-                                    )
+                                    drawSharedFixtureImage(crop = true)
                                 }
                             }
                         }
                         if (open) {
-                            MediaViewerFrame(
-                                senderLabel = "Alex",
-                                recordedAtLabel = "Oct 25, 2026",
-                                onDismiss = { closing = true },
-                                onSave = {},
-                                onShare = {},
-                                snackbarHostState = remember { SnackbarHostState() },
-                            ) {
-                                MediaViewerMotion(registry, id, selected, closing, onClosed = {
+                            MediaViewerMotion(
+                                registry,
+                                id,
+                                selected,
+                                closing,
+                                attachmentAspectRatio = 16f / 9f,
+                                onClosed = {
                                     open = false
                                     closed++
-                                }) {
+                                },
+                            ) { motionBodyModifier ->
+                                MediaViewerFrame(
+                                    senderLabel = "Alex",
+                                    recordedAtLabel = "Oct 25, 2026",
+                                    onDismiss = { closing = true },
+                                    onSave = {},
+                                    onShare = {},
+                                    snackbarHostState = remember { SnackbarHostState() },
+                                    bodyModifier = motionBodyModifier,
+                                    actionsEnabled = !closing,
+                                ) {
                                     Canvas(Modifier.fillMaxSize()) {
-                                        val imageHeight = size.width * 104f / 144f
-                                        val top = (size.height - imageHeight) / 2f
-                                        translate(0f, top) {
-                                            clipRect(0f, 0f, size.width, imageHeight) {
-                                                drawRect(
-                                                    Color(0xff195563),
-                                                    size =
-                                                        androidx.compose.ui.geometry
-                                                            .Size(size.width, imageHeight),
-                                                )
-                                                drawCircle(
-                                                    Color(0xffffc45d),
-                                                    size.width * 22f / 144f,
-                                                    Offset(size.width * .7f, imageHeight * .3f),
-                                                )
-                                                drawLine(
-                                                    Color(0xff5bb89d),
-                                                    Offset.Zero,
-                                                    Offset(size.width, imageHeight),
-                                                    size.width * 35f / 144f,
-                                                )
-                                            }
-                                        }
+                                        drawSharedFixtureImage(crop = false)
                                     }
                                 }
                             }
@@ -185,6 +171,21 @@ class MediaViewerMotionScreenshotTest {
         // measure/draw until requested. Draw at this same virtual instant before checking chrome.
         composeRule.onRoot().captureToImage()
         composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertIsDisplayed()
+        val sourceBounds = composeRule.onNodeWithTag("motion-thumbnail").fetchSemanticsNode().boundsInRoot
+        val chromeBounds = composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).fetchSemanticsNode().boundsInRoot
+        assertTrue("the real viewer owner starts below the window origin", chromeBounds.top >= 64f)
+        assertTrue("the source crosses the visible chrome boundary", sourceBounds.top < chromeBounds.bottom)
+        assertTrue("the source also reaches below chrome", sourceBounds.bottom > chromeBounds.bottom)
+        assertTrue("the asserted first pixel is inside chrome", sourceBounds.top + 50f < chromeBounds.bottom)
+        val firstPixels = composeRule.onRoot().captureToImage().toPixelMap()
+        assertEquals(
+            "the first copy is at the actual source, not shifted by the viewer's header",
+            Color(0xff195563),
+            firstPixels[
+                (sourceBounds.left + sourceBounds.width * 10f / 144f).toInt(),
+                (sourceBounds.top + sourceBounds.height * 50f / 104f).toInt(),
+            ],
+        )
         var videoFrame = 0
         val recordFrames = System.getenv("ANIMATION_CAPTURE_FRAMES") == "1"
         val frames = File("build/media-viewer-motion/$name")
@@ -207,7 +208,10 @@ class MediaViewerMotionScreenshotTest {
         capture("media_motion_${name}_first")
         advance(112)
         capture("media_motion_${name}_middle")
-        advance(240)
+        advance(96)
+        assertSharedImageLandmarks(settled = false)
+        advance(144)
+        assertSharedImageLandmarks(settled = true)
         capture("media_motion_${name}_settled")
         composeRule.runOnIdle {
             if (missingReturn) selected = ConversationMediaViewerAttachmentId("offscreen-page", 1)
@@ -215,6 +219,7 @@ class MediaViewerMotionScreenshotTest {
         }
         flushQueuedComposition()
         if (missingReturn) composeRule.runOnIdle { assertTrue(closed == 1) }
+        composeRule.onNodeWithTag("conversation.media.viewer.share").assertIsNotEnabled()
         advance(96)
         capture("media_motion_${name}_return")
         advance(240)
@@ -224,6 +229,156 @@ class MediaViewerMotionScreenshotTest {
         }
         flushQueuedComposition()
         assertNull(registry.find(id))
+    }
+
+    /** A single intrinsic16:9 scene is center-cropped by the tile and fitted by the real viewer. */
+    private fun DrawScope.drawSharedFixtureImage(crop: Boolean) {
+        val xScale = size.width / 144f
+        val yScale = size.height / 81f
+        val factor = if (crop) maxOf(xScale, yScale) else minOf(xScale, yScale)
+        translate((size.width - 144f * factor) / 2f, (size.height - 81f * factor) / 2f) {
+            scale(factor, factor, pivot = Offset.Zero) {
+                clipRect(0f, 0f, 144f, 81f) {
+                    drawRect(
+                        Color(0xff195563),
+                        size =
+                            androidx.compose.ui.geometry
+                                .Size(144f, 81f),
+                    )
+                    drawCircle(Color(0xffffc45d), 22f, Offset(100.8f, 24.3f))
+                    drawLine(Color(0xff5bb89d), Offset.Zero, Offset(144f, 81f), 35f)
+                    drawRect(
+                        Color(0xffffc45d),
+                        topLeft = Offset(79.2f, 16f),
+                        size =
+                            androidx.compose.ui.geometry
+                                .Size(43.2f, 24f),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun assertSharedImageLandmarks(settled: Boolean) {
+        val body = composeRule.onNodeWithTag(MEDIA_VIEWER_CONTENT_TAG).fetchSemanticsNode().boundsInRoot
+        val imageHeight = body.width * 9f / 16f
+        val y = (body.top + (body.height - imageHeight) / 2f + imageHeight * .3f).toInt()
+        val pixels = composeRule.onRoot().captureToImage().toPixelMap()
+        val center = pixels[(body.left + body.width * .7f).toInt(), y]
+        val cropEdge = pixels[(body.left + body.width * .555f).toInt(), y]
+        // Native compositing can round one channel by one8-bit step at these two positions.
+        val centerChannels = listOf(center.red, center.green, center.blue).map { (it * 255).roundToInt() }
+        val edgeChannels = listOf(cropEdge.red, cropEdge.green, cropEdge.blue).map { (it * 255).roundToInt() }
+        assertEquals("the shared image keeps its alpha", center.alpha, cropEdge.alpha)
+        centerChannels.zip(edgeChannels).forEach { (expected, actual) ->
+            assertTrue("the shared crop keeps its landmark aligned", abs(expected - actual) <= 1)
+        }
+        if (settled) assertEquals("the real full image owns the same landmark", Color(0xffffc45d), center)
+    }
+
+    @Test
+    fun videoMotionPreservesThePreAndroid14SurfaceFallback() {
+        for (sdk in 30..33) assertTrue(!mediaViewerPlatformMotionAllowed(isVideo = true, sdk = sdk))
+        for (sdk in 34..36) assertTrue(mediaViewerPlatformMotionAllowed(isVideo = true, sdk = sdk))
+        for (sdk in 30..36) assertTrue(mediaViewerPlatformMotionAllowed(isVideo = false, sdk = sdk))
+    }
+
+    @Test
+    fun openingEpochMismatchUsesDirectPresentation() = verifyReturnOwnership(mismatchedEpoch = true)
+
+    @Test
+    fun aDrawOnlyLostReturnDismissesOnTheNextFrame() = verifyReturnOwnership()
+
+    @Test
+    fun removingTheOwnerDuringReturnCannotDismissItsReplacement() = verifyReturnOwnership(disposeOwner = true)
+
+    private fun verifyReturnOwnership(
+        mismatchedEpoch: Boolean = false,
+        disposeOwner: Boolean = false,
+    ) {
+        val registry = MediaViewerThumbnailRegistry()
+        val id = ConversationMediaViewerAttachmentId("return-owner", 0)
+        val visibleBounds = arrayOf(Rect(0f, 0f, 360f, 640f))
+        var open by mutableStateOf(false)
+        var closing by mutableStateOf(false)
+        var mounted by mutableStateOf(true)
+        var closed = 0
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Box(Modifier.fillMaxSize()) {
+                    MediaViewerThumbnailHost(registry, readingViewport = { visibleBounds[0] }) {
+                        Canvas(
+                            Modifier.offset(24.dp, 24.dp).size(64.dp).mediaViewerThumbnail(id.messageIdHex, 0, 0uL),
+                        ) {
+                            drawRect(Color.Blue)
+                        }
+                    }
+                    if (open && mounted) {
+                        MediaViewerMotion(
+                            registry,
+                            id,
+                            id,
+                            closing,
+                            onClosed = { closed++ },
+                            selectedSourceEpoch = if (mismatchedEpoch) 1uL else 0uL,
+                            attachmentAspectRatio = 1f,
+                        ) { modifier -> Box(Modifier.fillMaxSize().then(modifier).background(Color.Red)) }
+                    }
+                }
+            }
+        }
+        flushInitialNativeDraw()
+        assertNotNull(registry.find(id))
+        composeRule.runOnIdle { open = true }
+        flushQueuedComposition()
+        if (mismatchedEpoch) {
+            assertEquals(Color.Red, composeRule.onRoot().captureToImage().toPixelMap()[40, 40])
+            return
+        }
+        composeRule.mainClock.advanceTimeBy(320)
+        composeRule.runOnIdle { closing = true }
+        flushQueuedComposition()
+        assertEquals(0, closed)
+        if (disposeOwner) composeRule.runOnIdle { mounted = false } else visibleBounds[0] = Rect.Zero
+        composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        assertEquals(if (disposeOwner) 0 else 1, closed)
+        composeRule.mainClock.advanceTimeBy(320)
+        composeRule.waitForIdle()
+        assertEquals(if (disposeOwner) 0 else 1, closed)
+    }
+
+    /** Eligibility is read lazily from the foreground composer's actual clear interval. */
+    @Test
+    fun partlyOccludedSourceBecomesEligibleWithoutAnotherLayoutCallback() {
+        val registry = MediaViewerThumbnailRegistry()
+        val id = ConversationMediaViewerAttachmentId("viewport-media", 0)
+        var bottom by mutableStateOf(200f)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            WhiteNoiseTheme {
+                MediaViewerThumbnailHost(registry, readingViewport = {
+                    Rect(0f, 0f, with(density) { 360.dp.toPx() }, with(density) { bottom.dp.toPx() })
+                }) {
+                    Canvas(
+                        Modifier
+                            .offset(24.dp, 150.dp)
+                            .size(144.dp, 104.dp)
+                            .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL),
+                    ) {
+                        drawRect(Color.Blue)
+                    }
+                }
+            }
+        }
+        flushInitialNativeDraw()
+        composeRule.runOnIdle {
+            assertNull("a tile partly beneath the composer is ineligible", registry.find(id))
+            bottom = 300f
+            assertNotNull("a fresh viewport is used without remeasuring the tile", registry.find(id))
+        }
     }
 
     @Test

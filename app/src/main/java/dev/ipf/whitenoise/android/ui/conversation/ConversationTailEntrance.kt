@@ -168,14 +168,20 @@ internal fun rememberConversationTailEntrance(
 internal fun Modifier.conversationTailEntranceMotion(
     entrance: ConversationTailEntrance,
     itemId: String,
-    claimedPresentationId: String? = null,
+    claimedPresentationId: () -> String? = { null },
 ): Modifier {
     val shifted =
         graphicsLayer {
+            val currentClaim = claimedPresentationId()
+            val entering = entrance.enteringItemId
+            // Once visible accepted ink retires, its neighbours must share its final slots too.
+            val claimedEntrance = entering != null && entrance.claimedEnteringItemId == entering
+            val retiredClaim = claimedEntrance && currentClaim != entering
             translationY =
-                if (itemId == claimedPresentationId ||
-                    itemId == entrance.enteringItemId &&
-                    itemId == entrance.claimedEnteringItemId
+                if (retiredClaim ||
+                    itemId == entering &&
+                    claimedEntrance &&
+                    currentClaim == entering
                 ) {
                     0f
                 } else {

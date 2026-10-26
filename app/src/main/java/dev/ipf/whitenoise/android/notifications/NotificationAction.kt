@@ -30,7 +30,7 @@ object NotificationActions {
     private const val EXTRA_NOTIFICATION_TAG = "dev.ipf.whitenoise.android.extra.NOTIFICATION_TAG"
     private const val EXTRA_NOTIFICATION_ID = "dev.ipf.whitenoise.android.extra.NOTIFICATION_ID"
     private const val EXTRA_INLINE_REACTION_CHOICES = "dev.ipf.whitenoise.android.extra.INLINE_REACTION_CHOICES"
-    internal const val LEGACY_EXTRA_REACTION = "dev.ipf.whitenoise.android.extra.REACTION"
+    private const val LEGACY_EXTRA_REACTION = "dev.ipf.whitenoise.android.extra.REACTION"
     private const val URI_SCHEME = "whitenoise-notify"
 
     fun targetFromUpdate(
@@ -69,6 +69,7 @@ object NotificationActions {
         if (acceptsInlineReactionChoices) intent.putExtra(EXTRA_INLINE_REACTION_CHOICES, true)
     }
 
+    /** The action an intent carries, reading a Reply that returned a chosen chip as a reaction. */
     fun parse(intent: Intent?): NotificationAction? {
         intent ?: return null
         val parsedKind = kindForAction(intent.action) ?: return null
@@ -92,8 +93,10 @@ object NotificationActions {
         )
     }
 
-    // Fixed image choices and cards from the previous app version carry a
-    // direct value. Both remain subject to the current allowlist in the receiver.
+    /**
+     * The direct value carried by cards from earlier app versions: the old emoji action and the expanded
+     * image choices. Both keep working across an in-place update, still subject to the receiver's allowlist.
+     */
     internal fun legacyReaction(intent: Intent): String? =
         normalizeNotificationReaction(
             intent.getStringExtra(LEGACY_EXTRA_REACTION),

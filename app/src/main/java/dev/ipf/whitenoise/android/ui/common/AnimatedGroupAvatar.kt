@@ -48,7 +48,7 @@ internal fun AnimatedGroupAvatarOverlay(
     modifier: Modifier = Modifier,
     maxEdgePx: Int,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
-    decode: suspend (ByteArray, Int) -> android.graphics.drawable.Drawable? = ::decodeAnimatedGroupThumbnail,
+    decode: (suspend (ByteArray, Int) -> android.graphics.drawable.Drawable?)? = null,
 ) {
     key(animation.key) {
         GroupAvatarPlayback(animation, modifier, maxEdgePx, animationsEnabled, decode)
@@ -63,7 +63,7 @@ private fun GroupAvatarPlayback(
     modifier: Modifier,
     maxEdgePx: Int,
     animationsEnabled: Boolean,
-    decode: suspend (ByteArray, Int) -> android.graphics.drawable.Drawable?,
+    decode: (suspend (ByteArray, Int) -> android.graphics.drawable.Drawable?)?,
 ) {
     val visible = remember { mutableStateOf(false) }
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow
@@ -104,7 +104,9 @@ private fun GroupAvatarPlayback(
                 modifier = Modifier.fillMaxSize(),
                 groupThumbnail = true,
                 animationsEnabled = animationsEnabled,
-                decode = decode,
+                groupDecode = { source, edge, demand ->
+                    if (decode != null) decode(source, edge) else decodeAnimatedGroupThumbnail(source, edge, demand)
+                },
                 onDecodeUnavailable = { unavailable = true },
             )
         }

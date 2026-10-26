@@ -161,7 +161,6 @@ internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 internal const val COMPOSER_EDITOR_VIEWPORT_TAG = "composer-editor-viewport"
 internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
 
-private val CompactEditorStartInset = 72.dp
 private val EditingEditorStartInset = 14.dp
 private val ExpandedEditorEndInset = 14.dp
 private val CompactEditorTopInset = ComposerResizeStripHeight
@@ -684,17 +683,18 @@ internal fun ComposerPill(
     val draftStartOffscreen by remember(composerScrollState) {
         derivedStateOf { composerScrollState.value > 0 }
     }
-    val sendingIdentityWidth = if (sendingIdentity != null) composerSendingIdentityTargetSize else 0.dp
-    val leadingControlsWidth = (if (hasAttachmentAction) 80.dp else 40.dp) + 48.dp + sendingIdentityWidth
+    val sendingIdentityWidth = if (sendingIdentity != null) ComposerToolbarSlotWidth else 0.dp
+    val leadingControlsWidth =
+        ComposerToolbarSlotWidth * (if (hasAttachmentAction) 3 else 2) + sendingIdentityWidth + 8.dp
     val compactEditorStartInset =
-        (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp + 8.dp + sendingIdentityWidth
+        leadingControlsWidth
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
-            (if (trailingAction != null) 40.dp else 0.dp)
+            (if (trailingAction != null) ComposerToolbarSlotWidth else 0.dp)
     val minimumDictationWidth =
         when {
             dictationControls != null -> DICTATION_ACTIVE_ACTIONS_WIDTH
-            onDictation != null -> 40.dp
+            onDictation != null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
     // Automatic geometry may still be animating its outer reservation; budget the smaller surface.
@@ -713,7 +713,7 @@ internal fun ComposerPill(
     val targetDictationControlWidth =
         when {
             dictationControls != null -> minOf(DICTATION_ACTIVE_ACTIONS_WIDTH, availableDictationWidth)
-            onDictation != null -> 40.dp
+            onDictation != null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
     val dictationControlWidthState =
@@ -731,7 +731,7 @@ internal fun ComposerPill(
         4.dp +
             dictationControlWidth +
             expandedTrailingActionInset +
-            (if (compactMeasurementReservesTrailingAction) 40.dp else 0.dp)
+            (if (compactMeasurementReservesTrailingAction) ComposerToolbarSlotWidth else 0.dp)
     val composerTextStyle =
         MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface,
@@ -959,7 +959,7 @@ internal fun ComposerPill(
     SideEffect { if (accessoryContent == null) onAccessoryHeightChanged(0.dp) }
     val compactTrailingReserve =
         4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth + expandedTrailingActionInset +
-            (if (trailingAction != null) 40.dp else 0.dp)
+            (if (trailingAction != null) ComposerToolbarSlotWidth else 0.dp)
     val automaticTextHeight =
         if (usesAnimatedTextHeight) {
             Modifier.layout { measurable, constraints ->
@@ -1107,20 +1107,22 @@ internal fun ComposerPill(
             Modifier.fillMaxHeight()
         }
     val draftTopAction: @Composable () -> Unit = {
-        IconButton(
-            onClick = {
-                editorScrollJob?.cancel()
-                readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
-                editorScrollJob = editorScrollScope.launch { composerScrollState.scrollTo(0) }
-            },
-            modifier = Modifier.width(draftTopWidth).height(48.dp).testTag(COMPOSER_DRAFT_TOP_TAG),
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_jump_to_edge),
-                contentDescription = stringResource(R.string.scroll_to_top),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp),
-            )
+        ComposerToolbarTargets {
+            IconButton(
+                onClick = {
+                    editorScrollJob?.cancel()
+                    readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
+                    editorScrollJob = editorScrollScope.launch { composerScrollState.scrollTo(0) }
+                },
+                modifier = Modifier.width(draftTopWidth).height(48.dp).testTag(COMPOSER_DRAFT_TOP_TAG),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_jump_to_edge),
+                    contentDescription = stringResource(R.string.scroll_to_top),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 
@@ -1591,85 +1593,103 @@ internal fun ComposerPill(
                                 if (hasAttachmentAction) {
                                     Box(
                                         modifier =
-                                            Modifier.width(40.dp).height(48.dp).onGloballyPositioned { coordinates ->
-                                                val position = coordinates.positionInWindow()
-                                                attachmentAnchorBounds =
-                                                    androidx.compose.ui.unit.IntRect(
-                                                        position.x.roundToInt(),
-                                                        position.y.roundToInt(),
-                                                        position.x.roundToInt() + coordinates.size.width,
-                                                        position.y.roundToInt() + coordinates.size.height,
-                                                    )
-                                            },
+
+                                            Modifier
+                                                .width(ComposerToolbarSlotWidth)
+                                                .height(48.dp)
+                                                .onGloballyPositioned { coordinates ->
+                                                    val position = coordinates.positionInWindow()
+                                                    attachmentAnchorBounds =
+                                                        androidx.compose.ui.unit.IntRect(
+                                                            position.x.roundToInt(),
+                                                            position.y.roundToInt(),
+                                                            position.x.roundToInt() + coordinates.size.width,
+                                                            position.y.roundToInt() + coordinates.size.height,
+                                                        )
+                                                },
                                         contentAlignment = Alignment.CenterStart,
                                     ) {
-                                        IconButton(
-                                            onClick = onAttachmentsToggle,
-                                            enabled = inputContentVisible,
-                                            modifier =
-                                                Modifier
-                                                    .width(32.dp)
-                                                    .height(48.dp)
-                                                    .alpha(if (inputContentVisible) 1f else 0f)
-                                                    .then(
-                                                        if (inputContentVisible) {
-                                                            Modifier
-                                                        } else {
-                                                            Modifier.clearAndSetSemantics {}
-                                                        },
-                                                    ),
-                                        ) {
-                                            // Swap the glyph on open (X) the way the emoji toggle swaps
-                                            // to a keyboard, so sighted users get a visual cue, not just
-                                            // a changed content description.
-                                            Icon(
-                                                painter =
-                                                    painterResource(
-                                                        if (attachmentSheetOpen) {
-                                                            R.drawable.ic_close
-                                                        } else {
-                                                            R.drawable.ic_add
-                                                        },
-                                                    ),
-                                                contentDescription =
-                                                    stringResource(
-                                                        if (attachmentSheetOpen) {
-                                                            R.string.close
-                                                        } else {
-                                                            R.string.attach_options
-                                                        },
-                                                    ),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(24.dp),
-                                            )
+                                        ComposerToolbarTargets {
+                                            IconButton(
+                                                onClick = onAttachmentsToggle,
+                                                enabled = inputContentVisible,
+                                                modifier =
+                                                    Modifier
+                                                        .width(ComposerToolbarSlotWidth)
+                                                        .height(48.dp)
+                                                        .alpha(if (inputContentVisible) 1f else 0f)
+                                                        .then(
+                                                            if (inputContentVisible) {
+                                                                Modifier
+                                                            } else {
+                                                                Modifier.clearAndSetSemantics {}
+                                                            },
+                                                        ),
+                                            ) {
+                                                // Swap the glyph on open (X) the way the emoji toggle swaps
+                                                // to a keyboard, so sighted users get a visual cue, not just
+                                                // a changed content description.
+                                                Icon(
+                                                    painter =
+                                                        painterResource(
+                                                            if (attachmentSheetOpen) {
+                                                                R.drawable.ic_close
+                                                            } else {
+                                                                R.drawable.ic_add
+                                                            },
+                                                        ),
+                                                    contentDescription =
+                                                        stringResource(
+                                                            if (attachmentSheetOpen) {
+                                                                R.string.close
+                                                            } else {
+                                                                R.string.attach_options
+                                                            },
+                                                        ),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(24.dp),
+                                                )
+                                            }
                                         }
                                         attachmentMenu?.invoke(attachmentAnchorBounds)
                                     }
                                 }
-                                TextEntryEmojiAction(
-                                    pickerOpen = emojiPickerOpen,
-                                    enabled = inputContentVisible,
-                                    onClick = {
-                                        selectingWithoutKeyboard = false
-                                        onEmojiPickerToggle()
-                                    },
-                                    togglesKeyboard = true,
-                                    modifier = Modifier.width(32.dp).height(48.dp).focusRequester(defaultActionFocus),
-                                    iconSize = 24.dp,
-                                    emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
-                                )
+                                ComposerToolbarTargets {
+                                    TextEntryEmojiAction(
+                                        pickerOpen = emojiPickerOpen,
+                                        enabled = inputContentVisible,
+                                        onClick = {
+                                            selectingWithoutKeyboard = false
+                                            onEmojiPickerToggle()
+                                        },
+                                        togglesKeyboard = true,
+                                        modifier =
+                                            Modifier
+                                                .width(ComposerToolbarSlotWidth)
+                                                .height(48.dp)
+                                                .focusRequester(defaultActionFocus),
+                                        iconSize = 24.dp,
+                                        emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
+                                    )
+                                }
                                 key(scrollOwnerKey, pasteTargetKey, inputContentVisible, inputFocusEnabled) {
-                                    SystemPasteIconButton(
-                                        onPaste = tryPasteFromClipboard,
-                                        enabled = inputContentVisible && inputFocusEnabled,
-                                        modifier = Modifier.size(48.dp).testTag("composer.paste"),
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_content_paste),
-                                            contentDescription = stringResource(R.string.paste_from_clipboard),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(24.dp),
-                                        )
+                                    ComposerToolbarTargets {
+                                        SystemPasteIconButton(
+                                            onPaste = tryPasteFromClipboard,
+                                            enabled = inputContentVisible && inputFocusEnabled,
+                                            modifier =
+                                                Modifier
+                                                    .width(ComposerToolbarSlotWidth)
+                                                    .height(48.dp)
+                                                    .testTag("composer.paste"),
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.ic_content_paste),
+                                                contentDescription = stringResource(R.string.paste_from_clipboard),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1703,25 +1723,31 @@ internal fun ComposerPill(
                                     },
                                 ) { dictationControls() }
                             } else if (onDictation != null) {
-                                IconButton(
-                                    onClick = onDictation,
-                                    enabled = inputContentVisible,
-                                    modifier =
-                                        Modifier
-                                            .width(40.dp)
-                                            .height(48.dp)
-                                            .alpha(if (inputContentVisible) 1f else 0f)
-                                            .then(
-                                                if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {},
-                                            ),
-                                ) {
-                                    // The prototype's microphone is dictation; voice notes use the waveform glyph.
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_mic),
-                                        contentDescription = stringResource(R.string.dictate_text),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(24.dp),
-                                    )
+                                ComposerToolbarTargets {
+                                    IconButton(
+                                        onClick = onDictation,
+                                        enabled = inputContentVisible,
+                                        modifier =
+                                            Modifier
+                                                .width(ComposerToolbarSlotWidth)
+                                                .height(48.dp)
+                                                .alpha(if (inputContentVisible) 1f else 0f)
+                                                .then(
+                                                    if (inputContentVisible) {
+                                                        Modifier
+                                                    } else {
+                                                        Modifier.clearAndSetSemantics {}
+                                                    },
+                                                ),
+                                    ) {
+                                        // The prototype's microphone is dictation; voice notes use the waveform glyph.
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_mic),
+                                            contentDescription = stringResource(R.string.dictate_text),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
+                                        )
+                                    }
                                 }
                             }
                             if (sendAccessoryContent != null && inputContentVisible) {

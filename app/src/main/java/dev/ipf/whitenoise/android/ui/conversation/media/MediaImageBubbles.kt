@@ -403,12 +403,11 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
-                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
-                                ),
+                                ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
+                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                     )
                 is DecodedAttachmentPresentation.Animated ->
                     AnimatedDrawableAttachmentImage(
@@ -418,12 +417,11 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
-                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
-                                ),
+                                ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
+                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                     )
                 null ->
                     when {

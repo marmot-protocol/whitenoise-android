@@ -21,6 +21,16 @@
           "CON-036"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Claim retirement settles neighbouring paint without overlap",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailEntrance.kt",
+        "anchor": "val retiredClaim =",
+        "test_ids": [
+          "CON-036"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

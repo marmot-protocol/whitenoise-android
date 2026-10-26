@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -435,17 +436,20 @@ internal fun MessageBubble(
     // add a warning; only unknown reasons still take the error-styled
     // tombstone. Explicit deletion always wins.
     val invalidated = !deleted && item.projected?.invalidationStatus != null
-    val reactionMotionRuntime = remember(controller) { appState.runtimeGeneration }
-    val currentReactionOwner =
-        !appState.appLockScreenVisible &&
-            controller.isCurrentGroupMutationOwner(appState, reactionMotionRuntime) &&
-            controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
-    val reactionTargetAvailable = !deleted && !invalidated && !actionsReadOnly
+    val rowReactionMotion = dev.ipf.whitenoise.android.ui.conversation.reactions.LocalRowReactionMotion.current
     val localReactionMotion =
-        rememberLocalReactionMotion(
-            controller to item.presentationId,
-            enabled = rememberConversationMotionEnabled() && currentReactionOwner && reactionTargetAvailable,
-        )
+        rowReactionMotion ?: run {
+            val runtime = remember(controller) { appState.runtimeGeneration }
+            val currentOwner =
+                !appState.appLockScreenVisible &&
+                    controller.isCurrentGroupMutationOwner(appState, runtime) &&
+                    controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
+            val available = currentOwner && !deleted && !invalidated && !actionsReadOnly
+            rememberLocalReactionMotion(
+                controller to item.presentationId,
+                enabled = rememberConversationMotionEnabled() && available,
+            )
+        }
     val invalidationPresentation =
         if (deleted) {
             TimelineInvalidationPresentation.None
@@ -1541,7 +1545,7 @@ internal fun MessageBubble(
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .localReactionOverlay(localReactionMotion)
+            .then(if (rowReactionMotion == null) Modifier.localReactionOverlay(localReactionMotion) else Modifier)
             .onGloballyPositioned {
                 if (replySwipe.atRest) replySwipe.rowBoundsInRoot = it.boundsInRoot()
             },
@@ -2177,6 +2181,29 @@ internal fun MessageBubble(
                             parseMarkdown = parseMarkdown,
                         )
                     }
+                SideEffect {
+                    val document = displayedMarkdownDocument
+                    if (document != null && document.blocks.isNotEmpty() && !isSinglePlainSendParagraph(document)) {
+                        composerSendMotion
+                            ?.takeIf { it.activePresentationId == item.presentationId }
+                            ?.clear("destination-markdown-transformed")
+                    }
+                }
+                val currentSendDocument by rememberUpdatedState(displayedMarkdownDocument)
+                val sendSelectableTextLayoutReporter: dev.ipf.whitenoise.android.ui.SelectableTextLayoutReporter =
+                    remember(textLayouts, composerSendMotion, item.presentationId) {
+                        { key, layout, coordinates ->
+                            textLayouts.selectableTextLayoutReporter(key, layout, coordinates)
+                            if (composerSendMotion?.activePresentationId == item.presentationId &&
+                                layout != null &&
+                                coordinates != null &&
+                                currentSendDocument?.let(::isSinglePlainSendParagraph) == true
+                            ) {
+                                composerSendMotion.destinationLayout(item.presentationId, layout)
+                                composerSendMotion.destinationText(item.presentationId, coordinates)
+                            }
+                        }
+                    }
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
                 val soleCaptionedVisual =
@@ -2504,7 +2531,7 @@ internal fun MessageBubble(
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
                                     customBubbleColorActive = customBubbleColorActive,
-                                    selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                                    selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
@@ -2595,7 +2622,7 @@ internal fun MessageBubble(
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
                                     customBubbleColorActive = customBubbleColorActive,
-                                    selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                                    selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
@@ -2677,7 +2704,7 @@ internal fun MessageBubble(
                             persistedFailure = persistedFailure,
                             textSelectionMode = textSelectionMode,
                             customBubbleColorActive = customBubbleColorActive,
-                            selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                            selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                             markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                             onCopyMarkdownLink = ::copyMarkdownLink,
                             deferMarkdownLinkActivation = deferMarkdownLinkActivation,

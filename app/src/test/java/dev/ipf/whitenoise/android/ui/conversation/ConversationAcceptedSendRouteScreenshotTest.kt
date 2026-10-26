@@ -29,11 +29,14 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -50,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -75,6 +79,11 @@ class ConversationAcceptedSendRouteScreenshotTest {
 
     private var controller: ConversationController? = null
     private var publishCount = 0
+    private var deferMarkdownHydration = false
+    private var formattedHydration = false
+    private var receiveDuringFlight = false
+    private var emitIncomingWindow: (() -> Unit)? = null
+    private val markdownHydrationGate = CompletableDeferred<Unit>()
     private val originalTimeZone = TimeZone.getDefault()
 
     /** Releases every conversation-owned job and restores process-wide timestamp formatting. */
@@ -87,6 +96,33 @@ class ConversationAcceptedSendRouteScreenshotTest {
     /** Real tail sends must paint intermediate geometry. */
     @Test
     fun acceptedSendAtLiveTailPaintsAnIntermediateFlight() = assertLiveTailFlight("Short send", 0)
+
+    /** Real native-shaped paragraph hydration completes before the first accepted paint. */
+    @Test
+    fun hydratedParagraphBeforeFirstFrameKeepsTheSendFlight() = assertLiveTailFlight("Hydrated before paint", 0)
+
+    /** Replacing the plain leaf during travel must preserve the same accepted destination owner. */
+    @Test
+    fun hydratedParagraphDuringFlightKeepsTheSendFlight() {
+        deferMarkdownHydration = true
+        assertLiveTailFlight("Hydrated during travel", 0)
+    }
+
+    @Test
+    fun incomingRowDuringFlightKeepsWholePaintedRowsSeparate() {
+        receiveDuringFlight = true
+        assertLiveTailFlight("Sending while another row arrives", 0)
+    }
+
+    @Test
+    fun formattedHydrationRetiresOnlyTheMatchingCopyAndRevealsCanonicalInk() {
+        deferMarkdownHydration = true
+        formattedHydration = true
+        assertLiveTailFlight("**Styled send**", 0)
+    }
+
+    @Test
+    fun trailingKeyboardSpaceKeepsTheAcceptedInkFlight() = assertLiveTailFlight("Keyboard suggestion ", 0)
 
     /** Multiline contraction uses the actual transcript viewport. */
     @Test
@@ -158,8 +194,102 @@ class ConversationAcceptedSendRouteScreenshotTest {
         val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
         var motionOwner: ComposerSendMotion? = null
         val boundaries = mutableListOf<String>()
+        var firstCanonicalExposureIndex: Int? = null
+        var firstCanonicalExposureTop: Float? = null
+        var incomingMovedAfterExposure = false
         var earlyRetiredHeight: Float? = null
         var earlyRetiredInternalGeometry: Pair<Rect, List<Color>>? = null
+    }
+
+    private fun hydrateDuringFlight(
+        index: Int,
+        frames: LiveTailFrames,
+    ) {
+        if (!deferMarkdownHydration || index != 4) return
+        assertTrue("hydrate only after real moving ink", frames.painted.any { it.progress > 0f && it.progress < 1f })
+        markdownHydrationGate.complete(Unit)
+        awaitConversationCondition { publishCount == 1 }
+    }
+
+    private fun suppressAtFrame(
+        index: Int,
+        frames: LiveTailFrames,
+        resolver: android.content.ContentResolver,
+    ) {
+        if (index != 6) return
+        assertTrue("the production flight must be active before suppression", frames.motionOwner?.flight != null)
+        assertTrue(
+            "suppression must follow a genuinely painted moving frame",
+            frames.painted.any { it.progress > 0f && it.progress < 1f },
+        )
+        composeRule.runOnIdle {
+            Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 0f)
+            resolver.notifyChange(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), null)
+        }
+    }
+
+    private fun retireAtFrame(
+        index: Int,
+        frames: LiveTailFrames,
+    ) {
+        if (index != 6) return
+        assertTrue(
+            "retirement must follow a genuinely painted flight",
+            frames.painted.any { it.progress > 0f && it.progress < 1f },
+        )
+        composeRule.runOnIdle { checkNotNull(frames.motionOwner).clear("test-destination-retired") }
+        assertTrue("this fallback must not depend on disabling motion", frames.motionOwner?.enabled == true)
+    }
+
+    private fun receiveAtFrame(
+        index: Int,
+        frames: LiveTailFrames,
+    ) {
+        if (!receiveDuringFlight || index != 10) return
+        assertTrue("the accepted send is really in flight", frames.motionOwner?.flight != null)
+        assertTrue("the accepted copy already painted", frames.painted.any { it.progress > 0f && it.progress < 1f })
+        checkNotNull(emitIncomingWindow).invoke()
+        awaitConversationCondition { checkNotNull(controller).timeline.any { it.record.plaintext == INCOMING_TEXT } }
+    }
+
+    private fun assertPaintedTailSeparation(
+        frames: LiveTailFrames,
+        index: Int,
+    ) {
+        val motion = checkNotNull(frames.motionOwner)
+        val settledCopy = motion.lastRenderedGeometry?.takeIf { it.settled }
+        // A still-traveling copy may cross the entrance; only landing/canonical paint owns row slots.
+        if (motion.flight != null && settledCopy == null) return
+        val rows =
+            checkNotNull(controller).timeline.takeLast(3).map { item ->
+                val bounds =
+                    if (motion.hides(item.presentationId)) {
+                        checkNotNull(settledCopy).bounds
+                    } else {
+                        composeRule
+                            .onNodeWithTag(
+                                messageBubbleColumnTestTag(item.record.messageIdHex),
+                                useUnmergedTree = true,
+                            ).fetchSemanticsNode()
+                            .boundsInWindow
+                    }
+                item to bounds
+            }
+        val outgoing = rows.single { it.first.record.direction == "sent" }.second
+        if (frames.firstCanonicalExposureIndex == null) {
+            frames.firstCanonicalExposureIndex = index
+            frames.firstCanonicalExposureTop = outgoing.top
+        } else if (kotlin.math.abs(outgoing.top - checkNotNull(frames.firstCanonicalExposureTop)) > 1f) {
+            frames.incomingMovedAfterExposure = true
+        }
+        val visibleRows = rows.filterNot { it.second.isEmpty }.sortedBy { it.second.top }
+        assertTrue("the actual tail exposes multiple whole rows", visibleRows.size >= 2)
+        for ((upper, lower) in visibleRows.zipWithNext()) {
+            assertTrue(
+                "whole landing/canonical rows cannot overlap: $upper then $lower",
+                upper.second.bottom <= lower.second.top + 1f,
+            )
+        }
     }
 
     private fun advanceLiveTailFrames(
@@ -168,34 +298,18 @@ class ConversationAcceptedSendRouteScreenshotTest {
         suppressDuringFlight: Boolean,
         retireDuringFlight: Boolean,
     ) {
-        repeat(30) {
-            if (suppressDuringFlight && it == 6) {
-                assertTrue(
-                    "the production flight must be active before suppression",
-                    frames.motionOwner?.flight != null,
-                )
-                assertTrue(
-                    "suppression must follow a genuinely painted moving frame",
-                    frames.painted.any { it.progress > 0f && it.progress < 1f },
-                )
-                composeRule.runOnIdle {
-                    Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 0f)
-                    resolver.notifyChange(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), null)
-                }
-            }
-            if (retireDuringFlight && it == 6) {
-                assertTrue(
-                    "retirement must follow a genuinely painted flight",
-                    frames.painted.any { it.progress > 0f && it.progress < 1f },
-                )
-                composeRule.runOnIdle { checkNotNull(frames.motionOwner).clear("test-destination-retired") }
-                assertTrue("this fallback must not depend on disabling motion", frames.motionOwner?.enabled == true)
-            }
+        repeat(30) { index ->
+            hydrateDuringFlight(index, frames)
+            if (suppressDuringFlight) suppressAtFrame(index, frames, resolver)
+            if (retireDuringFlight) retireAtFrame(index, frames)
+            receiveAtFrame(index, frames)
             composeRule.mainClock.advanceTimeByFrame()
             composeRule.waitForIdle()
             // Drive the actual production Canvas at this clock frame through native View.draw.
             composeRule.onRoot().captureToImage()
-            if (retireDuringFlight && it == 8) {
+            if (receiveDuringFlight && index >= 10) assertPaintedTailSeparation(frames, index)
+            if (formattedHydration && index >= 6) assertEquals(null, frames.motionOwner?.activePresentationId)
+            if (retireDuringFlight && index == 8) {
                 frames.earlyRetiredInternalGeometry = retiredPillInternalGeometry()
                 frames.earlyRetiredHeight =
                     composeRule
@@ -203,7 +317,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                         .fetchSemanticsNode()
                         .boundsInRoot.height
             }
-            frames.boundaries += "frame-$it ${frames.motionOwner?.diagnosticState}"
+            frames.boundaries += "frame-$index ${frames.motionOwner?.diagnosticState}"
         }
     }
 
@@ -221,6 +335,13 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 it.progress > 0f && it.progress < 1f && !motionRectsMatch(it.bounds, it.canonicalFrame)
             },
         )
+        if (receiveDuringFlight) {
+            assertTrue("the real route exposes a landing or canonical row", frames.firstCanonicalExposureIndex != null)
+            assertTrue(
+                "incoming moves after first canonical exposure: ${frames.firstCanonicalExposureIndex}",
+                frames.incomingMovedAfterExposure,
+            )
+        }
         if (suppressDuringFlight || retireDuringFlight) assertEquals(null, frames.motionOwner?.flight)
         if (retireDuringFlight) {
             val settledHeight =
@@ -241,8 +362,17 @@ class ConversationAcceptedSendRouteScreenshotTest {
             )
         }
         assertEquals(1, publishCount)
-        assertEquals(1, conversation.timeline.count { it.record.plaintext == text })
-        composeRule.onNodeWithText(text).assertIsDisplayed()
+        val acceptedText = text.trimEnd(' ')
+        assertEquals(1, conversation.timeline.count { it.record.plaintext == acceptedText })
+        assertTrue(
+            "actual paragraph hydration reached the mounted row",
+            conversation.timeline.any {
+                it.record.plaintext == acceptedText &&
+                    it.record.contentTokens.blocks
+                        .isNotEmpty()
+            },
+        )
+        composeRule.onNodeWithText(if (formattedHydration) "Styled send" else acceptedText).assertIsDisplayed()
         composeRule.onNodeWithTag("conversation.send.motion.active").assertDoesNotExist()
         if (retireDuringFlight) {
             composeRule.onNode(hasSetTextAction()).performTextInput("Next draft")
@@ -299,7 +429,13 @@ class ConversationAcceptedSendRouteScreenshotTest {
             frames.boundaries += "before-send ${frames.motionOwner?.diagnosticState}"
             composeRule.mainClock.autoAdvance = false
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-            awaitConversationCondition { publishCount == 1 }
+            awaitConversationCondition {
+                if (deferMarkdownHydration) {
+                    frames.motionOwner?.flight != null
+                } else {
+                    publishCount == 1
+                }
+            }
             frames.boundaries += "accepted ${frames.motionOwner?.diagnosticState}"
             advanceLiveTailFrames(frames, resolver, suppressDuringFlight, retireDuringFlight)
             assertLiveTailResult(conversation, text, frames, suppressDuringFlight, retireDuringFlight)
@@ -425,9 +561,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
                     }
                 timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), text)
             }
+        val timelineSubscription = ScriptedConversationTimelineSubscription(timelinePage(*records.toTypedArray()))
         val subscriptions =
             ScriptedConversationLiveSubscriptions(
-                listOf(ScriptedConversationTimelineSubscription(timelinePage(*records.toTypedArray()))),
+                listOf(timelineSubscription),
                 conversationTimelineTestGroup(),
             )
         val appState = conversationTimelineTestAppState(subscriptions.subscriptions)
@@ -443,7 +580,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
                 startOnConstruction = true,
-                markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
+                markdownParser = { text ->
+                    if (deferMarkdownHydration && text == draftText) markdownHydrationGate.await()
+                    plainParagraphDocument(text)
+                },
                 clockMillis = { 1_672_531_260_000L },
                 textPublisher = { _, _, _, _ ->
                     publishCount++
@@ -456,9 +596,57 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 },
             )
         controller = conversation
+        emitIncomingWindow = incomingWindowEmitter(conversation, timelineSubscription, records, draftText)
         awaitConversationCondition { conversation.timeline.size == records.size }
         return conversation
     }
+
+    private fun incomingWindowEmitter(
+        conversation: ConversationController,
+        timelineSubscription: ScriptedConversationTimelineSubscription,
+        records: List<TimelineMessageRecordFfi>,
+        draftText: String,
+    ): () -> Unit =
+        {
+            val accepted = conversation.timeline.single { it.record.plaintext == draftText.trimEnd(' ') }
+            val own =
+                accepted.projected ?: timelineRecord(
+                    accepted.record.messageIdHex,
+                    accepted.record.recordedAt,
+                    accepted.record.plaintext,
+                ).copy(
+                    direction = accepted.record.direction,
+                    sender = accepted.record.sender,
+                    contentTokens = accepted.record.contentTokens,
+                )
+            val incoming = timelineRecord("d4".repeat(32), accepted.record.recordedAt + 1uL, INCOMING_TEXT)
+            timelineSubscription.emitWindow(timelinePage(*(records + own + incoming).toTypedArray()))
+        }
+
+    private fun plainParagraphDocument(text: String): MarkdownDocumentFfi =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blocks =
+                if (formattedHydration && text == "**Styled send**") {
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Styled send")))),
+                        ),
+                    )
+                } else {
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            text.split('\n').flatMapIndexed { index, line ->
+                                buildList {
+                                    if (index > 0) add(MarkdownInlineFfi.SoftBreak)
+                                    add(MarkdownInlineFfi.Text(line))
+                                }
+                            },
+                        ),
+                    )
+                },
+            blankLinesBefore = ByteArray(0),
+        )
 
     private fun liveTailProjection(conversation: ConversationController): dev.ipf.marmotkit.ChatListRowFfi {
         val group = conversationTimelineTestGroup()
@@ -540,6 +728,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
     }
 
     private companion object {
+        const val INCOMING_TEXT = "A received row while sending"
         const val SENT_TEXT = "Accepted send from older history"
         const val HISTORY_ANCHOR_INDEX = 10
         const val LONG_MESSAGE_LINES = 70

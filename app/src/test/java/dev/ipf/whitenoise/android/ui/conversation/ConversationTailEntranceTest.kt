@@ -178,7 +178,7 @@ class ConversationTailEntranceTest {
                 items(harness.rows, key = { it }) { id ->
                     Box(
                         Modifier
-                            .conversationTailEntranceMotion(harness.entrance, id, harness.claimedId)
+                            .conversationTailEntranceMotion(harness.entrance, id) { harness.claimedId }
                             .fillMaxWidth()
                             .height(ROW_HEIGHT)
                             .background(if (id == "m4") Color(0xFF2E7D32) else Color(0xFF37474F))
@@ -191,9 +191,9 @@ class ConversationTailEntranceTest {
         }
     }
 
-    /** Releasing the send claim cannot replay a generic entrance on the same row. */
+    /** Releasing the send claim settles the coordinated paint, without replay or neighbour overlap. */
     @Test
-    fun retiredSendClaimStaysSettledWhileOtherRowsKeepMoving() {
+    fun retiredSendClaimSettlesItsNeighboursWithoutPaintOverlap() {
         val harness = TailHarness()
         setTailContent(harness)
         composeRule.mainClock.autoAdvance = false
@@ -205,9 +205,13 @@ class ConversationTailEntranceTest {
         val aboveBeforeRelease = seenTop("m3")
         composeRule.runOnIdle { harness.claimedId = null }
         composeRule.mainClock.advanceTimeByFrame()
-        assertTrue("the shared entrance still runs after release", harness.entrance.shiftPx > 0f)
+        assertTrue("the retirement precedes the natural tail curve end", harness.entrance.shiftPx > 0f)
         assertEquals("the previously claimed row stays in its canonical slot", claimedTop, seenTop("m4"), 1f)
-        assertTrue("the row above keeps moving", seenTop("m3") < aboveBeforeRelease)
+        assertTrue("the row above advances to its final slot", seenTop("m3") < aboveBeforeRelease)
+        assertTrue(
+            "visible whole rows cannot overlap after the claimed ink retires",
+            seenTop("m3") + rowHeightPx() <= seenTop("m4") + 1f,
+        )
         composeRule.mainClock.advanceTimeBy(1_000)
         assertEquals(null, harness.entrance.claimedEnteringItemId)
 
@@ -216,6 +220,36 @@ class ConversationTailEntranceTest {
         assertTrue("the next entrance must still move", harness.entrance.shiftPx > 0f)
         assertTrue("the old claimed row participates in the next entrance", seenTop("m4") > claimedTop - rowHeightPx())
         assertEquals("the next entering and older row move together", rowHeightPx(), seenTop("m5") - seenTop("m4"), 1f)
+    }
+
+    @Test
+    fun anActiveOlderSendClaimSharesAnUnrelatedNewRowShift() {
+        val harness = TailHarness()
+        setTailContent(harness)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        appendTailRow(harness, "m4", claimed = true)
+        composeRule.runOnUiThread {
+            // Keep the actual active claim on m4 while a different row becomes newest.
+            harness.rows = listOf("m5") + harness.rows
+            harness.latestId = "m5"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnUiThread {
+            harness.followedId = "m5"
+            harness.listState.requestScrollToItem(0, 0)
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals("m4", harness.claimedId)
+        assertEquals("m5", harness.entrance.enteringItemId)
+        assertTrue("the unrelated entrance is actually shifting", harness.entrance.shiftPx > 0f)
+        repeat(4) {
+            assertEquals("older full-width rows keep their gap", rowHeightPx(), seenTop("m4") - seenTop("m3"), 1f)
+            assertEquals("active older claim shares incoming shift", rowHeightPx(), seenTop("m5") - seenTop("m4"), 1f)
+            composeRule.mainClock.advanceTimeByFrame()
+        }
     }
 
     private fun appendTailRow(

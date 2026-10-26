@@ -563,189 +563,204 @@ internal fun FullScreenMediaViewer(
 
     PlaybackDialog(
         onDismissRequest = dismissWithMotion,
+        onSourceDismiss = onDismiss,
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
                 decorFitsSystemWindows = false,
             ),
     ) {
-        MediaViewerFrame(
-            senderLabel = appState.displayName(currentPage.sender),
-            recordedAtLabel = currentRecordedAtLabel,
-            currentPosition = currentPageIndex + 1,
-            pageCount = pages.size,
-            actionOwner = currentPage,
-            onGoToMessage =
-                onGoToMessage?.let {
-                    { actionGate.dispatch(currentPage, currentActionOwner()) { latestGoToMessage?.invoke(it) } }
-                },
-            onForwardMessage =
-                forwardActions?.takeIf { it.canForward(currentPage) }?.let {
-                    {
-                        actionGate.dispatch(currentPage, currentActionOwner()) { page ->
-                            if (latestForwardActions?.forward(page) == true) onDismiss()
-                        }
-                    }
-                },
-            onSetGroupPicture =
-                if (canSetViewerGroupPicture(
-                        controller.isDm,
-                        controller.isSelfMember,
-                        controller.isSelfAdmin,
-                        pictureSession.isCurrent(),
-                        currentPage,
-                    )
-                ) {
-                    {
-                        actionGate.dispatch(currentPage, currentActionOwner()) { page ->
-                            scope.launch {
-                                pictureSession.choose(page, read = { selected ->
-                                    val bytes =
-                                        attachmentBytes(
-                                            controller,
-                                            selected.messageIdHex,
-                                            selected.attachmentIndex,
-                                            selected.reference,
-                                            selected.mine,
-                                            maxBytes = IDENTITY_IMAGE_SOURCE_MAX_BYTES.toLong(),
-                                        )
-                                    loadGroupAttachmentCropSource(bytes, selected.reference.mediaType)
-                                }, failure = ::pictureFailure)
+        MediaViewerMotion(
+            registry = thumbnails,
+            opening = openingMotionAttachment,
+            selected =
+                ConversationMediaViewerAttachmentId(
+                    currentPage.messageIdHex,
+                    currentPage.attachmentIndex,
+                ),
+            closing = closingMotion,
+            allowMotion =
+                mediaViewerPlatformMotionAllowed(
+                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    android.os.Build.VERSION.SDK_INT,
+                ) &&
+                    scale == 1f &&
+                    offset == Offset.Zero &&
+                    (
+                        closingMotion ||
+                            openingMotionAttachment ==
+                            ConversationMediaViewerAttachmentId(
+                                currentPage.messageIdHex,
+                                currentPage.attachmentIndex,
+                            )
+                    ),
+            onClosed = onDismiss,
+            selectedSourceEpoch = currentReference.sourceEpoch,
+            attachmentAspectRatio = aspectRatioFromDim(currentReference.dim),
+        ) { motionBodyModifier ->
+            MediaViewerFrame(
+                senderLabel = appState.displayName(currentPage.sender),
+                recordedAtLabel = currentRecordedAtLabel,
+                currentPosition = currentPageIndex + 1,
+                pageCount = pages.size,
+                actionOwner = currentPage,
+                onGoToMessage =
+                    onGoToMessage?.let {
+                        { actionGate.dispatch(currentPage, currentActionOwner()) { latestGoToMessage?.invoke(it) } }
+                    },
+                onForwardMessage =
+                    forwardActions?.takeIf { it.canForward(currentPage) }?.let {
+                        {
+                            actionGate.dispatch(currentPage, currentActionOwner()) { page ->
+                                if (latestForwardActions?.forward(page) == true) onDismiss()
                             }
                         }
-                    }
-                } else {
-                    null
-                },
-            groupPictureBusy = pictureSession.busy,
-            onDismiss = dismissWithMotion,
-            onSave = {
-                val ref = currentReference
-                val attachmentIndex = currentAttachmentIndex
-                val msgId = currentMessageIdHex
-                val owned = currentMine
-                scope.launch {
-                    val outcome =
-                        runCatchingCancellable {
-                            val saved =
-                                if (MediaReferenceSupport.isVideoMedia(ref)) {
-                                    withMaterializedVideoFile(context, controller, msgId, attachmentIndex, ref, owned) {
-                                        withContext(Dispatchers.IO) {
-                                            saveVideoToGallery(context, it, ref.fileName, ref.mediaType)
-                                        }
-                                    }
-                                } else {
-                                    // An explicit Save streams the whole verified image into MediaStore, so it is
-                                    // neither bounded by the preview budget nor read into one array.
-                                    attachmentSource(controller, msgId, attachmentIndex, ref, owned).use { source ->
-                                        withContext(Dispatchers.IO) {
-                                            saveImageToGallery(context, source, ref.fileName, ref.mediaType)
-                                        }
-                                    }
+                    },
+                onSetGroupPicture =
+                    if (canSetViewerGroupPicture(
+                            controller.isDm,
+                            controller.isSelfMember,
+                            controller.isSelfAdmin,
+                            pictureSession.isCurrent(),
+                            currentPage,
+                        )
+                    ) {
+                        {
+                            actionGate.dispatch(currentPage, currentActionOwner()) { page ->
+                                scope.launch {
+                                    pictureSession.choose(page, read = { selected ->
+                                        val bytes =
+                                            attachmentBytes(
+                                                controller,
+                                                selected.messageIdHex,
+                                                selected.attachmentIndex,
+                                                selected.reference,
+                                                selected.mine,
+                                                maxBytes = IDENTITY_IMAGE_SOURCE_MAX_BYTES.toLong(),
+                                            )
+                                        loadGroupAttachmentCropSource(bytes, selected.reference.mediaType)
+                                    }, failure = ::pictureFailure)
                                 }
-                            check(saved) { "MediaStore save returned false" }
+                            }
                         }
-                    snackbarHostState.showSnackbar(
-                        mediaSaveSnackbarVisuals(
-                            context = context,
-                            outcome = outcome,
-                            successTitleRes = R.string.media_saved,
-                            failureTitleRes = R.string.media_save_failed,
-                            operationCode = "MEDIA_VIEWER_SAVE",
-                        ),
-                    )
-                }
-            },
-            onShare = {
-                val request =
-                    MediaViewerShareRequest(
-                        messageIdHex = currentMessageIdHex,
-                        attachmentIndex = currentAttachmentIndex,
-                        reference = currentReference,
-                        mine = currentMine,
-                    )
-                scope.launch {
-                    runCatchingCancellable {
-                        when {
-                            onShareRequest != null -> onShareRequest(request).getOrThrow()
-                            MediaReferenceSupport.isVideoMedia(request.reference) ->
-                                withMaterializedVideoFile(
-                                    context,
-                                    controller,
-                                    request.messageIdHex,
-                                    request.attachmentIndex,
-                                    request.reference,
-                                    request.mine,
-                                ) { file ->
-                                    shareVideo(
+                    } else {
+                        null
+                    },
+                groupPictureBusy = pictureSession.busy,
+                actionsEnabled = !closingMotion,
+                onDismiss = dismissWithMotion,
+                onSave = {
+                    val ref = currentReference
+                    val attachmentIndex = currentAttachmentIndex
+                    val msgId = currentMessageIdHex
+                    val owned = currentMine
+                    scope.launch {
+                        val outcome =
+                            runCatchingCancellable {
+                                val saved =
+                                    if (MediaReferenceSupport.isVideoMedia(ref)) {
+                                        withMaterializedVideoFile(
+                                            context,
+                                            controller,
+                                            msgId,
+                                            attachmentIndex,
+                                            ref,
+                                            owned,
+                                        ) {
+                                            withContext(Dispatchers.IO) {
+                                                saveVideoToGallery(context, it, ref.fileName, ref.mediaType)
+                                            }
+                                        }
+                                    } else {
+                                        // An explicit Save streams the whole verified image into MediaStore, so it is
+                                        // neither bounded by the preview budget nor read into one array.
+                                        attachmentSource(controller, msgId, attachmentIndex, ref, owned).use { source ->
+                                            withContext(Dispatchers.IO) {
+                                                saveImageToGallery(context, source, ref.fileName, ref.mediaType)
+                                            }
+                                        }
+                                    }
+                                check(saved) { "MediaStore save returned false" }
+                            }
+                        snackbarHostState.showSnackbar(
+                            mediaSaveSnackbarVisuals(
+                                context = context,
+                                outcome = outcome,
+                                successTitleRes = R.string.media_saved,
+                                failureTitleRes = R.string.media_save_failed,
+                                operationCode = "MEDIA_VIEWER_SAVE",
+                            ),
+                        )
+                    }
+                },
+                onShare = {
+                    val request =
+                        MediaViewerShareRequest(
+                            messageIdHex = currentMessageIdHex,
+                            attachmentIndex = currentAttachmentIndex,
+                            reference = currentReference,
+                            mine = currentMine,
+                        )
+                    scope.launch {
+                        runCatchingCancellable {
+                            when {
+                                onShareRequest != null -> onShareRequest(request).getOrThrow()
+                                MediaReferenceSupport.isVideoMedia(request.reference) ->
+                                    withMaterializedVideoFile(
                                         context,
-                                        file,
-                                        request.reference.fileName,
-                                        request.reference.mediaType,
-                                    ).getOrThrow()
-                                }
-                            else ->
-                                // An explicit Share stages the whole verified image through the message share cache,
-                                // streamed from its source, so it is never read into one array. Leaving the viewer
-                                // cancels this scope, which stops staging and opens no share sheet.
-                                shareAttachmentExternally(
-                                    context = context,
-                                    attachmentIndex = request.attachmentIndex,
-                                    reference = request.reference,
-                                    chooserTitle = shareChooserTitle,
-                                    isCurrent = { true },
-                                ) {
-                                    attachmentSource(
                                         controller,
                                         request.messageIdHex,
                                         request.attachmentIndex,
                                         request.reference,
                                         request.mine,
-                                    )
-                                }
-                        }
-                    }.onFailure { error ->
-                        if (MediaReferenceSupport.isVideoMedia(request.reference)) {
-                            appState.presentMediaLaunchFailure(
-                                R.string.media_couldnt_open,
-                                "MEDIA_VIEWER_VIDEO_SHARE",
-                                error,
-                            )
-                        } else {
-                            appState.presentMediaLaunchFailure(
-                                R.string.media_couldnt_open,
-                                "MEDIA_VIEWER_IMAGE_SHARE",
-                                error,
-                            )
+                                    ) { file ->
+                                        shareVideo(
+                                            context,
+                                            file,
+                                            request.reference.fileName,
+                                            request.reference.mediaType,
+                                        ).getOrThrow()
+                                    }
+                                else ->
+                                    // Explicit Share stages the verified image through the message cache,
+                                    // streamed from its source, so it is never read into one array. Leaving the viewer
+                                    // cancels this scope, which stops staging and opens no share sheet.
+                                    shareAttachmentExternally(
+                                        context = context,
+                                        attachmentIndex = request.attachmentIndex,
+                                        reference = request.reference,
+                                        chooserTitle = shareChooserTitle,
+                                        isCurrent = { true },
+                                    ) {
+                                        attachmentSource(
+                                            controller,
+                                            request.messageIdHex,
+                                            request.attachmentIndex,
+                                            request.reference,
+                                            request.mine,
+                                        )
+                                    }
+                            }
+                        }.onFailure { error ->
+                            if (MediaReferenceSupport.isVideoMedia(request.reference)) {
+                                appState.presentMediaLaunchFailure(
+                                    R.string.media_couldnt_open,
+                                    "MEDIA_VIEWER_VIDEO_SHARE",
+                                    error,
+                                )
+                            } else {
+                                appState.presentMediaLaunchFailure(
+                                    R.string.media_couldnt_open,
+                                    "MEDIA_VIEWER_IMAGE_SHARE",
+                                    error,
+                                )
+                            }
                         }
                     }
-                }
-            },
-            snackbarHostState = snackbarHostState,
-            chromeVisible = chromeVisible,
-        ) {
-            MediaViewerMotion(
-                registry = thumbnails,
-                opening = openingMotionAttachment,
-                selected =
-                    ConversationMediaViewerAttachmentId(
-                        currentPage.messageIdHex,
-                        currentPage.attachmentIndex,
-                    ),
-                closing = closingMotion,
-                allowMotion =
-                    scale == 1f &&
-                        offset == Offset.Zero &&
-                        (
-                            closingMotion ||
-                                openingMotionAttachment ==
-                                ConversationMediaViewerAttachmentId(
-                                    currentPage.messageIdHex,
-                                    currentPage.attachmentIndex,
-                                )
-                        ),
-                onClosed = onDismiss,
-                selectedSourceEpoch = currentReference.sourceEpoch,
+                },
+                snackbarHostState = snackbarHostState,
+                chromeVisible = chromeVisible,
+                bodyModifier = motionBodyModifier,
             ) {
                 StableMediaViewerPager(
                     pages = pages,
@@ -847,6 +862,8 @@ internal fun MediaViewerFrame(
     chromeVisible: Boolean = true,
     onSetGroupPicture: (() -> Unit)? = null,
     groupPictureBusy: Boolean = false,
+    bodyModifier: Modifier = Modifier,
+    actionsEnabled: Boolean = true,
     body: @Composable BoxScope.() -> Unit,
 ) {
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
@@ -882,7 +899,7 @@ internal fun MediaViewerFrame(
                             .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
+                    IconButton(onClick = onDismiss, enabled = actionsEnabled, modifier = Modifier.size(48.dp)) {
                         Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
                     }
                     Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
@@ -910,14 +927,18 @@ internal fun MediaViewerFrame(
                         )
                     }
                     Box {
-                        IconButton(onClick = { moreExpanded = true }, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { moreExpanded = true },
+                            enabled = actionsEnabled,
+                            modifier = Modifier.size(48.dp),
+                        ) {
                             Icon(
                                 painterResource(R.drawable.ic_more_vert),
                                 contentDescription = stringResource(R.string.more_options),
                             )
                         }
                         WhiteNoiseDropdownMenu(
-                            expanded = moreExpanded,
+                            expanded = moreExpanded && actionsEnabled,
                             onDismissRequest = { moreExpanded = false },
                             items =
                                 buildList {
@@ -926,6 +947,7 @@ internal fun MediaViewerFrame(
                                             label = stringResource(R.string.media_save),
                                             icon = R.drawable.ic_download,
                                             onClick = onSave,
+                                            enabled = actionsEnabled,
                                         ),
                                     )
                                     if (onSetGroupPicture != null) {
@@ -934,7 +956,7 @@ internal fun MediaViewerFrame(
                                                 label = stringResource(R.string.media_set_group_picture),
                                                 icon = R.drawable.ic_image,
                                                 onClick = onSetGroupPicture,
-                                                enabled = !groupPictureBusy,
+                                                enabled = actionsEnabled && !groupPictureBusy,
                                             ),
                                         )
                                     }
@@ -944,6 +966,7 @@ internal fun MediaViewerFrame(
                                                 label = stringResource(R.string.shared_content_go_to_message),
                                                 icon = R.drawable.ic_settings_chat_bubble_outline,
                                                 onClick = onGoToMessage,
+                                                enabled = actionsEnabled,
                                             ),
                                         )
                                     }
@@ -962,6 +985,7 @@ internal fun MediaViewerFrame(
                 Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(contentWindowInsets.only(mediaViewerContentInsetSides(chromeShown)))
+                    .then(bodyModifier)
                     .testTag(MEDIA_VIEWER_CONTENT_TAG),
             content = body,
         )
@@ -988,6 +1012,7 @@ internal fun MediaViewerFrame(
                 ) {
                     IconButton(
                         onClick = onShare,
+                        enabled = actionsEnabled,
                         modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.share"),
                     ) {
                         Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
@@ -995,6 +1020,7 @@ internal fun MediaViewerFrame(
                     if (onForwardMessage != null) {
                         IconButton(
                             onClick = onForwardMessage,
+                            enabled = actionsEnabled,
                             modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.forward"),
                         ) {
                             Icon(

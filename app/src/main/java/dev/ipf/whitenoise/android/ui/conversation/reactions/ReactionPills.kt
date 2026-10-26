@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 
 // Distinct emojis shown as pills; the "+N" pill carries every reaction beyond them.
 internal const val MAX_VISIBLE_REACTIONS = 4
@@ -171,7 +172,7 @@ private fun ReactionPillItem(
     val emoji = pill.emoji
     val description =
         if (emoji != null) {
-            pluralStringResource(R.plurals.reaction_count, pill.count, emoji, pill.count)
+            pluralStringResource(R.plurals.reaction_count, pill.count, emojiPlainLabel(emoji), pill.count)
         } else {
             pluralStringResource(R.plurals.more_reaction_types, pill.omittedTypes, pill.count, pill.omittedTypes)
         }
@@ -196,7 +197,6 @@ private fun ReactionPillItem(
                             role = Role.Button,
                             onClick = {
                                 if (emoji != null && onToggleReaction != null) {
-                                    localMotion?.targets?.get(emoji)?.let { localMotion.choose(emoji, it) }
                                     onToggleReaction(emoji)
                                 } else {
                                     onOpenDetails(null)

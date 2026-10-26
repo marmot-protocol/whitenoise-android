@@ -61,7 +61,9 @@ internal fun GroupSystemTimelineRow(
         remember(controller, item.record.messageIdHex) {
             GroupSystemReactionOwner(controller.boundAccountRef, item.record.groupIdHex, item.record.messageIdHex)
         }
-    val motion = rememberActivityReactionMotion(controller, appState, owner, readOnly)
+    val motion =
+        dev.ipf.whitenoise.android.ui.conversation.reactions.LocalRowReactionMotion.current
+            ?: rememberActivityReactionMotion(controller, appState, owner, readOnly)
     val currentReadOnly by rememberUpdatedState(readOnly)
     val currentItem by rememberUpdatedState(item)
     val actions =

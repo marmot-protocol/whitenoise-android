@@ -1,7 +1,13 @@
 package dev.ipf.whitenoise.android.media
 
-/** A decorative drawable can resume after yielding to an explicit viewer, but not after codec failure. */
+/** Decorative playback observes retirement without granting access to the compressed source or worker. */
 internal interface PreemptibleAnimation {
-    /** Suspends until interactive playback retires this session; ordinary failure does not trigger retries. */
+    /** Compatibility for existing preemption-only controls and injected drawables. */
     suspend fun awaitPreemption()
+
+    /** Production sessions report first-reason termination; older controls report takeover only. */
+    suspend fun awaitTermination(): AnimationTermination {
+        awaitPreemption()
+        return AnimationTermination.Preempted
+    }
 }

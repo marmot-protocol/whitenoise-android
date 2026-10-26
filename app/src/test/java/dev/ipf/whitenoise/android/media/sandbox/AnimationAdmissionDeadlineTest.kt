@@ -93,8 +93,7 @@ class AnimationAdmissionDeadlineTest {
                     held.release()
                 }
                 waiting.join(2000)
-                val busy = checkNotNull(failure.get())
-                withTimeout(1000) { busy.awaitAvailability() }
+                assertNull(failure.get()) // Ready FIFO head gets its immediate acquisition before expiry.
                 admission.awaitDecorative(100).release()
             } finally {
                 held.release()
@@ -107,8 +106,16 @@ class AnimationAdmissionDeadlineTest {
     fun alreadyFreeExpiredAttemptDoesNotParkWithoutAWorker() =
         runBlocking {
             val admission = AnimationAdmission()
-            val busy = assertThrows(AnimationAdmissionBusyException::class.java) { admission.awaitDecorative(0) }
-            withTimeout(1000) { busy.awaitAvailability() }
+            admission.awaitDecorative(0).release() // Free acquisition is allowed; this starts no native work.
+            var opens = 0
+            assertThrows(AnimationAdmissionBusyException::class.java) {
+                admission.decode(true, true, 0) {
+                    opens++
+                    it.release()
+                    "unexpected"
+                }
+            }
+            assertEquals(0, opens) // Expired total decode budget still forbids every new OPEN.
             admission.awaitDecorative(100).release()
         }
 }

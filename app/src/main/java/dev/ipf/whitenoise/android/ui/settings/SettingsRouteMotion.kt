@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -12,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -96,8 +96,12 @@ internal fun <T> rememberRouteMotionModifier(
     val travel = with(LocalDensity.current) { 48.dp.toPx() }
     // Draw the themed backplate outside the translated child layer. Moving a whole opaque page
     // otherwise exposes the Activity window behind its vacated edge, including in AMOLED mode.
-    return Modifier.background(MaterialTheme.colorScheme.background).graphicsLayer {
-        val remaining = if (motion) 1f - progress.value else 0f
-        translationX = direction * travel * remaining
-    }
+    val backplate = MaterialTheme.colorScheme.background
+    return Modifier
+        .drawBehind {
+            if (motion && progress.value < 1f) drawRect(backplate)
+        }.graphicsLayer {
+            val remaining = if (motion) 1f - progress.value else 0f
+            translationX = direction * travel * remaining
+        }
 }

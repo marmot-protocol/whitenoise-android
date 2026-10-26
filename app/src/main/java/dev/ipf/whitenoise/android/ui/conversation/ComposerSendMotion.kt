@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -123,8 +124,8 @@ internal class ComposerSendMotion {
     var sourceTopRadius: Float = 0f
     var sourceBottomRadius: Float = 0f
     var sourceStrokeWidth: Float = 0f
-    private var destinationFrame: LayoutCoordinates? by mutableStateOf(null)
-    private var destinationText: LayoutCoordinates? by mutableStateOf(null)
+    private var destinationFrame: LayoutCoordinates? by mutableStateOf(null, neverEqualPolicy())
+    private var destinationText: LayoutCoordinates? by mutableStateOf(null, neverEqualPolicy())
     private var destinationLayout: TextLayoutResult? by mutableStateOf(null)
     private var destinationFill = Color.Transparent
     private var destinationBorder = Color.Transparent
@@ -163,7 +164,7 @@ internal class ComposerSendMotion {
                             }?.uniformParagraphDirection()
                             ?.let { direction ->
                                 ComposerSendSource(
-                                    text,
+                                    text.trimEnd(' '),
                                     ownerGeneration,
                                     layout,
                                     surface,
@@ -237,7 +238,7 @@ internal class ComposerSendMotion {
         strokeWidth: Float,
     ) {
         if (activePresentationId != id) return
-        if (coordinates.visibleMotionBounds() == null) {
+        if (coordinates.visibleMotionBounds() == null && lastRenderedGeometry != null) {
             clear("destination-frame-unavailable")
             return
         }
@@ -253,11 +254,11 @@ internal class ComposerSendMotion {
         coordinates: LayoutCoordinates,
     ) {
         if (activePresentationId != id) return
-        if (coordinates.visibleMotionBounds() == null) {
+        if (coordinates.visibleMotionBounds() == null && lastRenderedGeometry != null) {
             clear("destination-text-unavailable")
-        } else {
-            destinationText = coordinates
+            return
         }
+        destinationText = coordinates
     }
 
     fun destinationLayout(
@@ -265,7 +266,16 @@ internal class ComposerSendMotion {
         layout: TextLayoutResult,
     ) {
         if (activePresentationId != id) return
-        if (layout.hasVisualOverflow) clear("destination-text-overflow") else destinationLayout = layout
+        val source = flight?.source ?: return
+        val sameInk =
+            layout.layoutInput.text.text == source.text &&
+                layout.layoutInput.style.color.isSpecified &&
+                layout.uniformParagraphDirection() == source.paragraphDirection
+        when {
+            layout.hasVisualOverflow -> clear("destination-text-overflow")
+            !sameInk -> clear("destination-ink-changed")
+            else -> destinationLayout = layout
+        }
     }
 
     /** The source copy holds the accepted frame until the target measures, for at most 80 ms. */
@@ -509,15 +519,22 @@ private fun TextLayoutResult.uniformParagraphDirection(): ResolvedTextDirection?
     }
 }
 
-// Trimmed sends, transformed mentions, clipped drafts and enormous layouts take the normal path.
+// Leading/line-breaking whitespace, transformed text and clipped layouts keep the direct presentation.
 private fun validComposerCaptureText(
     enabled: Boolean,
     text: String,
     layout: TextLayoutResult,
 ): Boolean {
-    val plainText = text.isNotBlank() && text == text.trim()
+    val canonical = text.trimEnd(' ')
+    val ordinaryInk = canonical.isNotBlank() && canonical == text.trim()
     val matchingText = text.length <= MAX_COMPOSER_MOTION_CHARACTERS && layout.layoutInput.text.text == text
-    return enabled && plainText && matchingText
+    val sameLastLine =
+        if (matchingText && canonical.isNotEmpty()) {
+            layout.getLineForOffset(canonical.lastIndex) == layout.lineCount - 1
+        } else {
+            false
+        }
+    return enabled && ordinaryInk && matchingText && sameLastLine
 }
 
 private fun validComposerCaptureLayout(

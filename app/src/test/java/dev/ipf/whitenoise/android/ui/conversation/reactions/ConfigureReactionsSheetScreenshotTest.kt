@@ -73,6 +73,16 @@ class ConfigureReactionsSheetScreenshotTest {
         }
     }
 
+    /** An optional shortcode slot's remove button names the emoji readably, never as a raw `:shortcode:`. */
+    @Test
+    fun optionalShortcodeSlotRemoveButtonUsesItsReadableName() {
+        render(current = RecentEmojiList.DefaultQuickChoices + listOf(":marmot:", ":party_parrot:"))
+
+        composeRule.onNodeWithContentDescription("Remove reaction 7, Marmot").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Remove reaction 8, party parrot").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Remove reaction 7, :marmot:").assertDoesNotExist()
+    }
+
     /** Reset drops the optional slots and returns to exactly the six defaults. */
     @Test
     fun resetReturnsToTheSixDefaults() {

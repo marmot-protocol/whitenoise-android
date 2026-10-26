@@ -4540,6 +4540,7 @@ internal fun ConversationScreen(
                                             }
                                         MediaViewerThumbnailHost(
                                             mediaViewerSessionState.thumbnails,
+                                            readingViewport = { timelineViewport.readingBoundsInWindow },
                                             enabled =
                                                 controller.isCurrentGroupMutationOwner(
                                                     appState,
@@ -4553,7 +4554,7 @@ internal fun ConversationScreen(
                                                         .conversationTailEntranceMotion(
                                                             tailEntrance,
                                                             item.presentationId,
-                                                            composerSendMotion.activePresentationId,
+                                                            { composerSendMotion.activePresentationId },
                                                         ).then(membershipFrameModifier),
                                                 item = item,
                                                 reactionViewport = reactionViewport,
