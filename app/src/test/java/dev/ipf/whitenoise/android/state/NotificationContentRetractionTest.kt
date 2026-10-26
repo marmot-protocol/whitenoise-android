@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.notifications.ConversationCardBarrier
 import dev.ipf.whitenoise.android.notifications.ConversationCardOp
 import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
+import dev.ipf.whitenoise.android.notifications.ConversationCardPostedRegistry
 import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
@@ -69,6 +70,7 @@ class NotificationContentRetractionTest {
     /** Grants posting and starts from an empty tray. */
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager().cancelAll()
     }
@@ -296,15 +298,7 @@ class NotificationContentRetractionTest {
                         .activeNotifications
                         .single { it.tag == cardKey.tag && it.id == cardKey.id }
                         .notification
-                if (localHide) {
-                    val hidden =
-                        fixture.runOnMainLooperPumping {
-                            fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, OLDER_ID)
-                        }
-                    assertTrue(hidden)
-                } else {
-                    fixture.emitRuntimeEvent(deletion(OLDER_ID))
-                }
+                removeOlderNotificationEntry(fixture, localHide)
                 withTimeout(AWAIT_TIMEOUT_MS) {
                     while (activeCardText()?.contains("older deleted text") != false) {
                         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
@@ -330,6 +324,22 @@ class NotificationContentRetractionTest {
                 fixture.close()
             }
         }
+
+    /** Runs the same accepted hide or subscribed deletion event used by both stale-snapshot cases. */
+    private suspend fun removeOlderNotificationEntry(
+        fixture: NotificationBootstrapTestFixture,
+        localHide: Boolean,
+    ) {
+        if (localHide) {
+            val hidden =
+                fixture.runOnMainLooperPumping {
+                    fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, OLDER_ID)
+                }
+            assertTrue(hidden)
+        } else {
+            fixture.emitRuntimeEvent(deletion(OLDER_ID))
+        }
+    }
 
     /** Awaits C's own accepted card identity, rather than unrelated listener or enrichment activity. */
     private suspend fun awaitShownMessage(messageId: String) {

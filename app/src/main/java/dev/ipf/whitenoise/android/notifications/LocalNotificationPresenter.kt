@@ -2334,11 +2334,9 @@ class LocalNotificationPresenter(
                         }
                     expandedChoiceAttempted = expanded.extras.getBoolean(EXTRA_EXPANDED_REACTION_CHOICES)
                     val revision = ConversationCardPostedRegistry.newPayloadRevision()
-                    val outgoing =
-                        NotificationCompat
-                            .Builder(context, expanded)
-                            .addExtras(Bundle().apply { putString(EXTRA_PAYLOAD_REVISION, revision) })
-                            .build()
+                    // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
+                    // the final platform payload so the revision describes exactly the card Android receives.
+                    val outgoing = expanded.clone().apply { extras.putString(EXTRA_PAYLOAD_REVISION, revision) }
                     notificationPoster(manager, tag, id, outgoing)
                     recordAcceptedPayload(tag, id, outgoing, recordedAtMs)
                 }

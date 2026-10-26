@@ -2,10 +2,33 @@ package dev.ipf.whitenoise.android.notifications
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /** The app-side record of written cards that lets a dismissal cancel a card the platform has not listed yet. */
 class ConversationCardPostedRecordTest {
+    /** Each case models a separate process rather than inheriting another case's retirement history. */
+    @Before
+    fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
+    }
+
+    /** Fixture isolation clears tombstones and capacity retirement without weakening production checks. */
+    @Test
+    fun freshTestProcessAllowsUntouchedLegacyPayloads() {
+        assertTrue(ConversationCardPostedRegistry.prepareCancellation("legacy", 1, true))
+        assertTrue(ConversationCardPostedRegistry.clearPosted("legacy", 1))
+        repeat(300) { ConversationCardPostedRegistry.markPosted("fixture-eviction", it) }
+        assertFalse(ConversationCardPostedRegistry.isCurrentPayload("legacy", 1, null))
+        assertFalse(ConversationCardPostedRegistry.canCarryEntry("untouched", 1, null, "message"))
+
+        ConversationCardPostedRegistry.resetForTests()
+
+        assertTrue(ConversationCardPostedRegistry.isCurrentPayload("legacy", 1, null))
+        assertTrue(ConversationCardPostedRegistry.canCarryEntry("untouched", 1, null, "message"))
+        assertFalse(ConversationCardPostedRegistry.clearPosted("fixture-eviction", 299))
+    }
+
     /** A recorded write is reported once and then forgotten. */
     @Test
     fun recordedWriteIsConsumedByOneClear() {

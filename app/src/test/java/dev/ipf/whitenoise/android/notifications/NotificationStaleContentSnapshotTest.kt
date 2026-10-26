@@ -13,10 +13,16 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -63,6 +69,7 @@ class NotificationStaleContentSnapshotTest {
     /** Every fixture starts with posting allowed and no platform cards. */
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager.cancelAll()
         presenter.ensureChannels()
@@ -217,6 +224,62 @@ class NotificationStaleContentSnapshotTest {
             assertFalse(refreshed)
             assertEquals(afterCleanup, writes.size)
             assertEquals(listOf("newer valid text"), messageTexts(requireNotNull(card(ACCOUNT))))
+        }
+
+    /** Legacy adoption stamps its final redacted payload, so hidden cards keep matching accepted metadata. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun redactedLegacyAdoptionPreservesOnlyItsPayloadRevision() =
+        runTest {
+            post(message("old-id", "older secret text"))
+            val key = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT, GROUP)
+            val original = requireNotNull(card(ACCOUNT))
+            val extras =
+                Bundle(original.extras).apply {
+                    remove(UserEventNotificationGroup.EXTRA_CHILD)
+                    remove(UserEventNotificationGroup.EXTRA_GENERATION)
+                }
+            val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            val previous = preferences.getBoolean(NotificationPreviewPreferences.KEY, true)
+            preferences.edit().putBoolean(NotificationPreviewPreferences.KEY, false).commit()
+            val coordinator =
+                NotificationGroupReconciler(
+                    context,
+                    backgroundScope,
+                    NotificationPostPacer(burstCapacity = 20, nowMillis = { 0L }, sleep = {}),
+                )
+            try {
+                // Any grouping observer must see previews disabled before the legacy card becomes visible.
+                manager.notify(
+                    key.tag,
+                    key.id,
+                    NotificationCompat
+                        .Builder(context, original)
+                        .setGroup(null)
+                        .setExtras(extras)
+                        .build(),
+                )
+                coordinator.request()
+                advanceTimeBy(2_000L)
+                runCurrent()
+                val adopted = manager.activeNotifications.single { it.tag == key.tag && it.id == key.id }.notification
+                assertNotNull(
+                    UserEventNotificationGroup.child(
+                        manager.activeNotifications.single {
+                            it.tag == key.tag && it.id == key.id
+                        },
+                    ),
+                )
+                val revision = adopted.extras.getString(EXTRA_PAYLOAD_REVISION)
+                assertNotNull(revision)
+                assertNotEquals(original.extras.getString(EXTRA_PAYLOAD_REVISION), revision)
+                assertTrue(ConversationCardPostedRegistry.isCurrentPayload(key.tag, key.id, revision))
+                assertTrue(adopted.extras.getBoolean(EXTRA_CONTENT_REDACTED))
+                assertFalse(allText(adopted.extras).any { "older secret text" in it })
+            } finally {
+                coordinator.close()
+                preferences.edit().putBoolean(NotificationPreviewPreferences.KEY, previous).commit()
+            }
         }
 
     /** Posts through the shipped show entry point. */

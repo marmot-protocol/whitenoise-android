@@ -247,6 +247,15 @@ internal object ConversationCardPostedRegistry {
     private var untrackedPreviousProcessAllowed = true
     private val processRevisionPrefix = UUID.randomUUID().toString() + ":"
 
+    /** Starts an independent test process; platform-only fixture cleanup must not retain retirement history. */
+    @VisibleForTesting
+    internal fun resetForTests() {
+        synchronized(lock) {
+            postedCards.clear()
+            untrackedPreviousProcessAllowed = true
+        }
+    }
+
     /** Opaque identity for one accepted Android payload, independent of dismissal generation and age. */
     fun newPayloadRevision(): String = processRevisionPrefix + UUID.randomUUID()
 

@@ -234,10 +234,7 @@ internal class NotificationGroupReconciler(
                         val generation =
                             live.notification.extras.getString(EXTRA_GENERATION) ?: UUID.randomUUID().toString()
                         val revision = ConversationCardPostedRegistry.newPayloadRevision()
-                        val builder =
-                            legacyCardBuilder(live).addExtras(
-                                android.os.Bundle().apply { putString(EXTRA_PAYLOAD_REVISION, revision) },
-                            )
+                        val builder = legacyCardBuilder(live)
                         val adopted =
                             UserEventNotificationGroup
                                 .decorateChild(
@@ -254,6 +251,7 @@ internal class NotificationGroupReconciler(
                             } else {
                                 notificationWithoutPreview(context, adopted, silent = true)
                             }
+                        payload.extras.putString(EXTRA_PAYLOAD_REVISION, revision)
                         post(compat, requireNotNull(live.tag), live.id, payload)
                         NotificationGroupWriteVisibility.childWritten(context)
                         ConversationCardPostedRegistry.markPosted(

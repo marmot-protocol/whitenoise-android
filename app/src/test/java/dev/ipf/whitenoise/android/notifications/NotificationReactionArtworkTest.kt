@@ -43,6 +43,7 @@ class NotificationReactionArtworkTest {
     /** Start each case with an empty tray and enabled previews. */
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         manager.cancelAll()
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -63,6 +64,10 @@ class NotificationReactionArtworkTest {
             assertEquals(expected.id, active.id)
             assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
             assertEquals(UserEventNotificationGroup.KEY, card.group)
+            assertEquals(Notification.GROUP_ALERT_CHILDREN, card.groupAlertBehavior)
+            val revision = card.extras.getString(EXTRA_PAYLOAD_REVISION)
+            assertNotNull(revision)
+            assertTrue(ConversationCardPostedRegistry.isCurrentPayload(active.tag, active.id, revision))
             assertNotNull(card.contentIntent)
             assertNotNull(card.deleteIntent)
             assertTrue(card.actions.isNullOrEmpty())

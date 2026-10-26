@@ -24,10 +24,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.notifications.AndroidNotificationSettingsTarget
+import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
-import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
-import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsLaunchAttempt
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsLaunchGate
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationSettingsPreparation
@@ -37,7 +36,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.EffectiveConversationVibration
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationConversationDescriptor
-import dev.ipf.whitenoise.android.notifications.OverridableConversationNotificationCategory
 import dev.ipf.whitenoise.android.notifications.PreparedConversationNotificationSettingsTarget
 import dev.ipf.whitenoise.android.notifications.androidBlockedConversationCategories
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
@@ -46,6 +44,7 @@ import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.notifications.openPreparedConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.conversationAlertPreferences
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -93,7 +92,6 @@ internal fun ConversationNotificationSettingsScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var resumeGeneration by remember { mutableIntStateOf(0) }
-    var showSoundSettings by remember(appState.activeAccountRef, groupIdHex) { mutableStateOf(false) }
     val routingState by appState.conversationNotificationRouting.state.collectAsStateWithLifecycle()
     val accountRef = appState.activeAccountRef
     var blockedChannels by remember(accountRef, groupIdHex) { mutableStateOf<Set<NotificationChannelSpec>>(emptySet()) }
@@ -139,13 +137,16 @@ internal fun ConversationNotificationSettingsScreen(
         SettingsList {
             item { SettingsSection(stringResource(R.string.notifications)) }
             item {
-                ConversationAlertControls(
+                NotificationCategoriesSection(
                     appState = appState,
                     groupIdHex = groupIdHex,
+                    conversationTitle = conversationTitle,
+                    conversationAvatarUrl = conversationAvatarUrl,
                     isDm = isDm,
+                    primaryVibrationPattern = vibrationPattern,
                     legacyMode = notifyForMode,
-                    isMuted = isMuted,
                     blockedChannels = blockedChannels,
+                    isMuted = isMuted,
                 )
             }
             item { SettingsExplainer(stringResource(R.string.notification_alerts_detail)) }
@@ -170,36 +171,12 @@ internal fun ConversationNotificationSettingsScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.notification_sound_appearance)) }
-            item {
-                SettingsGroup {
-                    row("sound_settings") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.notification_sound_appearance),
-                            onClick = { showSoundSettings = true },
-                            modifier = Modifier.testTag(SOUND_APPEARANCE_OPEN_TAG),
-                        )
-                    }
-                }
-            }
-        }
-    }
-    if (showSoundSettings) {
-        ConversationSoundAppearanceSheet(onDismiss = { showSoundSettings = false }) {
-            NotificationCategoriesSection(
-                appState = appState,
-                groupIdHex = groupIdHex,
-                conversationTitle = conversationTitle,
-                conversationAvatarUrl = conversationAvatarUrl,
-                isDm = isDm,
-                primaryVibrationPattern = vibrationPattern,
-            )
         }
     }
 }
 
 /** Resolves routing and Android-owned launch targets as one lifecycle-cancellable pass. */
+@Suppress("LongMethod") // One lifecycle-owned platform-channel preparation.
 @Composable
 private fun NotificationCategoriesSection(
     appState: WhiteNoiseAppState,
@@ -208,6 +185,9 @@ private fun NotificationCategoriesSection(
     conversationAvatarUrl: String?,
     isDm: Boolean,
     primaryVibrationPattern: ConversationVibrationPattern,
+    legacyMode: ChatNotifyMode,
+    blockedChannels: Set<NotificationChannelSpec>,
+    isMuted: Boolean,
 ) {
     val routing = appState.conversationNotificationRouting
     val routingState by routing.state.collectAsStateWithLifecycle()
@@ -258,14 +238,28 @@ private fun NotificationCategoriesSection(
             }
     }
     if (descriptor == null || accountRef == null || settings.isEmpty()) {
+        if (accountRef != null) {
+            ConversationAlertControls(
+                appState = appState,
+                groupIdHex = groupIdHex,
+                isDm = isDm,
+                legacyMode = legacyMode,
+                isMuted = isMuted,
+                blockedChannels = blockedChannels,
+            )
+        }
         NotificationCategoriesLoadingRow()
         return
     }
     LoadedNotificationCategories(
         appState = appState,
-        routing = routing,
         descriptor = descriptor,
         settings = settings,
+        accountRef = accountRef,
+        groupIdHex = groupIdHex,
+        legacyMode = legacyMode,
+        blockedChannels = blockedChannels,
+        isMuted = isMuted,
     )
 }
 
@@ -307,14 +301,22 @@ private fun NotificationCategoriesLoadingRow() {
 }
 
 /** Renders prepared category rows and coalesces taps until Android returns control. */
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+// Lifecycle-owned channel launch and durable alert writes share one scope.
 @Composable
 private fun LoadedNotificationCategories(
     appState: WhiteNoiseAppState,
-    routing: ConversationNotificationRouting,
     descriptor: NotificationConversationDescriptor,
     settings: List<PreparedNotificationCategorySetting>,
+    accountRef: String,
+    groupIdHex: String,
+    legacyMode: ChatNotifyMode,
+    blockedChannels: Set<NotificationChannelSpec>,
+    isMuted: Boolean,
 ) {
     val context = LocalContext.current
+    val preferences = appState.conversationAlertPreferences
+    val alertState by preferences.state.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     var pendingChannel by remember(descriptor.shortcutId) { mutableStateOf<NotificationChannelSpec?>(null) }
@@ -331,30 +333,54 @@ private fun LoadedNotificationCategories(
         settings = settings.map(PreparedNotificationCategorySetting::setting),
         pendingChannel = pendingChannel,
         onOpen = { setting ->
-            if (launchGate.tryBegin()) {
+            if (appState.activeAccountRef == accountRef && launchGate.tryBegin()) {
                 val preparedSetting = settings.first { candidate -> candidate.setting == setting }
                 val launch = openCategorySettings(context, preparedSetting, appState)
                 if (!launch.opened) launchGate.onLaunchFailed()
             }
         },
-        onScopeChange = { setting, useCustom ->
-            val category =
-                OverridableConversationNotificationCategory.from(setting.channel)
-                    ?: return@ConversationNotificationCategoriesList
-            pendingChannel = setting.channel
-            coroutineScope.launch {
-                val requestedScope =
-                    if (useCustom) {
-                        ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT
-                    } else {
-                        ConversationNotificationScope.USE_GLOBAL_DEFAULT
+        alertDetails =
+            settings.associate { prepared ->
+                val channel = prepared.setting.channel
+                channel to
+                    when {
+                        channel in blockedChannels -> stringResource(R.string.notification_system_blocked)
+                        isMuted && channel != NotificationChannelSpec.MENTIONS ->
+                            stringResource(R.string.notification_alert_paused)
+                        else -> ""
                     }
-                val result =
-                    withContext(Dispatchers.Default) {
-                        routing.setScope(descriptor, category, requestedScope)
+            },
+        alertEnabled =
+            settings
+                .map(PreparedNotificationCategorySetting::setting)
+                .filter {
+                    it.channel in ConversationAlertPreferences.supportedChannels
+                }.associate { setting ->
+                    setting.channel to
+                        remember(alertState, accountRef, groupIdHex, setting.channel, legacyMode) {
+                            preferences.choice(accountRef, groupIdHex, setting.channel)
+                                ?: (
+                                    setting.channel == NotificationChannelSpec.MENTIONS ||
+                                        legacyMode == ChatNotifyMode.ALL
+                                )
+                        }
+                },
+        onAlertChange = { setting, enabled ->
+            if (pendingChannel == null && appState.activeAccountRef == accountRef) {
+                pendingChannel = setting.channel
+                coroutineScope.launch {
+                    try {
+                        val saved =
+                            withContext(Dispatchers.IO) {
+                                preferences.setEnabled(accountRef, groupIdHex, setting.channel, enabled)
+                            }
+                        if (!saved && appState.activeAccountRef == accountRef) {
+                            appState.present(R.string.toast_notification_scope_update_failed)
+                        }
+                    } finally {
+                        pendingChannel = null
                     }
-                pendingChannel = null
-                result.onFailure { appState.present(R.string.toast_notification_scope_update_failed) }
+                }
             }
         },
     )
