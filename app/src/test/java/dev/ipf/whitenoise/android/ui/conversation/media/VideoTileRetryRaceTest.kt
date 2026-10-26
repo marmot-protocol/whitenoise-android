@@ -223,6 +223,8 @@ class VideoTileRetryRaceTest {
                 }
             }
         }
+        // The off-main cache probe owns the opening state; taps there are intentionally ignored.
+        composeRule.waitUntil(WAIT_MILLIS) { shows(R.string.media_tap_to_download) }
         tapVideo(album)
         composeRule.waitUntil(WAIT_MILLIS) { resolutions == 1 && shows(R.string.media_tap_to_retry) }
         composeRule.runOnIdle { assertEquals("a download tap opened the video", 0, opens) }
