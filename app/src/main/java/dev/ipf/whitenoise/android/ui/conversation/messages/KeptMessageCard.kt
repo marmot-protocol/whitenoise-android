@@ -312,7 +312,7 @@ private fun KeptMessageCardHeader(
 /**
  * One page of the card. Collapsed it is a four-line plain preview; expanded it
  * names the author, scrolls the full body, and closes with where the message
- * came from and when.
+ * came from and when. Author and body draw `:shortcode:` artwork as the bubble does.
  */
 @Composable
 private fun KeptMessageBody(
@@ -327,7 +327,7 @@ private fun KeptMessageBody(
                 .testTag(KEPT_MESSAGE_PREVIEW_TAG),
     ) {
         if (expanded) {
-            Text(
+            EmojiLabel(
                 text = presentation.authorName,
                 modifier = Modifier.testTag(KEPT_MESSAGE_AUTHOR_TAG),
                 style = MaterialTheme.typography.labelLarge,
@@ -337,7 +337,7 @@ private fun KeptMessageBody(
             KeptAttachmentSummary(presentation.attachments, expanded = true)
             if (presentation.body.isNotBlank()) {
                 Box(Modifier.padding(top = KEPT_MESSAGE_BODY_GAP)) {
-                    Text(text = presentation.body, style = MaterialTheme.typography.bodyMedium)
+                    EmojiLabel(text = presentation.body, style = MaterialTheme.typography.bodyMedium)
                 }
             }
             EmojiLabel(
@@ -350,7 +350,7 @@ private fun KeptMessageBody(
         } else {
             KeptAttachmentSummary(presentation.attachments, expanded = false)
             if (presentation.body.isNotBlank()) {
-                Text(
+                EmojiLabel(
                     text = presentation.body,
                     modifier = Modifier.testTag(KEPT_MESSAGE_TEXT_TAG),
                     style = MaterialTheme.typography.bodyMedium,

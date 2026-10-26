@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -57,6 +58,19 @@ class KeptMessageCardTest {
         composeRule.onNodeWithTag(KEPT_MESSAGE_PAGINATION_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(KEPT_MESSAGE_AUTHOR_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(KEPT_MESSAGE_SOURCE_TAG).assertDoesNotExist()
+    }
+
+    /** Built-in shortcodes in the author and body become inline artwork, while a code literal stays text. */
+    @Test
+    fun builtInShortcodesRenderAsInlineArtwork() {
+        render(controllerWith("aa"), author = "Alice :wn:", body = { "Ship it :marmot: :wn: `:marmot:`" })
+
+        assertEquals(listOf(":marmot:", ":wn:"), inlineShortcodes(KEPT_MESSAGE_TEXT_TAG))
+        composeRule.onNodeWithTag(KEPT_MESSAGE_CARD_TAG).performTouchInput { longClick() }
+        composeRule.waitForIdle()
+
+        assertEquals(listOf(":wn:"), inlineShortcodes(KEPT_MESSAGE_AUTHOR_TAG))
+        composeRule.onNodeWithText("Ship it :marmot: :wn: `:marmot:`").assertIsDisplayed()
     }
 
     /** A second kept message brings in the pagination gutter. */
@@ -117,7 +131,20 @@ class KeptMessageCardTest {
     private fun controllerWith(vararg ids: String): KeptMessagesController =
         KeptMessagesController().apply { ids.forEach { keep(KeptMessageKey(ACCOUNT, GROUP, it)) } }
 
-    private fun render(controller: KeptMessagesController) {
+    /** Shortcodes a tagged text marks as inline artwork, in order; Compose draws the rest as text. */
+    private fun inlineShortcodes(tag: String): List<String> =
+        composeRule
+            .onNodeWithTag(tag)
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.Text]
+            .flatMap { text -> text.getStringAnnotations(0, text.length).map { it.item } }
+
+    /** Hosts the production overlay with one presentation per kept entry. */
+    private fun render(
+        controller: KeptMessagesController,
+        author: String = "Alice",
+        body: (String) -> String = { id -> "kept body $id" },
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Box(Modifier.fillMaxSize()) {
@@ -130,8 +157,8 @@ class KeptMessageCardTest {
                         composerHeight = 96.dp,
                         presentation = { entry ->
                             KeptMessagePresentation(
-                                authorName = "Alice",
-                                body = "kept body ${entry.key.messageIdHex}",
+                                authorName = author,
+                                body = body(entry.key.messageIdHex),
                                 chatTitle = "Design",
                                 timeLabel = "12:34",
                             )
