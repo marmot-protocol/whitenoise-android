@@ -213,6 +213,7 @@ object LocalNotificationFormatter {
         recipientLabel: String?,
     ): String? = recipientLabel?.takeIf { it.isNotBlank() && relevantSignedInAccountCount > 1 }
 
+    /** Hidden-preview content: the app name replaces every sender and title, and no artwork body survives. */
     fun redactedContent(
         content: LocalNotificationContent,
         appName: String,
@@ -230,6 +231,7 @@ object LocalNotificationFormatter {
             reactionArtworkBody = null,
         )
 
+    /** Builds one update's card text from caller-resolved names and previews, never raw keys. */
     fun content(
         update: NotificationUpdateFfi,
         context: Context? = null,
@@ -415,6 +417,7 @@ object LocalNotificationFormatter {
                 )
         }
 
+    /** The sender's name, or "Sender in Group" for a group message. */
     private fun messageTitle(
         update: NotificationUpdateFfi,
         context: Context?,

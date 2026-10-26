@@ -186,6 +186,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     }
 }
 
+/** A direct reply's card is marked handled only once the reply was sent. */
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
 
 /**

@@ -69,6 +69,7 @@ object NotificationActions {
         if (acceptsInlineReactionChoices) intent.putExtra(EXTRA_INLINE_REACTION_CHOICES, true)
     }
 
+    /** The action an intent carries, reading a Reply that returned a chosen chip as a reaction. */
     fun parse(intent: Intent?): NotificationAction? {
         intent ?: return null
         val parsedKind = kindForAction(intent.action) ?: return null

@@ -144,6 +144,7 @@ private fun postLocalNotification(
     manager.notify(tag, id, notification)
 }
 
+/** Keeps an existing readable shortcut title when the candidate is only an npub fallback. */
 internal fun preferredConversationShortcutTitle(
     candidate: String,
     existing: String?,
@@ -3148,6 +3149,7 @@ class LocalNotificationPresenter(
             .build()
     }
 
+    /** The Mark as read action, which completes without opening the app. */
     private fun markReadNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action =
         NotificationCompat
             .Action

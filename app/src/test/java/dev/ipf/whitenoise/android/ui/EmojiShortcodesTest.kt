@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EmojiShortcodesTest {
+    /** Notification artwork skips the same code literals and fenced blocks as in-app rendering. */
     @Test
     fun notificationPresentationUsesTheSameLiteralExclusions() {
         assertEquals(
@@ -40,6 +41,7 @@ class EmojiShortcodesTest {
         assertNull(EmojiShortcodes.builtinName(":party:"))
     }
 
+    /** A fence closes only on a matching or longer marker, so later shortcodes render again. */
     @Test
     fun closingFenceBoundaries() {
         val fencedBodies =

@@ -8,6 +8,7 @@ import androidx.work.BackoffPolicy
 import androidx.work.NetworkType
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -100,10 +101,12 @@ class NotificationQuickReactionTest {
         assertNull(notificationReactionChoice(delivered("😀".repeat(33)), listOf("🥳", "🔥")))
     }
 
+    /** A chosen chip routes to a reaction, while typed text on the same Reply stays a reply. */
     @Test
     fun replyActionChoiceRoutesToReactionWhileFreeFormStillRoutesToReply() {
         val remoteInput = RemoteInput.Builder(NotificationActions.KEY_TEXT_REPLY).build()
 
+        /** A Reply intent carrying [value] as if SystemUI returned it from [source]. */
         fun delivered(
             value: String,
             source: Int,
@@ -167,6 +170,7 @@ class NotificationQuickReactionTest {
         assertEquals(":marmot:", notificationReactionChoice(earlier, listOf(":marmot:", "🔥")))
     }
 
+    /** An emoji action from a card posted before the upgrade still reacts, within the current allowlist. */
     @Test
     fun directReactionFromANotificationPostedBeforeUpgradeStillUsesTheCurrentAllowlist() {
         val legacy =
@@ -177,6 +181,18 @@ class NotificationQuickReactionTest {
 
         assertEquals("🔥", notificationReactionChoice(legacy, listOf("🥳", "🔥")))
         assertNull(notificationReactionChoice(legacy, listOf("🥳")))
+    }
+
+    /** A shortcode with no words keeps its exact value as its label, so neither TalkBack nor a chip reads blank. */
+    @Test
+    fun wordlessShortcodeKeepsItsExactValue() {
+        val resources = context.resources
+
+        assertEquals(":__:", EmojiShortcodes.plainLabel(":__:", resources))
+        assertEquals(":-_-:", EmojiShortcodes.plainLabel(":-_-:", resources))
+        assertEquals("wave", EmojiShortcodes.plainLabel(":_wave_:", resources))
+        assertEquals("party parrot", EmojiShortcodes.plainLabel(":party_parrot:", resources))
+        assertEquals(listOf(":__:"), notificationQuickReactionLabels(context, listOf(":__:")))
     }
 
     /** An image choice on a card posted by the earlier expanded-choice build still sends its exact reaction. */
@@ -197,6 +213,7 @@ class NotificationQuickReactionTest {
         assertNull(notificationReactionChoice(earlier, listOf(":wn:")))
     }
 
+    /** React and Reply never share a request code or action URI, so neither PendingIntent replaces the other. */
     @Test
     fun reactKeepsAPendingIntentIdentityOfItsOwn() {
         val tag = "account-a|group-a"

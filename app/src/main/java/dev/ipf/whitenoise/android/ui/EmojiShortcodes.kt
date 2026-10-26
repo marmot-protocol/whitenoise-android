@@ -84,6 +84,7 @@ internal object EmojiShortcodes {
 
     fun isShortcode(text: String): Boolean = shortcodePattern.matches(text)
 
+    /** The bundled artwork for `:marmot:` and `:wn:`, or null for any other shortcode. */
     fun builtinDrawable(shortcode: String): Int? =
         when (shortcode) {
             ":marmot:" -> R.drawable.builtin_emoji_marmot
@@ -116,14 +117,21 @@ internal object EmojiShortcodes {
 
     /**
      * Readable text for [emoji] on surfaces that can only show text, never the raw `:shortcode:`.
-     * Unicode stays as is, built-ins use their product name and other shortcodes their words.
+     * Unicode stays as is, built-ins use their product name and other shortcodes their words. A code
+     * with no words, such as `:__:`, keeps its exact value so TalkBack never announces a blank.
      */
     fun plainLabel(
         emoji: String,
         resources: Resources,
     ): String =
         if (isShortcode(emoji)) {
-            builtinName(emoji)?.let(resources::getString) ?: emoji.trim(':').replace('_', ' ').replace('-', ' ')
+            builtinName(emoji)?.let(resources::getString)
+                ?: emoji
+                    .trim(':')
+                    .replace('_', ' ')
+                    .replace('-', ' ')
+                    .trim()
+                    .ifBlank { emoji }
         } else {
             emoji
         }

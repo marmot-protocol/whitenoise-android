@@ -62,6 +62,7 @@ class LocalNotificationReactionChipsTest {
         assertEquals(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED, remoteInput.editChoicesBeforeSending)
     }
 
+    /** The card offers Reply then Mark as read, and Reply's mutable broadcast routes a chosen chip as a reaction. */
     @Test
     fun rowKeepsReplyAndMarkReadWhileReplyUsesAMutableBroadcast() {
         postConversationCard(presenter(defaultChoices()))
@@ -105,6 +106,7 @@ class LocalNotificationReactionChipsTest {
             remoteInput.choices?.map(CharSequence::toString),
         )
 
+        /** The posted Reply intent as SystemUI returns it once [chip] is chosen from [source]. */
         fun tapped(
             chip: String,
             source: Int = RemoteInput.SOURCE_CHOICE,
@@ -203,6 +205,7 @@ class LocalNotificationReactionChipsTest {
         }
     }
 
+    /** A handled reaction for an older message never writes history onto a newer message's card. */
     @Test
     fun reactionHandledRepostCannotAnnotateANewerMessageGeneration() {
         val presenter = presenter(defaultChoices())

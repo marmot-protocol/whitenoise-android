@@ -14,6 +14,7 @@ private const val EXTRA_INLINE_REACTION_LABELS = "dev.ipf.whitenoise.android.ext
 internal fun notificationQuickReactionChoices(context: Context): List<String> =
     notificationQuickReactionChoices(RecentEmojiPreferences.loadQuickReactions(context))
 
+/** Valid, distinct quick reactions in their saved order, bounded to what one card can offer. */
 internal fun notificationQuickReactionChoices(stored: List<String>): List<String> =
     stored
         .mapNotNull(::normalizeNotificationReaction)

@@ -134,6 +134,7 @@ class EmojiPickerRecentsBehaviorTest {
         assertEquals(listOf("😀", "👍", "😂"), owner.recents)
     }
 
+    /** Choosing an emoji while configuring quick reactions does not count as using it. */
     @Test
     fun configureQuickReactionPurposeDoesNotRecordUsage() {
         var usedCount = 0
