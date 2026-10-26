@@ -1,0 +1,72 @@
+name: WN build server smoke
+
+# Builds and unit-tests both flavors on the two persistent wn-build-server
+# runners. The runners refuse pull_request events, so this runs only on push
+# to its own branch or on manual dispatch.
+on:
+  push:
+    branches: [ci/wn-build-server]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and unit-test ${{ matrix.flavor }}
+    runs-on: [self-hosted, Linux, X64, wn-build-server, "${{ matrix.slot }}"]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: Zapstore
+            slot: wn-cache-1
+          - flavor: Play
+            slot: wn-cache-2
+    env:
+      ORG_GRADLE_PROJECT_ciTestForks: '3'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # Content-addressed by artifact SHA-256, so it is safe to keep across runs.
+      - name: Configure MarmotKit cache directory
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$HOME/.cache/marmotkit" >> "$GITHUB_ENV"
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ~/.gradle persists on this host; skip the GitHub cache round trip.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: true
+
+      - name: Build and unit-test
+        run: >-
+          ./gradlew :app:assembleDev${{ matrix.flavor }}Debug
+          :app:testDev${{ matrix.flavor }}DebugUnitTest
+          -Proborazzi.test.verify=true --build-cache --profile --stacktrace
+
+      - name: Upload reports and APK
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: wn-build-server-${{ matrix.flavor }}
+          path: |
+            app/build/outputs/apk/dev${{ matrix.flavor }}/debug/*.apk
+            app/build/reports/tests/
+            build/reports/profile/
+          if-no-files-found: warn
+          retention-days: 7
