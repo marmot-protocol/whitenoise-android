@@ -25,7 +25,10 @@ internal class RemoteGiphyAcquisition(
     private val workSlots = Semaphore(6)
 
     /** A retained controller is an account/runtime-bound owner, never a process-wide permission grant. */
-    private data class Key(val owner: Any, val request: RemoteGiphyMedia.ImageRequest)
+    private data class Key(
+        val owner: Any,
+        val request: RemoteGiphyMedia.ImageRequest,
+    )
 
     /** Holds a bounded response until every subscriber finishes decoding or cancels. */
     private class Flight {
@@ -72,11 +75,12 @@ internal class RemoteGiphyAcquisition(
         mayDownload: () -> Boolean,
     ): Flight =
         synchronized(lock) {
-            flights.getOrPut(key) {
-                Flight().also { flight ->
-                    flight.job = scope.launch(start = CoroutineStart.LAZY) { acquire(key, flight) }
-                }
-            }.also { it.subscribers[subscriber] = mayDownload }
+            flights
+                .getOrPut(key) {
+                    Flight().also { flight ->
+                        flight.job = scope.launch(start = CoroutineStart.LAZY) { acquire(key, flight) }
+                    }
+                }.also { it.subscribers[subscriber] = mayDownload }
         }
 
     /** Keeps at most six uncached responses alive, with six total concurrent fetch/decode operations. */
@@ -101,14 +105,21 @@ internal class RemoteGiphyAcquisition(
     }
 
     /** A queued request cannot inherit consent from a subscriber that left or revoked permission. */
-    private suspend fun fetchIfAllowed(key: Key, flight: Flight): ByteArray? {
+    private suspend fun fetchIfAllowed(
+        key: Key,
+        flight: Flight,
+    ): ByteArray? {
         val allowed = synchronized(lock) { flight.subscribers.values.any { it() } }
         if (!allowed) return null
         return fetch(key.request)?.takeIf { it.isNotEmpty() && it.size <= GIPHY_MAX_BODY_BYTES }
     }
 
     /** Removes by identity so late cancellation cannot retire a replacement flight for the same URL. */
-    private fun unsubscribe(key: Key, flight: Flight, subscriber: Any) {
+    private fun unsubscribe(
+        key: Key,
+        flight: Flight,
+        subscriber: Any,
+    ) {
         synchronized(lock) {
             flight.subscribers.remove(subscriber)
             if (flight.subscribers.isEmpty()) {

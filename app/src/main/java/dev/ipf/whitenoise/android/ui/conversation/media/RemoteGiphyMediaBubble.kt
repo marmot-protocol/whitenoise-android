@@ -135,7 +135,10 @@ internal fun shouldLoadRemoteGiphyMedia(
 ): Boolean = ownerEligible && (cachedAvailable || manualRequest || (!automaticDownloadsPaused && automaticAllowed))
 
 /** Reads live consent at slot admission, even before a policy change has recomposed its row. */
-private fun remoteGiphyNetworkAllowed(controller: ConversationController, manualRequest: Boolean): Boolean =
+private fun remoteGiphyNetworkAllowed(
+    controller: ConversationController,
+    manualRequest: Boolean,
+): Boolean =
     shouldLoadRemoteGiphyMedia(
         automaticDownloadsPaused = controller.appState.automaticAttachmentDownloadsPaused(),
         automaticAllowed = controller.appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
