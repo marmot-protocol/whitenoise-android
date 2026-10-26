@@ -48,6 +48,11 @@ source disposal or account/chat replacement. This path does not add MDK persiste
 or claim permissionless decoder isolation. Run `MED-038` against the exact provider
 and candidate APK; source contracts alone do not prove recognition compatibility.
 
+The opt-in `AudioTranscriptionDeviceTest` uses Kokoro `af_heart` speech in a
+27-second, 48 kHz stereo Opus fixture, with 18 seconds of inserted silence.
+It checks `Hello world` before the pause, `Good morning` after it, and clearing
+the result on Close.
+
 HEIF/HEIC is not qualified by the JPEG/PNG tests. Some Android image implementations internally need media services unavailable to an isolated UID. Such formats fail closed if unsupported, without an app-process image fallback.
 
 ## Automatic versus explicit parsing
