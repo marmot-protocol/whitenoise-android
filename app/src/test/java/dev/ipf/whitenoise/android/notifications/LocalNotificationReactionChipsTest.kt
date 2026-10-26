@@ -192,6 +192,79 @@ class LocalNotificationReactionChipsTest {
         assertNull(live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
     }
 
+    @Test
+    fun rejectedExpandedChoicesRetryTheSameMessageThroughNativeLayoutOnce() {
+        val attempted = mutableListOf<Notification>()
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                groupReconciliation = {},
+                quickReactionChoices = { listOf(":marmot:", ":wn:", "👍") },
+                notificationPoster = { compat, tag, id, notification ->
+                    attempted += notification
+                    if (attempted.size == 1) {
+                        checkNotNull(notification.bigContentView)
+                        throw IllegalArgumentException("Rejected fixture RemoteViews")
+                    }
+                    compat.notify(tag, id, notification)
+                },
+            ).also(LocalNotificationPresenter::ensureChannels)
+        postConversationCard(presenter)
+        assertEquals(2, attempted.size)
+        assertNull(attempted.last().bigContentView)
+        val style =
+            checkNotNull(
+                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(attempted.last()),
+            )
+        assertEquals(
+            "message-a",
+            style.messages
+                .last()
+                .text
+                .toString(),
+        )
+        assertEquals(2, attempted.last().actions.size)
+    }
+
+    @Test
+    fun optionalLayoutRetryRechecksPreviewPrivacyInsteadOfResendingRichPayload() {
+        val attempted = mutableListOf<Notification>()
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                groupReconciliation = {},
+                quickReactionChoices = { listOf(":marmot:", ":wn:", "👍") },
+                notificationPoster = { compat, tag, id, notification ->
+                    attempted += notification
+                    if (attempted.size == 1) {
+                        runBlocking { NotificationPreviewPreferences.setEnabled(context, false, scrub = { true }) }
+                        throw IllegalArgumentException("Rejected fixture RemoteViews")
+                    }
+                    compat.notify(tag, id, notification)
+                },
+            ).also(LocalNotificationPresenter::ensureChannels)
+        try {
+            postConversationCard(presenter)
+            assertEquals(2, attempted.size)
+            val native = attempted.last()
+            assertNull(native.bigContentView)
+            val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(native))
+            assertEquals(
+                context.getString(R.string.notification_hidden_content),
+                style.messages
+                    .single()
+                    .text
+                    .toString(),
+            )
+            assertEquals(
+                listOf(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ),
+                native.actions.map { it.semanticAction },
+            )
+        } finally {
+            runBlocking { NotificationPreviewPreferences.setEnabled(context, true) }
+        }
+    }
+
     private fun presenter(choices: List<String>) =
         LocalNotificationPresenter(
             context,

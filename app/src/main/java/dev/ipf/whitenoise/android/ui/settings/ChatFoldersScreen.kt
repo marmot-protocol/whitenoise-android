@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -138,6 +139,8 @@ private fun ChatFoldersAccountScreen(
         )
         return
     }
+
+    BackHandler(onBack = onBack)
 
     /** Moves a folder by [delta] positions. */
     fun move(
