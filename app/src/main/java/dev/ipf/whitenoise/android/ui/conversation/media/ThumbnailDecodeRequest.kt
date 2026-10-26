@@ -10,7 +10,9 @@ import dev.ipf.whitenoise.android.media.thumbnailDecodeMaxEdge
  * Transient geometry for one mounted attachment. The largest observed bucket wins until that attachment is replaced,
  * so resize oscillations cannot repeatedly cancel and restart decoding or accumulate cached variants.
  */
-internal class ThumbnailDecodeRequest(private var sourceAspectRatio: Float?) {
+internal class ThumbnailDecodeRequest(
+    private var sourceAspectRatio: Float?,
+) {
     private var size = IntSize.Zero
 
     var maxEdgePx by mutableIntStateOf(0)

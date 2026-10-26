@@ -1432,7 +1432,8 @@ class WhiteNoiseAppState private constructor(
         maxEdgePx: Int = dev.ipf.whitenoise.android.media.MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
     ) {
         assertMainThread { "cacheMediaThumbnail" }
-        if (mediaThumbnailCache.get(cacheKey)?.maxEdgePx?.let { it > maxEdgePx } == true) return
+        val cached = mediaThumbnailCache.get(cacheKey)
+        if (cached != null && cached.maxEdgePx > maxEdgePx) return
         val entry = dev.ipf.whitenoise.android.media.MediaThumbnail(thumbnail, maxEdgePx)
         val previous = mediaThumbnailCache.put(cacheKey, entry)
         if (mediaThumbnailCache.get(cacheKey) === entry || previous != null) {

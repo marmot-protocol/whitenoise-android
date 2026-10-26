@@ -10509,8 +10509,11 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
         requestedMaxEdgePx: Int = 0,
-    ): dev.ipf.whitenoise.android.media.MediaThumbnail? =
-        attachmentPresentation.thumbnailEntryFor(messageIdHex, attachmentIndex, requestedMaxEdgePx)
+    ): dev.ipf.whitenoise.android.media.MediaThumbnail? = attachmentPresentation.thumbnailEntryFor(
+        messageIdHex,
+        attachmentIndex,
+        requestedMaxEdgePx,
+    )
 
     /** Stores a decoded thumbnail under the pinned cache identity. */
     fun cacheThumbnail(
