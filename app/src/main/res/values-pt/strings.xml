@@ -2484,4 +2484,8 @@
     <string name="setup_finding_outcome_unknown">Resultado desconhecido</string>
     <string name="setup_finding_outcome_success">Verificação concluída com sucesso</string>
     <string name="setup_finding_outcome_failure">Falha na verificação</string>
+    <string name="public_jpeg_previews_title">Prévias de imagens na conversa</string>
+    <string name="public_jpeg_previews_privacy">Desativadas por padrão. Links diretos para JPEGs do Blossom podem revelar seu endereço IP ao servidor da imagem. As prévias usam Wi-Fi definido como não medido e suas regras de download de fotos. Os links comuns continuam disponíveis quando desativadas.</string>
+    <string name="public_jpeg_preview_image">Prévia de JPEG vinculado</string>
+    <string name="public_jpeg_preview_save_failed">Não foi possível salvar a configuração de prévia de imagens. Tente novamente.</string>
 </resources>

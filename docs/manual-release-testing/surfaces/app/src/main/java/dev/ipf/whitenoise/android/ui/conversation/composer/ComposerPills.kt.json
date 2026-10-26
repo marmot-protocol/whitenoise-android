@@ -64,6 +64,14 @@
         "test_ids": [
           "CON-013"
         ]
+      },
+      {
+        "surface": "Composer sending identity slot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "sendingIdentity?.invoke()",
+        "test_ids": [
+          "CON-035"
+        ]
       }
     ],
     "source_coverage": [
