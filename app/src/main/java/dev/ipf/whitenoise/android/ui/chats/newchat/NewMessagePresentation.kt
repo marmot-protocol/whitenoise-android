@@ -82,6 +82,7 @@ internal data class NewMessageActions(
     val person: (RecipientSearch.Candidate) -> Unit,
     val profile: (RecipientSearch.Candidate) -> Unit,
     val copyError: (String) -> Unit,
+    val agentSettings: () -> Unit = {},
 )
 
 /** Prototype discovery hierarchy driven exclusively by the caller's current native result state. */
@@ -200,6 +201,16 @@ private fun NewMessageActionGroup(
                 actions.invite,
                 enabled = !busy,
                 leading = { Icon(painterResource(R.drawable.ic_share), null, Modifier.size(24.dp)) },
+            )
+        }
+        row("agent_settings") { context ->
+            SettingsLink(
+                context,
+                stringResource(R.string.new_message_talk_to_agent),
+                actions.agentSettings,
+                modifier = Modifier.testTag("new_message.agentSettings"),
+                enabled = !busy,
+                leading = { Icon(painterResource(R.drawable.ic_settings_person_add), null, Modifier.size(24.dp)) },
             )
         }
     }

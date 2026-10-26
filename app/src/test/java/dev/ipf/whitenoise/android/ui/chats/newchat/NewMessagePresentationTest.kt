@@ -36,6 +36,21 @@ class NewMessagePresentationTest {
     private val calls = mutableListOf<String>()
     private val person = RecipientSearch.Candidate("b".repeat(64), "Ada", "npub1ada", isFollowing = true)
 
+    /** Agent discovery has its own action below Invite, and busy creation blocks it. */
+    @Test fun agentDiscoveryIsBelowInviteAndUsesItsOwnCallback() {
+        show()
+        val invite = composeRule.onNodeWithText(context.getString(R.string.new_message_invite_friend)).fetchSemanticsNode()
+        val agent = composeRule.onNodeWithTag("new_message.agentSettings").fetchSemanticsNode()
+        org.junit.Assert.assertTrue(agent.boundsInRoot.top >= invite.boundsInRoot.bottom)
+        composeRule.onNodeWithTag("new_message.agentSettings").performClick()
+        assertEquals(listOf("agent"), calls)
+    }
+
+    @Test fun chatCreationDisablesAgentDiscovery() {
+        show(creating = person.accountIdHex)
+        composeRule.onNodeWithTag("new_message.agentSettings").assertIsNotEnabled()
+    }
+
     /** Target quick links remain present for a nonblank search and invoke their distinct existing owners. */
     @Test fun searchKeepsQuickActionsAvailable() {
         show()
@@ -245,6 +260,7 @@ class NewMessagePresentationTest {
                         { calls += "person" },
                         { calls += "profile" },
                         {},
+                        agentSettings = { calls += "agent" },
                     ),
                     isValidNpub = { true },
                     identifierLookupFailed = lookupFailed,
