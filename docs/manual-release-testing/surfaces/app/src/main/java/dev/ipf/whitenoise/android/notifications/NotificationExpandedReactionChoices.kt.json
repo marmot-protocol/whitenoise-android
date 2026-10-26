@@ -19,6 +19,15 @@
         "test_ids": [
           "NTF-034"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationExpandedReactionChoices.kt",
+        "anchor": "notificationBuiltinEmojiBitmap(context, choice, CHOICE_ARTWORK_PX)",
+        "surface": "expanded choice artwork cropped like the in-app glyph, with readable names for choices without artwork and in every description",
+        "test_ids": [
+          "NTF-034",
+          "NTF-017"
+        ]
       }
     ]
   },

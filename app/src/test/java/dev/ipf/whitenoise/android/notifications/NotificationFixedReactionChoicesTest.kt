@@ -67,8 +67,12 @@ class NotificationFixedReactionChoicesTest {
         assertNull(fixedNotificationReactionIntent(context, target, "not-configured", choices))
     }
 
+    /**
+     * Saved built-ins become cropped images announced by name, and a choice with no artwork shows the same
+     * readable name as the native chip, never a raw `:shortcode:`.
+     */
     @Test
-    fun savedShortcodesBecomeBundledImagesAndUnknownChoiceStaysHonestText() {
+    fun savedShortcodesBecomeCroppedImagesAndOtherChoicesShowReadableNames() {
         RecentEmojiPreferences.saveQuickReactions(context, choices)
         assertEquals(choices, notificationQuickReactionChoices(context))
         val original = card("first")
@@ -90,17 +94,26 @@ class NotificationFixedReactionChoicesTest {
         val view = checkNotNull(expanded.bigContentView).apply(context, FrameLayout(context))
         val first = view.findViewById<android.widget.LinearLayout>(R.id.reaction_choices_first)
         val marmot = first.getChildAt(0)
-        assertEquals(View.VISIBLE, marmot.findViewById<ImageView>(R.id.reaction_choice_image).visibility)
+        val marmotImage = marmot.findViewById<ImageView>(R.id.reaction_choice_image)
+        assertEquals(View.VISIBLE, marmotImage.visibility)
         assertEquals(View.GONE, marmot.findViewById<TextView>(R.id.reaction_choice_text).visibility)
+        val react = context.getString(R.string.message_react)
+        assertEquals("$react ${context.getString(R.string.emoji_name_marmot)}", marmot.contentDescription.toString())
+        val whiteNoise = first.getChildAt(1).contentDescription.toString()
+        assertEquals("$react ${context.getString(R.string.white_noise)}", whiteNoise)
+        // The tile is the cropped artwork, opaque to its edges, not the padded 72px canvas.
+        val tile = (marmotImage.drawable as android.graphics.drawable.BitmapDrawable).bitmap
+        val opaque =
+            (0 until tile.height).flatMap { y ->
+                (0 until tile.width)
+                    .filter { x -> android.graphics.Color.alpha(tile.getPixel(x, y)) > 0 }
+                    .map { x -> x to y }
+            }
+        assertTrue(opaque.minOf { it.first } <= 2 && opaque.minOf { it.second } <= 2)
         val second = view.findViewById<android.widget.LinearLayout>(R.id.reaction_choices_second)
-        assertEquals(
-            ":unknown:",
-            second
-                .getChildAt(0)
-                .findViewById<TextView>(R.id.reaction_choice_text)
-                .text
-                .toString(),
-        )
+        val unknown = second.getChildAt(0)
+        assertEquals("unknown", unknown.findViewById<TextView>(R.id.reaction_choice_text).text.toString())
+        assertEquals("$react unknown", unknown.contentDescription.toString())
     }
 
     @Test

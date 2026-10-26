@@ -7,20 +7,27 @@
     android:clickable="true"
     android:focusable="true"
     android:importantForAccessibility="yes">
+    <!-- Sized in sp so built-in artwork scales with the system font like the Unicode choices beside it. -->
     <ImageView
         android:id="@+id/reaction_choice_image"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="24sp"
+        android:layout_height="24sp"
         android:layout_gravity="center"
         android:importantForAccessibility="no" />
+    <!-- Unicode choices grow toward the 24dp artwork size; long names and large fonts shrink to fit the target. -->
     <TextView
         android:id="@+id/reaction_choice_text"
         style="@style/TextAppearance.Compat.Notification"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:layout_gravity="center"
+        android:autoSizeMaxTextSize="20sp"
+        android:autoSizeMinTextSize="10sp"
+        android:autoSizeStepGranularity="1sp"
+        android:autoSizeTextType="uniform"
         android:ellipsize="end"
         android:gravity="center"
         android:importantForAccessibility="no"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:paddingHorizontal="4dp" />
 </FrameLayout>

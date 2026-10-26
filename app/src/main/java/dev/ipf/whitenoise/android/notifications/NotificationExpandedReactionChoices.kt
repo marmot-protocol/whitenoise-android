@@ -152,19 +152,23 @@ private fun expandedReactionView(
                     ?.toIcon(context)
         identity?.let { icon -> setImageViewIcon(R.id.reaction_choices_avatar, icon) }
             ?: setViewVisibility(R.id.reaction_choices_avatar, View.GONE)
+        // The same names the native chips show, so text choices and every description stay readable.
+        val labels = notificationQuickReactionLabels(context, choices)
         choices.forEachIndexed { index, choice ->
             val pending =
                 fixedNotificationReactionPendingIntent(context, target, choice, choices) ?: return@forEachIndexed
             val item = RemoteViews(context.packageName, R.layout.notification_reaction_choice)
-            val drawable = EmojiShortcodes.builtinDrawable(choice)
-            if (drawable == null) {
-                item.setTextViewText(R.id.reaction_choice_text, choice)
+            // Cropped like every other notification and in-app glyph, so the Marmot is not drawn small.
+            val artwork = notificationBuiltinEmojiBitmap(context, choice, CHOICE_ARTWORK_PX)
+            if (artwork == null) {
+                item.setTextViewText(R.id.reaction_choice_text, labels[index])
                 item.setViewVisibility(R.id.reaction_choice_image, View.GONE)
             } else {
-                item.setImageViewResource(R.id.reaction_choice_image, drawable)
+                item.setImageViewBitmap(R.id.reaction_choice_image, artwork)
                 item.setViewVisibility(R.id.reaction_choice_text, View.GONE)
             }
-            item.setContentDescription(R.id.reaction_choice, "${context.getString(R.string.message_react)} $choice")
+            val description = "${context.getString(R.string.message_react)} ${labels[index]}"
+            item.setContentDescription(R.id.reaction_choice, description)
             item.setOnClickPendingIntent(R.id.reaction_choice, pending)
             addView(if (index < CHOICES_PER_ROW) R.id.reaction_choices_first else R.id.reaction_choices_second, item)
         }
@@ -207,5 +211,8 @@ private fun addExpandedReactionMessages(
 
 internal const val EXTRA_EXPANDED_REACTION_CHOICES = "dev.ipf.whitenoise.android.notification.EXPANDED_REACTION_CHOICES"
 private const val CHOICES_PER_ROW = 3
+
+// Covers the 24dp choice glyph at xxxhdpi while keeping each card's bitmap payload small.
+private const val CHOICE_ARTWORK_PX = 96
 
 private val NOTIFICATION_CHOICE_ARTWORK_NAME = Regex("[0-9a-f-]{36}\\.png")
