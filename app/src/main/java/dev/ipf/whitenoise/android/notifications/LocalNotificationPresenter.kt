@@ -2624,10 +2624,20 @@ class LocalNotificationPresenter(
         notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
     }
 
+    /** Reads only the acted card's platform identity before dismissal is allowed to inspect siblings. */
     internal fun conversationCardMessageIdHex(
         notificationTag: String,
         notificationId: Int,
-    ): String? = conversationCardMessageIdHex(activeConversationCard(notificationTag, notificationId))
+    ): String? =
+        conversationCardMessageIdHex(
+            runCatching {
+                context
+                    .getSystemService(NotificationManager::class.java)
+                    ?.activeNotifications
+                    ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
+                    ?.notification
+            }.getOrNull(),
+        )
 
     internal fun cancelRepliedConversationCardIfSameGeneration(
         notificationTag: String,
