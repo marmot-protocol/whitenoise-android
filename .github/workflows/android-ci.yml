@@ -843,8 +843,9 @@ jobs:
     runs-on: *wn-build-server
     timeout-minutes: 40
     env:
-      # Hosted runners have four vCPUs; wn-build-server's CI slice has 12.8.
-      ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '3' || '8' }}
+      # Hosted runners have four vCPUs. wn-build-server shares 12.8 CPUs and
+      # 50 GiB between concurrent jobs; eight forks peaked at 28 GB alone.
+      ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '3' || '6' }}
     strategy:
       # Keep both variants' diagnostics; two isolated 1 GiB workers per runner.
       # PRs test Zapstore only; secondary-variant runs Play's flavor-sensitive tests.
