@@ -620,7 +620,12 @@ class ConversationAcceptedSendRouteScreenshotTest {
                     contentTokens = accepted.record.contentTokens,
                 )
             val incoming = timelineRecord("d4".repeat(32), accepted.record.recordedAt + 1uL, INCOMING_TEXT)
+            val callsBefore = timelineSubscription.nextWindowCallCount
             timelineSubscription.emitWindow(timelinePage(*(records + own + incoming).toTypedArray()))
+            awaitConversationCondition { timelineSubscription.nextWindowCallCount > callsBefore }
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofMillis(10))
         }
 
     private fun plainParagraphDocument(text: String): MarkdownDocumentFfi =

@@ -96,27 +96,33 @@ class MediaAnimationService : Service() {
                         )
                         armIdle()
                     }, ::nativeWork)
-                } catch (rejected: Exception) {
-                    // Only admitted source codec/geometry construction is a known rejection.
-                    // Staging, IPC and frame publication are outside this category.
-                    runCatching {
-                        writeAnimationStatus(
-                            callback.binder,
-                            AnimationStatusInfo(
-                                session,
-                                AnimationFrameProtocol.CODEC_REJECTED,
-                                Process.isIsolated(),
-                                checkSelfPermission(android.Manifest.permission.INTERNET) ==
-                                    android.content.pm.PackageManager.PERMISSION_GRANTED,
-                                (application as dev.ipf.whitenoise.android.WhiteNoiseApplication)
-                                    .initializedAppState() != null,
-                            ),
-                        )
-                    }
+                } catch (rejected: java.io.IOException) {
+                    reportCodecRejection(callback)
+                    throw rejected
+                } catch (rejected: IllegalArgumentException) {
+                    reportCodecRejection(callback)
                     throw rejected
                 }
         }
         animation?.firstFrame()
+    }
+
+    /** Only known decoder or source-geometry rejection has a permanent codec status. */
+    private fun reportCodecRejection(callback: Messenger) {
+        runCatching {
+            writeAnimationStatus(
+                callback.binder,
+                AnimationStatusInfo(
+                    session,
+                    AnimationFrameProtocol.CODEC_REJECTED,
+                    Process.isIsolated(),
+                    checkSelfPermission(android.Manifest.permission.INTERNET) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    (application as dev.ipf.whitenoise.android.WhiteNoiseApplication)
+                        .initializedAppState() != null,
+                ),
+            )
+        }
     }
 
     private fun nativeWork(block: () -> Unit) {

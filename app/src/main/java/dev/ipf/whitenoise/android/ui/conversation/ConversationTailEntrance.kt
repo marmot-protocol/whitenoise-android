@@ -177,12 +177,9 @@ internal fun Modifier.conversationTailEntranceMotion(
             // Once visible accepted ink retires, its neighbours must share its final slots too.
             val claimedEntrance = entering != null && entrance.claimedEnteringItemId == entering
             val retiredClaim = claimedEntrance && currentClaim != entering
+            val activeEnteringClaim = itemId == entering && claimedEntrance && currentClaim == entering
             translationY =
-                if (retiredClaim ||
-                    itemId == entering &&
-                    claimedEntrance &&
-                    currentClaim == entering
-                ) {
+                if (retiredClaim || activeEnteringClaim) {
                     0f
                 } else {
                     entrance.shiftPx

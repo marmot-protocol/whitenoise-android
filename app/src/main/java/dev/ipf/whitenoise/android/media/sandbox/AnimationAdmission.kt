@@ -180,29 +180,38 @@ internal class AnimationAdmission(
         val ownedDemand = if (waitingGroup && demand == null) groupDemand() else null
         val ticket = demand ?: ownedDemand
         val deadline = nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        var result: T? = null
+        var retry = true
         try {
-            do {
-                if (expireStartup(deadline, if (waitingGroup) ticket else null)) return null
-                val lease =
-                    if (waitingGroup) {
-                        awaitDecorativeUntil(deadline, checkNotNull(ticket))
-                    } else {
-                        acquireUntil(decorative, deadline) ?: return null
-                    }
-                if (expireStartup(deadline, if (waitingGroup) ticket else null, lease)) return null
+            while (retry) {
+                val lease = startupLease(decorative, deadline, if (waitingGroup) ticket else null) ?: break
                 if (Thread.currentThread().isInterrupted) {
                     lease.release() // Cancellation before OPEN owns no worker capability.
                     throw InterruptedException("group playback cancelled before OPEN")
                 }
-                val result = open(lease)
-                if (result != null || !waitingGroup || !lease.wasPreempted()) return result
-                // Requeue at the tail, but do not issue another OPEN from an expired startup budget.
-                checkNotNull(ticket).enqueue()
-                if (expireStartup(deadline, ticket)) return null
-            } while (true)
+                result = open(lease)
+                retry = result == null && waitingGroup && lease.wasPreempted()
+                if (retry) {
+                    // Requeue at the tail without refreshing the total startup deadline.
+                    checkNotNull(ticket).enqueue()
+                    if (expireStartup(deadline, ticket)) break
+                }
+            }
+            return result
         } finally {
             ownedDemand?.close()
         }
+    }
+
+    /** Both sides of acquisition share the original total budget; an unused grant never reaches OPEN. */
+    private fun startupLease(
+        decorative: Boolean,
+        deadline: Long,
+        ticket: GroupDemand?,
+    ): Lease? {
+        if (expireStartup(deadline, ticket)) return null
+        val lease = if (ticket != null) awaitDecorativeUntil(deadline, ticket) else acquireUntil(decorative, deadline)
+        return if (lease == null || expireStartup(deadline, ticket, lease)) null else lease
     }
 
     /** An expired total startup budget can never issue OPEN, even after a ready acquisition. */

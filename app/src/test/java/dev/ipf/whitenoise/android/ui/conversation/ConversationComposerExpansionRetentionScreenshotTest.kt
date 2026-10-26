@@ -462,7 +462,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         val retainedHeight = productionComposerPillContentHeight()
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
+        awaitConversationCondition(timeoutMs = 5_000) { publisherStarted.isCompleted }
 
         assertEquals("", productionComposerText())
         assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_A, GROUP_A))
@@ -524,7 +524,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
+            awaitConversationCondition(timeoutMs = 5_000) {
                 publisherStarted.isCompleted &&
                     fixture.controller.timeline.any { it.record.plaintext == dictatedDraft }
             }
@@ -1057,7 +1057,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         showProductionConversation(appState, fixture)
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
+        awaitConversationCondition(timeoutMs = 5_000) { publisherStarted.isCompleted }
         composeRule.onNode(hasSetTextAction()).performTextReplacement(newerDraft)
         composeRule.waitForIdle()
         performAccessibleResizeAction()

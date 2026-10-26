@@ -322,7 +322,7 @@ class AnimationSessionStartupDeadlineTest {
                 .apply { isAccessible = true }
                 .invoke(session, twoFrameGif()) as IsolatedAnimationDrawable?
         } catch (wrapped: InvocationTargetException) {
-            throw checkNotNull(wrapped.cause)
+            throw (wrapped.cause ?: wrapped)
         }
 
     private fun waitForBlocked(thread: Thread) {

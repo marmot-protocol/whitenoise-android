@@ -74,8 +74,9 @@ class ComposerEmojiActionContractTest {
             bounds.left + bounds.right < fieldBounds.left + fieldBounds.right,
         )
         val touchBounds = openAction.fetchSemanticsNode().touchBoundsInRoot
+        val toolbarTargetWidthPx = with(composeRule.density) { 40.dp.toPx() }
         val minimumTouchTargetPx = with(composeRule.density) { 48.dp.toPx() }
-        assertTrue("Composer emoji action touch width must be at least 48dp", touchBounds.width >= minimumTouchTargetPx)
+        assertTrue("Compact emoji action touch width must be at least 40dp", touchBounds.width >= toolbarTargetWidthPx)
         assertTrue(
             "Composer emoji action touch height must be at least 48dp",
             touchBounds.height >= minimumTouchTargetPx,

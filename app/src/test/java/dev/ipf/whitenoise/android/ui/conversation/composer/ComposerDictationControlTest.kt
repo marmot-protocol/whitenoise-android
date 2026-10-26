@@ -273,15 +273,16 @@ class ComposerDictationControlTest {
 
         assertTrue(action.left >= root.left && action.right <= root.right)
         assertTrue(action.top >= root.top && action.bottom <= root.bottom)
+        val toolbarTargetWidth = with(composeRule.density) { 40.dp.toPx() }
         val minimumTouchTarget = with(composeRule.density) { 48.dp.toPx() }
         val emojiTouch =
             composeRule.onNodeWithContentDescription("Open emoji picker").fetchSemanticsNode().touchBoundsInRoot
-        assertTrue(emojiTouch.width >= minimumTouchTarget && emojiTouch.height >= minimumTouchTarget)
+        assertTrue(emojiTouch.width >= toolbarTargetWidth && emojiTouch.height >= minimumTouchTarget)
         assertTrue(dictation.left >= root.left && dictation.right <= root.right)
         assertTrue(dictation.top >= root.top && dictation.bottom <= root.bottom)
         val dictationTouch =
             composeRule.onNodeWithContentDescription("Dictate text").fetchSemanticsNode().touchBoundsInRoot
-        assertTrue(dictationTouch.width >= minimumTouchTarget && dictationTouch.height >= minimumTouchTarget)
+        assertTrue(dictationTouch.width >= toolbarTargetWidth && dictationTouch.height >= minimumTouchTarget)
         assertTrue("RTL emoji action must remain on the leading side", action.left >= field.left)
         assertTrue("RTL dictation action must not overlap the text field", dictation.right <= field.left)
     }

@@ -2196,11 +2196,12 @@ internal fun MessageBubble(
                             textLayouts.selectableTextLayoutReporter(key, layout, coordinates)
                             if (composerSendMotion?.activePresentationId == item.presentationId &&
                                 layout != null &&
-                                coordinates != null &&
-                                currentSendDocument?.let(::isSinglePlainSendParagraph) == true
+                                coordinates != null
                             ) {
-                                composerSendMotion.destinationLayout(item.presentationId, layout)
-                                composerSendMotion.destinationText(item.presentationId, coordinates)
+                                if (currentSendDocument?.let(::isSinglePlainSendParagraph) == true) {
+                                    composerSendMotion.destinationLayout(item.presentationId, layout)
+                                    composerSendMotion.destinationText(item.presentationId, coordinates)
+                                }
                             }
                         }
                     }

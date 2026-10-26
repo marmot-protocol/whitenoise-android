@@ -92,8 +92,8 @@ internal fun rememberMessageMarkdownDocumentForDisplayedBody(
 /** Only one ordinary text leaf can share the accepted composer's actual ink geometry. */
 internal fun isSinglePlainSendParagraph(document: MarkdownDocumentFfi): Boolean {
     if (document.truncated || document.blankLinesBefore.any { it.toInt() != 0 }) return false
-    val paragraph = document.blocks.singleOrNull() as? MarkdownBlockFfi.Paragraph ?: return false
-    return paragraph.inlines.all {
+    val paragraph = document.blocks.singleOrNull() as? MarkdownBlockFfi.Paragraph
+    return paragraph?.inlines?.all {
         it is MarkdownInlineFfi.Text || it == MarkdownInlineFfi.SoftBreak || it == MarkdownInlineFfi.HardBreak
-    }
+    } == true
 }

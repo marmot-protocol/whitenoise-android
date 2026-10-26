@@ -119,7 +119,12 @@ class MediaVideoShareParityTest {
         val pages =
             listOf(imagePage("first-image", 0), imagePage("second-image", 1)).map { page ->
                 page.copy(
-                    reference = page.reference.copy(fileName = "${page.messageIdHex}.png", mediaType = "image/png"),
+                    reference =
+                        page.reference.copy(
+                            fileName = "${page.messageIdHex}.png",
+                            mediaType = "image/png",
+                            dim = "64x32",
+                        ),
                 )
             }
         val registry = MediaViewerThumbnailRegistry()

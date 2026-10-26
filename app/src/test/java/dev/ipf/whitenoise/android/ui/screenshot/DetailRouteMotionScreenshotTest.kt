@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.awaitConversationCondition
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -184,14 +185,34 @@ class DetailRouteMotionScreenshotTest {
     }
 
     /** Wait for real platform preparation without advancing the measured animation. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun awaitNotificationCategories(logOffset: Int) {
+        val animationOrigin = rule.mainClock.currentTime
+
         fun terminalRecords() =
             ShadowLog
                 .getLogsForTag("ConversationSettings")
                 .drop(logOffset)
                 .map { it.msg }
                 .filter { "stage=prepare_total " in it }
-        rule.waitUntil(timeoutMillis = 5_000) { terminalRecords().isNotEmpty() }
+        try {
+            awaitConversationCondition(timeoutMs = 5_000) {
+                rule.runOnUiThread { rule.mainClock.scheduler.runCurrent() }
+                rule.waitForIdle()
+                terminalRecords().isNotEmpty()
+            }
+        } catch (failure: AssertionError) {
+            val trace =
+                ShadowLog.getLogsForTag("ConversationSettings").drop(logOffset).joinToString("\n") { item ->
+                    item.msg + (item.throwable?.stackTraceToString()?.let { "\n$it" } ?: "")
+                }
+            throw AssertionError("category preparation did not finish:\n$trace", failure)
+        }
+        assertEquals(
+            "platform readiness keeps the measured animation origin",
+            animationOrigin,
+            rule.mainClock.currentTime,
+        )
         val records = terminalRecords()
         val diagnostics =
             ShadowLog.getLogsForTag("ConversationSettings").drop(logOffset).joinToString("\n") { item ->

@@ -180,6 +180,7 @@ class AnimationAdmissionTest {
             group.start()
             awaitBlocked(group)
             viewer.start()
+            awaitBlocked(viewer)
             assertTrue(retirement.await(2, TimeUnit.SECONDS))
             previous.release()
             viewer.join(2000)

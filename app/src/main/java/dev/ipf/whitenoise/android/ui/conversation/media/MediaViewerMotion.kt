@@ -242,27 +242,7 @@ internal fun MediaViewerMotion(
             progress.snapTo(1f)
             if (closing) latestClosed()
         } else if (closing || !entrySettled) {
-            var sourceLost = false
-            coroutineScope {
-                val animation =
-                    launch {
-                        progress.animateTo(
-                            if (closing) 0f else 1f,
-                            tween(if (closing) MEDIA_CLOSE_MILLIS else MEDIA_OPEN_MILLIS, easing = FastOutSlowInEasing),
-                        )
-                    }
-                while (animation.isActive) {
-                    withFrameNanos { }
-                    if (readThumbnail() == null) {
-                        sourceLost = true
-                        animation.cancel()
-                    }
-                }
-                animation.join()
-            }
-            if (sourceLost) progress.snapTo(1f)
-            entrySettled = true
-            if (closing) latestClosed()
+            animateMediaViewerMotion(progress, closing, readThumbnail, { entrySettled = true }, { latestClosed() })
         }
     }
     val bodyModifier =
@@ -289,6 +269,37 @@ internal fun MediaViewerMotion(
             }
         }
     }
+}
+
+/** Monitors source eligibility only while the existing animation child is active. */
+private suspend fun animateMediaViewerMotion(
+    progress: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    closing: Boolean,
+    readThumbnail: () -> MediaViewerThumbnailRegistry.Thumbnail?,
+    onSettled: () -> Unit,
+    onClosed: () -> Unit,
+) {
+    var sourceLost = false
+    coroutineScope {
+        val animation =
+            launch {
+                progress.animateTo(
+                    if (closing) 0f else 1f,
+                    tween(if (closing) MEDIA_CLOSE_MILLIS else MEDIA_OPEN_MILLIS, easing = FastOutSlowInEasing),
+                )
+            }
+        while (animation.isActive) {
+            withFrameNanos { }
+            if (readThumbnail() == null) {
+                sourceLost = true
+                animation.cancel()
+            }
+        }
+        animation.join()
+    }
+    if (sourceLost) progress.snapTo(1f)
+    onSettled()
+    if (closing) onClosed()
 }
 
 @Composable
@@ -368,7 +379,7 @@ private fun MediaViewerThumbnailRegistry.motionThumbnail(
 internal fun mediaViewerPlatformMotionAllowed(
     isVideo: Boolean,
     sdk: Int,
-): Boolean = !isVideo || sdk >= 34
+): Boolean = !isVideo || sdk >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
 internal fun mediaViewerContentAlpha(
     enabled: Boolean,

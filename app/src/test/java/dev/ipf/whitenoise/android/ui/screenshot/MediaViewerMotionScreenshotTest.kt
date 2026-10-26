@@ -359,16 +359,18 @@ class MediaViewerMotionScreenshotTest {
         composeRule.setContent {
             val density = LocalDensity.current
             WhiteNoiseTheme {
-                MediaViewerThumbnailHost(registry, readingViewport = {
-                    Rect(0f, 0f, with(density) { 360.dp.toPx() }, with(density) { bottom.dp.toPx() })
-                }) {
-                    Canvas(
-                        Modifier
-                            .offset(24.dp, 150.dp)
-                            .size(144.dp, 104.dp)
-                            .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL),
-                    ) {
-                        drawRect(Color.Blue)
+                Box(Modifier.fillMaxSize()) {
+                    MediaViewerThumbnailHost(registry, readingViewport = {
+                        Rect(0f, 0f, with(density) { 360.dp.toPx() }, with(density) { bottom.dp.toPx() })
+                    }) {
+                        Canvas(
+                            Modifier
+                                .offset(24.dp, 150.dp)
+                                .size(144.dp, 104.dp)
+                                .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL),
+                        ) {
+                            drawRect(Color.Blue)
+                        }
                     }
                 }
             }

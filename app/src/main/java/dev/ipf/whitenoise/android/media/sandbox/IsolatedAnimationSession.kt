@@ -286,11 +286,9 @@ internal class IsolatedAnimationSession private constructor(
     private fun startupAvailable(): Boolean {
         if (closed) return false
         if (Thread.currentThread().isInterrupted) throw InterruptedException("animation owner cancelled")
-        if (admissionLease.remainingNanos() == 0L) {
-            closeWithReason(AnimationTermination.TransportUnavailable)
-            return false
-        }
-        return true
+        val available = admissionLease.remainingNanos() != 0L
+        if (!available) closeWithReason(AnimationTermination.TransportUnavailable)
+        return available
     }
 
     private fun awaitStartup(signal: CountDownLatch): Boolean {
