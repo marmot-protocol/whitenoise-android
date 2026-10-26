@@ -53,6 +53,10 @@ private const val MAX_COMPOSER_MOTION_CHARACTERS = 4096
 private const val DESTINATION_MEASURE_WAIT_MILLIS = 80L
 private const val TEXT_REFLOW_BLEND_START = 0.65f
 private const val TEXT_REFLOW_BLEND_INTERVAL = 0.35f
+
+/** Optional geometry-only draw observer; no message text or identity leaves the motion owner. */
+internal val LocalComposerSendGeometryObserver =
+    staticCompositionLocalOf<((ComposerSendFlightGeometry) -> Unit)?> { null }
 internal val LocalComposerSendMotion = staticCompositionLocalOf<ComposerSendMotion?> { null }
 
 /** Presentation-only snapshots live for at most one send animation, never in saveable state. */
@@ -256,6 +260,7 @@ internal class ComposerSendMotion {
     @Composable
     fun Overlay() {
         val active = flight
+        val geometryObserver = LocalComposerSendGeometryObserver.current
         val progress = remember(active) { Animatable(0f) }
         var origin by remember { mutableStateOf<LayoutCoordinates?>(null) }
         LaunchedEffect(active) {
@@ -271,7 +276,7 @@ internal class ComposerSendMotion {
         Canvas(overlayModifier.fillMaxSize().onGloballyPositioned { origin = it }) {
             lastRenderedGeometry = null
             lastRenderedPendingSource = null
-            drawFlight(active, origin, progress.value)
+            drawFlight(active, origin, progress.value, geometryObserver)
         }
     }
 
@@ -279,6 +284,7 @@ internal class ComposerSendMotion {
         active: ComposerSendFlight?,
         origin: LayoutCoordinates?,
         progress: Float,
+        geometryObserver: ((ComposerSendFlightGeometry) -> Unit)?,
     ) {
         val canvasOrigin = origin?.takeIf { enabled && it.isAttached }
         if (active == null || flight !== active || canvasOrigin == null) return
@@ -321,6 +327,7 @@ internal class ComposerSendMotion {
                 destinationStrokeWidth,
             )
             clipPath(path) { drawFlightText(source, layout, textTarget, p, fill) }
+            geometryObserver?.invoke(geometry)
         }
     }
 }

@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
+import android.provider.Settings
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
@@ -15,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -68,6 +74,59 @@ class ConversationAcceptedSendRouteScreenshotTest {
     fun releaseFixture() {
         controller?.onCleared()
         TimeZone.setDefault(originalTimeZone)
+    }
+
+    /** Real tail sends must paint intermediate geometry. */
+    @Test
+    fun acceptedSendAtLiveTailPaintsAnIntermediateFlight() = assertLiveTailFlight("Short send", 0)
+
+    /** Multiline contraction uses the actual transcript viewport. */
+    @Test
+    fun acceptedMultilineSendWithKeyboardClearancePaintsAnIntermediateFlight() {
+        assertLiveTailFlight("First line\nSecond line\nThird line", 240)
+    }
+
+    private fun assertLiveTailFlight(
+        text: String,
+        keyboardClearanceDp: Int,
+    ) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val resolver = context.contentResolver
+        val previousScale = Settings.Global.getString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE)
+        Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        try {
+            val conversation = createConversation(draftText = text)
+            val evidence = SendRouteEvidence()
+            val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
+            mountHistoryConversation(
+                conversation,
+                evidence,
+                liveTail = true,
+                keyboardClearanceDp = keyboardClearanceDp,
+                onPaintedGeometry = { painted.add(it) },
+            )
+            composeRule.waitForIdle()
+            composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }
+            composeRule.mainClock.autoAdvance = false
+            composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+            awaitConversationCondition { publishCount == 1 }
+            repeat(30) {
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.waitForIdle()
+            }
+            assertTrue(
+                "a real tail send must paint moving geometry, not merely create a flight",
+                painted.any {
+                    it.progress > 0f && it.progress < 1f && !motionRectsMatch(it.bounds, it.canonicalFrame)
+                },
+            )
+            assertEquals(1, publishCount)
+            assertEquals(1, conversation.timeline.count { it.record.plaintext == text })
+            composeRule.onNodeWithText(text).assertIsDisplayed()
+            composeRule.onNodeWithTag("conversation.send.motion.active").assertDoesNotExist()
+        } finally {
+            Settings.Global.putString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, previousScale)
+        }
     }
 
     /** Exercises the production Send button and measures the pending bubble above the composer. */
@@ -170,7 +229,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
      * Builds one synthetic authoritative window with typed durable acceptance and no relay publication. With
      * [longHistoryMessage], the restored history anchor is long enough to collapse behind Read more.
      */
-    private fun createConversation(longHistoryMessage: Boolean = false): ConversationController {
+    private fun createConversation(
+        longHistoryMessage: Boolean = false,
+        draftText: String = SENT_TEXT,
+    ): ConversationController {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val records =
             List(60) { index ->
@@ -191,7 +253,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         appState.draftStore.set(
             ConversationTimelineTestIds.ACCOUNT_REF,
             ConversationTimelineTestIds.GROUP_ID,
-            TextFieldValue(SENT_TEXT),
+            TextFieldValue(draftText),
         )
         val conversation =
             ConversationController(
@@ -221,31 +283,43 @@ class ConversationAcceptedSendRouteScreenshotTest {
     private fun mountHistoryConversation(
         conversation: ConversationController,
         evidence: SendRouteEvidence,
+        liveTail: Boolean = false,
+        keyboardClearanceDp: Int = 0,
+        onPaintedGeometry: ((ComposerSendFlightGeometry) -> Unit)? = null,
     ) {
         val historyId = (HISTORY_ANCHOR_INDEX + 1).toString(16).padStart(64, '0')
         composeRule.setContent {
-            CompositionLocalProvider(LocalConversationScrollEvidenceSink provides evidence) {
+            CompositionLocalProvider(
+                LocalConversationScrollEvidenceSink provides evidence,
+                LocalComposerSendGeometryObserver provides onPaintedGeometry,
+            ) {
                 WhiteNoiseTheme {
-                    ConversationScreen(
-                        appState = conversation.appState,
-                        chat =
-                            ChatListItem(
-                                group = conversationTimelineTestGroup(),
-                                latest = null,
-                                otherMemberAccount = null,
-                                memberCount = 1,
-                                memberSnapshot = conversationTimelineMemberSnapshot(),
-                            ),
-                        controller = conversation,
-                        onBack = {},
-                        restoredScrollSnapshot =
-                            ConversationScrollSnapshot(
-                                firstVisibleItemIndex = 49,
-                                firstVisibleItemScrollOffset = 0,
-                                anchorItemId = "msg:$historyId",
-                                anchorMessageIdHex = historyId,
-                            ),
-                    )
+                    Box(Modifier.fillMaxSize().padding(bottom = keyboardClearanceDp.dp)) {
+                        ConversationScreen(
+                            appState = conversation.appState,
+                            chat =
+                                ChatListItem(
+                                    group = conversationTimelineTestGroup(),
+                                    latest = null,
+                                    otherMemberAccount = null,
+                                    memberCount = 1,
+                                    memberSnapshot = conversationTimelineMemberSnapshot(),
+                                ),
+                            controller = conversation,
+                            onBack = {},
+                            restoredScrollSnapshot =
+                                if (liveTail) {
+                                    null
+                                } else {
+                                    ConversationScrollSnapshot(
+                                        firstVisibleItemIndex = 49,
+                                        firstVisibleItemScrollOffset = 0,
+                                        anchorItemId = "msg:$historyId",
+                                        anchorMessageIdHex = historyId,
+                                    )
+                                },
+                        )
+                    }
                 }
             }
         }
