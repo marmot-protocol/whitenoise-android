@@ -19,7 +19,7 @@ permissions:
 jobs:
   update-description:
     name: Update visual changes in PR description
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server"]') }}
     timeout-minutes: 5
     steps:
       - name: Check out trusted workflow scripts

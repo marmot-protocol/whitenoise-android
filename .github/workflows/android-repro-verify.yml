@@ -55,7 +55,7 @@ jobs:
   changes:
     name: Classify reproduction campaign inputs
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: ubuntu-latest
+    runs-on: &wn-build-server ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server"]') }}
     timeout-minutes: 10
     outputs:
       supplemental_campaigns: ${{ steps.classify.outputs.supplemental_campaigns }}
@@ -79,7 +79,7 @@ jobs:
   lint:
     name: Release lint (${{ matrix.variant }})
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: ubuntu-24.04
+    runs-on: *wn-build-server
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -91,8 +91,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           ref: ${{ github.sha }}
           persist-credentials: false
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Set up JDK 17
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -103,6 +108,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
+          cache-disabled: ${{ runner.environment == 'self-hosted' }}
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       # Run each release assertion once, without competing with R8 or emulator work.
@@ -126,7 +132,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.supplemental_campaigns != 'false'
     name: Independent unsigned build (${{ matrix.tree }})
-    runs-on: ubuntu-24.04
+    runs-on: *wn-build-server
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -215,7 +221,7 @@ jobs:
     name: Verify unsigned production APK reproducibility
     needs: [changes, build, lint]
     if: always()
-    runs-on: ubuntu-24.04
+    runs-on: *wn-build-server
     timeout-minutes: 10
     steps:
       - name: Require independent builds and release lint

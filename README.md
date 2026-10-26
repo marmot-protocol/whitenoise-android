@@ -121,6 +121,17 @@ MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks a
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
+Pull request workflows run on wn-build-server, a persistent self-hosted runner
+pool registered to this repository. Fork pull requests fall back to
+`ubuntu-latest`, and the runner's job-start hook rejects them anyway. All slots
+share one Gradle user home and build cache, so the GitHub cache is disabled
+there. Jobs that compile keep the module `build/` directories and `.gradle`
+between runs for incremental compilation;
+`.github/scripts/prepare-persistent-workspace.sh` deletes everything else,
+including reports, test results and outputs, so test tasks still execute on
+every run. Emulator jobs require the `wn-emulator` label, which only one slot
+carries, because emulators share the host's adb ports and SDK.
+
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
 including description edits, without compiling anything. The checker script runs
 from the base revision, and the pull request's registry is fetched through the API
