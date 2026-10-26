@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
         "anchor": "fun ColumnScope.BubbleBodyFooterAndRetry(",
         "test_ids": [
+          "CON-001",
           "CON-006",
           "MED-003",
           "MED-007",

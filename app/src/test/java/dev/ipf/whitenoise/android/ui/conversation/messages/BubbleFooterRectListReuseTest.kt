@@ -255,8 +255,8 @@ class BubbleFooterRectListReuseTest {
                                 onEditedClick = null,
                             )
                         },
-                        lastLineWidth = lastLineLayout?.let { ceil(it.getLineRight(it.lineCount - 1)).toInt() },
-                        lastLineBaseline = lastLineLayout?.let { it.getLineBaseline(it.lineCount - 1).toInt() },
+                        lastLineWidth = { lastLineLayout?.let { ceil(it.getLineRight(it.lineCount - 1)).toInt() } },
+                        lastLineBaseline = { lastLineLayout?.let { it.getLineBaseline(it.lineCount - 1).toInt() } },
                     ) {
                         // selectableMessageBody → readAloudMessageSemantics → MarkdownMessageBody.
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

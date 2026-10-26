@@ -31,8 +31,8 @@ private val BubbleFooterGap = 8.dp
 internal fun BubbleFooterLayout(
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    lastLineWidth: Int? = null,
-    lastLineBaseline: Int? = null,
+    lastLineWidth: () -> Int? = { null },
+    lastLineBaseline: () -> Int? = { null },
     content: @Composable () -> Unit,
 ) {
     Layout(
@@ -48,8 +48,8 @@ internal fun BubbleFooterLayout(
             constraints = constraints,
             content = contentPlaceable,
             footer = footerPlaceable,
-            lastLineWidth = lastLineWidth,
-            lastLineBaseline = lastLineBaseline,
+            lastLineWidth = lastLineWidth(),
+            lastLineBaseline = lastLineBaseline(),
             gap = BubbleFooterGap.roundToPx(),
         )
     }
@@ -147,8 +147,8 @@ internal fun BubbleCollapsibleFooterLayout(
     readMore: @Composable () -> Unit,
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    lastLineWidth: Int? = null,
-    lastLineBaseline: Int? = null,
+    lastLineWidth: () -> Int? = { null },
+    lastLineBaseline: () -> Int? = { null },
     content: @Composable () -> Unit,
 ) {
     Layout(
@@ -191,8 +191,8 @@ internal fun BubbleCollapsibleFooterLayout(
                 constraints = constraints,
                 content = contentPlaceable,
                 footer = footerPlaceable,
-                lastLineWidth = lastLineWidth,
-                lastLineBaseline = lastLineBaseline,
+                lastLineWidth = lastLineWidth(),
+                lastLineBaseline = lastLineBaseline(),
                 gap = gap,
             )
         } else {

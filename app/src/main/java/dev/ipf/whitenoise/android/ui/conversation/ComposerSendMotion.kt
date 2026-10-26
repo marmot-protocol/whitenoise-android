@@ -88,22 +88,22 @@ internal data class ComposerSendFlight(
     val landing = ComposerSendLanding(source.surface, source.composer, source.fill, inputGeneration, source.viewport)
 }
 
+private fun resolveLanding(
+    active: ComposerSendFlight,
+    progress: Float,
+    callKind: String,
+    observer: ((String, ComposerSendLandingDiagnostic) -> Unit)?,
+    measurement: ComposerSendLandingMeasurement?,
+): ComposerSendFlightGeometry? =
+    active.landing.resolve(
+        measurement,
+        progress,
+        observer?.let { sink -> { diagnostic -> sink(callKind, diagnostic) } },
+    )
+
 internal class ComposerSendMotion {
     /** Test-installed, geometry-only observer; absent in normal UI. */
     internal var onLandingDiagnostic: ((String, ComposerSendLandingDiagnostic) -> Unit)? = null
-
-    private fun resolveLanding(
-        active: ComposerSendFlight,
-        progress: Float,
-        callKind: String,
-    ): ComposerSendFlightGeometry? {
-        val observer = onLandingDiagnostic
-        return active.landing.resolve(
-            landingMeasurement,
-            progress,
-            observer?.let { sink -> { diagnostic -> sink(callKind, diagnostic) } },
-        )
-    }
 
     var flight: ComposerSendFlight? by mutableStateOf(null)
         private set
@@ -301,9 +301,12 @@ internal class ComposerSendMotion {
     private val hasPaintedLanding: Boolean
         get() =
             lastRenderedGeometry?.let { painted ->
-                flight?.let { resolveLanding(it, 1f, "landing-check") }?.let { current ->
-                    painted.settled && current.settled && motionRectsMatch(painted.bounds, current.canonicalFrame)
-                }
+                flight
+                    ?.let {
+                        resolveLanding(it, 1f, "landing-check", onLandingDiagnostic, landingMeasurement)
+                    }?.let { current ->
+                        painted.settled && current.settled && motionRectsMatch(painted.bounds, current.canonicalFrame)
+                    }
             } == true
 
     private fun canRender(): Boolean {
@@ -319,7 +322,10 @@ internal class ComposerSendMotion {
                 ?.color
                 ?.isSpecified == true &&
                 destinationLayout?.uniformParagraphDirection() == flight?.source?.paragraphDirection
-        val admittedLanding = flight?.let { resolveLanding(it, 0f, "admission-or-timing") } != null
+        val admittedLanding =
+            flight?.let {
+                resolveLanding(it, 0f, "admission-or-timing", onLandingDiagnostic, landingMeasurement)
+            } != null
         val validDestination = visible && sameText && sameStyle
         return validDestination && admittedLanding
     }
@@ -357,7 +363,7 @@ internal class ComposerSendMotion {
     ) {
         val canvasOrigin = origin?.takeIf { enabled && it.isAttached }
         if (active == null || flight !== active || canvasOrigin == null) return
-        val geometry = resolveLanding(active, progress, "draw")
+        val geometry = resolveLanding(active, progress, "draw", onLandingDiagnostic, landingMeasurement)
         if (geometry == null) {
             if (progress == 0f) {
                 lastRenderedPendingSource = active.source

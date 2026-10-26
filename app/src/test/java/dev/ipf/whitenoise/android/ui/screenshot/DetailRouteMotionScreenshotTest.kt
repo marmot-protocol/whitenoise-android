@@ -30,6 +30,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -41,12 +42,14 @@ import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLog
 import java.io.File
 
 /** Actual caller navigation: no substitute route or screen, no protocol mutations. */
@@ -88,6 +91,7 @@ class DetailRouteMotionScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
     ) {
+        if (!profile) NotificationChannels.ensureChannels(app)
         val state =
             appState(
                 profileHex = PEER_HEX,
@@ -136,8 +140,10 @@ class DetailRouteMotionScreenshotTest {
         action.performScrollTo()
         captureSource(name, profile)
         rule.mainClock.autoAdvance = false
+        val preparationLogOffset = ShadowLog.getLogsForTag("ConversationSettings").size
         action.performClick()
         rule.mainClock.advanceTimeByFrame()
+        if (!profile) awaitNotificationCategories(preparationLogOffset)
         captureTransition(name, profile)
         val destinationTitle =
             app.getString(
@@ -175,6 +181,28 @@ class DetailRouteMotionScreenshotTest {
         }
         rule.mainClock.advanceTimeByFrame()
         protectedDestination.assertDoesNotExist()
+    }
+
+    /** Wait for real platform preparation without advancing the measured animation. */
+    private fun awaitNotificationCategories(logOffset: Int) {
+        fun terminalRecords() =
+            ShadowLog
+                .getLogsForTag("ConversationSettings")
+                .drop(logOffset)
+                .map { it.msg }
+                .filter { "stage=prepare_total " in it }
+        rule.waitUntil(timeoutMillis = 5_000) { terminalRecords().isNotEmpty() }
+        val records = terminalRecords()
+        val diagnostics =
+            ShadowLog.getLogsForTag("ConversationSettings").drop(logOffset).joinToString("\n") { item ->
+                item.msg + (item.throwable?.stackTraceToString()?.let { "\n$it" } ?: "")
+            }
+        assertTrue("category preparation must succeed:\n$diagnostics", records.all { "outcome=ok" in it })
+        // prepare_total precedes the main continuation that assigns the rows.
+        rule.runOnIdle { }
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithText(app.getString(R.string.notification_categories_loading)).assertDoesNotExist()
+        rule.onNodeWithText(app.getString(R.string.notification_channel_mentions)).assertExists()
     }
 
     /** Diagnostic frame sets are opt-in; only the three registered goldens participate in CI verification. */
