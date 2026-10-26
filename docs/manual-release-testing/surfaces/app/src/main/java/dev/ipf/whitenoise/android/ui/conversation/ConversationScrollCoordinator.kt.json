@@ -43,6 +43,14 @@
           "CON-028",
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "surface": "Deferred anchor ownership after drawing resumes",
+        "anchor": "val foregroundRestorePending: Boolean",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

@@ -4,7 +4,7 @@
   "categories": {
     "settings_controls": [
       {
-        "surface": "Explicit dictation choice overrides automatic completion before delivery",
+        "surface": "Latest explicit dictation Send or Paste stays editable until delivery claim",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCompletionIntent.kt",
         "anchor": "fun choose(",
         "test_ids": [
