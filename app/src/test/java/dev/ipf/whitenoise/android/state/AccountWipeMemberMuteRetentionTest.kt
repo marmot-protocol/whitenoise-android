@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.app.Application
+import android.content.Context
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
@@ -124,7 +125,7 @@ class AccountWipeMemberMuteRetentionTest {
             org.junit.Assert.assertNull(state.activeAccountRef)
             org.junit.Assert.assertEquals(AppPhase.Onboarding, state.phase)
             org.junit.Assert.assertFalse(
-                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE).contains("active_account"),
+                context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE).contains("active_account"),
             )
             org.junit.Assert.assertEquals(remainingAccounts, state.accounts)
             org.junit.Assert.assertEquals(0, signInCalls)
@@ -148,7 +149,8 @@ class AccountWipeMemberMuteRetentionTest {
             org.junit.Assert.assertEquals(AppPhase.Ready, state.phase)
             org.junit.Assert.assertEquals(
                 SURVIVING_ACCOUNT,
-                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE)
+                context
+                    .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
                     .getString("active_account", null),
             )
             org.junit.Assert.assertEquals(0, signInCalls)

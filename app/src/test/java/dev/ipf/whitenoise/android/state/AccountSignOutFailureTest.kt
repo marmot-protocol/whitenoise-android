@@ -28,7 +28,7 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             signOutFailure = IllegalStateException("synthetic reply failure")
             listAccountsFailure = IllegalStateException("synthetic read failure")
             val state = appState()
-            state.phase = AppPhase.Ready
+            markReady(state)
 
             assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
             assertEquals(accountRef, state.activeAccountRef)
@@ -36,7 +36,7 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             assertFalse(state.accounts.single().signedOut)
             assertEquals(1, listAccountsCalls.get())
             assertFalse(nativePushEnabled)
-            assertColdBootstrap(durableNativeAccounts(), accountRef)
+            assertColdBootstrap(nativeAccounts(), accountRef)
         }
 
     /** Losing a reply after native commit still retires the local account and preserves a signed-in successor. */
@@ -61,11 +61,15 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
         runBlocking {
             signOutFailure = IllegalStateException("synthetic native rejection")
             val state = appState()
-            state.phase = AppPhase.Ready
-            context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE)
-                .edit().putString("active_account", accountRef).commit()
+            markReady(state)
+            context
+                .getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putString("active_account", accountRef)
+                .commit()
 
-            dev.ipf.whitenoise.android.ui.settings.signOutActiveAccount(state, deleteKeyPackages = true)
+            dev.ipf.whitenoise.android.ui.settings
+                .signOutActiveAccount(state, deleteKeyPackages = true)
             awaitUiSignOut(state)
 
             assertEquals(AppText.Resource(R.string.toast_couldnt_sign_out), state.toast?.title)
@@ -74,29 +78,31 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             assertEquals(AppPhase.Ready, state.phase)
             assertEquals(
                 accountRef,
-                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE)
+                context
+                    .getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE)
                     .getString("active_account", null),
             )
-            assertColdBootstrap(durableNativeAccounts(), accountRef)
+            assertColdBootstrap(nativeAccounts(), accountRef)
         }
 
-    /** A lost reply with confirmed native commit shows only incomplete relay cleanup and stays signed out on restart. */
+    /** Confirmed native commit with a lost reply stays signed out on restart and reports unknown relay cleanup. */
     @Test
     fun confirmedNativeSignOutSurvivesLostReplyAndColdBootstrap() =
         runBlocking {
             signOutFailure = IllegalStateException("synthetic lost reply")
             persistSignedOutBeforePartialFailure = true
             val state = appState()
-            state.phase = AppPhase.Ready
+            markReady(state)
 
-            dev.ipf.whitenoise.android.ui.settings.signOutActiveAccount(state, deleteKeyPackages = true)
+            dev.ipf.whitenoise.android.ui.settings
+                .signOutActiveAccount(state, deleteKeyPackages = true)
             awaitUiSignOut(state)
 
             assertEquals(AppText.Resource(R.string.toast_signed_out_relay_cleanup_incomplete), state.toast?.title)
             assertNull(state.activeAccountRef)
             assertEquals(AppPhase.Onboarding, state.phase)
             assertTrue(state.accounts.single().signedOut)
-            assertColdBootstrap(durableNativeAccounts(), null)
+            assertColdBootstrap(nativeAccounts(), null)
         }
 
     /** Ordinary relay failures remain best-effort cleanup after a successful native local commit. */
@@ -122,8 +128,7 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
     }
 
     /** Read the fake's durable native state independently of Android's post-operation account cache. */
-    private fun durableNativeAccounts() =
-        listOf(externalSignerAccount(signedOut = engineSignedOut)) + additionalAccounts
+    private fun nativeAccounts() = listOf(externalSignerAccount(signedOut = engineSignedOut)) + additionalAccounts
 
     /** A fresh runtime consumes the durable native snapshot and the saved host selection without reactivation. */
     private suspend fun assertColdBootstrap(

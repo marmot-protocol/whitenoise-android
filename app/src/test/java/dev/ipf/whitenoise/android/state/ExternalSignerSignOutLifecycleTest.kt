@@ -328,7 +328,7 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
         runBlocking {
             signOutFailure = RuntimeException("native command unavailable")
             val state = appState()
-            state.phase = AppPhase.Ready
+            markReady(state)
             retainComposerExpansion(state)
             retainContactPictures(state)
 
@@ -340,5 +340,6 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             assertFalse(nativePushEnabled)
             assertEquals(listOf("disable", "signOut"), nativeCallOrder)
             assertTrue(state.contactPictureStore.reference(accountRef, "private-contact") != null)
+            assertEquals(composerExpansion, state.composerExpansionStateRetention.preferenceFor(accountRef, groupId))
         }
 }
