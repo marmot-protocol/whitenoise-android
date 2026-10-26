@@ -434,7 +434,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
             hasUnread = false,
             firstUnreadMessageIdHex = null,
             lastReadMessageIdHex = latest.messageIdHex,
-            lastReadTimelineAt = latest.timelineAt,
+            lastReadTimelineAt = latest.recordedAt,
         )
     }
 
