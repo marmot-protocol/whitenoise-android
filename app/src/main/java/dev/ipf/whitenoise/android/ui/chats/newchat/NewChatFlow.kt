@@ -411,7 +411,8 @@ private fun NewMessageAccountScreen(
 
     /** Leaves the screen through [action] after closing the scanner, unless the flow is busy. */
     fun leaveScreen(action: () -> Unit) {
-        if (!session.isCurrent() || creatingHex != null || scannerSession != null || agentSettingsOpen) return
+        if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
+        if (agentSettingsOpen) return
         scannerSession = null
         session.dispose()
         action()

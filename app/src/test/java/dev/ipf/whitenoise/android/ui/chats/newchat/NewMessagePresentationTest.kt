@@ -39,7 +39,8 @@ class NewMessagePresentationTest {
     /** Agent discovery has its own action below Invite, and busy creation blocks it. */
     @Test fun agentDiscoveryIsBelowInviteAndUsesItsOwnCallback() {
         show()
-        val invite = composeRule.onNodeWithText(context.getString(R.string.new_message_invite_friend)).fetchSemanticsNode()
+        val inviteLabel = context.getString(R.string.new_message_invite_friend)
+        val invite = composeRule.onNodeWithText(inviteLabel).fetchSemanticsNode()
         val agent = composeRule.onNodeWithTag("new_message.agentSettings").fetchSemanticsNode()
         org.junit.Assert.assertTrue(agent.boundsInRoot.top >= invite.boundsInRoot.bottom)
         composeRule.onNodeWithTag("new_message.agentSettings").performClick()

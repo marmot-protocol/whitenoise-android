@@ -210,7 +210,7 @@ private fun NewMessageActionGroup(
                 actions.agentSettings,
                 modifier = Modifier.testTag("new_message.agentSettings"),
                 enabled = !busy,
-                leading = { Icon(painterResource(R.drawable.ic_settings_person_add), null, Modifier.size(24.dp)) },
+                leading = { Icon(painterResource(R.drawable.ic_ai_agents), null, Modifier.size(24.dp)) },
             )
         }
     }
