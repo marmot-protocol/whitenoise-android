@@ -26,6 +26,9 @@ internal data class GroupAvatarPresentation(
     val groupAnimation: GroupAvatarAnimation? = null,
 )
 
+/** Maximum local read for an evicted animated source, matching the existing encoded avatar budget. */
+private const val GROUP_ANIMATION_LOCAL_READ_MAX_BYTES: ULong = 2_097_152uL
+
 /** A durable group selection keeps viewer bytes and thumbnail admission under the same pinned owner. */
 internal fun WhiteNoiseAppState.durableGroupAvatarPresentation(
     group: AppGroupRecordFfi,
@@ -44,13 +47,16 @@ internal fun WhiteNoiseAppState.durableGroupAvatarPresentation(
         val sameAccount = activeAccountRef == accountRef && runtimeGeneration == runtime
         sameAccount && sameRuntime && AvatarImageLoader.currentCacheLifetime() == lifetime
     }
-    // The first-frame loader already retains bounded GIF bytes. A thumbnail must never re-read
-    // a warm static asset merely to discover its format; evicted sources retain the static frame.
+    // Encoded sources have a smaller cache than first-frame pixels. Recover an evicted durable
+    // source only from MDK's existing local store, inside the visible thumbnail's source budget.
+    // Static durable pictures can incur one bounded local read per active mount; legacy URLs cannot.
     val animation =
         if (ownsGroupPicture && durableKey != null && owner != null) {
+            val readLocal = retainedAvatarBytesReader(asset, accountRef, GROUP_ANIMATION_LOCAL_READ_MAX_BYTES)
             GroupAvatarAnimation("$runtime|$lifetime|${group.groupIdHex}|$durableKey") {
                 if (ownsSource()) {
-                    AvatarImageLoader.peekAnimatedSource(durableKey)?.takeIf { ownsSource() }
+                    val bytes = AvatarImageLoader.peekAnimatedSource(durableKey) ?: readLocal?.invoke()
+                    bytes?.takeIf { ownsSource() }
                 } else {
                     null
                 }

@@ -95,6 +95,7 @@ import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 import dev.ipf.whitenoise.android.ui.chats.ChatRow
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
+import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
@@ -111,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -132,6 +134,7 @@ import org.robolectric.shadows.ShadowLooper
 import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.startCoroutine
@@ -869,6 +872,143 @@ class CachedGroupAvatarSourceTest {
             assertEquals(0, fixture.reads.get())
         }
 
+    /** A warm first frame does not strand a durable GIF when only the smaller source LRU evicts it. */
+    @Test
+    fun evictedDurableGifRecoversFromOneBoundedLocalRead() =
+        runBlocking {
+            val gif =
+                dev.ipf.whitenoise.android.core
+                    .twoFrameGif()
+            val fixture = AvatarLocalFixture { listOf(payload().copy(bytes = gif)) }
+            val selected = asset()
+            val cacheKey = checkNotNull(selected.cacheKey(ACCOUNT_REF))
+            val image =
+                checkNotNull(
+                    AvatarImageLoader.decodeAndCache(cacheKey, solidPng(), AvatarImageLoader.currentCacheLifetime()),
+                )
+            AvatarImageLoader.putCachedAnimated(cacheKey, image, gif)
+            // Cross the 4 MiB encoded budget while keeping the small first-frame bitmap warm.
+            repeat(3) { AvatarImageLoader.putCachedAnimated("source-pressure-$it", image, gif.copyOf(1_500_000)) }
+            assertSame(image, AvatarImageLoader.cachedImage(cacheKey))
+            assertNull(AvatarImageLoader.peekAnimatedSource(cacheKey))
+            val presentation =
+                fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, false)
+            assertTrue(gif.contentEquals(checkNotNull(presentation.groupAnimation).readBytes()))
+            assertSame(image, presentation.image)
+            assertEquals(1, fixture.reads.get())
+            assertEquals(2_097_152L, fixture.readMaxBytes.get())
+            assertEquals(0, fixture.requests.get())
+            assertEquals(0, fixture.legacyDownloads.get())
+            fixture.state.clearCrossAccountCachesForTest()
+            assertNull(checkNotNull(presentation.groupAnimation).readBytes())
+            assertEquals(1, fixture.reads.get())
+        }
+
+    /** The local reader rejects another revision, another reference and payloads over its source budget. */
+    @Test
+    fun durableAnimationRejectsStaleOrOversizedLocalBytes() =
+        runBlocking {
+            val gif =
+                dev.ipf.whitenoise.android.core
+                    .twoFrameGif()
+            val rejected =
+                listOf(
+                    payload().copy(bytes = gif, contentRevision = 2uL),
+                    payload().copy(bytes = gif, reference = "different-reference"),
+                    payload().copy(bytes = ByteArray(2_097_153)),
+                )
+            for (returned in rejected) {
+                val fixture = AvatarLocalFixture { listOf(returned) }
+                val animation = durableAnimationWithoutEncodedSource(fixture)
+                assertNull(animation.readBytes())
+                assertEquals(1, fixture.reads.get())
+                assertEquals(2_097_152L, fixture.readMaxBytes.get())
+                assertEquals(0, fixture.requests.get())
+                assertEquals(0, fixture.legacyDownloads.get())
+            }
+        }
+
+    /** A late local read cannot return pixels to an account/cache owner that has already retired. */
+    @Test
+    fun durableAnimationDiscardsLocalReadAfterOwnerRetires() =
+        runBlocking {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val fixture =
+                AvatarLocalFixture {
+                    started.complete(Unit)
+                    release.await()
+                    listOf(
+                        payload().copy(
+                            bytes =
+                                dev.ipf.whitenoise.android.core
+                                    .twoFrameGif(),
+                        ),
+                    )
+                }
+            val animation = durableAnimationWithoutEncodedSource(fixture)
+            val pending = async(Dispatchers.Default) { animation.readBytes() }
+            try {
+                withTimeout(5_000) { started.await() }
+                fixture.state.clearCrossAccountCachesForTest()
+                release.complete(Unit)
+                assertNull(withTimeout(5_000) { pending.await() })
+                assertEquals(1, fixture.reads.get())
+                assertEquals(0, fixture.requests.get())
+                assertEquals(0, fixture.legacyDownloads.get())
+            } finally {
+                release.complete(Unit)
+                pending.cancelAndJoin()
+            }
+        }
+
+    /** Cancelling a visible thumbnail's source job cannot complete a pending read as a usable source. */
+    @Test
+    fun durableAnimationLocalReadRemainsCancellable() =
+        runBlocking {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val fixture =
+                AvatarLocalFixture {
+                    started.complete(Unit)
+                    release.await()
+                    listOf(
+                        payload().copy(
+                            bytes =
+                                dev.ipf.whitenoise.android.core
+                                    .twoFrameGif(),
+                        ),
+                    )
+                }
+            val animation = durableAnimationWithoutEncodedSource(fixture)
+            val pending = async(Dispatchers.Default) { animation.readBytes() }
+            try {
+                withTimeout(5_000) { started.await() }
+                withTimeout(5_000) { pending.cancelAndJoin() }
+                release.complete(Unit)
+                assertTrue(pending.isCancelled)
+                assertEquals(1, fixture.reads.get())
+                assertEquals(0, fixture.requests.get())
+                assertEquals(0, fixture.legacyDownloads.get())
+            } finally {
+                release.complete(Unit)
+                pending.cancelAndJoin()
+            }
+        }
+
+    /** Uses the production durable presentation, with warm pixels and no encoded-source entry. */
+    private fun durableAnimationWithoutEncodedSource(fixture: AvatarLocalFixture): GroupAvatarAnimation {
+        val selected = asset()
+        val cacheKey = checkNotNull(selected.cacheKey(ACCOUNT_REF))
+        val image =
+            checkNotNull(
+                AvatarImageLoader.decodeAndCache(cacheKey, solidPng(), AvatarImageLoader.currentCacheLifetime()),
+            )
+        assertNull(AvatarImageLoader.peekAnimatedSource(cacheKey))
+        val presentation = fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, false)
+        return checkNotNull(presentation.groupAnimation)
+    }
+
     /** Cached encoded bytes alone cannot authorize playback without a live native runtime owner. */
     @Test
     fun cachedGroupGifRequiresNativeRuntimeOwnership() {
@@ -1102,6 +1242,7 @@ private class AvatarLocalFixture(
     read: suspend () -> List<AvatarBytesFfi> = { listOf(payload()) },
 ) {
     val reads = AtomicInteger()
+    val readMaxBytes = AtomicLong()
     val requests = AtomicInteger()
     val legacyDownloads = AtomicInteger()
     private val native =
@@ -1113,6 +1254,7 @@ private class AvatarLocalFixture(
                 "readAvatarAssets" -> {
                     assertEquals(ACCOUNT_REF, arguments!![0])
                     reads.incrementAndGet()
+                    readMaxBytes.set(arguments[2] as Long)
                     val operation: suspend () -> List<AvatarBytesFfi> = { read() }
                     @Suppress("UNCHECKED_CAST")
                     operation.startCoroutine(arguments.last() as Continuation<List<AvatarBytesFfi>>)

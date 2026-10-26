@@ -6,10 +6,11 @@ import java.util.concurrent.TimeUnit
 /** One actual worker; decorative use never queues ahead of interactive media. */
 internal class AnimationAdmission {
     private val permit = Semaphore(1, true)
-    private val lock = Any()
+    private val lock = Object()
     private var interactiveWaiters = 0
     private var current: Lease? = null
 
+    /** Opportunistic thumbnails never take admission ahead of a waiting explicit viewer. */
     fun acquire(
         decorative: Boolean,
         timeoutMillis: Long,
@@ -32,8 +33,41 @@ internal class AnimationAdmission {
                 null
             }
         } finally {
-            synchronized(lock) { interactiveWaiters-- }
+            synchronized(lock) {
+                interactiveWaiters--
+                lock.notifyAll()
+            }
         }
+    }
+
+    /**
+     * Waits without polling for confirmed worker death and all interactive waiters. Group thumbnails
+     * call this only inside their three-source budget and an interruptible, lifecycle-owned IO job.
+     * Cancellation interrupts the wait without acquiring a lease or starting another worker.
+     */
+    fun awaitDecorative(): Lease =
+        synchronized(lock) {
+            if (Thread.currentThread().isInterrupted) throw InterruptedException("group playback cancelled")
+            while (interactiveWaiters != 0 || !permit.tryAcquire()) lock.wait()
+            Lease(true).also { current = it }
+        }
+
+    /**
+     * Retries an interrupted group startup after viewer takeover, without retrying codec failures.
+     * Each attempt owns its lease cleanup; a retry still waits for confirmed death and viewer release.
+     */
+    fun <T : Any> decode(
+        decorative: Boolean,
+        waitForDecorativeAdmission: Boolean,
+        timeoutMillis: Long,
+        open: (Lease) -> T?,
+    ): T? {
+        val waitingGroup = decorative && waitForDecorativeAdmission
+        do {
+            val lease = if (waitingGroup) awaitDecorative() else acquire(decorative, timeoutMillis) ?: return null
+            val result = open(lease)
+            if (result != null || !waitingGroup || !lease.wasPreempted()) return result
+        } while (true)
     }
 
     inner class Lease internal constructor(
@@ -43,6 +77,10 @@ internal class AnimationAdmission {
         private var retirement: (() -> Unit)? = null
         private var released = false
 
+        /** The request is recorded before its callback can close a startup with no drawable yet. */
+        internal fun wasPreempted(): Boolean = synchronized(lock) { retirementRequested }
+
+        /** Delivers a viewer's retirement request even if it arrived before callback installation. */
         fun onRetire(callback: () -> Unit) {
             val requested =
                 synchronized(lock) {
@@ -52,6 +90,7 @@ internal class AnimationAdmission {
             if (requested) callback()
         }
 
+        /** Requests shutdown; only confirmed death may release this lease. */
         internal fun retire() {
             val callback =
                 synchronized(lock) {
@@ -68,6 +107,7 @@ internal class AnimationAdmission {
                 released = true
                 if (current === this) current = null
                 permit.release()
+                lock.notifyAll()
             }
         }
     }

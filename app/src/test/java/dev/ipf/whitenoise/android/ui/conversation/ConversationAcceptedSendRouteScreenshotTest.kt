@@ -54,6 +54,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowView
+import org.robolectric.util.ReflectionHelpers
 import java.util.TimeZone
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -93,8 +95,13 @@ class ConversationAcceptedSendRouteScreenshotTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val resolver = context.contentResolver
         val previousScale = Settings.Global.getString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE)
+        val previousRealDrawTraversals =
+            ReflectionHelpers.callStaticMethod<Boolean>(ShadowView::class.java, "areRealDrawTraversalsEnabled")
         Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         try {
+            // Native graphics alone does not run real draw traversals on this API 36 fixture.
+            // Observe the production Canvas through actual frames, not idle/layout callbacks alone.
+            ShadowView.setUseRealDrawTraversals(true)
             val conversation = createConversation(draftText = text)
             val evidence = SendRouteEvidence()
             val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
@@ -115,7 +122,8 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 composeRule.waitForIdle()
             }
             assertTrue(
-                "a real tail send must paint moving geometry, not merely create a flight",
+                "a real tail send must paint moving geometry, not merely create a flight" +
+                    " (painted frames=${painted.size})",
                 painted.any {
                     it.progress > 0f && it.progress < 1f && !motionRectsMatch(it.bounds, it.canonicalFrame)
                 },
@@ -125,6 +133,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
             composeRule.onNodeWithText(text).assertIsDisplayed()
             composeRule.onNodeWithTag("conversation.send.motion.active").assertDoesNotExist()
         } finally {
+            ShadowView.setUseRealDrawTraversals(previousRealDrawTraversals)
             Settings.Global.putString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, previousScale)
         }
     }
