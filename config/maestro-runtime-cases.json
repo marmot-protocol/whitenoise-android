@@ -3782,6 +3782,7 @@
         "contacts-confirmed"
       ],
       "layer": "production-presentation-ui"
-    }
+    },
+    "presentation-audio-transcript-cancel":{"suite":"presentation","manual_ids":["MED-038"],"assertions":"Actual received-audio disclosure and Cancel callback. No decoding, provider, microphone, transcript accuracy or lifecycle qualification is claimed.","postcondition":"presentation-checked","presentation":"audio-transcript-cancel","presentation_actions":["dismiss"],"layer":"production-presentation-ui"}
   }
 }
