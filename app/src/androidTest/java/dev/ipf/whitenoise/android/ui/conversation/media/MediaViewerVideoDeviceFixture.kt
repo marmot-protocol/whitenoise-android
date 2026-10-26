@@ -38,7 +38,9 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 import java.util.Collections
 import androidx.media3.ui.R as Media3R
 
@@ -122,15 +124,18 @@ internal class EdgeClipViewerFixture(
                     onCurrentPageChange = { currentAttachment = it.attachmentIndex },
                     onVideoPlayerChanged = ::trackFirstFrame,
                     videoFileResolver = { resolverContext, _, messageId, index, reference, _, _ ->
-                        videoResolutionStage = "materializing"
-                        try {
-                            beforeMaterialize()
-                            materializeVideoAttachment(resolverContext, messageId, index, reference) {
-                                clipBytes.getValue(EdgeClip.entries[index])
-                            }.also { videoResolutionStage = "completed" }
-                        } catch (failure: Throwable) {
-                            videoResolutionStage = "failed:${failure.javaClass.simpleName}"
-                            throw failure
+                        // Publish on the I/O worker even while the stopped viewer cannot resume composition.
+                        withContext(Dispatchers.IO) {
+                            videoResolutionStage = "materializing"
+                            try {
+                                beforeMaterialize()
+                                materializeVideoAttachment(resolverContext, messageId, index, reference) {
+                                    clipBytes.getValue(EdgeClip.entries[index])
+                                }.also { videoResolutionStage = "completed" }
+                            } catch (failure: Throwable) {
+                                videoResolutionStage = "failed:${failure.javaClass.simpleName}"
+                                throw failure
+                            }
                         }
                     },
                 )
