@@ -79,6 +79,13 @@ class RemoteGiphyMediaDownloadPolicyTest {
         }
     }
 
+    /** Cached bytes and manual consent cannot admit work under a retired account/runtime owner. */
+    @Test
+    fun retiredOwnerCannotUseCachedOrManuallyRequestedMedia() {
+        assertFalse(shouldLoadRemoteGiphyMedia(false, true, true, cachedAvailable = true, ownerEligible = false))
+        assertTrue(shouldLoadRemoteGiphyMedia(true, false, false, cachedAvailable = true, ownerEligible = true))
+    }
+
     @Test
     fun byteCacheRetainsRecentMediaAndEvictsLeastRecentlyUsedBytes() {
         val cache = RemoteGiphyByteCache(maxBytes = 5)
