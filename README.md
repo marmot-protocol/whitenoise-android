@@ -129,7 +129,7 @@ there. Jobs that compile keep the module `build/` directories and `.gradle`
 between runs for incremental compilation;
 `.github/scripts/prepare-persistent-workspace.sh` deletes everything else,
 including reports, test results and outputs, so test tasks still execute on
-every run. Emulator jobs require the `wn-emulator` label, which only one slot
+every run. Emulator jobs require the `wn-cache-1` label, which only slot 1
 carries, because emulators share the host's adb ports and SDK.
 
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,

@@ -288,7 +288,8 @@ jobs:
     needs: changes
     if: ${{ !inputs.media_startup_trace && needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification }}
     name: Controlled attachment fixture (${{ matrix.distribution }})
-    runs-on: &wn-emulator ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server", "wn-emulator"]') }}
+    # Emulators on one host share adb ports and the Android SDK: keep them on slot 1.
+    runs-on: &wn-emulator ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server", "wn-cache-1"]') }}
     timeout-minutes: 45
     strategy:
       fail-fast: false

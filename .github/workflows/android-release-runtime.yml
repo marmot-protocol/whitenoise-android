@@ -59,7 +59,8 @@ jobs:
   verify-production:
     name: Verify production APK on API 36 ART
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: &wn-emulator ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server", "wn-emulator"]') }}
+    # Emulators on one host share adb ports and the Android SDK: keep them on slot 1.
+    runs-on: &wn-emulator ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server", "wn-cache-1"]') }}
     timeout-minutes: 60
 
     steps:
