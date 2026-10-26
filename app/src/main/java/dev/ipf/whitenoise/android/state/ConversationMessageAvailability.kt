@@ -42,7 +42,9 @@ private suspend fun ConversationController.materializeMessage(
     messageIdHex: String,
     maxOlderPages: Int,
 ): MessageAvailability {
-    if (timelineRecords.containsKey(messageIdHex)) return MessageAvailability.AVAILABLE
+    if (timelineRecords.containsKey(messageIdHex)) {
+        return if (isMessagePublished(messageIdHex)) MessageAvailability.AVAILABLE else MessageAvailability.RETRYABLE
+    }
     when (jumpWindowToMessage(messageIdHex)) {
         ConversationWindowJumpResult.AVAILABLE -> return MessageAvailability.AVAILABLE
         ConversationWindowJumpResult.MISSING -> return MessageAvailability.MISSING
@@ -61,12 +63,18 @@ private suspend fun ConversationController.materializeMessage(
         if (loadOlderPageInternal() != ConversationPageLoad.ADVANCED) break
         loadedPageCount += 1
     }
-    return when {
-        timelineRecords.containsKey(messageIdHex) -> MessageAvailability.AVAILABLE
-        olderPageBlocked || hasMoreBefore -> MessageAvailability.RETRYABLE
+    return currentMessageAvailability(messageIdHex)
+}
+
+private fun ConversationController.currentMessageAvailability(messageIdHex: String): MessageAvailability =
+    when {
+        isMessagePublished(messageIdHex) -> MessageAvailability.AVAILABLE
+        olderPageBlocked || hasMoreBefore || timelineRecords.containsKey(messageIdHex) -> MessageAvailability.RETRYABLE
         else -> MessageAvailability.MISSING
     }
-}
+
+/** Availability is actionable only once the row belongs to the published transcript. */
+private fun ConversationController.isMessagePublished(id: String) = timeline.any { it.record.messageIdHex == id }
 
 /** Compatibility boolean for callers that do not present a missing-target error themselves. */
 suspend fun ConversationController.loadUntilMessageAvailable(
@@ -79,7 +87,7 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
     retryConversationWindowJump(
         subscription = timelineSubscription,
         messageIdHex = messageIdHex,
-        targetLoaded = { timelineRecords.containsKey(messageIdHex) },
+        targetLoaded = { isMessagePublished(messageIdHex) },
         jumpIfActive = ::jumpIfSubscriptionActive,
         installPage = { page ->
             // The jumped-to window shows once its cards are read, so the landing never composes a card Loading.
@@ -95,6 +103,8 @@ private suspend fun ConversationController.jumpWindowToMessage(messageIdHex: Str
             // The reader landed somewhere else in history, so an older prefetch that stood
             // down at the previous edge may ask again from here (#2727).
             automaticPaging.older.reset()
+            // The jump must classify its target after the held page becomes the published transcript.
+            awaitEventCardHoldReleased()
         },
     )
 

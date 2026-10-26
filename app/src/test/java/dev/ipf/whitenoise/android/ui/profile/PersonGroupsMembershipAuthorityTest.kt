@@ -4,14 +4,15 @@ import android.os.Looper
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
@@ -253,19 +254,39 @@ class PersonGroupsMembershipAuthorityTest {
         id: String,
     ) {
         fixture.recordAuthorityEvent(id, "menu-wait-start")
+        var lastMenuNodeCount: Int? = null
+        var lastAuthorityStatus = "not completed"
+        val menuTag = "groups_in_common.menu.$id"
+        val rowTag = "groups_in_common.group.$id"
+        val retryTag = "groups_in_common.retry"
+        val observedTags = setOf(menuTag, rowTag, retryTag)
         try {
-            awaitAuthority { menuShown(id) }
+            awaitAuthority {
+                val nodes =
+                    rule
+                        .onAllNodes(
+                            SemanticsMatcher("membership authority status") {
+                                it.config.getOrNull(SemanticsProperties.TestTag) in observedTags
+                            },
+                        ).fetchSemanticsNodes()
+                val counts = nodes.groupingBy { it.config.getOrNull(SemanticsProperties.TestTag) }.eachCount()
+                val menuCount = counts[menuTag] ?: 0
+                lastMenuNodeCount = menuCount
+                lastAuthorityStatus = "rowNodes=${counts[rowTag] ?: 0} retryNodes=${counts[retryTag] ?: 0}"
+                menuCount > 0
+            }
         } catch (failure: Throwable) {
             runCatching {
                 fixture.recordAuthorityEvent(id, "menu-wait-failed:${failure.javaClass.simpleName}")
                 val native =
                     runCatching { fixture.authorityDiagnostics().take(MAX_AUTHORITY_DIAGNOSTIC_CHARS) }
                         .getOrElse { "Native diagnostics unavailable: ${it.javaClass.simpleName}" }
-                val semantics =
-                    runCatching {
-                        rule.onRoot(useUnmergedTree = true).printToString().take(MAX_AUTHORITY_DIAGNOSTIC_CHARS)
-                    }.getOrElse { "Semantics unavailable: ${it.javaClass.simpleName}" }
-                failure.addSuppressed(AssertionError("Authority menu $id: $native\n$semantics"))
+                failure.addSuppressed(
+                    AssertionError(
+                        "Authority menu $id: $native\n" +
+                            "Last completed poll menuNodes=$lastMenuNodeCount $lastAuthorityStatus",
+                    ),
+                )
             }
             throw failure
         }

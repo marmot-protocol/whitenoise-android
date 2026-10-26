@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner.kt",
+  "legacy_sha256": "ec17a9935172dda9e7e20d11db2ec28a17984ca1ebe6c696ab620d656dabbb83",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberConversationViewportRestorationOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner.kt",
+        "anchor": "fun rememberConversationViewportRestorationOwner(",
+        "test_ids": [
+          "CON-027"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner.kt",
+        "surface": "Retained correction defers automatic viewport writes after first live frame",
+        "anchor": "!coordinator.foregroundRestorePending",
+        "test_ids": [
+          "CON-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
