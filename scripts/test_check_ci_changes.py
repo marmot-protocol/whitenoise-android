@@ -81,6 +81,9 @@ class CiChangesTest(unittest.TestCase):
 
     def test_isolated_host_suites_use_complete_diff_and_fail_closed(self):
         source = entry('app/src/main/java/example/Screen.kt')
+        legacy = cli_outputs('pull_request', '', [], source)
+        self.assertEqual(legacy['ci_mode'], 'legacy-pr')
+        self.assertEqual(legacy['tooling_regressions'], 'false')
         for event in ('pull_request', 'merge_group', 'push', 'schedule', 'workflow_dispatch'):
             value = cli_outputs(event, 'merge-queue', [], source)['tooling_regressions']
             self.assertEqual(value, str(event != 'pull_request').lower())

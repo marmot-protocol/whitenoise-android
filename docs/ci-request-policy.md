@@ -218,8 +218,8 @@ production UI source and screen coverage also remain unconditional.
 Only the isolated attachment-fixture suite and Maestro artifact, offline-suite,
 environment, host-pressure and SDK-image regression suites can be deferred.
 The complete PR diff must contain only known ordinary source/resources/goldens,
-prose or validated test metadata, with regular file modes. Any Android test
-fixture change, tooling/scripts/workflows, `.maestro` input, build/dependency
+prose or validated test metadata, with regular file modes. Any instrumented (`androidTest`)
+input change, tooling/scripts/workflows, `.maestro` input, build/dependency
 change, unknown/malformed diff, unavailable labels or `ci:full` runs all suites.
 Missing classifier output also runs them. Merge-group, master, nightly and
 manual events always run every host suite, independently of PR precheck mode.

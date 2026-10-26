@@ -8,7 +8,8 @@ import re
 import subprocess
 
 
-# Kotlin tests read these documents; their edits require the validating suites.
+# Kotlin test inputs never qualify as docs-only. Their validating consumers
+# run in full integration; selected metadata may use the PR precheck.
 BUILD_INPUT_DOCS = {
     'docs/composer-dictation-device-matrix.md',
     'docs/invariant-gates.md',
