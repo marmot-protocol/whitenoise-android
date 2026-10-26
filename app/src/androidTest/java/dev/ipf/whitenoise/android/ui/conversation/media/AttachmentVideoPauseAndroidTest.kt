@@ -204,7 +204,7 @@ class AttachmentVideoPauseAndroidTest {
         val gate = CompletableDeferred<Unit>()
         materializationGate = gate
         fixture.beginOpen(EdgeClipScenario(listOf(EdgeClip.Portrait)))
-        await("pending materialization to enter") { materializationEntered }
+        fixture.awaitCondition("pending materialization to enter") { materializationEntered }
         assertTrue(device.pressHome())
         await("STOP before file publication") {
             onMain { activity.lifecycle.currentState == Lifecycle.State.CREATED }
