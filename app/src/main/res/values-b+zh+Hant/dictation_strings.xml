@@ -38,4 +38,5 @@
     <string name="dictation_finishing_microphone">正在關閉麥克風…</string>
     <string name="dictation_audio_state_unavailable">無法檢查保留的音訊。請保留並重試。</string>
     <string name="dictation_original_conversation">請在原對話中完成聽寫。</string>
+    <string name="dictation_waiting_for_unlock">聽寫已暫存。解鎖應用程式後即可貼上。</string>
 </resources>

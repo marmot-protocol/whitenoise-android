@@ -9,6 +9,18 @@ class ConversationDictationPlaybackHandoffSourceCoverageTest {
     @Test
     fun appStateUsesPairedPauseAndResumeCallbacksForDictationCapture() {
         val appState = source("state/AppState.kt")
+        assertTrue(appState.contains("conversationDictation.interruptForAudioFocusLoss()"))
+        assertTrue(
+            appState.contains(
+                "writeConversationDictationDraftWhenUnlocked(appLockScreenVisible, appUnlockEvaluationPending)",
+            ),
+        )
+        assertTrue(appState.contains("initializedConversationDictation()?.onAppForegrounded()"))
+        assertTrue(
+            !appState.contains(
+                "createConversationDictationMediaHandoff(ttsController, appContext) { conversationDictation.cancel() }",
+            ),
+        )
         assertTrue(appState.contains("onBeforeRecognition = conversationDictationMediaHandoff::beforeRecognition"))
         assertTrue(appState.contains("onAfterAudioCapture = conversationDictationMediaHandoff::afterAudioCapture"))
 
