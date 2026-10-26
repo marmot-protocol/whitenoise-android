@@ -135,6 +135,15 @@
           "NTF-006",
           "NTF-010"
         ]
+      },
+      {
+        "surface": "Accepted payload revision fences asynchronously stale notification history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private fun existingConversationMessages(",
+        "test_ids": [
+          "NTF-043",
+          "NTF-044"
+        ]
       }
     ],
     "source_coverage": [
