@@ -2501,4 +2501,8 @@
     <string name="setup_finding_outcome_unknown">Ergebnis unbekannt</string>
     <string name="setup_finding_outcome_success">Prüfung erfolgreich</string>
     <string name="setup_finding_outcome_failure">Prüfung fehlgeschlagen</string>
+    <string name="public_jpeg_previews_title">Bildvorschauen im Chat</string>
+    <string name="public_jpeg_previews_privacy">Standardmäßig deaktiviert. Direkte Blossom-JPEG-Links können dem Bildhost deine IP-Adresse offenlegen. Vorschauen nutzen ungetaktetes WLAN und deine Regeln zum Herunterladen von Fotos. Normale Links bleiben bei deaktivierter Vorschau verfügbar.</string>
+    <string name="public_jpeg_preview_image">Vorschau eines verlinkten JPEG-Bildes</string>
+    <string name="public_jpeg_preview_save_failed">Die Einstellung für Bildvorschauen konnte nicht gespeichert werden. Bitte versuche es erneut.</string>
 </resources>

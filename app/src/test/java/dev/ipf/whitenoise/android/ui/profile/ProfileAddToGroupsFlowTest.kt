@@ -67,6 +67,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.coroutines.Continuation
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -521,7 +522,14 @@ class ProfileAddToGroupsFlowTest {
             composeRule.onNodeWithText(group.name).performClick()
             composeRule.onNodeWithTag("profile.add_groups.action").performClick()
             composeRule.onNodeWithTag("selected_members_confirm").performClick()
-            composeRule.waitUntil(5_000) { invited.size == 1 }
+            composeRule.waitUntil(5_000) {
+                assertEquals(
+                    "Every native method must have an explicit fixture",
+                    emptyList<String>(),
+                    unexpected.toList(),
+                )
+                invited.size == 1
+            }
             composeRule.waitUntil(5_000) {
                 composeRule.onAllNodesWithTag("groups_in_common.list").fetchSemanticsNodes().size == 1
             }
@@ -698,7 +706,7 @@ private class NestedInviteRuntimeFixture(
             arrayOf(MarmotInterface::class.java),
         ) { _, method, arguments ->
             val name = method.name.substringBefore('-')
-            val args = arguments.orEmpty().toList()
+            val args = fixtureArguments(name, method.parameterTypes, arguments.orEmpty().toList())
             when (name) {
                 "recordHostTiming", "recordHostPerformance" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "accountIdHex" -> readIdentity(name, args)
@@ -714,6 +722,28 @@ private class NestedInviteRuntimeFixture(
                 else -> reject("Unexpected native method $name")
             }
         } as MarmotInterface
+
+    /** Java proxies receive the compiler's continuation after the native command arguments. */
+    private fun fixtureArguments(
+        name: String,
+        parameterTypes: Array<Class<*>>,
+        arguments: List<Any?>,
+    ): List<Any?> {
+        val semanticTypes =
+            when (name) {
+                "inviteMembersDetailed" -> listOf(String::class.java, String::class.java, List::class.java)
+                "groupCommitDelivery", "groupConversationSnapshot" -> listOf(String::class.java, String::class.java)
+                else -> return arguments
+            }
+        val expectedTypes = semanticTypes + Continuation::class.java
+        if (parameterTypes.toList() != expectedTypes ||
+            arguments.size != expectedTypes.size ||
+            arguments.lastOrNull() !is Continuation<*>
+        ) {
+            reject("Unexpected suspend bridge for $name")
+        }
+        return arguments.dropLast(1)
+    }
 
     private fun readIdentity(
         name: String,

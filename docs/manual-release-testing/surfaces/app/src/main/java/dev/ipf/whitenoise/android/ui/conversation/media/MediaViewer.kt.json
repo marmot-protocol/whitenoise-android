@@ -173,7 +173,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun FullScreenMediaViewer(",
         "test_ids": [
-          "MED-040"
+          "MED-041"
         ]
       }
     ]

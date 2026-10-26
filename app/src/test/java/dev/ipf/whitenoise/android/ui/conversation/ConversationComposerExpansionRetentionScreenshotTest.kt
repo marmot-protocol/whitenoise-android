@@ -210,8 +210,8 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     /** Releases all production fixture owners after the test, including failed assertion paths. */
     @After
     fun releaseControllers() {
-        TimeZone.setDefault(originalTimeZone)
         controllers.forEach { it.onCleared() }
+        TimeZone.setDefault(originalTimeZone)
     }
 
     /**
@@ -492,6 +492,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     @Test
     @Suppress("LongMethod")
     fun acceptedSendStaysVisibleWhenBottomInputGrowsNextFrame() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val publisherStarted = CompletableDeferred<Unit>()
         val releaseSuccess = CompletableDeferred<Unit>()
         val draftStore = DraftStore(InMemoryDraftPersistence())

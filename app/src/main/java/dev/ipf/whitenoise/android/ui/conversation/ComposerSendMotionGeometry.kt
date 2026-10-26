@@ -42,6 +42,20 @@ internal data class ComposerSendFlightGeometry(
     val settled: Boolean get() = progress == 1f && remainingCollapse == 0f && motionRectsMatch(bounds, canonicalFrame)
 }
 
+/** Immutable numeric observation of one existing resolve call; contains no message content. */
+internal data class ComposerSendLandingDiagnostic(
+    val timerProgress: Float,
+    val sourceSurface: Rect,
+    val sourceComposer: Rect?,
+    val sourceViewport: ComposerSendViewportProjection?,
+    val inputGeneration: Long,
+    val measured: ComposerSendLandingMeasurement?,
+    val expectedFrameBefore: Rect?,
+    val expectedTextBefore: Rect?,
+    val lastConsumedHeightBefore: Float?,
+    val resolved: ComposerSendFlightGeometry? = null,
+)
+
 /** Compensates the existing measured composer overlap, never unrelated viewport or scroll motion. */
 internal class ComposerSendLanding(
     private val sourceSurface: Rect,
@@ -57,9 +71,32 @@ internal class ComposerSendLanding(
     fun resolve(
         measured: ComposerSendLandingMeasurement?,
         timerProgress: Float,
+        observe: ((ComposerSendLandingDiagnostic) -> Unit)? = null,
     ): ComposerSendFlightGeometry? {
         val container = sourceComposer
-        return if (container != null && measured != null) resolveMeasured(container, measured, timerProgress) else null
+        // Capture immutable values before the existing resolve can mutate endpoint/monotonic state.
+        val before =
+            observe?.let {
+                ComposerSendLandingDiagnostic(
+                    timerProgress,
+                    sourceSurface,
+                    container,
+                    sourceViewport,
+                    inputGeneration,
+                    measured,
+                    expectedFrame,
+                    expectedText,
+                    lastConsumedHeight,
+                )
+            }
+        val result =
+            if (container != null && measured != null) {
+                resolveMeasured(container, measured, timerProgress)
+            } else {
+                null
+            }
+        if (before != null) observe?.invoke(before.copy(resolved = result))
+        return result
     }
 
     private fun resolveMeasured(

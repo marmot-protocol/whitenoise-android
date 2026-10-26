@@ -129,7 +129,32 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return editorBounds to corners
     }
 
+    /** Rect.toString rounds coordinates; raw IEEE754 bits retain exact guard inputs. */
+    private fun diagnosticRectBits(value: ComposerSendLandingDiagnostic): String =
+        listOf(
+            value.sourceSurface,
+            value.sourceComposer,
+            value.sourceViewport?.bounds,
+            value.measured?.frame,
+            value.measured?.text,
+            value.measured?.composer,
+            value.measured?.viewport?.bounds,
+            value.expectedFrameBefore,
+            value.expectedTextBefore,
+            value.resolved?.bounds,
+            value.resolved?.textTarget,
+            value.resolved?.canonicalFrame,
+            value.resolved?.canonicalText,
+            value.resolved?.composer,
+        ).joinToString("|") { rect ->
+            rect?.let {
+                listOf(it.left.toRawBits(), it.top.toRawBits(), it.right.toRawBits(), it.bottom.toRawBits())
+                    .joinToString(",")
+            } ?: "null"
+        }
+
     private class LiveTailFrames {
+        var landingDiagnosticCount = 0
         val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
         var motionOwner: ComposerSendMotion? = null
         val boundaries = mutableListOf<String>()
@@ -250,7 +275,18 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 liveTail = true,
                 keyboardClearanceDp = keyboardClearanceDp,
                 onPaintedGeometry = { frames.painted.add(it) },
-                onMotionOwner = { frames.motionOwner = it },
+                onMotionOwner = { owner ->
+                    frames.motionOwner = owner
+                    owner.onLandingDiagnostic = { kind, diagnostic ->
+                        // Log each immutable observation immediately: retirement can fail before final assertions.
+                        if (frames.landingDiagnosticCount++ < 160) {
+                            println(
+                                "SEND_RESOLVE clockMs=${composeRule.mainClock.currentTime} kind=$kind " +
+                                    "rectBits=${diagnosticRectBits(diagnostic)} $diagnostic",
+                            )
+                        }
+                    }
+                },
             )
             composeRule.waitForIdle()
             composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }

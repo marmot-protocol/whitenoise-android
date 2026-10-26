@@ -166,8 +166,8 @@ class TtsHighlightPlacementAndroidTest {
         }
         composeRule.waitForIdle()
         val leaf = checkNotNull(leafCarryingHighlight())
-        assertNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
         val sentence = checkNotNull(leaf.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey))
+        assertEquals(sentence, leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
         assertTrue(sentence.first >= 0 && sentence.last < leaf.text().length)
         assertTrue(leaf.boundsInRoot.width > 0f && leaf.boundsInRoot.height > 0f)
         assertEquals(FIRST_SENTENCE, renderedSentenceBand())

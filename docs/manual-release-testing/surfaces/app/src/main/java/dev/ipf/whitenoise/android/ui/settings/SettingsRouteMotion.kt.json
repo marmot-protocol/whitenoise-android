@@ -16,8 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsRouteMotion.kt",
         "anchor": "fun <T> rememberRouteMotionModifier(",
         "test_ids": [
-          "SET-040",
-          "CON-035"
+          "SET-041",
+          "CON-037"
         ]
       }
     ]

@@ -1220,6 +1220,12 @@ class WhiteNoiseAppState private constructor(
     )
 
     internal val appContext = context.applicationContext
+    internal val publicJpegPreviewPreferences =
+        dev.ipf.whitenoise.android.media
+            .PublicJpegPreviewPreferences(appContext)
+    internal val publicJpegPreviewLoader =
+        dev.ipf.whitenoise.android.media
+            .PublicJpegPreviewLoader()
 
     /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
     internal val emojiUploads = EmojiUploadCache()
@@ -7579,6 +7585,9 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
+            publicJpegPreviewPreferences
+                .retainAccounts(accounts.filter { it.label != wipedRef }.map { it.accountIdHex })
+                .forEach(publicJpegPreviewLoader::clearPixels)
             withContext(NonCancellable + Dispatchers.IO) {
                 val alertsCleared =
                     runCatching {
@@ -8944,6 +8953,11 @@ class WhiteNoiseAppState private constructor(
             hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
         )
 
+    internal fun publicJpegPreviewNetworkAllowed(): Boolean =
+        hasValidatedInternet() &&
+            activeNetworkTypesSnapshot == setOf(MediaAutoDownloadNetwork.WiFi) &&
+            shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
+
     /**
      * Every [MediaAutoDownloadNetwork] the active connection currently matches.
      * A single connection can match several at once (e.g. cellular that is both
@@ -8957,10 +8971,17 @@ class WhiteNoiseAppState private constructor(
      */
     private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> = activeNetworkTypesSnapshot
 
+    private val previewNetworkTypesMutable = MutableStateFlow<Set<MediaAutoDownloadNetwork>>(emptySet())
+    internal val publicJpegPreviewNetworkTypes = previewNetworkTypesMutable.asStateFlow()
+
     // Callback-maintained mirror of the default network's state, volatile so
     // composition-time reads see the connectivity thread's latest write.
     @Volatile
     private var activeNetworkTypesSnapshot: Set<MediaAutoDownloadNetwork> = emptySet()
+        set(value) {
+            field = value
+            previewNetworkTypesMutable.value = value
+        }
 
     @Volatile
     private var hasActiveNetworkSnapshot = false

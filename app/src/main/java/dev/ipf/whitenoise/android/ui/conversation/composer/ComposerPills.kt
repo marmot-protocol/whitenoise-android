@@ -388,6 +388,7 @@ internal fun ComposerPill(
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
+    sendingIdentity: (@Composable () -> Unit)? = null,
     // Sits in the bottom action row directly before the trailing Send slot.
     sendAccessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
@@ -683,8 +684,10 @@ internal fun ComposerPill(
     val draftStartOffscreen by remember(composerScrollState) {
         derivedStateOf { composerScrollState.value > 0 }
     }
-    val leadingControlsWidth = (if (hasAttachmentAction) 80.dp else 40.dp) + 48.dp
-    val compactEditorStartInset = (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp + 8.dp
+    val sendingIdentityWidth = if (sendingIdentity != null) composerSendingIdentityTargetSize else 0.dp
+    val leadingControlsWidth = (if (hasAttachmentAction) 80.dp else 40.dp) + 48.dp + sendingIdentityWidth
+    val compactEditorStartInset =
+        (if (hasAttachmentAction) CompactEditorStartInset else 40.dp) + 48.dp + 8.dp + sendingIdentityWidth
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
             (if (trailingAction != null) 40.dp else 0.dp)
@@ -932,6 +935,7 @@ internal fun ComposerPill(
             dictationControls != null,
             onDictation != null,
             hasAttachmentAction,
+            sendingIdentityWidth,
             trailingAction != null,
             sendAccessoryContent != null,
             accessoryContent != null,
@@ -1583,6 +1587,7 @@ internal fun ComposerPill(
                                     .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (inputContentVisible) sendingIdentity?.invoke()
                                 if (hasAttachmentAction) {
                                     Box(
                                         modifier =
@@ -1596,7 +1601,7 @@ internal fun ComposerPill(
                                                         position.y.roundToInt() + coordinates.size.height,
                                                     )
                                             },
-                                        contentAlignment = Alignment.CenterEnd,
+                                        contentAlignment = Alignment.CenterStart,
                                     ) {
                                         IconButton(
                                             onClick = onAttachmentsToggle,
@@ -1815,7 +1820,7 @@ private fun composerOverflowIndicatorColor(): Color =
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 @Suppress("FunctionNaming")
-private fun ComposerPlatformPreImeBackHandler(
+internal fun ComposerPlatformPreImeBackHandler(
     enabled: Boolean,
     onBack: () -> Unit,
     overlayBackRegistrar: ComposerOverlayBackRegistrar?,

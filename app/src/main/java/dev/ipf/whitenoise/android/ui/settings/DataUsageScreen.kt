@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadMatrix
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
@@ -38,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.launch
 
 internal val MediaQuality.labelRes: Int
     @StringRes
@@ -82,6 +85,12 @@ internal fun DataUsageScreen(
     var picker by rememberSaveable { mutableStateOf<MediaAutoDownloadType?>(null) }
     var qualityPicker by rememberSaveable { mutableStateOf(false) }
     var stopConfirmation by rememberSaveable { mutableStateOf(false) }
+    val previewPreferences = appState.publicJpegPreviewPreferences
+    val previewChoices by previewPreferences.state.collectAsStateWithLifecycle()
+    val previewAccount = appState.activeAccountRef
+    val previewAccountId = appState.accounts.firstOrNull { it.label == previewAccount }?.accountIdHex
+    val scope = rememberCoroutineScope()
+    var savingPreview by androidx.compose.runtime.remember(previewAccount) { mutableStateOf(false) }
     val matrix = appState.mediaAutoDownloadMatrix
     val paused = appState.automaticAttachmentDownloadsPaused()
     val networkLabels = MediaAutoDownloadNetwork.entries.associateWith { stringResource(it.labelRes) }
@@ -152,6 +161,39 @@ internal fun DataUsageScreen(
             item {
                 SettingsExplainer(stringResource(R.string.download_quality_help))
                 SettingsExplainer(stringResource(R.string.media_quality_footer))
+            }
+            item {
+                SettingsGroup {
+                    row("public_jpeg_previews") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.public_jpeg_previews_title),
+                            subtitle = stringResource(R.string.public_jpeg_previews_privacy),
+                            checked = previewChoices[previewAccountId] == true,
+                            enabled = previewAccountId != null && !savingPreview,
+                            modifier = Modifier.testTag("data_usage.public_jpeg_previews"),
+                            onCheckedChange = { enabled ->
+                                if (previewAccountId != null && !savingPreview) {
+                                    if (!enabled) {
+                                        previewPreferences.revoke(previewAccountId)
+                                        appState.publicJpegPreviewLoader.clearPixels(previewAccountId)
+                                    }
+                                    savingPreview = true
+                                    scope.launch {
+                                        try {
+                                            val saved = previewPreferences.setEnabled(previewAccountId, enabled)
+                                            if (!saved && appState.activeAccountRef == previewAccount) {
+                                                appState.present(R.string.public_jpeg_preview_save_failed)
+                                            }
+                                        } finally {
+                                            savingPreview = false
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
             }
         }
     }

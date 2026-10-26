@@ -89,6 +89,22 @@ internal data class ComposerSendFlight(
 }
 
 internal class ComposerSendMotion {
+    /** Test-installed, geometry-only observer; absent in normal UI. */
+    internal var onLandingDiagnostic: ((String, ComposerSendLandingDiagnostic) -> Unit)? = null
+
+    private fun resolveLanding(
+        active: ComposerSendFlight,
+        progress: Float,
+        callKind: String,
+    ): ComposerSendFlightGeometry? {
+        val observer = onLandingDiagnostic
+        return active.landing.resolve(
+            landingMeasurement,
+            progress,
+            observer?.let { sink -> { diagnostic -> sink(callKind, diagnostic) } },
+        )
+    }
+
     var flight: ComposerSendFlight? by mutableStateOf(null)
         private set
     val activePresentationId: String? get() = flight?.presentationId
@@ -285,7 +301,7 @@ internal class ComposerSendMotion {
     private val hasPaintedLanding: Boolean
         get() =
             lastRenderedGeometry?.let { painted ->
-                flight?.landing?.resolve(landingMeasurement, 1f)?.let { current ->
+                flight?.let { resolveLanding(it, 1f, "landing-check") }?.let { current ->
                     painted.settled && current.settled && motionRectsMatch(painted.bounds, current.canonicalFrame)
                 }
             } == true
@@ -303,7 +319,7 @@ internal class ComposerSendMotion {
                 ?.color
                 ?.isSpecified == true &&
                 destinationLayout?.uniformParagraphDirection() == flight?.source?.paragraphDirection
-        val admittedLanding = flight?.landing?.resolve(landingMeasurement, 0f) != null
+        val admittedLanding = flight?.let { resolveLanding(it, 0f, "admission-or-timing") } != null
         val validDestination = visible && sameText && sameStyle
         return validDestination && admittedLanding
     }
@@ -341,7 +357,7 @@ internal class ComposerSendMotion {
     ) {
         val canvasOrigin = origin?.takeIf { enabled && it.isAttached }
         if (active == null || flight !== active || canvasOrigin == null) return
-        val geometry = active.landing.resolve(landingMeasurement, progress)
+        val geometry = resolveLanding(active, progress, "draw")
         if (geometry == null) {
             if (progress == 0f) {
                 lastRenderedPendingSource = active.source

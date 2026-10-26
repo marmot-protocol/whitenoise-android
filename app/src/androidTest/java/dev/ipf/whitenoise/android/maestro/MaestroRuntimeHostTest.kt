@@ -548,6 +548,11 @@ private suspend fun loadMaestroPresentation(
         } else {
             expected.split(",")
         }
+    if (scenario == "extra-composer-sending-identity") {
+        val owner = app.accounts.first { it.accountIdHex == peerAccountIdHex }
+        app.warmProfilePresentationsBlocking(listOf(owner.accountIdHex))
+        check(app.accountDisplayNameCached(owner.accountIdHex) == "Maestro Bob")
+    }
     val nativeChat =
         if (scenario.startsWith("extra-native-")) {
             app.loadCreatedChatListItem(group).copy(latest = checkNotNull(lastMessage))
