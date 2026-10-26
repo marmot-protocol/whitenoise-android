@@ -31,7 +31,6 @@ import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.dismissalTime
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -2606,8 +2605,8 @@ class LocalNotificationPresenter(
      * Clear a reaction chip's direct-reply lifetime extension only while the
      * live card still represents the message that offered the chip. A newer
      * message reuses the same notification key and must not inherit the old
-     * reaction as RemoteInput history. The history line repeats the chip's
-     * readable name, never a raw `:shortcode:`.
+     * reaction as RemoteInput history. The history line uses the posted chip's
+     * readable name or exact shortcode when that name is ambiguous.
      */
     internal fun markReactionHandledIfSameGeneration(
         notificationTag: String,
@@ -2619,7 +2618,8 @@ class LocalNotificationPresenter(
             notificationTag,
             notificationId,
             reactedMessageIdHex,
-            EmojiShortcodes.plainLabel(reaction, context.resources),
+            reaction,
+            reactionChoice = true,
         )
 
     /**
@@ -2632,6 +2632,7 @@ class LocalNotificationPresenter(
         notificationId: Int,
         expectedMessageIdHex: String?,
         handledText: String,
+        reactionChoice: Boolean = false,
     ): Boolean =
         ConversationCardPostSynchronizer.withLock(
             notificationTag,
@@ -2661,13 +2662,30 @@ class LocalNotificationPresenter(
                 notificationId,
             )
             runCatching {
+                val historyText =
+                    if (reactionChoice) {
+                        val postedChoices =
+                            active.notification.actions.orEmpty().flatMap { action ->
+                                action.remoteInputs.orEmpty().flatMap { input ->
+                                    input.choices.orEmpty().map(CharSequence::toString)
+                                }
+                            }
+                        val readable = notificationQuickReactionLabels(context, listOf(handledText)).single()
+                        if (handledText in postedChoices) {
+                            handledText
+                        } else {
+                            readable.takeIf { it in postedChoices } ?: handledText
+                        }
+                    } else {
+                        handledText
+                    }
                 val resolved =
                     NotificationCompat
                         .Builder(context, active.notification)
                         .apply {
                             extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
                             extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
-                        }.setRemoteInputHistory(arrayOf(handledText))
+                        }.setRemoteInputHistory(arrayOf(historyText))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()

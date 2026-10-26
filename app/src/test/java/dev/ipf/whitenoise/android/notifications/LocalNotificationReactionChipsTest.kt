@@ -169,6 +169,40 @@ class LocalNotificationReactionChipsTest {
         )
     }
 
+    /** Colliding names and blank names retain the same exact shortcode as their configured chips. */
+    @Test
+    fun handledReactionHistoryPreservesCollisionAndBlankLabelFallbacks() {
+        val choices = listOf(":wave:", ":_wave_:", ":___:")
+        var configured = choices
+        val presenter =
+            LocalNotificationPresenter(context, groupReconciliation = {}, quickReactionChoices = { configured })
+                .also(LocalNotificationPresenter::ensureChannels)
+        postConversationCard(presenter, "message-a")
+        assertEquals(
+            choices,
+            replyAction()
+                .remoteInputs
+                .single()
+                .choices
+                ?.map(CharSequence::toString),
+        )
+        // History must repeat the posted chip even if configuration changes before completion.
+        configured = listOf(":wave:")
+        val posted = manager.activeNotifications.single()
+
+        choices.forEach { reaction ->
+            assertTrue(presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", reaction))
+            assertEquals(
+                listOf(reaction),
+                manager.activeNotifications
+                    .single()
+                    .notification.extras
+                    .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+                    ?.map(CharSequence::toString),
+            )
+        }
+    }
+
     @Test
     fun reactionHandledRepostCannotAnnotateANewerMessageGeneration() {
         val presenter = presenter(defaultChoices())
