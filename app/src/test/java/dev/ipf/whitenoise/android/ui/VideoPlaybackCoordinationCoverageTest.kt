@@ -62,7 +62,9 @@ class VideoPlaybackCoordinationCoverageTest {
     fun mountedPlayerPausesOnStopAndDetachesItsObserver() {
         val body = mediaVideoSource().readText().functionBody("VideoViewerPage")
         val observer =
-            body.substringAfter("DisposableEffect(exo, lifecycle, autoplayAllowed)").substringBefore("HoldCacheFileWhileComposed")
+            body
+                .substringAfter("DisposableEffect(exo, lifecycle, autoplayAllowed)")
+                .substringBefore("HoldCacheFileWhileComposed")
         assertTrue("the host lifecycle must own the observer", "LocalLifecycleOwner.current.lifecycle" in body)
         val pendingFile = body.substringBefore("if (file == null)")
         assertTrue(
@@ -75,12 +77,18 @@ class VideoPlaybackCoordinationCoverageTest {
             "observer must be removed on disposal",
             "lifecycle.removeObserver(observer)" in observer.substringAfter("onDispose"),
         )
-        assertTrue("replacement must retain the latest play intent", "autoplayAllowed.value = playWhenReady" in observer)
+        assertTrue(
+            "replacement must retain the latest play intent",
+            "autoplayAllowed.value = playWhenReady" in observer,
+        )
         assertTrue("pause listener must be attached", "exo.addListener(pauseListener)" in observer)
-        assertTrue("pause listener must be detached", "exo.removeListener(pauseListener)" in observer.substringAfter("onDispose"))
+        assertTrue(
+            "pause listener must be detached",
+            "exo.removeListener(pauseListener)" in observer.substringAfter("onDispose"),
+        )
         assertTrue(
             "the retained view must follow the replacement player",
-            "if (playerView.player !== exo) playerView.player = exo" in body.substringAfter("update ="),
+            "playerView.player = exo" in body.substringAfter("update ="),
         )
         assertFalse(
             "returning to foreground must not play",

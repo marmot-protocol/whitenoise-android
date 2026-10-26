@@ -212,7 +212,12 @@ internal class EdgeClipViewerFixture(
         val clip = EdgeClip.entries[currentAttachment]
         val nextEpoch = sourceEpoch + 1uL
         runBlocking(Dispatchers.IO) {
-            materializeVideoAttachment(context, MESSAGE_ID, clip.ordinal, clip.reference().copy(sourceEpoch = nextEpoch)) {
+            materializeVideoAttachment(
+                context,
+                MESSAGE_ID,
+                clip.ordinal,
+                clip.reference().copy(sourceEpoch = nextEpoch),
+            ) {
                 clipBytes.getValue(clip)
             }
         }
