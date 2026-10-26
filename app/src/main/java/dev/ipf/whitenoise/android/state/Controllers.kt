@@ -8107,14 +8107,15 @@ class ConversationController(
                 ?.takeIf { it.blocks.isNotEmpty() }
                 ?: return optimistic
         val pending = optimisticMessages[optimisticKey]
-        if (pending == null || pending.record.messageIdHex != optimistic.messageIdHex) {
-            return optimistic.copy(contentTokens = tokens)
+        return if (pending == null || pending.record.messageIdHex != optimistic.messageIdHex) {
+            optimistic.copy(contentTokens = tokens)
+        } else {
+            val hydrated = pending.record.copy(contentTokens = tokens)
+            optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
+            messageById[optimistic.messageIdHex] = hydrated
+            publishTimelineFromIndexes()
+            hydrated
         }
-        val hydrated = pending.record.copy(contentTokens = tokens)
-        optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
-        messageById[optimistic.messageIdHex] = hydrated
-        publishTimelineFromIndexes()
-        return hydrated
     }
 
     /**
