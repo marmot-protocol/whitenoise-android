@@ -5995,6 +5995,23 @@
         }
       ],
       "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+      "symbol": "AudioTranscriptDialog",
+      "bindings": [
+        {
+          "case": "presentation-audio-transcript-cancel",
+          "selector": {
+            "text": "Audio transcript"
+          },
+          "scope": "Production confirmation dialog disclosure and Cancel dispatch only; full received-audio provider/lifecycle behavior remains MED-038/MED-039.",
+          "entry_assertion": {
+            "text": "Audio transcript"
+          },
+          "visible_on_entry": true
+        }
+      ]
     }
   ]
 }

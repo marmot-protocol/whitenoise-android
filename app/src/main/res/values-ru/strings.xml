@@ -1316,6 +1316,19 @@
     <string name="voice_message_permission_denied">Требуется доступ к микрофону</string>
     <string name="voice_message_recording_failed">Не удалось записать голосовое сообщение</string>
     <string name="voice_message_microphone_busy">Микрофон используется другим приложением. Закройте его и повторите попытку.</string>
+    <string name="transcribe_audio">Расшифровать</string>
+    <string name="audio_transcription_title">Расшифровка аудио</string>
+    <string name="audio_transcription_disclosure">Offline Speech to Text обработает эту запись на вашем устройстве с помощью установленной модели распознавания речи. White Noise не записывает звук с микрофона и не отправляет сообщение. Созданный текст может содержать ошибки и удаляется, когда вы закрываете его или покидаете этот экран.</string>
+    <string name="audio_transcription_working">Расшифровка записи на этом устройстве…</string>
+    <string name="audio_transcription_generated">Автоматическая расшифровка · не текст отправителя</string>
+    <string name="audio_transcription_android_version">Для расшифровки записей требуется Android 13 или новее.</string>
+    <string name="audio_transcription_provider_missing">Установите Offline Speech to Text и настройте модель распознавания речи, чтобы расшифровывать записи на этом устройстве.</string>
+    <string name="audio_transcription_provider_outdated">Обновите Offline Speech to Text до версии 0.21.0 или новее. Более ранние версии не прошли проверку для расшифровки только готовых записей.</string>
+    <string name="audio_transcription_provider_unavailable">Не удалось запустить Offline Speech to Text. Откройте приложение и убедитесь, что модель распознавания речи готова к работе, затем повторите попытку.</string>
+    <string name="audio_transcription_permission_denied">Android запретил доступ к службе распознавания речи. Проверьте разрешения на использование микрофона для White Noise и Offline Speech to Text в настройках Android. При расшифровке обрабатывается готовая запись; звук с микрофона не записывается.</string>
+    <string name="audio_transcription_audio_rejected">Не удалось прочитать или полностью передать эту запись. Возможно, её аудиоформат или размер не поддерживается.</string>
+    <string name="audio_transcription_failed">Не удалось расшифровать запись. Проверьте Offline Speech to Text и повторите попытку.</string>
+    <string name="audio_transcription_timeout">Расшифровка заняла слишком много времени. Убедитесь, что в Offline Speech to Text готова к работе модель распознавания речи, затем повторите попытку.</string>
     <string name="voice_message_play">Воспроизвести голосовое</string>
     <string name="voice_message_pause">Пауза</string>
     <string name="voice_message_speed">Скорость воспроизведения %1$s</string>
@@ -2222,6 +2235,7 @@
     <string name="new_message_name_or_npub">Имя или npub</string>
     <string name="new_message_connect_qr">Подключиться по QR-коду</string>
     <string name="new_message_invite_friend">Пригласить друга</string>
+    <string name="new_message_talk_to_agent">Поговорить с агентом</string>
     <string name="new_message_people">Люди</string>
     <string name="new_message_source_chats">Люди в чатах</string>
     <string name="new_message_source_following">Следование</string>

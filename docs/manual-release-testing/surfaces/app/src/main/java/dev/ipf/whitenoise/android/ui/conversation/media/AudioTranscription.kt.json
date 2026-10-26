@@ -1,0 +1,187 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ReceivedAudioTranscription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun ReceivedAudioTranscription(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "AudioTranscriptDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun AudioTranscriptDialog(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "AudioTranscriptBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun AudioTranscriptBody(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "AudioTranscriptConfirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun AudioTranscriptConfirm(",
+        "test_ids": [
+          "MED-038"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Transcribe audio action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.transcribe_audio",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Transcript heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_title",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Provider disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_disclosure",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Transcription progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_working",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Generated text attribution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_generated",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Android version refusal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_android_version",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Missing provider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_provider_missing",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Unavailable provider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_provider_unavailable",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Provider update required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_provider_outdated",
+        "test_ids": [
+          "MED-039"
+        ]
+      },
+      {
+        "surface": "Platform permission denial",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_permission_denied",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Rejected audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_audio_rejected",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Recognition failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_failed",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Recognition timeout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.audio_transcription_timeout",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Get speech provider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.dictation_ostt_recommendation_title",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Provider listing failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.dictation_ostt_recommendation_open_failed",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Retry transcription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Cancel or close transcription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "Close transcript",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MED-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
