@@ -9,7 +9,8 @@
         "anchor": "fun Modifier.conversationTailEntranceMotion(",
         "test_ids": [
           "CON-004",
-          "CON-005"
+          "CON-005",
+          "CON-036"
         ]
       },
       {

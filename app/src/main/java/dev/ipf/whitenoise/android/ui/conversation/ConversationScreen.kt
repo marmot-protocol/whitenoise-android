@@ -3284,6 +3284,8 @@ internal fun ConversationScreen(
             motionEnabled = conversationMotionEnabled,
             ownerKey = controller,
         )
+    val claimedTailPresentationId = composerSendMotion.activePresentationId
+    SideEffect { tailEntrance.claimPresentation(claimedTailPresentationId) }
 
     /**
      * Follows the tail for membership activity and new rows, keeps viewport structure current and lands route focus

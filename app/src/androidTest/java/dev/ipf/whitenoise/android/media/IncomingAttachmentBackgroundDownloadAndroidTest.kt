@@ -87,6 +87,14 @@ private enum class ReceiptBoundary {
     RETURN_LOCAL_COMPLETE,
     DISABLED_COMPLETE,
     NETWORK_POLICY_START,
+    WIFI_COMMAND_START,
+    WIFI_COMMAND_COMPLETE,
+    WIFI_SNAPSHOT_WAIT_START,
+    WIFI_SNAPSHOT_CONFIRMED,
+    WIFI_VALIDATION_START,
+    WIFI_VALIDATION_COMPLETE,
+    POLICY_UPDATE_START,
+    POLICY_UPDATE_COMPLETE,
     NETWORK_POLICY_APPLIED,
     WIFI_DISABLE_START,
     WIFI_DISABLED,
@@ -600,6 +608,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         wifiOnly: Set<MediaAutoDownloadType> = emptySet(),
     ) {
         val receiverState = requireNotNull(state)
+        reportBoundary(ReceiptBoundary.POLICY_UPDATE_START)
         withContext(Dispatchers.Main.immediate) {
             MediaAutoDownloadType.entries.forEach { type ->
                 MediaAutoDownloadNetwork.entries.forEach { network ->
@@ -608,6 +617,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 }
             }
         }
+        reportBoundary(ReceiptBoundary.POLICY_UPDATE_COMPLETE)
         val snapshot = {
             backgroundReceiptPolicySnapshot(
                 receiverState.automaticAttachmentPolicy(receiver.label),
@@ -632,11 +642,19 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         receiver: AccountSummaryFfi,
         enabled: Boolean,
     ) {
+        reportBoundary(ReceiptBoundary.WIFI_COMMAND_START)
         BackgroundReceiptFixtureSupport.setWifiEnabled(enabled)
+        reportBoundary(ReceiptBoundary.WIFI_COMMAND_COMPLETE)
         wifiDisabled = !enabled
         val receiverState = requireNotNull(state)
+        reportBoundary(ReceiptBoundary.WIFI_SNAPSHOT_WAIT_START)
         BackgroundReceiptFixtureSupport.awaitWifiSnapshot(receiverState, receiver.label, enabled)
-        if (enabled) awaitValidatedInternet(receiverState)
+        reportBoundary(ReceiptBoundary.WIFI_SNAPSHOT_CONFIRMED)
+        if (enabled) {
+            reportBoundary(ReceiptBoundary.WIFI_VALIDATION_START)
+            awaitValidatedInternet(receiverState)
+            reportBoundary(ReceiptBoundary.WIFI_VALIDATION_COMPLETE)
+        }
     }
 
     /** Leaves every generated Activity behind Home so the process runs with no visible UI. */

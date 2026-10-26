@@ -48,6 +48,18 @@ internal class ConversationTailEntrance internal constructor(
     var enteringItemId: String? by mutableStateOf(null)
         internal set
 
+    /** One row claimed by its send flight for this entrance, including early retirement. */
+    internal var claimedEnteringItemId: String? by mutableStateOf(null)
+        private set
+
+    /** Composition owns claims even when the hidden destination skips drawing. */
+    internal fun claimPresentation(presentationId: String?) {
+        if (claimedEnteringItemId != enteringItemId) claimedEnteringItemId = null
+        if (motionEnabled && presentationId != null && presentationId == enteringItemId) {
+            claimedEnteringItemId = presentationId
+        }
+    }
+
     private var startedForItemId: String? = null
     private val shift = Animatable(0f)
     private var animation: Job? = null
@@ -57,6 +69,7 @@ internal class ConversationTailEntrance internal constructor(
             if (!value) {
                 animation?.cancel()
                 shiftPx = 0f
+                claimedEnteringItemId = null
             }
         }
 
@@ -159,7 +172,15 @@ internal fun Modifier.conversationTailEntranceMotion(
 ): Modifier {
     val shifted =
         graphicsLayer {
-            translationY = if (itemId == claimedPresentationId) 0f else entrance.shiftPx
+            translationY =
+                if (itemId == claimedPresentationId ||
+                    itemId == entrance.enteringItemId &&
+                    itemId == entrance.claimedEnteringItemId
+                ) {
+                    0f
+                } else {
+                    entrance.shiftPx
+                }
         }
     return if (entrance.enteringItemId == itemId) {
         // Measured, not size-changed: the row's first measure is the frame that

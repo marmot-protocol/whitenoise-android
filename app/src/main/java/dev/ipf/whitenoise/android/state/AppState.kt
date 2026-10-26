@@ -7199,9 +7199,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
-     * local fallback behavior only after durable push cleanup admission; a structured unfinished-local
-     * outcome or unavailable cleanup authority retains the active session. Credential revocation failure
+     * Non-destructive MDK sign-out (#349, #2132). A thrown engine call requires an authoritative
+     * native signed-out observation before local deactivation; unfinished or unknown local cleanup
+     * retains the active session. Credential revocation failure
      * returns an incomplete result before
      * native admission; errors after admission retain their established propagation.
      * Final deactivation retires selections through the account session; native per-account cleanup remains
@@ -7403,7 +7403,7 @@ class WhiteNoiseAppState private constructor(
         return NativeSignOutAttempt(result, true, result.exceptionOrNull() as? CancellationException)
     }
 
-    /** Native partial cleanup is not evidence that the native identity remained signed in. */
+    /** A partial or lost native reply requires durable status before the host can retire its session. */
     @Suppress("LongMethod", "ReturnCount")
     private suspend fun finishOwnedSignOutLocked(
         account: String,
@@ -7418,9 +7418,9 @@ class WhiteNoiseAppState private constructor(
                 nativeCancellation = attempt.cancellation,
             )
         val native = result.getOrNull()
-        var partial = native?.localCleanup?.completed == false
+        val partial = native?.localCleanup?.completed == false
         var knownSignedOut = native?.localCleanup?.completed == true
-        if (partial || attempt.cancellation != null) {
+        if (partial || result.isFailure) {
             val observed =
                 runCatching {
                     withContext(marmotIoDispatcher) { checkNotNull(runtime).marmot.listAccounts() }
@@ -7431,7 +7431,7 @@ class WhiteNoiseAppState private constructor(
                     nativeCancellation = attempt.cancellation,
                 )
             }
-            partial = true
+            // A lost reply leaves remote cleanup unknown; only a typed unfinished-local report is partial.
             knownSignedOut = true
         }
         if (knownSignedOut) {
@@ -7642,7 +7642,7 @@ class WhiteNoiseAppState private constructor(
                 }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
-            val next = refreshedAccounts.firstOrNull()?.label
+            val next = signOutOutcome(refreshedAccounts, wipedRef).nextActiveRef
             activeAccountRef = next
             preferences
                 .edit()

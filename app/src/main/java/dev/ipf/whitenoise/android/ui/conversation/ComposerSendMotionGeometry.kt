@@ -187,3 +187,16 @@ internal fun motionRectsMatch(
             expected.right - actual.right,
             expected.bottom - actual.bottom,
         ).all { abs(it) <= MOTION_ROUNDING_PX }
+
+internal fun resolveComposerSendLanding(
+    active: ComposerSendFlight,
+    progress: Float,
+    callKind: String,
+    observer: ((String, ComposerSendLandingDiagnostic) -> Unit)?,
+    measurement: ComposerSendLandingMeasurement?,
+): ComposerSendFlightGeometry? =
+    active.landing.resolve(
+        measurement,
+        progress,
+        observer?.let { sink -> { diagnostic -> sink(callKind, diagnostic) } },
+    )
