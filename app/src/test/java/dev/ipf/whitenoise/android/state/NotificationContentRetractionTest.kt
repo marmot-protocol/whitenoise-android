@@ -256,6 +256,88 @@ class NotificationContentRetractionTest {
             }
         }
 
+    /** Remote deletion cannot return through an older Android tray snapshot when the next message arrives. */
+    @Test
+    fun remoteDeletionStaysRetractedWhenThePlatformSnapshotLags() = staleSnapshotAfterRemoval(localHide = false)
+
+    /** Local hide uses the same production retraction and retained-history boundary as remote deletion. */
+    @Test
+    fun localHideStaysRetractedWhenThePlatformSnapshotLags() = staleSnapshotAfterRemoval(localHide = true)
+
+    /** Drives the real event/hide route, then makes Android expose its old A/B payload for C's history read. */
+    private fun staleSnapshotAfterRemoval(localHide: Boolean) =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = OLDER_ID,
+                    previewText = "older deleted text",
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+                fixture.awaitRuntimeEventSubscription()
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = MESSAGE_ID,
+                        notificationKey = "startup:account-a:$MESSAGE_ID",
+                        previewText = "newer valid text",
+                    ),
+                )
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("newer valid text") != true) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                val old = manager().activeNotifications.single { it.tag == cardKey.tag && it.id == cardKey.id }.notification
+                if (localHide) {
+                    assertTrue(fixture.runOnMainLooperPumping { fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, OLDER_ID) })
+                } else {
+                    fixture.emitRuntimeEvent(deletion(OLDER_ID))
+                }
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("older deleted text") != false) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                assertTrue(activeCardText().orEmpty().contains("newer valid text"))
+                // Only the platform observation moves backwards; the accepted-write registry remains untouched.
+                manager().notify(cardKey.tag, cardKey.id, old)
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = NEWER_ID,
+                        notificationKey = "startup:account-a:$NEWER_ID",
+                        previewText = "fresh valid text",
+                    ),
+                )
+                awaitShownMessage(NEWER_ID)
+                val text = activeCardText().orEmpty()
+                assertTrue(text.contains("newer valid text"))
+                assertTrue(text.contains("fresh valid text"))
+                assertFalse(text.contains("older deleted text"))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Awaits C's own accepted card identity, rather than unrelated listener or enrichment activity. */
+    private suspend fun awaitShownMessage(messageId: String) {
+        withTimeout(AWAIT_TIMEOUT_MS) {
+            while (manager().activeNotifications.none {
+                    it.tag == cardKey.tag &&
+                        it.id == cardKey.id &&
+                        it.notification.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX) == messageId
+                }
+            ) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
     /** A deletion that lands after the read-state check but before the first write leaves no card. */
     @Test
     fun deletionWhileTheFirstPostIsQueuedLeavesNoCard() =
