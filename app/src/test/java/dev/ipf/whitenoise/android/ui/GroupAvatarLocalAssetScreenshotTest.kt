@@ -872,6 +872,50 @@ class CachedGroupAvatarSourceTest {
             assertEquals(0, fixture.reads.get())
         }
 
+    /** A decoded static first frame does not reread its original bytes on repeated visibility. */
+    @Test
+    fun knownStaticDurableFrameSkipsOriginalByteReads() =
+        runBlocking {
+            val fixture = AvatarLocalFixture { error("known static pixels must not reread bytes") }
+            val selected = asset()
+            val cacheKey = checkNotNull(selected.cacheKey(ACCOUNT_REF))
+            val image =
+                checkNotNull(
+                    AvatarImageLoader.decodeAndCache(cacheKey, solidPng(), AvatarImageLoader.currentCacheLifetime()),
+                )
+            val classification = AvatarImageLoader.cachedAnimationClassification(cacheKey)
+            AvatarImageLoader.clearStoredAvatars()
+            AvatarImageLoader.restoreStoredAvatar(cacheKey, image, null, classification)
+            assertEquals(false, AvatarImageLoader.cachedAnimationClassification(cacheKey))
+            val presentation =
+                fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, false)
+            repeat(3) { assertNull(checkNotNull(presentation.groupAnimation).readBytes()) }
+            assertEquals(0, fixture.reads.get())
+        }
+
+    /** Pixels injected without original bytes remain unknown rather than being mistaken for a static image. */
+    @Test
+    fun unclassifiedDurableFrameStillUsesBoundedLocalSourceRecovery() =
+        runBlocking {
+            val gif =
+                dev.ipf.whitenoise.android.core
+                    .twoFrameGif()
+            val fixture = AvatarLocalFixture { listOf(payload().copy(bytes = gif)) }
+            val selected = asset()
+            val cacheKey = checkNotNull(selected.cacheKey(ACCOUNT_REF))
+            val image =
+                checkNotNull(
+                    AvatarImageLoader.decodeAndCache(cacheKey, solidPng(), AvatarImageLoader.currentCacheLifetime()),
+                )
+            AvatarImageLoader.putCached(cacheKey, image)
+            assertNull(AvatarImageLoader.cachedAnimationClassification(cacheKey))
+            val presentation =
+                fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, false)
+            assertTrue(gif.contentEquals(checkNotNull(presentation.groupAnimation).readBytes()))
+            assertEquals(1, fixture.reads.get())
+            assertEquals(2_097_152L, fixture.readMaxBytes.get())
+        }
+
     /** A warm first frame does not strand a durable GIF when only the smaller source LRU evicts it. */
     @Test
     fun evictedDurableGifRecoversFromOneBoundedLocalRead() =
@@ -891,6 +935,11 @@ class CachedGroupAvatarSourceTest {
             repeat(3) { AvatarImageLoader.putCachedAnimated("source-pressure-$it", image, gif.copyOf(1_500_000)) }
             assertSame(image, AvatarImageLoader.cachedImage(cacheKey))
             assertNull(AvatarImageLoader.peekAnimatedSource(cacheKey))
+            assertEquals(true, AvatarImageLoader.cachedAnimationClassification(cacheKey))
+            val classification = AvatarImageLoader.cachedAnimationClassification(cacheKey)
+            AvatarImageLoader.clearStoredAvatars()
+            AvatarImageLoader.restoreStoredAvatar(cacheKey, image, null, classification)
+            assertEquals(true, AvatarImageLoader.cachedAnimationClassification(cacheKey))
             val presentation =
                 fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, false)
             assertTrue(gif.contentEquals(checkNotNull(presentation.groupAnimation).readBytes()))
@@ -996,15 +1045,20 @@ class CachedGroupAvatarSourceTest {
             }
         }
 
-    /** Uses the production durable presentation, with warm pixels and no encoded-source entry. */
+    /** Uses real animated classification retained with its warm frame after encoded-source pressure. */
     private fun durableAnimationWithoutEncodedSource(fixture: AvatarLocalFixture): GroupAvatarAnimation {
         val selected = asset()
         val cacheKey = checkNotNull(selected.cacheKey(ACCOUNT_REF))
+        val gif =
+            dev.ipf.whitenoise.android.core
+                .twoFrameGif()
         val image =
             checkNotNull(
-                AvatarImageLoader.decodeAndCache(cacheKey, solidPng(), AvatarImageLoader.currentCacheLifetime()),
+                AvatarImageLoader.decodeAndCache(cacheKey, gif, AvatarImageLoader.currentCacheLifetime()),
             )
+        repeat(3) { AvatarImageLoader.putCachedAnimated("source-pressure-$it", image, gif.copyOf(1_500_000)) }
         assertNull(AvatarImageLoader.peekAnimatedSource(cacheKey))
+        assertEquals(true, AvatarImageLoader.cachedAnimationClassification(cacheKey))
         val presentation = fixture.state.durableGroupAvatarPresentation(group(), selected, ACCOUNT_REF, image, false)
         return checkNotNull(presentation.groupAnimation)
     }

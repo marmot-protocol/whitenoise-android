@@ -42,6 +42,7 @@ class AnimatedProfileAvatarLoaderTest {
 
             assertNotNull(AvatarImageLoader.load(url))
             assertArrayEquals(gif, AvatarImageLoader.peekAnimatedSource(url))
+            assertEquals(true, AvatarImageLoader.cachedAnimationClassification(url))
             // Notification and shortcut icons keep reading the same cached first frame.
             assertNotNull(AvatarImageLoader.peekBitmap(url))
         }
@@ -55,7 +56,28 @@ class AnimatedProfileAvatarLoaderTest {
 
             assertNotNull(AvatarImageLoader.load(url))
             assertNull(AvatarImageLoader.peekAnimatedSource(url))
+            assertEquals(false, AvatarImageLoader.cachedAnimationClassification(url))
         }
+
+    /** Account-switch restoration cannot mistake evicted GIF bytes or unknown pixels for a static picture. */
+    @Test
+    fun restoredStoredFramePreservesNullableAnimationClassification() {
+        val key = "marmot-avatar:classification-restore"
+        val image =
+            checkNotNull(
+                AvatarImageLoader.decodeAndCache(key, pngBytes(), AvatarImageLoader.currentCacheLifetime()),
+            )
+        for (classification in listOf<Boolean?>(true, false, null)) {
+            AvatarImageLoader.clearStoredAvatars()
+            AvatarImageLoader.restoreStoredAvatar(key, image, null, classification)
+            assertNotNull(AvatarImageLoader.cachedImage(key))
+            assertNull(AvatarImageLoader.peekAnimatedSource(key))
+            assertEquals(classification, AvatarImageLoader.cachedAnimationClassification(key))
+        }
+        AvatarImageLoader.clearStoredAvatars()
+        AvatarImageLoader.restoreStoredAvatar(key, image, twoFrameGif(), null)
+        assertEquals(true, AvatarImageLoader.cachedAnimationClassification(key))
+    }
 
     /** Content decides, not the URL: a `.gif` URL serving PNG stays static, a `.png` URL serving GIF animates. */
     @Test
@@ -116,6 +138,7 @@ class AnimatedProfileAvatarLoaderTest {
             AvatarImageLoader.clear()
 
             assertNull(AvatarImageLoader.peekAnimatedSource(url))
+            assertNull(AvatarImageLoader.cachedAnimationClassification(url))
         }
 
     /** A stored GIF keeps its account-private source; the stored clear drops it but keeps public URL sources. */
@@ -134,7 +157,9 @@ class AnimatedProfileAvatarLoaderTest {
             AvatarImageLoader.clearStoredAvatars()
 
             assertNull(AvatarImageLoader.peekAnimatedSource(storedKey))
+            assertNull(AvatarImageLoader.cachedAnimationClassification(storedKey))
             assertNotNull(AvatarImageLoader.peekAnimatedSource(publicUrl))
+            assertEquals(true, AvatarImageLoader.cachedAnimationClassification(publicUrl))
         }
 
     /** Banners are out of scope: a GIF banner decodes statically and leaves no avatar source behind. */

@@ -49,13 +49,17 @@ internal fun WhiteNoiseAppState.durableGroupAvatarPresentation(
     }
     // Encoded sources have a smaller cache than first-frame pixels. Recover an evicted durable
     // source only from MDK's existing local store, inside the visible thumbnail's source budget.
-    // Static durable pictures can incur one bounded local read per active mount; legacy URLs cannot.
+    // Known static first frames never reread bytes; classification shares their existing bitmap LRU entry.
     val animation =
         if (ownsGroupPicture && durableKey != null && owner != null) {
             val readLocal = retainedAvatarBytesReader(asset, accountRef, GROUP_ANIMATION_LOCAL_READ_MAX_BYTES)
             GroupAvatarAnimation("$runtime|$lifetime|${group.groupIdHex}|$durableKey") {
                 if (ownsSource()) {
-                    val bytes = AvatarImageLoader.peekAnimatedSource(durableKey) ?: readLocal?.invoke()
+                    val bytes =
+                        AvatarImageLoader.peekAnimatedSource(durableKey)
+                            ?: readLocal
+                                ?.takeIf { AvatarImageLoader.cachedAnimationClassification(durableKey) != false }
+                                ?.invoke()
                     bytes?.takeIf { ownsSource() }
                 } else {
                     null

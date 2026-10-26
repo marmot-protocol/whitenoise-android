@@ -105,25 +105,31 @@ class ConversationAcceptedSendRouteScreenshotTest {
             val conversation = createConversation(draftText = text)
             val evidence = SendRouteEvidence()
             val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
+            var motionOwner: ComposerSendMotion? = null
+            val boundaries = mutableListOf<String>()
             mountHistoryConversation(
                 conversation,
                 evidence,
                 liveTail = true,
                 keyboardClearanceDp = keyboardClearanceDp,
                 onPaintedGeometry = { painted.add(it) },
+                onMotionOwner = { motionOwner = it },
             )
             composeRule.waitForIdle()
             composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }
+            boundaries += "before-send ${motionOwner?.diagnosticState}"
             composeRule.mainClock.autoAdvance = false
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
             awaitConversationCondition { publishCount == 1 }
+            boundaries += "accepted ${motionOwner?.diagnosticState}"
             repeat(30) {
                 composeRule.mainClock.advanceTimeByFrame()
                 composeRule.waitForIdle()
+                boundaries += "frame-$it ${motionOwner?.diagnosticState}"
             }
             assertTrue(
                 "a real tail send must paint moving geometry, not merely create a flight" +
-                    " (painted frames=${painted.size})",
+                    " (painted frames=${painted.size}; owner boundaries=$boundaries)",
                 painted.any {
                     it.progress > 0f && it.progress < 1f && !motionRectsMatch(it.bounds, it.canonicalFrame)
                 },
@@ -295,12 +301,14 @@ class ConversationAcceptedSendRouteScreenshotTest {
         liveTail: Boolean = false,
         keyboardClearanceDp: Int = 0,
         onPaintedGeometry: ((ComposerSendFlightGeometry) -> Unit)? = null,
+        onMotionOwner: ((ComposerSendMotion) -> Unit)? = null,
     ) {
         val historyId = (HISTORY_ANCHOR_INDEX + 1).toString(16).padStart(64, '0')
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalConversationScrollEvidenceSink provides evidence,
                 LocalComposerSendGeometryObserver provides onPaintedGeometry,
+                LocalComposerSendOwnerObserver provides onMotionOwner,
             ) {
                 WhiteNoiseTheme {
                     Box(Modifier.fillMaxSize().padding(bottom = keyboardClearanceDp.dp)) {

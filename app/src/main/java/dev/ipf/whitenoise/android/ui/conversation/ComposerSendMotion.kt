@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,9 @@ private const val TEXT_REFLOW_BLEND_INTERVAL = 0.35f
 /** Optional geometry-only draw observer; no message text or identity leaves the motion owner. */
 internal val LocalComposerSendGeometryObserver =
     staticCompositionLocalOf<((ComposerSendFlightGeometry) -> Unit)?> { null }
+
+/** Optional source-owner diagnostics; reports only bounded presentation flags, never message content. */
+internal val LocalComposerSendOwnerObserver = staticCompositionLocalOf<((ComposerSendMotion) -> Unit)?> { null }
 internal val LocalComposerSendMotion = staticCompositionLocalOf<ComposerSendMotion?> { null }
 
 /** Presentation-only snapshots live for at most one send animation, never in saveable state. */
@@ -113,50 +117,78 @@ internal class ComposerSendMotion {
     private var destinationCorners = RoundRect(Rect.Zero, CornerRadius.Zero)
     private var destinationStrokeWidth = 0f
 
+    private var captureAttempts = 0
+    private var lastCaptureSucceeded = false
+    private var acceptAttempts = 0
+    private var admittedFlights = 0
+    private var lastClearReason = "none"
+    private var lastClearedActiveFlight = false
+
+    /** Distinguishes absent capture/admission/landing/draw boundaries without pretending idle means painted. */
+    internal val diagnosticState: String
+        get() =
+            "captureAttempts=$captureAttempts captureSucceeded=$lastCaptureSucceeded " +
+                "acceptAttempts=$acceptAttempts admittedFlights=$admittedFlights " +
+                "clearReason=$lastClearReason clearedActive=$lastClearedActiveFlight " +
+                "enabled=$enabled sourceLayout=${sourceLayout != null} " +
+                "sourceSurface=${sourceSurface?.isAttached == true} sourceEditor=${sourceEditor?.isAttached == true} " +
+                "flight=${flight != null} destinationFrame=${destinationFrame?.isAttached == true} " +
+                "destinationText=${destinationText?.isAttached == true} " +
+                "destinationLayout=${destinationLayout != null} " +
+                "landingMeasured=${landingMeasurement != null} painted=${lastRenderedGeometry != null}"
+
     fun capture(text: String): ComposerSendSource? =
-        sourceLayout?.let { layout ->
-            sourceSurface?.visibleMotionBounds()?.let { surface ->
-                sourceEditor?.visibleMotionBounds()?.let { editor ->
-                    layout
-                        .takeIf {
-                            validComposerCaptureText(enabled, text, layout) &&
-                                validComposerCaptureLayout(layout, editor)
-                        }?.uniformParagraphDirection()
-                        ?.let { direction ->
-                            ComposerSendSource(
-                                text,
-                                ownerGeneration,
-                                layout,
-                                surface,
-                                editor,
-                                sourceFill,
-                                sourceBorder,
-                                sourceTopRadius,
-                                sourceBottomRadius,
-                                sourceStrokeWidth,
-                                direction,
-                                composerCoordinates?.visibleMotionBounds(),
-                                readViewport?.invoke(null),
-                            )
-                        }
+        sourceLayout
+            ?.let { layout ->
+                sourceSurface?.visibleMotionBounds()?.let { surface ->
+                    sourceEditor?.visibleMotionBounds()?.let { editor ->
+                        layout
+                            .takeIf {
+                                validComposerCaptureText(enabled, text, layout) &&
+                                    validComposerCaptureLayout(layout, editor)
+                            }?.uniformParagraphDirection()
+                            ?.let { direction ->
+                                ComposerSendSource(
+                                    text,
+                                    ownerGeneration,
+                                    layout,
+                                    surface,
+                                    editor,
+                                    sourceFill,
+                                    sourceBorder,
+                                    sourceTopRadius,
+                                    sourceBottomRadius,
+                                    sourceStrokeWidth,
+                                    direction,
+                                    composerCoordinates?.visibleMotionBounds(),
+                                    readViewport?.invoke(null),
+                                )
+                            }
+                    }
                 }
+            }.also { captured ->
+                captureAttempts = (captureAttempts + 1).coerceAtMost(255)
+                lastCaptureSucceeded = captured != null
             }
-        }
 
     fun accept(
         source: ComposerSendSource?,
         presentationId: String?,
         inputGeneration: Long,
     ) {
+        acceptAttempts = (acceptAttempts + 1).coerceAtMost(255)
         // An old pre-lock callback must not cancel a newer resumed flight either.
         if (source == null || source.ownerGeneration != ownerGeneration) return
-        clear()
+        clear("accepted-replacement")
         if (enabled && presentationId != null) {
             flight = ComposerSendFlight(presentationId, source, inputGeneration)
+            admittedFlights = (admittedFlights + 1).coerceAtMost(255)
         }
     }
 
-    fun clear() {
+    fun clear(reason: String = "external-owner") {
+        lastClearReason = reason
+        lastClearedActiveFlight = flight != null
         lastRenderedGeometry = null
         lastRenderedPendingSource = null
         flight = null
@@ -168,7 +200,7 @@ internal class ComposerSendMotion {
     fun dispose() {
         enabled = false
         ownerGeneration += 1
-        clear()
+        clear("disposed")
         sourceLayout = null
         sourceSurface = null
         sourceEditor = null
@@ -188,7 +220,7 @@ internal class ComposerSendMotion {
     ) {
         if (activePresentationId != id) return
         if (coordinates.visibleMotionBounds() == null) {
-            clear()
+            clear("destination-frame-unavailable")
             return
         }
         destinationFrame = coordinates
@@ -203,7 +235,11 @@ internal class ComposerSendMotion {
         coordinates: LayoutCoordinates,
     ) {
         if (activePresentationId != id) return
-        if (coordinates.visibleMotionBounds() == null) clear() else destinationText = coordinates
+        if (coordinates.visibleMotionBounds() == null) {
+            clear("destination-text-unavailable")
+        } else {
+            destinationText = coordinates
+        }
     }
 
     fun destinationLayout(
@@ -211,7 +247,7 @@ internal class ComposerSendMotion {
         layout: TextLayoutResult,
     ) {
         if (activePresentationId != id) return
-        if (layout.hasVisualOverflow) clear() else destinationLayout = layout
+        if (layout.hasVisualOverflow) clear("destination-text-overflow") else destinationLayout = layout
     }
 
     /** The source copy holds the accepted frame until the target measures, for at most 80 ms. */
@@ -259,6 +295,8 @@ internal class ComposerSendMotion {
 
     @Composable
     fun Overlay() {
+        val ownerObserver = LocalComposerSendOwnerObserver.current
+        SideEffect { ownerObserver?.invoke(this) }
         val active = flight
         val geometryObserver = LocalComposerSendGeometryObserver.current
         val progress = remember(active) { Animatable(0f) }
@@ -268,7 +306,7 @@ internal class ComposerSendMotion {
             try {
                 ComposerSendFlightTiming.run(progress, ::canRender) { hasPaintedLanding }
             } finally {
-                if (flight === active) clear()
+                if (flight === active) clear("overlay-finished")
             }
         }
         val overlayModifier =
