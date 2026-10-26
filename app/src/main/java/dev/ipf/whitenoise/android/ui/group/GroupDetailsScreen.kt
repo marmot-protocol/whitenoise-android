@@ -295,6 +295,7 @@ internal fun GroupDetailsScreen(
             rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
         // Reuse the established account/runtime admission owner for protected route drawing.
         if (appState.appLockScreenVisible || !controller.isCurrentGroupMutationOwner(appState, reviewRuntime)) {
+            BackHandler { onBack() }
             return@PreparedGroupAvatarContent
         }
         var showChatRelays by remember(controller) { mutableStateOf(false) }

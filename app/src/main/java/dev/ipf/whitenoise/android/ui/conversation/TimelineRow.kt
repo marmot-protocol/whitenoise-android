@@ -88,7 +88,7 @@ internal fun TimelineRow(
     // Reveals a send accepted from a long message's Read more reader (#3268).
     onReaderSendAccepted: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
-    reactionViewport: Rect? = null,
+    reactionViewport: () -> Rect? = { null },
     modifier: Modifier = Modifier,
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)

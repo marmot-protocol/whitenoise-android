@@ -96,7 +96,7 @@ internal fun reactionPillBorderColor(selected: Boolean): Color {
  * The prototype's reaction row under a bubble: 23dp pills, one per emoji, each inside a 48dp touch row.
  * Every tap opens the unfiltered reactor list so the details surface consistently starts on All.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList") // Host clipping is independent of row selection and mutation ownership.
 @Composable
 internal fun ReactionPillRow(
     tallies: List<ReactionTally>,
@@ -104,6 +104,7 @@ internal fun ReactionPillRow(
     onOpenDetails: (String?) -> Unit,
     modifier: Modifier = Modifier,
     localMotion: LocalReactionMotion? = null,
+    allowHostClipping: Boolean = false,
 ) {
     val pills = remember(tallies) { reactionPills(tallies) }
     Row(
@@ -118,6 +119,7 @@ internal fun ReactionPillRow(
                 enabled,
                 onOpenDetails,
                 localMotion = localMotion,
+                allowHostClipping = allowHostClipping,
                 motionEmoji = pill.motionEmoji(tallies, localMotion),
             )
         }
@@ -162,6 +164,7 @@ private fun ReactionPillItem(
     onToggleReaction: ((String) -> Unit)? = null,
     localMotion: LocalReactionMotion? = null,
     motionEmoji: String? = pill.emoji,
+    allowHostClipping: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val emoji = pill.emoji
@@ -183,7 +186,7 @@ private fun ReactionPillItem(
             Modifier
                 .heightIn(min = ReactionTouchTargetHeight)
                 .testTag("$REACTION_PILL_TEST_TAG:$index")
-                .localReactionTarget(localMotion, motionEmoji, pill.selected)
+                .localReactionTarget(localMotion, motionEmoji, pill.selected, allowHostClipping)
                 .then(
                     if (enabled) {
                         Modifier.combinedClickable(

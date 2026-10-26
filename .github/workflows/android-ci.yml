@@ -61,6 +61,7 @@ jobs:
       precheck: ${{ steps.classify.outputs.precheck }}
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       ci_mode: ${{ steps.classify.outputs.ci_mode }}
+      tooling_regressions: ${{ steps.classify.outputs.tooling_regressions }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -100,6 +101,7 @@ jobs:
         run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
 
   tooling-contracts:
+    needs: changes
     name: Validate tooling and documentation contracts
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -135,10 +137,17 @@ jobs:
           "$RUNNER_TEMP/ci-permissions/bin/python" -m unittest scripts/test_merge_authorization_boundary.py
 
       - name: Test attachment fixture HTTP ledger and cancellation contracts
+        if: needs.changes.outputs.tooling_regressions != 'false'
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
 
+      # These suites use scripts, workflows and committed fixtures, not changing
+      # production UI source. Unknown inputs and all integrations run them.
       - name: Test Maestro artifact and manual-only execution contracts
-        run: python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_offline_batches.py scripts/test_maestro_runtime.py scripts/test_maestro_screen_coverage.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py scripts/test_maestro_modal_discovery.py scripts/test_maestro_sdk_image.py
+        if: needs.changes.outputs.tooling_regressions != 'false'
+        run: python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_offline_batches.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py scripts/test_maestro_sdk_image.py
+
+      - name: Test Maestro production-source and screen contracts
+        run: python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_screen_coverage.py scripts/test_maestro_modal_discovery.py
 
       - name: Validate manual release guide
         env:

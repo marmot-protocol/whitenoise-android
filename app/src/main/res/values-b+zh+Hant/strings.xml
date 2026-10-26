@@ -2132,6 +2132,7 @@
     <string name="new_message_name_or_npub">名稱或 npub</string>
     <string name="new_message_connect_qr">透過 QR 碼連線</string>
     <string name="new_message_invite_friend">邀請好友</string>
+    <string name="new_message_talk_to_agent">與你的智慧體交談</string>
     <string name="new_message_people">人員</string>
     <string name="new_message_source_chats">聊天的人</string>
     <string name="new_message_source_following">跟蹤</string>

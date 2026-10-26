@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -31,18 +32,27 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.testGroupMutationResult
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundState
+import dev.ipf.whitenoise.android.ui.share.chatRow
+import dev.ipf.whitenoise.android.ui.share.member
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -55,6 +65,8 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import java.lang.reflect.Proxy
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -435,8 +447,119 @@ class ProfileAddToGroupsFlowTest {
         composeRule.onNodeWithTag("profile.add_groups.action").assertIsDisplayed()
     }
 
-    private fun renderProfile() {
-        val appState = testAppState()
+    /** Both dismissal controls return the nested picker to its captured Groups parent. */
+    @Test
+    fun nestedPickerBackAndCloseReturnToGroups() {
+        renderProfile()
+        val host = latestComponentDialog()
+        openNestedPicker()
+        composeRule.runOnUiThread { host.onBackPressedDispatcher.onBackPressed() }
+        finishContentTransition()
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertDoesNotExist()
+        assertSame(host, latestComponentDialog())
+
+        composeRule.onNodeWithText(app.getString(R.string.person_add_to_group)).performClick()
+        finishContentTransition()
+        composeRule.onNodeWithText(app.getString(R.string.close)).performClick()
+        finishContentTransition()
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertDoesNotExist()
+        assertSame(host, latestComponentDialog())
+    }
+
+    /** Native invite acceptance uses the same parent return as Back, without setting route state in the test. */
+    @Test
+    @Suppress("LongMethod") // One isolated native invite fixture and its real nested modal completion.
+    fun acceptedNestedInviteReturnsToGroups() {
+        val group = groupItem(ConversationTimelineTestIds.GROUP_ID, "Invite destination").group
+        val invited = CopyOnWriteArrayList<String>()
+        val unexpected = CopyOnWriteArrayList<String>()
+        val runtime =
+            Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { _, method, arguments ->
+                when (val name = method.name.substringBefore('-')) {
+                    "recordHostTiming", "recordHostPerformance" -> ProductRecordResultFfi.IGNORED_DISABLED
+                    "groupCommitDelivery" -> null
+                    "inviteMembersDetailed" -> {
+                        assertEquals(listOf(TARGET_HEX), arguments?.get(2))
+                        invited += arguments?.get(1) as String
+                        val result =
+                            testGroupMutationResult(
+                                listOf(ACTIVE_ACCOUNT_HEX, TARGET_HEX, THIRD_ACCOUNT_HEX),
+                                listOf(ACTIVE_ACCOUNT_HEX),
+                                self = ACTIVE_ACCOUNT_HEX,
+                                selfRef = ACTIVE_ACCOUNT_REF,
+                            )
+                        result.copy(details = result.details.copy(group = group))
+                    }
+                    // This fixture deliberately supplies retained rows, not a second account-wide source.
+                    else -> {
+                        unexpected += name
+                        error("No native fixture for $name")
+                    }
+                }
+            } as MarmotInterface
+        val state =
+            WhiteNoiseAppState(
+                context = app,
+                draftStore = DraftStore(EmptyDraftPersistence()),
+                accountIdHexResolver = { ref -> if (ref == TARGET_NPROFILE) TARGET_HEX else null },
+                accounts = listOf(activeAccount()),
+                activeAccountRef = ACTIVE_ACCOUNT_REF,
+                initialMarmotRuntime = AppMarmotRuntime("profile-parent-test", runtime),
+                profileReader = { null },
+            )
+        state.liveSubscriptionOverrides.chatList =
+            dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> error("No live window in retained-profile fixture") },
+                openChats = { _, _ -> error("No live feed in retained-profile fixture") },
+                presentedChatList = { _, _ -> emptyList() },
+            )
+        val chats = ChatsController(state, ACTIVE_ACCOUNT_REF) { _, _ -> emptyList() }
+        try {
+            state.attachChatsController(chats)
+            chats.setChatListVisible(false)
+            chats.applyChatListRow(
+                chatRow(group.groupIdHex).copy(
+                    title = group.name,
+                    groupName = group.name,
+                    conversationKind = ChatConversationKindFfi.GROUP,
+                ),
+            )
+            chats.applyLocalGroupDetails(
+                group,
+                listOf(member(ACTIVE_ACCOUNT_HEX, true), member(THIRD_ACCOUNT_HEX, false)),
+            )
+            renderProfile(state)
+            openNestedPicker()
+            composeRule.onNodeWithText(group.name).performClick()
+            composeRule.onNodeWithTag("profile.add_groups.action").performClick()
+            composeRule.onNodeWithTag("selected_members_confirm").performClick()
+            composeRule.waitUntil(5_000) { invited.size == 1 }
+            composeRule.waitUntil(5_000) {
+                composeRule.onAllNodesWithTag("groups_in_common.list").fetchSemanticsNodes().size == 1
+            }
+            assertEquals(listOf(group.groupIdHex), invited.toList())
+            assertEquals("Every native method must have an explicit fixture", emptyList<String>(), unexpected.toList())
+            composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertDoesNotExist()
+        } finally {
+            composeRule.runOnIdle {
+                state.attachChatsController(null)
+                chats.onCleared()
+            }
+        }
+    }
+
+    /** Opens both production route callbacks; no test-only page setter participates. */
+    private fun openNestedPicker() {
+        composeRule.onNodeWithText(app.getString(R.string.person_groups_in_common)).performScrollTo().performClick()
+        finishContentTransition()
+        composeRule.onNodeWithText(app.getString(R.string.person_add_to_group)).performClick()
+        finishContentTransition()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
+    }
+
+    private fun renderProfile(appState: WhiteNoiseAppState = testAppState()) {
         appState.presentProfile(TARGET_NPROFILE)
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -552,6 +675,7 @@ class ProfileAddToGroupsFlowTest {
     }
 
     private companion object {
+        val THIRD_ACCOUNT_HEX = "c".repeat(64)
         const val ACTIVE_ACCOUNT_REF = "active"
         const val ACTIVE_ACCOUNT_HEX =
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

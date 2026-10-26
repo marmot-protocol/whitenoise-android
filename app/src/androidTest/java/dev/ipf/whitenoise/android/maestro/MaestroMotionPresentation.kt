@@ -110,7 +110,8 @@ private fun ReactionMotionPresentation(fixture: MaestroPresentationFixture) {
     LaunchedEffect(started) {
         if (started) {
             repeat(16) {
-                check(!source.isEmpty && motion.targets["👍"] != null)
+                // Targets are measured only after acceptance activates their observer.
+                check(!source.isEmpty)
                 motion.choose("👍", source)
                 motion.accept("👍", true, motion.takeOrigin("👍"))
                 delay(500)

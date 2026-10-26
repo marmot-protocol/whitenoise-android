@@ -3265,7 +3265,9 @@ internal fun ConversationScreen(
     val motionRouteAvailable = !showDetails && !routeTransitionInProgress
     val motionOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, sendMotionRuntime) && motionRouteAvailable
     val motionTranscriptVisible = !routePresentationFrozen && transcriptReadyToReveal
-    val conversationMotionEnabled = rememberConversationMotionEnabled() && motionOwnerCurrent && motionTranscriptVisible
+    val surfaceMotionEnabled = rememberConversationMotionEnabled()
+    val conversationMotionEnabled = surfaceMotionEnabled && motionOwnerCurrent && motionTranscriptVisible
+    val reactionViewport = remember(timelineViewport) { { timelineViewport.readingBoundsInWindow ?: Rect.Zero } }
     val sendMotionEnabled = conversationMotionEnabled && timelineUnderlayEnabled && scrollCoordinator.isFollowingTail
     val tailEntrance =
         rememberConversationTailEntrance(
@@ -3624,7 +3626,7 @@ internal fun ConversationScreen(
             target = showDetails,
             depth = if (showDetails) 1 else 0,
             ownerKey = controller to appState.runtimeGeneration,
-            animationsEnabled = rememberConversationMotionEnabled(),
+            animationsEnabled = surfaceMotionEnabled,
             suppressMotion = routeTransitionInProgress || routePresentationFrozen,
         )
     if (showDetails) {
@@ -3898,7 +3900,7 @@ internal fun ConversationScreen(
             )
     }
     composerSendMotion.enabled = sendMotionEnabled && mediaViewerSessionState.active == null
-    ComposerSendMotionHost(composerSendMotion) {
+    ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled) {
         WhiteNoiseScaffold(
             modifier =
                 Modifier
@@ -4552,7 +4554,7 @@ internal fun ConversationScreen(
                                                             composerSendMotion.activePresentationId,
                                                         ).then(membershipFrameModifier),
                                                 item = item,
-                                                reactionViewport = timelineViewport.readingBoundsInWindow ?: Rect.Zero,
+                                                reactionViewport = reactionViewport,
                                                 // Newest-first rows: the chronologically
                                                 // older neighbour is the next row emitted.
                                                 older = renderedTimelineNewestFirst.getOrNull(index + 1),

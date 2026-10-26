@@ -153,6 +153,7 @@ internal fun ColumnScope.MessageReactionSummary(
                 onOpenDetails = onClick,
                 modifier = hostGraphicsModifier,
                 localMotion = localMotion,
+                allowHostClipping = hostAnimating,
             )
         }
     }

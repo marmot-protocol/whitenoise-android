@@ -182,19 +182,22 @@ internal class ComposerSendMotion {
                 lastCaptureSucceeded = captured != null
             }
 
+    /** True only when this current acceptance installs a new flight; a captured source alone is not admission. */
     fun accept(
         source: ComposerSendSource?,
         presentationId: String?,
         inputGeneration: Long,
-    ) {
+    ): Boolean {
         acceptAttempts = (acceptAttempts + 1).coerceAtMost(MAX_DIAGNOSTIC_ATTEMPTS)
         // An old pre-lock callback must not cancel a newer resumed flight either.
-        if (source == null || source.ownerGeneration != ownerGeneration) return
+        if (source == null || source.ownerGeneration != ownerGeneration) return false
         clear("accepted-replacement")
         if (enabled && presentationId != null) {
             flight = ComposerSendFlight(presentationId, source, inputGeneration)
             admittedFlights = (admittedFlights + 1).coerceAtMost(MAX_DIAGNOSTIC_ATTEMPTS)
+            return true
         }
+        return false
     }
 
     fun clear(reason: String = "external-owner") {
@@ -449,11 +452,19 @@ private fun LayoutCoordinates.visibleMotionBounds(): Rect? {
 @Composable
 internal fun ComposerSendMotionHost(
     motion: ComposerSendMotion,
+    motionEnabled: Boolean = rememberConversationMotionEnabled(),
     content: @Composable () -> Unit,
 ) {
     DisposableEffect(motion) { onDispose { motion.dispose() } }
-    CompositionLocalProvider(LocalComposerSendMotion provides motion) {
-        Box(Modifier.fillMaxSize()) {
+    val reactionWindow =
+        dev.ipf.whitenoise.android.ui.conversation.reactions
+            .rememberReactionWindowCoordinates()
+    CompositionLocalProvider(
+        LocalComposerSendMotion provides motion,
+        LocalConversationMotionEnabled provides motionEnabled,
+        dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionWindowCoordinates provides reactionWindow,
+    ) {
+        Box(Modifier.fillMaxSize().onGloballyPositioned { reactionWindow.update() }) {
             content()
             motion.Overlay()
         }

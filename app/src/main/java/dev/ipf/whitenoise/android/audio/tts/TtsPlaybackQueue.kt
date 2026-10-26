@@ -657,9 +657,8 @@ internal class TtsPlaybackQueue(
     /**
      * The exact engine payload of the utterance the queue is currently
      * speaking, or null when [utteranceId] is stale, out of generation, or not
-     * the active chunk. This is the validation gate the estimated word-timing
-     * lane shares with real engine callbacks: an utterance that fails it must
-     * neither arm a schedule nor contribute a calibration sample.
+     * the active chunk. An utterance that fails this validation cannot update
+     * native word position or contribute a calibration sample.
      */
     fun submittedChunk(utteranceId: String?): TtsChunk? {
         val index = parseCurrentGenerationIndex(utteranceId) ?: return null
@@ -770,7 +769,6 @@ internal class TtsPlaybackQueue(
         start: Int,
         end: Int,
         @Suppress("UNUSED_PARAMETER") frame: Int = 0,
-        retainVisibleWordOnFallback: Boolean = false,
     ): RangeApplication {
         val callbackIndex = parseCurrentGenerationIndex(utteranceId) ?: return RangeApplication.Stale
         val speaking = _state.value as? TtsState.Speaking ?: return RangeApplication.Stale
@@ -789,14 +787,7 @@ internal class TtsPlaybackQueue(
         _state.value =
             speaking.copy(
                 messageProgressFraction = progress.fraction,
-                passage =
-                    if (passage?.visibleWord?.isNotEmpty() == true) {
-                        passage
-                    } else if (retainVisibleWordOnFallback) {
-                        speaking.passage
-                    } else {
-                        passage
-                    },
+                passage = passage,
             )
         return if (passage?.visibleWord?.isNotEmpty() == true) {
             RangeApplication.VisibleWord

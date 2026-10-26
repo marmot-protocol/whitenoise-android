@@ -71,10 +71,13 @@ class ComposerExpansionTest {
     fun acceptedSendCollapseTweensEveryPieceOfPillGeometry() {
         val tweened = composerGeometrySpec<Int>(collapsedBySend = false, durationMillis = 160, easing = LinearEasing)
         val sendCollapse =
-            composerGeometrySpec<Int>(collapsedBySend = true, durationMillis = 160, easing = LinearEasing)
+            composerGeometrySpec<Int>(collapsedBySend = true, animatedSendCollapse = true, durationMillis = 160, easing = LinearEasing)
 
         assertTrue(tweened is TweenSpec<Int>)
         assertEquals(160, (tweened as TweenSpec<Int>).durationMillis)
+        assertTrue(
+            composerGeometrySpec<Int>(collapsedBySend = true, durationMillis = 160, easing = LinearEasing) is androidx.compose.animation.core.SnapSpec<Int>,
+        )
         assertTrue(sendCollapse is TweenSpec<Int>)
         assertEquals(280, (sendCollapse as TweenSpec<Int>).durationMillis)
     }

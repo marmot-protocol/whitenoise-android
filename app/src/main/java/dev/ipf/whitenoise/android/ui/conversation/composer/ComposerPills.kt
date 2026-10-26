@@ -415,6 +415,7 @@ internal fun ComposerPill(
     // An accepted send has emptied the field. Height, row insets and corner radii
     // converge together; the transcript retains its existing scroll owner.
     collapsedBySend: Boolean = false,
+    animatedSendCollapse: Boolean = false,
     // Reports settlement so later editing uses its ordinary geometry timing.
     onSendCollapseApplied: () -> Unit = {},
     // The owner places the trailing Send/voice action outside this pill, so it needs the same animated
@@ -810,17 +811,22 @@ internal fun ComposerPill(
         (compactTextLayout?.size?.height ?: 0).let { naturalHeight ->
             automaticTextHeightCeilingPx?.let { naturalHeight.coerceAtMost(it) } ?: naturalHeight
         }
+    // Replacing only these animation owners retires an in-flight tween even when its target is unchanged.
+    val forceSendGeometrySnap = collapsedBySend && !animatedSendCollapse
     val animatedTextHeight =
-        animateIntAsState(
-            targetValue = renderedTextHeightTarget,
-            animationSpec =
-                composerGeometrySpec(
-                    collapsedBySend = collapsedBySend,
-                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
-                    easing = FastOutSlowInEasing,
-                ),
-            label = "composer text height",
-        )
+        key(forceSendGeometrySnap) {
+            animateIntAsState(
+                targetValue = renderedTextHeightTarget,
+                animationSpec =
+                    composerGeometrySpec(
+                        collapsedBySend = collapsedBySend,
+                        animatedSendCollapse = animatedSendCollapse,
+                        durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                        easing = FastOutSlowInEasing,
+                    ),
+                label = "composer text height",
+            )
+        }
     // Record the exact clipping bounds used by the rendered editor, not its unbounded draft height.
     val textHeightBounds = remember(scrollOwnerKey) { mutableStateOf(0..Int.MAX_VALUE) }
     val usesAnimatedTextHeight =
@@ -848,16 +854,19 @@ internal fun ComposerPill(
         !multilineControlsSuppressed &&
             (editingRequested || expandedLayout)
     val editingProgress =
-        animateFloatAsState(
-            targetValue = if (editingLayout) 1f else 0f,
-            animationSpec =
-                composerGeometrySpec(
-                    collapsedBySend = collapsedBySend,
-                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
-                    easing = FastOutSlowInEasing,
-                ),
-            label = "composer editing row",
-        )
+        key(forceSendGeometrySnap) {
+            animateFloatAsState(
+                targetValue = if (editingLayout) 1f else 0f,
+                animationSpec =
+                    composerGeometrySpec(
+                        collapsedBySend = collapsedBySend,
+                        animatedSendCollapse = animatedSendCollapse,
+                        durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                        easing = FastOutSlowInEasing,
+                    ),
+                label = "composer editing row",
+            )
+        }
     SideEffect { onEditingProgress(editingProgress) }
     // The resting one-line row centers its inline actions with the text, whatever the font scale; as the
     // editing row unfolds they settle on the bottom row, aligned with the external Send/voice action.
@@ -875,16 +884,19 @@ internal fun ComposerPill(
         }
     // The editor and action edges animate without reserving space above the surface.
     val expansionProgress =
-        animateFloatAsState(
-            targetValue = if (expandedLayout) 1f else 0f,
-            animationSpec =
-                composerGeometrySpec(
-                    collapsedBySend = collapsedBySend,
-                    durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
-                    easing = FastOutSlowInEasing,
-                ),
-            label = "composer layout progress",
-        )
+        key(forceSendGeometrySnap) {
+            animateFloatAsState(
+                targetValue = if (expandedLayout) 1f else 0f,
+                animationSpec =
+                    composerGeometrySpec(
+                        collapsedBySend = collapsedBySend,
+                        animatedSendCollapse = animatedSendCollapse,
+                        durationMillis = COMPOSER_EXPANSION_ANIMATION_MILLIS,
+                        easing = FastOutSlowInEasing,
+                    ),
+                label = "composer layout progress",
+            )
+        }
     // Release the one-shot send collapse once every piece of geometry has
     // reached its target, so a later dismiss or refocus of the
     // empty field tweens again. Geometry the send left unchanged settles at once.
@@ -1005,7 +1017,7 @@ internal fun ComposerPill(
         } else {
             Modifier
         }
-    LaunchedEffect(collapsedBySend) {
+    LaunchedEffect(collapsedBySend, forceSendGeometrySnap) {
         if (!collapsedBySend) return@LaunchedEffect
         snapshotFlow {
             animatedTextHeight.value == textHeightTarget &&

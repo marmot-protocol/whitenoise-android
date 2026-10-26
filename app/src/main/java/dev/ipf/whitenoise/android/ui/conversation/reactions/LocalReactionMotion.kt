@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
+import android.view.View
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -14,12 +15,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -30,7 +31,8 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
@@ -41,7 +43,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 internal const val LOCAL_REACTION_MOTION_MILLIS = 220
-private val LocalRowReactionMotion = staticCompositionLocalOf<LocalReactionMotion?> { null }
+private val LocalRowReactionMotion = compositionLocalOf<LocalReactionMotion?> { null }
 
 internal data class LocalReactionEffect(
     val sequence: Long,
@@ -57,6 +59,7 @@ internal class LocalReactionMotion {
     val progress = Animatable(1f)
     val targets = mutableStateMapOf<String, Rect>()
     var viewport: Rect? by mutableStateOf(null)
+    var readViewport: (() -> Rect?)? = null
     var origin: Offset by mutableStateOf(Offset.Zero)
     var enabled: Boolean by mutableStateOf(true)
     private var mounted = true
@@ -76,7 +79,7 @@ internal class LocalReactionMotion {
         source: Rect,
         target: Rect,
     ): Boolean =
-        viewport?.let { bounds ->
+        (readViewport?.invoke() ?: viewport)?.let { bounds ->
             listOf(source, target).all {
                 val horizontal = it.left >= bounds.left && it.right <= bounds.right
                 val vertical = it.top >= bounds.top && it.bottom <= bounds.bottom
@@ -105,6 +108,7 @@ internal class LocalReactionMotion {
 
     fun dispose() {
         mounted = false
+        readViewport = null
         settle()
         targets.clear()
     }
@@ -113,16 +117,17 @@ internal class LocalReactionMotion {
 @Composable
 internal fun rememberLocalReactionMotion(
     owner: Any?,
-    enabled: Boolean = rememberConversationMotionEnabled(),
+    enabled: Boolean? = null,
 ): LocalReactionMotion {
     LocalRowReactionMotion.current?.let { return it }
+    val motionEnabled = enabled ?: rememberConversationMotionEnabled()
     // A suppressed owner is retired, so a delayed callback cannot revive it after re-enabling motion.
-    val state = remember(owner, enabled) { LocalReactionMotion() }
-    state.enabled = enabled
+    val state = remember(owner, motionEnabled) { LocalReactionMotion() }
+    state.enabled = motionEnabled
     DisposableEffect(state) { onDispose { state.dispose() } }
     val effect = state.effect
-    LaunchedEffect(state, effect, enabled) {
-        if (!enabled || effect == null) {
+    LaunchedEffect(state, effect, motionEnabled) {
+        if (!motionEnabled || effect == null) {
             state.settle()
             state.progress.snapTo(1f)
         } else {
@@ -138,21 +143,22 @@ internal fun rememberLocalReactionMotion(
 @Composable
 internal fun Modifier.reactionSourceBounds(
     requireFullyVisible: Boolean = true,
+    enabled: Boolean = true,
     onBounds: (Rect) -> Unit,
 ): Modifier {
+    if (!enabled) return this
     val view = LocalView.current
+    val shared = LocalReactionWindowCoordinates.current?.takeIf { it.view === view }
+    val own = remember(view) { ReactionWindowCoordinates(view) }
     return onGloballyPositioned { coordinates ->
-        val screen = IntArray(2)
-        val window = IntArray(2)
-        view.getLocationOnScreen(screen)
-        view.getLocationInWindow(window)
+        val offset = shared?.offset ?: own.also { it.update() }.offset
         val full = coordinates.boundsInWindow(clipBounds = false)
         val visible = coordinates.boundsInWindow()
         onBounds(
             if (requireFullyVisible && full != visible) {
                 Rect.Zero
             } else {
-                full.translate(Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat()))
+                full.translate(offset)
             },
         )
     }
@@ -179,9 +185,13 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
             )
         }
     val targetCellPx = with(density) { 14.dp.toPx() }
-    val overlayActive = state.hasVisibleFlight(effect)
-    val owner = if (overlayActive) testTag("conversation.reaction.motion.active") else this
-    return owner.reactionSourceBounds(requireFullyVisible = false) { state.origin = it.topLeft }.drawWithContent {
+    val owner =
+        if (effect?.origin != null) {
+            semantics { if (state.hasVisibleFlight(effect)) testTag = "conversation.reaction.motion.active" }
+        } else {
+            this
+        }
+    return owner.reactionSourceBounds(requireFullyVisible = false, enabled = effect?.origin != null) { state.origin = it.topLeft }.drawWithContent {
         drawContent()
         val current = state.effect
         if (!state.enabled || current != effect) return@drawWithContent
@@ -208,10 +218,12 @@ internal fun Modifier.localReactionTarget(
     state: LocalReactionMotion?,
     emoji: String?,
     selected: Boolean,
+    allowHostClipping: Boolean = false,
 ): Modifier {
     if (state == null || emoji == null) return this
-    DisposableEffect(state, emoji) { onDispose { state.targets.remove(emoji) } }
-    return reactionSourceBounds {
+    val measuring = selected && state.enabled && state.effect?.emoji == emoji
+    DisposableEffect(state, emoji, measuring) { onDispose { state.targets.remove(emoji) } }
+    return reactionSourceBounds(requireFullyVisible = !allowHostClipping, enabled = measuring) {
         if (selected && !it.isEmpty) state.targets[emoji] = it else state.targets.remove(emoji)
     }.graphicsLayer {
         val active = state.enabled && selected && state.effect?.emoji == emoji
@@ -229,18 +241,11 @@ private const val MAX_REACTION_GLYPH_LENGTH = 32
 internal fun ReactionMotionRow(
     state: LocalReactionMotion,
     modifier: Modifier = Modifier,
-    viewportBoundsInWindow: Rect? = null,
+    viewportBoundsInWindow: () -> Rect? = { null },
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val view = LocalView.current
-    val screen = IntArray(2)
-    val window = IntArray(2)
-    view.getLocationOnScreen(screen)
-    view.getLocationInWindow(window)
-    state.viewport =
-        viewportBoundsInWindow?.translate(
-            Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat()),
-        )
+    val shared = LocalReactionWindowCoordinates.current
+    state.readViewport = { viewportBoundsInWindow()?.translate(shared?.offset ?: Offset.Zero) }
     val row = modifier.fillMaxWidth().localReactionOverlay(state).zIndex(if (state.effect != null) 1f else 0f)
     CompositionLocalProvider(LocalRowReactionMotion provides state) {
         Column(row, content = content)
@@ -251,4 +256,29 @@ internal fun ReactionMotionRow(
 private fun LocalReactionMotion.hasVisibleFlight(effect: LocalReactionEffect?): Boolean {
     val source = effect?.origin ?: return false
     return enabled && targets[effect.emoji]?.let { canFly(source, it) } == true
+}
+
+/** One screen/window conversion shared by transcript endpoints; popup windows keep their own origin. */
+@Stable
+internal class ReactionWindowCoordinates(
+    val view: View,
+) {
+    private val screen = IntArray(2)
+    private val window = IntArray(2)
+    var offset by mutableStateOf(Offset.Zero)
+        private set
+
+    fun update() {
+        view.getLocationOnScreen(screen)
+        view.getLocationInWindow(window)
+        offset = Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat())
+    }
+}
+
+internal val LocalReactionWindowCoordinates = compositionLocalOf<ReactionWindowCoordinates?> { null }
+
+@Composable
+internal fun rememberReactionWindowCoordinates(): ReactionWindowCoordinates {
+    val view = LocalView.current
+    return remember(view) { ReactionWindowCoordinates(view) }
 }

@@ -301,16 +301,32 @@ internal class ComposerTextState(
 
     /**
      * True from the moment an accepted send empties the field until the pill has applied that
-     * collapse, or until the next content edit. The pill reads it to collapse in the same frame the
-     * text leaves: a tween there would drag the newest bubble, glued to the composer, down with the
-     * shrinking pill. It is one-shot so a later dismiss or refocus of the empty field tweens again.
+     * collapse, or until the next content edit. Non-flight sends snap in the acceptance frame. Only
+     * an actually admitted flight shares its clock with the pill. A later dismiss/refocus tweens again.
      */
     var collapsedBySend by mutableStateOf(false)
         private set
 
+    private var collapseFlight: dev.ipf.whitenoise.android.ui.conversation.ComposerSendFlight? = null
+    private var animatedSendCollapse by mutableStateOf(false)
+
+    /** Associates geometry animation only with this cleared input generation and its admitted flight. */
+    fun animateAcceptedCollapse(flight: dev.ipf.whitenoise.android.ui.conversation.ComposerSendFlight?) {
+        collapseFlight = flight?.takeIf { collapsedBySend && it.inputGeneration == contentRevision }
+        animatedSendCollapse = collapseFlight != null
+    }
+
+    /** An expired/missing destination or retired owner must snap the remaining geometry at any nonzero scale. */
+    fun animatesAcceptedCollapse(flight: dev.ipf.whitenoise.android.ui.conversation.ComposerSendFlight?): Boolean {
+        if (!animatedSendCollapse || flight !== collapseFlight) return false
+        return flight?.inputGeneration == contentRevision
+    }
+
     /** Called by the pill once the send collapse has been applied, so later geometry tweens again. */
     fun consumeSendCollapse() {
         collapsedBySend = false
+        animatedSendCollapse = false
+        collapseFlight = null
     }
 
     /** Captures the exact content generation an asynchronous acceptance may clear. */
@@ -332,6 +348,8 @@ internal class ComposerTextState(
         if (value.text != valueState.value.text) {
             contentRevision += 1L
             collapsedBySend = false
+            animatedSendCollapse = false
+            collapseFlight = null
         }
         valueState.value = value
     }
@@ -347,6 +365,8 @@ internal class ComposerTextState(
     fun clearAccepted(token: ComposerAcceptanceToken): Boolean {
         if (!token.isCurrentFor(this, valueState.value.text, contentRevision)) return false
         updateValue(TextFieldValue(""))
+        animatedSendCollapse = false
+        collapseFlight = null
         collapsedBySend = true
         return true
     }
@@ -932,10 +952,9 @@ internal fun ComposerBar(
                     // next message (Enter-to-send makes that common). Only the
                     // exact shared content generation may clear the field.
                     if (textState.clearAccepted(acceptanceToken)) {
-                        sendMotion?.accept(visual, presentationId, textState.contentGeneration)
-                        if (composerExpansion.mode != ComposerExpansionMode.Automatic ||
-                            (visual != null && presentationId != null)
-                        ) {
+                        val admitted = sendMotion?.accept(visual, presentationId, textState.contentGeneration) == true
+                        textState.animateAcceptedCollapse(sendMotion?.flight?.takeIf { admitted })
+                        if (admitted) {
                             // Retained draft expansion may already have reset inside the acceptance
                             // callback. Start from the measured old viewport, not the new preference.
                             composerHeightTransitionStartPx = visibleComposerHeightPx
@@ -1097,6 +1116,8 @@ internal fun ComposerBar(
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
+        val animatedSendCollapse = textState.animatesAcceptedCollapse(sendMotion?.flight)
+        val forceAcceptedGeometrySnap = textState.collapsedBySend && !animatedSendCollapse
         val renderedMotionGeneration = textState.contentGeneration
         val renderedMotionValue = textFieldValue
         val transitionTargetHeightPx =
@@ -1126,13 +1147,17 @@ internal fun ComposerBar(
         LaunchedEffect(
             composerHeightTransitionEpoch,
             transitionTargetHeightPx,
+            forceAcceptedGeometrySnap,
         ) {
-            if (composerHeightTransitionActive) {
+            if (forceAcceptedGeometrySnap) {
+                composerHeightAnimation.snapTo(transitionTargetHeightPx)
+                completedComposerHeightTransitionEpoch = composerHeightTransitionEpoch
+            } else if (composerHeightTransitionActive) {
                 composerHeightAnimation.animateTo(
                     transitionTargetHeightPx,
                     tween(
                         durationMillis =
-                            if (textState.collapsedBySend) {
+                            if (animatedSendCollapse) {
                                 dev.ipf.whitenoise.android.ui.conversation.COMPOSER_SEND_MOTION_MILLIS
                             } else {
                                 composerHeightAnimationDurationMillis(
@@ -1611,6 +1636,7 @@ internal fun ComposerBar(
                         multilineControlsSuppressed = compactControlLayout,
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,
+                        animatedSendCollapse = animatedSendCollapse,
                         onSendCollapseApplied = textState::consumeSendCollapse,
                         modifier =
                             Modifier

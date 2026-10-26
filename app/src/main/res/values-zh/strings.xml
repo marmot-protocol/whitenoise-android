@@ -2131,6 +2131,7 @@
     <string name="new_message_name_or_npub">名称或 npub</string>
     <string name="new_message_connect_qr">通过二维码连接</string>
     <string name="new_message_invite_friend">邀请好友</string>
+    <string name="new_message_talk_to_agent">与你的智能体交谈</string>
     <string name="new_message_people">人员</string>
     <string name="new_message_source_chats">聊天的人</string>
     <string name="new_message_source_following">跟踪</string>

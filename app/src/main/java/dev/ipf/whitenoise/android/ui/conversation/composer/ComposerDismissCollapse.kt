@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 
 /**
@@ -23,15 +24,20 @@ internal fun composerEditingRequested(
 
 /**
  * The spec for one piece of pill geometry. Ordinary edits tween over [durationMillis]; the collapse
- * following an accepted send shares the text flight's clock. The existing tail owner keeps the
+ * following an admitted text flight shares its clock; every other accepted send snaps. The tail owner keeps the
  * transcript anchored while the empty input gradually reaches its minimal geometry.
  */
 internal fun <T> composerGeometrySpec(
     collapsedBySend: Boolean,
+    animatedSendCollapse: Boolean = false,
     durationMillis: Int,
     easing: Easing,
 ): AnimationSpec<T> =
-    tween(
-        if (collapsedBySend) dev.ipf.whitenoise.android.ui.conversation.COMPOSER_SEND_MOTION_MILLIS else durationMillis,
-        easing = easing,
-    )
+    if (collapsedBySend && !animatedSendCollapse) {
+        snap()
+    } else {
+        tween(
+            if (collapsedBySend) dev.ipf.whitenoise.android.ui.conversation.COMPOSER_SEND_MOTION_MILLIS else durationMillis,
+            easing = easing,
+        )
+    }

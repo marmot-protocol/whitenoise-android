@@ -2222,6 +2222,7 @@
     <string name="new_message_name_or_npub">Имя или npub</string>
     <string name="new_message_connect_qr">Подключиться по QR-коду</string>
     <string name="new_message_invite_friend">Пригласить друга</string>
+    <string name="new_message_talk_to_agent">Поговорить с агентом</string>
     <string name="new_message_people">Люди</string>
     <string name="new_message_source_chats">Люди в чатах</string>
     <string name="new_message_source_following">Следование</string>

@@ -126,6 +126,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "surface": "Only an admitted current text flight animates accepted composer collapse",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "fun animateAcceptedCollapse(",
+        "test_ids": [
+          "CON-036"
+        ]
       }
     ]
   },

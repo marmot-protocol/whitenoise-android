@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -19,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -88,9 +92,125 @@ class ConversationAcceptedSendRouteScreenshotTest {
         assertLiveTailFlight("First line\nSecond line\nThird line", 240)
     }
 
+    /** Disabling motion during a real accepted send immediately retires its decorative copy. */
+    @Test
+    fun liveSystemDisableSettlesTheAcceptedSendRoute() = assertLiveTailFlight("Live suppression", 0, suppressDuringFlight = true)
+
+    /** A measured target can retire while motion remains enabled; remaining composer geometry must snap. */
+    @Test
+    fun retiredTargetSnapsAnAlreadyPaintedSendAndKeepsTheNextDraft() =
+        assertLiveTailFlight("First line\nSecond line\nThird line", 240, retireDuringFlight = true)
+
+    private fun retiredPillInternalGeometry(): Pair<androidx.compose.ui.geometry.Rect, List<androidx.compose.ui.graphics.Color>> {
+        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+        val surfaceBounds = surface.fetchSemanticsNode().boundsInRoot
+        val editorBounds =
+            composeRule
+                .onNodeWithTag(
+                    dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_EDITOR_VIEWPORT_TAG,
+                    useUnmergedTree = true,
+                ).fetchSemanticsNode()
+                .boundsInRoot
+                .translate(-surfaceBounds.topLeft)
+        val pixels = surface.captureToImage().toPixelMap()
+        val corners =
+            buildList {
+                for (y in 0 until minOf(16, pixels.height)) {
+                    for (x in 0 until minOf(24, pixels.width)) {
+                        add(pixels[x, y])
+                        add(pixels[pixels.width - 1 - x, y])
+                    }
+                }
+            }
+        return editorBounds to corners
+    }
+
+    private class LiveTailFrames {
+        val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
+        var motionOwner: ComposerSendMotion? = null
+        val boundaries = mutableListOf<String>()
+        var earlyRetiredHeight: Float? = null
+        var earlyRetiredInternalGeometry: Pair<androidx.compose.ui.geometry.Rect, List<androidx.compose.ui.graphics.Color>>? = null
+    }
+
+    private fun advanceLiveTailFrames(
+        frames: LiveTailFrames,
+        resolver: android.content.ContentResolver,
+        suppressDuringFlight: Boolean,
+        retireDuringFlight: Boolean,
+    ) {
+        repeat(30) {
+            if (suppressDuringFlight && it == 6) {
+                assertTrue("the production flight must be active before suppression", frames.motionOwner?.flight != null)
+                assertTrue("suppression must follow a genuinely painted moving frame", frames.painted.any { it.progress > 0f && it.progress < 1f })
+                composeRule.runOnIdle {
+                    Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 0f)
+                    resolver.notifyChange(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), null)
+                }
+            }
+            if (retireDuringFlight && it == 6) {
+                assertTrue("retirement must follow a genuinely painted flight", frames.painted.any { it.progress > 0f && it.progress < 1f })
+                composeRule.runOnIdle { checkNotNull(frames.motionOwner).clear("test-destination-retired") }
+                assertTrue("this fallback must not depend on disabling motion", frames.motionOwner?.enabled == true)
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            if (retireDuringFlight && it == 8) {
+                frames.earlyRetiredInternalGeometry = retiredPillInternalGeometry()
+                frames.earlyRetiredHeight =
+                    composeRule
+                        .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                        .fetchSemanticsNode()
+                        .boundsInRoot.height
+            }
+            frames.boundaries += "frame-$it ${frames.motionOwner?.diagnosticState}"
+        }
+    }
+
+    private fun assertLiveTailResult(
+        conversation: ConversationController,
+        text: String,
+        frames: LiveTailFrames,
+        suppressDuringFlight: Boolean,
+        retireDuringFlight: Boolean,
+    ) {
+        assertTrue(
+            "a real tail send must paint moving geometry, not merely create a flight" +
+                " (painted frames=${frames.painted.size}; owner boundaries=${frames.boundaries})",
+            frames.painted.any {
+                it.progress > 0f && it.progress < 1f && !motionRectsMatch(it.bounds, it.canonicalFrame)
+            },
+        )
+        if (suppressDuringFlight || retireDuringFlight) assertEquals(null, frames.motionOwner?.flight)
+        if (retireDuringFlight) {
+            val settledHeight =
+                composeRule
+                    .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+                    .fetchSemanticsNode()
+                    .boundsInRoot.height
+            assertEquals("retiring the flight must snap the remaining composer geometry", settledHeight, checkNotNull(frames.earlyRetiredHeight), 1f)
+            assertEquals(
+                "inner editor insets and painted pill corners must already be settled",
+                retiredPillInternalGeometry(),
+                checkNotNull(frames.earlyRetiredInternalGeometry),
+            )
+        }
+        assertEquals(1, publishCount)
+        assertEquals(1, conversation.timeline.count { it.record.plaintext == text })
+        composeRule.onNodeWithText(text).assertIsDisplayed()
+        composeRule.onNodeWithTag("conversation.send.motion.active").assertDoesNotExist()
+        if (retireDuringFlight) {
+            composeRule.onNode(hasSetTextAction()).performTextInput("Next draft")
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.onNodeWithText("Next draft").assertIsDisplayed()
+        }
+    }
+
     private fun assertLiveTailFlight(
         text: String,
         keyboardClearanceDp: Int,
+        suppressDuringFlight: Boolean = false,
+        retireDuringFlight: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val resolver = context.contentResolver
@@ -104,46 +224,31 @@ class ConversationAcceptedSendRouteScreenshotTest {
             ShadowView.setUseRealDrawTraversals(true)
             val conversation = createConversation(draftText = text)
             val evidence = SendRouteEvidence()
-            val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
-            var motionOwner: ComposerSendMotion? = null
-            val boundaries = mutableListOf<String>()
+            val frames = LiveTailFrames()
             mountHistoryConversation(
                 conversation,
                 evidence,
                 liveTail = true,
                 keyboardClearanceDp = keyboardClearanceDp,
-                onPaintedGeometry = { painted.add(it) },
-                onMotionOwner = { motionOwner = it },
+                onPaintedGeometry = { frames.painted.add(it) },
+                onMotionOwner = { frames.motionOwner = it },
             )
             composeRule.waitForIdle()
             composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }
             // FollowingTail is the initial navigation intent, before reveal/layout gates have settled.
             // Keep driving frames until the real route admits motion, then freeze the send itself.
-            composeRule.waitUntil(5_000) { motionOwner?.enabled == true }
-            boundaries += "before-send ${motionOwner?.diagnosticState}"
+            composeRule.waitUntil(5_000) { frames.motionOwner?.enabled == true }
+            frames.boundaries += "before-send ${frames.motionOwner?.diagnosticState}"
             composeRule.mainClock.autoAdvance = false
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
             awaitConversationCondition { publishCount == 1 }
-            boundaries += "accepted ${motionOwner?.diagnosticState}"
-            repeat(30) {
-                composeRule.mainClock.advanceTimeByFrame()
-                composeRule.waitForIdle()
-                boundaries += "frame-$it ${motionOwner?.diagnosticState}"
-            }
-            assertTrue(
-                "a real tail send must paint moving geometry, not merely create a flight" +
-                    " (painted frames=${painted.size}; owner boundaries=$boundaries)",
-                painted.any {
-                    it.progress > 0f && it.progress < 1f && !motionRectsMatch(it.bounds, it.canonicalFrame)
-                },
-            )
-            assertEquals(1, publishCount)
-            assertEquals(1, conversation.timeline.count { it.record.plaintext == text })
-            composeRule.onNodeWithText(text).assertIsDisplayed()
-            composeRule.onNodeWithTag("conversation.send.motion.active").assertDoesNotExist()
+            frames.boundaries += "accepted ${frames.motionOwner?.diagnosticState}"
+            advanceLiveTailFrames(frames, resolver, suppressDuringFlight, retireDuringFlight)
+            assertLiveTailResult(conversation, text, frames, suppressDuringFlight, retireDuringFlight)
         } finally {
             ShadowView.setUseRealDrawTraversals(previousRealDrawTraversals)
             Settings.Global.putString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, previousScale)
+            resolver.notifyChange(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), null)
         }
     }
 

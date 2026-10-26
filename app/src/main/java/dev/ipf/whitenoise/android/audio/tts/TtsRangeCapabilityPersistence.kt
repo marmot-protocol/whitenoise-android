@@ -23,13 +23,11 @@ internal fun confirmTtsRangeCapability(
     rangeProbe: TtsRangeCapabilityProbe,
     timingStore: TtsTimingStore?,
     rangeVerdictKey: String,
-    onConfirmed: () -> Unit,
 ) {
-    // Each usable native range retires this utterance's estimate. Historical confirmation
-    // controls persistence only; a later utterance may need its own estimated schedule.
+    // A usable native range proves current timing capability. Historical confirmation
+    // controls persistence only; it cannot provide timings for a later silent utterance.
     val wasProven = rangeProbe.hasConfirmedRangeCapability
     rangeProbe.onRangeStart()
-    onConfirmed()
     if (!wasProven) {
         if (timingStore?.rangeVerdict(rangeVerdictKey) != true) {
             timingStore?.setRangeVerdict(rangeVerdictKey, true)
