@@ -30,6 +30,8 @@ import kotlin.coroutines.resumeWithException
 class AccountWipeMemberMuteRetentionTest {
     private val context: Application = RuntimeEnvironment.getApplication()
     private var listAccountsFailure: Throwable? = null
+    private var remainingAccounts = listOf(localAccount(SURVIVING_ACCOUNT))
+    private var signInCalls = 0
     private var wiped = false
     private var localCleanupCompleted = true
 
@@ -72,7 +74,11 @@ class AccountWipeMemberMuteRetentionTest {
                     ).also { wiped = true }
                 "listAccounts" -> {
                     listAccountsFailure?.let(::suspendFailure)
-                    if (wiped) listOf(localAccount(SURVIVING_ACCOUNT)) else listOf(localAccount(WIPED_ACCOUNT))
+                    if (wiped) remainingAccounts else listOf(localAccount(WIPED_ACCOUNT))
+                }
+                "signInAccount" -> {
+                    signInCalls++
+                    Unit
                 }
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "AccountWipeMemberMuteRetentionMarmotFake"
@@ -104,6 +110,61 @@ class AccountWipeMemberMuteRetentionTest {
                 .getDeclaredField("marmotRuntime")
                 .apply { isAccessible = true }
                 .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
+        }
+
+    /** Wiping the final signed-in identity must not select a retained signed-out identity. */
+    @Test
+    fun wipeWithOnlySignedOutProfilesReturnsToOnboarding() =
+        runBlocking {
+            remainingAccounts = listOf(localAccount("retained", signedOut = true))
+            val state = appState()
+
+            state.signOutAndWipeActiveAccount()
+
+            org.junit.Assert.assertNull(state.activeAccountRef)
+            org.junit.Assert.assertEquals(AppPhase.Onboarding, state.phase)
+            org.junit.Assert.assertFalse(
+                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE).contains("active_account"),
+            )
+            org.junit.Assert.assertEquals(remainingAccounts, state.accounts)
+            org.junit.Assert.assertEquals(0, signInCalls)
+        }
+
+    /** Inventory order and tracked-only identities must not displace the surviving signing profile. */
+    @Test
+    fun wipeSkipsSignedOutAndTrackedProfilesBeforeSignedInSuccessor() =
+        runBlocking {
+            remainingAccounts =
+                listOf(
+                    localAccount("retained", signedOut = true),
+                    localAccount("tracked").copy(localSigning = false),
+                    localAccount(SURVIVING_ACCOUNT),
+                )
+            val state = appState()
+
+            state.signOutAndWipeActiveAccount()
+
+            org.junit.Assert.assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
+            org.junit.Assert.assertEquals(AppPhase.Ready, state.phase)
+            org.junit.Assert.assertEquals(
+                SURVIVING_ACCOUNT,
+                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE)
+                    .getString("active_account", null),
+            )
+            org.junit.Assert.assertEquals(0, signInCalls)
+        }
+
+    /** Tracked-only inventory is retained but cannot become a signed-in successor. */
+    @Test
+    fun wipeWithOnlyTrackedProfilesReturnsToOnboarding() =
+        runBlocking {
+            remainingAccounts = listOf(localAccount("tracked").copy(localSigning = false))
+            val state = appState()
+            state.signOutAndWipeActiveAccount()
+            org.junit.Assert.assertNull(state.activeAccountRef)
+            org.junit.Assert.assertEquals(AppPhase.Onboarding, state.phase)
+            org.junit.Assert.assertEquals(remainingAccounts, state.accounts)
+            org.junit.Assert.assertEquals(0, signInCalls)
         }
 
     /** A clean wipe still prunes a genuinely removed account's mutes as before. */
