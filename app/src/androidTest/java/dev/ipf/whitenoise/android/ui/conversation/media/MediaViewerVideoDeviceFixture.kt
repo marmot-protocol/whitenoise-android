@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.Collections
 import androidx.media3.ui.R as Media3R
@@ -90,6 +91,7 @@ internal class EdgeClipViewerFixture(
     private val clipBytes = EdgeClip.entries.associateWith { it.readVerifiedBytes() }
     private val renderedPlayers = Collections.synchronizedSet(mutableSetOf<Player>())
     private var scenario by mutableStateOf<EdgeClipScenario?>(null)
+    private var sourceEpoch by mutableStateOf(1uL)
     private var shellTransportShown = false
 
     @Volatile
@@ -113,7 +115,12 @@ internal class EdgeClipViewerFixture(
     fun Content() {
         val active = scenario ?: return
         key(active) {
-            val pages = remember { active.clips.map { it.page() } }
+            val pages =
+                remember(sourceEpoch) {
+                    active.clips.map { clip ->
+                        clip.page().copy(reference = clip.reference().copy(sourceEpoch = sourceEpoch))
+                    }
+                }
             CompositionLocalProvider(LocalShellPlaybackHost provides shellHost.takeIf { active.shellTransport }) {
                 FullScreenMediaViewer(
                     controller = controller,
@@ -199,6 +206,18 @@ internal class EdgeClipViewerFixture(
 
     /** Identity of the current page's player, for asserting a gesture did not replace it. */
     fun currentPlayer(): Player = readPlayer { it }
+
+    /** Publishes identical bytes at a new epoch's path, then refreshes the still-mounted page descriptor. */
+    fun replaceCurrentPlaybackFile() {
+        val clip = EdgeClip.entries[currentAttachment]
+        val nextEpoch = sourceEpoch + 1uL
+        runBlocking(Dispatchers.IO) {
+            materializeVideoAttachment(context, MESSAGE_ID, clip.ordinal, clip.reference().copy(sourceEpoch = nextEpoch)) {
+                clipBytes.getValue(clip)
+            }
+        }
+        rule.runOnIdle { sourceEpoch = nextEpoch }
+    }
 
     /** Measures the open viewer, re-dispatching [simulatedInsets] first so real insets cannot replace them. */
     fun geometry(): ViewerGeometry {
@@ -309,7 +328,14 @@ internal class EdgeClipViewerFixture(
         } finally {
             controller.onCleared()
             EdgeClip.entries.forEach { clip ->
-                videoAttachmentCacheFileForTests(context, MESSAGE_ID, clip.ordinal, clip.reference()).delete()
+                for (epoch in 1uL..sourceEpoch) {
+                    videoAttachmentCacheFileForTests(
+                        context,
+                        MESSAGE_ID,
+                        clip.ordinal,
+                        clip.reference().copy(sourceEpoch = epoch),
+                    ).delete()
+                }
             }
             context.deleteSharedPreferences(PREFERENCES_NAME)
         }

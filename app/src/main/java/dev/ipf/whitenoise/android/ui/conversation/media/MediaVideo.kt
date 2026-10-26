@@ -1482,8 +1482,8 @@ private fun videoAttachmentExtension(reference: MediaAttachmentReferenceFfi): St
  * the page recycles the multi-MB native bitmap instead of leaning on GC. The
  * pager precomposes one page either side by default, so transfer and playback
  * are gated on [isCurrent] to avoid concurrent downloads and decoders. Lifecycle STOP
- * and noisy audio routes pause playback; pending files retain STOP intent so foreground
- * return cannot start audio without a new page selection or an explicit Play action.
+ * and noisy audio routes pause playback; pending or replaced files retain pause intent so
+ * foreground return cannot start audio without a new page selection or an explicit Play action.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
@@ -1670,14 +1670,28 @@ internal fun VideoViewerPage(
     }
     // Pause the mounted player on Home or screen lock. START intentionally does not resume it:
     // only the user's play action may resume after a stop or a disconnected audio route.
-    DisposableEffect(exo, lifecycle) {
+    DisposableEffect(exo, lifecycle, autoplayAllowed) {
+        val pauseListener =
+            object : androidx.media3.common.Player.Listener {
+                /** Carries a pause or subsequent explicit Play across replacement of the same attachment's file. */
+                override fun onPlayWhenReadyChanged(
+                    playWhenReady: Boolean,
+                    reason: Int,
+                ) {
+                    autoplayAllowed.value = playWhenReady
+                }
+            }
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_STOP) exo.pause()
             }
+        exo.addListener(pauseListener)
         lifecycle.addObserver(observer)
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) exo.pause()
-        onDispose { lifecycle.removeObserver(observer) }
+        onDispose {
+            exo.removeListener(pauseListener)
+            lifecycle.removeObserver(observer)
+        }
     }
     // The player reopens its file to seek or replay, so the cache holds it for as long as this page plays it.
     HoldCacheFileWhileComposed(file)

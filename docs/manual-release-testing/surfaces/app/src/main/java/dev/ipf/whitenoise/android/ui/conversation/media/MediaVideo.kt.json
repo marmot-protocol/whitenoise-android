@@ -145,7 +145,7 @@
       {
         "surface": "Attachment video foreground and audio-route pause",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "DisposableEffect(exo, lifecycle)",
+        "anchor": "DisposableEffect(exo, lifecycle, autoplayAllowed)",
         "test_ids": [
           "MED-041"
         ]

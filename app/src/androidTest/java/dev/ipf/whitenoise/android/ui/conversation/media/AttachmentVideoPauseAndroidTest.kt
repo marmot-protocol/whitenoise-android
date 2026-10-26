@@ -21,6 +21,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -156,6 +157,43 @@ class AttachmentVideoPauseAndroidTest {
         assertPausedAt(player, pausedAt)
         onMain { player.play() }
         await("explicit play after reconnect") { onMain { player.isPlaying } }
+    }
+
+    /** A new materialized file cannot erase the pause imposed by Media3's real noisy-route receiver. */
+    @Test
+    fun noisyPauseSurvivesMaterializedFileReplacement() {
+        val player = openPlayingVideo()
+        systemBroadcast(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+        await("noisy pause before file replacement") { onMain { !player.playWhenReady && !player.isPlaying } }
+        systemBroadcast(Intent.ACTION_HEADSET_PLUG, "--ei state 1 --ei microphone 1 --es name fixture")
+        assertFileReplacementStaysPaused(player)
+    }
+
+    /** Replacing the file of a manually paused attachment also requires another explicit Play action. */
+    @Test
+    fun userPauseSurvivesMaterializedFileReplacement() {
+        val player = openPlayingVideo()
+        onMain { player.pause() }
+        assertFileReplacementStaysPaused(player)
+    }
+
+    /** Requires an actually replaced, decoded player and rejects even a brief autoplay request. */
+    private fun assertFileReplacementStaysPaused(previous: Player) {
+        onMain { everRequestedPlayback = false }
+        fixture.replaceCurrentPlaybackFile()
+        fixture.awaitCondition("the refreshed file to replace the player") { fixture.currentPlayer() !== previous }
+        fixture.awaitFirstFrame()
+        val replacement = fixture.currentPlayer()
+        assertNotSame(previous, replacement)
+        assertFalse("file replacement briefly restarted playback", onMain { everRequestedPlayback })
+        assertPausedAt(replacement, 0L)
+        onMain { replacement.play() }
+        await("explicit play after file replacement") { onMain { replacement.isPlaying } }
+        fixture.replaceCurrentPlaybackFile()
+        fixture.awaitCondition("explicit play intent to survive another file replacement") {
+            val resumed = fixture.currentPlayer()
+            resumed !== replacement && onMain { resumed.isPlaying }
+        }
     }
 
     /** Rotation preserves pause and position; paging stops the previous decoder and disposal stops the current one. */
