@@ -128,6 +128,28 @@ class LocalNotificationReactionChipsTest {
         assertNull(notificationReactionChoice(tapped(marmot), listOf("👍")))
     }
 
+    /** Boundary underscores and blank names preserve each posted chip's exact reaction. */
+    @Test
+    fun normalizedChipNamesRoundTripThroughThePostedIntent() {
+        val choices = listOf(":_wave_:", ":wave:", ":_party_:", ":__:")
+        postConversationCard(presenter(choices))
+        val reply = replyAction()
+        val remoteInput = checkNotNull(reply.remoteInputs).single()
+        val labels = checkNotNull(remoteInput.choices).map(CharSequence::toString)
+
+        assertEquals(listOf(":_wave_:", ":wave:", "party", ":__:"), labels)
+        labels.zip(choices).forEach { (label, expected) ->
+            val tapped = Intent(shadowOf(reply.actionIntent).savedIntent)
+            RemoteInput.addResultsToIntent(
+                arrayOf(remoteInput),
+                tapped,
+                Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, label) },
+            )
+            RemoteInput.setResultsSource(tapped, RemoteInput.SOURCE_CHOICE)
+            assertEquals(expected, notificationReactionChoice(tapped, choices))
+        }
+    }
+
     /** After a shortcode chip is handled, the card's reply history repeats the chip's name, not `:marmot:`. */
     @Test
     fun handledShortcodeReactionHistoryRepeatsTheChipName() {

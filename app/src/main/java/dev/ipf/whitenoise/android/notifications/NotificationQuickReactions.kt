@@ -28,7 +28,10 @@ internal fun notificationQuickReactionLabels(
     context: Context,
     choices: List<String>,
 ): List<String> {
-    val labels = choices.map { EmojiShortcodes.plainLabel(it, context.resources) }
+    val labels =
+        choices.map { choice ->
+            EmojiShortcodes.plainLabel(choice, context.resources).trim().ifBlank { choice }
+        }
     return choices.mapIndexed { index, choice ->
         val label = labels[index]
         val ambiguous = labels.count { it == label } > 1 || (label != choice && label in choices)
