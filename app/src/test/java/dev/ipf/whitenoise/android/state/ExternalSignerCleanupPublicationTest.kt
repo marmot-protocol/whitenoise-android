@@ -26,11 +26,12 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34])
 internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixture() {
-    /** A failed native sign-out cannot let an older suspended selection undo completed local deactivation. */
+    /** A lost native reply after commit cannot let an older selection undo confirmed local deactivation. */
     @Test
-    fun localSignOutFallbackRejectsAnOlderSuspendedActivation() =
+    fun confirmedSignOutWithLostReplyRejectsAnOlderSuspendedActivation() =
         runBlocking {
-            signOutFailure = RuntimeException("relay unavailable")
+            signOutFailure = RuntimeException("native reply unavailable")
+            persistSignedOutBeforePartialFailure = true
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             val state =
@@ -66,9 +67,10 @@ internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixtu
 
     /** Selection retirement precedes suspended cleanup once local sign-out is admitted. */
     @Test
-    fun localSignOutFallbackRejectsActivationDuringAccountRefresh() =
+    fun confirmedSignOutWithLostReplyRejectsActivationDuringAccountRefresh() =
         runBlocking {
-            signOutFailure = RuntimeException("relay unavailable")
+            signOutFailure = RuntimeException("native reply unavailable")
+            persistSignedOutBeforePartialFailure = true
             val profileEntered = CompletableDeferred<Unit>()
             val profileRelease = CompletableDeferred<Unit>()
             val cleanupEntered = CompletableDeferred<Unit>()
