@@ -300,7 +300,7 @@ class StalenessGuardCoverageTest {
                 "Controllers.kt:deleteMessageResult" to "serialized optimistic command with conditional rollback",
                 // Retry resumes one retained optimistic mutation; media retries also recheck the account session.
                 "Controllers.kt:retryFailedSend" to "retained optimistic command ownership",
-                // Sends retain per-account optimistic identity across routes; locked admission and caller tokens settle them.
+                // Sends retain identity across routes; locked admission and caller tokens settle them.
                 "Controllers.kt:send" to "serialized authoritative send with token-bound reconciliation",
                 // The conversation mutation mutex serializes decline and its local projection update.
                 "Controllers.kt:declineInvite" to "conversation mutation mutex",

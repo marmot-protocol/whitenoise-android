@@ -8093,24 +8093,26 @@ class ConversationController(
      * A parse failure keeps the plain-text presentation. The chat list publishes
      * that fallback only after the parse attempt completes, so it cannot flash a
      * raw frame before replacing it with styled content. In either case,
-     * a bubble already reconciled or rolled back is left alone. Returns the
-     * record now backing the bubble so later reconciliation and failure
-     * retention keep the styled document instead of the pre-parse snapshot.
+     * a bubble already reconciled or rolled back is left alone. The parsed
+     * record still backs preview reconciliation when an early echo removed
+     * the optimistic bubble, so the chat list cannot lose its styled tokens.
      */
     private suspend fun hydrateOptimisticSendMarkdown(
         optimisticKey: String,
-        tempId: String,
-        text: String,
-    ): AppMessageRecordFfi? {
+        optimistic: AppMessageRecordFfi,
+    ): AppMessageRecordFfi {
         val tokens =
-            runCatchingCancellable { markdownParser(text) }
+            runCatchingCancellable { markdownParser(optimistic.plaintext) }
                 .getOrNull()
                 ?.takeIf { it.blocks.isNotEmpty() }
+                ?: return optimistic
         val pending = optimisticMessages[optimisticKey]
-        if (tokens == null || pending == null || pending.record.messageIdHex != tempId) return null
+        if (pending == null || pending.record.messageIdHex != optimistic.messageIdHex) {
+            return optimistic.copy(contentTokens = tokens)
+        }
         val hydrated = pending.record.copy(contentTokens = tokens)
         optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
-        messageById[tempId] = hydrated
+        messageById[optimistic.messageIdHex] = hydrated
         publishTimelineFromIndexes()
         return hydrated
     }
@@ -8301,7 +8303,7 @@ class ConversationController(
                                     .also { completeDurableAcceptance(optimisticKey) }
                             }
                         }
-                    publishedRecord = hydrateOptimisticSendMarkdown(optimisticKey, tempId, trimmed) ?: optimistic
+                    publishedRecord = hydrateOptimisticSendMarkdown(optimisticKey, optimistic)
                     // Keep the prior chat-list row while the parser is in flight. The
                     // optimistic preview is published only with a completed document,
                     // never as a raw frame followed by a styled replacement (#2411).

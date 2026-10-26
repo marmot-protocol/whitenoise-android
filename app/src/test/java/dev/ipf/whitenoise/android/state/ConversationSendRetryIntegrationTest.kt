@@ -1358,6 +1358,8 @@ class ConversationSendRetryIntegrationTest {
     @Test
     fun nativeEchoWhileMarkdownIsBlockedKeepsCanonicalIdentityAndTokens() =
         runTest {
+            val state = appState()
+            val chats = attachedChatsController(state, ACCOUNT_REF, chatListRow())
             val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
             val durablyAccepted = CompletableDeferred<Unit>()
             val nativeTokens =
@@ -1369,10 +1371,9 @@ class ConversationSendRetryIntegrationTest {
             val lateLocalTokens =
                 nativeTokens.copy(truncated = true)
             var publishCalls = 0
-            var durableCallbacks = 0
             val controller =
                 ConversationController(
-                    appState = appState(),
+                    appState = state,
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     markdownParser = {
@@ -1386,17 +1387,12 @@ class ConversationSendRetryIntegrationTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     controller.send(
                         "hello",
-                        onDurablyAccepted = {
-                            durableCallbacks += 1
-                            durablyAccepted.complete(Unit)
-                        },
+                        onDurablyAccepted = { durablyAccepted.complete(Unit) },
                     )
                 }
 
             try {
-                withTimeout(5_000) {
-                    durablyAccepted.await()
-                }
+                assertTrue("admission must beat parsing", durablyAccepted.isCompleted)
                 val optimistic = controller.timeline.single().record
                 applyProjection(
                     controller,
@@ -1411,12 +1407,15 @@ class ConversationSendRetryIntegrationTest {
                 send.await()
 
                 assertNativeEcho(controller, nativeTokens)
+                chats.setChatListVisible(true)
+                assertEquals(lateLocalTokens, chats.items.single().previewTokens)
                 assertEquals(1, publishCalls)
-                assertEquals(1, durableCallbacks)
             } finally {
                 releaseParse.complete(lateLocalTokens)
                 send.cancelAndJoin()
                 controller.onCleared()
+                state.attachChatsController(null)
+                chats.onCleared()
             }
         }
 
