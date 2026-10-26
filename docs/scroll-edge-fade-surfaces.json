@@ -837,7 +837,21 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
       "calls": {
-        "whiteNoiseVerticalScroll": 2
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+      "calls": {
+        "SettingsList": 1
       },
       "family": "group",
       "policy": "ordinary",

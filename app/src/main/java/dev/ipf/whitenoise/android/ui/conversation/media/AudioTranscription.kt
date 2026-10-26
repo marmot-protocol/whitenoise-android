@@ -98,15 +98,10 @@ internal fun ReceivedAudioTranscription(file: File?) {
         Text(stringResource(R.string.transcribe_audio))
     }
     ui?.let { state ->
-        val listingError =
-            if (listingFailed) {
-                stringResource(R.string.dictation_ostt_recommendation_open_failed)
-            } else {
-                null
-            }
         AudioTranscriptDialog(
             state = state,
-            listingError = listingError,
+            listingError =
+                if (listingFailed) stringResource(R.string.dictation_ostt_recommendation_open_failed) else null,
             onStart = { ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING) },
             onDismiss = {
                 request?.cancel()
@@ -205,7 +200,10 @@ private fun AudioTranscriptConfirm(
                 Text(stringResource(R.string.transcribe_audio))
             }
         AudioTranscriptPhase.FAILED -> {
-            if (state.failure == AttachmentSpeechFailure.PROVIDER_MISSING || state.failure == AttachmentSpeechFailure.PROVIDER_OUTDATED) {
+            val needsProvider =
+                state.failure == AttachmentSpeechFailure.PROVIDER_MISSING ||
+                    state.failure == AttachmentSpeechFailure.PROVIDER_OUTDATED
+            if (needsProvider) {
                 TextButton(onClick = onGetProvider) {
                     Text(stringResource(R.string.dictation_ostt_recommendation_title))
                 }
