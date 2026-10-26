@@ -164,3 +164,6 @@ dev.ipf.whitenoise.android.ui.conversation.media.AttachmentVideoPauseAndroidTest
 
 # #3449: measured thumbnail allocation with independent full-viewer detail.
 dev.ipf.whitenoise.android.media.MediaThumbnailDecodeDeviceTest#renderedTileUsesFewerDecodedBytesWhileTheViewerRetainsOriginalDetail
+
+# Fixture teardown must verify durable own-send bytes even when L1 is populated.
+dev.ipf.whitenoise.android.media.AttachmentFixturePublicationDeviceTest#smallMemoryHitStillWaitsForVerifiedDiskPublication

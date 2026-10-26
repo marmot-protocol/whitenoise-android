@@ -119,6 +119,7 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
+import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -1434,7 +1435,7 @@ class WhiteNoiseAppState private constructor(
         assertMainThread { "cacheMediaThumbnail" }
         val cached = mediaThumbnailCache.get(cacheKey)
         if (cached != null && cached.maxEdgePx > maxEdgePx) return
-        val entry = dev.ipf.whitenoise.android.media.MediaThumbnail(thumbnail, maxEdgePx)
+        val entry = MediaThumbnail(thumbnail, maxEdgePx)
         val previous = mediaThumbnailCache.put(cacheKey, entry)
         if (mediaThumbnailCache.get(cacheKey) === entry || previous != null) {
             mediaThumbnailRevisionState.update { it + 1L }
