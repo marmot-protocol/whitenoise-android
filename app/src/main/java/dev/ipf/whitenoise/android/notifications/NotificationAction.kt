@@ -92,9 +92,10 @@ object NotificationActions {
         )
     }
 
-    // Cards posted by earlier app versions carry a direct value: the old emoji
-    // action and the expanded image choices. Both stay functional across an
-    // in-place update, still subject to the current allowlist in the receiver.
+    /**
+     * The direct value carried by cards from earlier app versions: the old emoji action and the expanded
+     * image choices. Both keep working across an in-place update, still subject to the receiver's allowlist.
+     */
     internal fun legacyReaction(intent: Intent): String? =
         normalizeNotificationReaction(
             intent.getStringExtra(LEGACY_EXTRA_REACTION),

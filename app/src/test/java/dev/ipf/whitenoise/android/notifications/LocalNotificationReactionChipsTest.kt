@@ -181,8 +181,7 @@ class LocalNotificationReactionChipsTest {
         postConversationCard(presenter, "message-a")
         assertEquals(
             choices,
-            replyAction()
-                .remoteInputs
+            checkNotNull(replyAction().remoteInputs)
                 .single()
                 .choices
                 ?.map(CharSequence::toString),
@@ -260,7 +259,11 @@ class LocalNotificationReactionChipsTest {
                     },
                 ).build()
         manager.notify(posted.tag, posted.id, legacy)
-        assertNotNull(manager.activeNotifications.single().notification.bigContentView)
+        assertNotNull(
+            manager.activeNotifications
+                .single()
+                .notification.bigContentView,
+        )
 
         assertTrue(presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", ":marmot:"))
 

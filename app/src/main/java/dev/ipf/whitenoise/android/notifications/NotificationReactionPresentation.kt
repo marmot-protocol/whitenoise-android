@@ -190,8 +190,9 @@ internal fun notificationBuiltinEmojiBitmap(
 ): Bitmap? {
     val resource = EmojiShortcodes.builtinDrawable(code) ?: return null
     val region = EmojiShortcodes.builtinArtworkRegion(resource)
+    val tile = NOTIFICATION_EMOJI_TILE_PX
     return AppCompatResources.getDrawable(context, resource)?.let { drawable ->
-        Bitmap.createBitmap(NOTIFICATION_EMOJI_TILE_PX, NOTIFICATION_EMOJI_TILE_PX, Bitmap.Config.ARGB_8888).also { bitmap ->
+        Bitmap.createBitmap(tile, tile, Bitmap.Config.ARGB_8888).also { bitmap ->
             if (region == null || drawable.intrinsicWidth <= 0 || drawable.intrinsicHeight <= 0) {
                 drawable.setBounds(0, 0, bitmap.width, bitmap.height)
             } else {

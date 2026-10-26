@@ -185,7 +185,9 @@ class NotificationQuickReactionTest {
         val earlier =
             Intent(context, NotificationActionReceiver::class.java).also { intent ->
                 NotificationActions.applyToIntent(intent, NotificationActionKind.REACT, actionTarget())
-                intent.data = Uri.parse("whitenoise-notify://fixed-reaction/account-a/group-a/message-a/MESSAGE/17/:marmot:")
+                // The data URI the earlier build gave each image choice, so no two targets shared an identity.
+                val uri = "whitenoise-notify://fixed-reaction/account-a/group-a/message-a/MESSAGE/17/marmot"
+                intent.data = Uri.parse(uri)
                 intent.putExtra("dev.ipf.whitenoise.android.extra.REACTION", ":marmot:")
             }
 

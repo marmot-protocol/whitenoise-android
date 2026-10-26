@@ -2644,22 +2644,7 @@ class LocalNotificationPresenter(
             )
             runCatching {
                 val historyText =
-                    if (reactionChoice) {
-                        val postedChoices =
-                            active.notification.actions.orEmpty().flatMap { action ->
-                                action.remoteInputs.orEmpty().flatMap { input ->
-                                    input.choices.orEmpty().map(CharSequence::toString)
-                                }
-                            }
-                        val readable = notificationQuickReactionLabels(context, listOf(handledText)).single()
-                        if (handledText in postedChoices) {
-                            handledText
-                        } else {
-                            readable.takeIf { it in postedChoices } ?: handledText
-                        }
-                    } else {
-                        handledText
-                    }
+                    if (reactionChoice) postedReactionHistoryText(active.notification, handledText) else handledText
                 val resolved =
                     NotificationCompat
                         .Builder(context, active.notification)
@@ -2686,6 +2671,26 @@ class LocalNotificationPresenter(
                 true
             }.getOrDefault(false)
         }
+
+    /**
+     * The chip [card] posted for [reaction]: its exact value when shown as is, else its readable name,
+     * else the value itself, so the history line matches the tapped chip even after the choices change.
+     */
+    private fun postedReactionHistoryText(
+        card: Notification,
+        reaction: String,
+    ): String {
+        val postedChoices =
+            card.actions.orEmpty().flatMap { action ->
+                action.remoteInputs.orEmpty().flatMap { input -> input.choices.orEmpty().map(CharSequence::toString) }
+            }
+        val readable = notificationQuickReactionLabels(context, listOf(reaction)).single()
+        return when {
+            reaction in postedChoices -> reaction
+            readable in postedChoices -> readable
+            else -> reaction
+        }
+    }
 
     /**
      * Re-post the (tag, id) conversation card after a direct reply failed
