@@ -1,12 +1,14 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.core.app.RemoteInput
 import androidx.work.BackoffPolicy
 import androidx.work.NetworkType
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -99,10 +101,12 @@ class NotificationQuickReactionTest {
         assertNull(notificationReactionChoice(delivered("😀".repeat(33)), listOf("🥳", "🔥")))
     }
 
+    /** A chosen chip routes to a reaction, while typed text on the same Reply stays a reply. */
     @Test
     fun replyActionChoiceRoutesToReactionWhileFreeFormStillRoutesToReply() {
         val remoteInput = RemoteInput.Builder(NotificationActions.KEY_TEXT_REPLY).build()
 
+        /** A Reply intent carrying [value] as if SystemUI returned it from [source]. */
         fun delivered(
             value: String,
             source: Int,
@@ -130,6 +134,7 @@ class NotificationQuickReactionTest {
         assertNull(notificationReactionChoice(freeForm, listOf("🥳", "🔥")))
     }
 
+    /** An emoji action from a card posted before the upgrade still reacts, within the current allowlist. */
     @Test
     fun directReactionFromANotificationPostedBeforeUpgradeStillUsesTheCurrentAllowlist() {
         val legacy =
@@ -142,6 +147,36 @@ class NotificationQuickReactionTest {
         assertNull(notificationReactionChoice(legacy, listOf("🥳")))
     }
 
+    /** A shortcode with no words keeps its exact value as its readable label, so TalkBack never reads a blank. */
+    @Test
+    fun wordlessShortcodeKeepsItsExactValue() {
+        val resources = context.resources
+
+        assertEquals(":__:", EmojiShortcodes.plainLabel(":__:", resources))
+        assertEquals(":-_-:", EmojiShortcodes.plainLabel(":-_-:", resources))
+        assertEquals("wave", EmojiShortcodes.plainLabel(":_wave_:", resources))
+        assertEquals("party parrot", EmojiShortcodes.plainLabel(":party_parrot:", resources))
+    }
+
+    /** An image choice on a card posted by the earlier expanded-choice build still sends its exact reaction. */
+    @Test
+    fun imageChoiceFromAnEarlierExpandedCardStillReacts() {
+        val earlier =
+            Intent(context, NotificationActionReceiver::class.java).also { intent ->
+                NotificationActions.applyToIntent(intent, NotificationActionKind.REACT, actionTarget())
+                // The data URI the earlier build gave each image choice, so no two targets shared an identity.
+                val uri = "whitenoise-notify://fixed-reaction/account-a/group-a/message-a/MESSAGE/17/marmot"
+                intent.data = Uri.parse(uri)
+                intent.putExtra("dev.ipf.whitenoise.android.extra.REACTION", ":marmot:")
+            }
+
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(earlier)?.kind)
+        assertEquals(actionTarget().target, NotificationActions.parse(earlier)?.target)
+        assertEquals(":marmot:", notificationReactionChoice(earlier, listOf(":marmot:", ":wn:")))
+        assertNull(notificationReactionChoice(earlier, listOf(":wn:")))
+    }
+
+    /** React and Reply never share a request code or action URI, so neither PendingIntent replaces the other. */
     @Test
     fun reactKeepsAPendingIntentIdentityOfItsOwn() {
         val tag = "account-a|group-a"

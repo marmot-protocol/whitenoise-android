@@ -20,6 +20,32 @@
           "NTF-034",
           "NTF-030"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "private fun reactionBody(",
+        "surface": "readable built-in reaction names in the plain-text line, authored shortcode kept only for inline artwork",
+        "test_ids": [
+          "NTF-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "R.string.notification_reacted_to_message",
+        "surface": "reaction sentence with its quoted target",
+        "test_ids": [
+          "NTF-034",
+          "NTF-007"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "R.string.notification_reacted",
+        "surface": "reaction sentence without a quoted target",
+        "test_ids": [
+          "NTF-034",
+          "NTF-007"
+        ]
       }
     ],
     "source_coverage": [

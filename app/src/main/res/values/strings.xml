@@ -561,6 +561,8 @@
     <string name="emoji_category_objects" translatable="false">Objects</string>
     <string name="emoji_category_symbols" translatable="false">Symbols</string>
     <string name="emoji_category_flags" translatable="false">Flags</string>
+    <!-- Product name of the bundled :marmot: emoji, shown where its artwork cannot be drawn. -->
+    <string name="emoji_name_marmot" translatable="false">Marmot</string>
     <string name="reply">Reply</string>
     <string name="forward">Forward</string>
     <string name="forward_to">Forward to</string>

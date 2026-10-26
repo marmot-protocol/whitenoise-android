@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -61,6 +62,7 @@ class LocalNotificationReactionChipsTest {
         assertEquals(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED, remoteInput.editChoicesBeforeSending)
     }
 
+    /** The card offers Reply then Mark as read, and Reply's mutable broadcast routes a chosen chip as a reaction. */
     @Test
     fun rowKeepsReplyAndMarkReadWhileReplyUsesAMutableBroadcast() {
         postConversationCard(presenter(defaultChoices()))
@@ -89,6 +91,7 @@ class LocalNotificationReactionChipsTest {
         assertEquals(NotificationActionKind.REACT, NotificationActions.parse(selectedChoice)?.kind)
     }
 
+    /** A handled reaction for an older message never writes history onto a newer message's card. */
     @Test
     fun reactionHandledRepostCannotAnnotateANewerMessageGeneration() {
         val presenter = presenter(defaultChoices())
@@ -112,30 +115,74 @@ class LocalNotificationReactionChipsTest {
         assertNull(live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
     }
 
+    /** Android draws choice chips as text only, so shortcode chips show their exact code and tapping one sends it. */
     @Test
-    fun rejectedExpandedChoicesRetryTheSameMessageThroughNativeLayoutOnce() {
-        val attempted = mutableListOf<Notification>()
-        val presenter =
-            LocalNotificationPresenter(
-                context,
-                groupReconciliation = {},
-                quickReactionChoices = { listOf(":marmot:", ":wn:", "👍") },
-                notificationPoster = { compat, tag, id, notification ->
-                    attempted += notification
-                    if (attempted.size == 1) {
-                        checkNotNull(notification.bigContentView)
-                        throw IllegalArgumentException("Rejected fixture RemoteViews")
-                    }
-                    compat.notify(tag, id, notification)
-                },
-            ).also(LocalNotificationPresenter::ensureChannels)
-        postConversationCard(presenter)
-        assertEquals(2, attempted.size)
-        assertNull(attempted.last().bigContentView)
-        val style =
-            checkNotNull(
-                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(attempted.last()),
-            )
+    fun shortcodeChipsShowTheirExactCodeAndSendIt() {
+        val choices = listOf(":marmot:", ":wn:", "👍")
+        postConversationCard(presenter(choices))
+        val reply = replyAction()
+        val remoteInput = checkNotNull(reply.remoteInputs).single()
+
+        assertEquals(choices, remoteInput.choices?.map(CharSequence::toString))
+        val tapped =
+            Intent(shadowOf(reply.actionIntent).savedIntent).also { intent ->
+                RemoteInput.addResultsToIntent(
+                    arrayOf(remoteInput),
+                    intent,
+                    Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, ":wn:") },
+                )
+                RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_CHOICE)
+            }
+        assertEquals(":wn:", notificationReactionChoice(tapped, choices))
+    }
+
+    /** Built-in choices keep Android's conversation card: no custom expanded view, Reply and Mark as read stay. */
+    @Test
+    fun builtInChoicesKeepTheStandardConversationCard() {
+        postConversationCard(presenter(listOf(":marmot:", ":wn:", "👍")))
+        val live = manager.activeNotifications.single().notification
+
+        assertNull(live.bigContentView)
+        assertEquals(Notification.MessagingStyle::class.java.name, live.extras.getString(Notification.EXTRA_TEMPLATE))
+        assertEquals(
+            listOf(context.getString(R.string.reply), context.getString(R.string.chat_row_action_mark_read)),
+            actions().map { it.title.toString() },
+        )
+        assertFalse(live.extras.containsKey(LEGACY_EXTRA_EXPANDED_REACTION_CHOICES))
+        assertFalse(live.extras.containsKey(LEGACY_EXTRA_FIXED_REACTION_TARGET))
+    }
+
+    /** A card left by the earlier expanded-choice build loses that layout on its next write and keeps its thread. */
+    @Test
+    fun earlierExpandedChoiceCardReturnsToTheStandardCardOnItsNextWrite() {
+        val presenter = presenter(listOf(":marmot:", ":wn:", "👍"))
+        postConversationCard(presenter, "message-a")
+        val posted = manager.activeNotifications.single()
+        val legacy =
+            NotificationCompat
+                .Builder(context, posted.notification)
+                .setCustomBigContentView(RemoteViews(context.packageName, R.layout.notification_reaction_inline))
+                .addExtras(
+                    Bundle().apply {
+                        putBoolean(LEGACY_EXTRA_EXPANDED_REACTION_CHOICES, true)
+                        putBundle(LEGACY_EXTRA_FIXED_REACTION_TARGET, Bundle().apply { putString("target", "a") })
+                    },
+                ).build()
+        manager.notify(posted.tag, posted.id, legacy)
+        assertNotNull(
+            manager.activeNotifications
+                .single()
+                .notification.bigContentView,
+        )
+
+        assertTrue(presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", ":marmot:"))
+
+        val live = manager.activeNotifications.single().notification
+        assertNull(live.bigContentView)
+        assertFalse(live.extras.containsKey(LEGACY_EXTRA_EXPANDED_REACTION_CHOICES))
+        assertFalse(live.extras.containsKey(LEGACY_EXTRA_FIXED_REACTION_TARGET))
+        assertEquals(2, actions().size)
+        val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live))
         assertEquals(
             "message-a",
             style.messages
@@ -143,46 +190,10 @@ class LocalNotificationReactionChipsTest {
                 .text
                 .toString(),
         )
-        assertEquals(2, attempted.last().actions.size)
-    }
-
-    @Test
-    fun optionalLayoutRetryRechecksPreviewPrivacyInsteadOfResendingRichPayload() {
-        val attempted = mutableListOf<Notification>()
-        val presenter =
-            LocalNotificationPresenter(
-                context,
-                groupReconciliation = {},
-                quickReactionChoices = { listOf(":marmot:", ":wn:", "👍") },
-                notificationPoster = { compat, tag, id, notification ->
-                    attempted += notification
-                    if (attempted.size == 1) {
-                        runBlocking { NotificationPreviewPreferences.setEnabled(context, false, scrub = { true }) }
-                        throw IllegalArgumentException("Rejected fixture RemoteViews")
-                    }
-                    compat.notify(tag, id, notification)
-                },
-            ).also(LocalNotificationPresenter::ensureChannels)
-        try {
-            postConversationCard(presenter)
-            assertEquals(2, attempted.size)
-            val native = attempted.last()
-            assertNull(native.bigContentView)
-            val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(native))
-            assertEquals(
-                context.getString(R.string.notification_hidden_content),
-                style.messages
-                    .single()
-                    .text
-                    .toString(),
-            )
-            assertEquals(
-                listOf(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ),
-                native.actions.map { it.semanticAction },
-            )
-        } finally {
-            runBlocking { NotificationPreviewPreferences.setEnabled(context, true) }
-        }
+        assertEquals(
+            listOf(":marmot:"),
+            live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.map(CharSequence::toString),
+        )
     }
 
     private fun presenter(choices: List<String>) =

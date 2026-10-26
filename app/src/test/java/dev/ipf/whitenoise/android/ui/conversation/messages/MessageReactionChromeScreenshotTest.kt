@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
@@ -150,6 +151,7 @@ class MessageReactionChromeScreenshotTest {
         capture("message_reactions_adjacency_large_font")
     }
 
+    /** Built-in pills draw their artwork and announce readable names to TalkBack, never `:marmot:`. */
     @Test
     fun builtInReactionPills() {
         composeRule.setContent {
@@ -163,9 +165,12 @@ class MessageReactionChromeScreenshotTest {
                 }
             }
         }
+        composeRule.onNodeWithContentDescription("Marmot, 1 reaction").assertExists()
+        composeRule.onNodeWithContentDescription("White Noise, 3 reactions").assertExists()
         capture("message_reactions_builtins")
     }
 
+    /** Built-in quick-reaction slots draw their artwork and announce readable names, never `:marmot:`. */
     @Test
     fun builtInConfiguredQuickReactions() {
         composeRule.setContent {
@@ -178,6 +183,8 @@ class MessageReactionChromeScreenshotTest {
                 )
             }
         }
+        composeRule.onNodeWithContentDescription("Reaction 1, Marmot. Double tap to replace.").assertExists()
+        composeRule.onNodeWithContentDescription("Reaction 2, White Noise. Double tap to replace.").assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/configure_reactions_builtins.png")
     }
 

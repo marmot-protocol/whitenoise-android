@@ -1270,7 +1270,6 @@ class LocalNotificationPresenter(
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
-                                        builder.addExtras(notificationFixedReactionTargetExtras(actionTarget))
                                         decision.actions.forEach { action ->
                                             when (action) {
                                                 NotificationActionKind.REPLY ->
@@ -2317,8 +2316,7 @@ class LocalNotificationPresenter(
                     id,
                 )
             }
-            var expandedChoiceAttempted = false
-            val post = { expandedChoices: Boolean ->
+            val written =
                 NotificationGroupReconciler.postChild(
                     context,
                     notification,
@@ -2326,30 +2324,14 @@ class LocalNotificationPresenter(
                     isLive = { notificationWriteIsLive(notification, tag, id, mustBeLive, finalPostAllowed) },
                 ) {
                     val payload = previewPayload(withCurrentContactPictures(notification), tag, id, hiddenShortcut)
-                    val expanded =
-                        if (expandedChoices) {
-                            withExpandedReactionChoices(context, payload, tag, id, quickReactionChoices())
-                        } else {
-                            clearExpandedReactionChoices(context, payload)
-                        }
-                    expandedChoiceAttempted = expanded.extras.getBoolean(EXTRA_EXPANDED_REACTION_CHOICES)
+                    // Rewrites of a card posted by the earlier expanded-choice build return to the standard template.
+                    val standard = withoutLegacyReactionRail(context, payload)
                     val revision = ConversationCardPostedRegistry.newPayloadRevision()
                     // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
                     // the final platform payload so the revision describes exactly the card Android receives.
-                    val outgoing = expanded.clone().apply { extras.putString(EXTRA_PAYLOAD_REVISION, revision) }
+                    val outgoing = standard.clone().apply { extras.putString(EXTRA_PAYLOAD_REVISION, revision) }
                     notificationPoster(manager, tag, id, outgoing)
                     recordAcceptedPayload(tag, id, outgoing, recordedAtMs)
-                }
-            }
-            val written =
-                try {
-                    post(true)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (exception: RuntimeException) {
-                    if (!expandedChoiceAttempted) throw exception
-                    // Repeat the complete live/profile/privacy fence, never resend the prior rich payload.
-                    post(false)
                 }
             if (written) {
                 runCatching { onNotificationWritten?.invoke() }
@@ -2384,7 +2366,7 @@ class LocalNotificationPresenter(
         )
     }
 
-    /** Same existing write predicate, rechecked independently for the optional native fallback. */
+    /** The caller's final fence still holds and, for a live-only write, the tray still shows this generation. */
     private fun notificationWriteIsLive(
         notification: Notification,
         tag: String,
