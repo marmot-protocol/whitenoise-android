@@ -95,8 +95,9 @@ internal fun reactionPillBorderColor(selected: Boolean): Color {
 /**
  * The prototype's reaction row under a bubble: 23dp pills, one per emoji, each inside a 48dp touch row.
  * Every tap opens the unfiltered reactor list so the details surface consistently starts on All.
+ * Host clipping is independent of row selection and mutation ownership.
  */
-@Suppress("FunctionNaming", "LongParameterList") // Host clipping is independent of row selection and mutation ownership.
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun ReactionPillRow(
     tallies: List<ReactionTally>,

@@ -119,23 +119,57 @@ class TtsHighlightPlacementAndroidTest {
         appState.ttsController.detachEngine()
     }
 
-    /** The production row keeps a sentence band when an engine reports no native ranges. */
+    /** Only native ranges add a word marker; a following silent utterance keeps its own sentence band. */
     @Test
-    fun rangeSilentPlaybackKeepsTheSentenceAndMapsEstimatedWords() {
+    fun silentEngineKeepsSentenceBand() {
         startSpeaking(TWO_SENTENCES)
         assertEquals(FIRST_SENTENCE, renderedSentenceBand())
         engine.start(0)
+        composeRule.waitForIdle()
+        // Primary highlight semantics also name the sentence fallback, not just a reported word.
+        assertTrue(checkNotNull(appState.ttsController.state.value.passage).visibleWord.isEmpty())
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+
+        rangeWithin(chunkIndex = 0, word = "first")
+        val leaf = checkNotNull(leafCarryingHighlight())
+        val word = checkNotNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
+        assertEquals("first", leaf.text().substring(word.first, word.last + 1))
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+
+        engine.advanceTo(1)
+        composeRule.waitForIdle()
+        assertEquals(SECOND_SENTENCE, renderedSentenceBand())
+        assertTrue(checkNotNull(appState.ttsController.state.value.passage).visibleWord.isEmpty())
+    }
+
+    /** The production row keeps a sentence band when an engine reports no native ranges. */
+    @Test
+    fun rangeSilentPlaybackKeepsTheSentenceWithoutInventingWordProgress() {
+        startSpeaking(TWO_SENTENCES)
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+        engine.start(0)
+        val silentSince = android.os.SystemClock.elapsedRealtime()
+        val initialProgress = appState.ttsController.state.value.messageProgressFraction
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            appState.ttsController.state.value.passage
-                ?.visibleWord
-                .orEmpty()
-                .isNotEmpty()
+            val state = appState.ttsController.state.value
+            assertTrue(state is dev.ipf.whitenoise.android.audio.tts.TtsState.Speaking)
+            assertTrue(
+                "time alone cannot invent a spoken word",
+                state.passage
+                    ?.visibleWord
+                    .orEmpty()
+                    .isEmpty(),
+            )
+            assertEquals(initialProgress, state.messageProgressFraction, 0f)
+            assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+            android.os.SystemClock.elapsedRealtime() - silentSince >= 1_000
         }
         composeRule.waitForIdle()
         val leaf = checkNotNull(leafCarryingHighlight())
-        val word = checkNotNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
-        assertTrue(word.first >= 0 && word.last < FIRST_SENTENCE.length)
-        assertTrue(leaf.text().substring(word.first, word.last + 1).isNotBlank())
+        assertNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
+        val sentence = checkNotNull(leaf.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey))
+        assertTrue(sentence.first >= 0 && sentence.last < leaf.text().length)
+        assertTrue(leaf.boundsInRoot.width > 0f && leaf.boundsInRoot.height > 0f)
         assertEquals(FIRST_SENTENCE, renderedSentenceBand())
     }
 

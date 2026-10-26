@@ -6023,6 +6023,23 @@
         }
       ],
       "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+      "symbol": "AudioTranscriptDialog",
+      "bindings": [
+        {
+          "case": "presentation-audio-transcript-cancel",
+          "selector": {
+            "text": "Audio transcript"
+          },
+          "scope": "Production confirmation dialog disclosure and Cancel dispatch only; full received-audio provider/lifecycle behavior remains MED-038/MED-039.",
+          "entry_assertion": {
+            "text": "Audio transcript"
+          },
+          "visible_on_entry": true
+        }
+      ]
     }
   ]
 }

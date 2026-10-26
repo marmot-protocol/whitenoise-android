@@ -112,12 +112,15 @@ class MediaVideoShareParityTest {
     /** The real dialog returns from page two toward page two's currently drawn thumbnail. */
     @Test
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    @Suppress("LongMethod") // Real dialog acquisition, selected-page paint, and matching return share one owned fixture.
+    // Real dialog acquisition, selected-page paint, and matching return share one owned fixture.
+    @Suppress("LongMethod")
     fun pagedDialogReturnsToItsSelectedThumbnailWithoutAnotherImageRead() {
         val fixture = fixture()
         val pages =
             listOf(imagePage("first-image", 0), imagePage("second-image", 1)).map { page ->
-                page.copy(reference = page.reference.copy(fileName = "${page.messageIdHex}.png", mediaType = "image/png"))
+                page.copy(
+                    reference = page.reference.copy(fileName = "${page.messageIdHex}.png", mediaType = "image/png"),
+                )
             }
         val registry = MediaViewerThumbnailRegistry()
         val open = mutableStateOf(false)
@@ -131,8 +134,10 @@ class MediaVideoShareParityTest {
         val previousScale =
             android.provider.Settings.Global
                 .getString(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE)
-        val previousDrawTraversals = ReflectionHelpers.callStaticMethod<Boolean>(ShadowView::class.java, "areRealDrawTraversalsEnabled")
-        ShadowView.setUseRealDrawTraversals(true)
+        val previousDrawTraversals =
+            ReflectionHelpers.callStaticMethod<Boolean>(ShadowView::class.java, "areRealDrawTraversalsEnabled")
+        // Native PixelCopy uses the supported View.draw adapter without a real device window surface.
+        ShadowView.setUseRealDrawTraversals(false)
         android.provider.Settings.Global
             .putFloat(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         try {
@@ -195,7 +200,8 @@ class MediaVideoShareParityTest {
             val second = context.getString(R.string.media_viewer_page_position, 2, 2)
             composeRule.onNode(hasStateDescription(first)).performTouchInput { swipeLeft() }
             composeRule.waitUntil(5_000) {
-                selected.value == ConversationMediaViewerAttachmentId("second-image", 1) && reads.contains("second-image")
+                selected.value == ConversationMediaViewerAttachmentId("second-image", 1) &&
+                    reads.contains("second-image")
             }
             composeRule.onNode(hasStateDescription(second)).assertExists()
             composeRule.waitUntil(5_000) {
@@ -265,7 +271,10 @@ class MediaVideoShareParityTest {
             }
         }
         assertTrue("the return must still paint the selected blue source", bottom >= top)
-        assertTrue("the flight must approach the second thumbnail, not the first or viewer center", (top + bottom) / 2f > frame.height * 0.65f)
+        assertTrue(
+            "the flight must approach the second thumbnail, not the first or viewer center",
+            (top + bottom) / 2f > frame.height * 0.65f,
+        )
     }
 
     private fun setRouteContent(

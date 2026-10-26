@@ -473,32 +473,18 @@ class ProfileAddToGroupsFlowTest {
     @Suppress("LongMethod") // One isolated native invite fixture and its real nested modal completion.
     fun acceptedNestedInviteReturnsToGroups() {
         val group = groupItem(ConversationTimelineTestIds.GROUP_ID, "Invite destination").group
-        val invited = CopyOnWriteArrayList<String>()
-        val unexpected = CopyOnWriteArrayList<String>()
-        val runtime =
-            Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { _, method, arguments ->
-                when (val name = method.name.substringBefore('-')) {
-                    "recordHostTiming", "recordHostPerformance" -> ProductRecordResultFfi.IGNORED_DISABLED
-                    "groupCommitDelivery" -> null
-                    "inviteMembersDetailed" -> {
-                        assertEquals(listOf(TARGET_HEX), arguments?.get(2))
-                        invited += arguments?.get(1) as String
-                        val result =
-                            testGroupMutationResult(
-                                listOf(ACTIVE_ACCOUNT_HEX, TARGET_HEX, THIRD_ACCOUNT_HEX),
-                                listOf(ACTIVE_ACCOUNT_HEX),
-                                self = ACTIVE_ACCOUNT_HEX,
-                                selfRef = ACTIVE_ACCOUNT_REF,
-                            )
-                        result.copy(details = result.details.copy(group = group))
-                    }
-                    // This fixture deliberately supplies retained rows, not a second account-wide source.
-                    else -> {
-                        unexpected += name
-                        error("No native fixture for $name")
-                    }
-                }
-            } as MarmotInterface
+        val fixture =
+            NestedInviteRuntimeFixture(
+                group,
+                ACTIVE_ACCOUNT_REF,
+                ACTIVE_ACCOUNT_HEX,
+                TARGET_HEX,
+                THIRD_ACCOUNT_HEX,
+                TARGET_NPROFILE,
+            )
+        val invited = fixture.invited
+        val unexpected = fixture.unexpected
+        val runtime = fixture.runtime
         val state =
             WhiteNoiseAppState(
                 context = app,
@@ -682,5 +668,112 @@ class ProfileAddToGroupsFlowTest {
         const val TARGET_HEX =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val TARGET_NPROFILE = "nprofile-test-alice"
+    }
+}
+
+/** Read-only identities and authoritative roster belong to this one native-invite fixture. */
+private class NestedInviteRuntimeFixture(
+    private val group: AppGroupRecordFfi,
+    private val selfRef: String,
+    private val selfHex: String,
+    private val targetHex: String,
+    private val thirdHex: String,
+    targetProfile: String,
+) {
+    val invited = CopyOnWriteArrayList<String>()
+    val unexpected = CopyOnWriteArrayList<String>()
+    private val npubs =
+        mapOf(
+            targetHex to "npub1424242424242424242424242424242424242424242424242424qamrcaj",
+            selfHex to "npub1hwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwasxw04hu",
+            thirdHex to "npub1enxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxqn2pktz",
+        )
+    private val references =
+        npubs.keys.associateWith { it } + npubs.entries.associate { it.value to it.key } +
+            mapOf(selfRef to selfHex, targetProfile to targetHex)
+    private val names = mapOf(selfHex to "Local profile", targetHex to "Alice", thirdHex to "Other member")
+    val runtime =
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { _, method, arguments ->
+            val name = method.name.substringBefore('-')
+            val args = arguments.orEmpty().toList()
+            when (name) {
+                "recordHostTiming", "recordHostPerformance" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "accountIdHex" -> readIdentity(name, args)
+                "npub" -> npubs.getValue(readIdentity(name, args))
+                "displayName" -> names.getValue(readIdentity(name, args))
+                "isUserBlocked", "isFollowing" -> relationship(name, args)
+                "groupCommitDelivery" -> {
+                    expect(name, args, listOf(selfRef, group.groupIdHex))
+                    null
+                }
+                "groupConversationSnapshot" -> snapshot(name, args)
+                "inviteMembersDetailed" -> invite(name, args)
+                else -> reject("Unexpected native method $name")
+            }
+        } as MarmotInterface
+
+    private fun readIdentity(
+        name: String,
+        args: List<Any?>,
+    ): String {
+        if (args.size != 1) reject("Unexpected $name arguments: $args")
+        return identity(args[0])
+    }
+
+    private fun identity(value: Any?): String {
+        val ref = value as? String ?: reject("Unexpected identity $value")
+        return references[ref] ?: reject("Unexpected identity $value")
+    }
+
+    private fun relationship(
+        name: String,
+        args: List<Any?>,
+    ): Boolean {
+        expect(name, args.take(1), listOf(selfRef))
+        if (args.size != 2 || identity(args[1]) != targetHex) reject("Unexpected $name arguments: $args")
+        return false
+    }
+
+    private fun snapshot(
+        name: String,
+        args: List<Any?>,
+    ): dev.ipf.marmotkit.GroupConversationSnapshotFfi {
+        expect(name, args, listOf(selfRef, group.groupIdHex))
+        val members = if (invited.isEmpty()) listOf(selfHex, thirdHex) else listOf(selfHex, targetHex, thirdHex)
+        val result = mutation(members)
+        return dev.ipf.marmotkit.GroupConversationSnapshotFfi(result.details, result.managementState)
+    }
+
+    private fun invite(
+        name: String,
+        args: List<Any?>,
+    ): dev.ipf.marmotkit.GroupMutationResultFfi {
+        expect(name, args, listOf(selfRef, group.groupIdHex, listOf(targetHex)))
+        invited += group.groupIdHex
+        return mutation(listOf(selfHex, targetHex, thirdHex))
+    }
+
+    private fun mutation(members: List<String>) =
+        testGroupMutationResult(
+            members,
+            listOf(selfHex),
+            self = selfHex,
+            selfRef = selfRef,
+        ).let { it.copy(details = it.details.copy(group = group)) }
+
+    private fun expect(
+        name: String,
+        actual: List<Any?>,
+        expected: List<Any?>,
+    ) {
+        if (actual != expected) reject("Unexpected $name arguments: $actual")
+    }
+
+    private fun reject(message: String): Nothing {
+        unexpected += message
+        error(message)
     }
 }

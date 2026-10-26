@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -94,14 +96,16 @@ class ConversationAcceptedSendRouteScreenshotTest {
 
     /** Disabling motion during a real accepted send immediately retires its decorative copy. */
     @Test
-    fun liveSystemDisableSettlesTheAcceptedSendRoute() = assertLiveTailFlight("Live suppression", 0, suppressDuringFlight = true)
+    fun liveSystemDisableSettlesTheAcceptedSendRoute() {
+        assertLiveTailFlight("Live suppression", 0, suppressDuringFlight = true)
+    }
 
     /** A measured target can retire while motion remains enabled; remaining composer geometry must snap. */
     @Test
     fun retiredTargetSnapsAnAlreadyPaintedSendAndKeepsTheNextDraft() =
         assertLiveTailFlight("First line\nSecond line\nThird line", 240, retireDuringFlight = true)
 
-    private fun retiredPillInternalGeometry(): Pair<androidx.compose.ui.geometry.Rect, List<androidx.compose.ui.graphics.Color>> {
+    private fun retiredPillInternalGeometry(): Pair<Rect, List<Color>> {
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
         val surfaceBounds = surface.fetchSemanticsNode().boundsInRoot
         val editorBounds =
@@ -130,7 +134,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         var motionOwner: ComposerSendMotion? = null
         val boundaries = mutableListOf<String>()
         var earlyRetiredHeight: Float? = null
-        var earlyRetiredInternalGeometry: Pair<androidx.compose.ui.geometry.Rect, List<androidx.compose.ui.graphics.Color>>? = null
+        var earlyRetiredInternalGeometry: Pair<Rect, List<Color>>? = null
     }
 
     private fun advanceLiveTailFrames(
@@ -141,20 +145,31 @@ class ConversationAcceptedSendRouteScreenshotTest {
     ) {
         repeat(30) {
             if (suppressDuringFlight && it == 6) {
-                assertTrue("the production flight must be active before suppression", frames.motionOwner?.flight != null)
-                assertTrue("suppression must follow a genuinely painted moving frame", frames.painted.any { it.progress > 0f && it.progress < 1f })
+                assertTrue(
+                    "the production flight must be active before suppression",
+                    frames.motionOwner?.flight != null,
+                )
+                assertTrue(
+                    "suppression must follow a genuinely painted moving frame",
+                    frames.painted.any { it.progress > 0f && it.progress < 1f },
+                )
                 composeRule.runOnIdle {
                     Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 0f)
                     resolver.notifyChange(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), null)
                 }
             }
             if (retireDuringFlight && it == 6) {
-                assertTrue("retirement must follow a genuinely painted flight", frames.painted.any { it.progress > 0f && it.progress < 1f })
+                assertTrue(
+                    "retirement must follow a genuinely painted flight",
+                    frames.painted.any { it.progress > 0f && it.progress < 1f },
+                )
                 composeRule.runOnIdle { checkNotNull(frames.motionOwner).clear("test-destination-retired") }
                 assertTrue("this fallback must not depend on disabling motion", frames.motionOwner?.enabled == true)
             }
             composeRule.mainClock.advanceTimeByFrame()
             composeRule.waitForIdle()
+            // Drive the actual production Canvas at this clock frame through native View.draw.
+            composeRule.onRoot().captureToImage()
             if (retireDuringFlight && it == 8) {
                 frames.earlyRetiredInternalGeometry = retiredPillInternalGeometry()
                 frames.earlyRetiredHeight =
@@ -188,7 +203,12 @@ class ConversationAcceptedSendRouteScreenshotTest {
                     .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
                     .fetchSemanticsNode()
                     .boundsInRoot.height
-            assertEquals("retiring the flight must snap the remaining composer geometry", settledHeight, checkNotNull(frames.earlyRetiredHeight), 1f)
+            assertEquals(
+                "retiring the flight must snap the remaining composer geometry",
+                settledHeight,
+                checkNotNull(frames.earlyRetiredHeight),
+                1f,
+            )
             assertEquals(
                 "inner editor insets and painted pill corners must already be settled",
                 retiredPillInternalGeometry(),
@@ -219,9 +239,8 @@ class ConversationAcceptedSendRouteScreenshotTest {
             ReflectionHelpers.callStaticMethod<Boolean>(ShadowView::class.java, "areRealDrawTraversalsEnabled")
         Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         try {
-            // Native graphics alone does not run real draw traversals on this API 36 fixture.
-            // Observe the production Canvas through actual frames, not idle/layout callbacks alone.
-            ShadowView.setUseRealDrawTraversals(true)
+            // Native capture uses View.draw: this host has no real PixelCopy window surface.
+            ShadowView.setUseRealDrawTraversals(false)
             val conversation = createConversation(draftText = text)
             val evidence = SendRouteEvidence()
             val frames = LiveTailFrames()
@@ -237,7 +256,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
             composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }
             // FollowingTail is the initial navigation intent, before reveal/layout gates have settled.
             // Keep driving frames until the real route admits motion, then freeze the send itself.
-            composeRule.waitUntil(5_000) { frames.motionOwner?.enabled == true }
+            composeRule.waitUntil(5_000) {
+                composeRule.onRoot().captureToImage()
+                frames.motionOwner?.enabled == true
+            }
             frames.boundaries += "before-send ${frames.motionOwner?.diagnosticState}"
             composeRule.mainClock.autoAdvance = false
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
@@ -402,6 +424,20 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return conversation
     }
 
+    private fun liveTailProjection(conversation: ConversationController): dev.ipf.marmotkit.ChatListRowFfi {
+        val group = conversationTimelineTestGroup()
+        val latest = conversation.timeline.last().record
+        return dev.ipf.whitenoise.android.state.chatRow(group.groupIdHex).copy(
+            groupName = group.name,
+            lastMessage = null,
+            unreadCount = 0uL,
+            hasUnread = false,
+            firstUnreadMessageIdHex = null,
+            lastReadMessageIdHex = latest.messageIdHex,
+            lastReadTimelineAt = latest.timelineAt,
+        )
+    }
+
     /** Mounts the real route with a logical far-history bookmark and the actual production scroll writer. */
     private fun mountHistoryConversation(
         conversation: ConversationController,
@@ -429,6 +465,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                                     otherMemberAccount = null,
                                     memberCount = 1,
                                     memberSnapshot = conversationTimelineMemberSnapshot(),
+                                    projection = if (liveTail) liveTailProjection(conversation) else null,
                                 ),
                             controller = conversation,
                             onBack = {},

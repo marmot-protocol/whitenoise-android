@@ -37,7 +37,11 @@ internal fun <T> composerGeometrySpec(
         snap()
     } else {
         tween(
-            if (collapsedBySend) dev.ipf.whitenoise.android.ui.conversation.COMPOSER_SEND_MOTION_MILLIS else durationMillis,
+            if (collapsedBySend) {
+                dev.ipf.whitenoise.android.ui.conversation.COMPOSER_SEND_MOTION_MILLIS
+            } else {
+                durationMillis
+            },
             easing = easing,
         )
     }

@@ -10,7 +10,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -33,7 +35,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h640dp-mdpi")
 class ReactionMotionSurfaceTest {
-    @get:Rule val rule = createComposeRule()
+    @get:Rule val rule = createComposeRule(effectContext = NormalReactionMotionDurationScale)
 
     @Test fun idleViewportChangesDoNotRecomposeRowsOrMeasureTargets() {
         var viewport by mutableStateOf(Rect(0f, 0f, 360f, 640f))
@@ -45,7 +47,12 @@ class ReactionMotionSurfaceTest {
                     repeat(6) { index ->
                         ReactionMotionRow(owners[index], viewportBoundsInWindow = { viewport }) {
                             SideEffect { compositions[index]++ }
-                            MessageReactionSummary(listOf(ReactionTally("👍", 1, true)), false, onClick = {}, localMotion = owners[index])
+                            MessageReactionSummary(
+                                listOf(ReactionTally("👍", 1, true)),
+                                false,
+                                onClick = {},
+                                localMotion = owners[index],
+                            )
                         }
                     }
                 }
@@ -81,21 +88,45 @@ class ReactionMotionSurfaceTest {
             }
         }
         rule.waitForIdle()
-        rule.runOnIdle {
+        rule.runOnUiThread {
             assertFalse(source.isEmpty)
             motion.choose("👍", source)
             tallies = listOf(ReactionTally("👍", 1, true))
             motion.accept("👍", true, motion.takeOrigin("👍"))
+            Snapshot.sendApplyNotifications()
         }
-        rule.mainClock.advanceTimeBy(48)
         rule.waitForIdle()
-        rule.runOnIdle {
-            assertTrue("the actual summary is still entering", visibility.isIdle.not())
-            assertTrue("the first chip is measured before its host unclipping", motion.targets["👍"]?.isEmpty == false)
-        }
+        assertTargetMeasuredDuringEntrance(visibility, motion)
         rule.onNodeWithTag("conversation.reaction.motion.active").assertExists()
         rule.runOnIdle { viewport = Rect.Zero }
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithTag("conversation.reaction.motion.active").assertDoesNotExist()
     }
+
+    private fun assertTargetMeasuredDuringEntrance(
+        visibility: MutableTransitionState<Boolean>,
+        motion: LocalReactionMotion,
+    ) {
+        var enteringWithTarget = false
+        val samples = mutableListOf<String>()
+        // Ten normal frames remain inside the existing 220ms reaction flight.
+        for (frame in 0 until 10) {
+            rule.mainClock.advanceTimeByFrame()
+            rule.waitForIdle()
+            rule.runOnIdle {
+                samples += "frame=$frame current=${visibility.currentState} target=${visibility.targetState} " +
+                    "idle=${visibility.isIdle} targetBounds=${motion.targets["👍"]} progress=${motion.progress.value}"
+                enteringWithTarget = visibility.targetState &&
+                    !visibility.currentState &&
+                    !visibility.isIdle &&
+                    motion.targets["👍"]?.isEmpty == false
+            }
+            if (enteringWithTarget) break
+        }
+        assertTrue("the actual entering summary must measure its first target: $samples", enteringWithTarget)
+    }
+}
+
+private object NormalReactionMotionDurationScale : MotionDurationScale {
+    override val scaleFactor: Float = 1f
 }

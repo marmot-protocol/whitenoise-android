@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
         "anchor": "fun MediaViewerMotion(",
         "test_ids": [
-          "MED-038"
+          "MED-040"
         ]
       }
     ],
@@ -18,7 +18,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
         "anchor": "fun MediaViewerMotion(",
         "test_ids": [
-          "MED-038"
+          "MED-040"
         ]
       },
       {
@@ -26,7 +26,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
         "anchor": "fun MediaViewerThumbnailHost(",
         "test_ids": [
-          "MED-038"
+          "MED-040"
         ]
       },
       {
@@ -34,7 +34,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
         "anchor": "fun Modifier.mediaViewerThumbnail(",
         "test_ids": [
-          "MED-038"
+          "MED-040"
         ]
       },
       {
@@ -42,7 +42,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
         "anchor": "fun MediaThumbnailCanvas(",
         "test_ids": [
-          "MED-038"
+          "MED-040"
         ]
       },
       {
@@ -50,7 +50,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
         "anchor": "fun MediaMotionVisual(",
         "test_ids": [
-          "MED-038"
+          "MED-040"
         ]
       }
     ]

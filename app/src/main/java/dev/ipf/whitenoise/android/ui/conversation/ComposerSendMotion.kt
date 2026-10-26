@@ -192,12 +192,13 @@ internal class ComposerSendMotion {
         // An old pre-lock callback must not cancel a newer resumed flight either.
         if (source == null || source.ownerGeneration != ownerGeneration) return false
         clear("accepted-replacement")
-        if (enabled && presentationId != null) {
+        return if (enabled && presentationId != null) {
             flight = ComposerSendFlight(presentationId, source, inputGeneration)
             admittedFlights = (admittedFlights + 1).coerceAtMost(MAX_DIAGNOSTIC_ATTEMPTS)
-            return true
+            true
+        } else {
+            false
         }
-        return false
     }
 
     fun clear(reason: String = "external-owner") {

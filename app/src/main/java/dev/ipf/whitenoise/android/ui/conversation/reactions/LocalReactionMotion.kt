@@ -191,25 +191,28 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
         } else {
             this
         }
-    return owner.reactionSourceBounds(requireFullyVisible = false, enabled = effect?.origin != null) { state.origin = it.topLeft }.drawWithContent {
-        drawContent()
-        val current = state.effect
-        if (!state.enabled || current != effect) return@drawWithContent
-        val source = current?.origin ?: return@drawWithContent
-        val target = state.targets[current.emoji] ?: return@drawWithContent
-        val glyph = layout ?: return@drawWithContent
-        if (!state.canFly(source, target)) return@drawWithContent
-        val p = state.progress.value
-        val center = source.center * (1f - p) + target.center * p - state.origin
-        val glyphScale = 1f + (targetCellPx / source.height.coerceAtLeast(1f) - 1f) * p
-        scale(glyphScale, pivot = center) {
-            drawText(
-                glyph,
-                topLeft = center - Offset(glyph.size.width / 2f, glyph.size.height / 2f),
-                alpha = (1f - p).coerceIn(0f, 1f),
-            )
+    return owner
+        .reactionSourceBounds(requireFullyVisible = false, enabled = effect?.origin != null) {
+            state.origin = it.topLeft
+        }.drawWithContent {
+            drawContent()
+            val current = state.effect
+            if (!state.enabled || current != effect) return@drawWithContent
+            val source = current?.origin ?: return@drawWithContent
+            val target = state.targets[current.emoji] ?: return@drawWithContent
+            val glyph = layout ?: return@drawWithContent
+            if (!state.canFly(source, target)) return@drawWithContent
+            val p = state.progress.value
+            val center = source.center * (1f - p) + target.center * p - state.origin
+            val glyphScale = 1f + (targetCellPx / source.height.coerceAtLeast(1f) - 1f) * p
+            scale(glyphScale, pivot = center) {
+                drawText(
+                    glyph,
+                    topLeft = center - Offset(glyph.size.width / 2f, glyph.size.height / 2f),
+                    alpha = (1f - p).coerceIn(0f, 1f),
+                )
+            }
         }
-    }
 }
 
 /** A selected local add pulses once; refreshes and remote count changes cannot start it. */

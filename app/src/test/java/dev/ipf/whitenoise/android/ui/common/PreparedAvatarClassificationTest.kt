@@ -10,10 +10,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Navigation metadata belongs to the exact validated pixels, including after their LRU entry leaves. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PreparedAvatarClassificationTest {
     @Test
     fun exactPinsPreserveStaticAnimatedAndUnknownClassification() {
