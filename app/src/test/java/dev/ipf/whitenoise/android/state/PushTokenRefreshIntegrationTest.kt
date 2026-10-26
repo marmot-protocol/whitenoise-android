@@ -299,10 +299,7 @@ class PushTokenRefreshIntegrationTest {
     fun callbackCannotBypassUnknownStorageCleanup() =
         runBlocking {
             var unavailable = false
-            val fixture =
-                fixture(pushWakeStorageDispatcher = kotlinx.coroutines.Dispatchers.Unconfined) {
-                    if (unavailable) error("unavailable") else "bootstrap-token"
-                }
+            val fixture = fixture { if (unavailable) error("unavailable") else "bootstrap-token" }
             try {
                 fixture.bootstrap()
                 fixture.appState.syncNativePushRegistrationIfEnabled()
@@ -317,10 +314,10 @@ class PushTokenRefreshIntegrationTest {
                     )
                 fixture.replacePushTokenStore(blocked)
                 val callback =
-                    fixture.runOnMainLooperPumping {
-                        // Inline storage makes the blocked rotation finish before launch returns its job.
+                    fixture.runWithMainLooperPumping {
+                        // Keep the handle after the blocked rotation has completed and detached from its parent.
                         val rotation = checkNotNull(fixture.appState.onPushTokenRotated("callback-token"))
-                        assertTrue(rotation.isCompleted)
+                        rotation.join()
                         rotation
                     }
                 fixture.runWithMainLooperPumping { callback.join() }
@@ -579,7 +576,6 @@ class PushTokenRefreshIntegrationTest {
 
     private fun fixture(
         available: Boolean = true,
-        pushWakeStorageDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
         reader: suspend () -> String?,
     ) = NotificationBootstrapTestFixture(
         context = context,
@@ -590,7 +586,6 @@ class PushTokenRefreshIntegrationTest {
         nativePushCapabilityResolver = {
             if (available) NativePushCapability.Available else NativePushCapability.FirebaseUnavailable
         },
-        pushWakeStorageDispatcher = pushWakeStorageDispatcher,
         fcmTokenReader = reader,
     )
 }

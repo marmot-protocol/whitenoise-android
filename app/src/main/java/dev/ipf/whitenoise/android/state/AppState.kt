@@ -10839,21 +10839,24 @@ class WhiteNoiseAppState private constructor(
                 android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
                 false
             }
-        if (!retained) return null
-        return notificationScope.launch {
-            val recorded =
-                withContext(pushWakeStorageDispatcher) {
-                    observePushState {
-                        pushTokenStore.recordPendingNativePushRegistrationSync()
-                        true
+        return if (retained) {
+            notificationScope.launch {
+                val recorded =
+                    withContext(pushWakeStorageDispatcher) {
+                        observePushState {
+                            pushTokenStore.recordPendingNativePushRegistrationSync()
+                            true
+                        }
+                    }
+                if (recorded != true) return@launch
+                notificationDeliveryModeMutex.withLock {
+                    if (!notificationDeliveryModeBusy) {
+                        if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
                     }
                 }
-            if (recorded != true) return@launch
-            notificationDeliveryModeMutex.withLock {
-                if (!notificationDeliveryModeBusy) {
-                    if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
-                }
             }
+        } else {
+            null
         }
     }
 
