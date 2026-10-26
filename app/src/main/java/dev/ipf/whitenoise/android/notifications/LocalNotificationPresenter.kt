@@ -115,6 +115,9 @@ internal enum class CardContentOutcome(
     FAILED("failed"),
 }
 
+/** Opaque identity of the exact accepted platform payload, separate from dismissal ownership. */
+internal const val EXTRA_PAYLOAD_REVISION = "dev.ipf.whitenoise.android.notification.PAYLOAD_REVISION"
+
 /** Payload keys a rewritten card drops so no removed entry's text can survive outside its MessagingStyle. */
 private val REMOVED_CONTENT_EXTRAS =
     listOf(
@@ -447,19 +450,30 @@ class LocalNotificationPresenter(
             val manager =
                 context.getSystemService(NotificationManager::class.java)
                     ?: return@withLock CardContentOutcome.FAILED
-            val liveCard =
-                activeNotification(manager, key.tag, key.id)
-                    ?: return@withLock CardContentOutcome.ABSENT
+            val liveCard = activeNotification(manager, key.tag, key.id)
+            val latestGeneration = ConversationCardPostedRegistry.latestGeneration(key.tag, key.id)
+            val observedGeneration = liveCard?.notification?.extras?.getString(EXTRA_GENERATION)
+            if (liveCard == null || (latestGeneration != null && latestGeneration != observedGeneration)) {
+                // Android can omit an accepted post or expose an older sibling. Without the actual latest payload
+                // there is no safe way to reconstruct its content: cancel rather than overwrite or report ABSENT.
+                return@withLock cancelUnverifiedContentCard(compat, key, liveCard != null)
+            }
             val live = liveCard.notification
-            val entries = retainedEntryGroups(live)
+            val entries =
+                retainedEntryGroups(live).filter { entry ->
+                    ConversationCardPostedRegistry.canCarryEntry(
+                        key.tag,
+                        key.id,
+                        live.extras.getString(EXTRA_PAYLOAD_REVISION),
+                        entryMessageId(entry),
+                    )
+                }
             val kept = entries.filter { isEntryValid(entryMessageId(it), it.first().timestamp) }
             try {
                 when {
                     kept.size == entries.size && entries.isNotEmpty() -> CardContentOutcome.UNCHANGED
                     kept.isEmpty() || live.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true -> {
-                        ConversationCardPostedRegistry.clearPosted(key.tag, key.id)
-                        cancelNotification(compat, key.tag, key.id)
-                        CardContentOutcome.CANCELLED
+                        cancelUnverifiedContentCard(compat, key, platformHasCard = true)
                     }
                     else -> rewriteWithEntries(compat, key, live, kept, recordedAtMs = dismissalTime(liveCard))
                 }
@@ -467,6 +481,28 @@ class LocalNotificationPresenter(
                 notificationDebug { "reconcile card failed type=${exception.javaClass.simpleName}" }
                 CardContentOutcome.FAILED
             }
+        }
+
+    /** Cancels an unobservable accepted card; absence is success only when this process has no accepted write. */
+    private fun cancelUnverifiedContentCard(
+        compat: NotificationManagerCompat,
+        key: NotificationDismissalKey,
+        platformHasCard: Boolean,
+    ): CardContentOutcome =
+        try {
+            synchronized(UserEventNotificationGroup.mutationLock) {
+                val pending = ConversationCardPostedRegistry.prepareCancellation(key.tag, key.id, platformHasCard)
+                if (pending) {
+                    ConversationCardPostSynchronizer.markDismissed(key.tag, key.id)
+                    cancelNotification(compat, key.tag, key.id)
+                    ConversationCardPostedRegistry.clearPosted(key.tag, key.id)
+                    CardContentOutcome.CANCELLED
+                } else {
+                    CardContentOutcome.ABSENT
+                }
+            }
+        } catch (_: RuntimeException) {
+            CardContentOutcome.FAILED
         }
 
     /**
@@ -1818,6 +1854,14 @@ class LocalNotificationPresenter(
                 return@withLock
             }
             val active = activeConversationCard(content.notificationTag, content.notificationId) ?: return@withLock
+            if (!ConversationCardPostedRegistry.isCurrentPayload(
+                    content.notificationTag,
+                    content.notificationId,
+                    active.extras.getString(EXTRA_PAYLOAD_REVISION),
+                )
+            ) {
+                return@withLock
+            }
             val expectedMessageId = update.messageIdHex?.takeIf(String::isNotBlank)
             if (
                 expectedMessageId != null &&
@@ -1972,6 +2016,11 @@ class LocalNotificationPresenter(
             val sameMessage = expectedMessageId != null && conversationCardMessageIdHex(card) == expectedMessageId
             sameMessage &&
                 latestWrite &&
+                ConversationCardPostedRegistry.isCurrentPayload(
+                    live.tag.orEmpty(),
+                    live.id,
+                    card.extras.getString(EXTRA_PAYLOAD_REVISION),
+                ) &&
                 card.recordedIdentityInputs() != null &&
                 NotificationPreviewPreferences.canExpose(context, card, card)
         }
@@ -2284,7 +2333,12 @@ class LocalNotificationPresenter(
                             clearExpandedReactionChoices(context, payload)
                         }
                     expandedChoiceAttempted = expanded.extras.getBoolean(EXTRA_EXPANDED_REACTION_CHOICES)
-                    notificationPoster(manager, tag, id, expanded)
+                    val revision = ConversationCardPostedRegistry.newPayloadRevision()
+                    // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
+                    // the final platform payload so the revision describes exactly the card Android receives.
+                    val outgoing = expanded.clone().apply { extras.putString(EXTRA_PAYLOAD_REVISION, revision) }
+                    notificationPoster(manager, tag, id, outgoing)
+                    recordAcceptedPayload(tag, id, outgoing, recordedAtMs)
                 }
             }
             val written =
@@ -2298,12 +2352,6 @@ class LocalNotificationPresenter(
                     post(false)
                 }
             if (written) {
-                ConversationCardPostedRegistry.markPosted(
-                    tag,
-                    id,
-                    recordedAtMs ?: System.currentTimeMillis(),
-                    notification.extras.getString(EXTRA_GENERATION),
-                )
                 runCatching { onNotificationWritten?.invoke() }
             }
             if (written) NotificationCardWriteResult.WRITTEN else NotificationCardWriteResult.REFUSED
@@ -2316,6 +2364,26 @@ class LocalNotificationPresenter(
             NotificationCardWriteResult.FAILED
         }
 
+    /** Keeps only bounded Android payload metadata, never message text or an independent removal/read policy. */
+    private fun recordAcceptedPayload(
+        tag: String,
+        id: Int,
+        payload: Notification,
+        recordedAtMs: Long?,
+    ) {
+        ConversationCardPostedRegistry.markPosted(
+            tag,
+            id,
+            recordedAtMs ?: System.currentTimeMillis(),
+            payload.extras.getString(EXTRA_GENERATION),
+            payload =
+                ConversationCardPostedRegistry.PayloadSnapshot(
+                    requireNotNull(payload.extras.getString(EXTRA_PAYLOAD_REVISION)),
+                    retainedEntryGroups(payload).mapNotNull(::entryMessageId).toSet(),
+                ),
+        )
+    }
+
     /** Same existing write predicate, rechecked independently for the optional native fallback. */
     private fun notificationWriteIsLive(
         notification: Notification,
@@ -2324,7 +2392,7 @@ class LocalNotificationPresenter(
         mustBeLive: Boolean,
         finalPostAllowed: (() -> Boolean)?,
     ): Boolean =
-        if (finalPostAllowed?.invoke() == false) {
+        if (!ConversationCardPostedRegistry.canAcceptPost(tag, id) || finalPostAllowed?.invoke() == false) {
             false
         } else if (!mustBeLive) {
             true
@@ -2333,7 +2401,17 @@ class LocalNotificationPresenter(
                 context.getSystemService(NotificationManager::class.java)?.let {
                     activeNotification(it, tag, id)
                 }
+            val candidateRevision = notification.extras.getString(EXTRA_PAYLOAD_REVISION)
             current != null &&
+                ConversationCardPostedRegistry.isCurrentPayload(
+                    tag,
+                    id,
+                    current.notification.extras.getString(EXTRA_PAYLOAD_REVISION),
+                ) &&
+                (
+                    candidateRevision == null ||
+                        ConversationCardPostedRegistry.isCurrentPayload(tag, id, candidateRevision)
+                ) &&
                 current.notification.extras.getString(EXTRA_GENERATION) ==
                 notification.extras.getString(EXTRA_GENERATION)
         }
@@ -2344,7 +2422,13 @@ class LocalNotificationPresenter(
     ): Boolean {
         val latest = activeConversationCard(content.notificationTag, content.notificationId) ?: return false
         val sameGeneration = latest.extras.getString(EXTRA_GENERATION) == expected.extras.getString(EXTRA_GENERATION)
-        return sameGeneration && NotificationPreviewPreferences.canExpose(context, latest, latest)
+        return sameGeneration &&
+            ConversationCardPostedRegistry.isCurrentPayload(
+                content.notificationTag,
+                content.notificationId,
+                latest.extras.getString(EXTRA_PAYLOAD_REVISION),
+            ) &&
+            NotificationPreviewPreferences.canExpose(context, latest, latest)
     }
 
     /** What Android receives: the rich card when its preview may be shown, otherwise the generic hidden card. */
@@ -2540,10 +2624,20 @@ class LocalNotificationPresenter(
         notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
     }
 
+    /** Reads only the acted card's platform identity before dismissal is allowed to inspect siblings. */
     internal fun conversationCardMessageIdHex(
         notificationTag: String,
         notificationId: Int,
-    ): String? = conversationCardMessageIdHex(activeConversationCard(notificationTag, notificationId))
+    ): String? =
+        conversationCardMessageIdHex(
+            runCatching {
+                context
+                    .getSystemService(NotificationManager::class.java)
+                    ?.activeNotifications
+                    ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
+                    ?.notification
+            }.getOrNull(),
+        )
 
     internal fun cancelRepliedConversationCardIfSameGeneration(
         notificationTag: String,
@@ -2800,7 +2894,7 @@ class LocalNotificationPresenter(
         runCatching {
             context
                 .getSystemService(NotificationManager::class.java)
-                ?.activeNotifications
+                ?.let(activeNotificationsProvider)
                 ?.firstOrNull { it.tag == tag && it.id == id }
                 ?.notification
         }.getOrNull()
@@ -2820,13 +2914,24 @@ class LocalNotificationPresenter(
                 .extractMessagingStyleFromNotification(existing)
                 ?.messages
                 ?: expandedSingleMessage(existing.extras)
+        val retained =
+            messages
+                ?.let(::notificationLogicalMessageGroups)
+                ?.filter { entry ->
+                    ConversationCardPostedRegistry.canCarryEntry(
+                        tag,
+                        id,
+                        existing.extras.getString(EXTRA_PAYLOAD_REVISION),
+                        entryMessageId(entry),
+                    )
+                }?.flatten()
         return if (
             replacingMessageIdHex != null &&
             conversationCardMessageIdHex(existing) == replacingMessageIdHex
         ) {
-            messages?.let(::dropLastNotificationLogicalMessage)
+            retained?.let(::dropLastNotificationLogicalMessage)
         } else {
-            messages
+            retained
         }
     }
 

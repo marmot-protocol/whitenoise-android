@@ -223,10 +223,11 @@ class ConversationTailEntranceTest {
         id: String,
         claimed: Boolean,
     ) {
-        composeRule.runOnIdle {
+        composeRule.runOnUiThread {
             harness.claimedId = id.takeIf { claimed }
             harness.rows = listOf(id) + harness.rows
             harness.latestId = id
+            Snapshot.sendApplyNotifications()
         }
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.runOnIdle {
@@ -241,12 +242,8 @@ class ConversationTailEntranceTest {
         setTailContent(harness)
         composeRule.mainClock.autoAdvance = false
         composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            harness.claimedId = "m4"
-            harness.rows = listOf("m4") + harness.rows
-            harness.latestId = "m4"
-        }
-        composeRule.mainClock.advanceTimeByFrame()
+        appendTailRow(harness, "m4", claimed = true)
+        assertTrue("motion disable must interrupt the real tail shift", harness.entrance.shiftPx > 0f)
         assertEquals("m4", harness.entrance.claimedEnteringItemId)
         composeRule.runOnIdle { harness.motionEnabled = false }
         composeRule.mainClock.advanceTimeByFrame()
