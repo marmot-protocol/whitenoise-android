@@ -2326,6 +2326,7 @@
     <string name="new_message_name_or_npub">Name or npub</string>
     <string name="new_message_connect_qr">Connect with QR</string>
     <string name="new_message_invite_friend">Invite a friend</string>
+    <string name="new_message_talk_to_agent">Talk to your agent</string>
     <string name="new_message_people">People</string>
     <string name="new_message_source_chats">People in chats</string>
     <string name="new_message_source_following">Following</string>

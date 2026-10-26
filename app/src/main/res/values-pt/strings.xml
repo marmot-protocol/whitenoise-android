@@ -2160,6 +2160,7 @@
     <string name="new_message_name_or_npub">Nome ou npub</string>
     <string name="new_message_connect_qr">Conectar com QR</string>
     <string name="new_message_invite_friend">Convidar um amigo</string>
+    <string name="new_message_talk_to_agent">Fale com seu agente</string>
     <string name="new_message_people">Pessoas</string>
     <string name="new_message_source_chats">Pessoas nas conversas</string>
     <string name="new_message_source_following">Seguindo</string>

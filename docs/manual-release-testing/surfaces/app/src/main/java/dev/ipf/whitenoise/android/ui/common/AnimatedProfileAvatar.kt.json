@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+  "legacy_sha256": "fcc1aa4945638adbd16e5f2346eb9785f74c6f71b72bb51f6a78674c7c6784c8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AnimatedProfileAvatarOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarOverlay(",
+        "test_ids": [
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarLayer(",
+        "test_ids": [
+          "PRO-006",
+          "GRP-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
