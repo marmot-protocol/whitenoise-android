@@ -2484,4 +2484,8 @@
     <string name="setup_finding_outcome_unknown">Résultat inconnu</string>
     <string name="setup_finding_outcome_success">Vérification réussie</string>
     <string name="setup_finding_outcome_failure">Échec de la vérification</string>
+    <string name="public_jpeg_previews_title">Aperçus des images dans la discussion</string>
+    <string name="public_jpeg_previews_privacy">Désactivés par défaut. Les liens directs vers des JPEG Blossom peuvent révéler votre adresse IP au serveur des images. Les aperçus utilisent le Wi-Fi non limité et vos règles de téléchargement des photos. Les liens restent accessibles lorsque les aperçus sont désactivés.</string>
+    <string name="public_jpeg_preview_image">Aperçu du JPEG lié</string>
+    <string name="public_jpeg_preview_save_failed">Impossible de sauvegarder le réglage des aperçus. Veuillez réessayer.</string>
 </resources>

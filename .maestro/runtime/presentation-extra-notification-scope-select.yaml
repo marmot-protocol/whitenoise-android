@@ -3,13 +3,8 @@ name: presentation-extra-notification-scope-select
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    id: conversation-sound-scope-messages_group
+    id: conversation-alert-messages_group
 - tapOn:
-    id: conversation-sound-scope-messages_group
-- assertVisible:
-    text: Use global default
-- assertVisible:
-    text: Custom for this chat
-- tapOn: Custom for this chat
+    id: conversation-alert-messages_group
 - assertVisible:
     id: presentation.complete

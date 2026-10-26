@@ -65,9 +65,7 @@ import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderChip
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
-import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -76,7 +74,6 @@ import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
-import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -289,10 +286,11 @@ internal fun ForwardMessagePickerContent(
             }
         }
     }
+    val titleOwner = destination.selectedAccountRef
     val titledTargets =
-        remember(targets, titleCopy, memberRevision, appState.profileRevisionForCompose) {
+        remember(targets, titleOwner, titleCopy, memberRevision, appState.profileRevisionForCompose) {
             targets.map {
-                it to forwardTargetDisplayTitle(it, appState, destination.selectedAccountRef, titleCopy)
+                it to forwardTargetDisplayTitle(it, appState, titleOwner, titleCopy)
             }
         }
     LaunchedEffect(destination.selectedAccountRef, selected, titledTargets) {
@@ -702,31 +700,19 @@ internal fun ForwardTargetRow(
     selected: Boolean,
     onToggle: (String) -> Unit,
 ) {
-    val avatarAccount = forwardTargetAvatarAccount(item)
-    val avatar =
-        rememberChatListGroupAvatar(
-            appState,
-            item,
-            ownerAccountRef,
-            avatarAccount?.let { appState.contactAvatarSource(it, ownerAccountRef) },
-        )
-    val membersPreview =
-        remember(item, ownerAccountRef, ownerAccountIdHex, appState.profileRevisionForCompose) {
-            forwardTargetMembersPreview(item, ownerAccountIdHex) { memberIdHex ->
-                appState.contactDisplayNameCached(ownerAccountRef, memberIdHex)
-            }
-        }
-    ContactRow(
-        title = title,
-        subtitle = membersPreview,
-        avatarSeed = avatarAccount ?: item.group.groupIdHex,
-        avatarUrl = avatar.pictureUrl,
-        avatarImage = avatar.image,
-        avatarAnimationKey = avatar.animationKey,
-        groupAnimation = avatar.groupAnimation,
-        modifier = Modifier.semantics { this.selected = selected },
+    // Use the actual home-row component, including its spacing, previews and badges.
+    // Selection mode disables avatar navigation, swipe and long-press actions.
+    dev.ipf.whitenoise.android.ui.chats.ChatRow(
+        item = item,
+        appState = appState,
+        accountRef = ownerAccountRef,
+        ownerAccountIdHex = ownerAccountIdHex,
+        titleOverride = title,
+        isMuted = item.engineMuted(),
+        selectionMode = true,
+        selected = selected,
         onClick = { onToggle(item.group.groupIdHex) },
-        trailing = { SelectionIndicator(selected = selected) },
+        onOpenProfile = {},
     )
 }
 
