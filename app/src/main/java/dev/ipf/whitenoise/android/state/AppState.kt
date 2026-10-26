@@ -1368,10 +1368,10 @@ class WhiteNoiseAppState private constructor(
      * frees the rest — no recycle() needed, and adding one back is unsafe.
      */
     private val mediaThumbnailCache =
-        dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
+        dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, dev.ipf.whitenoise.android.media.MediaThumbnail>(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
-            sizeOf = { it.allocationByteCount },
+            sizeOf = { it.bitmap.allocationByteCount },
         )
 
     internal fun cachedMediaPlaintext(cacheKey: String): ByteArray? {
@@ -1410,18 +1410,32 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Returns a placeholder or legacy thumbnail without asserting that it satisfies a larger image request. */
     internal fun cachedMediaThumbnail(cacheKey: String): android.graphics.Bitmap? {
         assertMainThread { "cachedMediaThumbnail" }
-        return mediaThumbnailCache.get(cacheKey)
+        return mediaThumbnailCache.get(cacheKey)?.bitmap
     }
 
+    /** Retains decode provenance so a thumbnail cannot silently satisfy a larger presentation request. */
+    internal fun cachedMediaThumbnailEntry(
+        cacheKey: String,
+        requestedMaxEdgePx: Int,
+    ): dev.ipf.whitenoise.android.media.MediaThumbnail? {
+        assertMainThread { "cachedMediaThumbnailEntry" }
+        return mediaThumbnailCache.get(cacheKey)?.takeIf { it.satisfies(requestedMaxEdgePx) }
+    }
+
+    /** Keeps at most one resolution per attachment, without allowing a late smaller decode to replace a larger one. */
     internal fun cacheMediaThumbnail(
         cacheKey: String,
         thumbnail: android.graphics.Bitmap,
+        maxEdgePx: Int = dev.ipf.whitenoise.android.media.MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
     ) {
         assertMainThread { "cacheMediaThumbnail" }
-        val previous = mediaThumbnailCache.put(cacheKey, thumbnail)
-        if (mediaThumbnailCache.get(cacheKey) === thumbnail || previous != null) {
+        if (mediaThumbnailCache.get(cacheKey)?.maxEdgePx?.let { it > maxEdgePx } == true) return
+        val entry = dev.ipf.whitenoise.android.media.MediaThumbnail(thumbnail, maxEdgePx)
+        val previous = mediaThumbnailCache.put(cacheKey, entry)
+        if (mediaThumbnailCache.get(cacheKey) === entry || previous != null) {
             mediaThumbnailRevisionState.update { it + 1L }
         }
     }
