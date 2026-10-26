@@ -31,7 +31,7 @@ internal fun applyReactionNotificationArtwork(
     if (!content.isReactionPreview) return false
     var images = emptyMap<String, Bitmap>()
     return try {
-        images = reactionBodyArtwork(context, content.body)
+        images = reactionBodyArtwork(context, content.artworkSource)
         if (images.isEmpty()) {
             false
         } else {
@@ -57,6 +57,9 @@ internal fun applyReactionNotificationArtwork(
         images.values.forEach { it.recycle() }
     }
 }
+
+/** The authored sentence the inline body draws from; the readable [LocalNotificationContent.body] stays the text. */
+private val LocalNotificationContent.artworkSource: String get() = reactionArtworkBody ?: body
 
 /** Failed optional drawing leaves a plain text card with no partially configured custom views. */
 private fun clearReactionArtwork(
@@ -94,11 +97,11 @@ private fun reactionInlineView(
         setTextViewText(R.id.reaction_notification_title, content.title)
         setImageViewBitmap(
             R.id.reaction_notification_body_light,
-            reactionBodyBitmap(context, content.body, artwork, expanded, dark = false),
+            reactionBodyBitmap(context, content.artworkSource, artwork, expanded, dark = false),
         )
         setImageViewBitmap(
             R.id.reaction_notification_body_dark,
-            reactionBodyBitmap(context, content.body, artwork, expanded, dark = true),
+            reactionBodyBitmap(context, content.artworkSource, artwork, expanded, dark = true),
         )
         setContentDescription(R.id.reaction_notification, "${content.title}, ${content.body}")
     }

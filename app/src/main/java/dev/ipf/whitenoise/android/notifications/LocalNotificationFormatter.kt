@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 
 data class LocalNotificationContent(
     val notificationTag: String,
@@ -22,6 +23,9 @@ data class LocalNotificationContent(
     val isGroupConversation: Boolean,
     val conversationTitle: String?,
     val isReactionPreview: Boolean = false,
+    // The reaction sentence as authored, with its `:shortcode:`, for the inline artwork only; [body] names
+    // built-ins readably, because Android shows it as plain text (grouped rows, text fallback, TalkBack).
+    val reactionArtworkBody: String? = null,
 )
 
 data class NotificationDismissalKey(
@@ -223,6 +227,7 @@ object LocalNotificationFormatter {
             selfKey = "",
             conversationTitle = null,
             isReactionPreview = false,
+            reactionArtworkBody = null,
         )
 
     fun content(
@@ -275,6 +280,13 @@ object LocalNotificationFormatter {
                 reactedToPreviewOverride,
                 mediaKind,
             )
+        val reactionArtworkBody =
+            if (kind == ContentKind.MESSAGE) {
+                reactionBody(update, context, reactedToPreviewOverride, readable = false)
+                    ?.let(::boundedNotificationMessageText)
+            } else {
+                null
+            }
         val dismissalKey = notificationDismissalKey(update)
         return LocalNotificationContent(
             // Messages from one conversation share a per-account, per-group tag
@@ -293,6 +305,7 @@ object LocalNotificationFormatter {
             isGroupConversation = !update.isDm,
             conversationTitle = conversationTitle,
             isReactionPreview = isReaction(update),
+            reactionArtworkBody = reactionArtworkBody,
         )
     }
 
@@ -414,29 +427,47 @@ object LocalNotificationFormatter {
         }
     }
 
+    /** A reaction reads as its readable reaction sentence; other messages use their resolved preview text. */
     private fun messageBody(
         update: NotificationUpdateFfi,
         context: Context?,
         previewTextOverride: String?,
         reactedToPreviewOverride: String?,
         mediaKind: ReplyMediaKind,
-    ): String {
-        val emoji = clean(update.reactionEmoji)
-        if (emoji != null) {
-            val reactedTo = clean(reactedToPreviewOverride) ?: clean(update.reactedToPreview)
-            return if (reactedTo != null) {
-                text(context, R.string.notification_reacted_to_message, "reacted %1\$s to: \"%2\$s\"", emoji, reactedTo)
-            } else {
-                text(context, R.string.notification_reacted, "reacted %1\$s", emoji)
-            }
-        }
-        // A caption (or any resolved text) always wins; only a captionless
-        // attachment falls through to the type-aware label, and a non-media
-        // empty message to the generic body.
-        return clean(previewTextOverride)
+    ): String =
+        reactionBody(update, context, reactedToPreviewOverride, readable = true)
+            // A caption (or any resolved text) always wins; only a captionless
+            // attachment falls through to the type-aware label, and a non-media
+            // empty message to the generic body.
+            ?: clean(previewTextOverride)
             ?: clean(update.previewText)
             ?: mediaBody(context, mediaKind)
             ?: text(context, R.string.notification_new_message, "New message")
+
+    /**
+     * The "reacted … to" sentence, or null when [update] is not a reaction. Readable text names a built-in
+     * emoji (Marmot, White Noise); the artwork source keeps the authored shortcode so the card can draw it.
+     * Other shortcodes stay exact either way, since no artwork stands in for them.
+     */
+    private fun reactionBody(
+        update: NotificationUpdateFfi,
+        context: Context?,
+        reactedToPreviewOverride: String?,
+        readable: Boolean,
+    ): String? {
+        val authored = clean(update.reactionEmoji) ?: return null
+        val emoji =
+            if (readable) {
+                EmojiShortcodes.builtinName(authored)?.let { name -> context?.getString(name) } ?: authored
+            } else {
+                authored
+            }
+        val reactedTo = clean(reactedToPreviewOverride) ?: clean(update.reactedToPreview)
+        return if (reactedTo != null) {
+            text(context, R.string.notification_reacted_to_message, "reacted %1\$s to: \"%2\$s\"", emoji, reactedTo)
+        } else {
+            text(context, R.string.notification_reacted, "reacted %1\$s", emoji)
+        }
     }
 
     private fun mediaBody(
