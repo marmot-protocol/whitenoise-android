@@ -103,6 +103,7 @@ internal fun NewMessageContent(
     identifierLookupFailed: Boolean = false,
     addressFallback: Boolean = false,
     startingAs: StartingAccount? = null,
+    inviteShareInProgress: Boolean = false,
 ) {
     val query = queryState.text.toString()
     val busy = creatingHex != null
@@ -127,7 +128,7 @@ internal fun NewMessageContent(
                     enabled = !busy,
                 )
             }
-            item { NewMessageActionGroup(actions, connectQrEnabled, busy) }
+            item { NewMessageActionGroup(actions, connectQrEnabled, busy, inviteShareInProgress) }
             error?.let { item { StartChatErrorCard(it, actions.retryChat, actions.invite, actions.copyError) } }
             item {
                 NewMessageSearchFeedback(
@@ -173,6 +174,7 @@ private fun NewMessageActionGroup(
     actions: NewMessageActions,
     connectQrEnabled: Boolean,
     busy: Boolean,
+    inviteShareInProgress: Boolean,
 ) {
     SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
         row("new_group") { context ->
@@ -209,7 +211,7 @@ private fun NewMessageActionGroup(
                 stringResource(R.string.new_message_talk_to_agent),
                 actions.agentSettings,
                 modifier = Modifier.testTag("new_message.agentSettings"),
-                enabled = !busy,
+                enabled = !busy && !inviteShareInProgress,
                 leading = { Icon(painterResource(R.drawable.ic_ai_agents), null, Modifier.size(24.dp)) },
             )
         }

@@ -2158,7 +2158,7 @@
     <string name="new_message_name_or_npub">Ad veya npub</string>
     <string name="new_message_connect_qr">QR koduyla bağlan</string>
     <string name="new_message_invite_friend">Bir arkadaşını davet et</string>
-    <string name="new_message_talk_to_agent">Aracınla konuş</string>
+    <string name="new_message_talk_to_agent">Ajanınla konuş</string>
     <string name="new_message_people">Kişiler</string>
     <string name="new_message_source_chats">Sohbetlerdeki kişiler</string>
     <string name="new_message_source_following">Takip ediliyor</string>

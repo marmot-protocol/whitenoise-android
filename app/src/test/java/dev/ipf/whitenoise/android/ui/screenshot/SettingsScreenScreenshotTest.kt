@@ -114,7 +114,8 @@ class SettingsScreenScreenshotTest {
 
     /** Scroll to the production row so the below-fold icon is part of every captured viewport. */
     private fun captureAgentRow(name: String) {
-        composeRule.onNodeWithText("AI Agents").performScrollTo().assertIsDisplayed()
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("AI Agents"))
+        composeRule.onNodeWithText("AI Agents").assertIsDisplayed()
         capture(name)
     }
 

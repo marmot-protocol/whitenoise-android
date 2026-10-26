@@ -724,6 +724,7 @@ private fun NewMessageAccountScreen(
     } else {
         NewMessageContent(
             startingAs = startingAccount(appState, accountRef, runtimeGeneration),
+            inviteShareInProgress = inviteShareInProgress,
             isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
             queryState = queryState,
             people = people,
