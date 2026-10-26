@@ -87,6 +87,38 @@ class SettingsScreenScreenshotTest {
         capture("settings_screen_rtl_large_font")
     }
 
+    /** AI Agents uses the shared sparkle icon in its actual Settings row. */
+    @Test
+    fun settingsScreenAiAgentsDark() {
+        render(darkTheme = true)
+        captureAgentRow("settings_screen_ai_agents_dark")
+    }
+
+    @Test
+    fun settingsScreenAiAgentsLight() {
+        render(darkTheme = false)
+        captureAgentRow("settings_screen_ai_agents_light")
+    }
+
+    @Test
+    fun settingsScreenAiAgentsAmoled() {
+        render(darkTheme = true, amoled = true)
+        captureAgentRow("settings_screen_ai_agents_amoled")
+    }
+
+    @Test
+    fun settingsScreenAiAgentsRtlLargeFont() {
+        render(darkTheme = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        captureAgentRow("settings_screen_ai_agents_rtl_large_font")
+    }
+
+    /** Scroll to the production row so the below-fold icon is part of every captured viewport. */
+    private fun captureAgentRow(name: String) {
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("AI Agents"))
+        composeRule.onNodeWithText("AI Agents").assertIsDisplayed()
+        capture(name)
+    }
+
     /** Captures the header with several signed-in profiles, which offers switching instead of adding. */
     @Test
     fun settingsScreenSeveralProfilesLight() {
