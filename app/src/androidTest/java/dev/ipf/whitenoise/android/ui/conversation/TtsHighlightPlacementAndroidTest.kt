@@ -126,7 +126,8 @@ class TtsHighlightPlacementAndroidTest {
         assertEquals(FIRST_SENTENCE, renderedSentenceBand())
         engine.start(0)
         composeRule.waitForIdle()
-        assertNull(checkNotNull(leafCarryingHighlight()).config.getOrNull(TtsReadAloudHighlightRangeKey))
+        // Primary highlight semantics also name the sentence fallback, not just a reported word.
+        assertTrue(checkNotNull(appState.ttsController.state.value.passage).visibleWord.isEmpty())
         assertEquals(FIRST_SENTENCE, renderedSentenceBand())
 
         rangeWithin(chunkIndex = 0, word = "first")
@@ -138,7 +139,7 @@ class TtsHighlightPlacementAndroidTest {
         engine.advanceTo(1)
         composeRule.waitForIdle()
         assertEquals(SECOND_SENTENCE, renderedSentenceBand())
-        assertNull(checkNotNull(leafCarryingHighlight()).config.getOrNull(TtsReadAloudHighlightRangeKey))
+        assertTrue(checkNotNull(appState.ttsController.state.value.passage).visibleWord.isEmpty())
     }
 
     /** Stopping revokes the active passage even when native callbacks arrive afterwards. */
