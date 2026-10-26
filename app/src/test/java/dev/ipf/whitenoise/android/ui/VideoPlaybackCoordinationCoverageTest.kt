@@ -53,7 +53,7 @@ class VideoPlaybackCoordinationCoverageTest {
         assertTrue("an off-screen page must release its decoder", "exo.stop()" in playbackEffect)
         assertTrue(
             "late materialization must not auto-play behind Home or the lock screen",
-            "exo.playWhenReady = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)" in playbackEffect,
+            "autoplayAllowed.value && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)" in playbackEffect,
         )
     }
 
@@ -64,6 +64,11 @@ class VideoPlaybackCoordinationCoverageTest {
         val observer =
             body.substringAfter("DisposableEffect(exo, lifecycle)").substringBefore("HoldCacheFileWhileComposed")
         assertTrue("the host lifecycle must own the observer", "LocalLifecycleOwner.current.lifecycle" in body)
+        val pendingFile = body.substringBefore("if (file == null)")
+        assertTrue(
+            "a pending file must remember STOP before the unavailable-page return",
+            "if (event == Lifecycle.Event.ON_STOP) autoplayAllowed.value = false" in pendingFile,
+        )
         assertTrue("STOP must pause the exact player", "if (event == Lifecycle.Event.ON_STOP) exo.pause()" in observer)
         assertTrue("observer must be registered", "lifecycle.addObserver(observer)" in observer)
         assertTrue(

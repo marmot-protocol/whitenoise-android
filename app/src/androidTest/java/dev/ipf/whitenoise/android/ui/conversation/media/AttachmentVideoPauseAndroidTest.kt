@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +40,11 @@ class AttachmentVideoPauseAndroidTest {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     private lateinit var fixture: EdgeClipViewerFixture
     private lateinit var activity: ComponentActivity
+    private var materializationGate: CompletableDeferred<Unit>? = null
+
+    @Volatile
+    private var materializationEntered = false
+    private var everRequestedPlayback = false
 
     /** Disables the fixture activity's lock-screen exemption so screen-off delivers the real STOP event. */
     @Before
@@ -52,7 +58,28 @@ class AttachmentVideoPauseAndroidTest {
             activity.setTurnScreenOn(false)
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
-        fixture = EdgeClipViewerFixture(composeRule, context)
+        fixture =
+            EdgeClipViewerFixture(
+                composeRule,
+                context,
+                beforeMaterialize = {
+                    materializationEntered = true
+                    materializationGate?.await()
+                },
+                onPlayerCreated = { player ->
+                    player.addListener(
+                        object : Player.Listener {
+                            /** Records even brief autoplay before the final paused assertion. */
+                            override fun onPlayWhenReadyChanged(
+                                playWhenReady: Boolean,
+                                reason: Int,
+                            ) {
+                                if (playWhenReady) everRequestedPlayback = true
+                            }
+                        },
+                    )
+                },
+            )
         composeRule.setContent { WhiteNoiseTheme(darkTheme = true) { fixture.Content() } }
     }
 
@@ -158,6 +185,42 @@ class AttachmentVideoPauseAndroidTest {
         }
         fixture.close()
         assertFalse("disposed page still plays", onMain { next.isPlaying })
+    }
+
+    /** A file published behind Home remains paused even if its player is not composed until return. */
+    @Test
+    fun materializationCompletingBehindHomeDoesNotAutoplayOnReturn() {
+        assertPendingOpenStaysPaused(completeWhileStopped = true)
+    }
+
+    /** Returning before file resolution finishes must not erase the earlier STOP admission decision. */
+    @Test
+    fun materializationCompletingAfterReturnRetainsTheEarlierStop() {
+        assertPendingOpenStaysPaused(completeWhileStopped = false)
+    }
+
+    /** Holds the real resolver across STOP and proves no player ever requests playback until explicitly played. */
+    private fun assertPendingOpenStaysPaused(completeWhileStopped: Boolean) {
+        val gate = CompletableDeferred<Unit>()
+        materializationGate = gate
+        fixture.beginOpen(EdgeClipScenario(listOf(EdgeClip.Portrait)))
+        await("pending materialization to enter") { materializationEntered }
+        assertTrue(device.pressHome())
+        await("STOP before file publication") {
+            onMain { activity.lifecycle.currentState == Lifecycle.State.CREATED }
+        }
+        if (completeWhileStopped) {
+            gate.complete(Unit)
+            await("file publication behind Home") { fixture.materializationComplete }
+        }
+        returnToViewer()
+        if (!completeWhileStopped) gate.complete(Unit)
+        fixture.awaitFirstFrame()
+        val player = fixture.currentPlayer()
+        assertFalse("pending resolution briefly requested playback after STOP", onMain { everRequestedPlayback })
+        assertPausedAt(player, 0L)
+        onMain { player.play() }
+        await("explicit play after delayed materialization") { onMain { player.isPlaying } }
     }
 
     /** Opens the production pager and starts its local decoded clip with enough duration for lifecycle probes. */

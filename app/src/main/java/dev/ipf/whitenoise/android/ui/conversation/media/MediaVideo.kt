@@ -1481,7 +1481,9 @@ private fun videoAttachmentExtension(reference: MediaAttachmentReferenceFfi): St
  * state so swiping to a sibling page doesn't carry zoom across, and disposing
  * the page recycles the multi-MB native bitmap instead of leaning on GC. The
  * pager precomposes one page either side by default, so transfer and playback
- * are gated on [isCurrent] to avoid concurrent downloads and decoders.
+ * are gated on [isCurrent] to avoid concurrent downloads and decoders. Lifecycle STOP
+ * and noisy audio routes pause playback; pending files retain STOP intent so foreground
+ * return cannot start audio without a new page selection or an explicit Play action.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
@@ -1503,6 +1505,20 @@ internal fun VideoViewerPage(
     val latestOnPlayerChanged by rememberUpdatedState(onPlayerChanged)
     val latestOnControllerVisibilityChange by rememberUpdatedState(onControllerVisibilityChange)
     val contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference)
+    // Remember STOP even while the file is pending and background recomposition is suspended.
+    // A deliberate new page/open gets fresh admission; foreground return alone never rearms it.
+    val autoplayAllowed =
+        remember(contentKey, isCurrent, lifecycle) {
+            mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+        }
+    DisposableEffect(autoplayAllowed, lifecycle) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) autoplayAllowed.value = false
+            }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val playbackRecoveryJob =
         remember(contentKey) {
             mutableStateOf<Job?>(null)
@@ -1674,7 +1690,7 @@ internal fun VideoViewerPage(
             VoicePlaybackController.pause()
             exo.prepare()
             // Materialization may finish after STOP, before this player has observed any lifecycle event.
-            exo.playWhenReady = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            exo.playWhenReady = autoplayAllowed.value && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         } else {
             exo.playWhenReady = false
             exo.stop()

@@ -77,6 +77,8 @@ internal data class ViewerGeometry(
 internal class EdgeClipViewerFixture(
     private val rule: ComposeTestRule,
     private val context: Context,
+    private val beforeMaterialize: suspend () -> Unit = {},
+    private val onPlayerCreated: (ExoPlayer) -> Unit = {},
 ) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val viewerState = localAppState(accounts = emptyList())
@@ -90,6 +92,10 @@ internal class EdgeClipViewerFixture(
 
     @Volatile
     private var videoResolutionStage = "not-started"
+
+    /** Whether the private clip has been published, even while background composition cannot create a player. */
+    val materializationComplete: Boolean
+        get() = videoResolutionStage == "completed"
 
     /** Attachment index of the page the viewer last reported as current, or -1 before any page settles. */
     @Volatile
@@ -118,6 +124,7 @@ internal class EdgeClipViewerFixture(
                     videoFileResolver = { resolverContext, _, messageId, index, reference, _, _ ->
                         videoResolutionStage = "materializing"
                         try {
+                            beforeMaterialize()
                             materializeVideoAttachment(resolverContext, messageId, index, reference) {
                                 clipBytes.getValue(EdgeClip.entries[index])
                             }.also { videoResolutionStage = "completed" }
@@ -131,26 +138,36 @@ internal class EdgeClipViewerFixture(
         }
     }
 
-    /** Opens [next], waits for its first decoded frame, then pauses so the frame and the controls hold still. */
-    fun open(next: EdgeClipScenario): ViewerGeometry {
+    /** Begins opening a page without waiting for file resolution, for background-completion probes. */
+    fun beginOpen(next: EdgeClipScenario) {
         rule.runOnIdle {
             scenario = null
             currentAttachment = -1
             videoResolutionStage = "on-open"
         }
         rule.runOnIdle { scenario = next }
+    }
+
+    /** Opens [next], waits for its first decoded frame, then pauses so the frame and the controls hold still. */
+    fun open(next: EdgeClipScenario): ViewerGeometry {
+        beginOpen(next)
+        awaitFirstFrame()
+        val view = requirePlayerView()
+        onMain { requireNotNull(view.player) { "The current page has no player" }.pause() }
+        awaitControllerAndChrome(visible = true)
+        return geometry()
+    }
+
+    /** Waits for real decoding without altering play intent, including a deliberately paused initial frame. */
+    fun awaitFirstFrame() {
         try {
-            awaitCondition("the first decoded frame of ${next.clips[next.startIndex]}") {
+            awaitCondition("the first decoded frame") {
                 currentPlayerView()?.let { view -> onMain { view.player in renderedPlayers } } == true
             }
         } catch (failure: AssertionError) {
             logFirstFrameTimeout()
             throw failure
         }
-        val view = requirePlayerView()
-        onMain { requireNotNull(view.player) { "The current page has no player" }.pause() }
-        awaitControllerAndChrome(visible = true)
-        return geometry()
     }
 
     /** Records bounded fixture stages without allowing diagnostics to replace the original assertion. */
@@ -309,6 +326,7 @@ internal class EdgeClipViewerFixture(
 
     /** Records each page player's first rendered frame, observed from before it is prepared. */
     private fun trackFirstFrame(player: ExoPlayer?) {
+        player?.let(onPlayerCreated)
         player?.addListener(
             object : Player.Listener {
                 /** Marks [player] as having put a decoded frame on its surface. */
