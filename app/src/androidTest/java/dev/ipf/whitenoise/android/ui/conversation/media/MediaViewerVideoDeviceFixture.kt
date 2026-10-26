@@ -38,7 +38,10 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.util.Collections
 import androidx.media3.ui.R as Media3R
 
@@ -77,6 +80,8 @@ internal data class ViewerGeometry(
 internal class EdgeClipViewerFixture(
     private val rule: ComposeTestRule,
     private val context: Context,
+    private val beforeMaterialize: suspend () -> Unit = {},
+    private val onPlayerCreated: (ExoPlayer) -> Unit = {},
 ) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val viewerState = localAppState(accounts = emptyList())
@@ -86,10 +91,15 @@ internal class EdgeClipViewerFixture(
     private val clipBytes = EdgeClip.entries.associateWith { it.readVerifiedBytes() }
     private val renderedPlayers = Collections.synchronizedSet(mutableSetOf<Player>())
     private var scenario by mutableStateOf<EdgeClipScenario?>(null)
+    private var sourceEpoch by mutableStateOf(1uL)
     private var shellTransportShown = false
 
     @Volatile
     private var videoResolutionStage = "not-started"
+
+    /** Whether the private clip has been published, even while background composition cannot create a player. */
+    val materializationComplete: Boolean
+        get() = videoResolutionStage == "completed"
 
     /** Attachment index of the page the viewer last reported as current, or -1 before any page settles. */
     @Volatile
@@ -105,7 +115,12 @@ internal class EdgeClipViewerFixture(
     fun Content() {
         val active = scenario ?: return
         key(active) {
-            val pages = remember { active.clips.map { it.page() } }
+            val pages =
+                remember(sourceEpoch) {
+                    active.clips.map { clip ->
+                        clip.page().copy(reference = clip.reference().copy(sourceEpoch = sourceEpoch))
+                    }
+                }
             CompositionLocalProvider(LocalShellPlaybackHost provides shellHost.takeIf { active.shellTransport }) {
                 FullScreenMediaViewer(
                     controller = controller,
@@ -116,14 +131,18 @@ internal class EdgeClipViewerFixture(
                     onCurrentPageChange = { currentAttachment = it.attachmentIndex },
                     onVideoPlayerChanged = ::trackFirstFrame,
                     videoFileResolver = { resolverContext, _, messageId, index, reference, _, _ ->
-                        videoResolutionStage = "materializing"
-                        try {
-                            materializeVideoAttachment(resolverContext, messageId, index, reference) {
-                                clipBytes.getValue(EdgeClip.entries[index])
-                            }.also { videoResolutionStage = "completed" }
-                        } catch (failure: Throwable) {
-                            videoResolutionStage = "failed:${failure.javaClass.simpleName}"
-                            throw failure
+                        // Publish on the I/O worker even while the stopped viewer cannot resume composition.
+                        withContext(Dispatchers.IO) {
+                            videoResolutionStage = "materializing"
+                            try {
+                                beforeMaterialize()
+                                materializeVideoAttachment(resolverContext, messageId, index, reference) {
+                                    clipBytes.getValue(EdgeClip.entries[index])
+                                }.also { videoResolutionStage = "completed" }
+                            } catch (failure: Throwable) {
+                                videoResolutionStage = "failed:${failure.javaClass.simpleName}"
+                                throw failure
+                            }
                         }
                     },
                 )
@@ -131,26 +150,36 @@ internal class EdgeClipViewerFixture(
         }
     }
 
-    /** Opens [next], waits for its first decoded frame, then pauses so the frame and the controls hold still. */
-    fun open(next: EdgeClipScenario): ViewerGeometry {
+    /** Begins opening a page without waiting for file resolution, for background-completion probes. */
+    fun beginOpen(next: EdgeClipScenario) {
         rule.runOnIdle {
             scenario = null
             currentAttachment = -1
             videoResolutionStage = "on-open"
         }
         rule.runOnIdle { scenario = next }
+    }
+
+    /** Opens [next], waits for its first decoded frame, then pauses so the frame and the controls hold still. */
+    fun open(next: EdgeClipScenario): ViewerGeometry {
+        beginOpen(next)
+        awaitFirstFrame()
+        val view = requirePlayerView()
+        onMain { requireNotNull(view.player) { "The current page has no player" }.pause() }
+        awaitControllerAndChrome(visible = true)
+        return geometry()
+    }
+
+    /** Waits for real decoding without altering play intent, including a deliberately paused initial frame. */
+    fun awaitFirstFrame() {
         try {
-            awaitCondition("the first decoded frame of ${next.clips[next.startIndex]}") {
+            awaitCondition("the first decoded frame") {
                 currentPlayerView()?.let { view -> onMain { view.player in renderedPlayers } } == true
             }
         } catch (failure: AssertionError) {
             logFirstFrameTimeout()
             throw failure
         }
-        val view = requirePlayerView()
-        onMain { requireNotNull(view.player) { "The current page has no player" }.pause() }
-        awaitControllerAndChrome(visible = true)
-        return geometry()
     }
 
     /** Records bounded fixture stages without allowing diagnostics to replace the original assertion. */
@@ -177,6 +206,23 @@ internal class EdgeClipViewerFixture(
 
     /** Identity of the current page's player, for asserting a gesture did not replace it. */
     fun currentPlayer(): Player = readPlayer { it }
+
+    /** Publishes identical bytes at a new epoch's path, then refreshes the still-mounted page descriptor. */
+    fun replaceCurrentPlaybackFile() {
+        val clip = EdgeClip.entries[currentAttachment]
+        val nextEpoch = sourceEpoch + 1uL
+        runBlocking(Dispatchers.IO) {
+            materializeVideoAttachment(
+                context,
+                MESSAGE_ID,
+                clip.ordinal,
+                clip.reference().copy(sourceEpoch = nextEpoch),
+            ) {
+                clipBytes.getValue(clip)
+            }
+        }
+        rule.runOnIdle { sourceEpoch = nextEpoch }
+    }
 
     /** Measures the open viewer, re-dispatching [simulatedInsets] first so real insets cannot replace them. */
     fun geometry(): ViewerGeometry {
@@ -287,7 +333,14 @@ internal class EdgeClipViewerFixture(
         } finally {
             controller.onCleared()
             EdgeClip.entries.forEach { clip ->
-                videoAttachmentCacheFileForTests(context, MESSAGE_ID, clip.ordinal, clip.reference()).delete()
+                for (epoch in 1uL..sourceEpoch) {
+                    videoAttachmentCacheFileForTests(
+                        context,
+                        MESSAGE_ID,
+                        clip.ordinal,
+                        clip.reference().copy(sourceEpoch = epoch),
+                    ).delete()
+                }
             }
             context.deleteSharedPreferences(PREFERENCES_NAME)
         }
@@ -309,6 +362,7 @@ internal class EdgeClipViewerFixture(
 
     /** Records each page player's first rendered frame, observed from before it is prepared. */
     private fun trackFirstFrame(player: ExoPlayer?) {
+        player?.let(onPlayerCreated)
         player?.addListener(
             object : Player.Listener {
                 /** Marks [player] as having put a decoded frame on its surface. */
