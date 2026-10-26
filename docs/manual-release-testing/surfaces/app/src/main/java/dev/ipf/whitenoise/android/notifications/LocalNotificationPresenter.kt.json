@@ -135,15 +135,6 @@
           "NTF-006",
           "NTF-010"
         ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "notificationQuickReactionLabels(context, reactionChoices)",
-        "surface": "readable shortcode names on inline reaction chips, each routed to its exact reaction",
-        "test_ids": [
-          "NTF-017",
-          "NTF-029"
-        ]
       }
     ],
     "source_coverage": [

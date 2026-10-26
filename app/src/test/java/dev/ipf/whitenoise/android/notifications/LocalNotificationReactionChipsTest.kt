@@ -91,120 +91,6 @@ class LocalNotificationReactionChipsTest {
         assertEquals(NotificationActionKind.REACT, NotificationActions.parse(selectedChoice)?.kind)
     }
 
-    /** Shortcode chips show readable names, and tapping one sends its exact reaction through the posted intent. */
-    @Test
-    fun shortcodeChipsShowReadableNamesAndSendTheirExactReaction() {
-        val choices = listOf(":marmot:", ":wn:", "👍", ":party_parrot:")
-        postConversationCard(presenter(choices))
-        val reply = replyAction()
-        val remoteInput = checkNotNull(reply.remoteInputs).single()
-        val marmot = context.getString(R.string.emoji_name_marmot)
-        val whiteNoise = context.getString(R.string.white_noise)
-
-        assertEquals(
-            listOf(marmot, whiteNoise, "👍", "party parrot"),
-            remoteInput.choices?.map(CharSequence::toString),
-        )
-
-        /** The posted Reply intent as SystemUI returns it once [chip] is chosen from [source]. */
-        fun tapped(
-            chip: String,
-            source: Int = RemoteInput.SOURCE_CHOICE,
-        ) = Intent(shadowOf(reply.actionIntent).savedIntent).also { intent ->
-            RemoteInput.addResultsToIntent(
-                arrayOf(remoteInput),
-                intent,
-                Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, chip) },
-            )
-            RemoteInput.setResultsSource(intent, source)
-        }
-
-        assertEquals(":marmot:", notificationReactionChoice(tapped(marmot), choices))
-        assertEquals(":wn:", notificationReactionChoice(tapped(whiteNoise), choices))
-        assertEquals("👍", notificationReactionChoice(tapped("👍"), choices))
-        assertEquals(":party_parrot:", notificationReactionChoice(tapped("party parrot"), choices))
-        // Typing the same name is still a text reply, and a choice removed since posting is refused.
-        assertEquals(
-            NotificationActionKind.REPLY,
-            NotificationActions.parse(tapped(marmot, RemoteInput.SOURCE_FREE_FORM_INPUT))?.kind,
-        )
-        assertNull(notificationReactionChoice(tapped(marmot), listOf("👍")))
-    }
-
-    /** Boundary underscores and blank names preserve each posted chip's exact reaction. */
-    @Test
-    fun normalizedChipNamesRoundTripThroughThePostedIntent() {
-        val choices = listOf(":_wave_:", ":wave:", ":_party_:", ":__:")
-        postConversationCard(presenter(choices))
-        val reply = replyAction()
-        val remoteInput = checkNotNull(reply.remoteInputs).single()
-        val labels = checkNotNull(remoteInput.choices).map(CharSequence::toString)
-
-        assertEquals(listOf(":_wave_:", ":wave:", "party", ":__:"), labels)
-        labels.zip(choices).forEach { (label, expected) ->
-            val tapped = Intent(shadowOf(reply.actionIntent).savedIntent)
-            RemoteInput.addResultsToIntent(
-                arrayOf(remoteInput),
-                tapped,
-                Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, label) },
-            )
-            RemoteInput.setResultsSource(tapped, RemoteInput.SOURCE_CHOICE)
-            assertEquals(expected, notificationReactionChoice(tapped, choices))
-        }
-    }
-
-    /** After a shortcode chip is handled, the card's reply history repeats the chip's name, not `:marmot:`. */
-    @Test
-    fun handledShortcodeReactionHistoryRepeatsTheChipName() {
-        val presenter = presenter(listOf(":marmot:", "👍"))
-        postConversationCard(presenter, "message-a")
-        val posted = manager.activeNotifications.single()
-
-        assertTrue(presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", ":marmot:"))
-
-        assertEquals(
-            listOf(context.getString(R.string.emoji_name_marmot)),
-            manager.activeNotifications
-                .single()
-                .notification.extras
-                .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
-                ?.map(CharSequence::toString),
-        )
-    }
-
-    /** Colliding names and blank names retain the same exact shortcode as their configured chips. */
-    @Test
-    fun handledReactionHistoryPreservesCollisionAndBlankLabelFallbacks() {
-        val choices = listOf(":wave:", ":_wave_:", ":___:")
-        var configured = choices
-        val presenter =
-            LocalNotificationPresenter(context, groupReconciliation = {}, quickReactionChoices = { configured })
-                .also(LocalNotificationPresenter::ensureChannels)
-        postConversationCard(presenter, "message-a")
-        assertEquals(
-            choices,
-            checkNotNull(replyAction().remoteInputs)
-                .single()
-                .choices
-                ?.map(CharSequence::toString),
-        )
-        // History must repeat the posted chip even if configuration changes before completion.
-        configured = listOf(":wave:")
-        val posted = manager.activeNotifications.single()
-
-        choices.forEach { reaction ->
-            assertTrue(presenter.markReactionHandledIfSameGeneration(posted.tag, posted.id, "message-a", reaction))
-            assertEquals(
-                listOf(reaction),
-                manager.activeNotifications
-                    .single()
-                    .notification.extras
-                    .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
-                    ?.map(CharSequence::toString),
-            )
-        }
-    }
-
     /** A handled reaction for an older message never writes history onto a newer message's card. */
     @Test
     fun reactionHandledRepostCannotAnnotateANewerMessageGeneration() {
@@ -227,6 +113,27 @@ class LocalNotificationReactionChipsTest {
             live.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
         )
         assertNull(live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
+    }
+
+    /** Android draws choice chips as text only, so shortcode chips show their exact code and tapping one sends it. */
+    @Test
+    fun shortcodeChipsShowTheirExactCodeAndSendIt() {
+        val choices = listOf(":marmot:", ":wn:", "👍")
+        postConversationCard(presenter(choices))
+        val reply = replyAction()
+        val remoteInput = checkNotNull(reply.remoteInputs).single()
+
+        assertEquals(choices, remoteInput.choices?.map(CharSequence::toString))
+        val tapped =
+            Intent(shadowOf(reply.actionIntent).savedIntent).also { intent ->
+                RemoteInput.addResultsToIntent(
+                    arrayOf(remoteInput),
+                    intent,
+                    Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, ":wn:") },
+                )
+                RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_CHOICE)
+            }
+        assertEquals(":wn:", notificationReactionChoice(tapped, choices))
     }
 
     /** Built-in choices keep Android's conversation card: no custom expanded view, Reply and Mark as read stay. */
@@ -284,7 +191,7 @@ class LocalNotificationReactionChipsTest {
                 .toString(),
         )
         assertEquals(
-            listOf(context.getString(R.string.emoji_name_marmot)),
+            listOf(":marmot:"),
             live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.map(CharSequence::toString),
         )
     }

@@ -144,7 +144,6 @@ private fun postLocalNotification(
     manager.notify(tag, id, notification)
 }
 
-/** Keeps an existing readable shortcut title when the candidate is only an npub fallback. */
 internal fun preferredConversationShortcutTitle(
     candidate: String,
     existing: String?,
@@ -2587,22 +2586,14 @@ class LocalNotificationPresenter(
      * Clear a reaction chip's direct-reply lifetime extension only while the
      * live card still represents the message that offered the chip. A newer
      * message reuses the same notification key and must not inherit the old
-     * reaction as RemoteInput history. The history line uses the posted chip's
-     * readable name or exact shortcode when that name is ambiguous.
+     * reaction as RemoteInput history.
      */
     internal fun markReactionHandledIfSameGeneration(
         notificationTag: String,
         notificationId: Int,
         reactedMessageIdHex: String?,
         reaction: String,
-    ): Boolean =
-        markRemoteInputHandled(
-            notificationTag,
-            notificationId,
-            reactedMessageIdHex,
-            reaction,
-            reactionChoice = true,
-        )
+    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, reactedMessageIdHex, reaction)
 
     /**
      * Re-posts the live (tag, id) card with [handledText] as its RemoteInput history, ending
@@ -2614,7 +2605,6 @@ class LocalNotificationPresenter(
         notificationId: Int,
         expectedMessageIdHex: String?,
         handledText: String,
-        reactionChoice: Boolean = false,
     ): Boolean =
         ConversationCardPostSynchronizer.withLock(
             notificationTag,
@@ -2644,15 +2634,13 @@ class LocalNotificationPresenter(
                 notificationId,
             )
             runCatching {
-                val historyText =
-                    if (reactionChoice) postedReactionHistoryText(active.notification, handledText) else handledText
                 val resolved =
                     NotificationCompat
                         .Builder(context, active.notification)
                         .apply {
                             extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
                             extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
-                        }.setRemoteInputHistory(arrayOf(historyText))
+                        }.setRemoteInputHistory(arrayOf(handledText))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
@@ -2672,26 +2660,6 @@ class LocalNotificationPresenter(
                 true
             }.getOrDefault(false)
         }
-
-    /**
-     * The chip [card] posted for [reaction]: its exact value when shown as is, else its readable name,
-     * else the value itself, so the history line matches the tapped chip even after the choices change.
-     */
-    private fun postedReactionHistoryText(
-        card: Notification,
-        reaction: String,
-    ): String {
-        val postedChoices =
-            card.actions.orEmpty().flatMap { action ->
-                action.remoteInputs.orEmpty().flatMap { input -> input.choices.orEmpty().map(CharSequence::toString) }
-            }
-        val readable = notificationQuickReactionLabels(context, listOf(reaction)).single()
-        return when {
-            reaction in postedChoices -> reaction
-            readable in postedChoices -> readable
-            else -> reaction
-        }
-    }
 
     /**
      * Re-post the (tag, id) conversation card after a direct reply failed
@@ -3116,17 +3084,15 @@ class LocalNotificationPresenter(
                 .mapNotNullTo(mutableSetOf()) { it.notification.shortcutId?.takeIf(::isConversationShortcutId) }
         }.getOrDefault(emptySet())
 
-    /** Reply with inline reaction chips; shortcode chips show a readable name and still send their exact value. */
     private fun replyNotificationAction(
         actionTarget: NotificationActionTarget,
         reactionChoices: List<String>,
     ): NotificationCompat.Action {
-        val reactionLabels = notificationQuickReactionLabels(context, reactionChoices)
         val remoteInput =
             RemoteInput
                 .Builder(NotificationActions.KEY_TEXT_REPLY)
                 .setLabel(context.getString(R.string.message))
-                .setChoices(reactionLabels.toTypedArray())
+                .setChoices(reactionChoices.toTypedArray())
                 .setAllowFreeFormInput(true)
                 .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
                 .build()
@@ -3139,8 +3105,6 @@ class LocalNotificationPresenter(
                     actionTarget,
                     NotificationActionKind.REPLY,
                     acceptsInlineReactionChoices = reactionChoices.isNotEmpty(),
-                    inlineReactionsByLabel =
-                        reactionLabels.zip(reactionChoices).filter { (label, choice) -> label != choice }.toMap(),
                 ),
             ).addRemoteInput(remoteInput)
             .setAllowGeneratedReplies(false)
@@ -3149,7 +3113,6 @@ class LocalNotificationPresenter(
             .build()
     }
 
-    /** The Mark as read action, which completes without opening the app. */
     private fun markReadNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action =
         NotificationCompat
             .Action
@@ -3161,12 +3124,10 @@ class LocalNotificationPresenter(
             .setShowsUserInterface(false)
             .build()
 
-    /** Broadcast for one card action, carrying which reaction each renamed inline chip stands for. */
     private fun actionPendingIntent(
         actionTarget: NotificationActionTarget,
         kind: NotificationActionKind,
         acceptsInlineReactionChoices: Boolean = false,
-        inlineReactionsByLabel: Map<String, String> = emptyMap(),
     ): PendingIntent {
         val actionIntent =
             Intent(context, NotificationActionReceiver::class.java).apply {
@@ -3176,7 +3137,6 @@ class LocalNotificationPresenter(
                     actionTarget,
                     acceptsInlineReactionChoices,
                 )
-                applyInlineReactionLabels(this, inlineReactionsByLabel)
             }
         val mutableFlag =
             if (kind == NotificationActionKind.REPLY || kind == NotificationActionKind.REACT) {

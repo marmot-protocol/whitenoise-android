@@ -186,29 +186,24 @@ class NotificationActionReceiver : BroadcastReceiver() {
     }
 }
 
-/** A direct reply's card is marked handled only once the reply was sent. */
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
 
-/**
- * The reaction a tapped chip chose. The reaction PendingIntent is mutable so SystemUI can attach
- * RemoteInput results, so a renamed chip maps back to its exact reaction, and only a normalized
- * value from the current configured choices is accepted.
- */
+// The reaction PendingIntent is mutable so SystemUI can attach RemoteInput
+// results. Accept only a normalized value from the current configured choices.
 internal fun notificationReactionChoice(
     intent: Intent,
     allowedChoices: List<String>,
 ): String? {
     val results = RemoteInput.getResultsFromIntent(intent)
-    val chosen =
-        (
-            results?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
-                ?: results
-                    ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
-                    ?.takeIf { NotificationActions.isInlineReactionChoice(intent) }
-        )?.toString()?.trim()
     val reaction =
-        normalizeNotificationReaction(chosen?.let { inlineReactionValue(intent, it) })
-            ?: NotificationActions.legacyReaction(intent)
+        normalizeNotificationReaction(
+            (
+                results?.getCharSequence(NotificationActions.KEY_REACTION_CHOICE)
+                    ?: results
+                        ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
+                        ?.takeIf { NotificationActions.isInlineReactionChoice(intent) }
+            )?.toString(),
+        ) ?: NotificationActions.legacyReaction(intent)
     return reaction?.takeIf { it in allowedChoices }
 }
 
