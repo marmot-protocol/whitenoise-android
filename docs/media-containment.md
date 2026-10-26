@@ -28,6 +28,10 @@ Native temporary allocations are not bounded solely by output dimensions. Worker
 
 Android media services perform platform extraction and codec work, but their JNI/Binder clients remain in the app process. Descriptor bounds and serialized deadlines reduce exposure; they do not provide the image worker’s UID/private-data/network boundary. Platform metadata is validated and waveforms must contain exactly 64 finite normalized values.
 
+The host rechecks source ownership and cancellation when a provider returns a
+descriptor, before staging its bytes or reading descriptor metadata. A provider
+that ignores cancellation cannot make a retired source enter those operations.
+
 Received-audio transcription reads an already materialized attachment through a
 separate serialized platform-codec adapter. It converts admitted mono/stereo
 PCM16 to 16 kHz mono, preserving the resampling phase across codec buffers, and
