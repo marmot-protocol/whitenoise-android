@@ -8525,9 +8525,7 @@ class ConversationController(
                 } catch (
                     @Suppress("TooGenericExceptionCaught") failure: Throwable,
                 ) {
-                    if (failure !is OptimisticSendCancelledException && isAmbiguousRelayDeliveryError(failure)) {
-                        withContext(controllerContext) { markAcceptanceUnknownIfPreAcceptance(optimisticKey) }
-                    }
+                    withContext(controllerContext) { recordSendAdmissionFailure(optimisticKey, failure) }
                     throw failure
                 }
             }
@@ -8583,8 +8581,14 @@ class ConversationController(
         }
     }
 
-    /** Records that a publish may have reached a relay, unless the send already moved past pre-acceptance. */
-    private fun markAcceptanceUnknownIfPreAcceptance(optimisticKey: String) {
+    /** Retires host cancellation when a failed admission may already have published. */
+    private fun recordSendAdmissionFailure(
+        optimisticKey: String,
+        failure: Throwable,
+    ) {
+        if (failure is OptimisticSendCancelledException || !isAmbiguousRelayDeliveryError(failure)) {
+            return
+        }
         if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
             optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
         }
@@ -8790,9 +8794,7 @@ class ConversationController(
                         // Presentation may still be parsing when this child
                         // returns. Retire host cancellation before releasing
                         // the commit lock if publication may have happened.
-                        if (throwable !is OptimisticSendCancelledException && isAmbiguousRelayDeliveryError(throwable)) {
-                            markAcceptanceUnknownIfPreAcceptance(optimisticKey)
-                        }
+                        recordSendAdmissionFailure(optimisticKey, throwable)
                         sendTrace(
                             trace,
                             PerformancePhase.FFI_ERROR,

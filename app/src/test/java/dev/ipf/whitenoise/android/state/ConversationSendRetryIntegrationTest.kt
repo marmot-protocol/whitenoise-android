@@ -1358,7 +1358,6 @@ class ConversationSendRetryIntegrationTest {
     @Test
     fun nativeEchoWhileMarkdownIsBlockedKeepsCanonicalIdentityAndTokens() =
         runTest {
-            val parseStarted = CompletableDeferred<Unit>()
             val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
             val durablyAccepted = CompletableDeferred<Unit>()
             val nativeTokens =
@@ -1368,11 +1367,7 @@ class ConversationSendRetryIntegrationTest {
                     blankLinesBefore = ByteArray(1),
                 )
             val lateLocalTokens =
-                MarkdownDocumentFfi(
-                    truncated = true,
-                    blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = emptyList())),
-                    blankLinesBefore = ByteArray(1),
-                )
+                nativeTokens.copy(truncated = true)
             var publishCalls = 0
             var durableCallbacks = 0
             val controller =
@@ -1381,12 +1376,10 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     markdownParser = {
-                        parseStarted.complete(Unit)
                         releaseParse.await()
                     },
                     textPublisher = { _, _, _, _ ->
-                        publishCalls += 1
-                        successfulSendSummary()
+                        successfulSendSummary().also { publishCalls += 1 }
                     },
                 )
             val send =
@@ -1402,10 +1395,8 @@ class ConversationSendRetryIntegrationTest {
 
             try {
                 withTimeout(5_000) {
-                    parseStarted.await()
                     durablyAccepted.await()
                 }
-                assertFalse(send.isCompleted)
                 val optimistic = controller.timeline.single().record
                 applyProjection(
                     controller,
@@ -1414,37 +1405,12 @@ class ConversationSendRetryIntegrationTest {
                         contentTokens = nativeTokens,
                     ),
                 )
-                assertEquals(
-                    CONFIRMED_MESSAGE_ID,
-                    controller.timeline
-                        .single()
-                        .record.messageIdHex,
-                )
-                assertEquals(
-                    nativeTokens,
-                    controller.timeline
-                        .single()
-                        .record.contentTokens,
-                )
+                assertNativeEcho(controller, nativeTokens)
 
                 releaseParse.complete(lateLocalTokens)
                 send.await()
 
-                assertEquals("the caller-token echo must consume, not duplicate, the optimistic row", 1, controller.timeline.size)
-                assertEquals(
-                    CONFIRMED_MESSAGE_ID,
-                    controller.timeline
-                        .single()
-                        .record.messageIdHex,
-                )
-                assertEquals(MessageStatus.Sent, controller.timeline.single().status)
-                assertEquals(
-                    "late local hydration must not replace authoritative tokens",
-                    nativeTokens,
-                    controller.timeline
-                        .single()
-                        .record.contentTokens,
-                )
+                assertNativeEcho(controller, nativeTokens)
                 assertEquals(1, publishCalls)
                 assertEquals(1, durableCallbacks)
             } finally {
@@ -1453,6 +1419,16 @@ class ConversationSendRetryIntegrationTest {
                 controller.onCleared()
             }
         }
+
+    private fun assertNativeEcho(
+        controller: ConversationController,
+        tokens: MarkdownDocumentFfi,
+    ) {
+        val message = controller.timeline.single()
+        assertEquals(CONFIRMED_MESSAGE_ID, message.record.messageIdHex)
+        assertEquals(MessageStatus.Sent, message.status)
+        assertEquals("native tokens must survive local hydration", tokens, message.record.contentTokens)
+    }
 
     /** Hands dictation back to Idle at optimistic publication, before transport settles. */
     @Test

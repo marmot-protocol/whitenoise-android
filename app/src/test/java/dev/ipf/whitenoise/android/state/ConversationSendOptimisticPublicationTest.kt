@@ -52,7 +52,7 @@ import org.robolectric.annotation.Config
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
-class ConversationSendOptimisticPublicationTest {
+class ConversationSendAdmissionTest {
     /** Native acceptance completes independently, but final reconciliation retains the hydrated document. */
     @Test
     fun bubblePublishesAndAcceptsBeforeTheMarkdownParseHopCompletes() =
@@ -64,7 +64,10 @@ class ConversationSendOptimisticPublicationTest {
             var accepted = 0
             var durableCallbacks = 0
             val controller =
-                controller(
+                ConversationController(
+                    appState = testAppState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
                     markdownParser = { releaseParse.await() },
                     textPublisher = { _, _, _, _ ->
                         sentSummary().also { publishCompleted.complete(Unit) }
@@ -90,39 +93,22 @@ class ConversationSendOptimisticPublicationTest {
                 }
                 assertFalse("native acceptance must not release the Markdown barrier", releaseParse.isCompleted)
                 assertFalse("final reconciliation must still await the presentation", send.isCompleted)
-                assertEquals("the bubble must be visible while the parse hop is still pending", 1, controller.timeline.size)
-                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
-                assertEquals(
-                    "hello *world*",
-                    controller.timeline
-                        .single()
-                        .record.plaintext,
-                )
+                val pending = controller.timeline.single()
+                assertEquals(MessageStatus.Pending, pending.status)
+                assertEquals("hello *world*", pending.record.plaintext)
                 assertEquals("acceptance must not wait on the parse hop", 1, accepted)
                 assertTrue(
-                    controller.timeline
-                        .single()
-                        .record.contentTokens.blocks
+                    pending.record.contentTokens.blocks
                         .isEmpty(),
                 )
 
                 releaseParse.complete(styled)
                 send.await()
 
-                assertSame(
-                    "the parsed document must rebind onto the published bubble",
-                    styled,
-                    controller.timeline
-                        .single()
-                        .record.contentTokens,
-                )
-                assertEquals(MessageStatus.Sent, controller.timeline.single().status)
-                assertEquals(
-                    CONFIRMED_MESSAGE_ID,
-                    controller.timeline
-                        .single()
-                        .record.messageIdHex,
-                )
+                val sent = controller.timeline.single()
+                assertSame("hydration must survive reconciliation", styled, sent.record.contentTokens)
+                assertEquals(MessageStatus.Sent, sent.status)
+                assertEquals(CONFIRMED_MESSAGE_ID, sent.record.messageIdHex)
                 assertEquals("durable acceptance must run exactly once", 1, durableCallbacks)
             } finally {
                 releaseParse.complete(styled)
@@ -142,7 +128,10 @@ class ConversationSendOptimisticPublicationTest {
             var publishCalls = 0
             var durableCallbacks = 0
             val controller =
-                controller(
+                ConversationController(
+                    appState = testAppState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
                     markdownParser = {
                         parseStarted.complete(Unit)
                         releaseParse.await()
@@ -189,7 +178,12 @@ class ConversationSendOptimisticPublicationTest {
                 controller.onCleared()
             }
         }
+}
 
+/** Optimistic bubble and chat-list presentation across admission, hydration and reconciliation. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationSendOptimisticPublicationTest {
     /** Resolves the durable Send target after its optimistic row grows the timeline during delayed transport. */
     @Test
     fun durableCallbackRevealsTheLiveTailAfterDelayedTransport() =
@@ -326,14 +320,15 @@ class ConversationSendOptimisticPublicationTest {
                 assertFalse(send.isCompleted)
                 chats.setChatListVisible(false)
                 chats.setChatListVisible(true)
-                assertEquals(
-                    "a parser stall must not expose raw optimistic Markdown in the chat list",
-                    "notified body",
+                val beforeParse =
                     chats.items
                         .single()
                         .projection
                         ?.lastMessage
-                        ?.plaintext,
+                assertEquals(
+                    "a parser stall must not expose raw optimistic Markdown in the chat list",
+                    "notified body",
+                    beforeParse?.plaintext,
                 )
 
                 releaseParse.complete(styled)
@@ -344,21 +339,11 @@ class ConversationSendOptimisticPublicationTest {
                 chats.setChatListVisible(false)
                 chats.setChatListVisible(true)
 
-                assertEquals(
-                    "hello *world*",
-                    chats.items
-                        .single()
-                        .projection
-                        ?.lastMessage
-                        ?.plaintext,
-                )
+                val afterParse = chats.items.single()
+                assertEquals("hello *world*", afterParse.projection?.lastMessage?.plaintext)
                 assertSame(styled, chats.items.single().previewTokens)
-                assertSame(
-                    styled,
-                    controller.timeline
-                        .single()
-                        .record.contentTokens,
-                )
+                val sent = controller.timeline.single().record
+                assertSame(styled, sent.contentTokens)
             } finally {
                 releaseParse.complete(styled)
                 controller.onCleared()
@@ -477,12 +462,12 @@ class ConversationSendOptimisticPublicationTest {
                 val first = async(start = CoroutineStart.UNDISPATCHED) { controller.send("first") }
                 val second = async(start = CoroutineStart.UNDISPATCHED) { controller.send("second") }
 
-                assertEquals("both native sends must precede either parse completion", listOf("first", "second"), published)
+                assertEquals("admission must precede parsing", listOf("first", "second"), published)
                 secondParse.complete(styledDocument())
                 second.await()
                 firstParse.complete(styledDocument())
                 first.await()
-                assertEquals("reverse parsing must not reorder native publication", listOf("first", "second"), published)
+                assertEquals("parsing must not reorder admission", listOf("first", "second"), published)
                 chats.setChatListVisible(false)
                 chats.setChatListVisible(true)
 
