@@ -220,7 +220,7 @@ class PushTokenRefreshIntegrationTest {
                 fixture.appState.syncNativePushRegistrationIfEnabled()
                 fixture.upsertedPushTokens.clear()
                 unavailable = true
-                val callback = queueRotation(fixture, "callback-token")
+                val callback = checkNotNull(fixture.appState.onPushTokenRotated("callback-token"))
                 fixture.runWithMainLooperPumping { callback.join() }
                 assertEquals(listOf("callback-token"), fixture.upsertedPushTokens.toList())
                 assertFalse(PushTokenStore.create(context).nativePushRegistrationSyncPending())
@@ -244,8 +244,8 @@ class PushTokenRefreshIntegrationTest {
                 val mutex = deliveryMutex(fixture)
                 mutex.lock()
                 try {
-                    val first = queueRotation(fixture, "first-callback")
-                    val latest = queueRotation(fixture, "latest-callback")
+                    val first = checkNotNull(fixture.appState.onPushTokenRotated("first-callback"))
+                    val latest = checkNotNull(fixture.appState.onPushTokenRotated("latest-callback"))
                     mutex.unlock()
                     fixture.runWithMainLooperPumping {
                         first.join()
@@ -276,7 +276,7 @@ class PushTokenRefreshIntegrationTest {
                     token = "newer-sdk-token"
                     val mutex = deliveryMutex(fixture)
                     mutex.lock()
-                    val callback = queueRotation(fixture, "callback-token")
+                    val callback = checkNotNull(fixture.appState.onPushTokenRotated("callback-token"))
                     retirePushOwner(fixture, retirement)
                     mutex.unlock()
                     fixture.runWithMainLooperPumping { callback.join() }
@@ -299,7 +299,10 @@ class PushTokenRefreshIntegrationTest {
     fun callbackCannotBypassUnknownStorageCleanup() =
         runBlocking {
             var unavailable = false
-            val fixture = fixture { if (unavailable) error("unavailable") else "bootstrap-token" }
+            val fixture =
+                fixture(pushWakeStorageDispatcher = kotlinx.coroutines.Dispatchers.Unconfined) {
+                    if (unavailable) error("unavailable") else "bootstrap-token"
+                }
             try {
                 fixture.bootstrap()
                 fixture.appState.syncNativePushRegistrationIfEnabled()
@@ -313,7 +316,13 @@ class PushTokenRefreshIntegrationTest {
                         },
                     )
                 fixture.replacePushTokenStore(blocked)
-                val callback = queueRotation(fixture, "callback-token")
+                val callback =
+                    fixture.runOnMainLooperPumping {
+                        // Inline storage makes the blocked rotation finish before launch returns its job.
+                        val rotation = checkNotNull(fixture.appState.onPushTokenRotated("callback-token"))
+                        assertTrue(rotation.isCompleted)
+                        rotation
+                    }
                 fixture.runWithMainLooperPumping { callback.join() }
                 assertTrue(fixture.upsertedPushTokens.isEmpty())
                 assertTrue(blocked.nativePushRegistrationSyncPending())
@@ -352,12 +361,12 @@ class PushTokenRefreshIntegrationTest {
                     fixture.appState.syncNativePushRegistrationIfEnabled()
                     fixture.upsertedPushTokens.clear()
                     rotating = true
-                    val first = queueRotation(fixture, "first-callback")
+                    val first = checkNotNull(fixture.appState.onPushTokenRotated("first-callback"))
                     fixture.runWithMainLooperPumping {
                         kotlinx.coroutines.withTimeout(5_000L) { started.await() }
                         val latest =
                             if (retirement == "rotation") {
-                                queueRotation(fixture, "latest-callback")
+                                checkNotNull(fixture.appState.onPushTokenRotated("latest-callback"))
                             } else {
                                 retirePushOwner(fixture, retirement)
                                 null
@@ -412,12 +421,14 @@ class PushTokenRefreshIntegrationTest {
                 store.setToken("bootstrap-token")
                 fixture.replacePushTokenStore(store)
                 rotating = true
-                val first = queueRotation(fixture, "first-callback")
+                val first = checkNotNull(fixture.appState.onPushTokenRotated("first-callback"))
                 fixture.runWithMainLooperPumping {
                     kotlinx.coroutines.coroutineScope {
                         kotlinx.coroutines.withTimeout(5_000L) { enteredWrite.await() }
                         val latest =
-                            async(kotlinx.coroutines.Dispatchers.IO) { queueRotation(fixture, "latest-callback") }
+                            async(kotlinx.coroutines.Dispatchers.IO) {
+                                checkNotNull(fixture.appState.onPushTokenRotated("latest-callback"))
+                            }
                         val sequence =
                             WhiteNoiseAppState::class.java
                                 .getDeclaredField("pushTokenRotationSequence")
@@ -429,7 +440,6 @@ class PushTokenRefreshIntegrationTest {
                         releaseWrite.countDown()
                         first.join()
                         latest.await().join()
-                        // The child snapshot can include another notification job; await the durable result.
                         kotlinx.coroutines.withTimeout(5_000L) {
                             while (store.nativePushRegistrationSyncPending()) kotlinx.coroutines.yield()
                         }
@@ -477,7 +487,7 @@ class PushTokenRefreshIntegrationTest {
                     kotlinx.coroutines.coroutineScope {
                         val ordinary = async { fixture.appState.syncNativePushRegistrationIfEnabled() }
                         kotlinx.coroutines.withTimeout(5_000L) { started.await() }
-                        val callback = queueRotation(fixture, "callback-token")
+                        val callback = checkNotNull(fixture.appState.onPushTokenRotated("callback-token"))
                         release.complete(Unit)
                         assertFalse(ordinary.await())
                         callback.join()
@@ -560,34 +570,16 @@ class PushTokenRefreshIntegrationTest {
             .apply { isAccessible = true }
             .get(fixture.appState) as kotlinx.coroutines.sync.Mutex
 
-    /**
-     * Waits for the durable registration marker to clear — the rotation child snapshot can be another notification
-     * job, so joining it alone does not prove registration finished.
-     */
+    /** Waits for the durable registration marker to clear. */
     private suspend fun awaitRegistrationSettled() {
         kotlinx.coroutines.withTimeout(5_000L) {
             while (PushTokenStore.create(context).nativePushRegistrationSyncPending()) kotlinx.coroutines.yield()
         }
     }
 
-    /** Observes a new notification child; callers must separately await durable registration state. */
-    private fun queueRotation(
-        fixture: NotificationBootstrapTestFixture,
-        token: String,
-    ): kotlinx.coroutines.Job {
-        val scope =
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("notificationScope")
-                .apply { isAccessible = true }
-                .get(fixture.appState) as kotlinx.coroutines.CoroutineScope
-        val parent = checkNotNull(scope.coroutineContext[kotlinx.coroutines.Job])
-        val previous = parent.children.toSet()
-        fixture.appState.onPushTokenRotated(token)
-        return parent.children.first { it !in previous }
-    }
-
     private fun fixture(
         available: Boolean = true,
+        pushWakeStorageDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
         reader: suspend () -> String?,
     ) = NotificationBootstrapTestFixture(
         context = context,
@@ -598,6 +590,7 @@ class PushTokenRefreshIntegrationTest {
         nativePushCapabilityResolver = {
             if (available) NativePushCapability.Available else NativePushCapability.FirebaseUnavailable
         },
+        pushWakeStorageDispatcher = pushWakeStorageDispatcher,
         fcmTokenReader = reader,
     )
 }
