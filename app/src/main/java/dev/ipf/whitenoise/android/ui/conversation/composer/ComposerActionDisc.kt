@@ -34,9 +34,10 @@ internal fun ComposerActionDisc(
     @DrawableRes icon: Int,
     enabled: Boolean = true,
     width: Dp = 40.dp,
+    modifier: Modifier = Modifier,
 ) {
     val outline = amoledOutlineBorder()
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.width(width).height(48.dp)) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.width(width).height(48.dp)) {
         Surface(
             modifier = Modifier.size(32.dp),
             shape = CircleShape,

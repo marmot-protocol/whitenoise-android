@@ -2447,6 +2447,8 @@
     <string name="search_message_content_failed">Impossible de rechercher dans le contenu des messages.</string>
     <string name="document_save_interrupted">L’authentification a interrompu cet enregistrement. Choisis à nouveau Enregistrer pour sélectionner une destination.</string>
     <string name="avatar_preparation_interrupted">La mise à jour de l’image a été interrompue. Vérifie l’image actuelle avant de la sélectionner à nouveau.</string>
+    <string name="dictation_interrupted">Dictée interrompue. Vérifie le texte récupéré et tout enregistrement audio restant avant l’envoi.</string>
+    <string name="dictation_waiting_for_unlock">Dictée enregistrée temporairement. Déverrouille l’application pour la coller.</string>
     <string name="show_less">Afficher moins</string>
     <string name="font_size_preview">Aperçu des messages</string>
     <string name="font_size_sample_received">Retrouvons-nous à la gare. L’après-midi te convient toujours ?</string>

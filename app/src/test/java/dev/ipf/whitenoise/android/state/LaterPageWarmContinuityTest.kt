@@ -80,6 +80,43 @@ class LaterPageWarmContinuityTest {
         }
     }
 
+    /** An early landing cannot claim a row while the initial card read still holds its publication. */
+    @Test
+    fun earlyLandingRemainsRetryableUntilItsInitialCardPageIsPublished() {
+        val read = CountDownLatch(1)
+        val fixture =
+            EventCardConversationFixture(
+                composeRule = composeRule,
+                snapshotPage = timelinePage(timelineRecord(TARGET_ID, 1uL, plaintext = "nostr:$NOTE")),
+                cacheRead = { read.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) },
+            )
+        try {
+            fixture.compose()
+            fixture.awaitIdleCondition { fixture.cacheReads.get() >= 1 }
+            val landing = Landing()
+            navigationScope.launch {
+                landing.availability = fixture.controller.loadMessageAvailability(TARGET_ID)
+            }
+            fixture.awaitIdleCondition { landing.availability != null }
+            assertEquals(MessageAvailability.RETRYABLE, landing.availability)
+            assertTrue(TARGET_ID !in timelineMessageIds(fixture.controller))
+
+            read.countDown()
+            fixture.awaitIdleCondition {
+                fixture.controller.hasPreparedInitialPresentation && TARGET_ID in timelineMessageIds(fixture.controller)
+            }
+            landing.availability = null
+            navigationScope.launch {
+                landing.availability = fixture.controller.loadMessageAvailability(TARGET_ID)
+            }
+            fixture.awaitIdleCondition { landing.availability != null }
+            assertEquals(MessageAvailability.AVAILABLE, landing.availability)
+        } finally {
+            read.countDown()
+            fixture.close()
+        }
+    }
+
     /**
      * A far jump that commits before the conversation's first presentation is ready, here held by its profile read:
      * the jumped-to window is held unpublished for its card like a first page (#2238). The landing waits until that

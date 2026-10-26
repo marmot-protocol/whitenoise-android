@@ -1652,6 +1652,7 @@
     <string name="dictation_microphone_muted">Microphone access is off</string>
     <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>
     <string name="dictation_microphone_in_use">The microphone is already in use</string>
+    <string name="dictation_interrupted">Dictation interrupted. Review recovered text and any remaining audio before sending.</string>
     <string name="dictation_audio_focus_unavailable">Could not pause other audio. Try again or turn off Pause other audio in Dictation settings.</string>
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>
@@ -2612,6 +2613,7 @@
     <string name="search_message_content_loading">Searching message content…</string>
     <string name="search_message_content_failed">Couldn’t search message content.</string>
     <string name="avatar_preparation_interrupted">The image update was interrupted. Check the current image before selecting it again.</string>
+    <string name="dictation_waiting_for_unlock">Dictation saved temporarily. Unlock the app to paste it.</string>
     <string name="show_less">Show less</string>
     <string name="font_size_preview">Message preview</string>
     <string name="font_size_sample_received">Let’s meet by the station. Is the afternoon still a good time for you?</string>

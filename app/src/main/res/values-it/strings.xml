@@ -2447,6 +2447,8 @@
     <string name="search_message_content_failed">Impossibile cercare nel contenuto dei messaggi.</string>
     <string name="document_save_interrupted">L’autenticazione ha interrotto il salvataggio. Scegli di nuovo Salva per selezionare una destinazione.</string>
     <string name="avatar_preparation_interrupted">L’aggiornamento dell’immagine è stato interrotto. Controlla l’immagine attuale prima di selezionarla di nuovo.</string>
+    <string name="dictation_interrupted">Dettatura interrotta. Controlla il testo recuperato e l’eventuale audio rimanente prima di inviare.</string>
+    <string name="dictation_waiting_for_unlock">Dettatura salvata temporaneamente. Sblocca l’app per incollarla.</string>
     <string name="show_less">Mostra meno</string>
     <string name="font_size_preview">Anteprima dei messaggi</string>
     <string name="font_size_sample_received">Incontriamoci alla stazione. Per te va ancora bene il pomeriggio?</string>
