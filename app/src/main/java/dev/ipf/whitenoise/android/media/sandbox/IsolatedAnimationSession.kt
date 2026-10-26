@@ -15,6 +15,8 @@ import android.os.Messenger
 import android.os.Parcel
 import android.os.Process
 import android.os.SharedMemory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -27,6 +29,11 @@ internal class IsolatedAnimationSession private constructor(
     private val edge: Int,
     private val admissionLease: AnimationAdmission.Lease,
 ) : AnimationSessionControl {
+    private val viewerPreemption = MutableStateFlow(false)
+
+    /** Observers may queue a replacement after viewer takeover, never manufacture worker death. */
+    override val preempted = viewerPreemption.asStateFlow()
+
     private val id = ids.incrementAndGet()
     private val output = SharedMemory.create("animation-pixels", requireNotNull(MediaDecodePolicy.outputCapacity(edge)))
     private val lock = Any()
@@ -169,6 +176,7 @@ internal class IsolatedAnimationSession private constructor(
             }
         }
 
+    /** Stages source IO outside the capability lock and returns no drawable when startup is retired. */
     private fun open(bytes: ByteArray): IsolatedAnimationDrawable? {
         synchronized(lock) {
             if (closed) {
@@ -192,26 +200,8 @@ internal class IsolatedAnimationSession private constructor(
                 false
             }
         return if (available) {
-            sources.withInput(bytes) { input ->
-                remote?.send(
-                    Message.obtain().apply {
-                        what = AnimationFrameProtocol.OPEN
-                        arg1 = id
-                        replyTo = this@IsolatedAnimationSession.callback
-                        data =
-                            android.os.Bundle().apply {
-                                putInt("edge", edge)
-                                putParcelable("input", input)
-                                putParcelable("output", output)
-                                if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
-                                    val canary = java.io.File(context.filesDir, "media-containment-canary")
-                                    if (canary.isFile) putString("canaryPath", canary.absolutePath)
-                                }
-                            }
-                    },
-                )
-            }
-            val received = firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+            val sent = sources.withInput(bytes, ::sendOpen) == true
+            val received = sent && firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
             synchronized(lock) {
                 if (closed || !received) {
                     null
@@ -228,6 +218,33 @@ internal class IsolatedAnimationSession private constructor(
             null
         }
     }
+
+    /**
+     * Serializes OPEN with [close], so retirement cannot close shared memory during parcel marshalling.
+     * A retired startup returns false; unrelated source/IPC failures still escape without a retry.
+     */
+    private fun sendOpen(input: android.os.ParcelFileDescriptor): Boolean =
+        synchronized(lock) {
+            val target = remote?.takeUnless { closed } ?: return@synchronized false
+            target.send(
+                Message.obtain().apply {
+                    what = AnimationFrameProtocol.OPEN
+                    arg1 = id
+                    replyTo = this@IsolatedAnimationSession.callback
+                    data =
+                        android.os.Bundle().apply {
+                            putInt("edge", edge)
+                            putParcelable("input", input)
+                            putParcelable("output", output)
+                            if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
+                                val canary = java.io.File(context.filesDir, "media-containment-canary")
+                                if (canary.isFile) putString("canaryPath", canary.absolutePath)
+                            }
+                        }
+                },
+            )
+            true
+        }
 
     override fun play() = send(AnimationFrameProtocol.PLAY)
 
@@ -324,6 +341,12 @@ internal class IsolatedAnimationSession private constructor(
         // on timeout/unbind alone or fabricate a death acknowledgement.
     }
 
+    /** Retires this decorative session before allowing its still-visible owner to queue again. */
+    private fun yieldToViewer() {
+        close()
+        viewerPreemption.value = true
+    }
+
     companion object {
         private val ids = AtomicInteger()
         private val admission = AnimationAdmission()
@@ -332,29 +355,37 @@ internal class IsolatedAnimationSession private constructor(
                 .AtomicReference<IsolatedAnimationSession?>()
         private val callbackHandler by lazy { Handler(HandlerThread("animation-ipc").apply { start() }.looper) }
 
+        /** Opens one admitted worker; waiting group thumbnails remain cancellable before any binding. */
         fun create(
             context: Context,
             bytes: ByteArray,
             edge: Int,
             decorative: Boolean = false,
+            waitForDecorativeAdmission: Boolean = false,
         ): IsolatedAnimationDrawable? {
             val validSource =
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
                     edge in 1..AnimationFrameProtocol.MAX_EDGE
-            val admissionLease =
-                if (Looper.myLooper() == Looper.getMainLooper() || !validSource) {
-                    null
-                } else {
-                    admission.acquire(decorative, MediaDecodePolicy.DEADLINE_MS)
-                }
-            if (admissionLease == null) return null
+            if (Looper.myLooper() == Looper.getMainLooper() || !validSource) return null
+            return admission.decode(decorative, waitForDecorativeAdmission, MediaDecodePolicy.DEADLINE_MS) { lease ->
+                openAdmitted(context, bytes, edge, lease)
+            }
+        }
+
+        /** Owns one startup attempt; a preempted null result is retried by admission after retirement. */
+        private fun openAdmitted(
+            context: Context,
+            bytes: ByteArray,
+            edge: Int,
+            admissionLease: AnimationAdmission.Lease,
+        ): IsolatedAnimationDrawable? {
             var session: IsolatedAnimationSession? = null
             var delivered: IsolatedAnimationDrawable? = null
             return try {
                 val created = IsolatedAnimationSession(context.applicationContext, edge, admissionLease)
                 session = created
                 active.set(created)
-                admissionLease.onRetire { created.close() }
+                admissionLease.onRetire { created.yieldToViewer() }
                 created.open(bytes).also { delivered = it }
             } finally {
                 // The facade handles failure/cancellation; this scope only owns cleanup.
