@@ -1713,6 +1713,9 @@ internal fun VideoViewerPage(
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = Modifier.fillMaxSize().background(Color.Black),
         factory = { ctx -> viewerPlayerView(ctx, exo) { visible -> latestOnControllerVisibilityChange(visible) } },
+        update = { playerView ->
+            if (playerView.player !== exo) playerView.player = exo
+        },
         onRelease = { playerView -> playerView.player = null },
     )
 }

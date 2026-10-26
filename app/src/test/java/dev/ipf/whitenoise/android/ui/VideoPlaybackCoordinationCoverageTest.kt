@@ -78,6 +78,10 @@ class VideoPlaybackCoordinationCoverageTest {
         assertTrue("replacement must retain the latest play intent", "autoplayAllowed.value = playWhenReady" in observer)
         assertTrue("pause listener must be attached", "exo.addListener(pauseListener)" in observer)
         assertTrue("pause listener must be detached", "exo.removeListener(pauseListener)" in observer.substringAfter("onDispose"))
+        assertTrue(
+            "the retained view must follow the replacement player",
+            "if (playerView.player !== exo) playerView.player = exo" in body.substringAfter("update ="),
+        )
         assertFalse(
             "returning to foreground must not play",
             "exo.play(" in observer || "playWhenReady = true" in observer,
