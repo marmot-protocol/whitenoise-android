@@ -45,6 +45,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
@@ -1494,6 +1497,7 @@ internal fun VideoViewerPage(
     onControllerVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
     val latestReference by rememberUpdatedState(reference)
     val latestOnPlayerChanged by rememberUpdatedState(onPlayerChanged)
@@ -1608,6 +1612,7 @@ internal fun VideoViewerPage(
                 .build()
                 .apply {
                     setAudioAttributes(videoPlaybackAudioAttributes, true)
+                    setHandleAudioBecomingNoisy(true)
                     addListener(
                         object : androidx.media3.common.Player.Listener {
                             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -1647,6 +1652,17 @@ internal fun VideoViewerPage(
             exo.release()
         }
     }
+    // Pause the mounted player on Home or screen lock. START intentionally does not resume it:
+    // only the user's play action may resume after a stop or a disconnected audio route.
+    DisposableEffect(exo, lifecycle) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) exo.pause()
+            }
+        lifecycle.addObserver(observer)
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) exo.pause()
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     // The player reopens its file to seek or replay, so the cache holds it for as long as this page plays it.
     HoldCacheFileWhileComposed(file)
     // Only the current page owns a decoder or audio focus. HorizontalPager
@@ -1657,7 +1673,8 @@ internal fun VideoViewerPage(
         if (isCurrent) {
             VoicePlaybackController.pause()
             exo.prepare()
-            exo.playWhenReady = true
+            // Materialization may finish after STOP, before this player has observed any lifecycle event.
+            exo.playWhenReady = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         } else {
             exo.playWhenReady = false
             exo.stop()
