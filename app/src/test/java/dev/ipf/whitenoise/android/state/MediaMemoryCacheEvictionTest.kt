@@ -1,14 +1,19 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
+import dev.ipf.whitenoise.android.ui.conversation.media.canRequestAttachmentOpen
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartAttachmentDownload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,6 +70,31 @@ class MediaMemoryCacheEvictionTest {
                 assertEquals(revision + 1, state.mediaCacheRevision.value)
                 assertEquals(thumbnailRevision + 1, state.mediaThumbnailRevision.value)
                 assertTrue("trim must not start native acquisition", fixture.calls.isEmpty())
+            }
+        }
+
+    /** A mounted L1-only file does not reopen automatic acquisition when trim leaves no retained disk body. */
+    @Test
+    fun trimmedL1OnlyFileSettlesWithoutAutomaticDownload() =
+        runBlocking {
+            MediaDownloadIntegrationFixture().use { fixture ->
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+                try {
+                    val state = fixture.state
+                    val coordinator = AttachmentTransferCoordinator(scope)
+                    state.cacheMediaPlaintext("l1-only", byteArrayOf(1, 2, 3))
+                    val transfer = coordinator.acquireState("l1-only", initiallyAvailable = true)
+                    state.trimPresentationMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+                    coordinator.refresh("l1-only") {
+                        state.cachedMediaPlaintext("l1-only") != null || fixture.disk.get("l1-only") != null
+                    }
+                    assertEquals(AttachmentTransferState.NotRetained, transfer.value)
+                    assertFalse(shouldStartAttachmentDownload(transfer.value, true, 1uL, mine = false))
+                    assertTrue(canRequestAttachmentOpen(transfer.value, 1uL, mine = false))
+                    assertTrue("no automatic native work may start", fixture.calls.isEmpty())
+                } finally {
+                    scope.cancel()
+                }
             }
         }
 

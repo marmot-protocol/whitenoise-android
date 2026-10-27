@@ -21,8 +21,8 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ContactPictureChange
 import dev.ipf.whitenoise.android.state.ProfilePresentation
 import dev.ipf.whitenoise.android.state.ScopedCache
-import dev.ipf.whitenoise.android.state.contactPicturePng
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.contactPicturePng
 import dev.ipf.whitenoise.android.ui.share.group
 import kotlinx.coroutines.runBlocking
 import org.junit.After

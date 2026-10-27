@@ -999,11 +999,14 @@ insertion capacity stays bounded. Cache-only avatar eviction does not publish a
 picture-change signal that would overwrite a launcher shortcut with initials.
 Later shortcut refreshes also distinguish a missing cache entry from a changed
 selection: the launcher stores only an opaque picture-selection digest alongside
-its existing icon. A still-selected owning source that missed before any available fallback,
-and a current privacy epoch, permit an icon-omitting update; an actual clear/replacement, account/cache lifetime change
-or privacy transition cannot retain the old photo. Changes to a lower-priority
-public fallback do not revoke an unchanged private-photo selection. No extra decoded-pixel store
-is introduced.
+its existing icon. A still-selected owning source that missed before any
+available fallback, and a current privacy epoch, permit an icon-omitting update.
+An actual clear/replacement, account/cache lifetime change or privacy transition
+cannot retain the old photo. Changes to a lower-priority public fallback do not
+revoke an unchanged private-photo selection. No extra decoded-pixel store is
+introduced. A confirmed cache miss for a previously available attachment
+settles as NotRetained, which permits an explicit retry but does not issue a new
+automatic-download demand; an inconclusive probe keeps its prior state.
 
 The coordinated image tiers are L1 attachment bytes/thumbnails, profile/banner
 pixels and profile animation sources, encrypted-group pixels/sources, public JPEG
