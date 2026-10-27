@@ -2482,13 +2482,6 @@ class ChatsController private constructor(
             },
         )
 
-    // Whether the chat list is on screen. While a conversation is foregrounded
-    // the subscription stays warm (updates keep folding into the maps above),
-    // but the recompute is deferred so list projection doesn't compete with the
-    // conversation on the heaviest nav path. See #6.
-    private var chatListVisible = true
-    private var pendingRecompute = false
-
     // Lifecycle-scoped member snapshots for the current chat rows. Initial
     // bind seeds identifier-only rows in bounded `groupMemberIdsPage` calls;
     // later group invalidations and a failed initial page fall back to the
@@ -2668,6 +2661,7 @@ class ChatsController private constructor(
             resetBackingState()
         }
         bindLifetime.advance()
+        presentationLifetime.reset()
         val epoch = bindEpoch
         initialLoadWatchdog?.cancel()
         if (isLoading) {
@@ -3702,34 +3696,32 @@ class ChatsController private constructor(
                 ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
     }
 
-    private fun awaitingSendPreview(groupIdHex: String): Boolean {
-        val key = chatRowKey(groupIdHex)
-        return optimisticChatListPreviewByGroup[key]?.awaitingSendPreview() == true
+    /** Projects the existing backing rows without retaining another presentation snapshot. */
+    private fun projectionAccountIdHex(): String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+
+    private fun currentProjectedItems(activeAccountIdHex: String? = projectionAccountIdHex()): List<ChatListItem> {
+        val projector = rowProjector(activeAccountIdHex)
+        return chatRows.map(projector::retained)
     }
 
-    /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
-    private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
-        chatRows.map { authoritativeRow ->
-            val row = archiveActions.projectRow(authoritativeRow)
-            chatListItemFromProjection(
-                row = row,
-                selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
-                selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
-                selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
-                actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
-                group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
-                activeAccountIdHex = activeAccountIdHex,
-                members = memberCacheByGroup[row.groupIdHex],
-                presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-                previewTokens = chatRowPreviewTokens(row, previewTokensByText),
-                resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
-                removed = row.groupIdHex in removedGroupIds,
-                activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
-                awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
-                hasOptimisticSendPreview =
-                    optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
-            )
-        }
+    private fun rowProjector(activeAccountIdHex: String?): ChatListRowProjector =
+        ChatListRowProjector(
+            activeAccountIdHex = activeAccountIdHex,
+            groups = groupRecordsById,
+            members = memberCacheByGroup,
+            presentationMembers = { lastKnownPresentation(it, activeAccountIdHex) },
+            tokens = previewTokensByText,
+            mediaFallbacks = mediaPreviewFallbackByMessageId,
+            removed = removedGroupIds,
+            activitySequences = activitySequenceByGroup,
+            optimisticPreviews = optimisticChatListPreviewByGroup,
+            archiveActions = archiveActions,
+            localGroupNames = localGroupNames,
+            presentations = selectedPresentationsByGroup,
+            avatars = selectedAvatarAssetsByGroup,
+            previews = selectedPreviewsByGroup,
+            actions = selectedActionsByGroup,
+        )
 
     internal fun boundAccountIdHex(): String? {
         val ref = accountRef ?: return null
@@ -3740,54 +3732,13 @@ class ChatsController private constructor(
     internal fun projectChatRow(
         authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
-    ): ChatListItem {
-        val row = archiveActions.projectRow(authoritativeRow)
-        return chatListItemFromProjection(
-            row = row,
-            selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
-            selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
-            selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
-            actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
-            group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
-            activeAccountIdHex = activeAccountIdHex,
-            members = memberCacheByGroup[row.groupIdHex],
-            presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-            previewTokens = chatRowPreviewTokens(row, previewTokensByText),
-            resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
-            removed = row.groupIdHex in removedGroupIds,
-            activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
-            awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
-            hasOptimisticSendPreview =
-                optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
-        )
-    }
+    ): ChatListItem = rowProjector(activeAccountIdHex).retained(authoritativeRow)
 
-    /**
-     * Projects a row MDK presented outside the retained window (#2618), with the presentation, preview,
-     * actions and avatar that row carries and whatever group, roster and preview caches this controller
-     * already holds for it. Retained rows must keep using [projectChatRow], which reads the live window.
-     */
+    /** Projects an off-window MDK row without materializing it into the retained window. */
     internal fun projectPresentedRow(
         presented: PresentedChatRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
-    ): ChatListItem {
-        val row = archiveActions.projectRow(presented.row)
-        return chatListItemFromProjection(
-            row = row,
-            selectedPresentation = localGroupNames.reconciledPresentation(presented.row, presented.presentation),
-            selectedAvatarAsset = presented.avatarAsset,
-            selectedPreview = presented.preview,
-            actions = presented.actions,
-            group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
-            activeAccountIdHex = activeAccountIdHex,
-            members = memberCacheByGroup[row.groupIdHex],
-            presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-            previewTokens = chatRowPreviewTokens(row, previewTokensByText),
-            resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
-            removed = row.groupIdHex in removedGroupIds,
-            activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
-        )
-    }
+    ): ChatListItem = rowProjector(activeAccountIdHex).presented(presented)
 
     /** Keeps source picture identity separate from MDK-selected display URL/hash rewrites. */
     internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? {
@@ -5282,17 +5233,7 @@ class ChatsController private constructor(
      * way — returning shows the current list with no reload — only the
      * recompute is paused while hidden and flushed once on return. See #6.
      */
-    fun setChatListVisible(visible: Boolean) {
-        if (isCleared) return
-        if (visible == chatListVisible) return
-        chatListVisible = visible
-        // Flush any folded backing updates synchronously on return so the shell's
-        // one-shot head snapshot compares against the current projection, not a
-        // stale list left over while scheduleRecompute's debounce was pending (#1313).
-        if (visible && (pendingRecompute || recomputeScheduled)) {
-            recompute()
-        }
-    }
+    fun setChatListVisible(visible: Boolean) = presentationLifetime.setVisible(visible)
 
     /**
      * A draft started, cleared, or received a newer coalesced MDK updatedAtMs,
@@ -5304,27 +5245,11 @@ class ChatsController private constructor(
         recompute()
     }
 
-    private var recomputeScheduled = false
     private val recomputeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val presentationLifetime = ChatListPresentationLifetime(recomputeScope) { recompute() }
 
-    // Coalesce the per-fold recompute. The chat-list stream emits a flurry of Row
-    // updates during a sync burst (open / reconnect catch-up); running the full
-    // O(n log n) sort + member/preview/invite fan-out on each one janks the main
-    // thread. Fold updates land in the backing maps synchronously; this defers the
-    // projection rebuild one frame so a burst collapses into a single recompute,
-    // mirroring the conversation timeline's coalescing.
-    private fun scheduleRecompute() {
-        if (isCleared || recomputeScheduled) return
-        recomputeScheduled = true
-        recomputeScope.launch {
-            try {
-                delay(CHAT_LIST_RECOMPUTE_DEBOUNCE_MS)
-            } finally {
-                recomputeScheduled = false
-            }
-            recompute()
-        }
-    }
+    // Folded native updates remain synchronous; only their visible publication is coalesced.
+    private fun scheduleRecompute() = presentationLifetime.schedule()
 
     /**
      * Dispose every reference this controller owns. The chat-list screen calls
@@ -5354,8 +5279,7 @@ class ChatsController private constructor(
         hasLoadedLocalSnapshot = false
         isLoading = false
         error = null
-        pendingRecompute = false
-        recomputeScheduled = false
+        presentationLifetime.clear()
         pendingRecoveryProjectionGeneration.clear()
         recoveryProjectionGeneration = 0L
         recomputeScope.cancel()
@@ -5420,11 +5344,7 @@ class ChatsController private constructor(
         // Hidden behind an open conversation: keep folding updates into the
         // backing maps (done by the caller) but defer the projection rebuild +
         // member/preview fan-out until the list returns, then run once. See #6.
-        if (!chatListVisible) {
-            pendingRecompute = true
-            return
-        }
-        pendingRecompute = false
+        if (!presentationLifetime.beginVisiblePublication()) return
         val all =
             sortChatListItems(projected) { item ->
                 accountRef?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
@@ -6022,9 +5942,6 @@ internal fun conversationSearchPageDirection(
 // loadOlder() must re-fetch.
 private const val LIVE_TIMELINE_WINDOW_CAP = 200
 
-// One frame: long enough to collapse a chat-list sync burst into a single
-// recompute, short enough to stay imperceptible.
-private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
 private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
 private const val CHAT_LIST_AVATAR_WARM_ROWS = 24
 
