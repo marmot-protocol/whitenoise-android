@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: d8d498ef2b0819103ba3c67bede182a4da5285f6
+          ref: 21876b3fd1fc9724b66da885ac89e92ffc56dedc
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -45,7 +45,7 @@ jobs:
           path: .marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.native.outputs.sha }}
       - name: Format and static-analysis gate before compilation
-        run: ./gradlew :app:ktlintCheck :app:detekt --max-workers=1 --no-daemon --stacktrace
+        run: ./gradlew :app:ktlintCheck :app:detekt --max-workers=1 --no-daemon --continue --stacktrace
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
@@ -62,7 +62,7 @@ jobs:
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
       PREVIOUS_SHA: f8aadcdc91d89bd4536003e208af09bd54977141
-      AFTER_SHA: d8d498ef2b0819103ba3c67bede182a4da5285f6
+      AFTER_SHA: 21876b3fd1fc9724b66da885ac89e92ffc56dedc
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -211,7 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: d8d498ef2b0819103ba3c67bede182a4da5285f6
+          ref: 21876b3fd1fc9724b66da885ac89e92ffc56dedc
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
