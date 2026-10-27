@@ -482,6 +482,14 @@
         "test_ids": [
           "SEC-002"
         ]
+      },
+      {
+        "surface": "Local send trace cleanup shares the existing local-only diagnostic clear action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "clearAuditAndDictationLogShares(appContext.cacheDir,",
+        "test_ids": [
+          "SEC-010"
+        ]
       }
     ]
   },

@@ -38,15 +38,15 @@ internal const val AUDIT_LOG_ARCHIVE_NAME = "white-noise-diagnostic-logs.zip"
 internal const val AUDIT_LOG_ARCHIVE_MIME_TYPE = "application/zip"
 
 /**
- * Stages engine-owned audit logs and immutable app-owned dictation and performance snapshots.
+ * Stages engine-owned audit logs and immutable app-owned diagnostic snapshots, including local traces.
  *
  * Symlinks and non-regular files are rejected so a compromised path cannot make the FileProvider
  * expose an unrelated file, and entry names are sanitised to safe, unique, relative names so an
  * archive can never carry an absolute path or a parent traversal to whatever opens it.
  *
- * The export is complete or it fails: a source that cannot be confined aborts the whole archive
- * rather than yielding a partial one that looks complete. The staging directory is replaced on each
- * export so previously exported forensic data does not accumulate in cache.
+ * An unconfined raw audit source aborts the archive. Bounded local trace snapshots carry their own
+ * explicit partial-coverage manifest; archiving their validated bytes does not imply atomic capture.
+ * Staging retains only the bounded number of recent export sessions documented below.
  */
 @Suppress("TooGenericExceptionCaught") // Any failure must clear this export's partial archive before rethrowing.
 internal fun prepareAuditLogArchive(
@@ -99,7 +99,7 @@ internal fun prepareAuditLogArchive(
                             "dm-create-previous.jsonl",
                             "dm-create-manifest.json",
                             "native-performance-snapshot.txt",
-                        ),
+                        ) + localSendTraceExportNames,
                 )
                 require(bytes.size <= MAX_DICTATION_EXPORT_ENTRY_BYTES)
                 zip.putNextEntry(ZipEntry(uniqueAuditFileName(name, usedNames)))

@@ -18,6 +18,22 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "Optional native send sidecar and sidecar-only explicit export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DictationAuditLogShare.kt",
+        "anchor": "val localSendTraceEntries =",
+        "test_ids": [
+          "SEC-009"
+        ]
+      },
+      {
+        "surface": "Independent optional native send trace cleanup failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DictationAuditLogShare.kt",
+        "anchor": "val localSendTrace = runCatchingCancellable",
+        "test_ids": [
+          "SEC-010"
+        ]
       }
     ]
   },
