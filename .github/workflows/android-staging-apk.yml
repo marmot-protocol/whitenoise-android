@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      AFTER_SHA: 3b5941ffaad3a8629b195c54e0c7decc7db13300
+      AFTER_SHA: 64ad13fcb99d0fcc5b04b91697e9cbed0064b12d
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -138,4 +138,67 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           compression-level: 0
+          retention-days: 7
+
+  checks:
+    name: Focused motion regression checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ github.workspace }}/.marmotkit-cache
+      ORG_GRADLE_PROJECT_ciTestForks: '2'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 64ad13fcb99d0fcc5b04b91697e9cbed0064b12d
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+        with:
+          cache-read-only: true
+      - name: Read native pin
+        id: native
+        run: |
+          pin=$(awk -F= '$1 == "artifact-sha256" {print $2}' app/src/main/marmotkit/MARMOT_VERSION)
+          [[ "$pin" =~ ^[0-9a-f]{64}$ ]]
+          printf 'sha=%s\n' "$pin" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: .marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.native.outputs.sha }}
+      - name: Both-distribution motion, geometry and screenshot regressions
+        run: |
+          set -euo pipefail
+          filters=(
+            --tests '*MediaViewerMotionScreenshotTest'
+            --tests '*ConversationTimelineUnderlayTest'
+            --tests '*MediaVideoShareParityTest'
+            --tests '*ConversationMotionInterruptionTest'
+            --tests '*SettingsRouteMotionTest'
+            --tests '*DetailRouteMotionScreenshotTest'
+            --tests '*ProfileNavigationMotionTest'
+            --tests '*ComposerSendMotionDurationScaleTest'
+            --tests '*ComposerSendMotionScreenshotTest'
+            --tests '*LocalReactionMotionLifecycleTest'
+            --tests '*LocalReactionMotionScreenshotTest'
+          )
+          ./gradlew :app:ktlintCheck :app:detekt \
+            :app:testDevZapstoreDebugUnitTest "${filters[@]}" \
+            :app:testDevPlayDebugUnitTest "${filters[@]}" \
+            -Proborazzi.test.verify=true --build-cache --no-daemon --stacktrace
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: focused-motion-checks-${{ github.run_id }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/roborazzi/
+          if-no-files-found: ignore
           retention-days: 7
