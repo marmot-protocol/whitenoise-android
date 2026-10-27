@@ -982,9 +982,10 @@
     "chatstate-pin-round-trip": {
       "suite": "chatstate",
       "manual_ids": [
-        "CHL-006"
+        "CHL-006",
+        "CHL-012"
       ],
-      "assertions": "Pin then Unpin restores the initial native row state without changing the peer row.",
+      "assertions": "Select one generated native group and apply batch Pin then Unpin. Each dialog directly asserts Changed 1 and zero other outcomes, then Close; exiting selection offers Pin again. Native verification requires the restored unpinned owner row while the peer row exists and remains unpinned.",
       "postcondition": "chat-unpinned"
     },
     "chatstate-delete-confirm": {

@@ -164,14 +164,42 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
       "symbol": "ChatListBatchDialog",
-      "bindings": [],
-      "remaining": "No maintained Maestro flow opens this production multi-chat request and directly asserts captured-scope progress, cumulative outcome counts, failed-only retry, read-only Check results or account/runtime retirement. CHL-012 and controller regression tests specify these requirements; their execution and UI lifecycle evidence remain separate. This entry grants no direct Maestro execution credit."
+      "bindings": [
+        {
+          "case": "chatstate-pin-round-trip",
+          "selector": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "scope": "Production captured-selection Pin then Unpin commands on one initially unpinned generated native group; exact successful counts and Close are directly asserted for both directions. Native postcondition separately verifies the restored unpinned owner row while the peer row exists and remains unpinned. Planned assertions, not an execution receipt.",
+          "entry_assertion": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "opened_by": {
+            "text": "Pin"
+          }
+        }
+      ],
+      "remaining": "Running progress, multiple or mixed-state targets, satisfied/unavailable/failed/not-started/unconfirmed outcomes, Check results, failed-only Retry, account/runtime retirement, source-filter replacement, translated/narrow/RTL large-text layout and physical-device interactions require separate execution evidence. This binding does not qualify those paths or full release proof."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
       "symbol": "ChatListBatchStatusDialog",
-      "bindings": [],
-      "remaining": "No maintained Maestro flow directly asserts this dialog's progress and result states or its Retry, Check results and Close controls. The partial-result AMOLED Roborazzi snapshot covers one static renderer state. Progress, unconfirmed recovery, enabled and disabled controls, narrow and RTL large-text layout, and physical interaction require separate evidence. This entry grants no direct Maestro execution credit."
+      "bindings": [
+        {
+          "case": "chatstate-pin-round-trip",
+          "selector": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "scope": "Production captured-selection Pin then Unpin commands on one initially unpinned generated native group; exact successful counts and Close are directly asserted for both directions. Native postcondition separately verifies the restored unpinned owner row while the peer row exists and remains unpinned. Planned assertions, not an execution receipt.",
+          "entry_assertion": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "opened_by": {
+            "text": "Pin"
+          }
+        }
+      ],
+      "remaining": "Running progress, multiple or mixed-state targets, satisfied/unavailable/failed/not-started/unconfirmed outcomes, Check results, failed-only Retry, account/runtime retirement, source-filter replacement, translated/narrow/RTL large-text layout and physical-device interactions require separate execution evidence. This binding does not qualify those paths or full release proof."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",

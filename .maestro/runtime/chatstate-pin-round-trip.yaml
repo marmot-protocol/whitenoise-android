@@ -6,10 +6,24 @@ name: chatstate-pin-round-trip
 - longPressOn:
     text: "Maestro group"
 - assertVisible: "Pin"
+- tapOn: "Select"
+- assertVisible:
+    id: "chats.selectionControls"
 - tapOn: "Pin"
+- assertVisible: "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+- assertVisible: "Close"
+- tapOn: "Close"
+- back
 - longPressOn:
     text: "Maestro group"
+- tapOn: "Select"
+- assertVisible:
+    id: "chats.selectionControls"
 - tapOn: "Unpin"
+- assertVisible: "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+- assertVisible: "Close"
+- tapOn: "Close"
+- back
 - longPressOn:
     text: "Maestro group"
 - assertVisible: "Pin"
