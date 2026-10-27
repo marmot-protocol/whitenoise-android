@@ -28,6 +28,7 @@ import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -392,6 +393,7 @@ internal fun ComposerPill(
     // Sits in the bottom action row directly before the trailing Send slot.
     sendAccessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
+    recordingContent: (@Composable BoxScope.() -> Unit)? = null,
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
@@ -1736,6 +1738,8 @@ internal fun ComposerPill(
                         }
                     }
                 }
+                // The Surface paints its complete outline above the recording background.
+                recordingContent?.invoke(this)
             }
         }
 

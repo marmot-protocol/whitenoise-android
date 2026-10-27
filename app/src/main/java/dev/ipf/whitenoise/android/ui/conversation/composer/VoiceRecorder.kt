@@ -52,7 +52,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Lock
 
 /**
  * Hold-to-record voice button. Press → start; release inside the button
- * bounds → stop and send. Drag the finger outside the button before
+ * bounds → stop and review. Drag the finger outside the button before
  * releasing → cancel. The cancel threshold is `cancelThresholdPx` away
  * from the down position; the gesture stays as a pointerInput input so
  * Compose doesn't fight us for the up event.
