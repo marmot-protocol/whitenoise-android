@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -103,9 +104,72 @@ class ChatsControllerInitialLoadStateTest {
         }
     }
 
+    /** Resetting while hidden must expose the empty replacement frame on return, before another turn. */
+    @Test
+    fun hiddenUnbindPublishesTheEmptyReplacementSynchronouslyOnReturn() {
+        val row = seededRow()
+        val controller = seededController(row, seededPresentation()) {}
+        try {
+            assertEquals(row, controller.items.single().projection)
+            controller.setChatListVisible(false)
+            runBlocking { controller.bind(null) }
+            assertNull(controller.chatItemForGroup(row.groupIdHex))
+            controller.setChatListVisible(true)
+            assertTrue(controller.items.isEmpty())
+            assertTrue(controller.archivedItems.isEmpty())
+            val returnedPublication = controller.forwardTargetsRevision
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+            assertEquals(returnedPublication, controller.forwardTargetsRevision)
+            assertTrue(controller.items.isEmpty())
+            assertTrue(controller.archivedItems.isEmpty())
+        } finally {
+            controller.onCleared()
+        }
+    }
+
+    /** The real controller flushes a hidden row update before its debounce can run, exactly once. */
+    @Test
+    fun returningBeforeDebouncePublishesTheHiddenRowUpdateWithoutAnotherPublication() {
+        val row = seededRow()
+        val controller = seededController(row, seededPresentation(), holdMemberLoads = true) {}
+        try {
+            controller.setChatListVisible(false)
+            controller.applyChatListRow(row.copy(hasUnread = true, unreadCount = 3uL, updatedAt = row.updatedAt + 1uL))
+            assertEquals(
+                0uL,
+                controller.items
+                    .single()
+                    .projection
+                    ?.unreadCount,
+            )
+            assertEquals(3uL, controller.chatItemForGroup(row.groupIdHex)?.projection?.unreadCount)
+            controller.setChatListVisible(true)
+            assertEquals(
+                3uL,
+                controller.items
+                    .single()
+                    .projection
+                    ?.unreadCount,
+            )
+            val returnedPublication = controller.forwardTargetsRevision
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+            assertEquals(returnedPublication, controller.forwardTargetsRevision)
+            assertEquals(
+                3uL,
+                controller.items
+                    .single()
+                    .projection
+                    ?.unreadCount,
+            )
+        } finally {
+            controller.onCleared()
+        }
+    }
+
     private fun seededController(
         row: ChatListRowFfi,
         presentation: ConversationPresentationFfi,
+        holdMemberLoads: Boolean = false,
         onMemberLoad: () -> Unit,
     ): ChatsController =
         ChatsController(
@@ -140,7 +204,8 @@ class ChatsControllerInitialLoadStateTest {
                 ),
             memberSnapshotLoader = { _, _ ->
                 onMemberLoad()
-                emptyList()
+                // A held adapter isolates presentation scheduling from independent enrichment completions.
+                if (holdMemberLoads) awaitCancellation() else emptyList()
             },
         )
 
