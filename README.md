@@ -124,7 +124,8 @@ the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 The `compile` job compiles the debug main, unit-test and Android-test sources of
 Zapstore, and of Play when a Play lane runs, before the unit-test, lint,
 build-contract and Play jobs start; they load those outputs from the build cache
-instead of compiling them again in parallel. When the baseline phase runs, it
+instead of compiling them again in parallel. Fork pull requests skip this step:
+their hosted jobs cannot share a cache. When the baseline phase runs, it
 assembles both release APKs, so R8 minifies the benchmark release build once per
 run; drafts and prechecks keep that packaging in the tooling phase.
 

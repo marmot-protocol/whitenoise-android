@@ -339,7 +339,10 @@ jobs:
 
       # Play is compiled only when a Play lane runs: ready and full PR runs,
       # merge groups, master and dispatches. Drafts and prechecks skip it.
+      # Fork PRs run each job on its own hosted runner with a read-only cache,
+      # so nothing could reuse these outputs; the job only succeeds there.
       - name: Compile shared debug variants
+        if: ${{ !github.event.pull_request.head.repo.fork }}
         env:
           CI_PLAY: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         run: |
