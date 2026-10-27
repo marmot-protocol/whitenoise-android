@@ -32,13 +32,13 @@ class ChatListSelectionBarScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
     /** Multiple selected chats in light theme. */
-    @Test fun multipleLight() = capture("selection_actions_multiple_light")
+    @Test fun multipleLight() = capture("selection_actions_multiple_light", bulk = true)
 
     /** Multiple selected chats in dark theme. */
-    @Test fun multipleDark() = capture("selection_actions_multiple_dark", dark = true)
+    @Test fun multipleDark() = capture("selection_actions_multiple_dark", dark = true, bulk = true)
 
     /** Multiple selected chats in AMOLED theme. */
-    @Test fun multipleAmoled() = capture("selection_actions_multiple_amoled", dark = true, amoled = true)
+    @Test fun multipleAmoled() = capture("selection_actions_multiple_amoled", dark = true, amoled = true, bulk = true)
 
     /** One selected chat exposes its conditional commands. */
     @Test fun single() = capture("selection_actions_single", single = true)
@@ -46,12 +46,12 @@ class ChatListSelectionBarScreenshotTest {
     /** Narrow screen still wraps every command into reachable rows. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w280dp-h700dp-mdpi")
-    fun narrow() = capture("selection_actions_narrow", single = true)
+    fun narrow() = capture("selection_actions_narrow", bulk = true)
 
     /** Long labels and 200 percent text in right-to-left layout. */
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
-    fun rtlLarge() = capture("selection_actions_rtl_large", single = true, rtl = true, large = true)
+    fun rtlLarge() = capture("selection_actions_rtl_large", bulk = true, rtl = true, large = true)
 
     @Test
     fun groupDepartureLight() =
@@ -131,11 +131,36 @@ class ChatListSelectionBarScreenshotTest {
             abandonLabel = R.string.chats_abandon_action,
         )
 
+    @Test fun partialBatchAmoled() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                ChatListBatchStatusDialog(
+                    dev.ipf.whitenoise.android.state.ChatListBatchCommand.READ,
+                    3,
+                    3,
+                    dev.ipf.whitenoise.android.state.ChatListBatchResult(
+                        mapOf(
+                            "one" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.CHANGED,
+                            "two" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.SATISFIED,
+                            "three" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.FAILED,
+                        ),
+                    ),
+                    true,
+                    {},
+                    {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Retry").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/selection_batch_partial_amoled.png")
+    }
+
     /** Captures the actual controls with deterministic eligibility and no account content. */
     @Suppress("LongParameterList")
     private fun capture(
         name: String,
         single: Boolean = false,
+        bulk: Boolean = false,
         dark: Boolean = false,
         amoled: Boolean = false,
         rtl: Boolean = false,
@@ -151,12 +176,12 @@ class ChatListSelectionBarScreenshotTest {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                         ChatListSelectionControls(
                             count = if (single) 1 else 4,
-                            deleteLabel = stringResource(departureLabel ?: R.string.delete),
+                            deleteLabel = stringResource(departureLabel ?: if (bulk) R.string.leave_and_delete else R.string.delete),
                             archiveAction = ChatListBulkArchiveAction.Archive,
                             actionsEnabled = true,
                             allVisibleSelected = false,
-                            showMarkRead = single,
-                            showMarkUnread = false,
+                            showMarkRead = single || bulk,
+                            showMarkUnread = bulk,
                             showMuteToggle = single,
                             muted = false,
                             showPinToggle = single,
@@ -174,6 +199,13 @@ class ChatListSelectionBarScreenshotTest {
                             onSelectAll = {},
                             onDeselectAll = {},
                             abandonLabel = abandonLabel?.let { stringResource(it) },
+                            showMute = single || bulk,
+                            showUnmute = bulk,
+                            showPin = single || bulk,
+                            showUnpin = bulk,
+                            onAlternateArchive = if (bulk) ({}) else null,
+                            onExcludeFromFolder = if (bulk) ({}) else null,
+                            onDeleteLocal = if (bulk) ({}) else null,
                         )
                     }
                 }

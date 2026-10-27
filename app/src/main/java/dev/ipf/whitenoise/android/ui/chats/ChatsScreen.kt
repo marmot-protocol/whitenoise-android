@@ -93,7 +93,9 @@ import dev.ipf.whitenoise.android.core.unreadMemberCandidateIds
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
+import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatListPinMoveResult
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
@@ -250,6 +252,19 @@ internal fun ChatsScreen(
         }
     var pendingAbandonment by remember(appState.activeAccountRef, appState.runtimeGeneration) {
         mutableStateOf<PendingChatAbandonment?>(null)
+    }
+    val batchScope = remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { AtomicBoolean(true) }
+    DisposableEffect(batchScope) { onDispose { batchScope.set(false) } }
+    var pendingStateBatch by remember(batchScope) { mutableStateOf<PendingChatListBatch?>(null) }
+
+    fun startStateBatch(command: ChatListBatchCommand) {
+        if (pendingStateBatch != null || controller.chatListBatchInProgress) return
+        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
+        if (!controller.chatListActionIsCurrent(owner)) return
+        pendingStateBatch = PendingChatListBatch(selectedChatIds.toList(), command, owner)
+    }
+    pendingStateBatch?.let { request ->
+        ChatListBatchDialog(request, controller) { pendingStateBatch = null }
     }
     val selectionMode = selectedChatIds.isNotEmpty()
     val searchOpen = globalSearchState.isOpen
@@ -916,7 +931,6 @@ internal fun ChatsScreen(
         remember(selectedVisibleItems) {
             chatListBulkArchiveAction(selectedVisibleItems.map { it.group.archived })
         }
-    val singleSelectedItem = selectedVisibleItems.singleOrNull()
     // Engine-normalized manual order of the pinned block, for the selection
     // bar's move actions. Ids keep the projection's casing — they round-trip
     // straight back into setPinnedChatOrder, which must receive the pinned
@@ -938,12 +952,6 @@ internal fun ChatsScreen(
                     it.equals(pinnedItem.group.groupIdHex, ignoreCase = true)
                 }
             }?.takeIf { it >= 0 }
-
-    val singleSelectedPinnedIndex = singleSelectedItem?.let(::pinnedIndex)
-    val singleSelectionMuted =
-        singleSelectedItem?.let { item ->
-            item.engineMuted()
-        } ?: false
 
     val actionScope =
         remember(
@@ -1900,31 +1908,66 @@ internal fun ChatsScreen(
                             ),
                         archiveAction = bulkArchiveAction,
                         actionsEnabled =
-                            selectedVisibleItems.isNotEmpty() &&
+                            pendingStateBatch == null &&
+                                !controller.chatListBatchInProgress &&
+                                selectedVisibleItems.isNotEmpty() &&
                                 selectedVisibleItems.none { it.group.groupIdHex in leavingAndDeleting },
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
                         showMarkRead =
-                            singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
+                            selectedVisibleItems.any {
+                                it.effectiveHasUnread(appState.activeAccount?.accountIdHex) && it.actions?.canMarkRead == true
+                            },
                         showMarkUnread =
-                            singleSelectedItem?.removedFromGroup(appState.activeAccount?.accountIdHex) == false &&
-                                singleSelectedItem.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
-                        showMuteToggle = singleSelectedItem != null,
-                        muted = singleSelectionMuted,
-                        // The engine only pins unarchived chats, so an archived
-                        // selection gets no pin affordance instead of a
-                        // silently failing one.
-                        showPinToggle = singleSelectedItem?.group?.archived == false,
-                        pinned = singleSelectedItem?.pinned() == true,
-                        showMovePinnedUp = (singleSelectedPinnedIndex ?: 0) > 0,
-                        showMovePinnedDown =
-                            singleSelectedPinnedIndex != null &&
-                                singleSelectedPinnedIndex < pinnedOrderedIds.lastIndex,
+                            selectedVisibleItems.any {
+                                !it.effectiveHasUnread(appState.activeAccount?.accountIdHex) && it.actions?.canMarkUnread == true
+                            },
+                        showMuteToggle = false,
+                        muted = false,
+                        showPinToggle = false,
+                        pinned = false,
+                        showMute = selectedVisibleItems.any { !it.engineMuted() && it.actions?.canMute == true },
+                        showUnmute = selectedVisibleItems.any { it.engineMuted() && it.actions?.canUnmute == true },
+                        showPin = selectedVisibleItems.any { !it.group.archived && !it.pinned() && it.actions?.canPin == true },
+                        showUnpin = selectedVisibleItems.any { it.pinned() && it.actions?.canUnpin == true },
+                        showMovePinnedUp = selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
+                        showMovePinnedDown = selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
+                        onSetMuted = { startStateBatch(if (it) ChatListBatchCommand.MUTE else ChatListBatchCommand.UNMUTE) },
+                        onSetPinned = { startStateBatch(if (it) ChatListBatchCommand.PIN else ChatListBatchCommand.UNPIN) },
                         onArchive = {
-                            val selected = selectedVisibleItems
-                            if (selected.isEmpty()) return@ChatListSelectionControls
-                            val archive = bulkArchiveAction == ChatListBulkArchiveAction.Archive
-                            archiveChats(selected, archive)
+                            startStateBatch(
+                                if (bulkArchiveAction ==
+                                    ChatListBulkArchiveAction.Archive
+                                ) {
+                                    ChatListBatchCommand.ARCHIVE
+                                } else {
+                                    ChatListBatchCommand.RESTORE
+                                },
+                            )
                         },
+                        onAlternateArchive =
+                            if (selectedVisibleItems.any { it.group.archived } && selectedVisibleItems.any { !it.group.archived }) {
+                                { startStateBatch(ChatListBatchCommand.RESTORE) }
+                            } else {
+                                null
+                            },
+                        onExcludeFromFolder =
+                            selectedFolder?.let { folder ->
+                                {
+                                    val owner = controller.captureChatListActionOwner { batchScope.get() }
+                                    if (owner != null && pendingStateBatch == null && controller.chatListActionIsCurrent(owner)) {
+                                        pendingStateBatch =
+                                            PendingChatListBatch(selectedChatIds.toList(), ChatListBatchCommand.EXCLUDE_FOLDER, owner, folder.id)
+                                    }
+                                }
+                            },
+                        onDeleteLocal =
+                            if (selectedVisibleItems.any { !it.isDm() } && selectedVisibleItems.any { it.actions?.canDeleteLocal == true }) {
+                                {
+                                    pendingBulkDelete = PendingLocalChatDelete.capture(selectedVisibleItems, controller, appState)
+                                }
+                            } else {
+                                null
+                            },
                         onDelete = {
                             if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
                                 return@ChatListSelectionControls
@@ -1950,25 +1993,29 @@ internal fun ChatsScreen(
                         onAddToFolder = {
                             openFolderPicker(selectedVisibleItems)
                         },
-                        onMarkRead = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionControls
-                            markChatRead(item, unread = false)
-                        },
-                        onMarkUnread = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionControls
-                            markChatRead(item, unread = true)
-                        },
-                        onMuteToggle = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionControls
-                            toggleChatMute(item, singleSelectionMuted)
-                        },
-                        onPinToggle = {
-                            val item = singleSelectedItem ?: return@ChatListSelectionControls
-                            toggleChatPin(item)
-                        },
+                        onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
+                        onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
+                        onMuteToggle = {},
+                        onPinToggle = {},
                         onMovePinned = { delta ->
-                            val item = singleSelectedItem ?: return@ChatListSelectionControls
-                            movePinnedChat(item, delta)
+                            val owner = controller.captureChatListActionOwner { batchScope.get() }
+                            val ids = selectedChatIds.toSet()
+                            if (owner != null) {
+                                appState.launchMutation {
+                                    val result =
+                                        runCatching { controller.movePinnedSelection(ids, delta, owner) }
+                                            .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
+                                    if (controller.chatListActionIsCurrent(owner) && result != ChatListPinMoveResult.MOVED) {
+                                        val message =
+                                            when (result) {
+                                                ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
+                                                ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
+                                                else -> R.string.chat_batch_order_failed
+                                            }
+                                        appState.presentTransient(context.getString(message))
+                                    }
+                                }
+                            }
                         },
                         onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
                         onDeselectAll = { selectedChatIds.clear() },

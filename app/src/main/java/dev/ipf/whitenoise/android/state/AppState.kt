@@ -8621,6 +8621,37 @@ class WhiteNoiseAppState private constructor(
         chatMutePreferences.setNotifyForMode(accountRef, groupIdHex, mode)
     }
 
+    /** Awaitable batch boundary, serialized by the same repository as single-chat mute commands. */
+    @Suppress("ReturnCount") // Owner fences bracket the awaited native command and its committed result.
+    internal suspend fun setConversationMutedAwaited(
+        account: String,
+        groupId: String,
+        muted: Boolean,
+        isCurrent: () -> Boolean,
+    ): Boolean {
+        if (!isCurrent()) return false
+        val key = ChatMutePreferences.compositeKey(account, groupId)
+        pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
+        try {
+            val result =
+                if (muted) {
+                    chatMuteRepository.setMuted(account, groupId, null, isCurrent)
+                } else {
+                    chatMuteRepository.clearMuted(account, groupId, isCurrent)
+                }
+            if (!isCurrent()) return false
+            return result.fold(
+                onSuccess = {
+                    authoritativeMuteOverrides[key] = it
+                    true
+                },
+                onFailure = { false },
+            )
+        } finally {
+            finishMuteCommand(key)
+        }
+    }
+
     fun setConversationMuted(
         groupIdHex: String,
         muted: Boolean,

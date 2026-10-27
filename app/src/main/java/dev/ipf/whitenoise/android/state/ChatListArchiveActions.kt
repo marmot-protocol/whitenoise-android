@@ -44,26 +44,32 @@ internal class ChatListArchiveActions(
     ): Int = commit(account, begin(groupIds, archived, epoch), archived, notify)
 
     /** Uses resolved off-window rows while preserving distinct admission and committed-completion fences. */
+    @Suppress("LongParameterList") // Preserve archive arguments plus optional per-target progress observers.
     suspend fun setArchivedRows(
         account: String,
         epoch: Long,
         resolved: ResolvedArchiveRows,
         archived: Boolean,
         notify: Boolean,
+        onAttempted: (String) -> Unit = {},
+        onSettled: (String, Boolean) -> Unit = { _, _ -> },
     ): Int {
         val intents = beginRows(resolved.rows, archived, epoch, resolved.isCurrent, resolved.completionIsCurrent)
-        return commit(account, intents, archived, notify)
+        return commit(account, intents, archived, notify, onAttempted, onSettled)
     }
 
     /**
      * Settles each overlay by identity after its native attempt; cancellation also retires unstarted overlays.
      * Errors and success feedback remain scoped to a current presentation, independently of committed work.
      */
+    @Suppress("LongParameterList") // The same archive owner carries optional attempt and settlement observers.
     private suspend fun commit(
         account: String,
         intents: List<Pair<String, OptimisticArchiveIntent>>,
         archived: Boolean,
         notify: Boolean,
+        onAttempted: (String) -> Unit = {},
+        onSettled: (String, Boolean) -> Unit = { _, _ -> },
     ): Int {
         if (intents.isEmpty()) return 0
         var succeeded = 0
@@ -71,12 +77,18 @@ internal class ChatListArchiveActions(
             intents.forEach { (groupIdHex, intent) ->
                 val applied =
                     runCatchingCancellable {
-                        updateGroup(account, groupIdHex, archived, intent)
+                        if (ownsIntent(groupIdHex, intent)) {
+                            onAttempted(groupIdHex)
+                            updateGroup(account, groupIdHex, archived, intent)
+                        } else {
+                            false
+                        }
                     }.onFailure { error ->
                         if (isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()) onFailure(error)
                     }.getOrDefault(false)
                 if (applied) succeeded += 1
                 finish(groupIdHex, intent)
+                onSettled(groupIdHex, applied)
             }
         } finally {
             // Cancellation retires unstarted overlays without rolling back native work.

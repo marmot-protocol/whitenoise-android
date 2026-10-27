@@ -357,18 +357,24 @@ class ChatListSelectionBarTest {
         assertEquals(1, pinToggles)
     }
 
-    /** Multi-selection keeps single-chat actions absent from the direct bar. */
+    /** Mixed multi-selection offers separately named explicit desired states. */
     @Test
-    fun multiSelectionDirectBarHidesSingleChatActions() {
+    @Suppress("LongMethod") // Keep the explicit mixed-action fixture beside its paired-label routing assertions.
+    fun mixedMultiSelectionRoutesExplicitDesiredStates() {
+        val mutedTargets = mutableListOf<Boolean>()
+        val pinnedTargets = mutableListOf<Boolean>()
+        val folderTargets = mutableListOf<String>()
+        val deleteTargets = mutableListOf<String>()
         composeRule.setContent {
             WhiteNoiseTheme {
                 ChatListSelectionControls(
                     count = 2,
+                    deleteLabel = string(R.string.leave_and_delete),
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
                     allVisibleSelected = false,
-                    showMarkRead = false,
-                    showMarkUnread = false,
+                    showMarkRead = true,
+                    showMarkUnread = true,
                     showMuteToggle = false,
                     muted = false,
                     showPinToggle = false,
@@ -376,8 +382,8 @@ class ChatListSelectionBarTest {
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
-                    onDelete = {},
-                    onAddToFolder = {},
+                    onDelete = { deleteTargets += "leave" },
+                    onAddToFolder = { folderTargets += "add" },
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
@@ -385,17 +391,43 @@ class ChatListSelectionBarTest {
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
+                    showMute = true,
+                    showUnmute = true,
+                    showPin = true,
+                    showUnpin = true,
+                    onSetMuted = { mutedTargets += it },
+                    onSetPinned = { pinnedTargets += it },
+                    onExcludeFromFolder = { folderTargets += "exclude" },
+                    onDeleteLocal = { deleteTargets += "local" },
                 )
             }
         }
 
-        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.archive)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_action_add_to_folder)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.delete)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.leave_and_delete)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_pin)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unpin)).performClick()
+        val pairedLabels =
+            listOf(
+                R.string.chat_list_action_add_to_folder,
+                R.string.folder_exclude_chat,
+                R.string.delete_from_device,
+                R.string.leave_and_delete,
+            )
+        for (label in pairedLabels) {
+            composeRule.onNodeWithText(string(label)).assertIsDisplayed().performClick()
+        }
+        assertEquals(listOf("add", "exclude"), folderTargets)
+        assertEquals(listOf("local", "leave"), deleteTargets)
+        assertEquals(listOf(true, false), mutedTargets)
+        assertEquals(listOf(true, false), pinnedTargets)
     }
 
     /** Direct multi-selection bar routes add to folder. */
