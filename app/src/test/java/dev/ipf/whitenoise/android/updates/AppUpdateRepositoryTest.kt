@@ -253,8 +253,10 @@ class AppUpdateRepositoryTest {
                 release.await()
                 ZapstoreLatestRelease("2026.2.0", 1)
             }
-            val owner = async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
-            val automatic = async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
+            val owner =
+                async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
+            val automatic =
+                async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
             val manual = async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refresh() }
             assertEquals(1, fetches)
             release.complete(Unit)
@@ -276,10 +278,13 @@ class AppUpdateRepositoryTest {
                 release.await()
                 null
             }
-            val owner = async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
-            val cancelled = async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
+            val owner =
+                async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
+            val cancelled =
+                async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
             cancelled.cancelAndJoin()
-            val survivor = async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
+            val survivor =
+                async(start = CoroutineStart.UNDISPATCHED) { repository(fetchLatestRelease = fetch).refreshAutomatically() }
             release.complete(Unit)
             assertTrue(owner.await() != null)
             assertEquals(owner.await(), survivor.await())
