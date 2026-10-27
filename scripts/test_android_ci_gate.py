@@ -235,6 +235,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn(':app:compileStagingZapstoreReleaseKotlin', compile_step)
         self.assertIn('-Pwhitenoise.enableComposeCompilerReports=true', compile_step)
         self.assertIn(' --no-build-cache ', compile_step)
+        # Reports cover only compiled files; a persistent workspace would compile incrementally.
+        self.assertIn(':app:compileStagingZapstoreReleaseKotlin --rerun ', compile_step)
         self.assertIn(' --no-daemon ', compile_step)
         self.assertNotIn(':app:compileStagingZapstoreReleaseKotlin', self.build_contracts)
         self.assertIn('name: compose-compiler-reports', self.compose_compiler)

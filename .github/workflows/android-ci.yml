@@ -687,9 +687,10 @@ jobs:
       # Release-mode Compose compiler output identifies unstable classes and
       # restartable/skippable composables using the same optimizations users
       # receive. Keep it opt-in locally; publish it on full campaign runs.
-      # Compiler reports are not cached task outputs, so this compile must execute.
+      # Compiler reports are not cached task outputs, so this compile must execute,
+      # and --rerun keeps a persistent workspace from compiling only changed files.
       - name: Compile Compose metrics and stability reports
-        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --no-build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin --rerun -Pwhitenoise.enableComposeCompilerReports=true --no-build-cache --profile --no-daemon --stacktrace
 
       - name: Upload Compose compiler reports
         if: always()
