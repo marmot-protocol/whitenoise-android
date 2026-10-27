@@ -177,8 +177,8 @@ func (relay *offlineSignerRelay) ServeHTTP(w http.ResponseWriter, r *http.Reques
 }
 
 func rehearse() error {
-	if len(os.Args) != 5 {
-		return fmt.Errorf("usage: rehearse-zsp.go PINNED_ZSP DISPOSABLE_APK FIXTURE_KEY_PEM FIXTURE_CERT_DER")
+	if len(os.Args) != 6 {
+		return fmt.Errorf("usage: rehearse-zsp.go PINNED_ZSP DISPOSABLE_APK FIXTURE_KEY_PEM FIXTURE_CERT_DER READBACK_TOOL")
 	}
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -271,6 +271,20 @@ func rehearse() error {
 	if err != nil {
 		return err
 	}
+	// Pending is not completion: use the production verifier against the signed
+	// CLI-generated events and actual loopback CDN bytes after acceptance.
+	reader := exec.CommandContext(ctx, os.Args[5], "verify", "-relay", strings.Replace(catalog.URL, "http://", "ws://", 1),
+		"-publisher", signerPub, "-app", "invalid.example.zspfixture", "-version", "2026.9.9", "-version-code", "1",
+		"-commit", strings.Repeat("a", 40), "-apk-sha256", public.hash, "-apk-bytes", strconv.Itoa(public.size),
+		"-cert-sha256", public.cert, "-blossom", blob.URL, "-release-id", document.ID, "-attempts", "1", "-json")
+	verified, err := reader.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("production readback rejected v2 fixture: %w: %s", err, verified)
+	}
+	var receipt struct{ Release string }
+	if json.Unmarshal(verified, &receipt) != nil || receipt.Release != document.ID {
+		return fmt.Errorf("readback did not confirm accepted release")
+	}
 	restored, err := os.ReadFile(keyPath)
 	if err != nil || strings.TrimSpace(string(restored)) != clientKey {
 		return fmt.Errorf("preseeded key changed")
@@ -283,7 +297,7 @@ func rehearse() error {
 	return json.NewEncoder(os.Stdout).Encode(map[string]any{
 		"version": "v2.0.0", "eventKinds": kinds,
 		"signerAuthor": signerPub, "preseededClientRestored": true,
-		"nip46Requests": relay.requests, "eventsSentToSignerRelay": relay.forbidden, "catalog": "loopback only", "blossom": "loopback only", "status": document.Status, "c1ProofVerifiedByCLI": true,
+		"nip46Requests": relay.requests, "eventsSentToSignerRelay": relay.forbidden, "catalog": "loopback only", "blossom": "loopback only", "status": document.Status, "c1ProofVerifiedByCLI": true, "verifiedPublicReadback": true,
 		"signerRelay": "loopback only", "keyDirectory": "os.UserConfigDir()/zsp/bunker-keys",
 	})
 }

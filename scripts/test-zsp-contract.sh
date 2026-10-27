@@ -51,6 +51,7 @@ python3 "$repo_dir/scripts/verify_apk_signature.py" "$apksigner_bin" \
   GOWORK=off go test -race "$repo_dir/scripts/rehearse-zsp.go" "$repo_dir/scripts/rehearse-zsp_test.go" >&2
   GOWORK=off go test "$repo_dir/scripts/zapstore-readback.go" "$repo_dir/scripts/zapstore-readback_test.go" >&2
   GOWORK=off go build -tags debug -o /dev/null "$repo_dir/scripts/diagnose-nip46-relays.go" >&2
-  GOWORK=off go run "$repo_dir/scripts/rehearse-zsp.go" "$temporary_dir/zsp" "$temporary_dir/fixture.apk" "$temporary_dir/fixture-key.pem" "$temporary_dir/fixture-cert.der"
+  GOWORK=off go build -o "$temporary_dir/readback" "$repo_dir/scripts/zapstore-readback.go"
+  GOWORK=off go run "$repo_dir/scripts/rehearse-zsp.go" "$temporary_dir/zsp" "$temporary_dir/fixture.apk" "$temporary_dir/fixture-key.pem" "$temporary_dir/fixture-cert.der" "$temporary_dir/readback"
 ) > "$receipt"
 cat "$receipt"

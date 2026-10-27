@@ -151,6 +151,8 @@ key/C1 proof, a disposable Nostr key, a loopback NIP-46 signer, a loopback catal
 and a loopback Blossom server. It exercises the checksummed real v2 binary,
 including C1 validation, authenticated upload, pending JSON, signed event IDs,
 release-to-asset references and restoration of the preseeded client identity.
+The production readback tool then verifies the accepted event ID, signed metadata
+and exact APK bytes served by the loopback CDN.
 The signer relay binds to `127.0.0.2` on the Linux runner: v2 special-cases
 `127.0.0.1` with a built-in local client key, so this second loopback address
 exercises the persistent production identity path. The signer relay rejects
