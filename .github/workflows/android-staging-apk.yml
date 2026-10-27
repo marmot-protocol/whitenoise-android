@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      AFTER_SHA: 538f30851dcc5f2b58927c0fea854b2432282fd1
+      AFTER_SHA: 8fbbc0c8c74661249ff5fcb4d7595871cb9179ea
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -150,7 +150,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 538f30851dcc5f2b58927c0fea854b2432282fd1
+          ref: 8fbbc0c8c74661249ff5fcb4d7595871cb9179ea
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -179,6 +179,9 @@ jobs:
             --tests '*MediaViewerMotionScreenshotTest'
             --tests '*ConversationTimelineUnderlayTest'
             --tests '*MediaVideoShareParityTest'
+            --tests '*ConversationMediaViewerSessionTest'
+            --tests '*ConversationMediaViewerSendMotionTest'
+            --tests '*ComposerSendMotionGeometryTest'
             --tests '*ConversationMotionInterruptionTest'
             --tests '*SettingsRouteMotionTest'
             --tests '*DetailRouteMotionScreenshotTest'
