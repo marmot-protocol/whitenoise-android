@@ -97,6 +97,21 @@ class ComposerSendMotionDurationScaleTest {
         assertEquals(81L, ComposerSendFlightTiming.timeoutMillis(0.001f))
     }
 
+    @Test
+    fun numericalCompletionStillWaitsForTheActualPaintedLandingSignal() =
+        runTest {
+            val progress = Animatable(0f)
+            val waiting = mutableListOf<Long>()
+            withContext(FrameClock(testScheduler) + DurationScale(1f)) {
+                ComposerSendFlightTiming.run(progress, { true }) {
+                    if (progress.value == 1f) waiting += testScheduler.currentTime
+                    progress.value == 1f && testScheduler.currentTime >= 336L
+                }
+            }
+            assertTrue("A numeric p1 is not a painted landing", waiting.any { it < 336L })
+            assertEquals(336L, testScheduler.currentTime)
+        }
+
     private fun scaledFlight(scale: Float) =
         runTest {
             val progress = Animatable(0f)

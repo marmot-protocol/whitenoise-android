@@ -39,7 +39,14 @@ internal data class ComposerSendFlightGeometry(
     val fill: Color,
     val consumedHeight: Float,
 ) {
-    val settled: Boolean get() = progress == 1f && remainingCollapse == 0f && motionRectsMatch(bounds, canonicalFrame)
+    val settled: Boolean
+        get() {
+            val nativeClear = canonicalFrame.bottom <= composer.top + MOTION_ROUNDING_PX
+            val sameMeasuredHeight = abs(composer.height - consumedHeight) <= MOTION_ROUNDING_PX
+            val completed = progress == 1f && remainingCollapse == 0f
+            val nativeSettled = nativeClear && sameMeasuredHeight
+            return completed && nativeSettled && motionRectsMatch(bounds, canonicalFrame)
+        }
 }
 
 /** Immutable numeric observation of one existing resolve call; contains no message content. */
@@ -63,6 +70,7 @@ internal class ComposerSendLanding(
     private val sourceFill: Color,
     private val inputGeneration: Long,
     private val sourceViewport: ComposerSendViewportProjection?,
+    private val sourceUpwardBoundBottom: Float = sourceSurface.bottom,
 ) {
     private var expectedFrame: Rect? = null
     private var expectedText: Rect? = null
@@ -74,7 +82,7 @@ internal class ComposerSendLanding(
         observe: ((ComposerSendLandingDiagnostic) -> Unit)? = null,
     ): ComposerSendFlightGeometry? {
         val container = sourceComposer
-        // Capture immutable values before the existing resolve can mutate endpoint/monotonic state.
+        // Observe immutable endpoint history; only the timing owner commits a successful probe.
         val before =
             observe?.let {
                 ComposerSendLandingDiagnostic(
@@ -99,6 +107,14 @@ internal class ComposerSendLanding(
         return result
     }
 
+    /** Only the timing owner commits a successful endpoint; layer and Canvas probes are read-only. */
+    fun commit(geometry: ComposerSendFlightGeometry) {
+        val remaining = Offset(0f, geometry.remainingCollapse)
+        expectedFrame = expectedFrame ?: geometry.canonicalFrame.translate(remaining)
+        expectedText = expectedText ?: geometry.canonicalText.translate(remaining)
+        lastConsumedHeight = geometry.consumedHeight
+    }
+
     private fun resolveMeasured(
         container: Rect,
         measured: ComposerSendLandingMeasurement,
@@ -110,14 +126,10 @@ internal class ComposerSendLanding(
         val remaining = if (abs(rawRemaining) <= MOTION_ROUNDING_PX) 0f else rawRemaining
         val targetFrame = measured.frame.translate(Offset(0f, remaining))
         val targetText = measured.text.translate(Offset(0f, remaining))
-        val upward = targetFrame.bottom <= sourceSurface.bottom + MOTION_ROUNDING_PX
+        val upward = targetFrame.bottom <= sourceUpwardBoundBottom + MOTION_ROUNDING_PX
         val stable = motionRectsMatch(expectedFrame, targetFrame) && motionRectsMatch(expectedText, targetText)
         return if (upward && stable) {
-            expectedFrame = expectedFrame ?: targetFrame
-            expectedText = expectedText ?: targetText
-            lastConsumedHeight = measured.viewport.consumedHeight
-            val contraction = checkNotNull(sourceViewport).consumedHeight - measured.target.height
-            val phase = if (contraction > MOTION_ROUNDING_PX) (contraction - remaining) / contraction else timerProgress
+            val phase = timerProgress
             ComposerSendFlightGeometry(
                 androidx.compose.ui.geometry
                     .lerp(sourceSurface, targetFrame, phase),

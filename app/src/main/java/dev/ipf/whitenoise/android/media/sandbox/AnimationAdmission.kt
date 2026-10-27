@@ -194,7 +194,7 @@ internal class AnimationAdmission(
                 if (retry) {
                     // Requeue at the tail without refreshing the total startup deadline.
                     checkNotNull(ticket).enqueue()
-                    if (expireStartup(deadline, ticket)) break
+                    retry = !expireStartup(deadline, ticket)
                 }
             }
             return result

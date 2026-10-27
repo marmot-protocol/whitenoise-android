@@ -81,6 +81,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
     private var publishCount = 0
     private var deferMarkdownHydration = false
     private var formattedHydration = false
+    private var restorePlainAfterInvalidation = false
     private var receiveDuringFlight = false
     private var emitIncomingWindow: (() -> Unit)? = null
     private val markdownHydrationGate = CompletableDeferred<Unit>()
@@ -118,6 +119,14 @@ class ConversationAcceptedSendRouteScreenshotTest {
     fun formattedHydrationRetiresOnlyTheMatchingCopyAndRevealsCanonicalInk() {
         deferMarkdownHydration = true
         formattedHydration = true
+        assertLiveTailFlight("**Styled send**", 0)
+    }
+
+    @Test
+    fun formattedDestinationThenPlainRestorationCannotResurrectTheSameFlight() {
+        deferMarkdownHydration = true
+        formattedHydration = true
+        restorePlainAfterInvalidation = true
         assertLiveTailFlight("**Styled send**", 0)
     }
 
@@ -211,6 +220,39 @@ class ConversationAcceptedSendRouteScreenshotTest {
         awaitConversationCondition { publishCount == 1 }
     }
 
+    private fun restorePlainDestination(
+        index: Int,
+        frames: LiveTailFrames,
+    ) {
+        if (!restorePlainAfterInvalidation || index != 8) return
+        assertEquals("Formatted native ink retired the matching owner", null, frames.motionOwner?.activePresentationId)
+        composeRule.onNodeWithText("Styled send").assertIsDisplayed()
+        val conversation = checkNotNull(controller)
+        val accepted = conversation.timeline.single { it.record.plaintext == "**Styled send**" }
+        val projected =
+            accepted.projected ?: timelineRecord(
+                accepted.record.messageIdHex,
+                accepted.record.recordedAt,
+                accepted.record.plaintext,
+            ).copy(direction = accepted.record.direction, sender = accepted.record.sender)
+        val plain =
+            MarkdownDocumentFfi(
+                blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("**Styled send**")))),
+                truncated = false,
+                blankLinesBefore = ByteArray(0),
+            )
+        composeRule.runOnIdle {
+            conversation.testApplyLiveTimelineChangesAndRegisterStreams(
+                listOf(
+                    dev.ipf.marmotkit.TimelineMessageChangeFfi.Upsert(
+                        trigger = dev.ipf.marmotkit.TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                        message = projected.copy(contentTokens = plain),
+                    ),
+                ),
+            )
+        }
+    }
+
     private fun suppressAtFrame(
         index: Int,
         frames: LiveTailFrames,
@@ -263,7 +305,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         val rows =
             checkNotNull(controller).timeline.takeLast(3).map { item ->
                 val bounds =
-                    if (motion.hides(item.presentationId)) {
+                    if (motion.presentation(item.presentationId).coversNative) {
                         checkNotNull(settledCopy).bounds
                     } else {
                         composeRule
@@ -300,6 +342,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
     ) {
         repeat(30) { index ->
             hydrateDuringFlight(index, frames)
+            restorePlainDestination(index, frames)
             if (suppressDuringFlight) suppressAtFrame(index, frames, resolver)
             if (retireDuringFlight) retireAtFrame(index, frames)
             receiveAtFrame(index, frames)
@@ -309,6 +352,9 @@ class ConversationAcceptedSendRouteScreenshotTest {
             composeRule.onRoot().captureToImage()
             if (receiveDuringFlight && index >= 10) assertPaintedTailSeparation(frames, index)
             if (formattedHydration && index >= 6) assertEquals(null, frames.motionOwner?.activePresentationId)
+            if (restorePlainAfterInvalidation && index in listOf(6, 8, 10)) {
+                composeRule.onRoot().captureRoboImage("src/test/snapshots/send_invalid_restore_$index.png")
+            }
             if (retireDuringFlight && index == 8) {
                 frames.earlyRetiredInternalGeometry = retiredPillInternalGeometry()
                 frames.earlyRetiredHeight =
@@ -372,7 +418,8 @@ class ConversationAcceptedSendRouteScreenshotTest {
                         .isNotEmpty()
             },
         )
-        composeRule.onNodeWithText(if (formattedHydration) "Styled send" else acceptedText).assertIsDisplayed()
+        val expectedText = if (formattedHydration && !restorePlainAfterInvalidation) "Styled send" else acceptedText
+        composeRule.onNodeWithText(expectedText).assertIsDisplayed()
         composeRule.onNodeWithTag("conversation.send.motion.active").assertDoesNotExist()
         if (retireDuringFlight) {
             composeRule.onNode(hasSetTextAction()).performTextInput("Next draft")

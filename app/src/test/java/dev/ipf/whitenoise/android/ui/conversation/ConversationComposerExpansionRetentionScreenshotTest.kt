@@ -716,6 +716,13 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 )
             }
             acceptedSource = checkNotNull(observedMotion).flight?.source
+            val captured = checkNotNull(acceptedSource)
+            assertEquals("The traveling patch is exactly the measured editor", captured.editor, captured.surface)
+            assertEquals("Controls do not acquire a traveling outline", 0f, captured.strokeWidth, 0f)
+            assertEquals(0f, captured.topRadius, 0f)
+            assertEquals(0f, captured.bottomRadius, 0f)
+            val pasteBounds = composeRule.onNodeWithTag("composer.paste").fetchSemanticsNode().boundsInWindow
+            assertTrue("Captured accepted text cannot include toolbar pixels", !captured.surface.overlaps(pasteBounds))
             traceAcceptedGeometry(
                 checkNotNull(observedMotion),
                 acceptedPresentationId,
@@ -740,7 +747,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             composeRule.runOnIdle {
                 assertTrue(
                     "The landed row/footer must remain hidden during the initial copy flight",
-                    checkNotNull(observedMotion).hides(acceptedPresentationId),
+                    checkNotNull(observedMotion).presentation(acceptedPresentationId).coversNative,
                 )
             }
             heights += productionComposerPillContentHeight()
@@ -756,7 +763,22 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                     diagnosticFrames,
                 )
                 val owner = checkNotNull(observedMotion)
-                sampleAcceptedTrajectory(owner, acceptedPresentationId, trajectory)
+                composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
+                if (!owner.presentation(acceptedPresentationId).coversNative) {
+                    val canonical =
+                        composeRule
+                            .onNodeWithTag(
+                                composerSendDestinationTag(acceptedPresentationId),
+                                useUnmergedTree = true,
+                            ).fetchSemanticsNode()
+                            .boundsInWindow
+                    val foreground = checkNotNull(owner.composerCoordinates).boundsInWindow(clipBounds = false)
+                    assertTrue(
+                        "Every exposed native frame clears the actual foreground",
+                        canonical.bottom <= foreground.top + 1f,
+                    )
+                }
+                sampleAcceptedTrajectory(owner, acceptedPresentationId, trajectory, captured)
                 firstExposedCanonical = firstVisibleCanonical(owner, acceptedPresentationId, firstExposedCanonical)
                 captureTrajectoryFrame(frames, "frame-%03d.png".format(index + 2))
                 if (index == 8) {
@@ -865,7 +887,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         presentationId: String,
         previous: Rect?,
     ): Rect? =
-        previous ?: if (owner.hides(presentationId)) {
+        previous ?: if (owner.presentation(presentationId).coversNative) {
             null
         } else {
             composeRule
@@ -943,7 +965,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             "\"flightGeneration\":${motion.flight?.inputGeneration},\"remaining\":$remaining," +
             "\"consumedHeight\":${projection?.consumedHeight},\"viewport\":${rect(projection?.bounds)}," +
             "\"corrected\":${rect(corrected)},\"active\":${motion.activePresentationId != null}," +
-            "\"hidden\":${motion.hides(presentationId)}," +
+            "\"hidden\":${motion.presentation(presentationId).coversNative}," +
             "\"pendingPaint\":${motion.lastRenderedPendingSource != null}," +
             "\"admitted\":${geometry != null},\"progress\":${geometry?.progress}," +
             "\"clockMillis\":${composeRule.mainClock.currentTime}," +
@@ -955,6 +977,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         motion: ComposerSendMotion,
         presentationId: String,
         frames: MutableList<ComposerSendFlightGeometry>,
+        source: ComposerSendSource,
     ) {
         val image = composeRule.onRoot().captureToImage().asAndroidBitmap()
         val geometry = composeRule.runOnIdle { motion.lastRenderedGeometry } ?: return
@@ -984,7 +1007,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 .onRoot()
                 .fetchSemanticsNode()
                 .boundsInWindow.topLeft
-        val x = (geometry.bounds.left - rootOrigin.x + 4f).toInt()
+        val x = (fillSampleWindowX(source, geometry) - rootOrigin.x).toInt()
         val y = (geometry.bounds.center.y - rootOrigin.y).toInt()
         assertTrue(
             "Paint sample must remain inside the captured native frame",
@@ -1002,6 +1025,30 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             )
         }
         frames += geometry
+    }
+
+    private fun fillSampleWindowX(
+        source: ComposerSendSource,
+        geometry: ComposerSendFlightGeometry,
+    ): Float {
+        val rtl = source.paragraphDirection == androidx.compose.ui.text.style.ResolvedTextDirection.Rtl
+        val edge = if (rtl) geometry.bounds.left + 4f else geometry.bounds.right - 4f
+        val anchorFrom = if (rtl) source.editor.right else source.editor.left
+        val anchorTo = if (rtl) geometry.textTarget.right else geometry.textTarget.left
+        val anchor = anchorFrom + (anchorTo - anchorFrom) * geometry.progress
+        val lines = 0 until source.layout.lineCount
+        val sourceEdge =
+            if (rtl) {
+                anchor - source.layout.size.width + lines.minOf(source.layout::getLineLeft)
+            } else {
+                anchor + lines.maxOf(source.layout::getLineRight)
+            }
+        val targetEdge = if (rtl) anchor - geometry.textTarget.width else anchor + geometry.textTarget.width
+        assertTrue(
+            "Fill sample excludes both text layouts",
+            if (rtl) edge <= minOf(sourceEdge, targetEdge) - 2f else edge >= maxOf(sourceEdge, targetEdge) + 2f,
+        )
+        return edge
     }
 
     private fun assertMotionRectNear(

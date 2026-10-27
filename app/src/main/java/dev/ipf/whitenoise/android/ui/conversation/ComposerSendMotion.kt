@@ -79,6 +79,7 @@ internal data class ComposerSendSource(
     val paragraphDirection: ResolvedTextDirection,
     val composer: Rect? = null,
     val viewport: ComposerSendViewportProjection? = null,
+    val wholePill: Rect = surface,
 )
 
 internal data class ComposerSendFlight(
@@ -86,7 +87,25 @@ internal data class ComposerSendFlight(
     val source: ComposerSendSource,
     val inputGeneration: Long,
 ) {
-    val landing = ComposerSendLanding(source.surface, source.composer, source.fill, inputGeneration, source.viewport)
+    val landing =
+        ComposerSendLanding(
+            source.surface,
+            source.composer,
+            source.fill,
+            inputGeneration,
+            source.viewport,
+            source.wholePill.bottom,
+        )
+    var admitted = false
+    var retired = false
+}
+
+/** One pure presentation choice shared by native alpha and the traveling copy. */
+internal data class ComposerSendDrawDecision(
+    val geometry: ComposerSendFlightGeometry? = null,
+    val pendingSource: ComposerSendSource? = null,
+) {
+    val coversNative: Boolean get() = geometry != null || pendingSource != null
 }
 
 internal class ComposerSendMotion {
@@ -97,6 +116,10 @@ internal class ComposerSendMotion {
         private set
     val activePresentationId: String? get() = flight?.presentationId
     private var ownerGeneration = 0L
+    private var readProgress: () -> Float = { 0f }
+
+    // An actual Canvas fallback decision retires only this flight, even if eligibility recovers before timing.
+    private var fallbackDecisionFlight: ComposerSendFlight? = null
     private var motionEnabled by mutableStateOf(false)
 
     /** Retire old callbacks and ink while preserving measurements owned by mounted content. */
@@ -167,16 +190,17 @@ internal class ComposerSendMotion {
                                     text.trimEnd(' '),
                                     ownerGeneration,
                                     layout,
-                                    surface,
+                                    editor,
                                     editor,
                                     sourceFill,
-                                    sourceBorder,
-                                    sourceTopRadius,
-                                    sourceBottomRadius,
-                                    sourceStrokeWidth,
+                                    Color.Transparent,
+                                    0f,
+                                    0f,
+                                    0f,
                                     direction,
                                     composerCoordinates?.visibleMotionBounds(),
                                     readViewport?.invoke(null),
+                                    surface,
                                 )
                             }
                     }
@@ -210,6 +234,7 @@ internal class ComposerSendMotion {
         lastClearedActiveFlight = flight != null
         lastRenderedGeometry = null
         lastRenderedPendingSource = null
+        fallbackDecisionFlight = null
         flight = null
         destinationFrame = null
         destinationText = null
@@ -238,7 +263,7 @@ internal class ComposerSendMotion {
         strokeWidth: Float,
     ) {
         if (activePresentationId != id) return
-        if (coordinates.visibleMotionBounds() == null && lastRenderedGeometry != null) {
+        if (coordinates.visibleMotionBounds() == null && flight?.admitted == true) {
             clear("destination-frame-unavailable")
             return
         }
@@ -254,7 +279,7 @@ internal class ComposerSendMotion {
         coordinates: LayoutCoordinates,
     ) {
         if (activePresentationId != id) return
-        if (coordinates.visibleMotionBounds() == null && lastRenderedGeometry != null) {
+        if (coordinates.visibleMotionBounds() == null && flight?.admitted == true) {
             clear("destination-text-unavailable")
             return
         }
@@ -278,8 +303,37 @@ internal class ComposerSendMotion {
         }
     }
 
-    /** The source copy holds the accepted frame until the target measures, for at most 80 ms. */
-    fun hides(id: String): Boolean = enabled && activePresentationId == id
+    /** Layer and Canvas read the same current measurement and timer, without committing endpoint history. */
+    fun presentation(id: String): ComposerSendDrawDecision {
+        val active =
+            flight
+                ?.takeIf { enabled && it.presentationId == id && !it.retired }
+                ?.takeUnless { fallbackDecisionFlight === it }
+                ?: return ComposerSendDrawDecision()
+        val layout = destinationLayout
+        val progress = readProgress()
+        val sameInk = layout?.layoutInput?.text?.text == active.source.text
+        val sameStyle =
+            layout
+                ?.layoutInput
+                ?.style
+                ?.color
+                ?.isSpecified == true &&
+                layout.uniformParagraphDirection() == active.source.paragraphDirection
+        val geometry =
+            if (sameInk && sameStyle) {
+                resolveComposerSendLanding(active, progress, "presentation", onLandingDiagnostic, landingMeasurement)
+            } else {
+                null
+            }
+        return if (geometry != null) {
+            ComposerSendDrawDecision(geometry = geometry)
+        } else if (!active.admitted && progress == 0f) {
+            ComposerSendDrawDecision(pendingSource = active.source)
+        } else {
+            ComposerSendDrawDecision()
+        }
+    }
 
     private val landingMeasurement: ComposerSendLandingMeasurement?
         get() =
@@ -298,33 +352,21 @@ internal class ComposerSendMotion {
     private val hasPaintedLanding: Boolean
         get() =
             lastRenderedGeometry?.let { painted ->
-                flight
-                    ?.let {
-                        resolveComposerSendLanding(it, 1f, "landing-check", onLandingDiagnostic, landingMeasurement)
-                    }?.let { current ->
-                        painted.settled && current.settled && motionRectsMatch(painted.bounds, current.canonicalFrame)
-                    }
+                val current = flight?.let { presentation(it.presentationId).geometry }
+                painted.settled && current?.settled == true && motionRectsMatch(painted.bounds, current.canonicalFrame)
             } == true
 
     private fun canRender(): Boolean {
-        if (!enabled || flight == null) return false
-        val frameVisible = destinationFrame?.visibleMotionBounds() != null
-        val textVisible = destinationText?.visibleMotionBounds() != null
-        val visible = frameVisible && textVisible
-        val sameText = destinationLayout?.layoutInput?.text?.text == flight?.source?.text
-        val sameStyle =
-            destinationLayout
-                ?.layoutInput
-                ?.style
-                ?.color
-                ?.isSpecified == true &&
-                destinationLayout?.uniformParagraphDirection() == flight?.source?.paragraphDirection
-        val admittedLanding =
-            flight?.let {
-                resolveComposerSendLanding(it, 0f, "admission-or-timing", onLandingDiagnostic, landingMeasurement)
-            } != null
-        val validDestination = visible && sameText && sameStyle
-        return validDestination && admittedLanding
+        val active = flight
+        val geometry = active?.let { presentation(it.presentationId).geometry }
+        return if (active != null && geometry != null) {
+            active.landing.commit(geometry)
+            active.admitted = true
+            true
+        } else {
+            if (active?.admitted == true) active.retired = true
+            false
+        }
     }
 
     @Composable
@@ -334,6 +376,7 @@ internal class ComposerSendMotion {
         val active = flight
         val geometryObserver = LocalComposerSendGeometryObserver.current
         val progress = remember(active) { Animatable(0f) }
+        SideEffect { readProgress = { progress.value } }
         var origin by remember { mutableStateOf<LayoutCoordinates?>(null) }
         LaunchedEffect(active) {
             if (active == null) return@LaunchedEffect
@@ -348,23 +391,24 @@ internal class ComposerSendMotion {
         Canvas(overlayModifier.fillMaxSize().onGloballyPositioned { origin = it }) {
             lastRenderedGeometry = null
             lastRenderedPendingSource = null
-            drawFlight(active, origin, progress.value, geometryObserver)
+            drawFlight(active, origin, geometryObserver)
         }
     }
 
     private fun DrawScope.drawFlight(
         active: ComposerSendFlight?,
         origin: LayoutCoordinates?,
-        progress: Float,
         geometryObserver: ((ComposerSendFlightGeometry) -> Unit)?,
     ) {
         val canvasOrigin = origin?.takeIf { enabled && it.isAttached }
         if (active == null || flight !== active || canvasOrigin == null) return
-        val geometry = resolveComposerSendLanding(active, progress, "draw", onLandingDiagnostic, landingMeasurement)
+        val decision = presentation(active.presentationId)
+        val geometry = decision.geometry
         if (geometry == null) {
-            if (progress == 0f) {
-                lastRenderedPendingSource = active.source
-                drawPendingSource(active.source, canvasOrigin.boundsInWindow().topLeft)
+            if (decision.pendingSource == null && active.admitted) fallbackDecisionFlight = active
+            decision.pendingSource?.let { source ->
+                lastRenderedPendingSource = source
+                drawPendingSource(source, canvasOrigin.boundsInWindow().topLeft)
             }
             return
         }

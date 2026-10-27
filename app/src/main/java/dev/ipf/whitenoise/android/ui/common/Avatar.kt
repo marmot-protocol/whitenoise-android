@@ -21,7 +21,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -125,7 +127,13 @@ internal fun Avatar(
                 IdentityFormatter.initials(title),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium,
+                style =
+                    MaterialTheme.typography.titleMedium.copy(
+                        lineHeight = fittedFontSize,
+                        letterSpacing = 0.sp,
+                        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    ),
                 fontSize = fittedFontSize,
                 maxLines = 1,
             )

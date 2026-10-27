@@ -24,7 +24,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -190,26 +189,6 @@ internal fun Modifier.mediaViewerThumbnail(
         }
 }
 
-internal fun mediaViewerMotionBounds(
-    source: Rect,
-    viewport: Size,
-    progress: Float,
-    aspectRatio: Float = source.width / source.height,
-    targetViewport: Rect = Rect(Offset.Zero, viewport),
-): Rect {
-    val width = minOf(targetViewport.width, targetViewport.height * aspectRatio)
-    val height = width / aspectRatio
-    val destination =
-        Rect(
-            targetViewport.center.x - width / 2f,
-            targetViewport.center.y - height / 2f,
-            targetViewport.center.x + width / 2f,
-            targetViewport.center.y + height / 2f,
-        )
-    return androidx.compose.ui.geometry
-        .lerp(source, destination, progress.coerceIn(0f, 1f))
-}
-
 /** Keeps the real viewer, playback and controls mounted throughout; only a non-interactive visual travels. */
 @Composable
 @Suppress("LongParameterList", "LongMethod") // Existing viewer/session inputs and one bounded draw-layer transition.
@@ -254,20 +233,28 @@ internal fun MediaViewerMotion(
     Box(Modifier.fillMaxSize().onGloballyPositioned { geometry[0] = it }) {
         content(bodyModifier)
         MediaMotionVisual(registry, { readThumbnail().takeIf { enabled } }, if (closing) selected else opening) {
-            val root = geometry[0]?.takeIf { it.isAttached }
-            val body = geometry[1]?.takeIf { it.isAttached }
-            if (root == null || body == null || knownAspect == null) {
-                null
-            } else {
-                val origin = root.positionOnScreen()
-                MediaMotionDrawGeometry(
-                    origin,
-                    Rect(body.positionOnScreen() - origin, body.size.toSize()),
-                    progress.value,
-                    knownAspect,
-                )
-            }
+            mediaMotionDrawGeometry(geometry, { progress.value }, knownAspect)
         }
+    }
+}
+
+private fun mediaMotionDrawGeometry(
+    geometry: Array<LayoutCoordinates?>,
+    progress: () -> Float,
+    knownAspect: Float?,
+): MediaMotionDrawGeometry? {
+    val root = geometry[0]?.takeIf { it.isAttached }
+    val body = geometry[1]?.takeIf { it.isAttached }
+    return if (root == null || body == null || knownAspect == null) {
+        null
+    } else {
+        val origin = root.positionOnScreen()
+        MediaMotionDrawGeometry(
+            origin,
+            Rect(body.positionOnScreen() - origin, body.size.toSize()),
+            progress(),
+            knownAspect,
+        )
     }
 }
 

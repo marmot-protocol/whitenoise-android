@@ -51,7 +51,7 @@ internal fun Modifier.composerSendDestination(
                     corners,
                     with(density) { border?.width?.toPx() ?: 0f },
                 )
-            }.graphicsLayer { alpha = if (motion.hides(presentationId)) 0f else 1f }
+            }.graphicsLayer { alpha = if (motion.presentation(presentationId).coversNative) 0f else 1f }
     }
 
 /** Identifies the actual landing surface before, during and after its accepted copy flight. */
