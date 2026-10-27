@@ -10511,10 +10511,11 @@ class ConversationController(
     internal fun retainThumbnail(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): AutoCloseable? = attachmentPresentation.retainThumbnail(
-        messageIdHex = messageIdHex,
-        attachmentIndex = attachmentIndex,
-    )
+    ): AutoCloseable? =
+        attachmentPresentation.retainThumbnail(
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+        )
 
     /** Returns cached pixels together with the largest request they can satisfy. */
     internal fun thumbnailEntryFor(

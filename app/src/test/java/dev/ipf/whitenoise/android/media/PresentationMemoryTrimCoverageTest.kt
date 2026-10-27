@@ -57,7 +57,10 @@ class PresentationMemoryTrimCoverageTest {
     /** Every image tier is wired, and trim cannot accidentally become account teardown or disk eviction. */
     @Test
     fun productionTrimKeepsTheCacheOwnershipBoundary() {
-        val callback = source("WhiteNoiseApplication.kt").functionBody("onTrimMemory")
+        val callback =
+            source("WhiteNoiseApplication.kt")
+                .functionBody("onTrimMemory")
+                .filterNot(Char::isWhitespace)
         listOf("AvatarImageLoader.trimMemory", "GroupAvatarImageLoader.trimMemory", "trimRemoteGiphyMemory").forEach {
             assertTrue("missing process-cache trim: $it", callback.contains(it))
         }
