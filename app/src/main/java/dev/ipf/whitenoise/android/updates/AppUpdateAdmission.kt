@@ -52,9 +52,10 @@ internal object AppUpdateAdmission {
 /** Matches the worker's connected constraint and metered Data Saver restriction for every automatic caller. */
 internal fun automaticUpdateNetworkAllowed(context: Context): Boolean {
     val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
-    if (manager.activeNetwork == null) return false
-    return !manager.isActiveNetworkMetered ||
-        manager.restrictBackgroundStatus != ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+    val restricted =
+        manager.isActiveNetworkMetered &&
+            manager.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+    return manager.activeNetwork != null && !restricted
 }
 
 /** A wall-clock correction must not strand a persisted check in the future indefinitely. */

@@ -61,7 +61,9 @@ class AppUpdateAdmissionCoverageTest {
 
     /** Resolves production source whether Gradle launches the tests from the root or app module. */
     private fun source(path: String): String =
-        listOf(File("src/main/java/dev/ipf/whitenoise/android", path), File("app/src/main/java/dev/ipf/whitenoise/android", path))
-            .first { it.isFile }
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android", path),
+            File("app/src/main/java/dev/ipf/whitenoise/android", path),
+        ).first { it.isFile }
             .readText()
 }
