@@ -138,7 +138,12 @@ class SigningCommandTest(unittest.TestCase):
         run = mock.Mock(return_value=mock.Mock(stdout=line + "\nSigner #1 certificate SHA-1 digest: 00\n"))
         self.assertEqual("ab" * 32, payload.signer_digest("/tools/apksigner", "x.apk", run))
         self.assertIn("--print-certs", run.call_args.args[0])
-        for printed in ("", line + "\n" + line.replace("#1", "#2").replace("ab" * 32, "cd" * 32)):
+        # apksigner 37 names each signature scheme instead of numbering signers.
+        schemes = "V2 Signer: certificate SHA-256 digest: " + "ab" * 32 + "\nV3 Signer: certificate SHA-256 digest: " + "ab" * 32
+        run.return_value.stdout = schemes
+        self.assertEqual("ab" * 32, payload.signer_digest("/tools/apksigner", "x.apk", run))
+        two_certificates = schemes.replace("V3 Signer: certificate SHA-256 digest: " + "ab" * 32, "V3 Signer: certificate SHA-256 digest: " + "cd" * 32)
+        for printed in ("", line + "\n" + line.replace("#1", "#2").replace("ab" * 32, "cd" * 32), two_certificates):
             run.return_value.stdout = printed
             with self.assertRaises(ValueError):
                 payload.signer_digest("/tools/apksigner", "x.apk", run)
