@@ -462,7 +462,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_parallel_test_workers(self):
         """Parallelism changes execution, never the full-suite scope or caching."""
         self.assertIn(
-            "ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '6' }}",
+            "ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '4' }}",
             self.tests_job,
         )
         root_build = (WORKFLOW.parents[2] / 'build.gradle.kts').read_text()
