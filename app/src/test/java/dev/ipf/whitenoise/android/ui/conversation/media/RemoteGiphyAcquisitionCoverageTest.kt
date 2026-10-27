@@ -30,10 +30,11 @@ class RemoteGiphyAcquisitionCoverageTest {
             val response = CompletableDeferred<ByteArray>()
             val cache = RemoteGiphyByteCache(1024)
             var gets = 0
-            val acquisition = RemoteGiphyAcquisition(backgroundScope, cache) {
-                gets++
-                response.await()
-            }
+            val acquisition =
+                RemoteGiphyAcquisition(backgroundScope, cache) {
+                    gets++
+                    response.await()
+                }
             val owner = Any()
             val first = async { acquisition.useBytes(owner, request(), { true }) { it } }
             runCurrent()

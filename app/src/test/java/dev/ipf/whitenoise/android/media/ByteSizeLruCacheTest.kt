@@ -7,6 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ByteSizeLruCacheTest {
+    /** Active holds can exceed a trim target while unheld LRU entries are still released. */
+    @Test
+    fun trimKeepsHeldKeysAndReleasesThemOnTheNextUnheldTrim() {
+        val cache = ByteSizeLruCache<String, ByteArray>(100, { it.size })
+        cache.put("held", ByteArray(30))
+        cache.put("expendable", ByteArray(40))
+        assertEquals(40L, cache.trimToSize(0) { it == "held" })
+        assertEquals(30L, cache.residentBytes())
+        assertEquals(30L, cache.trimToSize(0))
+        assertEquals(0L, cache.residentBytes())
+    }
+
     /** A trim is LRU, accounts exact bytes, and does not permanently lower the insertion capacity. */
     @Test
     fun trimReleasesOldestReferencesAndKeepsTheNormalCapacity() {

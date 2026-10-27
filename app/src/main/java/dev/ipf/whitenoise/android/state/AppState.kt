@@ -1361,6 +1361,9 @@ class WhiteNoiseAppState private constructor(
             sizeOf = { it.size },
         )
 
+    /** UI leases prevent trimming a kept card's only decoded pixels; explicit removal still wins. */
+    private val mediaThumbnailHolds = mutableMapOf<String, MutableSet<Any>>()
+
     /**
      * App-lifetime cache of *decoded* attachment thumbnails (sampled bitmaps),
      * keyed identically to [mediaPlaintextCache]. Lets a bubble render its
@@ -1455,10 +1458,26 @@ class WhiteNoiseAppState private constructor(
     internal fun trimPresentationMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
         assertMainThread { "trimPresentationMemory" }
         val plaintextRemoved = mediaPlaintextCache.trimToSize(trim.targetBytes(MEDIA_PLAINTEXT_CACHE_MAX_BYTES))
-        val thumbnailsRemoved = mediaThumbnailCache.trimToSize(trim.targetBytes(MEDIA_THUMBNAIL_CACHE_MAX_BYTES))
+        val thumbnailsRemoved =
+            mediaThumbnailCache.trimToSize(
+                targetBytes = trim.targetBytes(MEDIA_THUMBNAIL_CACHE_MAX_BYTES),
+                keep = mediaThumbnailHolds::containsKey,
+            )
         if (plaintextRemoved > 0) bumpMediaCacheRevision()
         if (thumbnailsRemoved > 0) mediaThumbnailRevisionState.update { it + 1L }
         publicJpegPreviewLoader.trimMemory(trim)
+    }
+
+    /** Holds an actively displayed kept thumbnail through cache trims, never through explicit invalidation. */
+    internal fun retainMediaThumbnail(cacheKey: String): AutoCloseable {
+        assertMainThread { "retainMediaThumbnail" }
+        val token = Any()
+        mediaThumbnailHolds.getOrPut(cacheKey) { mutableSetOf() }.add(token)
+        return AutoCloseable {
+            assertMainThread { "releaseMediaThumbnail" }
+            val holds = mediaThumbnailHolds[cacheKey]
+            if (holds?.remove(token) == true && holds.isEmpty()) mediaThumbnailHolds.remove(cacheKey)
+        }
     }
 
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {

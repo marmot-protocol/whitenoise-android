@@ -10504,6 +10504,13 @@ class ConversationController(
         attachmentIndex: Int,
     ): android.graphics.Bitmap? = attachmentPresentation.thumbnailFor(messageIdHex, attachmentIndex)
 
+    /** Keeps a displayed kept-card thumbnail eligible for rereads until its surface releases the hold. */
+    internal fun retainThumbnail(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): AutoCloseable? =
+        attachmentPresentation.retainThumbnail(messageIdHex = messageIdHex, attachmentIndex = attachmentIndex)
+
     /** Returns cached pixels together with the largest request they can satisfy. */
     internal fun thumbnailEntryFor(
         messageIdHex: String,

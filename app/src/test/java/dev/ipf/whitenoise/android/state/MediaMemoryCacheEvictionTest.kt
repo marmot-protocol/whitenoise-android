@@ -22,6 +22,25 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class MediaMemoryCacheEvictionTest {
+    /** Each displayed owner releases only its own hold, and repeated disposal cannot retire another owner. */
+    @Test
+    fun overlappingThumbnailHoldsReleaseIndependently() {
+        MediaDownloadIntegrationFixture().use { fixture ->
+            val bitmap = android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)
+            val state = fixture.state
+            state.cacheMediaThumbnail("held", bitmap)
+            val first = state.retainMediaThumbnail("held")
+            val second = state.retainMediaThumbnail("held")
+            first.close()
+            first.close()
+            state.trimPresentationMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+            org.junit.Assert.assertSame(bitmap, state.cachedMediaThumbnail("held"))
+            second.close()
+            state.trimPresentationMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+            org.junit.Assert.assertNull(state.cachedMediaThumbnail("held"))
+        }
+    }
+
     /** L1 trim releases counted bytes without recycling drawn pixels or erasing retained disk media. */
     @Test
     fun backgroundTrimPreservesDisplayedPixelsAndDurableMedia() =

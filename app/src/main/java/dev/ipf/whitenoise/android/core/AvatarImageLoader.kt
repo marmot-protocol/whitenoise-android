@@ -632,8 +632,12 @@ internal class PartitionedProfileImageCache(
     avatarBytes: Int,
     bannerBytes: Int,
 ) {
-    private val avatars = byteBudgetedCache(avatarBytes, AvatarCacheKind.PROFILE)
-    private val banners = byteBudgetedCache(bannerBytes, null)
+    private var trimmingMemory = false
+    private val avatars =
+        byteBudgetedCache(avatarBytes, AvatarCacheKind.PROFILE) {
+            if (!trimmingMemory) AvatarCacheChanges.published()
+        }
+    private val banners = byteBudgetedCache(bannerBytes, null) {}
 
     /** The image held for [cacheKey], looked up only in the partition its variant owns. */
     fun get(cacheKey: String): ImageBitmap? =
@@ -654,8 +658,13 @@ internal class PartitionedProfileImageCache(
 
     /** Trims each variant independently; shared ImageBitmaps are never recycled. */
     fun trimMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
-        avatars.trimToSize(trim.targetBytes(avatars.maxSize().toLong()).toInt())
-        banners.trimToSize(trim.targetBytes(banners.maxSize().toLong()).toInt())
+        trimmingMemory = true
+        try {
+            avatars.trimToSize(trim.targetBytes(avatars.maxSize().toLong()).toInt())
+            banners.trimToSize(trim.targetBytes(banners.maxSize().toLong()).toInt())
+        } finally {
+            trimmingMemory = false
+        }
     }
 
     /** Drops both variants for account teardown without recording a capacity eviction. */
@@ -690,6 +699,7 @@ internal class PartitionedProfileImageCache(
         fun byteBudgetedCache(
             maxBytes: Int,
             kind: AvatarCacheKind?,
+            publishChange: () -> Unit,
         ) = object : LruCache<String, ImageBitmap>(maxBytes) {
             override fun sizeOf(
                 key: String,
@@ -707,7 +717,7 @@ internal class PartitionedProfileImageCache(
                 newValue: ImageBitmap?,
             ) {
                 if (evicted && kind != null) AvatarCacheDiagnostics.evicted(kind)
-                if (kind == AvatarCacheKind.PROFILE) AvatarCacheChanges.published()
+                publishChange()
             }
         }
     }

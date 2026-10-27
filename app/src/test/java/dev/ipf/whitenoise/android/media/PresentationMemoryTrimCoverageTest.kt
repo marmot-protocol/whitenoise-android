@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.core.AvatarCacheChanges
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.functionBody
@@ -38,11 +39,19 @@ class PresentationMemoryTrimCoverageTest {
         AvatarImageLoader.putCached("trim-profile", image)
         GroupAvatarImageLoader.putCached("trim-group", image)
         assertNull(application.initializedAppState())
+        val published = AvatarCacheChanges.revision.value
         application.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
         assertNull(AvatarImageLoader.peek("trim-profile"))
         assertNull(GroupAvatarImageLoader.peek("trim-group"))
         assertFalse(image.asAndroidBitmap().isRecycled)
+        org.junit.Assert.assertSame(
+            "cache-only eviction must not rewrite launcher icons",
+            published,
+            AvatarCacheChanges.revision.value,
+        )
         assertNull(application.initializedAppState())
+        AvatarImageLoader.putCached("fresh", image)
+        org.junit.Assert.assertNotSame(published, AvatarCacheChanges.revision.value)
     }
 
     /** Every image tier is wired, and trim cannot accidentally become account teardown or disk eviction. */

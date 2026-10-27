@@ -20,6 +20,7 @@ class MainThreadConfinementCoverageTest {
             "cachedMediaThumbnailEntry" to "mediaThumbnailCache.get",
             "cacheMediaThumbnail" to "mediaThumbnailCache.put",
             "trimPresentationMemory" to "mediaPlaintextCache.trimToSize",
+            "retainMediaThumbnail" to "mediaThumbnailHolds.getOrPut",
             "removeMediaMemoryCacheEntry" to "mediaPlaintextCache.remove",
             "clearInMemoryMediaCaches" to "mediaPlaintextCache.clear",
         ).forEach { (functionName, mutation) ->

@@ -112,10 +112,14 @@ class ByteSizeLruCache<K : Any, V : Any>(
 
     /**
      * Drops least recently used cache references to [targetBytes], without changing the insertion cap.
-     * Non-evictable entries retain their ownership. Returns counted bytes released, not process RSS;
+     * Non-evictable entries and keys held by [keep] survive even when the target cannot be reached.
+     * Returns counted bytes released, not process RSS;
      * callers may still hold the same values. Removal callbacks must never recycle shared pixels.
      */
-    fun trimToSize(targetBytes: Long): Long {
+    fun trimToSize(
+        targetBytes: Long,
+        keep: (K) -> Boolean = { false },
+    ): Long {
         require(targetBytes >= 0) { "targetBytes must not be negative" }
         val before = residentBytes
         if (residentBytes <= targetBytes) return 0L
@@ -126,7 +130,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
         val it = entries.entries.iterator()
         while (it.hasNext() && residentBytes > targetBytes) {
             val eldest = it.next()
-            if (!isEvictable(eldest.value)) continue
+            if (!isEvictable(eldest.value) || keep(eldest.key)) continue
             residentBytes -= chargeOf(eldest.value)
             onEntryRemoved(eldest.value)
             onEvicted(eldest.value)

@@ -65,6 +65,7 @@ internal object GroupAvatarImageLoader {
         val animation: ByteArray?,
     )
 
+    private var trimmingMemory = false
     private val cache =
         ByteSizeLruCache<String, CachedAvatar>(
             maxBytes = CACHE_SIZE_BYTES.toLong(),
@@ -76,7 +77,7 @@ internal object GroupAvatarImageLoader {
             },
             onEvicted = {
                 AvatarCacheDiagnostics.evicted(AvatarCacheKind.GROUP)
-                AvatarCacheChanges.published()
+                if (!trimmingMemory) AvatarCacheChanges.published()
             },
         )
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
@@ -183,7 +184,14 @@ internal object GroupAvatarImageLoader {
 
     /** Releases only cached pixels/source references; existing surfaces and in-flight reads keep their owners. */
     internal fun trimMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
-        synchronized(lock) { cache.trimToSize(trim.targetBytes(CACHE_SIZE_BYTES.toLong())) }
+        synchronized(lock) {
+            trimmingMemory = true
+            try {
+                cache.trimToSize(trim.targetBytes(CACHE_SIZE_BYTES.toLong()))
+            } finally {
+                trimmingMemory = false
+            }
+        }
     }
 
     /** Clears cached group avatars and invalidates every pending completion. */

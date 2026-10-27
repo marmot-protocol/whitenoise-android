@@ -991,7 +991,12 @@ callback does not keep halving a warm cache. These are one-shot trims: admitted
 work may finish and publish through its original account fence, and subsequent
 inserts retain their normal bounded budget. Trimming does not restart acquisition
 or cancel its existing shared request. Existing displayed bitmap/source references
-remain valid; no shared bitmap is recycled.
+remain valid; no shared bitmap is recycled. Mounted kept cards hold their thumbnail
+keys against trim only, so a later unrelated cache publication cannot blank them.
+Explicit removal/account teardown still wins over those holds, and disposal releases
+the exact hold. Held pixels can keep occupancy above a trim target, while normal
+insertion capacity stays bounded. Cache-only avatar eviction does not publish a
+picture-change signal that would overwrite a launcher shortcut with initials.
 
 The coordinated image tiers are L1 attachment bytes/thumbnails, profile/banner
 pixels and profile animation sources, encrypted-group pixels/sources, public JPEG
