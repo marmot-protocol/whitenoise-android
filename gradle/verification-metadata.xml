@@ -3929,6 +3929,11 @@
             <sha256 value="d7bc499b584cf02ab9825daefdf387bc3d88988424a1aecaf131a75f62feb1d2" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="com.google.firebase" name="firebase-bom" version="35.1.0">
+         <artifact name="firebase-bom-35.1.0.pom">
+            <sha256 value="8268fc84e545aa8de0f9799f63b3c90a9e37c8dd1c286cf456a037f345672691" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="com.google.firebase" name="firebase-common" version="23.0.0">
          <artifact name="firebase-common-23.0.0.aar">
             <sha256 value="f8595dd404aa37bb4a92824ffd7b0325428432079ce4908ea3f97af1c6b33f0f" origin="Independent official supplier audit" />
@@ -4021,6 +4026,14 @@
          </artifact>
          <artifact name="firebase-messaging-26.0.0.pom">
             <sha256 value="84afa910795e546a93b5b89d41175b20f99b702b4b024713367d8d0c583f2739" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="com.google.firebase" name="firebase-messaging" version="26.0.1">
+         <artifact name="firebase-messaging-26.0.1.aar">
+            <sha256 value="2f9b97a0f5646d428d53fef82e4ec9568af6bbe3f7c3e4299f399a8751dbef44" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="firebase-messaging-26.0.1.pom">
+            <sha256 value="b2be54306428da010ff7a00d7e8f98e3dd8ca2b90fe971c1c7618bc1dd0a8826" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="com.google.flatbuffers" name="flatbuffers-java" version="1.12.0">
