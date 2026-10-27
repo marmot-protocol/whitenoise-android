@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      AFTER_SHA: 8fbbc0c8c74661249ff5fcb4d7595871cb9179ea
+      AFTER_SHA: 743c533961531a39a2d82ad29992455e8adfbdb8
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -147,16 +147,20 @@ jobs:
           retention-days: 7
 
   checks:
-    name: Focused motion regression checks
+    name: Motion regressions (${{ matrix.distribution }})
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [Zapstore, Play]
     env:
       WHITENOISE_MARMOTKIT_CACHE_DIR: ${{ github.workspace }}/.marmotkit-cache
-      ORG_GRADLE_PROJECT_ciTestForks: '2'
+      ORG_GRADLE_PROJECT_ciTestForks: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: a3567d213bb3e13a45638a9ab41d597146a2783a
+          ref: 743c533961531a39a2d82ad29992455e8adfbdb8
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -197,14 +201,17 @@ jobs:
             --tests '*LocalReactionMotionLifecycleTest'
             --tests '*LocalReactionMotionScreenshotTest'
           )
+          free -h
           ./gradlew :app:ktlintCheck :app:detekt \
-            :app:testDevZapstoreDebugUnitTest "${filters[@]}" \
-            :app:testDevPlayDebugUnitTest "${filters[@]}" \
-            -Proborazzi.test.verify=true --build-cache --no-daemon --continue --stacktrace
+            :app:testDev${{ matrix.distribution }}DebugUnitTest "${filters[@]}" \
+            -Proborazzi.test.verify=true -Pkotlin.compiler.execution.strategy=in-process \
+            -Dorg.gradle.parallel=false \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
+            --max-workers=1 --build-cache --no-daemon --continue --stacktrace
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
-          name: focused-motion-checks-${{ github.run_id }}
+          name: focused-motion-checks-${{ github.run_id }}-${{ matrix.distribution }}
           path: |
             app/build/reports/
             app/build/test-results/
