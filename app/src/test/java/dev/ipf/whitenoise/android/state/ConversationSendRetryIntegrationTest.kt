@@ -20,6 +20,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
+import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
@@ -1353,6 +1354,81 @@ class ConversationSendRetryIntegrationTest {
             )
         }
 
+    /** An exact native caller-token echo wins over a late local parse and its stale optimistic record. */
+    @Test
+    fun nativeEchoWhileMarkdownIsBlockedKeepsCanonicalIdentityAndTokens() =
+        runTest {
+            val state = appState()
+            val chats = attachedChatsController(state, ACCOUNT_REF, chatListRow())
+            val releaseParse = CompletableDeferred<MarkdownDocumentFfi>()
+            val durablyAccepted = CompletableDeferred<Unit>()
+            val nativeTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = emptyList())),
+                    blankLinesBefore = ByteArray(1),
+                )
+            val lateLocalTokens =
+                nativeTokens.copy(truncated = true)
+            var publishCalls = 0
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    markdownParser = {
+                        releaseParse.await()
+                    },
+                    textPublisher = { _, _, _, _ ->
+                        successfulSendSummary().also { publishCalls += 1 }
+                    },
+                )
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.send(
+                        "hello",
+                        onDurablyAccepted = { durablyAccepted.complete(Unit) },
+                    )
+                }
+
+            try {
+                assertTrue("admission must beat parsing", durablyAccepted.isCompleted)
+                val optimistic = controller.timeline.single().record
+                applyProjection(
+                    controller,
+                    projectedMessage(optimistic.recordedAt, null, null).copy(
+                        clientToken = optimistic.messageIdHex,
+                        contentTokens = nativeTokens,
+                    ),
+                )
+                assertNativeEcho(controller, nativeTokens)
+
+                releaseParse.complete(lateLocalTokens)
+                send.await()
+
+                assertNativeEcho(controller, nativeTokens)
+                chats.setChatListVisible(true)
+                assertEquals(lateLocalTokens, chats.items.single().previewTokens)
+                assertEquals(1, publishCalls)
+            } finally {
+                releaseParse.complete(lateLocalTokens)
+                send.cancelAndJoin()
+                controller.onCleared()
+                state.attachChatsController(null)
+                chats.onCleared()
+            }
+        }
+
+    private fun assertNativeEcho(
+        controller: ConversationController,
+        tokens: MarkdownDocumentFfi,
+    ) {
+        val message = controller.timeline.single()
+        assertEquals(CONFIRMED_MESSAGE_ID, message.record.messageIdHex)
+        assertEquals(MessageStatus.Sent, message.status)
+        assertEquals("native tokens must survive local hydration", tokens, message.record.contentTokens)
+    }
+
     /** Hands dictation back to Idle at optimistic publication, before transport settles. */
     @Test
     fun dictationPendingCallbackPrecedesDurableAcceptance() =
@@ -2286,12 +2362,14 @@ class ConversationSendRetryIntegrationTest {
     @Test
     fun cancellationBeforeAdmissionPreventsTextAndReplyPublication() =
         runTest {
+            val appState = appState()
             val parseStarted = CompletableDeferred<Unit>()
             val releaseParse = CompletableDeferred<Unit>()
+            val releaseSendOrder = CompletableDeferred<Unit>()
             var publishCalls = 0
             val controller =
                 ConversationController(
-                    appState = appState(),
+                    appState = appState,
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     markdownParser = {
@@ -2310,19 +2388,37 @@ class ConversationSendRetryIntegrationTest {
                 )
             controller.replyingTo = timelineAppMessage(REPLY_MESSAGE_ID)
 
+            // Parsing is presentation-only: hold the actual admission order lock instead.
+            val holder =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    appState.withConversationTextSendOrder(ACCOUNT_REF, GROUP_ID) {
+                        releaseSendOrder.await()
+                    }
+                }
             val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("cancel this reply") }
-            parseStarted.await()
-            val pending = controller.timeline.single().record
+            try {
+                withTimeout(5_000) { parseStarted.await() }
+                val pending = controller.timeline.single().record
 
-            assertTrue(controller.deleteMessage(pending, presentFailure = false))
-            assertTrue(controller.deleteMessage(pending, presentFailure = false))
-            assertTrue(controller.timeline.isEmpty())
+                assertTrue(controller.deleteMessage(pending, presentFailure = false))
+                assertTrue(controller.deleteMessage(pending, presentFailure = false))
+                assertTrue(controller.timeline.isEmpty())
 
-            releaseParse.complete(Unit)
-            send.await()
+                // Admission must observe cancellation even if it resumes before the parser.
+                releaseSendOrder.complete(Unit)
+                holder.join()
+                releaseParse.complete(Unit)
+                send.await()
 
-            assertEquals(0, publishCalls)
-            assertTrue(controller.timeline.isEmpty())
+                assertEquals(0, publishCalls)
+                assertTrue(controller.timeline.isEmpty())
+            } finally {
+                releaseSendOrder.complete(Unit)
+                releaseParse.complete(Unit)
+                send.cancelAndJoin()
+                holder.cancelAndJoin()
+                controller.onCleared()
+            }
         }
 
     @Test
@@ -2332,6 +2428,8 @@ class ConversationSendRetryIntegrationTest {
             appState.setDraft(GROUP_ID, TextFieldValue("cancel before admission"))
             val parseStarted = CompletableDeferred<Unit>()
             val releaseParse = CompletableDeferred<Unit>()
+            val releaseSendOrder = CompletableDeferred<Unit>()
+            var publishCalls = 0
             val controller =
                 ConversationController(
                     appState = appState,
@@ -2346,19 +2444,39 @@ class ConversationSendRetryIntegrationTest {
                             blankLinesBefore = ByteArray(0),
                         )
                     },
-                    textPublisher = { _, _, _, _ -> successfulSendSummary() },
+                    textPublisher = { _, _, _, _ ->
+                        publishCalls += 1
+                        successfulSendSummary()
+                    },
                 )
 
+            val holder =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    appState.withConversationTextSendOrder(ACCOUNT_REF, GROUP_ID) {
+                        releaseSendOrder.await()
+                    }
+                }
             val send = async { appState.sendConversationText(controller, "cancel before admission") }
-            parseStarted.await()
-            assertEquals(null, appState.draftFor(GROUP_ID))
-            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+            try {
+                withTimeout(5_000) { parseStarted.await() }
+                assertEquals(null, appState.draftFor(GROUP_ID))
+                assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
 
-            releaseParse.complete(Unit)
-            send.await()
+                releaseParse.complete(Unit)
+                releaseSendOrder.complete(Unit)
+                holder.join()
+                send.await()
 
-            assertTrue(controller.timeline.isEmpty())
-            assertEquals("cancel before admission", appState.draftFor(GROUP_ID))
+                assertEquals(0, publishCalls)
+                assertTrue(controller.timeline.isEmpty())
+                assertEquals("cancel before admission", appState.draftFor(GROUP_ID))
+            } finally {
+                releaseSendOrder.complete(Unit)
+                releaseParse.complete(Unit)
+                send.cancelAndJoin()
+                holder.cancelAndJoin()
+                controller.onCleared()
+            }
         }
 
     @Test

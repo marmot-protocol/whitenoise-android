@@ -790,6 +790,16 @@
         ]
       },
       {
+        "surface": "Text admission and durable acceptance progress independently of Markdown hydration and styled preview publication; reverse hydration completion preserves send order and final styled tokens, while cancellation wins only before admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun send(",
+        "test_ids": [
+          "CON-005",
+          "MSG-002",
+          "MSG-019"
+        ]
+      },
+      {
         "surface": "A relay echo that lands before the send call returns replaces the pending bubble instead of joining it",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "fun optimisticMessageIdForProjection(",

@@ -7961,34 +7961,35 @@ class ConversationController(
      * Parse the sent text into the same Markdown AST projected records carry
      * and rebind it onto the already-published optimistic bubble. The chat-list
      * preview is not published until this attempt finishes, so it never exposes
-     * a raw-Markdown intermediate frame. Only the bubble's first paint is
-     * decoupled from this FFI hop —
-     * an accepted Send must paint on the next frame even when the IO lane is
-     * congested — while the network publish still runs after the parse, so the
-     * send's total latency matches the previous parse-first ordering.
+     * a raw-Markdown intermediate frame. Native admission runs independently;
+     * only presentation reconciliation waits for this document, so it cannot
+     * overwrite the styled bubble with the pre-parse snapshot.
      * A parse failure keeps the plain-text presentation. The chat list publishes
      * that fallback only after the parse attempt completes, so it cannot flash a
      * raw frame before replacing it with styled content. In either case,
-     * a bubble already reconciled or rolled back is left alone. Returns the
-     * record now backing the bubble so later reconciliation and failure
-     * retention keep the styled document instead of the pre-parse snapshot.
+     * a bubble already reconciled or rolled back is left alone. The parsed
+     * record still backs preview reconciliation when an early echo removed
+     * the optimistic bubble, so the chat list cannot lose its styled tokens.
      */
     private suspend fun hydrateOptimisticSendMarkdown(
         optimisticKey: String,
-        tempId: String,
-        text: String,
-    ): AppMessageRecordFfi? {
+        optimistic: AppMessageRecordFfi,
+    ): AppMessageRecordFfi {
         val tokens =
-            runCatchingCancellable { markdownParser(text) }
+            runCatchingCancellable { markdownParser(optimistic.plaintext) }
                 .getOrNull()
                 ?.takeIf { it.blocks.isNotEmpty() }
+                ?: return optimistic
         val pending = optimisticMessages[optimisticKey]
-        if (tokens == null || pending == null || pending.record.messageIdHex != tempId) return null
-        val hydrated = pending.record.copy(contentTokens = tokens)
-        optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
-        messageById[tempId] = hydrated
-        publishTimelineFromIndexes()
-        return hydrated
+        return if (pending == null || pending.record.messageIdHex != optimistic.messageIdHex) {
+            optimistic.copy(contentTokens = tokens)
+        } else {
+            val hydrated = pending.record.copy(contentTokens = tokens)
+            optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
+            messageById[optimistic.messageIdHex] = hydrated
+            publishTimelineFromIndexes()
+            hydrated
+        }
     }
 
     /**
@@ -8161,64 +8162,63 @@ class ConversationController(
         // the parser so raw Markdown never flashes there.
         sendTrace(trace, PerformancePhase.OPTIMISTIC_SHOWN, result = PerformanceResult.PENDING)
         appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.OPTIMISTIC)
-        // Starts as the plain-rendered record so every failure path below has a
-        // valid record even if hydration is cut short; the styled rebind lands
-        // inside the same try region as the publish it precedes.
+        // Reconciliation and failure retention use the completed presentation,
+        // but neither presentation step gates native admission.
         var publishedRecord = optimistic
         try {
-            publishedRecord = hydrateOptimisticSendMarkdown(optimisticKey, tempId, trimmed) ?: optimistic
-            // Keep the prior chat-list row while the parser is in flight. The
-            // optimistic preview is published only with a completed document,
-            // never as a raw frame followed by a styled replacement (#2411).
-            // An empty/failed parse publishes one stable plaintext fallback only
-            // after the attempt completes. The bubble and composer acceptance
-            // remain independent of parsing, while preview publication joins
-            // cancellation in the group commit lock below.
-            val previewApplied =
-                appState.withGroupCommitLock(account, group.groupIdHex) {
+            val summary =
+                coroutineScope {
+                    // Enter the existing send-order/commit locks before presentation
+                    // can suspend. Keep rejection as data until the styled failure
+                    // row is ready; cancellation still cancels both branches.
+                    val admission =
+                        async(start = CoroutineStart.UNDISPATCHED) {
+                            runCatchingCancellable {
+                                publishTextWithRetry(replyTarget, account, trimmed, trace, tempId, optimisticKey)
+                                    .also { completeDurableAcceptance(optimisticKey) }
+                            }
+                        }
+                    publishedRecord = hydrateOptimisticSendMarkdown(optimisticKey, optimistic)
+                    // Keep the prior chat-list row while the parser is in flight. The
+                    // optimistic preview is published only with a completed document,
+                    // never as a raw frame followed by a styled replacement (#2411).
+                    // An empty/failed parse publishes one stable plaintext fallback only
+                    // after the attempt completes. Check cancellation and apply without
+                    // suspending on this controller's context: a cancel cannot interleave,
+                    // and a native publish holding the commit lock cannot delay styling.
                     requireOptimisticSendNotCancelled(optimisticKey)
-                    chatListPreviewReserved &&
-                        appState.applyReservedOptimisticSentPreview(
-                            conversationAccountRef,
-                            group.groupIdHex,
-                            ChatListMessagePreviewFfi(
-                                retentionSeconds = null,
-                                retentionExpiresAt = null,
-                                messageIdHex = tempId,
-                                sender = conversationAccountIdHex ?: "",
-                                senderDisplayName = null,
-                                plaintext = trimmed,
-                                contentTokens = publishedRecord.contentTokens,
-                                kind = 9uL,
-                                timelineAt = now,
-                                deleted = false,
-                                // A row we are optimistically publishing carries no deletion evidence.
-                                deletionSource = DeletionSourceFfi.UNKNOWN,
-                                attachmentKind = null,
-                                attachmentCount = 0u,
-                                groupSystem = null,
-                                deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
-                            ),
-                        )
+                    val previewApplied =
+                        chatListPreviewReserved &&
+                            appState.applyReservedOptimisticSentPreview(
+                                conversationAccountRef,
+                                group.groupIdHex,
+                                ChatListMessagePreviewFfi(
+                                    retentionSeconds = null,
+                                    retentionExpiresAt = null,
+                                    messageIdHex = tempId,
+                                    sender = conversationAccountIdHex ?: "",
+                                    senderDisplayName = null,
+                                    plaintext = trimmed,
+                                    contentTokens = publishedRecord.contentTokens,
+                                    kind = 9uL,
+                                    timelineAt = now,
+                                    deleted = false,
+                                    // A row we are optimistically publishing carries no deletion evidence.
+                                    deletionSource = DeletionSourceFfi.UNKNOWN,
+                                    attachmentKind = null,
+                                    attachmentCount = 0u,
+                                    groupSystem = null,
+                                    deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
+                                ),
+                            )
+                    if (previewApplied == false) {
+                        // No bound row to bump (pre-first-frame open, brand-new group,
+                        // account-pinned window) — the engine echo will still update the
+                        // list, but keep the drop visible in the send trace.
+                        sendTrace(trace, PerformancePhase.CHAT_LIST_PREVIEW_DROPPED, result = PerformanceResult.FAILURE)
+                    }
+                    admission.await().getOrThrow()
                 }
-            if (previewApplied == false) {
-                // No bound row to bump (pre-first-frame open, brand-new group,
-                // account-pinned window) — the engine echo will still update the
-                // list, but keep the drop visible in the send trace.
-                sendTrace(trace, PerformancePhase.CHAT_LIST_PREVIEW_DROPPED, result = PerformanceResult.FAILURE)
-            }
-            // Publish with a retry sweep so a *transient* relay-pool gap
-            // (socket teardown mid-reconnect, doze wake, network change) doesn't
-            // surface as a user-visible "send failed" the instant the pool looks
-            // empty (issue #294). A terminal/logic error fails on the first
-            // attempt; a sustained proven pre-publish connectivity outage keeps
-            // retrying while this send's coroutine is active. The optimistic
-            // bubble stays Pending, so the user sees "sending", not "failed".
-            //
-            // Each FFI attempt owns the conversation commit lock, but retry
-            // backoff does not. Other mutations remain usable while offline.
-            val summary = publishTextWithRetry(replyTarget, account, trimmed, trace, tempId, optimisticKey)
-            completeDurableAcceptance(optimisticKey)
             val reconciliation =
                 reconcileSuccessfulTextSend(
                     summaryMessageIds = summary.messageIds,
@@ -8402,9 +8402,7 @@ class ConversationController(
                 } catch (
                     @Suppress("TooGenericExceptionCaught") failure: Throwable,
                 ) {
-                    if (failure !is OptimisticSendCancelledException && isAmbiguousRelayDeliveryError(failure)) {
-                        withContext(controllerContext) { markAcceptanceUnknownIfPreAcceptance(optimisticKey) }
-                    }
+                    withContext(controllerContext) { recordSendAdmissionFailure(optimisticKey, failure) }
                     throw failure
                 }
             }
@@ -8460,8 +8458,14 @@ class ConversationController(
         }
     }
 
-    /** Records that a publish may have reached a relay, unless the send already moved past pre-acceptance. */
-    private fun markAcceptanceUnknownIfPreAcceptance(optimisticKey: String) {
+    /** Retires host cancellation when a failed admission may already have published. */
+    private fun recordSendAdmissionFailure(
+        optimisticKey: String,
+        failure: Throwable,
+    ) {
+        if (failure is OptimisticSendCancelledException || !isAmbiguousRelayDeliveryError(failure)) {
+            return
+        }
         if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
             optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
         }
@@ -8664,6 +8668,10 @@ class ConversationController(
                         }
                         summary
                     } catch (throwable: Throwable) {
+                        // Presentation may still be parsing when this child
+                        // returns. Retire host cancellation before releasing
+                        // the commit lock if publication may have happened.
+                        recordSendAdmissionFailure(optimisticKey, throwable)
                         sendTrace(
                             trace,
                             PerformancePhase.FFI_ERROR,
