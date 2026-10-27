@@ -997,6 +997,12 @@ Explicit removal/account teardown still wins over those holds, and disposal rele
 the exact hold. Held pixels can keep occupancy above a trim target, while normal
 insertion capacity stays bounded. Cache-only avatar eviction does not publish a
 picture-change signal that would overwrite a launcher shortcut with initials.
+Later shortcut refreshes also distinguish a missing cache entry from a changed
+selection: the launcher stores only an opaque picture-selection digest alongside
+its existing icon. An unchanged selection and current privacy epoch permit an
+icon-omitting update; an actual clear/replacement, account/cache lifetime change
+or privacy transition cannot retain the old photo. No extra decoded-pixel store
+is introduced.
 
 The coordinated image tiers are L1 attachment bytes/thumbnails, profile/banner
 pixels and profile animation sources, encrypted-group pixels/sources, public JPEG
@@ -1009,4 +1015,8 @@ Use STB-006 for the controlled return workload. Unit/Compose regressions check
 exact retained bytes, idempotence, shared-request counts, durable disk retention
 and displayed-pixel/account isolation. They do not measure device RSS, GPU frames
 or establish an existing OOM. Record those runtime measurements separately before
-claiming the corresponding performance qualification.
+claiming the corresponding performance qualification. The hosted
+`AvatarCacheScrollDeviceTest.presentationTrimAndWarmReturnCounters` records the
+existing cache, frame and process-memory counters on the same synthetic scroll
+workload around repeated application callbacks. Its raw PSS/heap samples are
+measurements, not a forced-GC estimate or a guaranteed process-memory reduction.

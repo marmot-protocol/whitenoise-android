@@ -151,6 +151,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
+import dev.ipf.whitenoise.android.notifications.PinnedConversationPicture
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
@@ -4146,16 +4147,43 @@ class WhiteNoiseAppState private constructor(
         return PinnedConversationPresentation(
             title = title,
             contact = peer,
-            currentAvatar = {
-                val available = accounts.any { it.label == account && !it.signedOut }
-                if (!available || appLockScreenVisible || isContactRefBeingCleared(account)) {
-                    null
-                } else {
-                    peer?.let { contactAvatarOverride(account, it).second }
-                        ?: firstFrameGroupAvatarSeed(item, account, ::avatarUrl)?.image?.asAndroidBitmap()
-                }
-            },
+            currentPicture = { pinnedConversationPicture(account, item, peer) },
         )
+    }
+
+    /** Resolve pixels and their opaque selection together; cache eviction cannot impersonate a picture removal. */
+    private fun pinnedConversationPicture(
+        account: String,
+        item: ChatListItem,
+        peer: String?,
+    ): PinnedConversationPicture {
+        val available = accounts.any { it.label == account && !it.signedOut }
+        if (!available || appLockScreenVisible || isContactRefBeingCleared(account)) {
+            return PinnedConversationPicture(null)
+        }
+        val privatePeer = peer?.takeIf { contactNicknameAccountRefForAccess(account, accounts, it) != null }
+        val privateRef = privatePeer?.let { contactPictureStore.reference(account, it) }
+        val publicFallback =
+            privatePeer?.takeIf { contactPictureStore.hasChoice(account, it) }?.let {
+                synchronized(profilePresentationLock) { profilePresentations[it]?.avatarUrl }
+            }
+        val sources =
+            firstFrameGroupAvatarSources(item, account) { contact ->
+                synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
+            }.toList()
+        val selection = listOfNotNull(privateRef?.cacheKey, publicFallback) + sources.map { "${it.first}:${it.second}" }
+        val identity =
+            selection.takeIf { it.isNotEmpty() }?.let {
+                val owned = listOf(account, AvatarImageLoader.currentCacheLifetime().toString()) + it
+                dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope(
+                    owned.joinToString("") { key -> "${key.length}:$key" },
+                )
+            }
+        val bitmap =
+            privateRef?.cacheKey?.let(AvatarImageLoader::cachedImage)?.asAndroidBitmap()
+                ?: AvatarImageLoader.peekBitmap(publicFallback)
+                ?: firstFrameGroupAvatarSeed(sources.asSequence(), account)?.image?.asAndroidBitmap()
+        return PinnedConversationPicture(bitmap, identity)
     }
 
     /**

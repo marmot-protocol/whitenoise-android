@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import android.app.ActivityManager
+import android.content.ComponentCallbacks2
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Debug
@@ -43,8 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.ManualDeviceFixture
+import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -55,7 +58,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 private const val AVATAR_FIXTURE_COUNT = 48
 private const val AVATAR_BENCH_TAG = "WNAvatarBench"
 
-/** Bounded, synthetic list-scroll measurement of both real avatar loaders on a physical device. */
+/** Bounded, synthetic list-scroll measurement of both real avatar loaders on Android. */
 @RunWith(AndroidJUnit4::class)
 class AvatarCacheScrollDeviceTest {
     @get:Rule
@@ -93,6 +96,59 @@ class AvatarCacheScrollDeviceTest {
         assertTrue("cold profile fetch boundary did not run", cold.delta.profile.fetchCalls > 16)
         assertTrue("cold group fetch boundary did not run", cold.delta.group.fetchCalls > 16)
         Log.i(AVATAR_BENCH_TAG, "completed cold=$cold reverse=$reverse repeated=$repeated")
+    }
+
+    /** Compares the same scroll workload before and after actual application trim callbacks without forcing GC. */
+    @Test
+    fun presentationTrimAndWarmReturnCounters() {
+        val imageBytes = syntheticAvatarPng(256)
+        AvatarImageLoader.clear()
+        GroupAvatarImageLoader.clear()
+        AvatarImageLoader.attachProfileImageFetcher { _, _ -> imageBytes }
+        lateinit var listState: LazyListState
+        composeRule.setContent {
+            listState = rememberLazyListState()
+            MaterialTheme { FixtureList(listState, imageBytes) }
+        }
+        AvatarCacheDiagnostics.start()
+        val cold = measurePass("trim_cold_down", listState, down = true)
+        val warm = measurePass("trim_warm_up", listState, down = false)
+        assertEquals(0L, warm.delta.profile.fetchCalls)
+        assertEquals(0L, warm.delta.group.fetchCalls)
+        val memoryBefore = processMemory()
+        val before = AvatarCacheDiagnostics.snapshot()
+        deliverTrim(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)
+        val hidden = AvatarCacheDiagnostics.snapshot()
+        assertTrue("hidden did not trim profile entries", hidden.profile.evictions > before.profile.evictions)
+        assertTrue("hidden did not trim group entries", hidden.group.evictions > before.group.evictions)
+        deliverTrim(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)
+        assertEquals(hidden, AvatarCacheDiagnostics.snapshot())
+        deliverTrim(ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
+        val background = AvatarCacheDiagnostics.snapshot()
+        assertTrue("background did not trim profile remainder", background.profile.evictions > hidden.profile.evictions)
+        assertTrue("background did not trim group remainder", background.group.evictions > hidden.group.evictions)
+        deliverTrim(ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
+        assertEquals(background, AvatarCacheDiagnostics.snapshot())
+        val memoryAfter = processMemory()
+        val returned = measurePass("trim_return_down", listState, down = true)
+        val rewarmed = measurePass("trim_rewarm_up", listState, down = false)
+        val repeated = measurePass("trim_repeat_down", listState, down = true)
+        assertTrue("return never reacquired profile pixels", returned.delta.profile.fetchCalls > 0)
+        assertTrue("return never reacquired group pixels", returned.delta.group.fetchCalls > 0)
+        assertEquals(0L, repeated.delta.profile.fetchCalls)
+        assertEquals(0L, repeated.delta.group.fetchCalls)
+        AvatarCacheDiagnostics.stop()
+        Log.i(AVATAR_BENCH_TAG, "trim_counters before=$before hidden=$hidden background=$background")
+        Log.i(AVATAR_BENCH_TAG, "trim_memory before=$memoryBefore after=$memoryAfter")
+        Log.i(AVATAR_BENCH_TAG, "trim_completed cold=$cold warm=$warm returned=$returned")
+        Log.i(AVATAR_BENCH_TAG, "trim_rewarmed sample=$rewarmed repeated=$repeated")
+    }
+
+    /** Only the synthetic emulator/test application receives the controlled callback; installed data is untouched. */
+    private fun deliverTrim(level: Int) {
+        composeRule.runOnIdle {
+            (composeRule.activity.application as WhiteNoiseApplication).onTrimMemory(level)
+        }
     }
 
     /** Repeats the stress fixture with physical touch timing and matched traversal endpoints. */

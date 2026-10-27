@@ -6,15 +6,24 @@ import android.content.pm.ShortcutManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarCacheChanges
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
+import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.share.group
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -306,6 +315,74 @@ class PinnedConversationShortcutsTest {
         assertEquals("Current", updated.longLabel)
         assertNotEquals(Color.MAGENTA, (updated.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
     }
+
+    /** An unrelated publication after trim keeps the launcher's current photo, but a changed selection clears it. */
+    @Test
+    fun trimmedGroupPictureSurvivesUnrelatedPublicationButNotReplacement() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val app = pinApp()
+        val url = "https://group.example/trim.png"
+        val row = ChatListItem(group(GROUP).copy(avatarUrl = url), null, null, 3, null)
+        val picture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        AvatarImageLoader.putCachedAnimated(url, picture.asImageBitmap(), byteArrayOf(1))
+        val presentation = app.pinnedConversationPresentation(ACCOUNT, row, "Group")
+        owner.request(capability, "Group", null, presentation = presentation) { true }
+        platform.approve(platform.requests.single())
+        try {
+            AvatarImageLoader.trimMemory(PresentationMemoryTrim.EMPTY)
+            assertNull(AvatarImageLoader.peek(url))
+            val revision = AvatarCacheChanges.revision.value
+            AvatarImageLoader.putCachedAnimated("https://other.example/avatar", picture.asImageBitmap(), byteArrayOf(1))
+            assertTrue(AvatarCacheChanges.revision.value > revision)
+            val renamed = app.pinnedConversationPresentation(ACCOUNT, row, "Renamed")
+            assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to renamed)))
+            val retained = platform.updates.last().single()
+            assertNull("omit icon to retain the platform-owned photo", retained.icon)
+            assertEquals("Renamed", retained.longLabel)
+            assertEquals(platform.requests.single().intent.data, retained.intent.data)
+
+            val replacement = row.copy(group = row.group.copy(avatarUrl = "https://group.example/replaced.png"))
+            val replaced = app.pinnedConversationPresentation(ACCOUNT, replacement, "Group")
+            assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to replaced)))
+            val changed = platform.updates.last().single()
+            val icon = changed.icon!!.loadDrawable(context) as BitmapDrawable
+            assertNotEquals(Color.MAGENTA, icon.bitmap.getPixel(0, 0))
+        } finally {
+            AvatarImageLoader.clear()
+        }
+    }
+
+    /** A matching cache-miss selector cannot retain platform pixels across a notification privacy epoch change. */
+    @Test
+    fun trimmedPictureCannotSurvivePrivacyRevocation() =
+        runBlocking {
+            val platform = Platform(context)
+            val owner = PinnedConversationShortcuts(context, platform)
+            var picture = PinnedConversationPicture(Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888), "same-source")
+            val presentation = PinnedConversationPresentation("Group", currentPicture = { picture })
+            owner.request(capability, "Group", null, presentation = presentation) { true }
+            platform.approve(platform.requests.single())
+            picture = picture.copy(bitmap = null)
+            NotificationPreviewPreferences.setEnabled(context, false) { true }
+            try {
+                assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+                val hidden = platform.updates.last().single()
+                assertEquals(context.getString(R.string.app_name), hidden.longLabel)
+                assertEquals(IconCompat.TYPE_RESOURCE, hidden.icon!!.type)
+            } finally {
+                NotificationPreviewPreferences.setEnabled(context, true) { true }
+            }
+        }
+
+    /** A signed-in synthetic owner resolves production picture selection without acquiring any native identity. */
+    private fun pinApp() =
+        WhiteNoiseAppState(
+            context = context,
+            accountIdHexResolver = { null },
+            accounts = listOf(AccountSummaryFfi(ACCOUNT, "self", true, false, false, true)),
+            activeAccountRef = ACCOUNT,
+        )
 
     /** A queued request reads current private pixels at publication rather than retaining its captured picture. */
     @Test
