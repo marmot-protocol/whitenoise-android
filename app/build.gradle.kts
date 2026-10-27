@@ -1194,9 +1194,13 @@ tasks.withType<Test>().configureEach {
         "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
         "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
     )
-    // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
-    // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
-    maxHeapSize = "1g"
+    // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite, and
+    // a 1 GiB G1 heap spent much of the run collecting. Full Zapstore suite, six forks, wn-build-server:
+    //   1 GiB G1:                          6m33s, 52.7 CPU-minutes
+    //   2 GiB ParallelGC, two GC threads:   5m12s, 31.2 CPU-minutes (27 GB peak for all forks)
+    // Two GC threads per fork keep collector bursts within the CI CPU budget.
+    maxHeapSize = "2g"
+    jvmArgs("-XX:+UseParallelGC", "-XX:ParallelGCThreads=2")
     // InvariantGateRegistryTest reads the registry from disk, so a registry-only edit must invalidate cached test
     // results (CI restores the build cache) instead of leaving every unit-test variant UP-TO-DATE.
     inputs
