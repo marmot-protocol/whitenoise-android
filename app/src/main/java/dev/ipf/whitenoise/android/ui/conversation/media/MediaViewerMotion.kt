@@ -146,7 +146,8 @@ internal fun MediaThumbnailCanvas(content: @Composable () -> Unit) {
 
 private val LocalMediaReadingViewport = staticCompositionLocalOf<(() -> Rect?)?> { null }
 
-private val LocalMediaViewerThumbnails = staticCompositionLocalOf<MediaViewerThumbnailRegistry?> { null }
+/** The current motion-eligible thumbnail host also scopes its controls' press feedback. */
+internal val LocalMediaViewerThumbnails = staticCompositionLocalOf<MediaViewerThumbnailRegistry?> { null }
 
 @Composable
 internal fun MediaViewerThumbnailHost(
@@ -272,7 +273,9 @@ internal fun MediaViewerMotion(
             }
         }
     Box(Modifier.fillMaxSize().onGloballyPositioned { geometry[0] = it }) {
-        content(bodyModifier)
+        CompositionLocalProvider(LocalMediaViewerPressFeedback provides enabled) {
+            content(bodyModifier)
+        }
         MediaMotionVisual({ if (enabled) readThumbnail() else null }) {
             mediaMotionDrawGeometry(geometry, { progress.value }, knownAspect)
         }

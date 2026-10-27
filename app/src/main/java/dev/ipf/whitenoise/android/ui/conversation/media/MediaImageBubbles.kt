@@ -426,6 +426,8 @@ internal fun MediaImageBubble(
                             Modifier
                                 .fillMaxSize()
                                 .combinedClickable(
+                                    interactionSource = null,
+                                    indication = rememberMediaViewerPressIndication(),
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
                                 ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
@@ -440,6 +442,8 @@ internal fun MediaImageBubble(
                             Modifier
                                 .fillMaxSize()
                                 .combinedClickable(
+                                    interactionSource = null,
+                                    indication = rememberMediaViewerPressIndication(),
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
                                 ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
@@ -947,6 +951,11 @@ internal fun MediaImageGridTile(
     Box(
         modifier =
             modifier.onSizeChanged(decodeRequest::onSizeChanged).combinedClickable(
+                interactionSource = null,
+                indication =
+                    rememberMediaViewerPressIndication(
+                        ready = presentation != null && !failed && !transfer.cancelling,
+                    ),
                 onLongClick = onLongPress,
                 // Two modes:
                 //   - Bytes ready (`bitmap != null`): tap opens the viewer.

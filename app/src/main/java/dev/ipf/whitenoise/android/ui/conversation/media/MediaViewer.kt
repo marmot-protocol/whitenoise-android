@@ -899,9 +899,7 @@ internal fun MediaViewerFrame(
                             .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onDismiss, enabled = actionsEnabled, modifier = Modifier.size(48.dp)) {
-                        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
-                    }
+                    MediaViewerCloseButton(onDismiss = onDismiss, enabled = actionsEnabled)
                     Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                         Text(
                             text = senderLabel,

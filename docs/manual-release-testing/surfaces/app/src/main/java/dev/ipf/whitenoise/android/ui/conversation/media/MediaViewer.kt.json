@@ -65,14 +65,6 @@
     ],
     "source_coverage": [
       {
-        "surface": "R.string.close",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.close",
-        "test_ids": [
-          "MED-015"
-        ]
-      },
-      {
         "surface": "R.string.group_photo_error",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "R.string.group_photo_error",
