@@ -240,6 +240,7 @@ internal fun MediaViewerMotion(
             Snapshot.withoutReadObservation { registry?.resolve(opening)?.thumbnail?.token }
         }
     val initialAvailable = openingToken != null
+    val awaitEntryFrame = rememberMediaViewerEntryFrame(enabled, initialAvailable)
     val progress = remember { Animatable(if (enabled && initialAvailable) 0f else 1f) }
     var entrySettled by remember { mutableStateOf(!enabled || !initialAvailable) }
     val geometry = remember { arrayOfNulls<LayoutCoordinates>(2) }
@@ -248,13 +249,20 @@ internal fun MediaViewerMotion(
             { registry?.motionThumbnail(opening, selected, closing, selectedSourceEpoch, openingToken) }
         }
     val latestClosed by androidx.compose.runtime.rememberUpdatedState(onClosed)
-    LaunchedEffect(closing, enabled, readThumbnail) {
+    LaunchedEffect(closing, enabled, readThumbnail, awaitEntryFrame) {
         if (!enabled || readThumbnail() == null) {
             entrySettled = true
             progress.snapTo(1f)
             if (closing) latestClosed()
         } else if (closing || !entrySettled) {
-            animateMediaViewerMotion(progress, closing, readThumbnail, { entrySettled = true }, { latestClosed() })
+            animateMediaViewerMotion(
+                progress,
+                closing,
+                sourceAvailable = { readThumbnail() != null },
+                awaitEntryFrame = awaitEntryFrame,
+                onSettled = { entrySettled = true },
+            )
+            if (closing) latestClosed()
         }
     }
     val bodyModifier =
@@ -294,26 +302,31 @@ private fun mediaMotionDrawGeometry(
     }
 }
 
-/** Monitors source eligibility only while the existing animation child is active. */
-private suspend fun animateMediaViewerMotion(
+/** Monitors source eligibility during window admission and travel, cancelling either before direct fallback. */
+internal suspend fun animateMediaViewerMotion(
     progress: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
     closing: Boolean,
-    readThumbnail: () -> MediaViewerThumbnailRegistry.ResolvedThumbnail?,
+    sourceAvailable: () -> Boolean,
+    awaitEntryFrame: suspend () -> Unit,
     onSettled: () -> Unit,
-    onClosed: () -> Unit,
 ) {
     var sourceLost = false
     coroutineScope {
         val animation =
             launch {
-                progress.animateTo(
-                    if (closing) 0f else 1f,
-                    tween(if (closing) MEDIA_CLOSE_MILLIS else MEDIA_OPEN_MILLIS, easing = FastOutSlowInEasing),
-                )
+                if (!closing) awaitEntryFrame()
+                if (sourceAvailable()) {
+                    progress.animateTo(
+                        if (closing) 0f else 1f,
+                        tween(if (closing) MEDIA_CLOSE_MILLIS else MEDIA_OPEN_MILLIS, easing = FastOutSlowInEasing),
+                    )
+                } else {
+                    sourceLost = true
+                }
             }
         while (animation.isActive) {
             withFrameNanos { }
-            if (readThumbnail() == null) {
+            if (!sourceAvailable()) {
                 sourceLost = true
                 animation.cancel()
             }
@@ -322,7 +335,6 @@ private suspend fun animateMediaViewerMotion(
     }
     if (sourceLost) progress.snapTo(1f)
     onSettled()
-    if (closing) onClosed()
 }
 
 /** Draws a fresh eligible source with reusable clipping objects and the existing pixel handoff. */

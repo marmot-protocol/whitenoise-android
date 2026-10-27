@@ -34,6 +34,14 @@
         "test_ids": [
           "MED-041"
         ]
+      },
+      {
+        "surface": "Committed-frame admission and content-owned dialog motion without a duplicate platform animation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "rememberMediaViewerEntryFrame(enabled, initialAvailable)",
+        "test_ids": [
+          "MED-041"
+        ]
       }
     ],
     "composable_surfaces": [

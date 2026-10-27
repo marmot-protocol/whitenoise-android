@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -41,11 +42,16 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationMotionEnabled
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerAttachmentId
 import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_TOP_CHROME_TAG
@@ -81,6 +87,62 @@ import kotlin.math.roundToInt
 @Config(sdk = [36], qualifiers = "w360dp-h640dp-mdpi")
 class MediaViewerMotionScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
+
+    /** The real dialog delegates motion to its content without changing its host window. */
+    @Test
+    @Suppress("LongMethod") // One real window lifecycle verifies content-owned motion and host isolation.
+    fun thumbnailTravelDisablesTheDialogsAdditionalPlatformAnimation() {
+        var hostAnimation: Int? = null
+        var dialogAnimation: Int? = null
+        var currentHostAnimation: Int? = null
+        val registry = MediaViewerThumbnailRegistry()
+        val id = ConversationMediaViewerAttachmentId("dialog-admission", 0)
+        composeRule.setContent {
+            val hostView = LocalView.current
+            val activity =
+                generateSequence(hostView.context) { (it as? android.content.ContextWrapper)?.baseContext }
+                    .filterIsInstance<android.app.Activity>()
+                    .first()
+            SideEffect { if (hostAnimation == null) hostAnimation = activity.window.attributes.windowAnimations }
+            var shown by remember { mutableStateOf(false) }
+            CompositionLocalProvider(LocalConversationMotionEnabled provides true) {
+                WhiteNoiseTheme {
+                    MediaViewerThumbnailHost(registry) {
+                        Box(
+                            Modifier
+                                .size(40.dp)
+                                .testTag("window-motion-source")
+                                .clickable { shown = true }
+                                .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 7uL)
+                                .background(Color.Red),
+                        )
+                    }
+                    if (shown) {
+                        PlaybackDialog(
+                            onDismissRequest = { shown = false },
+                            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+                        ) {
+                            val view = LocalView.current
+                            MediaViewerMotion(registry, id, id, closing = false, onClosed = {}, attachmentAspectRatio = 1f) {
+                                Box(it.fillMaxSize())
+                            }
+                            SideEffect {
+                                dialogAnimation = (view.parent as DialogWindowProvider).window.attributes.windowAnimations
+                                currentHostAnimation = activity.window.attributes.windowAnimations
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        flushInitialNativeDraw()
+        composeRule.runOnIdle { assertNotNull(registry.find(id)) }
+        composeRule.onNodeWithTag("window-motion-source").performClick()
+        composeRule.runOnIdle {
+            assertEquals(0, checkNotNull(dialogAnimation))
+            assertEquals(hostAnimation, currentHostAnimation)
+        }
+    }
 
     /** Resolving one animation frame must not traverse layout once per bounds/corner property. */
     @Test
