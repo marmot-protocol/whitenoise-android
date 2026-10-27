@@ -73,6 +73,7 @@ jobs:
           done
           cat > "$RUNNER_TEMP/perf3439.gradle" <<'GRADLE'
           gradle.beforeProject { project ->
+              if (project.path != ':app') return
               project.plugins.withId('com.android.application') {
                   project.extensions.getByName('androidComponents').finalizeDsl { android ->
                       def preview = android.productFlavors.getByName('preview')
