@@ -18,8 +18,8 @@ internal object AppLockPreferences {
     private const val LAST_UNLOCKED_AT_KEY = "last_unlocked_at_millis"
 
     // One instance for the process: every open pays a Keystore access plus a
-    // synchronous prefs-file read, and the call sites run on the main thread
-    // (cold start, every unlock, every backgrounding).
+    // synchronous prefs-file read. Reads and the ordered unlock/background
+    // timestamp writer run off-main; reusing the store avoids repeated initialization.
     @Volatile
     private var cachedStore: KeystoreSecureStore? = null
     private val cacheLock = Any()
