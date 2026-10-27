@@ -395,9 +395,8 @@ internal class ComposerSendMotion {
         geometryObserver: ((ComposerSendFlightGeometry) -> Unit)?,
     ) {
         // Idle ink must not subscribe the full-window canvas to modal eligibility changes.
-        if (active == null || flight !== active) return
-        val canvasOrigin = origin?.takeIf { enabled && it.isAttached }
-        if (canvasOrigin == null) return
+        val canvasOrigin = origin?.takeIf { active != null && flight === active && enabled && it.isAttached }
+        if (active == null || canvasOrigin == null) return
         val decision = presentation(active.presentationId)
         val geometry = decision.geometry
         if (geometry == null) {
