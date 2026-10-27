@@ -11,6 +11,11 @@
     ":app project coreLibraryDesugaring",
     ":app project detekt",
     ":app project detektPlugins",
+    ":app project devPlayBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devPlayBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devPlayBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devPlayBenchmarkReleaseCompileClasspath",
     ":app project devPlayBenchmarkReleaseImplementationDependenciesMetadata",
@@ -39,6 +44,11 @@
     ":app project devPlayNonMinifiedReleaseLintChecksClasspath",
     ":app project devPlayNonMinifiedReleaseReverseMetadataValues",
     ":app project devPlayNonMinifiedReleaseRuntimeClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devZapstoreBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devZapstoreBenchmarkReleaseCompileClasspath",
     ":app project devZapstoreBenchmarkReleaseImplementationDependenciesMetadata",
@@ -73,11 +83,13 @@
     ":app project kotlinCompilerClasspath",
     ":app project kotlinCompilerPluginClasspath",
     ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevPlayDebug",
     ":app project kotlinCompilerPluginClasspathDevPlayDebugAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevPlayDebugUnitTest",
     ":app project kotlinCompilerPluginClasspathDevPlayNonMinifiedRelease",
     ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebug",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebugAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebugUnitTest",
@@ -289,7 +301,7 @@
   ],
   "files": {
     "app/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "app/gradle.lockfile": "b64c81440d440bf105a12cf019df9b936cee0879a8ff7babd9dd3e30647dbafc",
+    "app/gradle.lockfile": "2f7bf0b37c42fe12ce1acb2ffe96875d56547581300ee3429f8142ed02689765",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "benchmark/gradle.lockfile": "c258b6e3914c1935d8eedbef4e8a238bba924f89a57c1648112ef0a8b9ee4351",
     "buildscript-gradle.lockfile": "372f4c86a0256c61f27b2ec649f2e891f53d71e0d2115cc7ab4bc4ec5d7de6bb",
@@ -840,13 +852,13 @@
     }
   ],
   "reviewed_from": {
-    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/40481434664/artifacts/12723022643",
+    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/40517908164/artifacts/12752230942",
     "repository": "marmot-protocol/whitenoise-android",
     "retained": {
       "path": "gradle/dependency-evidence/capture.json",
-      "sha256": "48a0045712f78887288262c0248169c133529ddf4c60c5764f42c602b5a8c738"
+      "sha256": "c91afa3d971577736ff118fdf6270d54b8f095085eb18082a2df42dab7c78293"
     },
-    "source_sha": "7d42c03285bb3b2b9f8755fd3b80f07f9ac82c21"
+    "source_sha": "003dbff06340ce7644032ef7fcac4a837020727f"
   },
   "schema": 1,
   "supplemental_tools": {
