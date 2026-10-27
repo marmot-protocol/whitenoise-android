@@ -1341,7 +1341,7 @@ class LocalDeletedGroupProjectionTest {
         // group's row again; Android folds it back without reviving any other
         // absent group as a side effect.
         restarted.setChatListVisible(false)
-        replaceRows(restarted, listOf(untouched, deleted.copy(activitySortAt = 30uL, updatedAt = 30uL)))
+        restarted.applyChatListRow(deleted.copy(activitySortAt = 30uL, updatedAt = 30uL))
         restarted.setChatListVisible(true)
 
         assertEquals(listOf("deleted-group", "untouched-group"), restarted.items.map { it.id })
