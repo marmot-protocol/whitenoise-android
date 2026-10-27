@@ -131,8 +131,9 @@ between runs for incremental compilation;
 including reports, test results and outputs, so test tasks still execute on
 every run. Emulator jobs require the `wn-cache-1` label, which only slot 1
 carries, because emulators share the host's adb ports and SDK.
-The runner's job-start hook gives the `tests` job's slot eight times the CPU
-weight of other slots, since unit tests are the longest chain of a PR run.
+The runner's job-start hook gives the `tests` and `static-analysis` slots eight
+times the CPU weight of other slots, since unit tests and Android lint are the
+longest chains of a PR run.
 
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
 including description edits, without compiling anything. The checker script runs
