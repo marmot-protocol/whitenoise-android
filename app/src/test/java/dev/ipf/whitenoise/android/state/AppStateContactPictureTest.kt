@@ -129,11 +129,11 @@ class AppStateContactPictureTest {
             AvatarImageLoader.trimMemory(PresentationMemoryTrim.EMPTY)
             val evicted = checkNotNull(captured.currentPicture?.invoke())
             assertNull(evicted.bitmap)
-            assertEquals(before.identity, evicted.identity)
+            assertTrue(before.identity in evicted.missingIdentities)
             assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
-            assertNull(captured.currentPicture?.invoke()?.identity)
+            assertTrue(checkNotNull(captured.currentPicture?.invoke()).missingIdentities.isEmpty())
             app.setAppLockScreenVisibleForTest(true)
-            assertNull(captured.currentPicture?.invoke()?.identity)
+            assertTrue(checkNotNull(captured.currentPicture?.invoke()).missingIdentities.isEmpty())
         }
 
     /** Clearing a private choice uses cached native public pixels without reviving private or locked-account pixels. */

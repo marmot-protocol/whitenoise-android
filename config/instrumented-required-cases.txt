@@ -167,3 +167,6 @@ dev.ipf.whitenoise.android.media.MediaThumbnailDecodeDeviceTest#renderedTileUses
 
 # Fixture teardown must verify durable own-send bytes even when L1 is populated.
 dev.ipf.whitenoise.android.media.AttachmentFixturePublicationDeviceTest#smallMemoryHitStillWaitsForVerifiedDiskPublication
+
+# #3450: controlled application trim and bounded warm return with cache/frame/memory samples.
+dev.ipf.whitenoise.android.core.AvatarCacheScrollDeviceTest#presentationTrimAndWarmReturnCounters

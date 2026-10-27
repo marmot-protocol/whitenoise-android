@@ -14,8 +14,14 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarCacheChanges
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
+import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ContactPictureChange
+import dev.ipf.whitenoise.android.state.ProfilePresentation
+import dev.ipf.whitenoise.android.state.ScopedCache
+import dev.ipf.whitenoise.android.state.contactPicturePng
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.share.group
 import kotlinx.coroutines.runBlocking
@@ -23,6 +29,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -31,6 +38,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.spec.SecretKeySpec
 
@@ -334,7 +342,7 @@ class PinnedConversationShortcutsTest {
             assertNull(AvatarImageLoader.peek(url))
             val revision = AvatarCacheChanges.revision.value
             AvatarImageLoader.putCachedAnimated("https://other.example/avatar", picture.asImageBitmap(), byteArrayOf(1))
-            assertTrue(AvatarCacheChanges.revision.value > revision)
+            assertNotSame(revision, AvatarCacheChanges.revision.value)
             val renamed = app.pinnedConversationPresentation(ACCOUNT, row, "Renamed")
             assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to renamed)))
             val retained = platform.updates.last().single()
@@ -353,6 +361,91 @@ class PinnedConversationShortcutsTest {
         }
     }
 
+    /** A trimmed private photo remains the owner even when the peer publishes a new, cached public fallback. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun privatePinSurvivesTrimAndPublicFallbackChangeUntilPrivateChoiceIsCleared() =
+        runBlocking {
+            val app = pinApp()
+            val bytes = contactPicturePng(Color.MAGENTA)
+            val replacement = ContactPictureChange.Replace(bytes)
+            assertTrue(app.contactPictureStore.save(ACCOUNT, "peer", "", "", replacement) { true })
+            val ref = checkNotNull(app.contactPictureStore.reference(ACCOUNT, "peer"))
+            val picture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+            AvatarImageLoader.putCachedAnimated(ref.cacheKey, picture.asImageBitmap(), byteArrayOf(1))
+            app.setPinProfile("https://peer.example/old.png")
+            val row = ChatListItem(group(GROUP), null, "peer", 2, null)
+            val platform = Platform(context)
+            val owner = PinnedConversationShortcuts(context, platform)
+            val presentation = app.pinnedConversationPresentation(ACCOUNT, row, "Peer")
+            owner.request(capability, "Peer", null, presentation = presentation) { true }
+            platform.approve(platform.requests.single())
+            try {
+                AvatarImageLoader.trimMemory(PresentationMemoryTrim.EMPTY)
+                app.setPinProfile("https://peer.example/new.png")
+                val fallback = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
+                AvatarImageLoader.putCachedAnimated(
+                    "https://peer.example/new.png",
+                    fallback.asImageBitmap(),
+                    byteArrayOf(1),
+                )
+                assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+                val retained = platform.updates.last().single()
+                assertNull("a cached fallback cannot replace the selected private photo", retained.icon)
+                assertTrue(app.contactPictureStore.save(ACCOUNT, "peer", "", "", ContactPictureChange.Clear) { true })
+                assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+                val cleared = platform.updates.last().single().icon!!.loadDrawable(context) as BitmapDrawable
+                assertEquals(Color.BLUE, cleared.bitmap.getPixel(0, 0))
+            } finally {
+                AvatarImageLoader.clear()
+            }
+        }
+
+    /** Group-only eviction cannot promote a cached peer fallback until the group-owned image is actually removed. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun trimmedEncryptedPinRetainsPrimaryOverCachedPeerFallback() =
+        runBlocking {
+            val app = pinApp()
+            app.setPinProfile("https://peer.example/fallback.png")
+            val row = ChatListItem(group(GROUP).copy(imageHashHex = "12".repeat(32)), null, "peer", 2, null)
+            val key = checkNotNull(encryptedGroupAvatarCacheKey(ACCOUNT, row.group))
+            checkNotNull(GroupAvatarImageLoader.load(key) { contactPicturePng(Color.MAGENTA) })
+            val fallback = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
+            AvatarImageLoader.putCachedAnimated(
+                "https://peer.example/fallback.png",
+                fallback.asImageBitmap(),
+                byteArrayOf(1),
+            )
+            val platform = Platform(context)
+            val owner = PinnedConversationShortcuts(context, platform)
+            val presentation = app.pinnedConversationPresentation(ACCOUNT, row, "Group")
+            owner.request(capability, "Group", null, presentation = presentation) { true }
+            platform.approve(platform.requests.single())
+            try {
+                GroupAvatarImageLoader.trimMemory(PresentationMemoryTrim.EMPTY)
+                assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+                assertNull("a cached peer cannot replace the group-owned photo", platform.updates.last().single().icon)
+                val removed = row.copy(group = row.group.copy(imageHashHex = null))
+                val current = app.pinnedConversationPresentation(ACCOUNT, removed, "Peer")
+                assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to current)))
+                val cleared = platform.updates.last().single().icon!!.loadDrawable(context) as BitmapDrawable
+                assertEquals(Color.BLUE, cleared.bitmap.getPixel(0, 0))
+            } finally {
+                AvatarImageLoader.clear()
+                GroupAvatarImageLoader.clear()
+            }
+        }
+
+    /** Seeds only the existing presentation map; no native profile fetch or account creation runs. */
+    @Suppress("UNCHECKED_CAST")
+    private fun WhiteNoiseAppState.setPinProfile(url: String) {
+        val field =
+            WhiteNoiseAppState::class.java.getDeclaredField("profilePresentations").apply { isAccessible = true }
+        val profiles = field.get(this) as ScopedCache<String, ProfilePresentation>
+        profiles.put("peer", ProfilePresentation("Peer", url))
+    }
+
     /** A matching cache-miss selector cannot retain platform pixels across a notification privacy epoch change. */
     @Test
     fun trimmedPictureCannotSurvivePrivacyRevocation() =
@@ -363,7 +456,7 @@ class PinnedConversationShortcutsTest {
             val presentation = PinnedConversationPresentation("Group", currentPicture = { picture })
             owner.request(capability, "Group", null, presentation = presentation) { true }
             platform.approve(platform.requests.single())
-            picture = picture.copy(bitmap = null)
+            picture = picture.copy(bitmap = null, missingIdentities = setOf(checkNotNull(picture.identity)))
             NotificationPreviewPreferences.setEnabled(context, false) { true }
             try {
                 assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))

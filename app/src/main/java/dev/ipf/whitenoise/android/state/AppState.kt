@@ -4168,22 +4168,26 @@ class WhiteNoiseAppState private constructor(
                 synchronized(profilePresentationLock) { profilePresentations[it]?.avatarUrl }
             }
         val sources =
-            firstFrameGroupAvatarSources(item, account) { contact ->
-                synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
-            }.toList()
-        val selection = listOfNotNull(privateRef?.cacheKey, publicFallback) + sources.map { "${it.first}:${it.second}" }
-        val identity =
-            selection.takeIf { it.isNotEmpty() }?.let {
-                val owned = listOf(account, AvatarImageLoader.currentCacheLifetime().toString()) + it
-                dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope(
-                    owned.joinToString("") { key -> "${key.length}:$key" },
-                )
+            sequence {
+                privateRef?.let { ref ->
+                    val read = { AvatarImageLoader.cachedImage(ref.cacheKey)?.asAndroidBitmap() }
+                    yield("private:${ref.cacheKey}" to read)
+                }
+                publicFallback?.let { url -> yield("public:$url" to { AvatarImageLoader.peekBitmap(url) }) }
+                val nativeSources =
+                    firstFrameGroupAvatarSources(item, account) { contact ->
+                        synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
+                    }
+                for ((kind, key) in nativeSources) {
+                    val read = { firstFrameGroupAvatarSeed(sequenceOf(kind to key), account)?.image?.asAndroidBitmap() }
+                    yield("$kind:$key" to read)
+                }
             }
-        val bitmap =
-            privateRef?.cacheKey?.let(AvatarImageLoader::cachedImage)?.asAndroidBitmap()
-                ?: AvatarImageLoader.peekBitmap(publicFallback)
-                ?: firstFrameGroupAvatarSeed(sources.asSequence(), account)?.image?.asAndroidBitmap()
-        return PinnedConversationPicture(bitmap, identity)
+        return dev.ipf.whitenoise.android.notifications.resolvePinnedConversationPicture(
+            account,
+            AvatarImageLoader.currentCacheLifetime(),
+            sources,
+        )
     }
 
     /**

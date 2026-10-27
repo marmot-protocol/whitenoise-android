@@ -31,12 +31,6 @@ internal data class PinnedConversationPresentation(
     val currentPicture: (() -> PinnedConversationPicture)? = null,
 )
 
-/** A cache miss retains its selected source identity; a removed or ineligible picture has no identity. */
-internal data class PinnedConversationPicture(
-    val bitmap: Bitmap?,
-    val identity: String? = null,
-)
-
 /** The platform owns approved pins, including denial, duplicate requests and process recreation. */
 internal interface PinnedShortcutPlatform {
     /** Availability belongs to the current launcher and may change while the app is backgrounded. */
@@ -272,10 +266,10 @@ internal class PinnedConversationShortcuts(
             } else {
                 PinnedConversationPicture(null)
             }
+        val priorIdentity = original?.extras?.getString(PICTURE_IDENTITY)
         val retainIcon =
-            picture.bitmap == null && picture.identity != null && original != null &&
-                shortcutPreviewAllowed(context, original) &&
-                original.extras?.getString(PICTURE_IDENTITY) == picture.identity
+            priorIdentity != null && priorIdentity in picture.missingIdentities &&
+                original != null && shortcutPreviewAllowed(context, original)
         val icon =
             if (privacy.allowed) {
                 notificationConversationIcon(label, capability.shortcutId, picture.bitmap?.let(::boundedPinnedAvatar))
@@ -286,7 +280,8 @@ internal class PinnedConversationShortcuts(
             checkNotNull(conversationShortcutAccountExtras(capability.accountRef)).apply {
                 stampShortcutPreview(privacy, this)
                 putBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN, !privacy.allowed)
-                if (picture.bitmap != null || retainIcon) putString(PICTURE_IDENTITY, picture.identity)
+                val iconIdentity = if (retainIcon) priorIdentity else picture.identity
+                if (iconIdentity != null) putString(PICTURE_IDENTITY, iconIdentity)
             }
         return ShortcutInfoCompat
             .Builder(context, capability.shortcutId)
