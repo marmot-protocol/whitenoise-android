@@ -127,7 +127,10 @@ class ShareFileImporterBudgetTest {
             assertEquals(listOf(ShareImportError.TooMany), result.payload.importErrors)
         }
 
-    /** Streams files across the cumulative limit and verifies that a later fitting item can still complete. */
+    /**
+     * Streams files across the cumulative limit and verifies that a later fitting item can still complete.
+     * Byte accounting is independent of disk speed; the dedicated timeout case verifies the deadline separately.
+     */
     @Test fun exactByteBoundaryAndCumulativeOverflowKeepOnlyCompleteFiles() =
         runBlocking {
             val sizes = List(3) { PRIVATE_SHARE_MAX_BYTES } + listOf(PRIVATE_SHARE_MAX_BYTES - 1, 2L, 1L)
@@ -136,6 +139,7 @@ class ShareFileImporterBudgetTest {
                     files,
                     { _, _ -> ShareSourceMetadata("file", "image/png", null) },
                     { uri, _ -> sizedStream(sizes[uri.lastPathSegment!!.toInt()]) },
+                    timeoutMs = Long.MAX_VALUE,
                 )
             val result = importer.import(request(sizes.indices.map { Uri.parse("content://external/$it") }))
             assertEquals(listOf(ShareImportError.BatchTooLarge), result.payload.importErrors)
