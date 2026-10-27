@@ -310,7 +310,6 @@ android {
         // compile-time false constant. Non-production flavors and debug builds
         // override this below; runtime collection still requires explicit opt-in.
         buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "false")
-        buildConfigField("String", "APP_SHORT_SHA", buildShortSha.asBuildConfigString())
         buildConfigField("boolean", "STARTUP_DIAGNOSTICS_ENABLED", "false")
         buildConfigField("String", "MARMOT_SOURCE_SHA", requiredMarmotKitProperty("mdk-sha").asBuildConfigString())
         buildConfigField(
@@ -728,6 +727,19 @@ androidComponents {
             val suffix = if (currentName.endsWith(".apk")) ".apk" else ""
             output.outputFileName.set("$stem-$buildDate-$buildShortSha$suffix")
         }
+    }
+
+    // The commit SHA changes on every push. Kotlin recompiles every reader of
+    // a changed class, and BuildConfig has about fifty; keeping the SHA in its
+    // own generated object limits a new commit to the few files that log it.
+    onVariants { variant ->
+        val generateAppRevision =
+            tasks.register<GenerateAppRevision>(
+                "generate${variant.name.replaceFirstChar(Char::uppercase)}AppRevision",
+            ) {
+                shortSha.set(buildShortSha)
+            }
+        variant.sources.kotlin?.addGeneratedSourceDirectory(generateAppRevision, GenerateAppRevision::outputDirectory)
     }
 
     // Mirror the release-build naming convention onto dev debug APKs during
@@ -1290,4 +1302,29 @@ listOf("staging", "production").forEach { environment ->
 // Audited upstream vector data for the exact used icon set; no extended icon runtime.
 android.sourceSets.named("main") {
     kotlin.srcDir("src/main/generated/material-icons")
+}
+
+/** Writes `AppRevision.SHORT_SHA`, the source revision diagnostics report for this build. */
+abstract class GenerateAppRevision : DefaultTask() {
+    @get:Input
+    abstract val shortSha: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val file = outputDirectory.file("dev/ipf/whitenoise/android/AppRevision.kt").get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            |package dev.ipf.whitenoise.android
+            |
+            |object AppRevision {
+            |    const val SHORT_SHA: String = "${shortSha.get()}"
+            |}
+            |
+            """.trimMargin(),
+        )
+    }
 }

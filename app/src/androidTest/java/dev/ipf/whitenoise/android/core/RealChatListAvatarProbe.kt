@@ -17,7 +17,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import org.junit.After
@@ -65,7 +65,7 @@ class RealChatListAvatarProbe {
         AvatarCacheDiagnostics.stop()
         Log.i(
             REAL_AVATAR_PROBE_TAG,
-            "complete source=${BuildConfig.APP_SHORT_SHA} cold=$cold reverse=$reverse repeated=$repeated",
+            "complete source=${AppRevision.SHORT_SHA} cold=$cold reverse=$reverse repeated=$repeated",
         )
         assertTrue("no frames captured", cold.frames.count > 0 && reverse.frames.count > 0 && repeated.frames.count > 0)
     }
