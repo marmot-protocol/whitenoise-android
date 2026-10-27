@@ -19,10 +19,13 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
@@ -47,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -65,6 +69,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
+import java.lang.reflect.Proxy
 import java.util.concurrent.TimeUnit
 
 /** Integration boundary for optimistic send state plus the shared relay retry policy (#2016). */
@@ -2567,6 +2572,94 @@ class ConversationSendRetryIntegrationTest {
             assertFalse(capability.canDeleteForMe)
         }
 
+    /** Native maintenance cannot delay a later durable send, including after a failed send is readmitted. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // Both admission histories share the held native boundary and exact projection assertions.
+    fun durableSendsSkipRecoveryWait() =
+        runBlocking {
+            Dispatchers.setMain(UnconfinedTestDispatcher())
+            try {
+                for (initialFailure in listOf(null, MarmotKitException.Publish("signer refused"))) {
+                    val releaseRecovery = CompletableDeferred<Unit>()
+                    val admitted = linkedMapOf<String, Pair<String, String>>()
+                    var failure = initialFailure
+                    val metadata =
+                        Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { proxy, method, args ->
+                            when (val name = method.name.substringBefore('-')) {
+                                "equals" -> proxy === args?.firstOrNull()
+                                "hashCode" -> System.identityHashCode(proxy)
+                                "toString" -> "durable-send-boundary"
+                                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                                "localSendStatus" -> null
+                                "sendTextWithClientToken" -> {
+                                    failure?.let {
+                                        failure = null
+                                        throw it
+                                    }
+                                    val token = args!![3] as String
+                                    val id = (if (admitted.isEmpty()) "c3" else "c5").repeat(32)
+                                    admitted[token] = id to (args[2] as String)
+                                    LocalSendAcceptanceFfi(token, id)
+                                }
+                                else -> error("Unexpected native call: $name")
+                            }
+                        } as MarmotInterface
+                    val native =
+                        object : MarmotInterface by metadata {
+                            override suspend fun retryGroupConvergence(
+                                accountRef: String,
+                                groupIdHex: String,
+                            ): SendSummaryFfi {
+                                releaseRecovery.await()
+                                return pendingLocalSend()
+                            }
+                        }
+                    val state = appState(initialMarmotRuntime = AppMarmotRuntime("test", native))
+                    val controller =
+                        ConversationController(
+                            appState = state,
+                            initialGroup = group(),
+                            initialMemberSnapshot = memberSnapshot(),
+                            markdownParser = { MarkdownDocumentFfi(false, emptyList(), ByteArray(0)) },
+                            customEmojiReader = { emptyList() },
+                        )
+                    try {
+                        withTimeout(5_000) {
+                            controller.send("first")
+                            if (initialFailure != null) {
+                                assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                                controller.retryFailedSend(controller.timeline.single())
+                            }
+                            controller.send("second")
+                        }
+                        assertFalse(releaseRecovery.isCompleted)
+                        assertEquals(listOf("first", "second"), admitted.values.map { it.second })
+                        assertEquals(2, admitted.keys.toSet().size)
+                        assertEquals(listOf(MessageStatus.Pending, MessageStatus.Pending), controller.timeline.map { it.status })
+                        admitted.entries.forEachIndexed { index, (token, message) ->
+                            applyProjection(
+                                controller,
+                                projectedMessage((index + 1).toULong(), null, null).copy(
+                                    messageIdHex = message.first,
+                                    sourceMessageIdHex = (if (index == 0) "d4" else "d6").repeat(32),
+                                    clientToken = token,
+                                    plaintext = message.second,
+                                ),
+                            )
+                        }
+                        assertEquals(admitted.values.map { it.first }.toSet(), controller.timeline.map { it.record.messageIdHex }.toSet())
+                        assertEquals(listOf(MessageStatus.Sent, MessageStatus.Sent), controller.timeline.map { it.status })
+                    } finally {
+                        releaseRecovery.complete(Unit)
+                        clearAndAwaitConversationTestFixture(controller)
+                    }
+                }
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
     @Test
     fun acceptedPendingClearsTheCapturedComposerDraft() =
         runTest {
@@ -3457,24 +3550,27 @@ class ConversationSendRetryIntegrationTest {
         messageEditPublisher = { _, _, _, _ -> error("pending revision must not use a wire edit") },
     )
 
-    private fun appState(additionalAccounts: List<AccountSummaryFfi> = emptyList()) =
-        WhiteNoiseAppState(
-            context = ApplicationProvider.getApplicationContext(),
-            draftStore = DraftStore(TestDraftPersistence()),
-            accountIdHexResolver = { ACCOUNT_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ) + additionalAccounts,
-            activeAccountRef = ACCOUNT_REF,
-        )
+    private fun appState(
+        additionalAccounts: List<AccountSummaryFfi> = emptyList(),
+        initialMarmotRuntime: AppMarmotRuntime? = null,
+    ) = WhiteNoiseAppState(
+        context = ApplicationProvider.getApplicationContext(),
+        draftStore = DraftStore(TestDraftPersistence()),
+        accountIdHexResolver = { ACCOUNT_ID },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ACCOUNT_REF,
+                    accountIdHex = ACCOUNT_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                ),
+            ) + additionalAccounts,
+        activeAccountRef = ACCOUNT_REF,
+        initialMarmotRuntime = initialMarmotRuntime,
+    )
 
     private fun memberSnapshot() =
         GroupMemberSnapshot(
