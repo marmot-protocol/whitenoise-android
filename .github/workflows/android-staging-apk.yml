@@ -105,10 +105,11 @@ jobs:
           candidates=[]
           for metadata in (root/'app/build').rglob('output-metadata.json'):
               data=json.loads(metadata.read_text())
-              if data.get('variantName')!='previewPlayRelease' or data.get('applicationId')!=expected: continue
+              if data.get('artifactType',{}).get('type')!='APK' or data.get('variantName')!='previewPlayRelease' or data.get('applicationId')!=expected: continue
               for element in data.get('elements',[]):
                   if any(f.get('filterType')=='ABI' and f.get('value')=='arm64-v8a' for f in element.get('filters',[])):
-                      candidates.append((metadata.parent/element['outputFile']).resolve())
+                      candidate=(metadata.parent/element['outputFile']).resolve()
+                      if candidate.suffix=='.apk': candidates.append(candidate)
           candidates=list(dict.fromkeys(candidates)); assert len(candidates)==1,candidates
           sdk=pathlib.Path(os.environ['ANDROID_HOME']); signer=sorted((sdk/'build-tools').glob('*/apksigner'))[-1]
           target=out/(role+'.apk')
