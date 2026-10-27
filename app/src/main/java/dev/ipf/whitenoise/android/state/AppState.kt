@@ -10814,10 +10814,10 @@ class WhiteNoiseAppState private constructor(
      * by [dev.ipf.whitenoise.android.notifications.MarmotFirebaseMessagingService] on
      * every Firebase token rotation. The sync coroutine no-ops if any
      * precondition is missing, so the call is safe at any point in the app
-     * lifecycle.
+     * lifecycle. Returns the re-sync job, or null if no rotation was queued.
      */
-    fun onPushTokenRotated(token: String) {
-        if (token.isBlank()) return
+    fun onPushTokenRotated(token: String): Job? {
+        if (token.isBlank()) return null
         val rotation = pushTokenRotationSequence.incrementAndGet()
         val runtime = marmotRuntime
         val generation = runtimeGeneration
@@ -10839,21 +10839,24 @@ class WhiteNoiseAppState private constructor(
                 android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
                 false
             }
-        if (!retained) return
-        notificationScope.launch {
-            val recorded =
-                withContext(pushWakeStorageDispatcher) {
-                    observePushState {
-                        pushTokenStore.recordPendingNativePushRegistrationSync()
-                        true
+        return if (retained) {
+            notificationScope.launch {
+                val recorded =
+                    withContext(pushWakeStorageDispatcher) {
+                        observePushState {
+                            pushTokenStore.recordPendingNativePushRegistrationSync()
+                            true
+                        }
+                    }
+                if (recorded != true) return@launch
+                notificationDeliveryModeMutex.withLock {
+                    if (!notificationDeliveryModeBusy) {
+                        if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
                     }
                 }
-            if (recorded != true) return@launch
-            notificationDeliveryModeMutex.withLock {
-                if (!notificationDeliveryModeBusy) {
-                    if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
-                }
             }
+        } else {
+            null
         }
     }
 
