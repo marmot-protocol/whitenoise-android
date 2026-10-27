@@ -59,7 +59,7 @@ internal class ConversationReverseDragSelectionTest {
     private lateinit var edgeController: ConversationController
     private lateinit var edgeSubscription: ScriptedConversationTimelineSubscription
 
-    /** A top-edge hold selects older rows, then reaches the golden's oldest loaded window before capture. */
+    /** A top-edge hold selects older rows and settles at the natural oldest boundary before capture. */
     @Test
     fun topEdgeHoldFromNewestRevealsOlderRowsAndExtendsSelection() {
         withScrollableConversation { surface, evidence, ids ->
