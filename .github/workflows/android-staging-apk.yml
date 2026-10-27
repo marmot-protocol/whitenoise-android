@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 6d7730c1ce5d94d0bb8eb317d67d3e6ecbdc3e69
+          ref: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -62,7 +62,7 @@ jobs:
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
       PREVIOUS_SHA: f8aadcdc91d89bd4536003e208af09bd54977141
-      AFTER_SHA: 6d7730c1ce5d94d0bb8eb317d67d3e6ecbdc3e69
+      AFTER_SHA: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -211,7 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 6d7730c1ce5d94d0bb8eb317d67d3e6ecbdc3e69
+          ref: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -255,18 +255,17 @@ jobs:
             --tests '*LocalReactionMotionScreenshotTest'
           )
           free -h
-          # Record only the new pressed-state baseline; existing snapshots remain verification-only.
-          test ! -e app/src/test/snapshots/media_viewer_pressed_feedback.png
-          ./gradlew :app:testDev${{ matrix.distribution }}DebugUnitTest --tests '*MediaPressIndicationTest' \
-            -Proborazzi.test.record=true -Pkotlin.compiler.execution.strategy=in-process \
-            -Dorg.gradle.parallel=false \
-            '-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
-            --max-workers=1 --build-cache --no-daemon --continue --stacktrace
           ./gradlew :app:testDev${{ matrix.distribution }}DebugUnitTest "${filters[@]}" \
             -Proborazzi.test.verify=true -Pkotlin.compiler.execution.strategy=in-process \
             -Dorg.gradle.parallel=false \
             '-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
             --max-workers=1 --build-cache --no-daemon --continue --stacktrace
+      - name: Focused Zapstore Android lint
+        if: matrix.distribution == 'Zapstore'
+        run: |
+          ./gradlew :app:lintDevZapstoreDebug -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
+            --max-workers=1 --build-cache --no-daemon --stacktrace
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
