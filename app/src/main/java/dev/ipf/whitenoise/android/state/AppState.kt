@@ -119,6 +119,7 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
+import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -1368,10 +1369,10 @@ class WhiteNoiseAppState private constructor(
      * frees the rest — no recycle() needed, and adding one back is unsafe.
      */
     private val mediaThumbnailCache =
-        dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
+        dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, dev.ipf.whitenoise.android.media.MediaThumbnail>(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
-            sizeOf = { it.allocationByteCount },
+            sizeOf = { it.bitmap.allocationByteCount },
         )
 
     internal fun cachedMediaPlaintext(cacheKey: String): ByteArray? {
@@ -1410,18 +1411,33 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Returns a placeholder or legacy thumbnail without asserting that it satisfies a larger image request. */
     internal fun cachedMediaThumbnail(cacheKey: String): android.graphics.Bitmap? {
         assertMainThread { "cachedMediaThumbnail" }
-        return mediaThumbnailCache.get(cacheKey)
+        return mediaThumbnailCache.get(cacheKey)?.bitmap
     }
 
+    /** Retains decode provenance so a thumbnail cannot silently satisfy a larger presentation request. */
+    internal fun cachedMediaThumbnailEntry(
+        cacheKey: String,
+        requestedMaxEdgePx: Int,
+    ): dev.ipf.whitenoise.android.media.MediaThumbnail? {
+        assertMainThread { "cachedMediaThumbnailEntry" }
+        return mediaThumbnailCache.get(cacheKey)?.takeIf { it.satisfies(requestedMaxEdgePx) }
+    }
+
+    /** Keeps at most one resolution per attachment, without allowing a late smaller decode to replace a larger one. */
     internal fun cacheMediaThumbnail(
         cacheKey: String,
         thumbnail: android.graphics.Bitmap,
+        maxEdgePx: Int = dev.ipf.whitenoise.android.media.MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
     ) {
         assertMainThread { "cacheMediaThumbnail" }
-        val previous = mediaThumbnailCache.put(cacheKey, thumbnail)
-        if (mediaThumbnailCache.get(cacheKey) === thumbnail || previous != null) {
+        val cached = mediaThumbnailCache.get(cacheKey)
+        if (cached != null && cached.maxEdgePx > maxEdgePx) return
+        val entry = MediaThumbnail(thumbnail, maxEdgePx)
+        val previous = mediaThumbnailCache.put(cacheKey, entry)
+        if (mediaThumbnailCache.get(cacheKey) === entry || previous != null) {
             mediaThumbnailRevisionState.update { it + 1L }
         }
     }
@@ -10814,10 +10830,10 @@ class WhiteNoiseAppState private constructor(
      * by [dev.ipf.whitenoise.android.notifications.MarmotFirebaseMessagingService] on
      * every Firebase token rotation. The sync coroutine no-ops if any
      * precondition is missing, so the call is safe at any point in the app
-     * lifecycle.
+     * lifecycle. Returns the re-sync job, or null if no rotation was queued.
      */
-    fun onPushTokenRotated(token: String) {
-        if (token.isBlank()) return
+    fun onPushTokenRotated(token: String): Job? {
+        if (token.isBlank()) return null
         val rotation = pushTokenRotationSequence.incrementAndGet()
         val runtime = marmotRuntime
         val generation = runtimeGeneration
@@ -10839,21 +10855,24 @@ class WhiteNoiseAppState private constructor(
                 android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
                 false
             }
-        if (!retained) return
-        notificationScope.launch {
-            val recorded =
-                withContext(pushWakeStorageDispatcher) {
-                    observePushState {
-                        pushTokenStore.recordPendingNativePushRegistrationSync()
-                        true
+        return if (retained) {
+            notificationScope.launch {
+                val recorded =
+                    withContext(pushWakeStorageDispatcher) {
+                        observePushState {
+                            pushTokenStore.recordPendingNativePushRegistrationSync()
+                            true
+                        }
+                    }
+                if (recorded != true) return@launch
+                notificationDeliveryModeMutex.withLock {
+                    if (!notificationDeliveryModeBusy) {
+                        if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
                     }
                 }
-            if (recorded != true) return@launch
-            notificationDeliveryModeMutex.withLock {
-                if (!notificationDeliveryModeBusy) {
-                    if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
-                }
             }
+        } else {
+            null
         }
     }
 

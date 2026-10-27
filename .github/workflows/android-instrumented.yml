@@ -202,6 +202,13 @@ on:
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox/**'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt'
+      # Rendered-size thumbnail allocation must be measured through the real isolated Android codec.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaThumbnail.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ThumbnailDecodeRequest.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaThumbnailDecodeDeviceTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AttachmentFixturePublicationDeviceTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureHostPublication.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentVideoPauseAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationVideoRotationAndroidTest.kt'
       # The viewer controls device test asserts real decoded frames and Media3 control geometry on CI's emulator.

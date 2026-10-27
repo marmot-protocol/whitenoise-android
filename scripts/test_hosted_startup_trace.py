@@ -272,7 +272,7 @@ class HostedStartupTraceTests(unittest.TestCase):
     def test_static_init_hook_uses_injected_execoperations_and_explicit_spec(self):
         script=(ROOT/'scripts/hosted-startup-trace.init.gradle').read_text()
         wrapper=(ROOT/'gradle/wrapper/gradle-wrapper.properties').read_text()
-        self.assertIn('gradle-9.8.1-bin.zip',wrapper)
+        self.assertIn('gradle-9.8.2-bin.zip',wrapper)
         self.assertIn('import org.gradle.process.ExecOperations',script)
         self.assertRegex(script,r'@Inject\s+abstract ExecOperations getExecOperations\(\)')
         self.assertIn('selected.objects.newInstance(StartupTraceExecution)',script)

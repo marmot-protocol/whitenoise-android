@@ -27,7 +27,9 @@ DEFAULT_ALIAS = "androiddebugkey"
 PASSWORD_ENVIRONMENT_VARIABLE = "WN_APK_PAYLOAD_STORE_PASSWORD"
 # The AOSP debug keystore ships with this fixed, documented password, it protects nothing.
 DEBUG_STORE_PASSWORD = "android"
-DIGEST_LINE = re.compile(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-f]{64})")
+# apksigner 36 prints "Signer #1 certificate ..."; 37 prints one "V2 Signer: certificate ..." line per
+# signature scheme, so one signer can appear several times (forms as in scripts/verify_apk_signature.py).
+DIGEST_LINE = re.compile(r"(?:Signer #\d+|V[1-4](?:\.\d+)? Signer:) certificate SHA-256 digest: ([0-9a-f]{64})")
 
 
 def build_tools(sdk_root):
@@ -111,10 +113,10 @@ def signer_digest(apksigner, apk, run=subprocess.run):
     """The single signer certificate SHA-256 of an APK as apksigner prints it, or a refusal for anything else."""
     printed = run([str(apksigner), "verify", "--print-certs", "--min-sdk-version", MIN_SDK, str(apk)],
                   check=True, capture_output=True, text=True).stdout
-    digests = DIGEST_LINE.findall(printed)
+    digests = set(DIGEST_LINE.findall(printed))
     if len(digests) != 1:
         raise ValueError("expected exactly one signer certificate")
-    return digests[0]
+    return digests.pop()
 
 
 def sha256_of(path):

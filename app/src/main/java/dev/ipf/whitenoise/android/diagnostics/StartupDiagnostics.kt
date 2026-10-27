@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.SystemClock
 import androidx.core.content.FileProvider
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import java.io.File
@@ -47,7 +48,7 @@ internal object StartupDiagnostics {
             "app=${DiagnosticFormatter.redactError("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")}\n" +
             "android_api=${Build.VERSION.SDK_INT}\n" +
             "os_build=${DiagnosticFormatter.redactError(Build.FINGERPRINT.take(MAX_OS_BUILD_LENGTH))}\n" +
-            "app_sha=${BuildConfig.APP_SHORT_SHA}\nmdk_sha=${BuildConfig.MARMOT_SOURCE_SHA}\n" +
+            "app_sha=${AppRevision.SHORT_SHA}\nmdk_sha=${BuildConfig.MARMOT_SOURCE_SHA}\n" +
             "process_started_utc=${Instant.now()}\n"
         val store = StartupDiagnosticFileStore(File(context.filesDir, "startup_diagnostics"))
         recorder = StartupDiagnosticRecorder(SystemClock::elapsedRealtime) { store.offer(header + it) }

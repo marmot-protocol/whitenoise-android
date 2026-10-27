@@ -47,6 +47,7 @@ internal fun emojiSuggestionTestTag(index: Int): String = "composer.emoji_sugges
 internal fun EmojiShortcodeSuggestions(
     field: TextFieldValue,
     onPick: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val active =
         remember(field.text, field.selection) {
@@ -75,7 +76,7 @@ internal fun EmojiShortcodeSuggestions(
     }
     Surface(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 4.dp)
                 .testTag(EMOJI_SUGGESTIONS_TEST_TAG),

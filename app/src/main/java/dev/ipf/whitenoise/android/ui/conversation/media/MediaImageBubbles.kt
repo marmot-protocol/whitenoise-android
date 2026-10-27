@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
@@ -157,8 +158,8 @@ internal fun MediaImageBubble(
     val record = item.record
     val key = record.messageIdHex
     val cachedThumbnail =
-        remember(key, attachmentIndex) {
-            controller.thumbnailFor(key, attachmentIndex)
+        remember(controller, key, attachmentIndex, reference.sourceEpoch) {
+            controller.thumbnailEntryFor(key, attachmentIndex)
         }
     val bubbleAspectRatio =
         rememberMediaBubbleAspectRatio(
@@ -175,14 +176,23 @@ internal fun MediaImageBubble(
     //     close a viewer the user just opened, or re-gate a download the
     //     user just consented to.
     val epoch = reference.sourceEpoch
+    val decodeRequest =
+        remember(controller, key, attachmentIndex, epoch) {
+            val cachedRatio = cachedThumbnail?.bitmap?.let { it.width.toFloat() / it.height }
+            ThumbnailDecodeRequest(cachedRatio ?: bubbleAspectRatio)
+        }
+    val requestedMaxEdgePx = decodeRequest.maxEdgePx
+    var presentationMaxEdgePx by remember(controller, key, attachmentIndex, epoch) {
+        mutableIntStateOf(cachedThumbnail?.maxEdgePx ?: 0)
+    }
     // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
     // image paints on the first frame — no decode spinner, no visible "reload".
     // Animated GIF/WebP and byte-sniffed unknowns skip the static thumbnail
     // cache so they always decode through the ImageDecoder path.
-    var presentation by remember(key, attachmentIndex, epoch) {
+    var presentation by remember(controller, key, attachmentIndex, epoch) {
         val cached =
             if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
-                cachedThumbnail
+                cachedThumbnail?.bitmap
             } else {
                 null
             }
@@ -280,9 +290,17 @@ internal fun MediaImageBubble(
         )
     }
 
-    LaunchedEffect(key, attachmentIndex, epoch, materializationIntent, reloadToken) {
-        if (presentation != null) return@LaunchedEffect // already have decoded pixels
+    LaunchedEffect(controller, key, attachmentIndex, epoch, materializationIntent, reloadToken, requestedMaxEdgePx) {
+        if (requestedMaxEdgePx == 0) return@LaunchedEffect
+        if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
+        val cached = controller.thumbnailEntryFor(key, attachmentIndex, requestedMaxEdgePx)
+        if (cached != null && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+            presentation = DecodedAttachmentPresentation.Static(cached.bitmap)
+            presentationMaxEdgePx = cached.maxEdgePx
+            decodeRequest.onDecodedSize(cached.bitmap.width, cached.bitmap.height)
+            return@LaunchedEffect
+        }
         failed = false
         tooLargeToPreview = false
         try {
@@ -308,17 +326,21 @@ internal fun MediaImageBubble(
                     decodeMessageAttachmentImage(
                         bytes = data,
                         mediaType = reference.mediaType,
-                        staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                        staticMaxEdgePx = requestedMaxEdgePx,
                     )
                 }
             if (decoded != null) {
                 if (decoded is DecodedAttachmentPresentation.Static && !decoded.animationDeferred) {
-                    controller.cacheThumbnail(key, attachmentIndex, decoded.bitmap)
+                    controller.cacheThumbnail(key, attachmentIndex, decoded.bitmap, requestedMaxEdgePx)
                 }
                 mediaApplyHostAttempt.replace(
                     appState.beginHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY),
                 )
                 presentation = decoded
+                presentationMaxEdgePx = requestedMaxEdgePx
+                if (decoded is DecodedAttachmentPresentation.Static) {
+                    decodeRequest.onDecodedSize(decoded.bitmap.width, decoded.bitmap.height)
+                }
             } else {
                 markFailed()
             }
@@ -364,7 +386,7 @@ internal fun MediaImageBubble(
         // upload-phase bubble so the optimistic → confirmed swap is a
         // visual no-op.
         modifier =
-            modifier.then(
+            modifier.onSizeChanged(decodeRequest::onSizeChanged).then(
                 if (gifFrame) {
                     Modifier
                         .width(ConversationMessageMetrics.RichContentCanvasWidth)
@@ -709,10 +731,19 @@ internal fun MediaImageGridTile(
     //     the user already consented to fetch.
     val decodeKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
     val tileSlot = "$messageIdHex#$attachmentIndex"
-    var presentation by remember(decodeKey) {
+    val cachedThumbnail =
+        remember(controller, decodeKey) { controller.thumbnailEntryFor(messageIdHex, attachmentIndex) }
+    val decodeRequest =
+        remember(controller, decodeKey) {
+            val cachedRatio = cachedThumbnail?.bitmap?.let { it.width.toFloat() / it.height }
+            ThumbnailDecodeRequest(cachedRatio ?: aspectRatioFromDim(reference.dim))
+        }
+    val requestedMaxEdgePx = decodeRequest.maxEdgePx
+    var presentationMaxEdgePx by remember(controller, decodeKey) { mutableIntStateOf(cachedThumbnail?.maxEdgePx ?: 0) }
+    var presentation by remember(controller, decodeKey) {
         val cached =
             if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
-                controller.thumbnailFor(messageIdHex, attachmentIndex)
+                cachedThumbnail?.bitmap
             } else {
                 null
             }
@@ -810,9 +841,17 @@ internal fun MediaImageGridTile(
             startDownload,
         )
 
-    LaunchedEffect(decodeKey, materializationIntent, reloadToken) {
-        if (presentation != null) return@LaunchedEffect
+    LaunchedEffect(controller, decodeKey, materializationIntent, reloadToken, requestedMaxEdgePx) {
+        if (requestedMaxEdgePx == 0) return@LaunchedEffect
+        if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
+        val cached = controller.thumbnailEntryFor(messageIdHex, attachmentIndex, requestedMaxEdgePx)
+        if (cached != null && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+            presentation = DecodedAttachmentPresentation.Static(cached.bitmap)
+            presentationMaxEdgePx = cached.maxEdgePx
+            decodeRequest.onDecodedSize(cached.bitmap.width, cached.bitmap.height)
+            return@LaunchedEffect
+        }
         failed = false
         tooLargeToPreview = false
         try {
@@ -838,17 +877,21 @@ internal fun MediaImageGridTile(
                     decodeMessageAttachmentImage(
                         bytes = data,
                         mediaType = reference.mediaType,
-                        staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                        staticMaxEdgePx = requestedMaxEdgePx,
                     )
                 }
             if (decoded != null) {
                 if (decoded is DecodedAttachmentPresentation.Static && !decoded.animationDeferred) {
-                    controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap)
+                    controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap, requestedMaxEdgePx)
                 }
                 mediaApplyHostAttempt.replace(
                     appState.beginHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY),
                 )
                 presentation = decoded
+                presentationMaxEdgePx = requestedMaxEdgePx
+                if (decoded is DecodedAttachmentPresentation.Static) {
+                    decodeRequest.onDecodedSize(decoded.bitmap.width, decoded.bitmap.height)
+                }
             } else {
                 markFailed()
             }
@@ -884,7 +927,7 @@ internal fun MediaImageGridTile(
 
     Box(
         modifier =
-            modifier.combinedClickable(
+            modifier.onSizeChanged(decodeRequest::onSizeChanged).combinedClickable(
                 onLongClick = onLongPress,
                 // Two modes:
                 //   - Bytes ready (`bitmap != null`): tap opens the viewer.

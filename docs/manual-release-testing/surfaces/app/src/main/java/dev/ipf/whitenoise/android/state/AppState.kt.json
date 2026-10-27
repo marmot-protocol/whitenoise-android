@@ -458,6 +458,14 @@
         "test_ids": [
           "SET-006"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "surface": "Token rotation retains pending registration while storage cleanup is unknown",
+        "anchor": "fun onPushTokenRotated(",
+        "test_ids": [
+          "SEC-017"
+        ]
       }
     ]
   },
