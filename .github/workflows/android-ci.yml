@@ -66,9 +66,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Test conservative CI classification
         run: python3 -m unittest scripts/test_check_ci_changes.py
@@ -109,9 +114,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Validate committed dependency locks and supplier evidence
         run: python3 scripts/check_dependency_inputs.py
@@ -247,8 +257,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
+
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -536,8 +552,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash

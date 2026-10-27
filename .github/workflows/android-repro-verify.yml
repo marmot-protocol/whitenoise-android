@@ -63,9 +63,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
+
       - name: Test conservative CI classification
         run: python3 -m unittest scripts/test_check_ci_changes.py
       - name: Classify complete PR diff
@@ -143,9 +149,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Shell tests (repro-verify)
         run: ./scripts/test-repro-verify.sh
@@ -252,8 +263,14 @@ jobs:
         if: needs.changes.outputs.supplemental_campaigns == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           ref: ${{ github.sha }}
           persist-credentials: false
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        if: needs.changes.outputs.supplemental_campaigns == 'true'
+        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Download independent evidence
         if: needs.changes.outputs.supplemental_campaigns == 'true'

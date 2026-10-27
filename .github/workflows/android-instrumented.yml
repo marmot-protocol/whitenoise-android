@@ -274,8 +274,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          clean: false
           fetch-depth: 0
           persist-credentials: false
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
+
       - name: Select lanes from the complete PR diff
         id: select
         env:
@@ -299,6 +305,13 @@ jobs:
         distribution: ${{ fromJSON(github.event_name == 'pull_request' && '["Zapstore"]' || '["Play", "Zapstore"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          clean: false
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
+
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -379,6 +392,12 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          clean: false
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash

@@ -125,8 +125,9 @@ Pull request workflows run on wn-build-server, a persistent self-hosted runner
 pool registered to this repository. Fork pull requests fall back to
 `ubuntu-latest`, and the runner's job-start hook rejects them anyway. All slots
 share one Gradle user home and build cache, so the GitHub cache is disabled
-there. Jobs that compile keep the module `build/` directories and `.gradle`
-between runs for incremental compilation;
+there. Every job there checks out with `clean: false` and keeps the module
+`build/` directories and `.gradle` between runs for incremental compilation;
+one cleaning checkout would erase a slot's compile history.
 `.github/scripts/prepare-persistent-workspace.sh` deletes everything else,
 including reports, test results and outputs, so test tasks still execute on
 every run. Emulator jobs require the `wn-cache-1` label, which only slot 1
