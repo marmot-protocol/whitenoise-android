@@ -7,8 +7,10 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.R
@@ -153,7 +155,7 @@ class ChatsScreenOffWindowActionsTest {
         rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").performClick()
         rule.onNodeWithContentDescription(rule.activity.getString(R.string.archive)).performClick()
         awaitProgress { "archive:true" in model.calls && "archive-survivor:true" in model.calls }
-        settle()
+        closeCompletedBatch()
         assertTrue(model.row.get().archived)
         assertTrue(model.retainedRow.get().archived)
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertDoesNotExist()
@@ -169,17 +171,15 @@ class ChatsScreenOffWindowActionsTest {
         rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").performClick()
         rule.onNodeWithContentDescription(rule.activity.getString(R.string.archive)).performClick()
         awaitProgress { "archive-survivor:true" in model.calls }
-        settle()
+        closeCompletedBatch()
         assertTrue(model.row.get().archived)
         assertTrue(model.retainedRow.get().archived)
         assertFalse("already archived target is not redundantly written", "archive:true" in model.calls)
         assertOffWindow(model)
-        openMenu("Unarchive")
-        rule.onNodeWithTag("chat.action.Select").performClick()
-        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").performClick()
+        // Completed batches retain selection; the next explicit direction reuses those same two chats.
         rule.onNodeWithContentDescription(rule.activity.getString(R.string.unarchive)).performClick()
         awaitProgress { "archive:false" in model.calls && "archive-survivor:false" in model.calls }
-        settle()
+        closeCompletedBatch()
         assertFalse(model.row.get().archived)
         assertFalse(model.retainedRow.get().archived)
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
@@ -335,6 +335,13 @@ class ChatsScreenOffWindowActionsTest {
 
     private fun assertOffWindow(model: OffWindowActionFixture) {
         assertFalse("unread actions must not grow the retained window", model.controller.containsGroup(ACTION_TARGET))
+    }
+
+    private fun closeCompletedBatch() {
+        val closeLabel = rule.activity.getString(R.string.close)
+        awaitProgress { rule.onAllNodesWithText(closeLabel).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText(closeLabel).performClick()
+        settle()
     }
 
     private fun awaitProgress(ready: () -> Boolean) {

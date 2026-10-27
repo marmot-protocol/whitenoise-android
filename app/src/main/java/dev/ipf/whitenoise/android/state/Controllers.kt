@@ -5028,8 +5028,11 @@ class ChatsController private constructor(
     internal var chatListBatchInProgress by mutableStateOf(false)
         private set
 
-    /** The immutable captured ids survive filter removal; no source projection is cached here. */
-    @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount") // One admission and finally own the complete sequential batch.
+    /**
+     * The immutable captured ids survive filter removal; no source projection is cached here.
+     * Admission/finally own one batch; both pre-read and post-read owner fences must stop the loop.
+     */
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount", "LoopWithTooManyJumpStatements")
     internal suspend fun runChatListBatch(
         ids: Collection<String>,
         command: ChatListBatchCommand,
@@ -5065,10 +5068,9 @@ class ChatsController private constructor(
                                 outcomes[id] = ChatListBatchOutcome.UNCONFIRMED
                                 val applied = applyChatListBatchCommand(item, command, owner)
                                 if (!chatListActionIsCurrent(owner)) return@withTimeoutOrNull null
-                                if (!applied &&
-                                    (command == ChatListBatchCommand.PIN || command == ChatListBatchCommand.UNPIN) &&
-                                    !reconcileNativePinState(owner)
-                                ) {
+                                val pinCommand =
+                                    command == ChatListBatchCommand.PIN || command == ChatListBatchCommand.UNPIN
+                                if (!applied && pinCommand && !reconcileNativePinState(owner)) {
                                     return@withTimeoutOrNull ChatListBatchOutcome.UNCONFIRMED
                                 }
                                 val committed = liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id)
@@ -5076,7 +5078,8 @@ class ChatsController private constructor(
                                     ChatListBatchOutcome.UNCONFIRMED
                                 } else {
                                     check(committed.row.groupIdHex.equals(id, ignoreCase = true))
-                                    if (chatListBatchDisposition(committed, command) == ChatListBatchOutcome.SATISFIED) {
+                                    val disposition = chatListBatchDisposition(committed, command)
+                                    if (disposition == ChatListBatchOutcome.SATISFIED) {
                                         if (chatListActionIsCurrent(owner)) applyChatListActionRow(committed.row)
                                         ChatListBatchOutcome.CHANGED
                                     } else {
@@ -5084,8 +5087,12 @@ class ChatsController private constructor(
                                     }
                                 }
                             }
-                        } ?: outcomes.getValue(id).takeIf { it == ChatListBatchOutcome.UNCONFIRMED } ?: ChatListBatchOutcome.FAILED
-                    }.getOrElse { outcomes.getValue(id).takeIf { it == ChatListBatchOutcome.UNCONFIRMED } ?: ChatListBatchOutcome.FAILED }
+                        } ?: outcomes.getValue(id).takeIf { it == ChatListBatchOutcome.UNCONFIRMED }
+                            ?: ChatListBatchOutcome.FAILED
+                    }.getOrElse {
+                        outcomes.getValue(id).takeIf { it == ChatListBatchOutcome.UNCONFIRMED }
+                            ?: ChatListBatchOutcome.FAILED
+                    }
                 if (!chatListActionIsCurrent(owner)) break
                 outcomes[id] = result
                 onProgress(index + 1, targets.size)
@@ -5096,8 +5103,11 @@ class ChatsController private constructor(
         }
     }
 
-    /** Shares the existing whole-selection overlay owner rather than introducing a second archive flow. */
-    @Suppress("LongMethod") // Classifies every target before the shared archive owner installs one frame.
+    /**
+     * Shares the existing whole-selection overlay owner rather than introducing a second archive flow.
+     * Classify the complete scope before its shared overlay; fence ownership before and after native reads.
+     */
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "LoopWithTooManyJumpStatements")
     private suspend fun runChatListArchiveBatch(
         targets: List<String>,
         command: ChatListBatchCommand,
@@ -5115,7 +5125,9 @@ class ChatsController private constructor(
                         kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
                             listOf(liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id))
                         } ?: error("Native chat lookup timed out")
-                    loaded.single()
+                    loaded.single()?.also { row ->
+                        check(row.row.groupIdHex.equals(id, ignoreCase = true))
+                    }
                 }
             if (!chatListActionIsCurrent(owner)) break
             val row = read.getOrNull()
@@ -5124,35 +5136,44 @@ class ChatsController private constructor(
             } else if (row == null) {
                 outcomes[id] = ChatListBatchOutcome.SKIPPED
             } else {
-                check(row.row.groupIdHex.equals(id, ignoreCase = true))
                 val disposition = chatListBatchDisposition(row, command)
                 if (disposition == null) rows += row.row else outcomes[id] = disposition
             }
         }
         if (chatListActionIsCurrent(owner)) {
-            archiveActions.setArchivedRows(
-                owner.accountRef,
-                owner.bindEpoch,
-                ResolvedArchiveRows(rows, { chatListActionIsCurrent(owner) }),
-                command == ChatListBatchCommand.ARCHIVE,
-                false,
-                onAttempted = { id ->
-                    val key = id.lowercase(java.util.Locale.ROOT)
-                    attemptedIds += key
-                    outcomes[key] = ChatListBatchOutcome.UNCONFIRMED
-                },
-            ) { id, changed ->
-                if (chatListActionIsCurrent(owner)) {
-                    outcomes[id.lowercase(java.util.Locale.ROOT)] = if (changed) ChatListBatchOutcome.CHANGED else ChatListBatchOutcome.UNCONFIRMED
-                    onProgress(outcomes.values.count { it != ChatListBatchOutcome.NOT_STARTED }, targets.size)
+            val settled =
+                kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
+                    val commitContext = currentCoroutineContext()
+                    val commitIsCurrent = { commitContext.isActive && chatListActionIsCurrent(owner) }
+                    archiveActions.setArchivedRows(
+                        owner.accountRef,
+                        owner.bindEpoch,
+                        ResolvedArchiveRows(rows, commitIsCurrent),
+                        command == ChatListBatchCommand.ARCHIVE,
+                        false,
+                        onAttempted = { id ->
+                            val key = id.lowercase(java.util.Locale.ROOT)
+                            attemptedIds += key
+                            outcomes[key] = ChatListBatchOutcome.UNCONFIRMED
+                        },
+                    ) { id, changed ->
+                        if (commitIsCurrent()) {
+                            outcomes[id.lowercase(java.util.Locale.ROOT)] =
+                                if (changed) ChatListBatchOutcome.CHANGED else ChatListBatchOutcome.UNCONFIRMED
+                            onProgress(outcomes.values.count { it != ChatListBatchOutcome.NOT_STARTED }, targets.size)
+                        }
+                    }
+                    true
                 }
-            }
+            // Keep uncertain attempts distinct from untouched targets; recovery remains read-only.
+            if (settled == null) return ChatListBatchResult(outcomes.toMap(), attemptedIds.toSet())
         }
         for (id in targets) {
             if (!chatListActionIsCurrent(owner)) break
             if (id in attemptedIds) {
                 val confirmed = reconcileChatListBatchTarget(id, command, owner)
-                outcomes[id] = if (confirmed == ChatListBatchOutcome.SATISFIED) ChatListBatchOutcome.CHANGED else confirmed
+                outcomes[id] =
+                    if (confirmed == ChatListBatchOutcome.SATISFIED) ChatListBatchOutcome.CHANGED else confirmed
             }
         }
         return ChatListBatchResult(outcomes.toMap(), attemptedIds.toSet())
@@ -5192,7 +5213,13 @@ class ChatsController private constructor(
     ): ChatListBatchOutcome =
         runCatchingCancellable {
             kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
-                if ((command == ChatListBatchCommand.PIN || command == ChatListBatchCommand.UNPIN) && !reconcileNativePinState(owner)) {
+                if (
+                    (
+                        command == ChatListBatchCommand.PIN ||
+                            command == ChatListBatchCommand.UNPIN
+                    ) &&
+                    !reconcileNativePinState(owner)
+                ) {
                     return@withTimeoutOrNull ChatListBatchOutcome.UNCONFIRMED
                 }
                 val row = liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id)
@@ -5246,7 +5273,8 @@ class ChatsController private constructor(
                     command == ChatListBatchCommand.MUTE,
                 ) { chatListActionIsCurrent(owner) }
             ChatListBatchCommand.EXCLUDE_FOLDER -> false // Folder commands use their existing host preference owner.
-            ChatListBatchCommand.ARCHIVE, ChatListBatchCommand.RESTORE -> false // Shared archive owner handles these batches.
+            // Shared archive owner handles these batches.
+            ChatListBatchCommand.ARCHIVE, ChatListBatchCommand.RESTORE -> false
         }
 
     @Suppress("ReturnCount") // Guard missing folders and satisfied exclusions before the existing preference mutation.
@@ -5297,10 +5325,13 @@ class ChatsController private constructor(
                 }.getOrNull()
             if (!dispatched) return ChatListPinMoveResult.UNAVAILABLE
             if (!chatListActionIsCurrent(owner)) return ChatListPinMoveResult.UNCONFIRMED
-            val confirmed = state?.orderedGroupIds ?: runCatchingCancellable { authoritativePinOrder(owner) }.getOrNull()
+            val confirmed =
+                state?.orderedGroupIds ?: runCatchingCancellable { authoritativePinOrder(owner) }.getOrNull()
             if (confirmed == null || !chatListActionIsCurrent(owner)) return ChatListPinMoveResult.UNCONFIRMED
             applyPinState(ChatPinStateFfi(confirmed))
-            return if (confirmed.map { it.lowercase(java.util.Locale.ROOT) } == next.map { it.lowercase(java.util.Locale.ROOT) }) {
+            val confirmedKeys = confirmed.map { it.lowercase(java.util.Locale.ROOT) }
+            val requestedKeys = next.map { it.lowercase(java.util.Locale.ROOT) }
+            return if (confirmedKeys == requestedKeys) {
                 ChatListPinMoveResult.MOVED
             } else {
                 ChatListPinMoveResult.UNAVAILABLE

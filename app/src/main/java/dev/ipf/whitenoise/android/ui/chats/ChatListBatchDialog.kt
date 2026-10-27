@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -9,20 +12,15 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListBatchCommand
+import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-
-internal class PendingChatListBatch(
-    val ids: List<String>,
-    val command: ChatListBatchCommand,
-    val owner: ChatListActionOwner,
-    val folderId: String? = null,
-)
 
 internal fun ChatListBatchCommand.labelResource(): Int =
     when (this) {
@@ -59,12 +57,14 @@ internal fun ChatListBatchDialog(
                 if (checking) {
                     controller.reconcileChatListBatch(previousResult, request.command, request.owner)
                 } else {
-                    controller.runChatListBatch(targets, request.command, request.owner, request.folderId) { done, _ -> completed = done }
+                    controller.runChatListBatch(targets, request.command, request.owner, request.folderId) { done, _ ->
+                        completed = done
+                    }
                 }
             )
         result =
             if (attemptResult == null && previousResult.outcomes.isEmpty()) {
-                ChatListBatchResult(targets.associateWith { dev.ipf.whitenoise.android.state.ChatListBatchOutcome.NOT_STARTED })
+                ChatListBatchResult(targets.associateWith { ChatListBatchOutcome.NOT_STARTED })
             } else {
                 previousResult.withAttempt(attemptResult)
             }
@@ -89,7 +89,7 @@ internal fun ChatListBatchDialog(
             result?.let { ready ->
                 targets =
                     ready.outcomes
-                        .filterValues { it == dev.ipf.whitenoise.android.state.ChatListBatchOutcome.UNCONFIRMED }
+                        .filterValues { it == ChatListBatchOutcome.UNCONFIRMED }
                         .keys
                         .toList()
                 checking = true
@@ -135,14 +135,21 @@ internal fun ChatListBatchStatusDialog(
             )
         },
         confirmButton = {
-            if (result != null) TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-        },
-        dismissButton = {
-            val failed = result?.retryIds.orEmpty()
-            if (current && (result?.unconfirmed ?: 0) > 0) {
-                TextButton(onClick = onCheck) { Text(stringResource(R.string.chat_batch_check_results)) }
-            } else if (current && failed.isNotEmpty()) {
-                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            val outcome = result
+            if (outcome != null) {
+                FlowRow(horizontalArrangement = Arrangement.End) {
+                    val buttonSize = Modifier.heightIn(min = 48.dp)
+                    if (current && outcome.unconfirmed > 0) {
+                        TextButton(
+                            onClick = onCheck,
+                            modifier = buttonSize,
+                        ) { Text(stringResource(R.string.chat_batch_check_results)) }
+                    }
+                    if (current && outcome.retryIds.isNotEmpty()) {
+                        TextButton(onClick = onRetry, modifier = buttonSize) { Text(stringResource(R.string.retry)) }
+                    }
+                    TextButton(onClick = onDismiss, modifier = buttonSize) { Text(stringResource(R.string.close)) }
+                }
             }
         },
     )

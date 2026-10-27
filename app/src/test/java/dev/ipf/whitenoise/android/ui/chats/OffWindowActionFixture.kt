@@ -79,11 +79,11 @@ internal class OffWindowActionFixture(
                     listOf(presented(row.get()), presented(retainedRow.get())) + snapshotExtras.map(::presented)
                 },
                 presentedRowByGroup = { account, id ->
-                    check(account == ACTION_ACCOUNT && id == ACTION_TARGET)
+                    check(account == ACTION_ACCOUNT && id in listOf(ACTION_TARGET, ACTION_SURVIVOR))
                     keyedReads++
                     lookupEntered?.complete(Unit)
                     releaseLookup?.await()
-                    presented(row.get())
+                    presented(if (id == ACTION_TARGET) row.get() else retainedRow.get())
                 },
             )
         controller =

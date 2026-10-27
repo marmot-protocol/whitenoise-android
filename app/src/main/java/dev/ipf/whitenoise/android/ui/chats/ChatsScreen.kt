@@ -69,6 +69,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -426,6 +427,7 @@ internal fun ChatsScreen(
     }
     val switchAccount: (String) -> Unit = onQuickSwitchAccount ?: ::switchAccountDirectly
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     fun clearSelection() {
         selectedChatIds.clear()
@@ -1915,11 +1917,13 @@ internal fun ChatsScreen(
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
                         showMarkRead =
                             selectedVisibleItems.any {
-                                it.effectiveHasUnread(appState.activeAccount?.accountIdHex) && it.actions?.canMarkRead == true
+                                it.effectiveHasUnread(appState.activeAccount?.accountIdHex) &&
+                                    it.actions?.canMarkRead == true
                             },
                         showMarkUnread =
                             selectedVisibleItems.any {
-                                !it.effectiveHasUnread(appState.activeAccount?.accountIdHex) && it.actions?.canMarkUnread == true
+                                !it.effectiveHasUnread(appState.activeAccount?.accountIdHex) &&
+                                    it.actions?.canMarkUnread == true
                             },
                         showMuteToggle = false,
                         muted = false,
@@ -1927,12 +1931,21 @@ internal fun ChatsScreen(
                         pinned = false,
                         showMute = selectedVisibleItems.any { !it.engineMuted() && it.actions?.canMute == true },
                         showUnmute = selectedVisibleItems.any { it.engineMuted() && it.actions?.canUnmute == true },
-                        showPin = selectedVisibleItems.any { !it.group.archived && !it.pinned() && it.actions?.canPin == true },
+                        showPin =
+                            selectedVisibleItems.any {
+                                !it.group.archived &&
+                                    !it.pinned() &&
+                                    it.actions?.canPin == true
+                            },
                         showUnpin = selectedVisibleItems.any { it.pinned() && it.actions?.canUnpin == true },
-                        showMovePinnedUp = selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
-                        showMovePinnedDown = selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
-                        onSetMuted = { startStateBatch(if (it) ChatListBatchCommand.MUTE else ChatListBatchCommand.UNMUTE) },
-                        onSetPinned = { startStateBatch(if (it) ChatListBatchCommand.PIN else ChatListBatchCommand.UNPIN) },
+                        showMovePinnedUp =
+                            selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
+                        showMovePinnedDown =
+                            selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
+                        onSetMuted =
+                            { startStateBatch(if (it) ChatListBatchCommand.MUTE else ChatListBatchCommand.UNMUTE) },
+                        onSetPinned =
+                            { startStateBatch(if (it) ChatListBatchCommand.PIN else ChatListBatchCommand.UNPIN) },
                         onArchive = {
                             startStateBatch(
                                 if (bulkArchiveAction ==
@@ -1945,7 +1958,10 @@ internal fun ChatsScreen(
                             )
                         },
                         onAlternateArchive =
-                            if (selectedVisibleItems.any { it.group.archived } && selectedVisibleItems.any { !it.group.archived }) {
+                            if (
+                                selectedVisibleItems.any { it.group.archived } &&
+                                selectedVisibleItems.any { !it.group.archived }
+                            ) {
                                 { startStateBatch(ChatListBatchCommand.RESTORE) }
                             } else {
                                 null
@@ -1954,16 +1970,33 @@ internal fun ChatsScreen(
                             selectedFolder?.let { folder ->
                                 {
                                     val owner = controller.captureChatListActionOwner { batchScope.get() }
-                                    if (owner != null && pendingStateBatch == null && controller.chatListActionIsCurrent(owner)) {
+                                    if (
+                                        owner != null &&
+                                        pendingStateBatch == null &&
+                                        controller.chatListActionIsCurrent(owner)
+                                    ) {
                                         pendingStateBatch =
-                                            PendingChatListBatch(selectedChatIds.toList(), ChatListBatchCommand.EXCLUDE_FOLDER, owner, folder.id)
+                                            PendingChatListBatch(
+                                                selectedChatIds.toList(),
+                                                ChatListBatchCommand.EXCLUDE_FOLDER,
+                                                owner,
+                                                folder.id,
+                                            )
                                     }
                                 }
                             },
                         onDeleteLocal =
-                            if (selectedVisibleItems.any { !it.isDm() } && selectedVisibleItems.any { it.actions?.canDeleteLocal == true }) {
+                            if (
+                                selectedVisibleItems.any { !it.isDm() } &&
+                                selectedVisibleItems.any { it.actions?.canDeleteLocal == true }
+                            ) {
                                 {
-                                    pendingBulkDelete = PendingLocalChatDelete.capture(selectedVisibleItems, controller, appState)
+                                    pendingBulkDelete =
+                                        PendingLocalChatDelete.capture(
+                                            selectedVisibleItems,
+                                            controller,
+                                            appState,
+                                        )
                                 }
                             } else {
                                 null
@@ -2005,14 +2038,18 @@ internal fun ChatsScreen(
                                     val result =
                                         runCatching { controller.movePinnedSelection(ids, delta, owner) }
                                             .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-                                    if (controller.chatListActionIsCurrent(owner) && result != ChatListPinMoveResult.MOVED) {
+                                    if (
+                                        controller.chatListActionIsCurrent(owner) &&
+                                        result != ChatListPinMoveResult.MOVED
+                                    ) {
                                         val message =
                                             when (result) {
                                                 ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
-                                                ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
+                                                ChatListPinMoveResult.UNCONFIRMED ->
+                                                    R.string.chat_batch_order_unconfirmed
                                                 else -> R.string.chat_batch_order_failed
                                             }
-                                        appState.presentTransient(context.getString(message))
+                                        appState.presentTransient(resources.getString(message))
                                     }
                                 }
                             }

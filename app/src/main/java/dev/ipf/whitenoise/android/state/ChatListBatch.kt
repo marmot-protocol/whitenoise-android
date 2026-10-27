@@ -14,7 +14,11 @@ internal data class ChatListBatchResult(
     val attemptedIds: Set<String> = emptySet(),
 ) {
     fun withAttempt(attempt: ChatListBatchResult?): ChatListBatchResult =
-        if (attempt == null) this else ChatListBatchResult(outcomes + attempt.outcomes, attemptedIds + attempt.attemptedIds)
+        if (attempt == null) {
+            this
+        } else {
+            ChatListBatchResult(outcomes + attempt.outcomes, attemptedIds + attempt.attemptedIds)
+        }
 
     val changed get() = outcomes.values.count { it == ChatListBatchOutcome.CHANGED }
     val satisfied get() = outcomes.values.count { it == ChatListBatchOutcome.SATISFIED }

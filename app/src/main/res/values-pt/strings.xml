@@ -2488,4 +2488,10 @@
     <string name="public_jpeg_previews_privacy">Desativadas por padrão. Links diretos para JPEGs do Blossom podem revelar seu endereço IP ao servidor da imagem. As prévias usam Wi-Fi definido como não medido e suas regras de download de fotos. Os links comuns continuam disponíveis quando desativadas.</string>
     <string name="public_jpeg_preview_image">Prévia de JPEG vinculado</string>
     <string name="public_jpeg_preview_save_failed">Não foi possível salvar a configuração de prévia de imagens. Tente novamente.</string>
+    <string name="chat_batch_progress">%1$d de %2$d conversas processadas</string>
+    <string name="chat_batch_result">Alteradas: %1$d\nEstado solicitado já atendido: %2$d\nIgnoradas (indisponíveis): %3$d\nCom falha: %4$d\nNão iniciadas: %5$d\nNão confirmadas: %6$d</string>
+    <string name="chat_batch_order_failed">A ordem das conversas fixadas está indisponível ou mudou. Confira a lista atual antes de movê-las novamente.</string>
+    <string name="chat_batch_order_unchanged">As conversas fixadas selecionadas não podem ser movidas mais nessa direção. Cada bloco de conversas selecionadas avança uma posição, mantendo sua ordem.</string>
+    <string name="chat_batch_check_results">Verificar resultados</string>
+    <string name="chat_batch_order_unconfirmed">Não foi possível confirmar a ordem das conversas fixadas. Confira a lista antes de mover conversas novamente.</string>
 </resources>

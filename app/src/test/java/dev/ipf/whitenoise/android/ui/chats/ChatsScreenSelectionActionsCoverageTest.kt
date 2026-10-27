@@ -73,24 +73,57 @@ class ChatsScreenSelectionActionsCoverageTest {
     /** Bulk actions must enter one fixed-scope command, never loop the selection-clearing row callbacks. */
     @Test fun selectionCapturesExplicitTargetsAndDirections() {
         val source = chatsScreenSource().readText()
-        val controls = source.requiredSection("ChatListSelectionControls(", "\n        floatingActionButton =")
-        assertTrue("fixed scope captured before launch", "PendingChatListBatch(selectedChatIds.toList(), command, owner)" in source)
-        assertTrue("screen lifetime guards admission", "controller.captureChatListActionOwner { batchScope.get() }" in source)
+        val controls =
+            source
+                .requiredSection("ChatListSelectionControls(", "\n        floatingActionButton =")
+                .replace(Regex("\\s+"), " ")
+        assertTrue(
+            "fixed scope captured before launch",
+            "PendingChatListBatch(selectedChatIds.toList(), command, owner)" in source,
+        )
+        assertTrue(
+            "screen lifetime guards admission",
+            "controller.captureChatListActionOwner { batchScope.get() }" in source,
+        )
         assertTrue("mark read is explicit", "onMarkRead = { startStateBatch(ChatListBatchCommand.READ) }" in controls)
-        assertTrue("mark unread is explicit", "onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) }" in controls)
-        assertTrue("mute and unmute remain separate destinations", "ChatListBatchCommand.MUTE else ChatListBatchCommand.UNMUTE" in controls)
-        assertTrue("pin and unpin remain separate destinations", "ChatListBatchCommand.PIN else ChatListBatchCommand.UNPIN" in controls)
-        assertTrue("archived rows cannot be newly pinned", "!it.group.archived && !it.pinned() && it.actions?.canPin == true" in controls)
-        assertTrue("ordering uses complete native universe", "controller.movePinnedSelection(ids, delta, owner)" in controls)
-        assertFalse("bulk never forwards to a selection-clearing helper", "markChatRead(item" in controls || "toggleChatMute(item" in controls)
+        assertTrue(
+            "mark unread is explicit",
+            "onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) }" in controls,
+        )
+        assertTrue(
+            "mute and unmute remain separate destinations",
+            "ChatListBatchCommand.MUTE else ChatListBatchCommand.UNMUTE" in controls,
+        )
+        assertTrue(
+            "pin and unpin remain separate destinations",
+            "ChatListBatchCommand.PIN else ChatListBatchCommand.UNPIN" in controls,
+        )
+        assertTrue(
+            "archived rows cannot be newly pinned",
+            "!it.group.archived && !it.pinned() && it.actions?.canPin == true" in controls,
+        )
+        assertTrue(
+            "ordering uses complete native universe",
+            "controller.movePinnedSelection(ids, delta, owner)" in controls,
+        )
+        assertFalse(
+            "bulk never forwards to a selection-clearing helper",
+            "markChatRead(item" in controls || "toggleChatMute(item" in controls,
+        )
     }
 
     /** Row/menu callbacks retain the existing captured presentation and session ownership boundaries. */
     @Test fun singleContextActionsKeepOwnershipAndAuthoritativeResolution() {
         val source = chatsScreenSource().readText()
         val helper = source.requiredSection("fun markChatRead(", "\n    fun toggleChatMute(")
-        assertTrue("single callbacks still resolve native rows", "controller.resolveChatListActionItem(item.id, owner)" in helper)
-        assertTrue("single callbacks still own their presentation", "controller.captureChatListActionOwner { actionScope.get() }" in helper)
+        assertTrue(
+            "single callbacks still resolve native rows",
+            "controller.resolveChatListActionItem(item.id, owner)" in helper,
+        )
+        assertTrue(
+            "single callbacks still own their presentation",
+            "controller.captureChatListActionOwner { actionScope.get() }" in helper,
+        )
         assertTrue("single mark read uses original controller", "controller.markAllRead(current, owner)" in helper)
         assertTrue("single mark unread uses original controller", "controller.markUnread(current, owner)" in helper)
         assertTrue("single callbacks retain their selection dismissal", "clearSelection()" in helper)
@@ -98,8 +131,15 @@ class ChatsScreenSelectionActionsCoverageTest {
 
     @Test fun batchRunnerRetainsNativeAuthorityAndSingleFlightAcrossFilterRemoval() {
         val source = File(chatsScreenSource().parentFile, "../../state/Controllers.kt").readText()
-        val batch = source.requiredSection("internal suspend fun runChatListBatch(", "private suspend fun applyChatListBatchCommand(")
-        assertTrue("admission is single flight", "if (chatListBatchInProgress || !chatListActionIsCurrent(owner)) return null" in batch)
+        val batch =
+            source.requiredSection(
+                "internal suspend fun runChatListBatch(",
+                "private suspend fun applyChatListBatchCommand(",
+            )
+        assertTrue(
+            "admission is single flight",
+            "if (chatListBatchInProgress || !chatListActionIsCurrent(owner)) return null" in batch,
+        )
         assertTrue("targets are copied before suspension", "val targets = ids.map" in batch)
         assertTrue(
             "eligibility and satisfied state come from keyed native projection",

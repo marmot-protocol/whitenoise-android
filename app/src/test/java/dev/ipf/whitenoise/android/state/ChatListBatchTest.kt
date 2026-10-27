@@ -36,21 +36,48 @@ class ChatListBatchTest {
                         canRestore = true,
                     ),
             )
-        val ordinary = row.copy(row = row.row.copy(hasUnread = false, manuallyMarkedUnread = false, muted = false, pinned = false, archived = false))
+        val ordinary =
+            row.copy(
+                row =
+                    row.row.copy(
+                        hasUnread = false,
+                        manuallyMarkedUnread = false,
+                        muted = false,
+                        pinned = false,
+                        archived = false,
+                    ),
+            )
         assertEquals(ChatListBatchOutcome.SATISFIED, chatListBatchDisposition(ordinary, ChatListBatchCommand.READ))
         assertNull(chatListBatchDisposition(ordinary, ChatListBatchCommand.UNREAD))
         assertNull(chatListBatchDisposition(ordinary, ChatListBatchCommand.MUTE))
         assertNull(chatListBatchDisposition(ordinary, ChatListBatchCommand.PIN))
         assertNull(chatListBatchDisposition(ordinary, ChatListBatchCommand.ARCHIVE))
-        val opposite = ordinary.copy(row = ordinary.row.copy(hasUnread = true, muted = true, pinned = true, archived = true))
-        listOf(ChatListBatchCommand.UNREAD, ChatListBatchCommand.MUTE, ChatListBatchCommand.PIN, ChatListBatchCommand.ARCHIVE).forEach {
+        val opposite =
+            ordinary.copy(row = ordinary.row.copy(hasUnread = true, muted = true, pinned = true, archived = true))
+        listOf(
+            ChatListBatchCommand.UNREAD,
+            ChatListBatchCommand.MUTE,
+            ChatListBatchCommand.PIN,
+            ChatListBatchCommand.ARCHIVE,
+        ).forEach {
             assertEquals(ChatListBatchOutcome.SATISFIED, chatListBatchDisposition(opposite, it))
         }
-        listOf(ChatListBatchCommand.READ, ChatListBatchCommand.UNMUTE, ChatListBatchCommand.UNPIN, ChatListBatchCommand.RESTORE).forEach {
+        listOf(
+            ChatListBatchCommand.READ,
+            ChatListBatchCommand.UNMUTE,
+            ChatListBatchCommand.UNPIN,
+            ChatListBatchCommand.RESTORE,
+        ).forEach {
             assertNull(chatListBatchDisposition(opposite, it))
         }
-        assertEquals(ChatListBatchOutcome.SKIPPED, chatListBatchDisposition(ordinary.copy(actions = noChatRowActions()), ChatListBatchCommand.UNREAD))
-        assertEquals(ChatListBatchOutcome.SKIPPED, chatListBatchDisposition(ordinary.copy(row = ordinary.row.copy(archived = true)), ChatListBatchCommand.PIN))
+        assertEquals(
+            ChatListBatchOutcome.SKIPPED,
+            chatListBatchDisposition(ordinary.copy(actions = noChatRowActions()), ChatListBatchCommand.UNREAD),
+        )
+        assertEquals(
+            ChatListBatchOutcome.SKIPPED,
+            chatListBatchDisposition(ordinary.copy(row = ordinary.row.copy(archived = true)), ChatListBatchCommand.PIN),
+        )
     }
 
     @Test fun selectedRunsMoveOnePositionWithoutChangingRelativeOrders() {

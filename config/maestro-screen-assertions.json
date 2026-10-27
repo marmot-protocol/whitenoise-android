@@ -162,6 +162,18 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+      "symbol": "ChatListBatchDialog",
+      "bindings": [],
+      "remaining": "No maintained Maestro flow opens this production multi-chat request and directly asserts captured-scope progress, cumulative outcome counts, failed-only retry, read-only Check results or account/runtime retirement. CHL-012 and controller regression tests specify these requirements; their execution and UI lifecycle evidence remain separate. This entry grants no direct Maestro execution credit."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+      "symbol": "ChatListBatchStatusDialog",
+      "bindings": [],
+      "remaining": "No maintained Maestro flow directly asserts this dialog's progress and result states or its Retry, Check results and Close controls. The partial-result AMOLED Roborazzi snapshot covers one static renderer state. Progress, unconfirmed recovery, enabled and disabled controls, narrow and RTL large-text layout, and physical interaction require separate evidence. This entry grants no direct Maestro execution credit."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
       "symbol": "ChatFolderPickerSheet",
       "bindings": [

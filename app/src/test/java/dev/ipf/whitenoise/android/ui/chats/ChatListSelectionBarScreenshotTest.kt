@@ -32,13 +32,31 @@ class ChatListSelectionBarScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
     /** Multiple selected chats in light theme. */
-    @Test fun multipleLight() = capture("selection_actions_multiple_light", bulk = true)
+    @Test fun multipleLight() =
+        capture(
+            "selection_actions_multiple_light",
+            bulk = true,
+            departureLabel = R.string.leave_and_delete,
+        )
 
     /** Multiple selected chats in dark theme. */
-    @Test fun multipleDark() = capture("selection_actions_multiple_dark", dark = true, bulk = true)
+    @Test fun multipleDark() =
+        capture(
+            "selection_actions_multiple_dark",
+            dark = true,
+            bulk = true,
+            departureLabel = R.string.leave_and_delete,
+        )
 
     /** Multiple selected chats in AMOLED theme. */
-    @Test fun multipleAmoled() = capture("selection_actions_multiple_amoled", dark = true, amoled = true, bulk = true)
+    @Test fun multipleAmoled() =
+        capture(
+            "selection_actions_multiple_amoled",
+            dark = true,
+            amoled = true,
+            bulk = true,
+            departureLabel = R.string.leave_and_delete,
+        )
 
     /** One selected chat exposes its conditional commands. */
     @Test fun single() = capture("selection_actions_single", single = true)
@@ -46,12 +64,19 @@ class ChatListSelectionBarScreenshotTest {
     /** Narrow screen still wraps every command into reachable rows. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w280dp-h700dp-mdpi")
-    fun narrow() = capture("selection_actions_narrow", bulk = true)
+    fun narrow() = capture("selection_actions_narrow", bulk = true, departureLabel = R.string.leave_and_delete)
 
     /** Long labels and 200 percent text in right-to-left layout. */
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
-    fun rtlLarge() = capture("selection_actions_rtl_large", bulk = true, rtl = true, large = true)
+    fun rtlLarge() =
+        capture(
+            "selection_actions_rtl_large",
+            bulk = true,
+            rtl = true,
+            large = true,
+            departureLabel = R.string.leave_and_delete,
+        )
 
     @Test
     fun groupDepartureLight() =
@@ -155,6 +180,49 @@ class ChatListSelectionBarScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/selection_batch_partial_amoled.png")
     }
 
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w280dp-h700dp-mdpi")
+    fun mixedRecoveryNarrow() = captureMixedRecovery("selection_batch_mixed_narrow")
+
+    @Test
+    @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
+    fun mixedRecoveryRtlLarge() = captureMixedRecovery("selection_batch_mixed_rtl_large", rtl = true, large = true)
+
+    private fun captureMixedRecovery(
+        name: String,
+        rtl: Boolean = false,
+        large: Boolean = false,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = if (large) 2f else 1f) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
+                    ChatListBatchStatusDialog(
+                        dev.ipf.whitenoise.android.state.ChatListBatchCommand.READ,
+                        3,
+                        3,
+                        dev.ipf.whitenoise.android.state.ChatListBatchResult(
+                            mapOf(
+                                "one" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.CHANGED,
+                                "two" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.UNCONFIRMED,
+                                "three" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.FAILED,
+                            ),
+                        ),
+                        true,
+                        {},
+                        {},
+                    )
+                }
+            }
+        }
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        for (label in listOf(R.string.retry, R.string.chat_batch_check_results, R.string.close)) {
+            composeRule.onNodeWithText(context.getString(label)).assertIsDisplayed()
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
     /** Captures the actual controls with deterministic eligibility and no account content. */
     @Suppress("LongParameterList")
     private fun capture(
@@ -176,7 +244,7 @@ class ChatListSelectionBarScreenshotTest {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                         ChatListSelectionControls(
                             count = if (single) 1 else 4,
-                            deleteLabel = stringResource(departureLabel ?: if (bulk) R.string.leave_and_delete else R.string.delete),
+                            deleteLabel = stringResource(departureLabel ?: R.string.delete),
                             archiveAction = ChatListBulkArchiveAction.Archive,
                             actionsEnabled = true,
                             allVisibleSelected = false,

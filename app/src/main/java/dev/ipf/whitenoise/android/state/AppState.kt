@@ -1326,7 +1326,7 @@ class WhiteNoiseAppState private constructor(
                 editorSessions = editorSessionStore,
             )
     internal val draftAttachmentRemovalTombstones = DraftAttachmentRemovalTombstones()
-    private val chatMuteRepository = ChatMuteRepository(MarmotChatMuteGateway(::marmot))
+    private val chatMuteRepository = ChatMuteRepository(MarmotChatMuteGateway(::marmot), marmotIoDispatcher)
 
     // Which of the two sequential signer round-trips the Amber sign-in is
     // waiting on (1 = identity request, 2 = identity proof), or null when
@@ -9744,7 +9744,11 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ) {
         runCatchingCancellable {
-            localNotificationPresenter.dismissConversationMessages(accountRef, groupIdHex)
+            localNotificationPresenter.dismissConversationMessages(
+                accountRef,
+                groupIdHex,
+                dispatcher = notificationCardCancellationDispatcher,
+            )
         }.onFailure {
             appStateDebug { "notification dismiss failed group=${groupIdHex.take(8)}" }
         }

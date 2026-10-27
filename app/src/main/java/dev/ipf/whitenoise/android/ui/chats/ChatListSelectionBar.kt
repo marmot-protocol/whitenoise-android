@@ -166,7 +166,10 @@ internal fun ChatListSelectionControls(
             onClick = { perform(onArchive) },
         )
         if (onExcludeFromFolder != null) {
-            LabeledSelectionAction(stringResource(R.string.chat_list_action_add_to_folder), actionsEnabled) { perform(onAddToFolder) }
+            LabeledSelectionAction(
+                stringResource(R.string.chat_list_action_add_to_folder),
+                actionsEnabled,
+            ) { perform(onAddToFolder) }
         } else {
             DirectSelectionAction(
                 label = stringResource(R.string.chat_list_action_add_to_folder),
@@ -194,17 +197,29 @@ internal fun ChatListSelectionControls(
             }
         }
         if (showMute) {
-            DirectSelectionAction(stringResource(R.string.chat_row_action_mute), R.drawable.ic_notifications_off, actionsEnabled) {
+            DirectSelectionAction(
+                stringResource(R.string.chat_row_action_mute),
+                R.drawable.ic_notifications_off,
+                actionsEnabled,
+            ) {
                 perform { onSetMuted?.invoke(true) ?: onMuteToggle() }
             }
         }
         if (showUnmute) {
-            DirectSelectionAction(stringResource(R.string.chat_row_action_unmute), R.drawable.ic_settings_notifications, actionsEnabled) {
+            DirectSelectionAction(
+                stringResource(R.string.chat_row_action_unmute),
+                R.drawable.ic_settings_notifications,
+                actionsEnabled,
+            ) {
                 perform { onSetMuted?.invoke(false) ?: onMuteToggle() }
             }
         }
         if (showPin) {
-            DirectSelectionAction(stringResource(R.string.chat_row_action_pin), R.drawable.ic_push_pin, actionsEnabled) {
+            DirectSelectionAction(
+                stringResource(R.string.chat_row_action_pin),
+                R.drawable.ic_push_pin,
+                actionsEnabled,
+            ) {
                 perform { onSetPinned?.invoke(true) ?: onPinToggle() }
             }
         }
@@ -215,8 +230,14 @@ internal fun ChatListSelectionControls(
         }
         onAlternateArchive?.let { alternate ->
             DirectSelectionAction(
-                stringResource(if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.unarchive else R.string.archive),
-                if (archiveAction == ChatListBulkArchiveAction.Archive) R.drawable.ic_unarchive else R.drawable.ic_archive,
+                stringResource(
+                    if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.unarchive else R.string.archive,
+                ),
+                if (archiveAction == ChatListBulkArchiveAction.Archive) {
+                    R.drawable.ic_unarchive
+                } else {
+                    R.drawable.ic_archive
+                },
                 actionsEnabled,
             ) { perform(alternate) }
         }
