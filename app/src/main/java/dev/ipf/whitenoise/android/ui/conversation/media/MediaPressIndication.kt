@@ -90,8 +90,9 @@ private class MediaPressNode(
     private val focuses = mutableSetOf<FocusInteraction.Focus>()
     private val hovers = mutableSetOf<HoverInteraction.Enter>()
 
-    /** Collect only interaction changes; there is no timer, frame loop or platform drawable. */
+    /** Redraw cleared reused content, then collect changes without a timer or platform drawable. */
     override fun onAttach() {
+        invalidateDraw()
         coroutineScope.launch {
             source.interactions.collect { interaction ->
                 when (interaction) {
