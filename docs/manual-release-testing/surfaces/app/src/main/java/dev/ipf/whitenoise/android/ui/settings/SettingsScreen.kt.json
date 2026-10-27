@@ -64,6 +64,14 @@
         ]
       },
       {
+        "surface": "Release version footer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "SettingsHomeSection.Version -> SettingsVersionFooter(versionName)",
+        "test_ids": [
+          "SET-019"
+        ]
+      },
+      {
         "surface": "SettingsHubGroup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsHubGroup(",
