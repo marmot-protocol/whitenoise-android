@@ -135,6 +135,8 @@ class MediaTileLifecycleTest {
         hold.set(true)
         try {
             show()
+            // Measured decoding starts after layout; Activity.setContent alone does not drive a frame in this harness.
+            composeRule.waitForIdle()
             composeRule.waitUntil(10_000) { reading.count == 0L }
             assertNoDownloadAction()
             composeRule.onNodeWithContentDescription(text(R.string.media_opening)).assertIsDisplayed()
