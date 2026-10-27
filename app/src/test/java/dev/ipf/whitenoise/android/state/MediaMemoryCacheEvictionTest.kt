@@ -93,7 +93,14 @@ class MediaMemoryCacheEvictionTest {
                     val displayed =
                         attachmentFilePresentationState(
                             transfer.value,
-                            NativeAttachmentProgress(AttachmentTransferStateFfi.NOT_REQUESTED, 0uL, 0uL, null, null, null),
+                            NativeAttachmentProgress(
+                                AttachmentTransferStateFfi.NOT_REQUESTED,
+                                0uL,
+                                0uL,
+                                null,
+                                null,
+                                null,
+                            ),
                             AttachmentCancellationState.None,
                         )
                     assertEquals(AttachmentTransferState.NotRetained, displayed)
