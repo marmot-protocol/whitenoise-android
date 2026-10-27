@@ -63,7 +63,14 @@ class KeptMediaLiveStateTest {
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
-            assertSame(bitmap, presentation!!.attachments.single().thumbnail?.asAndroidBitmap())
+            assertSame(
+                bitmap,
+                presentation!!
+                    .attachments
+                    .single()
+                    .thumbnail
+                    ?.asAndroidBitmap(),
+            )
             surface.appState.removeMediaMemoryCacheEntry(cacheKey)
         }
         composeRule.waitForIdle()

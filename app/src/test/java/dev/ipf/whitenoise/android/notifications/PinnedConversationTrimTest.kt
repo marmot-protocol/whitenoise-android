@@ -82,7 +82,12 @@ class PinnedConversationTrimTest {
             val retained = platform.updates.last().single()
             assertNull("omit icon to retain the platform-owned photo", retained.icon)
             assertEquals("Renamed", retained.longLabel)
-            assertEquals(platform.requests.single().intent.data, retained.intent.data)
+            assertEquals(
+                platform.requests
+                    .single()
+                    .intent.data,
+                retained.intent.data,
+            )
 
             val replacement = row.copy(group = row.group.copy(avatarUrl = "https://group.example/replaced.png"))
             val replaced = app.pinnedConversationPresentation(ACCOUNT, replacement, "Group")
@@ -128,7 +133,12 @@ class PinnedConversationTrimTest {
                 assertNull("a cached fallback cannot replace the selected private photo", retained.icon)
                 assertTrue(app.contactPictureStore.save(ACCOUNT, "peer", "", "", ContactPictureChange.Clear) { true })
                 assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
-                val cleared = platform.updates.last().single().icon!!.loadDrawable(context) as BitmapDrawable
+                val cleared =
+                    platform.updates
+                        .last()
+                        .single()
+                        .icon!!
+                        .loadDrawable(context) as BitmapDrawable
                 assertEquals(Color.BLUE, cleared.bitmap.getPixel(0, 0))
             } finally {
                 AvatarImageLoader.clear()
@@ -159,11 +169,22 @@ class PinnedConversationTrimTest {
             try {
                 GroupAvatarImageLoader.trimMemory(PresentationMemoryTrim.EMPTY)
                 assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
-                assertNull("a cached peer cannot replace the group-owned photo", platform.updates.last().single().icon)
+                assertNull(
+                    "a cached peer cannot replace the group-owned photo",
+                    platform.updates
+                        .last()
+                        .single()
+                        .icon,
+                )
                 val removed = row.copy(group = row.group.copy(imageHashHex = null))
                 val current = app.pinnedConversationPresentation(ACCOUNT, removed, "Peer")
                 assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to current)))
-                val cleared = platform.updates.last().single().icon!!.loadDrawable(context) as BitmapDrawable
+                val cleared =
+                    platform.updates
+                        .last()
+                        .single()
+                        .icon!!
+                        .loadDrawable(context) as BitmapDrawable
                 assertEquals(Color.BLUE, cleared.bitmap.getPixel(0, 0))
             } finally {
                 AvatarImageLoader.clear()

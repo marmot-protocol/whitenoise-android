@@ -806,7 +806,12 @@ class ConversationMediaEarlyProjectionCacheTest {
                 val reopened = DiskByteCache(root, 1024L * 1024L, keyProvider)
                 val retained = withContext(Dispatchers.IO) { reopened.get(key) }
                 assertEquals(bytes.toList(), retained?.toList())
-                assertEquals(CONFIRMED_MESSAGE_ID, controller.timeline.single().record.messageIdHex)
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
                 assertTrue(state.activeUploadKeys(ACCOUNT_REF, GROUP_ID).isEmpty())
             } finally {
                 try {
