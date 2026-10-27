@@ -69,8 +69,11 @@ internal class MediaViewerThumbnailRegistry {
         var ready = false
 
         /** One fresh measurement shared by eligibility, bounds and corners for this lookup only. */
-        fun readGeometry(): Pair<Rect, MediaThumbnailCorners>? =
-            if (geometry == null) measuredBounds to measuredCorners else geometry.invoke()
+        fun readGeometry(): Pair<Rect, MediaThumbnailCorners>? {
+            if (!ready) return null
+            val current = if (geometry == null) measuredBounds to measuredCorners else geometry.invoke()
+            return current?.takeIf { (bounds, _) -> bounds.width > 0f && bounds.height > 0f }
+        }
 
         var corners: MediaThumbnailCorners
             get() = if (geometry == null) measuredCorners else geometry.invoke()?.second ?: MediaThumbnailCorners()
@@ -111,9 +114,7 @@ internal class MediaViewerThumbnailRegistry {
     internal fun resolve(id: ConversationMediaViewerAttachmentId): ResolvedThumbnail? {
         var found: ResolvedThumbnail? = null
         for (thumbnail in thumbnails[id].orEmpty()) {
-            if (!thumbnail.ready) continue
             val (bounds, corners) = thumbnail.readGeometry() ?: continue
-            if (!(bounds.width > 0f && bounds.height > 0f)) continue
             // A quoted/duplicated visible rendering must never become an arbitrary origin.
             if (found != null) return null
             found = ResolvedThumbnail(thumbnail, bounds, corners)
@@ -259,9 +260,7 @@ internal fun MediaViewerMotion(
     val bodyModifier =
         remember(geometry, enabled, readThumbnail) {
             Modifier.onGloballyPositioned { geometry[1] = it }.graphicsLayer {
-                val fraction = progress.value
-                alpha =
-                    if (!enabled || fraction >= 1f) 1f else mediaViewerContentAlpha(true, readThumbnail() != null, fraction)
+                alpha = mediaViewerBodyAlpha(enabled, progress.value, readThumbnail)
             }
         }
     Box(Modifier.fillMaxSize().onGloballyPositioned { geometry[0] = it }) {
@@ -271,6 +270,14 @@ internal fun MediaViewerMotion(
         }
     }
 }
+
+/** A settled canonical viewer no longer observes thumbnail geometry or its timeline layout. */
+private fun mediaViewerBodyAlpha(
+    enabled: Boolean,
+    progress: Float,
+    readThumbnail: () -> MediaViewerThumbnailRegistry.ResolvedThumbnail?,
+): Float =
+    if (!enabled || progress >= 1f) 1f else mediaViewerContentAlpha(true, readThumbnail() != null, progress)
 
 private fun mediaMotionDrawGeometry(
     geometry: Array<LayoutCoordinates?>,
