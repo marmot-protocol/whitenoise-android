@@ -9,9 +9,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -141,7 +146,11 @@ class MediaTileLifecycleTest {
             composeRule.waitForIdle()
             composeRule.waitUntil(10_000) { reading.count == 0L }
             assertNoDownloadAction()
-            composeRule.onNodeWithContentDescription(text(R.string.media_opening)).assertIsDisplayed()
+            composeRule
+                .onNode(
+                    hasContentDescription(text(R.string.media_opening)) and
+                        hasAnyAncestor(hasTestTag("retained-image-bubble")),
+                ).assertIsDisplayed()
             assertEquals(0, fixture.calls.size)
         } finally {
             hold.set(false)
@@ -253,6 +262,7 @@ class MediaTileLifecycleTest {
                 appState = fixture.state,
                 onOpenConversationMedia = {},
                 mine = false,
+                modifier = Modifier.testTag("retained-image-bubble"),
             )
             Box(Modifier.width(ALBUM_WIDTH)) {
                 MasonryImageLayout(visibleCount = ALBUM_TILES) { index, tileModifier ->
