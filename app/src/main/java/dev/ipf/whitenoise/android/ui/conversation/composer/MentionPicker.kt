@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +26,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
-/** At most five names are offered, so the composer stays reachable instead of being buried under the roster. */
+/** Keep the existing five-candidate presentation limit; the viewport scrolls when those rows cannot fit. */
 internal const val MENTION_PICKER_MAX_ROWS = 5
 
 private val MENTION_ROW_AVATAR = 36.dp
@@ -39,17 +41,18 @@ private val MENTION_ROW_AVATAR = 36.dp
 internal fun MentionPicker(
     candidates: List<MentionComposer.Candidate>,
     onPick: (MentionComposer.Candidate) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = amoledOutlineBorder(),
     ) {
-        Column {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
             candidates.take(MENTION_PICKER_MAX_ROWS).forEach { candidate ->
                 MentionPickerRow(candidate, onPick)
             }
