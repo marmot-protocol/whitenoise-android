@@ -120,14 +120,26 @@ class MediaViewerMotionScreenshotTest {
                     if (shown) {
                         PlaybackDialog(
                             onDismissRequest = { shown = false },
-                            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+                            properties =
+                                DialogProperties(
+                                    usePlatformDefaultWidth = false,
+                                    decorFitsSystemWindows = false,
+                                ),
                         ) {
                             val view = LocalView.current
-                            MediaViewerMotion(registry, id, id, closing = false, onClosed = {}, attachmentAspectRatio = 1f) {
+                            MediaViewerMotion(
+                                registry = registry,
+                                opening = id,
+                                selected = id,
+                                closing = false,
+                                onClosed = {},
+                                attachmentAspectRatio = 1f,
+                            ) {
                                 Box(it.fillMaxSize())
                             }
                             SideEffect {
-                                dialogAnimation = (view.parent as DialogWindowProvider).window.attributes.windowAnimations
+                                dialogAnimation =
+                                    (view.parent as DialogWindowProvider).window.attributes.windowAnimations
                                 currentHostAnimation = activity.window.attributes.windowAnimations
                             }
                         }
