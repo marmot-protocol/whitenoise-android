@@ -415,7 +415,7 @@ This step makes the release public. Do not use it for a build rehearsal.
    the relay must finish both release/asset queries with EOSE and report no
    existing events. CLOSED, disconnects, timeouts and partial releases stop
    publication. Before public writes, the job retains a sanitized
-   `zapstore-submission-intent-<version>-<run>-<attempt>` artifact.
+   `zapstore-submission-intent-<version>` artifact.
 6. The job invokes `zsp --json publish` **once**, with the exact APK hash/source
    commit and channel `main`, bounded to eight minutes. There are no overwrite
    flags or automatic publication retries. CLI output and signer errors remain

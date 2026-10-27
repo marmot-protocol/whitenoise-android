@@ -95,13 +95,13 @@ jobs:
           MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
           VERIFY_ONLY: ${{ inputs.verify_only }}
         run: ./scripts/publish-zapstore.sh "$RUNNER_TEMP/bin/zsp" "$RUNNER_TEMP/bin/zapstore-readback" prepare
-      # Durable before the public side effect: a lost reply must not cause a retry.
+      # Retained before the public side effect: a lost reply must not cause a retry.
       - name: Retain submission intent before public writes
         id: intent
         if: steps.preflight.outputs.submit == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: zapstore-submission-intent-${{ inputs.expected_version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: zapstore-submission-intent-${{ inputs.expected_version }}
           path: build/zapstore-publication/intent.json
           if-no-files-found: error
           retention-days: 90

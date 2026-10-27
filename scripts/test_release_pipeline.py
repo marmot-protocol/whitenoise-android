@@ -126,6 +126,11 @@ class BundleTests(unittest.TestCase):
                 bundle.verify_source_metadata(self.path, self.manifest)
 
 
+    def test_producer_tool_version_must_match_immutable_source_policy(self):
+        with patch.object(bundle, 'command', return_value=b'ZSP_VERSION=0.4.17\n'):
+            with self.assertRaisesRegex(ValueError, 'Producer ZSP version differs'):
+                bundle.verify_source_metadata(self.path, self.manifest)
+
     def test_github_draft_exposes_only_apk_manifest_and_matching_checksums(self):
         published = {}
         def fake_command(*args):
@@ -339,7 +344,7 @@ class ZapstoreIntegrationTests(unittest.TestCase):
         gh = root / 'gh'
         gh.write_text('#!/usr/bin/env python3\nimport os,sys,json\n'
                       'if os.environ.get("PRIOR_INTENT") != "true": print("[]")\n'
-                      'elif "--paginate" in sys.argv: print(json.dumps([dict(artifacts=[dict(name="zapstore-submission-intent-"+os.environ["EXPECTED_VERSION"]+"-122-1",workflow_run=dict(id=122))])]))\n'
+                      'elif "--paginate" in sys.argv: print(json.dumps([dict(artifacts=[dict(name="zapstore-submission-intent-"+os.environ["EXPECTED_VERSION"],workflow_run=dict(id=122))])]))\n'
                       'else: print(json.dumps(dict(path=".github/workflows/android-zapstore-publish.yml",head_branch="master")))\n')
         gh.chmod(0o755)
         env = {**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'GITHUB_ACTIONS': 'true',

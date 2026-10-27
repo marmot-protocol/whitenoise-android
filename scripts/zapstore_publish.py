@@ -90,12 +90,12 @@ def previous_intent(version):
     # Fail closed if the ledger cannot be read. Reruns always use readback only.
     if int(os.environ.get("GITHUB_RUN_ATTEMPT", "1")) > 1:
         return True
+    name = f"zapstore-submission-intent-{version}"
     pages = json.loads(command("gh", "api", "--paginate", "--slurp",
-                              "repos/marmot-protocol/whitenoise-android/actions/artifacts?per_page=100"))
-    prefix = f"zapstore-submission-intent-{version}-"
+                              f"repos/marmot-protocol/whitenoise-android/actions/artifacts?name={name}&per_page=100"))
     for page in pages:
         for artifact in page["artifacts"]:
-            if not artifact["name"].startswith(prefix):
+            if artifact["name"] != name:
                 continue
             run_id = artifact.get("workflow_run", {}).get("id")
             require(run_id is not None, "Cannot establish prior submission provenance")
