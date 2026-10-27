@@ -41,6 +41,29 @@ class CiInventoryComparisonTest(unittest.TestCase):
             self.assertEqual(delta['baseline'], {'run_id': 1, 'artifact_id': 2})
             self.assertEqual(delta['added'], [])
 
+    def test_large_valid_baseline_retains_a_bounded_uncompressed_limit(self):
+        """Current tooling inventories exceed 32 MiB; oversized members still fail closed."""
+        inventory = selected_inventory([report()], SOURCE)
+        encoded = json.dumps(inventory).encode()
+        run = {'id': 1, 'head_sha': SOURCE, 'head_branch': 'master', 'event': 'push', 'conclusion': 'success',
+               'path': '.github/workflows/android-ci.yml', 'repository': {'full_name': ci.REPOSITORY},
+               'head_repository': {'full_name': ci.REPOSITORY}}
+        for size, accepted in [(32 * 1024 * 1024 + 1, True), (64 * 1024 * 1024 + 1, False)]:
+            stream = io.BytesIO()
+            with zipfile.ZipFile(stream, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr('inventory/selected.json', encoded + b' ' * (size - len(encoded)))
+            responses = [{'workflow_runs': [run]}, {'artifacts': [
+                {'id': 2, 'name': 'fixture', 'expired': False, 'created_at': '2026-10-15T10:00:00Z',
+                 'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
+            with self.subTest(size=size), mock.patch.object(ci, 'api', side_effect=responses):
+                if accepted:
+                    value, evidence = ci.baseline(SOURCE, 'fixture')
+                    self.assertEqual(value, inventory)
+                    self.assertEqual(evidence, {'run_id': 1, 'artifact_id': 2})
+                else:
+                    with self.assertRaisesRegex(ValueError, 'Missing or oversized baseline inventory'):
+                        ci.baseline(SOURCE, 'fixture')
+
     def test_rerun_uses_newest_unexpired_matching_artifact(self):
         """Retained older attempts and timestamp ties cannot make a successful rerun ambiguous."""
         inventory = selected_inventory([report()], SOURCE)
