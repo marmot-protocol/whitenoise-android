@@ -396,6 +396,15 @@ candidate's C1 proof, upload, publication and updater still need their own check
 gh workflow run android-zapstore-signer-test.yml --ref master
 ```
 
+For an isolated candidate-tool rehearsal on a branch, use the same workflow's
+**`fixture_only: true`** input. This runs the release-tooling regressions and real
+v2 loopback fixture on a GitHub-hosted runner with no protected environment or
+production secrets. It does not replace the PR's required aggregate checks:
+
+```bash
+gh workflow run android-zapstore-signer-test.yml --ref <candidate-branch> -f fixture_only=true
+```
+
 ### Publish the reviewed candidate
 
 This step makes the release public. Do not use it for a build rehearsal.

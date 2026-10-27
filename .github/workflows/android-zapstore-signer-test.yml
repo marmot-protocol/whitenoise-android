@@ -2,9 +2,14 @@ name: Android Zapstore - Signer Test (NO publication)
 
 on:
   workflow_dispatch:
+    inputs:
+      fixture_only:
+        description: Test the candidate CLI and publisher contracts with disposable keys only
+        type: boolean
+        default: false
 
 concurrency:
-  group: android-zapstore-publication
+  group: ${{ inputs.fixture_only && format('android-zapstore-fixture-{0}', github.ref) || 'android-zapstore-publication' }}
   cancel-in-progress: false
 
 permissions:
@@ -12,7 +17,7 @@ permissions:
 
 jobs:
   signer-test:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && !inputs.fixture_only
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: zapstore-production
@@ -35,3 +40,35 @@ jobs:
           SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
           BUNKER_CLIENT_KEY: ${{ secrets.ZAPSTORE_BUNKER_CLIENT_KEY }}
         run: bash scripts/test-zapstore-signer.sh
+
+  fixture:
+    if: inputs.fixture_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.24.11'
+          cache: false
+      - name: Install fixture APK tooling
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Validate publisher and immutable-bundle regressions
+        run: python3 -m unittest scripts/test_release_pipeline.py
+      - name: Validate release metadata
+        run: python3 scripts/check-release-metadata.py
+      - name: Exercise real ZSP v2 with disposable loopback services
+        run: bash scripts/test-zsp-contract.sh
+      - name: Retain sanitized fixture receipt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: zsp-v2-contract
+          path: build/reports/zsp-v2.json
+          if-no-files-found: error
+          retention-days: 14
