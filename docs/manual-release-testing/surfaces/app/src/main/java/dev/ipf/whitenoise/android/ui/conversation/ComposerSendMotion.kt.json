@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
         "anchor": "class ComposerSendMotion",
         "test_ids": [
-          "MSG-042"
+          "MSG-042",
+          "MED-041"
         ]
       },
       {
@@ -34,7 +35,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
         "anchor": "fun Overlay(",
         "test_ids": [
-          "MSG-042"
+          "MSG-042",
+          "MED-041"
         ]
       }
     ]

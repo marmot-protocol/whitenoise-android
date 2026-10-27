@@ -3,8 +3,13 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.material3.Text
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.ResolvedTextDirection
@@ -32,6 +37,22 @@ class ConversationMediaViewerSendMotionTest {
     private val enabled = mutableStateOf(true)
     private var transcriptCompositions = 0
     private lateinit var textLayout: TextLayoutResult
+    private lateinit var coordinates: LayoutCoordinates
+
+    /** Idle ink must not subscribe its canvas to eligibility changes or probe attached geometry. */
+    @Test
+    fun idleOverlayReadsNoSnapshotStateWithAnAttachedOrigin() {
+        render()
+        val drawScope = CanvasDrawScope()
+        rule.runOnIdle {
+            assertTrue(coordinates.isAttached)
+            val reads = mutableSetOf<Any>()
+            Snapshot.observe({ reads.add(it) }, null) {
+                with(motion) { drawScope.drawFlight(null, coordinates, null) }
+            }
+            assertTrue("Idle canvas subscribed to snapshot state", reads.isEmpty())
+        }
+    }
 
     @Test
     fun idleMediaOpenPagingAndDismissOnlyRecomposeTheSendGuard() {
@@ -109,7 +130,11 @@ class ConversationMediaViewerSendMotionTest {
         rule.setContent {
             SideEffect { transcriptCompositions++ }
             ComposerSendMotionMediaGate(motion, state, enabled.value)
-            Text("Transcript remains mounted", onTextLayout = { textLayout = it })
+            Text(
+                "Transcript remains mounted",
+                modifier = Modifier.onGloballyPositioned { coordinates = it },
+                onTextLayout = { textLayout = it },
+            )
         }
         rule.waitForIdle()
         assertTrue(motion.enabled)

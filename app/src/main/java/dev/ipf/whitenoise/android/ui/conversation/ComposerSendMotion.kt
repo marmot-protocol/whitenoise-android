@@ -388,13 +388,16 @@ internal class ComposerSendMotion {
         }
     }
 
-    private fun DrawScope.drawFlight(
+    /** Idle or replaced ink observes no eligibility or geometry; a current flight retains all paint guards. */
+    internal fun DrawScope.drawFlight(
         active: ComposerSendFlight?,
         origin: LayoutCoordinates?,
         geometryObserver: ((ComposerSendFlightGeometry) -> Unit)?,
     ) {
+        // Idle ink must not subscribe the full-window canvas to modal eligibility changes.
+        if (active == null || flight !== active) return
         val canvasOrigin = origin?.takeIf { enabled && it.isAttached }
-        if (active == null || flight !== active || canvasOrigin == null) return
+        if (canvasOrigin == null) return
         val decision = presentation(active.presentationId)
         val geometry = decision.geometry
         if (geometry == null) {
