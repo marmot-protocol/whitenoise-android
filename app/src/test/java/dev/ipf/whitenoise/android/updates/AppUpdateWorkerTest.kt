@@ -38,7 +38,11 @@ class AppUpdateWorkerTest {
     @Before
     fun setUp() {
         appContext = ApplicationProvider.getApplicationContext()
-        appContext.getSharedPreferences("darkmatter_app_updates", Context.MODE_PRIVATE).edit().clear().commit()
+        appContext
+            .getSharedPreferences("darkmatter_app_updates", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         WorkManagerTestInitHelper.initializeTestWorkManager(appContext)
     }
 
