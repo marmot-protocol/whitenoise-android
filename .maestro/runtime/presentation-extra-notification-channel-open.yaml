@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-notification-channel-open
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: conversation-alert-messages_group
+    checked: false
+- tapOn: Group messages
+- assertVisible:
+    id: presentation.complete

@@ -43,6 +43,14 @@
         "test_ids": [
           "MED-021"
         ]
+      },
+      {
+        "surface": "GIPHY shared byte acquisition and owner admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "giphyAcquisition.useBytes(",
+        "test_ids": [
+          "MED-021"
+        ]
       }
     ],
     "settings_controls": [

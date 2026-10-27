@@ -87,6 +87,38 @@ class SettingsScreenScreenshotTest {
         capture("settings_screen_rtl_large_font")
     }
 
+    /** AI Agents uses the shared sparkle icon in its actual Settings row. */
+    @Test
+    fun settingsScreenAiAgentsDark() {
+        render(darkTheme = true)
+        captureAgentRow("settings_screen_ai_agents_dark")
+    }
+
+    @Test
+    fun settingsScreenAiAgentsLight() {
+        render(darkTheme = false)
+        captureAgentRow("settings_screen_ai_agents_light")
+    }
+
+    @Test
+    fun settingsScreenAiAgentsAmoled() {
+        render(darkTheme = true, amoled = true)
+        captureAgentRow("settings_screen_ai_agents_amoled")
+    }
+
+    @Test
+    fun settingsScreenAiAgentsRtlLargeFont() {
+        render(darkTheme = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        captureAgentRow("settings_screen_ai_agents_rtl_large_font")
+    }
+
+    /** Scroll to the production row so the below-fold icon is part of every captured viewport. */
+    private fun captureAgentRow(name: String) {
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("AI Agents"))
+        composeRule.onNodeWithText("AI Agents").assertIsDisplayed()
+        capture(name)
+    }
+
     /** Captures the header with several signed-in profiles, which offers switching instead of adding. */
     @Test
     fun settingsScreenSeveralProfilesLight() {
@@ -97,8 +129,8 @@ class SettingsScreenScreenshotTest {
     /** Available Settings update row uses the requested green emblem and real release-version wording. */
     @Test
     fun settingsScreenAvailableUpdateLight() {
-        render(darkTheme = false, latestVersion = "2026.10.20")
-        composeRule.onNodeWithText("Version 2026.10.20 is available on Zapstore.").assertIsDisplayed()
+        render(darkTheme = false, latestVersion = "2026.11.1")
+        composeRule.onNodeWithText("Version 2026.11.1 is available on Zapstore.").assertIsDisplayed()
         capture("settings_screen_available_update_light")
     }
 
@@ -134,8 +166,8 @@ class SettingsScreenScreenshotTest {
         render(darkTheme = true)
         composeRule
             .onNode(hasScrollToNodeAction())
-            .performScrollToNode(hasText("Version 2026.10.14"))
-        composeRule.onNodeWithText("Version 2026.10.14").assertIsDisplayed()
+            .performScrollToNode(hasText("Version 2026.10.27"))
+        composeRule.onNodeWithText("Version 2026.10.27").assertIsDisplayed()
         composeRule
             .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/settings_screen_version_footer_dark.png")
@@ -331,7 +363,7 @@ class SettingsScreenScreenshotTest {
         // the fixture draw the prominent placement above an "Up to date" subtitle.
         val appUpdateInfo =
             AppUpdateInfo(
-                installedVersion = "2026.10.14",
+                installedVersion = "2026.10.27",
                 latestVersion = latestVersion,
                 checkedAtMillis = null,
                 dismissedVersion = null,
@@ -353,7 +385,7 @@ class SettingsScreenScreenshotTest {
                 ),
             profileCount = profileCount,
             appUpdateInfo = appUpdateInfo,
-            versionName = "2026.10.14",
+            versionName = "2026.10.27",
             onBack = {},
             onOpenShareConnect = {},
             onAddProfile = {},

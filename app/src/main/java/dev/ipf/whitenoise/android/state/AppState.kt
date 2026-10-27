@@ -119,6 +119,7 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
+import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -1220,6 +1221,12 @@ class WhiteNoiseAppState private constructor(
     )
 
     internal val appContext = context.applicationContext
+    internal val publicJpegPreviewPreferences =
+        dev.ipf.whitenoise.android.media
+            .PublicJpegPreviewPreferences(appContext)
+    internal val publicJpegPreviewLoader =
+        dev.ipf.whitenoise.android.media
+            .PublicJpegPreviewLoader()
 
     /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
     internal val emojiUploads = EmojiUploadCache()
@@ -1252,6 +1259,7 @@ class WhiteNoiseAppState private constructor(
                 context = appContext,
                 readDraft = ::conversationDictationDraftSnapshot,
                 writeDraft = ::setConversationDictationDraftIfCurrent,
+                completionWrite = ::writeCompletedDictationDraft,
                 // Chat rows are a refreshable projection, not proof that the immutable origin was removed.
                 targetAvailable = { accountRef, _ ->
                     accounts.any { it.label == accountRef && it.signedOut != true }
@@ -1361,10 +1369,10 @@ class WhiteNoiseAppState private constructor(
      * frees the rest — no recycle() needed, and adding one back is unsafe.
      */
     private val mediaThumbnailCache =
-        dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
+        dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, dev.ipf.whitenoise.android.media.MediaThumbnail>(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
-            sizeOf = { it.allocationByteCount },
+            sizeOf = { it.bitmap.allocationByteCount },
         )
 
     internal fun cachedMediaPlaintext(cacheKey: String): ByteArray? {
@@ -1403,18 +1411,33 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Returns a placeholder or legacy thumbnail without asserting that it satisfies a larger image request. */
     internal fun cachedMediaThumbnail(cacheKey: String): android.graphics.Bitmap? {
         assertMainThread { "cachedMediaThumbnail" }
-        return mediaThumbnailCache.get(cacheKey)
+        return mediaThumbnailCache.get(cacheKey)?.bitmap
     }
 
+    /** Retains decode provenance so a thumbnail cannot silently satisfy a larger presentation request. */
+    internal fun cachedMediaThumbnailEntry(
+        cacheKey: String,
+        requestedMaxEdgePx: Int,
+    ): dev.ipf.whitenoise.android.media.MediaThumbnail? {
+        assertMainThread { "cachedMediaThumbnailEntry" }
+        return mediaThumbnailCache.get(cacheKey)?.takeIf { it.satisfies(requestedMaxEdgePx) }
+    }
+
+    /** Keeps at most one resolution per attachment, without allowing a late smaller decode to replace a larger one. */
     internal fun cacheMediaThumbnail(
         cacheKey: String,
         thumbnail: android.graphics.Bitmap,
+        maxEdgePx: Int = dev.ipf.whitenoise.android.media.MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
     ) {
         assertMainThread { "cacheMediaThumbnail" }
-        val previous = mediaThumbnailCache.put(cacheKey, thumbnail)
-        if (mediaThumbnailCache.get(cacheKey) === thumbnail || previous != null) {
+        val cached = mediaThumbnailCache.get(cacheKey)
+        if (cached != null && cached.maxEdgePx > maxEdgePx) return
+        val entry = MediaThumbnail(thumbnail, maxEdgePx)
+        val previous = mediaThumbnailCache.put(cacheKey, entry)
+        if (mediaThumbnailCache.get(cacheKey) === entry || previous != null) {
             mediaThumbnailRevisionState.update { it + 1L }
         }
     }
@@ -1702,7 +1725,9 @@ class WhiteNoiseAppState private constructor(
     // back to the chat list, matching VoicePlaybackController's lifetime.
     val ttsController = createAppTtsController(appContext, ttsRatePreferences, ttsMediaMixPreferences)
     private val conversationDictationMediaHandoff by lazy {
-        createConversationDictationMediaHandoff(ttsController, appContext) { conversationDictation.cancel() }
+        createConversationDictationMediaHandoff(ttsController, appContext) {
+            conversationDictation.interruptForAudioFocusLoss()
+        }
     }
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
@@ -2994,12 +3019,30 @@ class WhiteNoiseAppState private constructor(
         return ConversationDictationDraftSnapshot(value, latest.value)
     }
 
+    private fun writeCompletedDictationDraft(
+        accountRef: String,
+        groupIdHex: String,
+        expectedRevision: Long,
+        value: TextFieldValue,
+    ): dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite =
+        if (appLockScreenVisible || appUnlockEvaluationPending) {
+            dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite.DeferredByHost
+        } else {
+            composerDraftExpansionBridge
+                .writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+                ?.let(dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite::Written)
+                ?: dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite.Refused
+        }
+
     private fun setConversationDictationDraftIfCurrent(
         accountRef: String,
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Long? = composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+    ): Long? =
+        writeConversationDictationDraftWhenUnlocked(appLockScreenVisible, appUnlockEvaluationPending) {
+            composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
+        }
 
     /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {
@@ -7170,9 +7213,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
-     * local fallback behavior only after durable push cleanup admission; a structured unfinished-local
-     * outcome or unavailable cleanup authority retains the active session. Credential revocation failure
+     * Non-destructive MDK sign-out (#349, #2132). A thrown engine call requires an authoritative
+     * native signed-out observation before local deactivation; unfinished or unknown local cleanup
+     * retains the active session. Credential revocation failure
      * returns an incomplete result before
      * native admission; errors after admission retain their established propagation.
      * Final deactivation retires selections through the account session; native per-account cleanup remains
@@ -7374,7 +7417,7 @@ class WhiteNoiseAppState private constructor(
         return NativeSignOutAttempt(result, true, result.exceptionOrNull() as? CancellationException)
     }
 
-    /** Native partial cleanup is not evidence that the native identity remained signed in. */
+    /** A partial or lost native reply requires durable status before the host can retire its session. */
     @Suppress("LongMethod", "ReturnCount")
     private suspend fun finishOwnedSignOutLocked(
         account: String,
@@ -7389,9 +7432,9 @@ class WhiteNoiseAppState private constructor(
                 nativeCancellation = attempt.cancellation,
             )
         val native = result.getOrNull()
-        var partial = native?.localCleanup?.completed == false
+        val partial = native?.localCleanup?.completed == false
         var knownSignedOut = native?.localCleanup?.completed == true
-        if (partial || attempt.cancellation != null) {
+        if (partial || result.isFailure) {
             val observed =
                 runCatching {
                     withContext(marmotIoDispatcher) { checkNotNull(runtime).marmot.listAccounts() }
@@ -7402,7 +7445,7 @@ class WhiteNoiseAppState private constructor(
                     nativeCancellation = attempt.cancellation,
                 )
             }
-            partial = true
+            // A lost reply leaves remote cleanup unknown; only a typed unfinished-local report is partial.
             knownSignedOut = true
         }
         if (knownSignedOut) {
@@ -7556,6 +7599,9 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
+            publicJpegPreviewPreferences
+                .retainAccounts(accounts.filter { it.label != wipedRef }.map { it.accountIdHex })
+                .forEach(publicJpegPreviewLoader::clearPixels)
             withContext(NonCancellable + Dispatchers.IO) {
                 val alertsCleared =
                     runCatching {
@@ -7610,7 +7656,7 @@ class WhiteNoiseAppState private constructor(
                 }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
-            val next = refreshedAccounts.firstOrNull()?.label
+            val next = signOutOutcome(refreshedAccounts, wipedRef).nextActiveRef
             activeAccountRef = next
             preferences
                 .edit()
@@ -7949,6 +7995,7 @@ class WhiteNoiseAppState private constructor(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
+        if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
         resumePendingInviteNotificationIdentityRefreshes()
         resumePushWakeEpisodeFromLifecycle()
         if (dismissRetainedVisibleConversation) {
@@ -8011,6 +8058,7 @@ class WhiteNoiseAppState private constructor(
                 requestAppUnlock()
             } else {
                 appLockScreenVisible = false
+                if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
                 resumePendingInviteNotificationIdentityRefreshes()
             }
         }
@@ -8919,6 +8967,11 @@ class WhiteNoiseAppState private constructor(
             hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
         )
 
+    internal fun publicJpegPreviewNetworkAllowed(): Boolean =
+        hasValidatedInternet() &&
+            activeNetworkTypesSnapshot == setOf(MediaAutoDownloadNetwork.WiFi) &&
+            shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
+
     /**
      * Every [MediaAutoDownloadNetwork] the active connection currently matches.
      * A single connection can match several at once (e.g. cellular that is both
@@ -8932,10 +8985,17 @@ class WhiteNoiseAppState private constructor(
      */
     private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> = activeNetworkTypesSnapshot
 
+    private val previewNetworkTypesMutable = MutableStateFlow<Set<MediaAutoDownloadNetwork>>(emptySet())
+    internal val publicJpegPreviewNetworkTypes = previewNetworkTypesMutable.asStateFlow()
+
     // Callback-maintained mirror of the default network's state, volatile so
     // composition-time reads see the connectivity thread's latest write.
     @Volatile
     private var activeNetworkTypesSnapshot: Set<MediaAutoDownloadNetwork> = emptySet()
+        set(value) {
+            field = value
+            previewNetworkTypesMutable.value = value
+        }
 
     @Volatile
     private var hasActiveNetworkSnapshot = false
@@ -10770,10 +10830,10 @@ class WhiteNoiseAppState private constructor(
      * by [dev.ipf.whitenoise.android.notifications.MarmotFirebaseMessagingService] on
      * every Firebase token rotation. The sync coroutine no-ops if any
      * precondition is missing, so the call is safe at any point in the app
-     * lifecycle.
+     * lifecycle. Returns the re-sync job, or null if no rotation was queued.
      */
-    fun onPushTokenRotated(token: String) {
-        if (token.isBlank()) return
+    fun onPushTokenRotated(token: String): Job? {
+        if (token.isBlank()) return null
         val rotation = pushTokenRotationSequence.incrementAndGet()
         val runtime = marmotRuntime
         val generation = runtimeGeneration
@@ -10795,21 +10855,24 @@ class WhiteNoiseAppState private constructor(
                 android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
                 false
             }
-        if (!retained) return
-        notificationScope.launch {
-            val recorded =
-                withContext(pushWakeStorageDispatcher) {
-                    observePushState {
-                        pushTokenStore.recordPendingNativePushRegistrationSync()
-                        true
+        return if (retained) {
+            notificationScope.launch {
+                val recorded =
+                    withContext(pushWakeStorageDispatcher) {
+                        observePushState {
+                            pushTokenStore.recordPendingNativePushRegistrationSync()
+                            true
+                        }
+                    }
+                if (recorded != true) return@launch
+                notificationDeliveryModeMutex.withLock {
+                    if (!notificationDeliveryModeBusy) {
+                        if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
                     }
                 }
-            if (recorded != true) return@launch
-            notificationDeliveryModeMutex.withLock {
-                if (!notificationDeliveryModeBusy) {
-                    if (ownerIsCurrent()) syncNativePushRegistration(token, ownerIsCurrent)
-                }
             }
+        } else {
+            null
         }
     }
 

@@ -1,0 +1,53 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+  "legacy_sha256": "fe97d1daff73c20736feb98bfe50b0e9eb5ddf9153b62f2de6c97d62a3a6cc0f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: MentionPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "MentionPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+        "anchor": "fun MentionPicker(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "MentionPickerRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+        "anchor": "fun MentionPickerRow(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:mention_picker_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+        "anchor": "R.string.mention_picker_member",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Suggestion viewport preserves composer input and actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+        "anchor": "Column(Modifier.fadingVerticalScroll",
+        "test_ids": [
+          "CON-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

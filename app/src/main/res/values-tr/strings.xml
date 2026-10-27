@@ -1867,6 +1867,19 @@
     <string name="composer_resize">Mesaj alanını yeniden boyutlandırmak için sürükleyin</string>
     <string name="composer_expand_full_screen">Mesaj alanını genişlet</string>
     <string name="composer_collapse">Mesaj alanını daralt</string>
+    <string name="transcribe_audio">Metne dönüştür</string>
+    <string name="audio_transcription_title">Ses kaydının dökümü</string>
+    <string name="audio_transcription_disclosure">Offline Speech to Text, yüklü konuşma modelini kullanarak bu kaydı cihazınızda işleyecek. White Noise mikrofondan ses kaydetmez veya mesaj göndermez. Oluşturulan metin hatalı olabilir ve metni kapattığınızda ya da bu ekrandan ayrıldığınızda silinir.</string>
+    <string name="audio_transcription_working">Kayıt bu cihazda metne dönüştürülüyor…</string>
+    <string name="audio_transcription_generated">Oluşturulan döküm · gönderenin yazdığı metin değildir</string>
+    <string name="audio_transcription_android_version">Kayıtları metne dönüştürmek için Android 13 veya üzeri gerekir.</string>
+    <string name="audio_transcription_provider_missing">Bu cihazda kayıtları metne dönüştürmek için Offline Speech to Text uygulamasını yükleyin ve bir konuşma modeli kurun.</string>
+    <string name="audio_transcription_provider_outdated">Offline Speech to Text uygulamasını 0.21.0 veya daha yeni bir sürüme güncelleyin. Önceki sürümlerin yalnızca kayıtları metne dönüştürmek için uygunluğu doğrulanmamıştır.</string>
+    <string name="audio_transcription_provider_unavailable">Offline Speech to Text başlatılamadı. Uygulamayı açıp bir konuşma modelinin hazır olduğunu kontrol edin ve tekrar deneyin.</string>
+    <string name="audio_transcription_permission_denied">Android, konuşma hizmetine erişimi reddetti. Android ayarlarında White Noise ve Offline Speech to Text için mikrofon izinlerini kontrol edin. Metne dönüştürme işlemi mevcut kaydı okur; mikrofonunuzdan ses kaydetmez.</string>
+    <string name="audio_transcription_audio_rejected">Bu kayıt okunamadı veya tamamı aktarılamadı. Ses biçimi ya da boyutu desteklenmiyor olabilir.</string>
+    <string name="audio_transcription_failed">Kayıt metne dönüştürülemedi. Offline Speech to Text uygulamasını kontrol edip tekrar deneyin.</string>
+    <string name="audio_transcription_timeout">Metne dönüştürme işlemi çok uzun sürdü. Offline Speech to Text uygulamasında bir konuşma modelinin hazır olduğunu kontrol edin ve tekrar deneyin.</string>
     <string name="dictate_text">Metni dikte et</string>
     <string name="dictation_preparing">Dikte hazırlanıyor…</string>
     <string name="dictation_checking_service">Konuşma hizmeti kontrol ediliyor…</string>
@@ -2158,6 +2171,7 @@
     <string name="new_message_name_or_npub">Ad veya npub</string>
     <string name="new_message_connect_qr">QR koduyla bağlan</string>
     <string name="new_message_invite_friend">Bir arkadaşını davet et</string>
+    <string name="new_message_talk_to_agent">Ajanınla konuş</string>
     <string name="new_message_people">Kişiler</string>
     <string name="new_message_source_chats">Sohbetlerdeki kişiler</string>
     <string name="new_message_source_following">Takip ediliyor</string>
@@ -2444,6 +2458,8 @@
     <string name="search_message_content_failed">Mesaj içeriğinde arama yapılamadı.</string>
     <string name="document_save_interrupted">Kimlik doğrulama bu kaydetme işlemini kesintiye uğrattı. Hedef seçmek için tekrar Kaydet’i seçin.</string>
     <string name="avatar_preparation_interrupted">Görüntü güncellemesi kesintiye uğradı. Tekrar seçmeden önce mevcut görüntüyü kontrol edin.</string>
+    <string name="dictation_interrupted">Dikte kesintiye uğradı. Göndermeden önce kurtarılan metni ve kalan ses kayıtlarını gözden geçirin.</string>
+    <string name="dictation_waiting_for_unlock">Dikte geçici olarak kaydedildi. Yapıştırmak için uygulamanın kilidini açın.</string>
     <string name="show_less">Daha az göster</string>
     <string name="font_size_preview">Mesaj önizlemesi</string>
     <string name="font_size_sample_received">İstasyonda buluşalım. Öğleden sonra senin için hâlâ uygun mu?</string>
@@ -2466,4 +2482,8 @@
     <string name="setup_finding_outcome_unknown">Sonuç bilinmiyor</string>
     <string name="setup_finding_outcome_success">Kontrol başarılı</string>
     <string name="setup_finding_outcome_failure">Kontrol başarısız</string>
+    <string name="public_jpeg_previews_title">Sohbet içi görsel önizlemeleri</string>
+    <string name="public_jpeg_previews_privacy">Varsayılan olarak kapalıdır. Doğrudan Blossom JPEG bağlantıları IP adresinizi görsel sunucusuna gösterebilir. Önizlemeler, ölçülmeyen Wi-Fi bağlantısını ve fotoğraf indirme kurallarınızı kullanır. Kapalıyken normal bağlantılar kullanılabilir.</string>
+    <string name="public_jpeg_preview_image">Bağlantılı JPEG önizlemesi</string>
+    <string name="public_jpeg_preview_save_failed">Görsel önizleme ayarı kaydedilemedi. Lütfen tekrar deneyin.</string>
 </resources>

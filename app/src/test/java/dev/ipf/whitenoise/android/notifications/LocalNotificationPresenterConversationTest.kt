@@ -62,6 +62,7 @@ class LocalNotificationPresenterConversationTest {
 
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         manager.cancelAll()
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
         ConversationVibrationPreferences(context).setPattern(

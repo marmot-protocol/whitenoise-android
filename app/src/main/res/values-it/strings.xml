@@ -1268,6 +1268,19 @@
     <string name="voice_message_permission_denied">Autorizzazione microfono necessaria</string>
     <string name="voice_message_recording_failed">Impossibile registrare il messaggio vocale</string>
     <string name="voice_message_microphone_busy">Il microfono è utilizzato da un’altra app. Chiudila e riprova.</string>
+    <string name="transcribe_audio">Trascrivi</string>
+    <string name="audio_transcription_title">Trascrizione audio</string>
+    <string name="audio_transcription_disclosure">Offline Speech to Text elaborerà questa registrazione sul tuo dispositivo usando il proprio modello di riconoscimento vocale installato. White Noise non registra dal microfono e non invia alcun messaggio. Il testo generato potrebbe essere impreciso e viene cancellato quando lo chiudi o esci da questa schermata.</string>
+    <string name="audio_transcription_working">Trascrizione della registrazione su questo dispositivo…</string>
+    <string name="audio_transcription_generated">Trascrizione generata · non è il testo del mittente</string>
+    <string name="audio_transcription_android_version">La trascrizione delle registrazioni richiede Android 13 o versioni successive.</string>
+    <string name="audio_transcription_provider_missing">Installa Offline Speech to Text e configura un modello di riconoscimento vocale per trascrivere le registrazioni su questo dispositivo.</string>
+    <string name="audio_transcription_provider_outdated">Aggiorna Offline Speech to Text alla versione 0.21.0 o successiva. Le versioni precedenti non sono state convalidate per la trascrizione limitata alle registrazioni esistenti.</string>
+    <string name="audio_transcription_provider_unavailable">Impossibile avviare Offline Speech to Text. Apri l’app e verifica che un modello di riconoscimento vocale sia pronto, poi riprova.</string>
+    <string name="audio_transcription_permission_denied">Android ha negato l’accesso al servizio vocale. Controlla le autorizzazioni del microfono per White Noise e Offline Speech to Text nelle impostazioni di Android. La trascrizione legge la registrazione; non registra dal tuo microfono.</string>
+    <string name="audio_transcription_audio_rejected">Impossibile leggere questa registrazione o trasmetterla per intero. Il formato audio o le dimensioni potrebbero non essere supportati.</string>
+    <string name="audio_transcription_failed">Impossibile trascrivere la registrazione. Controlla Offline Speech to Text e riprova.</string>
+    <string name="audio_transcription_timeout">La trascrizione ha richiesto troppo tempo. Verifica che Offline Speech to Text abbia un modello di riconoscimento vocale pronto, poi riprova.</string>
     <string name="voice_message_play">Riproduci messaggio vocale</string>
     <string name="voice_message_pause">Metti in pausa il messaggio vocale</string>
     <string name="voice_message_speed">Velocità di riproduzione %1$s</string>
@@ -2160,6 +2173,7 @@
     <string name="new_message_name_or_npub">Nome o npub</string>
     <string name="new_message_connect_qr">Connetti con QR</string>
     <string name="new_message_invite_friend">Invita un amico</string>
+    <string name="new_message_talk_to_agent">Parla con il tuo agente</string>
     <string name="new_message_people">Persone</string>
     <string name="new_message_source_chats">Persone nelle chat</string>
     <string name="new_message_source_following">Seguiti</string>
@@ -2446,6 +2460,8 @@
     <string name="search_message_content_failed">Impossibile cercare nel contenuto dei messaggi.</string>
     <string name="document_save_interrupted">L’autenticazione ha interrotto il salvataggio. Scegli di nuovo Salva per selezionare una destinazione.</string>
     <string name="avatar_preparation_interrupted">L’aggiornamento dell’immagine è stato interrotto. Controlla l’immagine attuale prima di selezionarla di nuovo.</string>
+    <string name="dictation_interrupted">Dettatura interrotta. Controlla il testo recuperato e l’eventuale audio rimanente prima di inviare.</string>
+    <string name="dictation_waiting_for_unlock">Dettatura salvata temporaneamente. Sblocca l’app per incollarla.</string>
     <string name="show_less">Mostra meno</string>
     <string name="font_size_preview">Anteprima dei messaggi</string>
     <string name="font_size_sample_received">Incontriamoci alla stazione. Per te va ancora bene il pomeriggio?</string>
@@ -2468,4 +2484,8 @@
     <string name="setup_finding_outcome_unknown">Risultato sconosciuto</string>
     <string name="setup_finding_outcome_success">Verifica riuscita</string>
     <string name="setup_finding_outcome_failure">Verifica non riuscita</string>
+    <string name="public_jpeg_previews_title">Anteprime delle immagini in chat</string>
+    <string name="public_jpeg_previews_privacy">Disattivate per impostazione predefinita. I link diretti a JPEG su Blossom possono rivelare il tuo indirizzo IP al server delle immagini. Le anteprime usano Wi-Fi senza limiti di dati e le tue regole di download delle foto. I normali link restano disponibili quando sono disattivate.</string>
+    <string name="public_jpeg_preview_image">Anteprima del JPEG collegato</string>
+    <string name="public_jpeg_preview_save_failed">Impossibile salvare la preferenza delle anteprime. Riprova.</string>
 </resources>

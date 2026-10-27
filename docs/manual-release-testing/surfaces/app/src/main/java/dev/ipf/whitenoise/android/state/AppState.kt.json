@@ -27,6 +27,22 @@
           "CON-017",
           "DIC-002"
         ]
+      },
+      {
+        "surface": "signout_native_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun finishOwnedSignOutLocked(",
+        "test_ids": [
+          "ACC-013"
+        ]
+      },
+      {
+        "surface": "wipe_eligible_successor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun signOutAndWipeActiveAccountLocked(",
+        "test_ids": [
+          "ACC-014"
+        ]
       }
     ],
     "notification_content_contracts": [
@@ -441,6 +457,14 @@
         "anchor": "fun updateFontScale(",
         "test_ids": [
           "SET-006"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "surface": "Token rotation retains pending registration while storage cleanup is unknown",
+        "anchor": "fun onPushTokenRotated(",
+        "test_ids": [
+          "SEC-017"
         ]
       }
     ]

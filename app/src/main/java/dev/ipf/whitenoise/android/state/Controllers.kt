@@ -6595,6 +6595,15 @@ class ConversationController(
     internal val boundAccountRef: String?
         get() = conversationAccountRef
 
+    /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
+    internal val ownsRetainedForegroundPresentation: Boolean
+        get() =
+            !controllerCleared &&
+                !isAccountTeardownRequested() &&
+                conversationAccountRef != null &&
+                appState.activeAccountRef == conversationAccountRef &&
+                appState.runtimeGeneration == conversationRuntimeGeneration
+
     // Self-identity for conversation-scoped UI ("is me", mention detection).
     // Follows the conversation's account, which the active account only lags
     // during a notification-routed early open (#586).
@@ -10495,12 +10504,25 @@ class ConversationController(
         attachmentIndex: Int,
     ): android.graphics.Bitmap? = attachmentPresentation.thumbnailFor(messageIdHex, attachmentIndex)
 
+    /** Returns cached pixels together with the largest request they can satisfy. */
+    internal fun thumbnailEntryFor(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        requestedMaxEdgePx: Int = 0,
+    ): dev.ipf.whitenoise.android.media.MediaThumbnail? =
+        attachmentPresentation.thumbnailEntryFor(
+            messageIdHex,
+            attachmentIndex,
+            requestedMaxEdgePx,
+        )
+
     /** Stores a decoded thumbnail under the pinned cache identity. */
     fun cacheThumbnail(
         messageIdHex: String,
         attachmentIndex: Int,
         bitmap: android.graphics.Bitmap,
-    ): Unit = attachmentPresentation.cacheThumbnail(messageIdHex, attachmentIndex, bitmap)
+        maxEdgePx: Int = dev.ipf.whitenoise.android.media.MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+    ): Unit = attachmentPresentation.cacheThumbnail(messageIdHex, attachmentIndex, bitmap, maxEdgePx)
 
     /** Resolves interactive attachment bytes through the bounded presentation owner. */
     suspend fun downloadAttachment(

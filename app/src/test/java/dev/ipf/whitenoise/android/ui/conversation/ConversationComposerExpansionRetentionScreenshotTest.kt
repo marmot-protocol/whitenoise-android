@@ -80,12 +80,15 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 @Suppress("LargeClass") // Production-route screenshot cases share one deterministic app/controller fixture.
 class ConversationComposerExpansionRetentionScreenshotTest {
+    private val originalTimeZone = TimeZone.getDefault()
+
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -186,6 +189,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     @After
     fun releaseControllers() {
         controllers.forEach { it.onCleared() }
+        TimeZone.setDefault(originalTimeZone)
     }
 
     /**
@@ -466,6 +470,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     @Test
     @Suppress("LongMethod")
     fun acceptedSendStaysVisibleWhenBottomInputGrowsNextFrame() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val publisherStarted = CompletableDeferred<Unit>()
         val releaseSuccess = CompletableDeferred<Unit>()
         val draftStore = DraftStore(InMemoryDraftPersistence())

@@ -118,6 +118,22 @@
         "test_ids": [
           "DIC-009"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "surface": "Both composer surfaces publish only direct user text edits through their shared text owner",
+        "anchor": "fun updateValueFromUser(value: TextFieldValue)",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "surface": "Suggestion viewport preserves composer input and actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "ComposerContentLayout(",
+        "test_ids": [
+          "CON-005"
+        ]
       }
     ]
   },

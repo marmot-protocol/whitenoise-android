@@ -85,6 +85,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
+import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.theme.Typography
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
@@ -602,6 +603,7 @@ private fun FocusedReactionTarget(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val description = emojiPlainLabel(emoji)
     Box(
         modifier =
             modifier
@@ -613,7 +615,7 @@ private fun FocusedReactionTarget(
                     onClick = onClick,
                 ).semantics {
                     this.selected = selected
-                    contentDescription = emoji
+                    contentDescription = description
                 }.testTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji"),
         contentAlignment = Alignment.Center,
     ) {

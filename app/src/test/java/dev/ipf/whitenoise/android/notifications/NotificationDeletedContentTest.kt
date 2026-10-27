@@ -45,6 +45,7 @@ class NotificationDeletedContentTest {
     /** Grants posting and starts each case from an empty tray. */
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager.cancelAll()
         presenter.ensureChannels()

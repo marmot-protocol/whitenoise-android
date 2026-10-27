@@ -915,6 +915,14 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"
       },
       {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Same account/runtime retained controller admission",
+        "anchor": "val ownsRetainedForegroundPresentation: Boolean",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
         "surface": "A later page reads the cached cards of its new rows before it is applied, so they first show complete",
         "anchor": "internal suspend fun warmLaterPageEventCards(",
         "test_ids": [

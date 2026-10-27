@@ -43,6 +43,7 @@ class NotificationReactionArtworkTest {
     /** Start each case with an empty tray and enabled previews. */
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         manager.cancelAll()
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -63,10 +64,14 @@ class NotificationReactionArtworkTest {
             assertEquals(expected.id, active.id)
             assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
             assertEquals(UserEventNotificationGroup.KEY, card.group)
+            assertEquals(Notification.GROUP_ALERT_CHILDREN, card.groupAlertBehavior)
+            val revision = card.extras.getString(EXTRA_PAYLOAD_REVISION)
+            assertNotNull(revision)
+            assertTrue(ConversationCardPostedRegistry.isCurrentPayload(active.tag, active.id, revision))
             assertNotNull(card.contentIntent)
             assertNotNull(card.deleteIntent)
             assertTrue(card.actions.isNullOrEmpty())
-            assertPicture(card, ":marmot:")
+            assertPicture(card, ":marmot:", context.getString(R.string.emoji_name_marmot))
             assertNoArtwork(card.publicVersion)
         }
 
@@ -81,12 +86,7 @@ class NotificationReactionArtworkTest {
                 card.extras.getString(Notification.EXTRA_TEMPLATE),
             )
             assertNotNull(card.contentView)
-            assertTrue(
-                card.extras
-                    .getCharSequence(Notification.EXTRA_TEXT)
-                    .toString()
-                    .contains(":wn:"),
-            )
+            assertPicture(card, ":wn:", context.getString(R.string.white_noise))
         }
 
     /** Reinflate the same posted payload in both directions; only the matching full-color image is visible. */
@@ -157,6 +157,48 @@ class NotificationReactionArtworkTest {
             }
         }
 
+    /**
+     * The plain-text line Android shows for grouped cards names a built-in readably, while only the inline artwork
+     * keeps the authored shortcode. Other shortcodes stay exact, and redaction drops the authored copy.
+     */
+    @Test
+    fun reactionTextNamesBuiltinsWhileOnlyArtworkKeepsTheShortcode() {
+        val marmot = context.getString(R.string.emoji_name_marmot)
+        val content =
+            requireNotNull(
+                LocalNotificationFormatter.content(reactionArtworkUpdate(":marmot:"), context, shortNpub = { it }),
+            )
+        assertEquals("reacted $marmot to: \"Hello :wn:\"", content.body)
+        assertEquals("reacted :marmot: to: \"Hello :wn:\"", content.reactionArtworkBody)
+        val partyUpdate = reactionArtworkUpdate(":party:")
+        val party = requireNotNull(LocalNotificationFormatter.content(partyUpdate, context, shortNpub = { it }))
+        assertEquals("reacted :party: to: \"Hello :wn:\"", party.body)
+        assertNull(LocalNotificationFormatter.redactedContent(content, "White Noise", "hidden").reactionArtworkBody)
+    }
+
+    /** Built-in tiles crop canvas padding as the in-app reaction chip does, so the Marmot is not drawn small. */
+    @Test
+    fun builtinArtworkFillsItsTileLikeTheInAppGlyph() {
+        for (code in listOf(":marmot:", ":wn:")) {
+            val tile = requireNotNull(notificationBuiltinEmojiBitmap(context, code))
+            try {
+                val opaque =
+                    (0 until tile.height).flatMap { y ->
+                        (0 until tile.width).filter { x -> Color.alpha(tile.getPixel(x, y)) > 0 }.map { x -> x to y }
+                    }
+                val edge = 2
+                assertTrue(code, opaque.minOf { it.first } <= edge && opaque.minOf { it.second } <= edge)
+                assertTrue(
+                    code,
+                    opaque.maxOf { it.first } >= tile.width - 1 - edge &&
+                        opaque.maxOf { it.second } >= tile.height - 1 - edge,
+                )
+            } finally {
+                tile.recycle()
+            }
+        }
+    }
+
     /** App-lock redaction and the persisted preview opt-out skip optional artwork entirely. */
     @Test
     fun hiddenPreviewsNeverExposeArtwork() =
@@ -165,12 +207,9 @@ class NotificationReactionArtworkTest {
             NotificationPreviewPreferences.setEnabled(context, false, scrub = { true })
             val card = post(":marmot:")
             assertNoArtwork(card)
-            assertFalse(
-                card.extras
-                    .getCharSequence(Notification.EXTRA_TEXT)
-                    .toString()
-                    .contains(":marmot:"),
-            )
+            val hiddenText = card.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+            assertFalse(hiddenText.contains(":marmot:"))
+            assertFalse(hiddenText.contains(context.getString(R.string.emoji_name_marmot)))
         }
 
     /** Already posted picture cards use the existing allowlisted redactor, with routing unchanged. */
@@ -198,7 +237,7 @@ class NotificationReactionArtworkTest {
                     poster = { target, tag, id, notification ->
                         attempts++
                         if (attempts == 1) {
-                            assertPicture(notification, ":marmot:")
+                            assertPicture(notification, ":marmot:", context.getString(R.string.emoji_name_marmot))
                             throw IllegalArgumentException("picture rejected")
                         }
                         assertNoArtwork(notification)
@@ -207,11 +246,9 @@ class NotificationReactionArtworkTest {
                 )
             assertEquals(2, attempts)
             assertNoArtwork(card)
-            assertTrue(
-                card.extras
-                    .getCharSequence(Notification.EXTRA_TEXT)
-                    .toString()
-                    .contains(":marmot:"),
+            assertEquals(
+                "reacted ${context.getString(R.string.emoji_name_marmot)} to: \"Hello\"",
+                card.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString(),
             )
             assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
             assertEquals(UserEventNotificationGroup.KEY, card.group)
@@ -346,10 +383,11 @@ class NotificationReactionArtworkTest {
             }
         }
 
-    /** Verify artwork and every textual representation survive the platform round trip. */
+    /** Verify artwork survives the platform round trip, while every textual representation names it readably. */
     private fun assertPicture(
         card: Notification,
         shortcode: String,
+        name: String,
     ) {
         assertEquals(
             "android.app.Notification\$DecoratedCustomViewStyle",
@@ -361,13 +399,16 @@ class NotificationReactionArtworkTest {
         val icon = root.findViewById<ImageView>(R.id.reaction_notification_body_light)
         assertNotNull(icon.drawable)
         assertFalse((icon.drawable as BitmapDrawable).bitmap.isRecycled)
-        assertTrue(root.contentDescription.toString().contains(shortcode))
-        assertTrue(
-            card.extras
-                .getCharSequence(Notification.EXTRA_TEXT)
-                .toString()
-                .contains(shortcode),
-        )
+        val texts =
+            listOfNotNull(
+                root.contentDescription,
+                card.extras.getCharSequence(Notification.EXTRA_TEXT),
+                card.extras.getCharSequence(Notification.EXTRA_BIG_TEXT),
+            ).map(CharSequence::toString)
+        texts.forEach { text ->
+            assertTrue(text, text.contains(name))
+            assertFalse(text, text.contains(shortcode))
+        }
     }
 
     /** No private artwork may remain in hidden or public payloads. */
