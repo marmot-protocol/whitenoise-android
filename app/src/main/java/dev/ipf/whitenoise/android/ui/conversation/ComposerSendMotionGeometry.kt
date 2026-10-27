@@ -193,12 +193,10 @@ internal fun motionRectsMatch(
     actual: Rect,
 ): Boolean =
     expected == null ||
-        listOf(
-            expected.left - actual.left,
-            expected.top - actual.top,
-            expected.right - actual.right,
-            expected.bottom - actual.bottom,
-        ).all { abs(it) <= MOTION_ROUNDING_PX }
+        abs(expected.left - actual.left) <= MOTION_ROUNDING_PX &&
+        abs(expected.top - actual.top) <= MOTION_ROUNDING_PX &&
+        abs(expected.right - actual.right) <= MOTION_ROUNDING_PX &&
+        abs(expected.bottom - actual.bottom) <= MOTION_ROUNDING_PX
 
 internal fun resolveComposerSendLanding(
     active: ComposerSendFlight,

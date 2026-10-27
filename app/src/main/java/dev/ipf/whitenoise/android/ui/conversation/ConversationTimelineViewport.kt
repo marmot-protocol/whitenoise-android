@@ -108,7 +108,10 @@ internal class ConversationTimelineViewport(
     ): ComposerSendViewportProjection? {
         val native = listState.layoutInfo
         val sameMeasure = enabled && hasMeasuredTimeline(publication) && native === measuredNativeLayout
-        val acceptedRow = presentationId == null || publication.any { it.presentationId == presentationId }
+        val acceptedRow =
+            presentationId == null ||
+                publication.lastOrNull()?.presentationId == presentationId ||
+                publication.any { it.presentationId == presentationId }
         val (base, measuredOverlap) = measuredPadding
         val consumed = native.beforeContentPadding - base
         val validOverlap = consumed in 0..measuredOverlap

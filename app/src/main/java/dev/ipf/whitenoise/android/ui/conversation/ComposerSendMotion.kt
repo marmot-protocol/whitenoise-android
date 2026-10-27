@@ -312,16 +312,9 @@ internal class ComposerSendMotion {
                 ?: return ComposerSendDrawDecision()
         val layout = destinationLayout
         val progress = readProgress()
-        val sameInk = layout?.layoutInput?.text?.text == active.source.text
-        val sameStyle =
-            layout
-                ?.layoutInput
-                ?.style
-                ?.color
-                ?.isSpecified == true &&
-                layout.uniformParagraphDirection() == active.source.paragraphDirection
+        // Only destinationLayout() publishes validated ink; clear() retires it with its flight.
         val geometry =
-            if (sameInk && sameStyle) {
+            if (layout != null) {
                 resolveComposerSendLanding(active, progress, "presentation", onLandingDiagnostic, landingMeasurement)
             } else {
                 null

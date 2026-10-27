@@ -612,33 +612,6 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return conversation
     }
 
-    private fun incomingWindowEmitter(
-        conversation: ConversationController,
-        timelineSubscription: ScriptedConversationTimelineSubscription,
-        records: List<TimelineMessageRecordFfi>,
-        draftText: String,
-    ): () -> Unit =
-        {
-            val accepted = conversation.timeline.single { it.record.plaintext == draftText.trimEnd(' ') }
-            val own =
-                accepted.projected ?: timelineRecord(
-                    accepted.record.messageIdHex,
-                    accepted.record.recordedAt,
-                    accepted.record.plaintext,
-                ).copy(
-                    direction = accepted.record.direction,
-                    sender = accepted.record.sender,
-                    contentTokens = accepted.record.contentTokens,
-                )
-            val incoming = timelineRecord("d4".repeat(32), accepted.record.recordedAt + 1uL, INCOMING_TEXT)
-            val callsBefore = timelineSubscription.nextWindowCallCount
-            timelineSubscription.emitWindow(timelinePage(*(records + own + incoming).toTypedArray()))
-            awaitConversationCondition { timelineSubscription.nextWindowCallCount > callsBefore }
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idleFor(java.time.Duration.ofMillis(10))
-        }
-
     private fun plainParagraphDocument(text: String): MarkdownDocumentFfi =
         MarkdownDocumentFfi(
             truncated = false,
@@ -714,12 +687,40 @@ class ConversationAcceptedSendRouteScreenshotTest {
     }
 
     private companion object {
-        const val INCOMING_TEXT = "A received row while sending"
         const val SENT_TEXT = "Accepted send from older history"
         const val HISTORY_ANCHOR_INDEX = 10
         const val LONG_MESSAGE_LINES = 70
     }
 }
+
+private const val INCOMING_TEXT = "A received row while sending"
+
+private fun incomingWindowEmitter(
+    conversation: ConversationController,
+    timelineSubscription: ScriptedConversationTimelineSubscription,
+    records: List<TimelineMessageRecordFfi>,
+    draftText: String,
+): () -> Unit =
+    {
+        val accepted = conversation.timeline.single { it.record.plaintext == draftText.trimEnd(' ') }
+        val own =
+            accepted.projected ?: timelineRecord(
+                accepted.record.messageIdHex,
+                accepted.record.recordedAt,
+                accepted.record.plaintext,
+            ).copy(
+                direction = accepted.record.direction,
+                sender = accepted.record.sender,
+                contentTokens = accepted.record.contentTokens,
+            )
+        val incoming = timelineRecord("d4".repeat(32), accepted.record.recordedAt + 1uL, INCOMING_TEXT)
+        val callsBefore = timelineSubscription.nextWindowCallCount
+        timelineSubscription.emitWindow(timelinePage(*(records + own + incoming).toTypedArray()))
+        awaitConversationCondition { timelineSubscription.nextWindowCallCount > callsBefore }
+        org.robolectric.Shadows
+            .shadowOf(android.os.Looper.getMainLooper())
+            .idleFor(java.time.Duration.ofMillis(10))
+    }
 
 /** Rect.toString rounds coordinates; raw IEEE754 bits retain exact guard inputs. */
 private fun diagnosticRectBits(value: ComposerSendLandingDiagnostic): String =
