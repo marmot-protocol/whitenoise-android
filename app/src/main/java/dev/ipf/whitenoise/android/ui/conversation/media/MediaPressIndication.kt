@@ -77,8 +77,9 @@ private data class MediaPressIndication(
     val circle: Boolean,
 ) : IndicationNodeFactory {
     /** Each clickable owns its interaction sets while the factory shares only current theme color. */
-    override fun create(interactionSource: InteractionSource): DelegatableNode =
-        MediaPressNode(interactionSource, color, circle)
+    override fun create(
+        interactionSource: InteractionSource,
+    ): DelegatableNode = MediaPressNode(interactionSource, color, circle)
 }
 
 /** A static state layer avoids RippleDrawable shader creation and its continuing hardware animation. */
