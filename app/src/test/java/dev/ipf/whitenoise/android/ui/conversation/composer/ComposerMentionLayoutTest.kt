@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -159,8 +160,7 @@ class ComposerMentionLayoutTest {
         val originalHeight = pillHeight()
         composeRule.onNode(hasSetTextAction()).performTextReplacement(":smile")
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag(EMOJI_SUGGESTIONS_TEST_TAG))
-                .fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodes(hasTestTag(EMOJI_SUGGESTIONS_TEST_TAG)).fetchSemanticsNodes().isNotEmpty()
         }
         assertUsableEditor(originalHeight)
     }
@@ -186,8 +186,7 @@ class ComposerMentionLayoutTest {
         val draft = (1..30).joinToString("\n") { "Draft line $it" } + "\n:smile"
         composeRule.onNode(hasSetTextAction()).performClick().performTextReplacement(draft)
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag(EMOJI_SUGGESTIONS_TEST_TAG))
-                .fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodes(hasTestTag(EMOJI_SUGGESTIONS_TEST_TAG)).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag(EMOJI_SUGGESTIONS_TEST_TAG).assertIsDisplayed()
         composeRule.onNode(hasSetTextAction()).assertIsDisplayed().assertIsFocused()
@@ -223,8 +222,10 @@ class ComposerMentionLayoutTest {
     }
 
     /** Reads the editor independently of the suggestion area. */
-    private fun pillHeight() =
-        composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().size.height.toFloat()
+    private fun pillHeight(): Float {
+        val node = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode()
+        return node.size.height.toFloat()
+    }
 
     /** Records only synthetic production-composer content for public review. */
     private fun capture(name: String) {
