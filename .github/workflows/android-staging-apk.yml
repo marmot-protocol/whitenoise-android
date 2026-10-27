@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      AFTER_SHA: 81cf3515c96908cca7a20a7e40a27816746c1664
+      AFTER_SHA: 3b5941ffaad3a8629b195c54e0c7decc7db13300
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
