@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.content.Context
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -12,19 +14,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
@@ -95,6 +101,47 @@ class ComposerToolbarSpacingScreenshotTest {
                 locked = true,
             ),
         )
+
+    @Test
+    fun compactSlotsKeepExpandedTouchTargetsAndRouteAdjacentClicks() {
+        val clicks = intArrayOf(0, 0)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Row(Modifier.testTag("touch-row").padding(8.dp)) {
+                    repeat(2) { index ->
+                        ComposerActionDisc(
+                            onClick = { clicks[index]++ },
+                            containerColor = Color.Black,
+                            contentColor = Color.White,
+                            description = "tool-$index",
+                            icon = R.drawable.ic_add,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val nodes = (0..1).map { composeRule.onNodeWithContentDescription("tool-$it").fetchSemanticsNode() }
+        val row = composeRule.onNodeWithTag("touch-row").fetchSemanticsNode().boundsInRoot
+        val minimum = with(composeRule.density) { 48.dp.toPx() }
+        nodes.forEach { node ->
+            assertTrue("platform touch width", node.touchBoundsInRoot.width >= minimum)
+            assertTrue("platform touch height", node.touchBoundsInRoot.height >= minimum)
+        }
+        val first = nodes[0].boundsInRoot
+        val second = nodes[1].boundsInRoot
+        val points =
+            listOf(
+                first.center.copy(x = first.left - 2f),
+                first.center.copy(x = first.right - 1f),
+                second.center.copy(x = second.left + 1f),
+                second.center.copy(x = second.right + 2f),
+            )
+        points.forEach { point ->
+            composeRule.onNodeWithTag("touch-row").performTouchInput { click(point - row.topLeft) }
+        }
+        composeRule.runOnIdle { assertEquals(listOf(2, 2), clicks.toList()) }
+    }
 
     private data class ToolbarCase(
         val name: String,
@@ -243,7 +290,7 @@ class ComposerToolbarSpacingScreenshotTest {
             assertTargets(trailing, sign)
             val row = (controls + trailing).sortedBy { it.left }
             row.zipWithNext().forEach { (first, second) ->
-                assertTrue("targets do not overlap", first.right <= second.left + 1f)
+                assertTrue("visual slots do not overlap", first.right <= second.left + 1f)
             }
             val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
             assertTrue("editor remains usable", editor.width > 1f && editor.height > 1f)
@@ -258,8 +305,8 @@ class ComposerToolbarSpacingScreenshotTest {
             assertEquals("all adjacent toolbar centers", 40f, (second.center.x - first.center.x) * sign, 1f)
         }
         controls.forEach {
-            assertEquals("actual compact target width", 40f, it.width, 1f)
-            assertEquals("actual compact target height", 48f, it.height, 1f)
+            assertEquals("compact visual slot width", 40f, it.width, 1f)
+            assertEquals("compact visual slot height", 48f, it.height, 1f)
         }
     }
 

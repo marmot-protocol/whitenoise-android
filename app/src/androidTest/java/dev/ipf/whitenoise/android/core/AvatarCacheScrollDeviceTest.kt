@@ -41,7 +41,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import org.junit.After
@@ -417,7 +417,7 @@ private fun processMemory(): MemorySummary {
         heapClassMib = manager.memoryClass,
         device = Build.MODEL,
         android = Build.VERSION.RELEASE,
-        source = BuildConfig.APP_SHORT_SHA,
+        source = AppRevision.SHORT_SHA,
     )
 }
 

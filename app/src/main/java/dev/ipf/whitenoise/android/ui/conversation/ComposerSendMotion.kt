@@ -659,6 +659,6 @@ private fun DrawScope.drawFlightText(
         layout.layoutInput.style.color
             .takeOrElse { sourceColor }
     val foreground = composerMotionForeground(sourceColor, targetColor, fill)
-    drawText(source.layout, color = foreground, topLeft = sourceOrigin, alpha = 1f - blend)
-    drawText(layout, color = foreground, topLeft = targetOrigin, alpha = blend)
+    if (blend < 1f) drawText(source.layout, color = foreground, topLeft = sourceOrigin, alpha = 1f - blend)
+    if (blend > 0f) drawText(layout, color = foreground, topLeft = targetOrigin, alpha = blend)
 }
