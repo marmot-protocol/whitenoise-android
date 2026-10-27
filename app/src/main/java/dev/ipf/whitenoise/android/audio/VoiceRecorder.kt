@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.content.Context
+import android.media.AudioManager
+import android.media.AudioRecordingConfiguration
 import android.media.MediaRecorder
 import android.os.Build
 import android.util.Log
@@ -22,6 +24,8 @@ import java.io.File
  * NOT thread-safe. Call from a single owner — the composer's coroutine.
  */
 internal interface VoiceRecordingSession {
+    val captureInterrupted: Boolean get() = false
+
     fun start()
 
     fun stop(): VoiceRecordingResult?
@@ -41,6 +45,13 @@ internal class VoiceRecorder(
 ) : VoiceRecordingSession {
     private var recorder: MediaRecorder? = null
     private var startedAtNanos: Long = 0L
+
+    @Volatile
+    override var captureInterrupted: Boolean = false
+        private set
+
+    @Volatile
+    private var recordingCallback: AudioManager.AudioRecordingCallback? = null
 
     val isRecording: Boolean get() = recorder != null
 
@@ -63,6 +74,20 @@ internal class VoiceRecorder(
                 MediaRecorder()
             }
         try {
+            captureInterrupted = false
+            val callback =
+                object : AudioManager.AudioRecordingCallback() {
+                    override fun onRecordingConfigChanged(configs: MutableList<AudioRecordingConfiguration>) {
+                        // MediaRecorder scopes this callback to its own capture.
+                        // Never infer interruption from quiet audio or another app.
+                        if (recordingCallback === this && configs.any { it.isClientSilenced }) {
+                            captureInterrupted = true
+                        }
+                    }
+                }
+            recordingCallback = callback
+            r.registerAudioRecordingCallback(context.mainExecutor, callback)
+            r.setOnErrorListener { _, _, _ -> captureInterrupted = true }
             r.setAudioSource(MediaRecorder.AudioSource.MIC)
             r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -78,7 +103,7 @@ internal class VoiceRecorder(
             // The MediaRecorder state machine is unforgiving: a failed
             // prepare/start leaves the instance unusable, so release it and
             // wipe any partial file rather than handing the caller a stub.
-            runCatching { r.release() }
+            release(r)
             runCatching { outputFile.delete() }
             throw t
         }
@@ -97,7 +122,7 @@ internal class VoiceRecorder(
         return try {
             r.stop()
             val durationMs = ((System.nanoTime() - startedAtNanos) / 1_000_000L).coerceAtLeast(0L)
-            r.release()
+            release(r)
             if (outputFile.length() <= 0L) {
                 runCatching { outputFile.delete() }
                 null
@@ -110,7 +135,7 @@ internal class VoiceRecorder(
             // emitted a valid atom yet). Drop the partial file and signal
             // failure to the caller without crashing the composer.
             Log.w("VoiceRecorder", "stop() failed; discarding partial recording", t)
-            runCatching { r.release() }
+            release(r)
             runCatching { outputFile.delete() }
             null
         }
@@ -124,8 +149,15 @@ internal class VoiceRecorder(
         val r = recorder ?: return
         recorder = null
         runCatching { r.stop() }
-        runCatching { r.release() }
+        release(r)
         runCatching { outputFile.delete() }
+    }
+
+    private fun release(recorder: MediaRecorder) {
+        val callback = recordingCallback
+        recordingCallback = null
+        if (callback != null) runCatching { recorder.unregisterAudioRecordingCallback(callback) }
+        runCatching { recorder.release() }
     }
 
     companion object {

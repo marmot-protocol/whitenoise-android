@@ -362,6 +362,8 @@ private fun presentVoiceRecordingFailure(
     voiceTooShortMessage: String,
 ) {
     when {
+        throwable is dev.ipf.whitenoise.android.audio.VoiceRecordingSaveException ->
+            appState.present(R.string.voice_recording_save_failed)
         throwable is IllegalStateException && throwable.message == "voice recording too short" ->
             appState.present(voiceTooShortMessage)
         throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
@@ -2186,8 +2188,20 @@ internal fun ConversationScreen(
                 // quality state) so a setting change applies to the next clip.
                 bitrateProvider = { appState.mediaQuality.audioBitrateBps },
                 microphoneCaptures = appState.microphoneCaptureCoordinator,
+                onAutomaticStop = { reason ->
+                    appState.present(
+                        when (reason) {
+                            dev.ipf.whitenoise.android.audio.VoiceRecordingStopReason.LimitReached ->
+                                R.string.voice_recording_limit_reached
+                            dev.ipf.whitenoise.android.audio.VoiceRecordingStopReason.Interrupted ->
+                                R.string.voice_recording_interrupted
+                        },
+                    )
+                },
             )
         }
+    dev.ipf.whitenoise.android.ui.conversation.composer
+        .VoiceRecordingLifecycleEffect(voiceRecordingController)
     LaunchedEffect(voiceRecordingController.isRecording, voiceReview.clip) {
         if (voiceRecordingController.isRecording) {
             voiceReview.discardForNewRecording()

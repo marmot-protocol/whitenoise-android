@@ -1703,6 +1703,11 @@
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_speed">Playback speed %1$s</string>
     <string name="voice_message_failed">Voice message couldn\'t load</string>
+    <string name="voice_recording_save_failed">Recording stopped, but the audio could not be saved. Record again.</string>
+    <string name="voice_recording_stops_in">Stops in %1$s</string>
+    <string name="voice_recording_limit_warning">Recording will stop in 30 seconds at the five-minute limit.</string>
+    <string name="voice_recording_limit_reached">Five-minute recording limit reached. Review your voice note before sending.</string>
+    <string name="voice_recording_interrupted">Recording interrupted. Review the captured audio before sending.</string>
     <string name="voice_message_locked">Locked</string>
     <string name="voice_message_cancel">Cancel voice message</string>
     <string name="reply_you">You</string>
