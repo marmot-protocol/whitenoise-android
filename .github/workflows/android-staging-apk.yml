@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 21876b3fd1fc9724b66da885ac89e92ffc56dedc
+          ref: 6d7730c1ce5d94d0bb8eb317d67d3e6ecbdc3e69
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -62,7 +62,7 @@ jobs:
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
       PREVIOUS_SHA: f8aadcdc91d89bd4536003e208af09bd54977141
-      AFTER_SHA: 21876b3fd1fc9724b66da885ac89e92ffc56dedc
+      AFTER_SHA: 6d7730c1ce5d94d0bb8eb317d67d3e6ecbdc3e69
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -211,7 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 21876b3fd1fc9724b66da885ac89e92ffc56dedc
+          ref: 6d7730c1ce5d94d0bb8eb317d67d3e6ecbdc3e69
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
