@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.ui.conversation.media.canRequestAttachmentOpen
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartAttachmentDownload
 import kotlinx.coroutines.CoroutineScope
@@ -89,8 +90,15 @@ class MediaMemoryCacheEvictionTest {
                         state.cachedMediaPlaintext("l1-only") != null || fixture.disk.get("l1-only") != null
                     }
                     assertEquals(AttachmentTransferState.NotRetained, transfer.value)
-                    assertFalse(shouldStartAttachmentDownload(transfer.value, true, 1uL, mine = false))
-                    assertTrue(canRequestAttachmentOpen(transfer.value, 1uL, mine = false))
+                    val displayed =
+                        attachmentFilePresentationState(
+                            transfer.value,
+                            NativeAttachmentProgress(AttachmentTransferStateFfi.NOT_REQUESTED, 0uL, 0uL, null, null, null),
+                            AttachmentCancellationState.None,
+                        )
+                    assertEquals(AttachmentTransferState.NotRetained, displayed)
+                    assertFalse(shouldStartAttachmentDownload(displayed, true, 1uL, mine = false))
+                    assertTrue(canRequestAttachmentOpen(displayed, 1uL, mine = false))
                     assertTrue("no automatic native work may start", fixture.calls.isEmpty())
                 } finally {
                     scope.cancel()

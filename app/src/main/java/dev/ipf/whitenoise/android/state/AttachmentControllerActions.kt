@@ -149,7 +149,7 @@ internal fun ConversationController.attachmentCancellationState(
     attachmentIndex: Int,
 ) = attachmentTransfers.cancellationState(attachmentTransferKey(messageIdHex, attachmentIndex))
 
-/** Native terminal failures can be shown before a user has started a host plaintext waiter. */
+/** Shows native progress and failures without letting passive observations re-arm trimmed plaintext. */
 internal fun attachmentFilePresentationState(
     host: AttachmentTransferState,
     native: NativeAttachmentProgress?,
@@ -170,7 +170,13 @@ internal fun attachmentFilePresentationState(
                     native.received,
                     native.total,
                     native.retryAt,
-                ).toPresentationState()
+                ).toPresentationState().let { projected ->
+                    if (host == AttachmentTransferState.NotRetained && projected == AttachmentTransferState.Remote) {
+                        host
+                    } else {
+                        projected
+                    }
+                }
     }
 
 /** An unresolved projection re-arms the in-place download; other failures remain visible to the user. */
