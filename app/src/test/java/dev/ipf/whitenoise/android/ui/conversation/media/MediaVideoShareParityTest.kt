@@ -199,7 +199,10 @@ class MediaVideoShareParityTest {
             composeRule.onRoot().captureToImage()
             assertTrue(registry.find(ConversationMediaViewerAttachmentId("first-image", 0)) != null)
             assertTrue(registry.find(ConversationMediaViewerAttachmentId("second-image", 1)) != null)
+            composeRule.mainClock.autoAdvance = false
             composeRule.onNodeWithTag("origin.0").performClick()
+            composeRule.submitMediaViewerDialogFrame()
+            composeRule.mainClock.autoAdvance = true
             composeRule.onNodeWithContentDescription(context.getString(R.string.close)).assertIsDisplayed()
             val first = context.getString(R.string.media_viewer_page_position, 1, 2)
             val second = context.getString(R.string.media_viewer_page_position, 2, 2)

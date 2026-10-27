@@ -64,6 +64,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailRegi
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerContentAlpha
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerPlatformMotionAllowed
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerThumbnail
+import dev.ipf.whitenoise.android.ui.conversation.media.submitMediaViewerDialogFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -149,10 +150,16 @@ class MediaViewerMotionScreenshotTest {
         }
         flushInitialNativeDraw()
         composeRule.runOnIdle { assertNotNull(registry.find(id)) }
-        composeRule.onNodeWithTag("window-motion-source").performClick()
-        composeRule.runOnIdle {
-            assertEquals(0, checkNotNull(dialogAnimation))
-            assertEquals(hostAnimation, currentHostAnimation)
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNodeWithTag("window-motion-source").performClick()
+            composeRule.submitMediaViewerDialogFrame()
+            composeRule.runOnIdle {
+                assertEquals(0, checkNotNull(dialogAnimation))
+                assertEquals(hostAnimation, currentHostAnimation)
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
         }
     }
 
