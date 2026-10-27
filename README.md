@@ -121,8 +121,12 @@ MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks a
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
-Pull request workflows run on wn-build-server, a persistent self-hosted runner
-pool registered to this repository. Fork pull requests fall back to
+Android CI, the fuzz PR gate and the invariant gate run on wn-build-server, a
+persistent self-hosted runner pool registered to this repository. The
+path-filtered campaigns (release runtime, reproducible build, instrumented
+tests) and PR screenshots stay on GitHub-hosted runners: together with Android
+CI they need more CPU and memory than the 8-core, 64 GB host has, and hosted
+runners add capacity in parallel. Fork pull requests fall back to
 `ubuntu-latest`, and the runner's job-start hook rejects them anyway. All slots
 share one Gradle user home and build cache, so the GitHub cache is disabled
 there. Every job there checks out with `clean: false` and keeps the module
@@ -130,8 +134,7 @@ there. Every job there checks out with `clean: false` and keeps the module
 one cleaning checkout would erase a slot's compile history.
 `.github/scripts/prepare-persistent-workspace.sh` deletes everything else,
 including reports, test results and outputs, so test tasks still execute on
-every run. Emulator jobs require the `wn-cache-1` label, which only slot 1
-carries, because emulators share the host's adb ports and SDK.
+every run.
 The runner's job-start hook gives the `static-analysis` slot sixteen times and
 the `tests` slot eight times the CPU weight of other slots: Android lint and
 unit tests are the longest chains of a PR run, and lint uses only two or three

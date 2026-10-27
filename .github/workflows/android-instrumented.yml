@@ -265,7 +265,7 @@ jobs:
   changes:
     name: Select emulator lanes
     if: ${{ !github.event.pull_request.draft && !inputs.mdk_preview_qualification }}
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       attachment_fixture: ${{ steps.select.outputs.attachment_fixture }}
@@ -274,14 +274,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           fetch-depth: 0
           persist-credentials: false
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
-
       - name: Select lanes from the complete PR diff
         id: select
         env:
@@ -294,8 +288,7 @@ jobs:
     needs: changes
     if: ${{ !inputs.media_startup_trace && needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification }}
     name: Controlled attachment fixture (${{ matrix.distribution }})
-    # Emulators on one host share adb ports and the Android SDK: keep them on slot 1.
-    runs-on: &wn-emulator ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server", "wn-cache-1"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -305,22 +298,12 @@ jobs:
         distribution: ${{ fromJSON(github.event_name == 'pull_request' && '["Zapstore"]' || '["Play", "Zapstore"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          clean: false
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
-
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
       - name: Enable KVM
-        if: runner.environment == 'github-hosted'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -361,7 +344,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.connected == 'true' && (inputs.media_startup_trace || github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.range_selection_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification
     name: Connected Android tests (emulator)
-    runs-on: *wn-emulator
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       OUTBOUND_SHARE_ANDROID_API: ${{ inputs.outbound_share_api || '34' }}
@@ -392,12 +375,6 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          clean: false
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -412,8 +389,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -432,7 +407,6 @@ jobs:
       # KVM lets the emulator run hardware-accelerated on the GitHub-hosted
       # ubuntu runner; without it the AVD boot is far slower or fails.
       - name: Enable KVM
-        if: runner.environment == 'github-hosted'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
