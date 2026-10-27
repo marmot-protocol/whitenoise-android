@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.updates
 
 import android.content.Context
-import android.net.ConnectivityManager
 import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -33,10 +32,10 @@ class AppUpdateWorker : CoroutineWorker {
         this.repository = repository
     }
 
+    /** Shares automatic admission with lifecycle checks, including persisted retry cooldown. */
     override suspend fun doWork(): Result {
-        if (shouldSkipForMeteredDataSaver(applicationContext)) return Result.success()
         return try {
-            val info = repository.refresh()
+            val info = repository.refreshAutomatically() ?: return Result.success()
             if (info.shouldShowBanner && AppUpdateForegroundState.shouldPostBackgroundNotification()) {
                 AppUpdateNotifier(applicationContext).show(info)
             }
@@ -83,12 +82,6 @@ class AppUpdateWorker : CoroutineWorker {
                 ExistingPeriodicWorkPolicy.UPDATE,
                 request,
             )
-        }
-
-        private fun shouldSkipForMeteredDataSaver(context: Context): Boolean {
-            val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
-            return manager.isActiveNetworkMetered &&
-                manager.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
         }
     }
 }
