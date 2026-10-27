@@ -91,7 +91,7 @@ func (relay *offlineSignerRelay) diagnostics() string {
 
 // publishFailure preserves the command error and exposes only bounded diagnostic state.
 func (relay *offlineSignerRelay) publishFailure(ctx context.Context, err error, started, publishStarted time.Time, stderr string) error {
-	return fmt.Errorf("offline ZSP failed: %w; phase=publish elapsed=%s total_elapsed=%s context=%v %s\n%s", err, time.Since(publishStarted), time.Since(started), ctx.Err(), relay.diagnostics(), stderr)
+	return fmt.Errorf("loopback ZSP failed: %w; phase=publish elapsed=%s total_elapsed=%s context=%v %s\n%s", err, time.Since(publishStarted), time.Since(started), ctx.Err(), relay.diagnostics(), stderr)
 }
 
 // ServeHTTP serializes request handling and reply replay across connection orderings.
@@ -212,7 +212,10 @@ func rehearse() error {
 	if writeErr != nil {
 		return writeErr
 	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	// ZSP v2 special-cases exactly 127.0.0.1/localhost/::1 with a built-in
+	// local client key. Use another Linux loopback address to exercise the actual
+	// persistent CI identity path without contacting an external service.
+	listener, err := net.Listen("tcp", "127.0.0.2:0")
 	if err != nil {
 		return err
 	}

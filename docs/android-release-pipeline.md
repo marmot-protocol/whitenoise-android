@@ -151,7 +151,10 @@ key/C1 proof, a disposable Nostr key, a loopback NIP-46 signer, a loopback catal
 and a loopback Blossom server. It exercises the checksummed real v2 binary,
 including C1 validation, authenticated upload, pending JSON, signed event IDs,
 release-to-asset references and restoration of the preseeded client identity.
-The signer relay rejects software events. Production credentials and public
+The signer relay binds to `127.0.0.2` on the Linux runner: v2 special-cases
+`127.0.0.1` with a built-in local client key, so this second loopback address
+exercises the persistent production identity path. The signer relay rejects
+software events. Production credentials and public
 services are absent. The `zsp-v2-contract` artifact contains the sanitized
 `build/reports/zsp-v2.json` receipt. This CI-covered rehearsal requires Go,
 JDK 17+, Android SDK platform 36 and build-tools 36.0.0; do not duplicate it locally.
