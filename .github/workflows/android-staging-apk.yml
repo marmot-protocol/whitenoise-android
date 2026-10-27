@@ -1,5 +1,5 @@
 name: Android Staging APK
-run-name: PR3439 isolated physical comparison
+run-name: PR3439 opening feedback controlled comparison
 on:
   workflow_dispatch:
     inputs:
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: c0d110a1b7bf6d6b5c0486676733e20e72a7da14
+          ref: d8d498ef2b0819103ba3c67bede182a4da5285f6
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -61,7 +61,8 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      AFTER_SHA: c0d110a1b7bf6d6b5c0486676733e20e72a7da14
+      PREVIOUS_SHA: f8aadcdc91d89bd4536003e208af09bd54977141
+      AFTER_SHA: d8d498ef2b0819103ba3c67bede182a4da5285f6
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -75,6 +76,11 @@ jobs:
         with:
           ref: ${{ env.AFTER_SHA }}
           path: after
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.PREVIOUS_SHA }}
+          path: previous
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
@@ -92,7 +98,9 @@ jobs:
           set -euo pipefail
           test "$(git -C before rev-parse HEAD)" = "$BEFORE_SHA"
           test "$(git -C after rev-parse HEAD)" = "$AFTER_SHA"
+          test "$(git -C previous rev-parse HEAD)" = "$PREVIOUS_SHA"
           cmp before/app/src/main/marmotkit/MARMOT_VERSION after/app/src/main/marmotkit/MARMOT_VERSION
+          cmp before/app/src/main/marmotkit/MARMOT_VERSION previous/app/src/main/marmotkit/MARMOT_VERSION
           mkdir -p artifacts
           cp before/app/src/main/marmotkit/MARMOT_VERSION artifacts/MARMOT_VERSION
           pin=$(awk -F= '$1 == "artifact-sha256" {print $2}' artifacts/MARMOT_VERSION)
@@ -110,7 +118,7 @@ jobs:
           keytool -genkeypair -keystore "$RUNNER_TEMP/fixture.p12" -storetype PKCS12 \
             -storepass fixture-only -keypass fixture-only -alias fixture -keyalg RSA -keysize 2048 \
             -validity 3650 -dname 'CN=PR3439 Disposable Performance Fixture'
-          for role in before after; do
+          for role in before previous after; do
             mkdir -p "$role/app/src/preview"
             test ! -e "$role/app/src/preview/AndroidManifest.xml"
             cat > "$role/app/src/preview/AndroidManifest.xml" <<'XML'
@@ -134,12 +142,12 @@ jobs:
               }
           }
           GRADLE
-      - name: Build, sign and retain both optimized variants
+      - name: Build, sign and retain all three optimized variants
         shell: bash
         run: |
           set -euo pipefail
-          for role in before after; do
-            case "$role" in before) source_sha=$BEFORE_SHA;; after) source_sha=$AFTER_SHA;; esac
+          for role in before previous after; do
+            case "$role" in before) source_sha=$BEFORE_SHA;; previous) source_sha=$PREVIOUS_SHA;; after) source_sha=$AFTER_SHA;; esac
             (
               cd "$role"
               PREVIEW_HEAD_SHA=$source_sha ./gradlew :app:assemblePreviewPlayRelease \
@@ -176,9 +184,9 @@ jobs:
           done
           python3 - <<'PY'
           import json,pathlib
-          a=json.loads(pathlib.Path('artifacts/before.json').read_text());b=json.loads(pathlib.Path('artifacts/after.json').read_text())
+          rows=[json.loads(pathlib.Path('artifacts',role+'.json').read_text()) for role in ['before','previous','after']]
           for key in ['certificate_sha256','package','variant','native_artifact_sha256']:
-              assert a[key]==b[key],key
+              assert len({row[key] for row in rows})==1,key
           PY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
@@ -203,7 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: c0d110a1b7bf6d6b5c0486676733e20e72a7da14
+          ref: d8d498ef2b0819103ba3c67bede182a4da5285f6
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -231,6 +239,7 @@ jobs:
           filters=(
             --tests '*MediaViewerMotionScreenshotTest'
             --tests '*MediaViewerEntryFrameTest'
+            --tests '*MediaPressIndicationTest'
             --tests '*ConversationTimelineUnderlayTest'
             --tests '*MediaVideoShareParityTest'
             --tests '*ConversationMediaViewerSessionTest'
@@ -246,6 +255,13 @@ jobs:
             --tests '*LocalReactionMotionScreenshotTest'
           )
           free -h
+          # Record only the new pressed-state baseline; existing snapshots remain verification-only.
+          test ! -e app/src/test/snapshots/media_viewer_pressed_feedback.png
+          ./gradlew :app:testDev${{ matrix.distribution }}DebugUnitTest --tests '*MediaPressIndicationTest' \
+            -Proborazzi.test.record=true -Pkotlin.compiler.execution.strategy=in-process \
+            -Dorg.gradle.parallel=false \
+            '-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
+            --max-workers=1 --build-cache --no-daemon --continue --stacktrace
           ./gradlew :app:testDev${{ matrix.distribution }}DebugUnitTest "${filters[@]}" \
             -Proborazzi.test.verify=true -Pkotlin.compiler.execution.strategy=in-process \
             -Dorg.gradle.parallel=false \
@@ -259,5 +275,6 @@ jobs:
             app/build/reports/
             app/build/test-results/
             app/build/outputs/roborazzi/
+            app/src/test/snapshots/media_viewer_pressed_feedback.png
           if-no-files-found: ignore
           retention-days: 7
