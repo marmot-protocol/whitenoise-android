@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      BEFORE_SHA: e94cd16094152216e1eaec47d99101bc142b289e
-      AFTER_SHA: 5dd90bf2cd288e25481dc9f1d641c5c068310cb9
+      BEFORE_SHA: c5c5225ef6d430a9bcdc6fe7a185145f91a9b600
+      AFTER_SHA: 40dda4106d932ba55d1dcc8512deef88ded78f69
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
