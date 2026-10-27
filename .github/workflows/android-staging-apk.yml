@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      AFTER_SHA: 64ad13fcb99d0fcc5b04b91697e9cbed0064b12d
+      AFTER_SHA: 538f30851dcc5f2b58927c0fea854b2432282fd1
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -150,7 +150,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 64ad13fcb99d0fcc5b04b91697e9cbed0064b12d
+          ref: 538f30851dcc5f2b58927c0fea854b2432282fd1
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
