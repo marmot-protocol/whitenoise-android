@@ -49,9 +49,9 @@ class AppUpdateRepository(
     }
 
     /** Returns null when distribution, connectivity, Data Saver or persisted timing denies automatic work. */
-    suspend fun refreshAutomatically(
-        installedVersion: String = installedVersionName(),
-    ): AppUpdateInfo? = refreshAdmitted(installedVersion, automatic = true)
+    suspend fun refreshAutomatically(installedVersion: String = installedVersionName()): AppUpdateInfo? {
+        return refreshAdmitted(installedVersion, automatic = true)
+    }
 
     /**
      * Explicit Check now bypasses automatic timing and Data Saver admission, but never distribution policy.
