@@ -99,6 +99,7 @@ class AppLockPreferencesTest {
         assertFalse(legacyPrefsFile().exists())
     }
 
+    /** A failed encryption attempt must remain recoverable by later writes and a fresh reader. */
     @Test
     fun failedKeyAccessDoesNotPreventALaterTimestampWriteOrFreshStoreRead() {
         var unavailable = true

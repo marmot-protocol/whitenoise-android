@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AppLockTimestampPersistenceTest {
+    /** A blocked real worker must leave authentication completion and the live grace period usable. */
     @Test
     fun blockedTimestampStorageDoesNotHoldUnlockOrItsLiveGracePeriod() =
         runTest {
@@ -72,6 +73,7 @@ class AppLockTimestampPersistenceTest {
             }
         }
 
+    /** Persist callback order rather than sorting by timestamps or worker completion. */
     @Test
     fun lifecycleWritesKeepInvocationOrderEvenWhenTheClockMovesBackwards() =
         runTest {
@@ -116,6 +118,7 @@ class AppLockTimestampPersistenceTest {
             }
         }
 
+    /** Cancellation drops waiting writes while allowing the already-running synchronous call to finish. */
     @Test
     fun cancelledProcessScopeDoesNotStartAQueuedTimestampWrite() =
         runTest {
@@ -152,6 +155,7 @@ class AppLockTimestampPersistenceTest {
             }
         }
 
+    /** Drive actual background callbacks through the existing locked and authenticated branches. */
     @Test
     fun backgroundLifecycleKeepsTheLockedGateAndEnqueuesOnlyAnUnlockedBaseline() =
         runTest {
@@ -181,6 +185,7 @@ class AppLockTimestampPersistenceTest {
             }
         }
 
+    /** Build credentialed host state with a controlled blocking sink and I/O dispatcher. */
     private fun state(
         dispatcher: kotlinx.coroutines.CoroutineDispatcher,
         write: (Long) -> Unit,

@@ -8009,6 +8009,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Publish successful authentication immediately; persist its captured grace baseline asynchronously. */
     internal fun markAppUnlockSucceeded(
         nowMillis: Long = System.currentTimeMillis(),
         dismissRetainedVisibleConversation: Boolean = true,
@@ -8089,6 +8090,7 @@ class WhiteNoiseAppState private constructor(
 
     fun shouldSecureAppLockWindowWhileBackgrounded(): Boolean = shouldSecureAppLockWindowWhileBackgrounded(requireUnlock = requireAppUnlock)
 
+    /** Start the away-time grace period only for an authenticated, credentialed background transition. */
     private fun recordAppLockBackgrounded(nowMillis: Long = System.currentTimeMillis()) {
         refreshAppLockCredentialAvailability()
         if (
