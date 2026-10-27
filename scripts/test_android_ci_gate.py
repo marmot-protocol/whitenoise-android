@@ -235,6 +235,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn(':app:compileStagingZapstoreReleaseKotlin', compile_step)
         self.assertIn('-Pwhitenoise.enableComposeCompilerReports=true', compile_step)
         self.assertIn(' --no-build-cache ', compile_step)
+        # Reports cover only compiled files; a persistent workspace would compile incrementally.
+        self.assertIn(':app:compileStagingZapstoreReleaseKotlin --rerun ', compile_step)
         self.assertIn(' --no-daemon ', compile_step)
         self.assertNotIn(':app:compileStagingZapstoreReleaseKotlin', self.build_contracts)
         self.assertIn('name: compose-compiler-reports', self.compose_compiler)
@@ -420,7 +422,7 @@ class AndroidCiGateTest(unittest.TestCase):
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
-        self.assertEqual(len(gradle_setup_steps), 6)
+        self.assertEqual(len(gradle_setup_steps), 7)
         for step in gradle_setup_steps:
             self.assertIn(
                 "cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && "
@@ -428,7 +430,7 @@ class AndroidCiGateTest(unittest.TestCase):
                 step,
             )
         self.assertNotIn('uses: actions/cache@', self.workflow)
-        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 6)
+        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 7)
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
         save_step = self.named_step(self.tests_job, 'Save MarmotKit artifact')
         # Zapstore is the only flavor every event runs.
@@ -460,7 +462,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_parallel_test_workers(self):
         """Parallelism changes execution, never the full-suite scope or caching."""
         self.assertIn(
-            "ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '6' }}",
+            "ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '4' }}",
             self.tests_job,
         )
         root_build = (WORKFLOW.parents[2] / 'build.gradle.kts').read_text()
@@ -691,10 +693,12 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_slow_tooling_does_not_block_android_job_start(self):
         self.assertIn('    needs: changes\n', self.tooling_contracts.split('    steps:', 1)[0])
-        for name in ('offline-zsp', 'build-contracts', 'compose-compiler',
+        # Jobs that compile the shared debug variants wait only for the compile job.
+        shared = ('build-contracts', 'static-analysis', 'tests', 'secondary-variant')
+        for name in ('offline-zsp', 'compile', 'build-contracts', 'compose-compiler',
                      'compile-tests', 'static-analysis', 'tests', 'secondary-variant'):
             job = self.job_block(self.workflow, name)
-            self.assertIn('    needs: changes\n', job)
+            self.assertIn('    needs: [changes, compile]\n' if name in shared else '    needs: changes\n', job)
             self.assertIn("needs.changes.outputs.docs_only != 'true'", job)
             if name == 'compose-compiler':
                 self.assertIn("needs.changes.outputs.supplemental_campaigns != 'false'", job)
@@ -979,7 +983,7 @@ class AndroidCiGateTest(unittest.TestCase):
                     diagnostics.write_bytes(Path(__file__).with_name('run_unit_tests_with_diagnostics.py').read_bytes())
                     result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script],
                         cwd=directory, capture_output=True, text=True,
-                        env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': full,
+                        env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': full, 'CI_BASELINE_PHASE': 'true',
                              'UNIT_TEST_DEADLINE_MONOTONIC': str(time.monotonic() + 5)})
                     self.assertEqual(result.returncode, 0, result.stderr)
                     owners.extend(argument for argument in result.stdout.splitlines()
@@ -989,6 +993,26 @@ class AndroidCiGateTest(unittest.TestCase):
                         [':app:compileDevZapstoreDebugAndroidTestKotlin',
                          ':app:compileDevPlayDebugAndroidTestKotlin'])
             self.assertEqual(owners, expected, (precheck, full))
+
+    def test_benchmark_release_is_packaged_by_one_phase_per_run(self):
+        """R8 minifies the release build once: in baseline when it runs, otherwise in tooling."""
+        baseline = self.named_step(self.build_contracts, 'Assemble app for Baseline Profile verification')
+        self.assertIn(':benchmark:assembleDevZapstoreBenchmarkRelease', baseline)
+        tooling = self.named_step(self.build_contracts, 'Compile (Kotlin)')
+        script = textwrap.dedent(tooling.split('        run: |\n', 1)[1])
+        for precheck, baseline_phase, packages in (('false', 'true', False), ('false', 'false', True),
+                                                   ('true', 'false', False)):
+            with tempfile.TemporaryDirectory() as directory:
+                wrapper = Path(directory) / 'gradlew'
+                wrapper.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
+                wrapper.chmod(0o755)
+                result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=directory,
+                                        capture_output=True, text=True,
+                                        env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': 'false',
+                                             'CI_BASELINE_PHASE': baseline_phase})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(':benchmark:assembleDevZapstoreBenchmarkRelease' in result.stdout.splitlines(),
+                             packages, (precheck, baseline_phase))
 
     def test_missing_or_extra_dependency_evidence_blocks(self):
         for job in self.dependencies:

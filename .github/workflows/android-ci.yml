@@ -284,11 +284,103 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Compile the debug variants every Gradle job below needs, once, into the
+  # build cache. Unit tests, lint, build contracts and the Play lane each used
+  # to compile them in parallel; on a shared runner pool that repeated the same
+  # Kotlin compilation up to four times per push. They now load it from cache.
+  compile:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    name: Compile shared debug variants
+    runs-on: *wn-build-server
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          clean: false
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      # Persistent runners keep Gradle's incremental state between jobs.
+      - name: Prepare persistent workspace
+        run: bash .github/scripts/prepare-persistent-workspace.sh
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: ${{ runner.environment == 'self-hosted' }}
+          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      # Play is compiled only when a Play lane runs: ready and full PR runs,
+      # merge groups, master and dispatches. Drafts and prechecks skip it.
+      # Fork PRs run each job on its own hosted runner with a read-only cache,
+      # so nothing could reuse these outputs; the job only succeeds there.
+      - name: Compile shared debug variants
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        env:
+          CI_PLAY: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
+        run: |
+          flavors=(Zapstore)
+          if [[ "$CI_PLAY" == true ]]; then
+            flavors+=(Play)
+          fi
+          tasks=()
+          for flavor in "${flavors[@]}"; do
+            for source in '' UnitTest AndroidTest; do
+              tasks+=(":app:compileDev${flavor}Debug${source}Kotlin")
+            done
+          done
+          ./gradlew "${tasks[@]}" --build-cache --profile --no-daemon --stacktrace
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-ci-reports-compile
+          path: app/build/reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-ci-gradle-profiles-compile
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
   build-contracts:
     permissions:
       contents: read
       actions: read
-    needs: changes
+    needs: [changes, compile]
     if: needs.changes.outputs.docs_only != 'true'
     name: Build contracts (${{ matrix.phase }})
     runs-on: *wn-build-server
@@ -367,10 +459,13 @@ jobs:
         if: matrix.phase == 'tooling'
         run: python3 scripts/test-release-gradle.py
 
+      # When the baseline phase runs, it assembles the benchmark APK with the
+      # app's, so R8 minifies the release build once per run instead of twice.
       - name: Compile (Kotlin)
         env:
           CI_PRECHECK: ${{ needs.changes.outputs.precheck }}
           CI_FULL_MATRIX: ${{ needs.changes.outputs.full_matrix }}
+          CI_BASELINE_PHASE: ${{ needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
         if: matrix.phase == 'tooling'
         run: |
           if [[ "$CI_PRECHECK" == true ]]; then
@@ -379,7 +474,9 @@ jobs:
             if [[ "$CI_FULL_MATRIX" != true ]]; then
               ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin --build-cache --profile --no-daemon --stacktrace
             fi
-            ./gradlew :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+            if [[ "$CI_BASELINE_PHASE" != true ]]; then
+              ./gradlew :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+            fi
           fi
 
       - name: ktlint and detekt
@@ -389,7 +486,7 @@ jobs:
       # Package on a separate runner so release compilation overlaps tooling checks.
       - name: Assemble app for Baseline Profile verification
         if: matrix.phase == 'baseline'
-        run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       - name: Verify packaged Baseline Profile assets
         id: baseline_apk
@@ -593,9 +690,10 @@ jobs:
       # Release-mode Compose compiler output identifies unstable classes and
       # restartable/skippable composables using the same optimizations users
       # receive. Keep it opt-in locally; publish it on full campaign runs.
-      # Compiler reports are not cached task outputs, so this compile must execute.
+      # Compiler reports are not cached task outputs, so this compile must execute,
+      # and --rerun keeps a persistent workspace from compiling only changed files.
       - name: Compile Compose metrics and stability reports
-        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --no-build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin --rerun -Pwhitenoise.enableComposeCompilerReports=true --no-build-cache --profile --no-daemon --stacktrace
 
       - name: Upload Compose compiler reports
         if: always()
@@ -757,7 +855,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
   static-analysis:
-    needs: changes
+    needs: [changes, compile]
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
     name: Android lint (${{ matrix.flavor }})
     runs-on: *wn-build-server
@@ -858,16 +956,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
   tests:
-    needs: changes
+    needs: [changes, compile]
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
     name: Unit tests, screenshots and coverage (${{ matrix.flavor }})
     runs-on: *wn-build-server
     timeout-minutes: 40
     env:
-      # Each fork peaks near 4 GB with its 2 GiB heap. Hosted runners have
-      # 16 GB; wn-build-server gives this job 30 GB and CPU priority. Eight
-      # forks there finished only 12s sooner than six, at 33 GB.
-      ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '6' }}
+      # Each fork peaks near 4 GB with its 2 GiB heap; hosted runners have
+      # 16 GB. On the shared wn-build-server, every fork also JIT-compiles the
+      # same Robolectric and Compose code. Full Zapstore suite under team load:
+      # six forks 47.6 CPU-min and 25.1 GB, four forks 37.1 CPU-min and 22.1 GB.
+      ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '4' }}
     strategy:
       # Keep both variants' diagnostics.
       # PRs test Zapstore only; secondary-variant runs Play's flavor-sensitive tests.
@@ -1065,7 +1164,7 @@ jobs:
   # androidTest sources) and run the unit tests that branch on its BuildConfig,
   # so Play-only code still fails the PR. master/nightly run Play's full suite.
   secondary-variant:
-    needs: changes
+    needs: [changes, compile]
     if: needs.changes.outputs.docs_only != 'true' && github.event_name == 'pull_request' && needs.changes.outputs.precheck != 'true' && needs.changes.outputs.full_matrix != 'true' && !github.event.pull_request.draft
     name: Compile and flavor-check Play
     runs-on: *wn-build-server
@@ -1181,7 +1280,7 @@ jobs:
   # ready run creates this job only after its heavy lanes finish.
   validate:
     name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft && ' (draft fast lane)' || '' }}
-    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, compile-tests, static-analysis, tests, secondary-variant]
+    needs: [changes, tooling-contracts, offline-zsp, compile, build-contracts, compose-compiler, compile-tests, static-analysis, tests, secondary-variant]
     if: always()
     runs-on: *wn-build-server
     timeout-minutes: 5
@@ -1203,7 +1302,7 @@ jobs:
             ($event == "pull_request" and $draft == "false" and ($precheck | not) and ($full | not)) as $is_ready |
             (["pull_request", "merge_group", "push", "schedule", "workflow_dispatch"] | index($event) != null) and
             ($draft == "true" or $draft == "false") and ($event == "pull_request" or $draft == "false") and
-            (keys == ["build-contracts", "changes", "compile-tests", "compose-compiler", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
+            (keys == ["build-contracts", "changes", "compile", "compile-tests", "compose-compiler", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
             (.changes.outputs.full_matrix == "true" or .changes.outputs.full_matrix == "false") and
             (.changes.outputs.ci_mode == (if $precheck then "precheck" elif $full then "full" else "legacy-pr" end)) and
             (($event == "pull_request") or $full) and

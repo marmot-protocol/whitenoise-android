@@ -110,7 +110,7 @@ release qualification remains tied to the exact release candidate.
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
-`build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
+`compile`, `build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
 `static-analysis-Play`, `compile-tests-Zapstore`, `compile-tests-Play`, `Zapstore`, or
 `Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
@@ -120,6 +120,14 @@ restore caches read-only. Assertions execute on every fresh runner. The separate
 MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks and docs-only runs do not write it. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
+
+The `compile` job compiles the debug main, unit-test and Android-test sources of
+Zapstore, and of Play when a Play lane runs, before the unit-test, lint,
+build-contract and Play jobs start; they load those outputs from the build cache
+instead of compiling them again in parallel. Fork pull requests skip this step:
+their hosted jobs cannot share a cache. When the baseline phase runs, it
+assembles both release APKs, so R8 minifies the benchmark release build once per
+run; drafts and prechecks keep that packaging in the tooling phase.
 
 Android CI, the fuzz PR gate and the invariant gate run on wn-build-server, a
 persistent self-hosted runner pool registered to this repository. The
@@ -135,10 +143,10 @@ one cleaning checkout would erase a slot's compile history.
 `.github/scripts/prepare-persistent-workspace.sh` deletes everything else,
 including reports, test results and outputs, so test tasks still execute on
 every run.
-The runner's job-start hook gives the `static-analysis` slot sixteen times and
-the `tests` slot eight times the CPU weight of other slots: Android lint and
-unit tests are the longest chains of a PR run, and lint uses only two or three
-cores once compiled, so its share costs the tests little.
+The runner's job-start hook gives the `compile` and `static-analysis` slots three
+times and the `tests` slot twice the CPU weight of other slots: they are the
+longest chains of a PR run. Larger ratios starved script jobs with wall-clock
+timeouts.
 
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
 including description edits, without compiling anything. The checker script runs
