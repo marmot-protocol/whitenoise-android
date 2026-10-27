@@ -383,16 +383,20 @@ class VoiceRecordingController internal constructor(
         } finally {
             // stop may have committed bytes on IO just as withContext cancels
             // delivery to Main. The recorder no longer owns that completed file.
-            withContext(NonCancellable + recorderDispatcher) {
-                try {
-                    recording.cancel()
-                } finally {
-                    if (!delivered) runCatching { finalized?.file?.delete() }
+            try {
+                withContext(NonCancellable + recorderDispatcher) {
+                    try {
+                        recording.cancel()
+                    } finally {
+                        if (!delivered) runCatching { finalized?.file?.delete() }
+                    }
                 }
-            }
-            if (!restarting) {
-                abandonRecordingFocus()
-                releaseMicrophoneLease()
+            } finally {
+                // Returning from IO can throw cancellation before Main resumes.
+                if (!restarting) {
+                    abandonRecordingFocus()
+                    releaseMicrophoneLease()
+                }
             }
         }
     }
