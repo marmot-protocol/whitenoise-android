@@ -635,12 +635,7 @@ internal class ConversationScrollCoordinator(
                 val tailIndex = resolveTailIndex()
                 // Preserve the first key-anchor reset and every uncertain or changing measurement.
                 // A repeated correction cannot improve the same measured, already-clear tail.
-                if (
-                    currentLayout.measuredTailKey == null ||
-                    !currentLayout.tailClearsViewportStart ||
-                    currentLayout != previousLayout ||
-                    tailIndex != previousTailIndex
-                ) {
+                if (currentLayout.needsTailCorrection(previousLayout, tailIndex, previousTailIndex)) {
                     scrollToTail(tailIndex)
                 }
                 previousLayout = currentLayout
@@ -659,6 +654,15 @@ internal class ConversationScrollCoordinator(
                 }
             }
         }
+    }
+
+    private fun ConversationTailLayout.needsTailCorrection(
+        previous: ConversationTailLayout?,
+        tailIndex: Int,
+        previousTailIndex: Int?,
+    ): Boolean {
+        if (measuredTailKey == null || !tailClearsViewportStart) return true
+        return this != previous || tailIndex != previousTailIndex
     }
 
     /** Preserves reaction geometry; an unready layout or absent prior frame is not stable. */
