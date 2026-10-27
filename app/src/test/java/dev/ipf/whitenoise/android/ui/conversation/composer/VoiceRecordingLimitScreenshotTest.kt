@@ -103,10 +103,22 @@ class VoiceRecordingLimitScreenshotTest {
         // Sample the enclosing pill, not the separate rounded recording strip.
         // A one-pixel curved stroke is antialiased (243/255 at the side midpoint).
         fun Color.isOutline() = red > 0.9f && green > 0.9f && blue > 0.9f
-        assertTrue("Top outline must remain visible", (0..1).any { pixels[middleX, it].isOutline() })
-        assertTrue("Bottom outline must remain visible", (0..1).any { pixels[middleX, pixels.height - 1 - it].isOutline() })
-        assertTrue("Left outline must remain visible", (0..1).any { pixels[it, middleY].isOutline() })
-        assertTrue("Right outline must remain visible", (0..1).any { pixels[pixels.width - 1 - it, middleY].isOutline() })
+        assertTrue(
+            "Top outline must remain visible",
+            (0..1).any { pixels[middleX, it].isOutline() },
+        )
+        assertTrue(
+            "Bottom outline must remain visible",
+            (0..1).any { pixels[middleX, pixels.height - 1 - it].isOutline() },
+        )
+        assertTrue(
+            "Left outline must remain visible",
+            (0..1).any { pixels[it, middleY].isOutline() },
+        )
+        assertTrue(
+            "Right outline must remain visible",
+            (0..1).any { pixels[pixels.width - 1 - it, middleY].isOutline() },
+        )
     }
 
     @Test
