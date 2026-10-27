@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 
 /** Capture belongs to the visible conversation; backgrounding preserves a reviewable take. */
 @Composable
+@Suppress("FunctionNaming")
 internal fun VoiceRecordingLifecycleEffect(controller: VoiceRecordingController) {
     val view = LocalView.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle

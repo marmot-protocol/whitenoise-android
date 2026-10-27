@@ -2562,4 +2562,10 @@
     <string name="public_jpeg_previews_privacy">По умолчанию отключён. Прямые ссылки на JPEG в Blossom могут раскрыть ваш IP-адрес серверу изображений. Предпросмотр использует Wi-Fi, не помеченный как лимитный и ваши правила загрузки фото. Обычные ссылки доступны и без предпросмотра.</string>
     <string name="public_jpeg_preview_image">Предпросмотр JPEG по ссылке</string>
     <string name="public_jpeg_preview_save_failed">Не удалось сохранить настройку предпросмотра изображений. Попробуйте ещё раз.</string>
+
+    <string name="voice_recording_save_failed">Запись остановлена, но не удалось сохранить аудио. Запишите ещё раз.</string>
+    <string name="voice_recording_stops_in">Остановка через %1$s</string>
+    <string name="voice_recording_limit_warning">Запись остановится через 30 секунд по достижении лимита в пять минут.</string>
+    <string name="voice_recording_limit_reached">Достигнут лимит записи в пять минут. Проверьте голосовое сообщение перед отправкой.</string>
+    <string name="voice_recording_interrupted">Запись прервана. Проверьте записанное аудио перед отправкой.</string>
 </resources>

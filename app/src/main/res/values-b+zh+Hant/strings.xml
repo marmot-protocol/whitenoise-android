@@ -2453,4 +2453,10 @@
     <string name="public_jpeg_previews_privacy">預設關閉。直接的 Blossom JPEG 連結可能會向圖片伺服器透露你的 IP 位址。預覽僅使用不按流量計費的 Wi-Fi，並遵循你的相片下載規則。關閉後仍可開啟一般連結。</string>
     <string name="public_jpeg_preview_image">連結的 JPEG 預覽</string>
     <string name="public_jpeg_preview_save_failed">無法儲存圖片預覽設定，請重試。</string>
+
+    <string name="voice_recording_save_failed">錄音已停止，但無法儲存音訊。請重新錄製。</string>
+    <string name="voice_recording_stops_in">將在 %1$s 後停止</string>
+    <string name="voice_recording_limit_warning">錄音將在 30 秒後達到五分鐘上限並停止。</string>
+    <string name="voice_recording_limit_reached">已達到五分鐘錄音上限。傳送前請檢查語音訊息。</string>
+    <string name="voice_recording_interrupted">錄音已中斷。傳送前請檢查已錄製的音訊。</string>
 </resources>

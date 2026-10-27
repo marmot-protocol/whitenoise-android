@@ -2486,4 +2486,10 @@
     <string name="public_jpeg_previews_privacy">Varsayılan olarak kapalıdır. Doğrudan Blossom JPEG bağlantıları IP adresinizi görsel sunucusuna gösterebilir. Önizlemeler, ölçülmeyen Wi-Fi bağlantısını ve fotoğraf indirme kurallarınızı kullanır. Kapalıyken normal bağlantılar kullanılabilir.</string>
     <string name="public_jpeg_preview_image">Bağlantılı JPEG önizlemesi</string>
     <string name="public_jpeg_preview_save_failed">Görsel önizleme ayarı kaydedilemedi. Lütfen tekrar deneyin.</string>
+
+    <string name="voice_recording_save_failed">Kayıt durduruldu, ancak ses kaydedilemedi. Yeniden kaydedin.</string>
+    <string name="voice_recording_stops_in">%1$s sonra duracak</string>
+    <string name="voice_recording_limit_warning">Kayıt, 30 saniye sonra beş dakikalık sınıra ulaşıldığında duracak.</string>
+    <string name="voice_recording_limit_reached">Beş dakikalık kayıt sınırına ulaşıldı. Göndermeden önce sesli mesajınızı gözden geçirin.</string>
+    <string name="voice_recording_interrupted">Kayıt kesintiye uğradı. Göndermeden önce kaydedilen sesi gözden geçirin.</string>
 </resources>
