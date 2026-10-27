@@ -9766,22 +9766,23 @@ class WhiteNoiseAppState private constructor(
         localNotificationPermissionGranted = localNotificationPresenter.canPostNotifications()
     }
 
+    /** Explicit checks bypass automatic cooldown; lifecycle calls share worker admission in the repository. */
     suspend fun refreshAppUpdate(
         force: Boolean = false,
         notifyIfNewer: Boolean = false,
     ): AppUpdateInfo {
-        if (!force && !appUpdateRepository.shouldCheck()) {
-            appUpdateInfo = appUpdateRepository.loadInfo()
-            maybeShowAppUpdateNotification(appUpdateInfo, notifyIfNewer)
-            return appUpdateInfo
-        }
         val info =
-            runCatchingCancellable { appUpdateRepository.refresh() }
-                .onFailure {
-                    appStateDebug(it) { "app update check failed: ${it.readableMessage()}" }
-                }.getOrElse {
-                    appUpdateRepository.loadInfo()
+            runCatchingCancellable {
+                if (force) {
+                    appUpdateRepository.refresh()
+                } else {
+                    appUpdateRepository.refreshAutomatically() ?: appUpdateRepository.loadInfo()
                 }
+            }.onFailure {
+                appStateDebug(it) { "app update check failed: ${it.readableMessage()}" }
+            }.getOrElse {
+                appUpdateRepository.loadInfo()
+            }
         appUpdateInfo = info
         maybeShowAppUpdateNotification(info, notifyIfNewer)
         return info
@@ -9796,6 +9797,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Startup, foreground and background triggers all use automatic admission. */
     suspend fun refreshAppUpdateIfStale(notifyIfNewer: Boolean = false): AppUpdateInfo = refreshAppUpdate(force = false, notifyIfNewer = notifyIfNewer)
 
     fun dismissAppUpdateBanner() {
