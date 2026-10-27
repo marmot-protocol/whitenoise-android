@@ -178,6 +178,16 @@ class MediaViewerMotionScreenshotTest {
         assertTrue("the source also reaches below chrome", sourceBounds.bottom > chromeBounds.bottom)
         assertTrue("the asserted first pixel is inside chrome", sourceBounds.top + 50f < chromeBounds.bottom)
         val firstPixels = composeRule.onRoot().captureToImage().toPixelMap()
+        assertTrue(
+            "The source has a real rounded top-right clip",
+            checkNotNull(registry.find(id)).corners.topRight > 4f,
+        )
+        val cornerY = (sourceBounds.top + 1f).toInt()
+        assertEquals(
+            "The opaque copy preserves the rounded corner over the viewer chrome",
+            firstPixels[(sourceBounds.right + 1f).toInt(), cornerY],
+            firstPixels[(sourceBounds.right - 1f).toInt(), cornerY],
+        )
         assertEquals(
             "the first copy is at the actual source, not shifted by the viewer's header",
             Color(0xff195563),

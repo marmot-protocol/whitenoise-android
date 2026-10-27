@@ -202,3 +202,10 @@
 *.ConversationDictationPersistentControlTest.processingChoiceLightLargeRtlKeepsBothChoicesUsable
 
 *.ComposerToolbarSpacingScreenshotTest
+
+# Bounded mention suggestions retain the production editor.
+*.ComposerMentionLayoutTest.largeRosterKeepsEditorAndSendWhileLastSuggestionScrolls
+*.ComposerMentionLayoutTest.smallRosterKeepsNormalInsertionAndFocus
+*.ComposerMentionLayoutTest.largeTextRtlRosterKeepsTheEditorReachable
+*.ComposerMentionLayoutTest.compactLandscapeRosterDoesNotFlattenTheEditor
+*.ComposerMentionLayoutTest.longDraftLeavesShortcodeSuggestionsVisible

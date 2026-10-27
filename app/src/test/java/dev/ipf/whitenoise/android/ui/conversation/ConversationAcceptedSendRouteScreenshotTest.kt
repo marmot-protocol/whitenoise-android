@@ -174,42 +174,6 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return editorBounds to corners
     }
 
-    /** Rect.toString rounds coordinates; raw IEEE754 bits retain exact guard inputs. */
-    private fun diagnosticRectBits(value: ComposerSendLandingDiagnostic): String =
-        listOf(
-            value.sourceSurface,
-            value.sourceComposer,
-            value.sourceViewport?.bounds,
-            value.measured?.frame,
-            value.measured?.text,
-            value.measured?.composer,
-            value.measured?.viewport?.bounds,
-            value.expectedFrameBefore,
-            value.expectedTextBefore,
-            value.resolved?.bounds,
-            value.resolved?.textTarget,
-            value.resolved?.canonicalFrame,
-            value.resolved?.canonicalText,
-            value.resolved?.composer,
-        ).joinToString("|") { rect ->
-            rect?.let {
-                listOf(it.left.toRawBits(), it.top.toRawBits(), it.right.toRawBits(), it.bottom.toRawBits())
-                    .joinToString(",")
-            } ?: "null"
-        }
-
-    private class LiveTailFrames {
-        var landingDiagnosticCount = 0
-        val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
-        var motionOwner: ComposerSendMotion? = null
-        val boundaries = mutableListOf<String>()
-        var firstCanonicalExposureIndex: Int? = null
-        var firstCanonicalExposureTop: Float? = null
-        var incomingMovedAfterExposure = false
-        var earlyRetiredHeight: Float? = null
-        var earlyRetiredInternalGeometry: Pair<Rect, List<Color>>? = null
-    }
-
     private fun hydrateDuringFlight(
         index: Int,
         frames: LiveTailFrames,
@@ -700,20 +664,6 @@ class ConversationAcceptedSendRouteScreenshotTest {
             blankLinesBefore = ByteArray(0),
         )
 
-    private fun liveTailProjection(conversation: ConversationController): dev.ipf.marmotkit.ChatListRowFfi {
-        val group = conversationTimelineTestGroup()
-        val latest = conversation.timeline.last().record
-        return dev.ipf.whitenoise.android.state.chatRow(group.groupIdHex).copy(
-            groupName = group.name,
-            lastMessage = null,
-            unreadCount = 0uL,
-            hasUnread = false,
-            firstUnreadMessageIdHex = null,
-            lastReadMessageIdHex = latest.messageIdHex,
-            lastReadTimelineAt = latest.recordedAt,
-        )
-    }
-
     /** Mounts the real route with a logical far-history bookmark and the actual production scroll writer. */
     private fun mountHistoryConversation(
         conversation: ConversationController,
@@ -763,26 +713,76 @@ class ConversationAcceptedSendRouteScreenshotTest {
         }
     }
 
-    /** Keeps identifiers private in test memory while observing the real writer and measured viewport. */
-    private class SendRouteEvidence : ConversationScrollEvidenceSink {
-        val writes = CopyOnWriteArrayList<ConversationScrollWriteEvidence>()
-        var viewport: ConversationViewportEvidence? = null
-
-        /** Retains the measured current frame for bubble/composer clearance assertions. */
-        override fun onViewport(snapshot: ConversationViewportEvidence) {
-            viewport = snapshot
-        }
-
-        /** Records every real list write so an animated history glide cannot pass as a snap. */
-        override fun onWrite(write: ConversationScrollWriteEvidence) {
-            writes += write
-        }
-    }
-
     private companion object {
         const val INCOMING_TEXT = "A received row while sending"
         const val SENT_TEXT = "Accepted send from older history"
         const val HISTORY_ANCHOR_INDEX = 10
         const val LONG_MESSAGE_LINES = 70
     }
+}
+
+/** Rect.toString rounds coordinates; raw IEEE754 bits retain exact guard inputs. */
+private fun diagnosticRectBits(value: ComposerSendLandingDiagnostic): String =
+    listOf(
+        value.sourceSurface,
+        value.sourceComposer,
+        value.sourceViewport?.bounds,
+        value.measured?.frame,
+        value.measured?.text,
+        value.measured?.composer,
+        value.measured?.viewport?.bounds,
+        value.expectedFrameBefore,
+        value.expectedTextBefore,
+        value.resolved?.bounds,
+        value.resolved?.textTarget,
+        value.resolved?.canonicalFrame,
+        value.resolved?.canonicalText,
+        value.resolved?.composer,
+    ).joinToString("|") { rect ->
+        rect?.let {
+            listOf(it.left.toRawBits(), it.top.toRawBits(), it.right.toRawBits(), it.bottom.toRawBits())
+                .joinToString(",")
+        } ?: "null"
+    }
+
+private class LiveTailFrames {
+    var landingDiagnosticCount = 0
+    val painted = CopyOnWriteArrayList<ComposerSendFlightGeometry>()
+    var motionOwner: ComposerSendMotion? = null
+    val boundaries = mutableListOf<String>()
+    var firstCanonicalExposureIndex: Int? = null
+    var firstCanonicalExposureTop: Float? = null
+    var incomingMovedAfterExposure = false
+    var earlyRetiredHeight: Float? = null
+    var earlyRetiredInternalGeometry: Pair<Rect, List<Color>>? = null
+}
+
+/** Keeps identifiers private in test memory while observing the real writer and measured viewport. */
+private class SendRouteEvidence : ConversationScrollEvidenceSink {
+    val writes = CopyOnWriteArrayList<ConversationScrollWriteEvidence>()
+    var viewport: ConversationViewportEvidence? = null
+
+    /** Retains the measured current frame for bubble/composer clearance assertions. */
+    override fun onViewport(snapshot: ConversationViewportEvidence) {
+        viewport = snapshot
+    }
+
+    /** Records every real list write so an animated history glide cannot pass as a snap. */
+    override fun onWrite(write: ConversationScrollWriteEvidence) {
+        writes += write
+    }
+}
+
+private fun liveTailProjection(conversation: ConversationController): dev.ipf.marmotkit.ChatListRowFfi {
+    val group = conversationTimelineTestGroup()
+    val latest = conversation.timeline.last().record
+    return dev.ipf.whitenoise.android.state.chatRow(group.groupIdHex).copy(
+        groupName = group.name,
+        lastMessage = null,
+        unreadCount = 0uL,
+        hasUnread = false,
+        firstUnreadMessageIdHex = null,
+        lastReadMessageIdHex = latest.messageIdHex,
+        lastReadTimelineAt = latest.recordedAt,
+    )
 }

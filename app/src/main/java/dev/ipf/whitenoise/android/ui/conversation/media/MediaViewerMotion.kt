@@ -321,20 +321,22 @@ private fun MediaMotionVisual(
                     )
                 }
             clipPath(outline) {
-                drawContext.canvas.saveLayer(
-                    bounds,
-                    Paint().apply {
-                        alpha = ((1f - progress) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
-                    },
-                )
-                val factor = minOf(bounds.width / expected.layer.size.width, bounds.height / expected.layer.size.height)
-                translate(
-                    bounds.center.x - expected.layer.size.width * factor / 2f,
-                    bounds.center.y - expected.layer.size.height * factor / 2f,
-                ) {
-                    scale(factor, factor, pivot = Offset.Zero) { drawLayer(expected.layer) }
+                val alpha = ((1f - progress) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
+                if (alpha < 1f) {
+                    drawContext.canvas.saveLayer(bounds, Paint().apply { this.alpha = alpha })
                 }
-                drawContext.canvas.restore()
+                try {
+                    val factor =
+                        minOf(bounds.width / expected.layer.size.width, bounds.height / expected.layer.size.height)
+                    translate(
+                        bounds.center.x - expected.layer.size.width * factor / 2f,
+                        bounds.center.y - expected.layer.size.height * factor / 2f,
+                    ) {
+                        scale(factor, factor, pivot = Offset.Zero) { drawLayer(expected.layer) }
+                    }
+                } finally {
+                    if (alpha < 1f) drawContext.canvas.restore()
+                }
             }
         }
     }

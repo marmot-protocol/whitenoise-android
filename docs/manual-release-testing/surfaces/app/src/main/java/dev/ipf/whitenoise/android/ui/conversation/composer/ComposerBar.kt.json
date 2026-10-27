@@ -143,6 +143,14 @@
         "test_ids": [
           "CON-036"
         ]
+      },
+      {
+        "surface": "Suggestion viewport preserves composer input and actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "ComposerContentLayout(",
+        "test_ids": [
+          "CON-005"
+        ]
       }
     ],
     "string_resources": [

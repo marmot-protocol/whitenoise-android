@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -1180,30 +1181,32 @@ internal fun ComposerBar(
                 base = Modifier.fillMaxWidth(),
             ),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .then(
-                        when {
-                            composerHeightDragActive -> Modifier.height(resolvedComposerHeight)
-                            composerHeightTransitionActive -> animatedComposerHeightModifier
-                            composerExpansion.mode == ComposerExpansionMode.Automatic ->
-                                Modifier.heightIn(max = automaticComposerCeiling)
-                            else -> Modifier.height(resolvedComposerHeight)
-                        },
-                    ).onGloballyPositioned { coordinates ->
-                        sendMotion?.composerCoordinates = coordinates
-                    }.onSizeChanged { size ->
-                        visibleComposerHeightPx = size.height.toFloat()
-                        if (
-                            composerExpansion.mode == ComposerExpansionMode.Automatic &&
-                            !composerHeightTransitionActive
-                        ) {
-                            automaticComposerHeightPx = size.height.toFloat()
-                        }
-                        onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
-                    }.padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ComposerContentLayout(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            when {
+                                composerHeightDragActive -> Modifier.height(resolvedComposerHeight)
+                                composerHeightTransitionActive -> animatedComposerHeightModifier
+                                composerExpansion.mode == ComposerExpansionMode.Automatic ->
+                                    Modifier.heightIn(max = automaticComposerCeiling)
+                                else -> Modifier.height(resolvedComposerHeight)
+                            },
+                        ).onGloballyPositioned { coordinates ->
+                            sendMotion?.composerCoordinates = coordinates
+                        }.onSizeChanged { size ->
+                            visibleComposerHeightPx = size.height.toFloat()
+                            if (
+                                composerExpansion.mode == ComposerExpansionMode.Automatic &&
+                                !composerHeightTransitionActive
+                            ) {
+                                automaticComposerHeightPx = size.height.toFloat()
+                            }
+                            onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
+                        }.padding(horizontal = 16.dp, vertical = 6.dp),
+                fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
+                minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {
                 val voiceReviewClip = voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
                 val accessoryContent: (@Composable () -> Unit)? =
@@ -1298,8 +1301,7 @@ internal fun ComposerBar(
                 // suppresses the one composition between an edit-session change and
                 // its LaunchedEffect prefill, when the field still belongs to the
                 // previous draft or edit target.
-                // Anchored directly above the composer input row, capped at
-                // ~50% of the viewport height.
+                // Suggestions use only the height left after the editor and required status chrome.
                 val composerTextMatchesEditSession = composerTextEditOwnerId == editingMessageId
                 val mentionQuery =
                     if (mentionPickerEnabled && composerTextMatchesEditSession) {
@@ -1326,6 +1328,7 @@ internal fun ComposerBar(
                     }
                 if (openQuery != null) {
                     MentionPicker(
+                        modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
                         candidates = mentionMatches,
                         onPick = { candidate ->
                             val insertion = MentionComposer.insertMention(textFieldValue.text, openQuery, candidate)
@@ -1346,6 +1349,7 @@ internal fun ComposerBar(
                     composerExpansion.mode == ComposerExpansionMode.Automatic
                 ) {
                     EmojiShortcodeSuggestions(
+                        modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
                         field = textFieldValue,
                         onPick = { updated ->
                             applyComposerFieldValue(updated)
@@ -1394,16 +1398,7 @@ internal fun ComposerBar(
                     }
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .then(
-                                if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
-                                    Modifier.weight(1f, fill = false)
-                                } else {
-                                    Modifier.weight(1f)
-                                },
-                            ),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     // Keep the field composed and focusable throughout dictation. The
                     // app-owned controls replace only the waveform slot, so an open IME

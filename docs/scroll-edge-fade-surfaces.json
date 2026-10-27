@@ -497,6 +497,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/composer",
+      "policy": "ordinary",
+      "test_ids": [
+        "CON-005",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
       "calls": {
         "fadingVerticalScroll": 1
