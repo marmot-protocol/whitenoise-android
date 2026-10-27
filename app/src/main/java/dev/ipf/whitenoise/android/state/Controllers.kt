@@ -9190,6 +9190,9 @@ class ConversationController(
                             acceptedPendingMessageIdHex in projectedMessageIds
                     if (acceptedPendingProjectionAlreadyLanded) {
                         val confirmedMessageIdHex = requireNotNull(acceptedPendingMessageIdHex)
+                        // The early echo may have seeded only L1 before upload supplied the ciphertext tag.
+                        // Register the guarded durable host copy before releasing its retained plaintext.
+                        handoffOwnMediaCacheOnReconcile(key, confirmedMessageIdHex)
                         appState.commitOptimisticSentPreview(
                             accountRef = conversationAccountRef,
                             groupIdHex = group.groupIdHex,
