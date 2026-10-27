@@ -406,6 +406,14 @@ object AvatarImageLoader {
             fetchLane = AvatarFetchLane.NOTIFICATION,
         )?.asAndroidBitmap()
 
+    /** Releases LRU references without invalidating displayed pixels, deduplicated work or account fences. */
+    internal fun trimMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+        synchronized(lock) {
+            cache.trimMemory(trim)
+            animatedSources.trimToSize(trim.targetBytes(ANIMATED_SOURCE_CACHE_SIZE_BYTES))
+        }
+    }
+
     /** Wipes cached avatars and invalidates every queued or in-flight fetch. */
     fun clear() {
         dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
@@ -642,6 +650,12 @@ internal class PartitionedProfileImageCache(
     ) {
         partitionFor(cacheKey).put(cacheKey, image)
         if (profileImageVariantOf(cacheKey) == ProfileImageVariant.AVATAR) AvatarCacheChanges.published()
+    }
+
+    /** Trims each variant independently; shared ImageBitmaps are never recycled. */
+    fun trimMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+        avatars.trimToSize(trim.targetBytes(avatars.maxSize().toLong()).toInt())
+        banners.trimToSize(trim.targetBytes(banners.maxSize().toLong()).toInt())
     }
 
     /** Drops both variants for account teardown without recording a capacity eviction. */

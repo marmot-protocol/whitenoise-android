@@ -1448,6 +1448,19 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * Releases expendable L1 references on the main thread. Displayed bitmaps remain valid and existing
+     * transfer/upload owners, retained retry bytes, account fences and durable L2/native media survive.
+     */
+    internal fun trimPresentationMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+        assertMainThread { "trimPresentationMemory" }
+        val plaintextRemoved = mediaPlaintextCache.trimToSize(trim.targetBytes(MEDIA_PLAINTEXT_CACHE_MAX_BYTES))
+        val thumbnailsRemoved = mediaThumbnailCache.trimToSize(trim.targetBytes(MEDIA_THUMBNAIL_CACHE_MAX_BYTES))
+        if (plaintextRemoved > 0) bumpMediaCacheRevision()
+        if (thumbnailsRemoved > 0) mediaThumbnailRevisionState.update { it + 1L }
+        publicJpegPreviewLoader.trimMemory(trim)
+    }
+
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
         assertMainThread { "removeMediaMemoryCacheEntry" }
         mediaPlaintextCache.remove(cacheKey)

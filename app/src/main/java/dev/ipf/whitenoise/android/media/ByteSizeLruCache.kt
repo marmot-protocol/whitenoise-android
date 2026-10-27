@@ -105,15 +105,26 @@ class ByteSizeLruCache<K : Any, V : Any>(
     /** Bytes currently counted against the cap. */
     fun residentBytes(): Long = residentBytes
 
-    /** Removes least recently used evictable entries and reports only capacity-driven removals. */
+    /** Applies normal capacity eviction after insertion. */
     private fun evictUntilUnderCap() {
-        if (residentBytes <= maxBytes) return
+        trimToSize(maxBytes)
+    }
+
+    /**
+     * Drops least recently used cache references to [targetBytes], without changing the insertion cap.
+     * Non-evictable entries retain their ownership. Returns counted bytes released, not process RSS;
+     * callers may still hold the same values. Removal callbacks must never recycle shared pixels.
+     */
+    fun trimToSize(targetBytes: Long): Long {
+        require(targetBytes >= 0) { "targetBytes must not be negative" }
+        val before = residentBytes
+        if (residentBytes <= targetBytes) return 0L
         // CRITICAL: hold a *single* iterator across the whole loop. Each
         // `entries.iterator()` (or `entries.entries.iterator()`) returns a
         // fresh iterator; calling `.remove()` on a fresh iterator throws
         // `IllegalStateException` because no `.next()` has advanced it.
         val it = entries.entries.iterator()
-        while (it.hasNext() && residentBytes > maxBytes) {
+        while (it.hasNext() && residentBytes > targetBytes) {
             val eldest = it.next()
             if (!isEvictable(eldest.value)) continue
             residentBytes -= chargeOf(eldest.value)
@@ -121,5 +132,6 @@ class ByteSizeLruCache<K : Any, V : Any>(
             onEvicted(eldest.value)
             it.remove()
         }
+        return before - residentBytes
     }
 }

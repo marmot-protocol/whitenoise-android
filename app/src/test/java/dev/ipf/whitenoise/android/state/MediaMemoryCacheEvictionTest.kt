@@ -22,6 +22,33 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class MediaMemoryCacheEvictionTest {
+    /** L1 trim releases counted bytes without recycling drawn pixels or erasing retained disk media. */
+    @Test
+    fun backgroundTrimPreservesDisplayedPixelsAndDurableMedia() =
+        runBlocking {
+            MediaDownloadIntegrationFixture().use { fixture ->
+                val state = fixture.state
+                val bytes = byteArrayOf(1, 2, 3)
+                val bitmap = android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)
+                state.cacheMediaPlaintext("trim-media", bytes)
+                state.cacheMediaThumbnail("trim-media", bitmap)
+                fixture.disk.put("trim-media", bytes)
+                val revision = state.mediaCacheRevision.value
+                val thumbnailRevision = state.mediaThumbnailRevision.value
+                state.trimPresentationMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+                org.junit.Assert.assertNull(state.cachedMediaPlaintext("trim-media"))
+                org.junit.Assert.assertNull(state.cachedMediaThumbnail("trim-media"))
+                org.junit.Assert.assertFalse(bitmap.isRecycled)
+                org.junit.Assert.assertArrayEquals(bytes, fixture.disk.get("trim-media"))
+                assertEquals(revision + 1, state.mediaCacheRevision.value)
+                assertEquals(thumbnailRevision + 1, state.mediaThumbnailRevision.value)
+                state.trimPresentationMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+                assertEquals(revision + 1, state.mediaCacheRevision.value)
+                assertEquals(thumbnailRevision + 1, state.mediaThumbnailRevision.value)
+                assertTrue("trim must not start native acquisition", fixture.calls.isEmpty())
+            }
+        }
+
     @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
     @Test
     fun removeMediaMemoryCacheKeys_usesSuppliedDispatcherForBothLrus() {

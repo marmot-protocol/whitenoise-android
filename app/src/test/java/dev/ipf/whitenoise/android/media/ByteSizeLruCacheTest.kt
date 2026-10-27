@@ -7,6 +7,46 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ByteSizeLruCacheTest {
+    /** A trim is LRU, accounts exact bytes, and does not permanently lower the insertion capacity. */
+    @Test
+    fun trimReleasesOldestReferencesAndKeepsTheNormalCapacity() {
+        val evicted = mutableListOf<ByteArray>()
+        val cache = ByteSizeLruCache<String, ByteArray>(100, { it.size }, onEvicted = evicted::add)
+        val first = ByteArray(30)
+        val second = ByteArray(30)
+        val third = ByteArray(30)
+        cache.put("first", first)
+        cache.put("second", second)
+        cache.put("third", third)
+        cache.get("first")
+        assertEquals(60L, cache.trimToSize(50))
+        assertEquals(listOf(second, third), evicted)
+        assertEquals(listOf("first"), cache.keysSnapshot())
+        assertEquals(0L, cache.trimToSize(50))
+        cache.put("return", ByteArray(60))
+        assertEquals(90L, cache.residentBytes())
+        assertEquals(2, cache.size())
+    }
+
+    /** Non-heap owners survive even a zero-byte trim, and callbacks see each evicted value once. */
+    @Test
+    fun trimPreservesNonEvictableOwnersAndRejectsNegativeTargets() {
+        val removed = mutableListOf<String>()
+        val cache =
+            ByteSizeLruCache<String, String>(
+                maxBytes = 100,
+                sizeOf = { 10 },
+                onEntryRemoved = removed::add,
+                isEvictable = { it != "owner" },
+            )
+        cache.put("owner", "owner")
+        cache.put("pixels", "pixels")
+        assertEquals(10L, cache.trimToSize(0))
+        assertEquals(listOf("pixels"), removed)
+        assertEquals("owner", cache.get("owner"))
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { cache.trimToSize(-1) }
+    }
+
     @Test
     fun emptyCache_getReturnsNull() {
         val cache = ByteSizeLruCache<String, ByteArray>(maxBytes = 100, sizeOf = { it.size })

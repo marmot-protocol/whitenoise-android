@@ -181,6 +181,11 @@ internal object GroupAvatarImageLoader {
         inFlight.clear()
     }
 
+    /** Releases only cached pixels/source references; existing surfaces and in-flight reads keep their owners. */
+    internal fun trimMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+        synchronized(lock) { cache.trimToSize(trim.targetBytes(CACHE_SIZE_BYTES.toLong())) }
+    }
+
     /** Clears cached group avatars and invalidates every pending completion. */
     fun clear() {
         synchronized(lock) {

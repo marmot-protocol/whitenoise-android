@@ -126,6 +126,18 @@ open class WhiteNoiseApplication :
         applicationScope.launch { PushWakeRecoveryScheduler.schedule(this@WhiteNoiseApplication) }
     }
 
+    /** Handles Android's supported visibility/pressure signals without bootstrapping a cold runtime. */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (android.os.Process.isIsolated()) return
+        val trim = dev.ipf.whitenoise.android.media.presentationMemoryTrim(level) ?: return
+        dev.ipf.whitenoise.android.core.AvatarImageLoader.trimMemory(trim)
+        dev.ipf.whitenoise.android.core.GroupAvatarImageLoader.trimMemory(trim)
+        dev.ipf.whitenoise.android.ui.conversation.media
+            .trimRemoteGiphyMemory(trim)
+        initializedAppState()?.trimPresentationMemory(trim)
+    }
+
     @Suppress("TooGenericExceptionCaught")
     internal fun ensurePeriodicWorkScheduled(
         scope: CoroutineScope = applicationScope,

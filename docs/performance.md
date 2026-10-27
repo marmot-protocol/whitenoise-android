@@ -974,3 +974,34 @@ the benchmark JSON artifact, and link the relevant traces.
 | Open group → members visible | _ms_ | _ms_ | _%_ |
 
 The mention benchmark retains a three-second collection tail after visible read completion so Compose animation and highlight spans can finish. This is not a completion assertion or a latency budget: the report still rejects missing, unfinished, ambiguous or stale landings. Qualified mention frame metrics use tap-to-landing, excluding the highlight and collection tail; `journey_ms` includes collection time.
+
+## Presentation cache trim policy
+
+`WhiteNoiseApplication.onTrimMemory` handles Android's supported visibility
+signals without initializing an unused app state. UI_HIDDEN (20 and intermediate
+levels below 40) trims each image-cache tier to half its configured capacity.
+BACKGROUND (40+) releases its expendable references. On API 33 and earlier,
+running pressure at 5–14 uses the half-budget target and 15–19 uses zero.
+On API 34+, those retired running-pressure signals are ignored. This follows
+[Android's callback contract](https://developer.android.com/reference/android/content/ComponentCallbacks2).
+No `onLowMemory` dependency, extra lifecycle observer or forced GC is required.
+
+Targets are based on capacity, not current occupancy, so repeating a hidden
+callback does not keep halving a warm cache. These are one-shot trims: admitted
+work may finish and publish through its original account fence, and subsequent
+inserts retain their normal bounded budget. Trimming does not restart acquisition
+or cancel its existing shared request. Existing displayed bitmap/source references
+remain valid; no shared bitmap is recycled.
+
+The coordinated image tiers are L1 attachment bytes/thumbnails, profile/banner
+pixels and profile animation sources, encrypted-group pixels/sources, public JPEG
+pixels and GIPHY bytes. Durable L2/native media, upload/retry payloads, account
+lifetimes, decoder workers, failure cooldowns, playback and small metadata caches
+are outside this expendable image-retention policy. Avatar eviction counters
+include trim removals; byte totals describe retained references, not measured RSS.
+
+Use STB-006 for the controlled return workload. Unit/Compose regressions check
+exact retained bytes, idempotence, shared-request counts, durable disk retention
+and displayed-pixel/account isolation. They do not measure device RSS, GPU frames
+or establish an existing OOM. Record those runtime measurements separately before
+claiming the corresponding performance qualification.

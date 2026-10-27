@@ -52,7 +52,7 @@ internal object AvatarCacheDiagnostics {
         if (variant == ProfileImageVariant.AVATAR) deduplicated(AvatarCacheKind.PROFILE)
     }
 
-    /** Records only a capacity eviction, excluding replacement, clear, and account teardown. */
+    /** Records capacity/trim eviction, excluding replacement, clear, and account teardown. */
     fun evicted(kind: AvatarCacheKind) = count(kind, AvatarCacheMetric.EVICTED)
 
     /** Adds one counter only while an explicit debug measurement is active. */

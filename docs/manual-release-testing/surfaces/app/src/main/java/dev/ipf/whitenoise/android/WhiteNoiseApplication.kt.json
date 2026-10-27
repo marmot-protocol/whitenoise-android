@@ -10,6 +10,14 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "Presentation memory trim preserves live images and data",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/WhiteNoiseApplication.kt",
+        "anchor": "override fun onTrimMemory(",
+        "test_ids": [
+          "STB-006"
+        ]
       }
     ]
   },

@@ -188,6 +188,11 @@ internal class PublicJpegPreviewLoader {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>): Boolean = size > MAX_FAILURES
         }
 
+    /** Drops only decoded-cache references; active images, consent and request serialization stay intact. */
+    fun trimMemory(trim: PresentationMemoryTrim) {
+        pixels.trimToSize(trim.targetBytes(CACHE_BYTES.toLong()).toInt())
+    }
+
     fun clearPixels(accountId: String) {
         pixels
             .snapshot()
