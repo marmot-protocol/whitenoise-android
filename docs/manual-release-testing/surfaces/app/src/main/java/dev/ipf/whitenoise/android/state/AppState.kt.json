@@ -466,6 +466,14 @@
         "test_ids": [
           "SEC-017"
         ]
+      },
+      {
+        "surface": "Ordered off-main app-lock timestamp persistence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "persistAppLockTimestamp",
+        "test_ids": [
+          "SEC-002"
+        ]
       }
     ]
   },

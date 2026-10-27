@@ -1080,6 +1080,8 @@ class WhiteNoiseAppState private constructor(
     pushTokenStoreOverride: PushTokenStore?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
+    private val appLockTimestampWrite: ((Long) -> Unit)? = null,
+    private val appLockPersistenceDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val dictationDiagnosticLifecycle = DictationDiagnosticLifecycle()
 
@@ -1184,6 +1186,8 @@ class WhiteNoiseAppState private constructor(
         },
         preferences: SharedPreferences? = null,
         pushTokenStore: PushTokenStore? = null,
+        appLockTimestampWrite: ((Long) -> Unit)? = null,
+        appLockPersistenceDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1218,6 +1222,8 @@ class WhiteNoiseAppState private constructor(
         pushTokenStoreOverride = pushTokenStore,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
+        appLockTimestampWrite = appLockTimestampWrite,
+        appLockPersistenceDispatcher = appLockPersistenceDispatcher,
     )
 
     internal val appContext = context.applicationContext
@@ -2620,6 +2626,7 @@ class WhiteNoiseAppState private constructor(
             }
         }
     private val hostPreferenceCommitMutex = Mutex()
+    private val appLockTimestampWriteMutex = Mutex()
     private val inFlightAttachmentAcquisitions =
         InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
 
@@ -7986,13 +7993,29 @@ class WhiteNoiseAppState private constructor(
         stopSpeaking()
     }
 
+    /** Capture on Main; serialize before dispatch so a slower old write cannot overtake a newer event. */
+    private fun persistAppLockTimestamp(value: Long) {
+        mutationsScope.launch {
+            appLockTimestampWriteMutex.withLock {
+                withContext(appLockPersistenceDispatcher) {
+                    val write = appLockTimestampWrite
+                    if (write != null) {
+                        write(value)
+                    } else {
+                        AppLockPreferences.writeLastUnlockedAtMillis(appContext, value)
+                    }
+                }
+            }
+        }
+    }
+
     internal fun markAppUnlockSucceeded(
         nowMillis: Long = System.currentTimeMillis(),
         dismissRetainedVisibleConversation: Boolean = true,
     ) {
         val normalizedNow = nowMillis.coerceAtLeast(0L)
         lastAppUnlockAtMillis = normalizedNow
-        AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
+        persistAppLockTimestamp(normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
         if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
@@ -8081,7 +8104,7 @@ class WhiteNoiseAppState private constructor(
         // The delay means time spent away from the app, not time since the
         // last credential prompt while the user was actively reading chats.
         lastAppUnlockAtMillis = normalizedNow
-        AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
+        persistAppLockTimestamp(normalizedNow)
     }
 
     /** Refreshes device-scoped native receipts and the independent diagnostic log choice. */
