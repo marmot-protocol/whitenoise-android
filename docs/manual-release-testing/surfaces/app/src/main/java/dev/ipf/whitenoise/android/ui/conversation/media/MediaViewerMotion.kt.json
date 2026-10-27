@@ -26,6 +26,14 @@
         "test_ids": [
           "MED-041"
         ]
+      },
+      {
+        "surface": "Fresh single-measurement thumbnail resolution without settled-viewer geometry polling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "internal fun resolve(",
+        "test_ids": [
+          "MED-041"
+        ]
       }
     ],
     "composable_surfaces": [

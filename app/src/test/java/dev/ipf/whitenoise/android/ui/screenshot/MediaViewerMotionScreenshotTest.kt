@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -47,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerA
 import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_TOP_CHROME_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MasonryImageLayout
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaThumbnailCorners
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerMotion
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
@@ -76,6 +80,45 @@ import kotlin.math.roundToInt
 @Config(sdk = [36], qualifiers = "w360dp-h640dp-mdpi")
 class MediaViewerMotionScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
+
+    /** Resolving one animation frame must not traverse layout once per bounds/corner property. */
+    @Test
+    fun thumbnailResolutionMeasuresOnceAndNeverCachesAcrossLookups() {
+        lateinit var layer: GraphicsLayer
+        composeRule.setContent {
+            val ownedLayer = rememberGraphicsLayer()
+            SideEffect { layer = ownedLayer }
+        }
+        composeRule.runOnIdle {
+            val registry = MediaViewerThumbnailRegistry()
+            val id = ConversationMediaViewerAttachmentId("geometry-budget", 0)
+            var bounds = Rect(10f, 20f, 110f, 80f)
+            val corners = MediaThumbnailCorners(8f, 0f, 8f, 0f)
+            var geometryReads = 0
+            val thumbnail =
+                MediaViewerThumbnailRegistry.Thumbnail(layer, 7uL) {
+                    geometryReads++
+                    bounds to corners
+                }.apply { ready = true }
+            registry.register(id, thumbnail)
+
+            val first = checkNotNull(registry.resolve(id))
+            assertEquals(1, geometryReads)
+            assertEquals(bounds, first.bounds)
+            assertEquals(corners, first.corners)
+            assertEquals(1, geometryReads)
+
+            bounds = Rect(30f, 40f, 130f, 100f)
+            assertEquals(bounds, checkNotNull(registry.resolve(id)).bounds)
+            assertEquals(2, geometryReads)
+            bounds = Rect.Zero
+            assertNull(registry.resolve(id))
+            assertEquals(3, geometryReads)
+            registry.remove(id, thumbnail)
+            assertNull(registry.resolve(id))
+            assertEquals(3, geometryReads)
+        }
+    }
 
     @Test fun thumbnailExpandsAndReturnsToItsCurrentRegistration() = render(false, LayoutDirection.Ltr, 1f, "dark")
 

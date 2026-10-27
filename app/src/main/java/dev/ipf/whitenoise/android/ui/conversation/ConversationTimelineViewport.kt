@@ -121,7 +121,13 @@ internal class ConversationTimelineViewport(
     }
 
     /** Returns the clear measured height consumed by native centering, tail, selection and speech owners. */
-    fun readingHeightPx(): Int = readingLayoutInfo().viewportSize.height
+    fun readingHeightPx(): Int {
+        val native = listState.layoutInfo
+        val (base, overlap) = measuredPadding
+        val laidOutOverlap = (native.beforeContentPadding - base).coerceIn(0, overlap)
+        // Geometry-only callers do not need a projected list or a filtered copy of every visible row.
+        return native.viewportSize.height - laidOutOverlap.coerceIn(0, native.viewportSize.height)
+    }
 
     /** Native newest-edge clamp, independent of a requested reading-start offset. */
     val isAtNaturalTail: Boolean

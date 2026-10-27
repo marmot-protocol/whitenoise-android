@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -66,6 +67,11 @@ internal class MediaViewerThumbnailRegistry {
                 measuredBounds = value
             }
         var ready = false
+
+        /** One fresh measurement shared by eligibility, bounds and corners for this lookup only. */
+        fun readGeometry(): Pair<Rect, MediaThumbnailCorners>? =
+            if (geometry == null) measuredBounds to measuredCorners else geometry.invoke()
+
         var corners: MediaThumbnailCorners
             get() = if (geometry == null) measuredCorners else geometry.invoke()?.second ?: MediaThumbnailCorners()
             set(value) {
@@ -101,9 +107,29 @@ internal class MediaViewerThumbnailRegistry {
         if (remaining.isEmpty()) thumbnails.remove(id) else thumbnails[id] = remaining
     }
 
-    internal fun find(id: ConversationMediaViewerAttachmentId): Thumbnail? =
-        // A quoted/duplicated visible rendering must never become an arbitrary last-registered origin.
-        thumbnails[id]?.filter { it.ready && it.bounds.width > 0f && it.bounds.height > 0f }?.singleOrNull()
+    /** Resolves current visibility once; no geometry is cached across frames or source mutations. */
+    internal fun resolve(id: ConversationMediaViewerAttachmentId): ResolvedThumbnail? {
+        var found: ResolvedThumbnail? = null
+        for (thumbnail in thumbnails[id].orEmpty()) {
+            if (!thumbnail.ready) continue
+            val (bounds, corners) = thumbnail.readGeometry() ?: continue
+            if (!(bounds.width > 0f && bounds.height > 0f)) continue
+            // A quoted/duplicated visible rendering must never become an arbitrary origin.
+            if (found != null) return null
+            found = ResolvedThumbnail(thumbnail, bounds, corners)
+        }
+        return found
+    }
+
+    /** Supplies the current unique registration to callers that do not consume a draw snapshot. */
+    internal fun find(id: ConversationMediaViewerAttachmentId): Thumbnail? = resolve(id)?.thumbnail
+
+    /** Ephemeral draw input; retaining this value must never replace a subsequent visibility lookup. */
+    internal data class ResolvedThumbnail(
+        val thumbnail: Thumbnail,
+        val bounds: Rect,
+        val corners: MediaThumbnailCorners,
+    )
 }
 
 private val LocalMediaThumbnailCanvas = staticCompositionLocalOf<(() -> LayoutCoordinates?)?> { null }
@@ -160,18 +186,19 @@ internal fun Modifier.mediaViewerThumbnail(
             MediaViewerThumbnailRegistry.Thumbnail(layer, sourceEpoch) {
                 coordinates[0]?.takeIf { it.isAttached }?.let { measured ->
                     val full = measured.boundsInWindow(clipBounds = false)
-                    val viewport = currentReadingViewport?.invoke()
+                    val readViewport = currentReadingViewport
+                    val viewport = readViewport?.invoke()
                     val visible =
                         measured.boundsInWindow() == full &&
                             (
-                                currentReadingViewport == null ||
+                                readViewport == null ||
                                     viewport != null &&
                                     full.left >= viewport.left &&
                                     full.top >= viewport.top &&
                                     full.right <= viewport.right &&
                                     full.bottom <= viewport.bottom
                             )
-                    val corners = mediaThumbnailCorners(measured, gridTile, radius, canvas?.invoke())
+                    val corners = mediaThumbnailCorners(full, gridTile, radius, canvas?.invoke())
                     if (visible && corners != null) Rect(measured.positionOnScreen(), full.size) to corners else null
                 }
             }
@@ -205,7 +232,12 @@ internal fun MediaViewerMotion(
 ) {
     val knownAspect = attachmentAspectRatio?.takeIf { it.isFinite() && it > 0f }
     val enabled = rememberConversationMotionEnabled() && allowMotion && knownAspect != null
-    val openingToken = remember(registry, opening) { registry?.find(opening)?.token }
+    val openingToken =
+        remember(registry, opening) {
+            // The animation monitor and draw/layer phases observe live geometry. Initial admission
+            // must not subscribe the whole viewer composition to the timeline's layout publication.
+            Snapshot.withoutReadObservation { registry?.resolve(opening)?.thumbnail?.token }
+        }
     val initialAvailable = openingToken != null
     val progress = remember { Animatable(if (enabled && initialAvailable) 0f else 1f) }
     var entrySettled by remember { mutableStateOf(!enabled || !initialAvailable) }
@@ -227,12 +259,14 @@ internal fun MediaViewerMotion(
     val bodyModifier =
         remember(geometry, enabled, readThumbnail) {
             Modifier.onGloballyPositioned { geometry[1] = it }.graphicsLayer {
-                alpha = mediaViewerContentAlpha(enabled, readThumbnail() != null, progress.value)
+                val fraction = progress.value
+                alpha =
+                    if (!enabled || fraction >= 1f) 1f else mediaViewerContentAlpha(true, readThumbnail() != null, fraction)
             }
         }
     Box(Modifier.fillMaxSize().onGloballyPositioned { geometry[0] = it }) {
         content(bodyModifier)
-        MediaMotionVisual(registry, { readThumbnail().takeIf { enabled } }, if (closing) selected else opening) {
+        MediaMotionVisual({ if (enabled) readThumbnail() else null }) {
             mediaMotionDrawGeometry(geometry, { progress.value }, knownAspect)
         }
     }
@@ -243,6 +277,8 @@ private fun mediaMotionDrawGeometry(
     progress: () -> Float,
     knownAspect: Float?,
 ): MediaMotionDrawGeometry? {
+    val fraction = progress()
+    if (fraction >= 1f) return null
     val root = geometry[0]?.takeIf { it.isAttached }
     val body = geometry[1]?.takeIf { it.isAttached }
     return if (root == null || body == null || knownAspect == null) {
@@ -252,7 +288,7 @@ private fun mediaMotionDrawGeometry(
         MediaMotionDrawGeometry(
             origin,
             Rect(body.positionOnScreen() - origin, body.size.toSize()),
-            progress(),
+            fraction,
             knownAspect,
         )
     }
@@ -262,7 +298,7 @@ private fun mediaMotionDrawGeometry(
 private suspend fun animateMediaViewerMotion(
     progress: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
     closing: Boolean,
-    readThumbnail: () -> MediaViewerThumbnailRegistry.Thumbnail?,
+    readThumbnail: () -> MediaViewerThumbnailRegistry.ResolvedThumbnail?,
     onSettled: () -> Unit,
     onClosed: () -> Unit,
 ) {
@@ -291,52 +327,48 @@ private suspend fun animateMediaViewerMotion(
 
 @Composable
 private fun MediaMotionVisual(
-    registry: MediaViewerThumbnailRegistry?,
-    thumbnail: () -> MediaViewerThumbnailRegistry.Thumbnail?,
-    identity: ConversationMediaViewerAttachmentId,
+    thumbnail: () -> MediaViewerThumbnailRegistry.ResolvedThumbnail?,
     geometry: () -> MediaMotionDrawGeometry?,
 ) {
+    val outline = remember { Path() }
+    val blendPaint = remember { Paint() }
     Canvas(Modifier.fillMaxSize()) {
         val frame = geometry() ?: return@Canvas
-        val expected = thumbnail() ?: return@Canvas
         val progress = frame.progress
         if (progress >= 1f) return@Canvas
-        // Resolve the current registration at draw time: disposed/offscreen rows never leave retained pixels.
-        val current = registry?.find(identity)
-        if (current === expected) {
-            val source = expected.bounds.translate(-frame.origin)
-            val bounds = mediaViewerMotionBounds(source, size, progress, frame.aspectRatio, frame.viewport)
-            val outline =
-                Path().apply {
-                    val corners = expected.corners
-                    val remaining = 1f - progress
-                    addRoundRect(
-                        RoundRect(
-                            bounds,
-                            CornerRadius(corners.topLeft * remaining),
-                            CornerRadius(corners.topRight * remaining),
-                            CornerRadius(corners.bottomRight * remaining),
-                            CornerRadius(corners.bottomLeft * remaining),
-                        ),
-                    )
+        // Resolve once at draw time: disposed/offscreen rows never leave retained pixels.
+        val current = thumbnail() ?: return@Canvas
+        val layer = current.thumbnail.layer
+        val source = current.bounds.translate(-frame.origin)
+        val bounds = mediaViewerMotionBounds(source, size, progress, frame.aspectRatio, frame.viewport)
+        outline.reset()
+        val corners = current.corners
+        val remaining = 1f - progress
+        outline.addRoundRect(
+            RoundRect(
+                bounds,
+                CornerRadius(corners.topLeft * remaining),
+                CornerRadius(corners.topRight * remaining),
+                CornerRadius(corners.bottomRight * remaining),
+                CornerRadius(corners.bottomLeft * remaining),
+            ),
+        )
+        clipPath(outline) {
+            val alpha = ((1f - progress) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
+            if (alpha < 1f) {
+                drawContext.canvas.saveLayer(bounds, blendPaint.apply { this.alpha = alpha })
+            }
+            try {
+                val factor =
+                    minOf(bounds.width / layer.size.width, bounds.height / layer.size.height)
+                translate(
+                    bounds.center.x - layer.size.width * factor / 2f,
+                    bounds.center.y - layer.size.height * factor / 2f,
+                ) {
+                    scale(factor, factor, pivot = Offset.Zero) { drawLayer(layer) }
                 }
-            clipPath(outline) {
-                val alpha = ((1f - progress) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
-                if (alpha < 1f) {
-                    drawContext.canvas.saveLayer(bounds, Paint().apply { this.alpha = alpha })
-                }
-                try {
-                    val factor =
-                        minOf(bounds.width / expected.layer.size.width, bounds.height / expected.layer.size.height)
-                    translate(
-                        bounds.center.x - expected.layer.size.width * factor / 2f,
-                        bounds.center.y - expected.layer.size.height * factor / 2f,
-                    ) {
-                        scale(factor, factor, pivot = Offset.Zero) { drawLayer(expected.layer) }
-                    }
-                } finally {
-                    if (alpha < 1f) drawContext.canvas.restore()
-                }
+            } finally {
+                if (alpha < 1f) drawContext.canvas.restore()
             }
         }
     }
@@ -355,12 +387,13 @@ private fun MediaViewerThumbnailRegistry.motionThumbnail(
     closing: Boolean,
     selectedSourceEpoch: ULong?,
     openingToken: Any?,
-): MediaViewerThumbnailRegistry.Thumbnail? =
+): MediaViewerThumbnailRegistry.ResolvedThumbnail? =
     if (closing) {
-        find(selected)?.takeIf { selectedSourceEpoch == null || it.sourceEpoch == selectedSourceEpoch }
+        resolve(selected)?.takeIf { selectedSourceEpoch == null || it.thumbnail.sourceEpoch == selectedSourceEpoch }
     } else {
-        find(opening)?.takeIf {
-            it.token === openingToken && (selectedSourceEpoch == null || it.sourceEpoch == selectedSourceEpoch)
+        resolve(opening)?.takeIf {
+            it.thumbnail.token === openingToken &&
+                (selectedSourceEpoch == null || it.thumbnail.sourceEpoch == selectedSourceEpoch)
         }
     }
 
@@ -390,7 +423,7 @@ internal data class MediaThumbnailCorners(
 )
 
 private fun mediaThumbnailCorners(
-    coordinates: LayoutCoordinates,
+    tile: Rect,
     grid: Boolean,
     radius: Float,
     canvas: LayoutCoordinates?,
@@ -398,7 +431,6 @@ private fun mediaThumbnailCorners(
     if (!grid) return MediaThumbnailCorners(radius, radius, radius, radius)
     // The explicit masonry host owns the outer clip; nested rows/columns are not clip bounds.
     return canvas?.takeIf { it.isAttached }?.let { outerCanvas ->
-        val tile = coordinates.boundsInWindow(clipBounds = false)
         val outer = outerCanvas.boundsInWindow(clipBounds = false)
         val left = tile.left <= outer.left + CORNER_EDGE_TOLERANCE_PX
         val right = tile.right >= outer.right - CORNER_EDGE_TOLERANCE_PX
