@@ -1759,6 +1759,7 @@ internal fun ConversationScreen(
                                     viewportEndOffsetPx = layoutInfo.viewportEndOffset,
                                     beforeContentPaddingPx = layoutInfo.beforeContentPadding,
                                     viewportSizePx = layoutInfo.viewportSize.height,
+                                    measuredTailKey = tailInfo?.key,
                                 )
                             },
                         )
@@ -3376,6 +3377,7 @@ internal fun ConversationScreen(
                             viewportEndOffsetPx = layoutInfo.viewportEndOffset,
                             beforeContentPaddingPx = layoutInfo.beforeContentPadding,
                             viewportSizePx = layoutInfo.viewportSize.height,
+                            measuredTailKey = tailInfo?.key,
                         )
                     },
                 )

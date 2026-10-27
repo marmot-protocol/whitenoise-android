@@ -166,6 +166,7 @@ internal data class ConversationTailLayout(
     val viewportStartOffsetPx: Int = 0,
     val beforeContentPaddingPx: Int = 0,
     val viewportSizePx: Int = viewportEndOffsetPx - viewportStartOffsetPx,
+    val measuredTailKey: Any? = null,
 ) {
     val isReady: Boolean
         get() =
@@ -601,6 +602,7 @@ internal class ConversationScrollCoordinator(
             resultingMode = ConversationScrollMode.FollowingTail,
         ) {
             var previousLayout: ConversationTailLayout? = null
+            var previousTailIndex: Int? = null
             val baselineLayout = captureLayout()
             var baselineRowHeightPx = baselineLayout.lastRowHeightPx
             val baselineBottomGeometry = baselineLayout.bottomGeometry
@@ -630,8 +632,19 @@ internal class ConversationScrollCoordinator(
                     } else {
                         0
                     }
+                val tailIndex = resolveTailIndex()
+                // Preserve the first key-anchor reset and every uncertain or changing measurement.
+                // A repeated correction cannot improve the same measured, already-clear tail.
+                if (
+                    currentLayout.measuredTailKey == null ||
+                    !currentLayout.tailClearsViewportStart ||
+                    currentLayout != previousLayout ||
+                    tailIndex != previousTailIndex
+                ) {
+                    scrollToTail(tailIndex)
+                }
                 previousLayout = currentLayout
-                scrollToTail(resolveTailIndex())
+                previousTailIndex = tailIndex
                 frame++
                 if (
                     currentLayout.canFinishSettle(
