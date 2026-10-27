@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 76088a173a93c1c361d3b778c3ef92b7d34e7706
+          ref: 57526cd492b678290389b7d26acfc9a931eb533f
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -61,7 +61,7 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      AFTER_SHA: 76088a173a93c1c361d3b778c3ef92b7d34e7706
+      AFTER_SHA: 57526cd492b678290389b7d26acfc9a931eb533f
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -185,7 +185,7 @@ jobs:
           name: perf3439-physical-ab-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: error
-          compression-level: 0
+          compression-level: 6
           retention-days: 7
 
   checks:
@@ -203,7 +203,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 76088a173a93c1c361d3b778c3ef92b7d34e7706
+          ref: 57526cd492b678290389b7d26acfc9a931eb533f
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -230,6 +230,7 @@ jobs:
           set -euo pipefail
           filters=(
             --tests '*MediaViewerMotionScreenshotTest'
+            --tests '*MediaViewerEntryFrameTest'
             --tests '*ConversationTimelineUnderlayTest'
             --tests '*MediaVideoShareParityTest'
             --tests '*ConversationMediaViewerSessionTest'
