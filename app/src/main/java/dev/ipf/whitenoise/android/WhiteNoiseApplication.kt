@@ -130,9 +130,13 @@ open class WhiteNoiseApplication :
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (android.os.Process.isIsolated()) return
-        val trim = dev.ipf.whitenoise.android.media.presentationMemoryTrim(level) ?: return
-        dev.ipf.whitenoise.android.core.AvatarImageLoader.trimMemory(trim)
-        dev.ipf.whitenoise.android.core.GroupAvatarImageLoader.trimMemory(trim)
+        val trim =
+            dev.ipf.whitenoise.android.media
+                .presentationMemoryTrim(level) ?: return
+        dev.ipf.whitenoise.android.core.AvatarImageLoader
+            .trimMemory(trim)
+        dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
+            .trimMemory(trim)
         dev.ipf.whitenoise.android.ui.conversation.media
             .trimRemoteGiphyMemory(trim)
         initializedAppState()?.trimPresentationMemory(trim)

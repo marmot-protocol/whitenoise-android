@@ -170,7 +170,8 @@ internal fun attachmentFilePresentationState(
                     native.received,
                     native.total,
                     native.retryAt,
-                ).toPresentationState().let { projected ->
+                ).toPresentationState()
+                .let { projected ->
                     if (host == AttachmentTransferState.NotRetained && projected == AttachmentTransferState.Remote) {
                         host
                     } else {

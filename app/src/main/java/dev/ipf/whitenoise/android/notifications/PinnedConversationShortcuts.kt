@@ -268,8 +268,10 @@ internal class PinnedConversationShortcuts(
             }
         val priorIdentity = original?.extras?.getString(PICTURE_IDENTITY)
         val retainIcon =
-            priorIdentity != null && priorIdentity in picture.missingIdentities &&
-                original != null && shortcutPreviewAllowed(context, original)
+            priorIdentity != null &&
+                priorIdentity in picture.missingIdentities &&
+                original != null &&
+                shortcutPreviewAllowed(context, original)
         val icon =
             if (privacy.allowed) {
                 notificationConversationIcon(label, capability.shortcutId, picture.bitmap?.let(::boundedPinnedAvatar))
