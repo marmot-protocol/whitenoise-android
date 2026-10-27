@@ -85,11 +85,10 @@ version, synthetic account state and diagnostics differ from the failing
 release. A further failing capture with usable phase evidence is needed before
 choosing a repair. No comparative battery saving is claimed.
 
-Restoration verified Owner active, the retained test profile stopped, the
-temporary shell wake lock released, normal network settings restored and
-notification permission retained. The original release APK and all 23 original
-Owner White Noise APKs were unchanged. No application was uninstalled and no
-application data was cleared or restored.
+Restoration verified that the retained test profile was stopped, the temporary
+shell wake lock released, normal network settings restored and notification
+permission retained. Existing White Noise APKs were unchanged. No application
+was uninstalled and no application data was cleared or restored.
 
 ## Ten additional reconnect captures
 
@@ -141,11 +140,11 @@ be treated as exact kernel sleep boundaries. This trace configuration has no
 scheduler or kernel-suspend events, so that overlap does not locate a stalled
 native operation. The native catch-up contract limits below still apply.
 
-Restoration passed again, including the original release and all 23 original
-Owner APK hashes, network settings, notification permission and temporary hold
-release. The retained test profile was stopped and Owner restored. No APK was
-installed or removed, no app data was cleared or restored, and app code was unchanged.
-The synthetic host sender and collection helpers were stopped after retrieval.
+Restoration passed again: existing White Noise APKs were unchanged, network
+settings and notification permission were preserved, and the temporary hold was
+released. The retained test profile was stopped. No APK was installed or removed,
+no app data was cleared or restored, and app code was unchanged. The synthetic
+host sender and collection helpers were stopped after retrieval.
 
 These additional successes do not establish that the intermittent release
 failure is fixed or distinguish an Android cause from an MDK cause. The earlier
@@ -165,8 +164,8 @@ unplugged capture.
 Correlate reconnect phases across `network_restored`,
 `recovery_attempt`, `notification_receiver_ready`, `account_catch_up_start`,
 `account_catch_up_ready` and system notification events. The current serialized
-sync logs omit operation IDs. Coordinator samples have an attempt field;
-nested native catch-up samples do not. This campaign had one observed recovery
+sync logs omit operation IDs. Coordinator samples include an attempt field. Nested native catch-up samples
+omit that field. This campaign had one observed recovery
 attempt per row, but overlapping generations cannot be joined reliably from
 phase names alone. Local delivery also does not emit the FCM-only candidate/post
 diagnostics. Preserve raw logs privately; publish only timing values and closed
@@ -191,8 +190,8 @@ that native work caused the earlier delayed burst.
   repairs later incoming-message wake delivery.
 - If work stalls with CPU and connectivity available, investigate the Android
   handoff and native contract before assigning ownership.
-- If the current runtime does not reproduce, report that limit rather than
-  inventing a pending step or applying a speculative repair.
+- If the current runtime does not reproduce, report that limit. A pending-step
+  diagnosis or repair requires a failing capture.
 
 The candidate Android boundary, only if supported by that evidence, is bounded
 CPU wake ownership for admitted active recovery and its required notification
