@@ -65,14 +65,25 @@ class PresentationMemoryTrimCoverageTest {
         val state = source("state/AppState.kt").functionBody("trimPresentationMemory")
         assertTrue(state.contains("assertMainThread"))
         val stateTrims =
-            listOf("mediaPlaintextCache.trimToSize", "mediaThumbnailCache.trimToSize", "publicJpegPreviewLoader.trimMemory")
+            listOf(
+                "mediaPlaintextCache.trimToSize",
+                "mediaThumbnailCache.trimToSize",
+                "publicJpegPreviewLoader.trimMemory",
+            )
         stateTrims.forEach { assertTrue("missing app-cache trim: $it", state.contains(it)) }
         val trimBodies =
             callback + state +
                 source("core/AvatarImageLoader.kt").functionBody("trimMemory") +
                 source("core/GroupAvatarImageLoader.kt").functionBody("trimMemory")
         val destructiveCalls =
-            listOf(".clear(", ".recycle(", "resetForAccount", "retireRequests", "diskMediaCache", "retainedMediaUploads")
+            listOf(
+                ".clear(",
+                ".recycle(",
+                "resetForAccount",
+                "retireRequests",
+                "diskMediaCache",
+                "retainedMediaUploads",
+            )
         destructiveCalls.forEach {
             assertFalse("trim must not retire active or durable ownership: $it", trimBodies.contains(it))
         }

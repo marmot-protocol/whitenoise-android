@@ -49,7 +49,11 @@ class KeptMediaLiveStateTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 if (mounted.value) {
-                    KeptMediaTestHost(surface.item, conversation = surface.controller, onPresentation = { presentation = it })
+                    KeptMediaTestHost(
+                        surface.item,
+                        conversation = surface.controller,
+                        onPresentation = { presentation = it },
+                    )
                 }
             }
         }
