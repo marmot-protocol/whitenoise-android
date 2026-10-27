@@ -110,7 +110,7 @@ release qualification remains tied to the exact release candidate.
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
-`build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
+`compile`, `build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
 `static-analysis-Play`, `compile-tests-Zapstore`, `compile-tests-Play`, `Zapstore`, or
 `Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
@@ -120,6 +120,13 @@ restore caches read-only. Assertions execute on every fresh runner. The separate
 MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks and docs-only runs do not write it. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
+
+The `compile` job compiles the debug main, unit-test and Android-test sources of
+Zapstore, and of Play when a Play lane runs, before the unit-test, lint,
+build-contract and Play jobs start; they load those outputs from the build cache
+instead of compiling them again in parallel. When the baseline phase runs, it
+assembles both release APKs, so R8 minifies the benchmark release build once per
+run; drafts and prechecks keep that packaging in the tooling phase.
 
 Android CI, the fuzz PR gate and the invariant gate run on wn-build-server, a
 persistent self-hosted runner pool registered to this repository. The
