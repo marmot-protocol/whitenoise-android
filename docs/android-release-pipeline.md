@@ -133,29 +133,51 @@ there is no input for production, open testing, or a rollout percentage.
 `zapstore-production` contains a scoped `ZAPSTORE_SIGN_WITH` bunker URI and a
 stable `ZAPSTORE_BUNKER_CLIENT_KEY` (64 hex characters). The runner restores the
 client identity before connecting. The bunker address identifies the remote
-signer transport and need not equal the publishing key. A signed preflight
-checks the returned event author against `ZAPSTORE_PUBLISHER_PUBKEY` before the
-online publication command. Direct nsec signing is not supported by this CI path.
+signer transport and need not equal the publishing key. A read-only v2 preflight
+checks the returned public key and active C1 authorization against the pinned
+publisher before any public write. Direct nsec signing is not supported by this CI path.
 
-`bash scripts/test-zsp-offline.sh` qualifies the checksummed real ZSP binary
-with a synthetic APK, disposable signing keys, and a loopback-only NIP-46 signer.
-It checks the version, JSONL output, event signatures/authors and kinds
-32267/30063/3063, and restoration of the preseeded client identity. No production
-credentials are read, and no online publication command is run. It requires Go,
-JDK 17+, Android SDK platform 36 and build-tools 36.0.0. CI runs it in a separate
-job and retains `zsp-offline-contract` as evidence; local receipts default to
-`build/reports/zsp-offline.json`. Record qualification results in #2128.
+ZSP **2.0.0** is pinned with platform-specific SHA-256 checksums in
+`config/android-release.properties`. Its `--json check` and `--json publish`
+commands return one JSON document; v1 JSONL event parsing, `--offline`,
+`--skip-certificate-linking` and `RELAY_URLS` no longer apply. CI sets `RELAYS`
+and `BLOSSOM_URL` explicitly. The Go protocol helpers use separately pinned,
+checksummed dependencies from upstream commit `c50c1ccbf32d7fa6ae00f74990ce2c83f3bac6a1`:
+ZSP 0.4.17 and 2.0.0 both use go-nostr 0.52.3 and coder/websocket 1.8.12.
+This dependency checkout never supplies the publishing binary.
+
+CI runs `scripts/test-zsp-contract.sh` with a synthetic APK, a disposable Android
+key/C1 proof, a disposable Nostr key, a loopback NIP-46 signer, a loopback catalog
+and a loopback Blossom server. It exercises the checksummed real v2 binary,
+including C1 validation, authenticated upload, pending JSON, signed event IDs,
+release-to-asset references and restoration of the preseeded client identity.
+The signer relay rejects software events. Production credentials and public
+services are absent. The `zsp-v2-contract` artifact contains the sanitized
+`build/reports/zsp-v2.json` receipt. This CI-covered rehearsal requires Go,
+JDK 17+, Android SDK platform 36 and build-tools 36.0.0; do not duplicate it locally.
 
 ZSP uses the platform config directory: on the Linux publication runner the key
 is `$XDG_CONFIG_HOME/zsp/bunker-keys/<transport-pubkey>.key`; on macOS it is under
-`~/Library/Application Support/zsp/bunker-keys/`. The rehearsal creates and removes
-only its own randomly named test-key file. Offline mode can contact its signer.
-The real production signer connection still needs holder qualification before
-public use; the synthetic rehearsal does not establish access to that signer.
+`~/Library/Application Support/zsp/bunker-keys/`. The rehearsal removes only its
+own randomly named key file. A synthetic rehearsal does not prove access to the
+production signer; use the protected signer test below.
 
-First-release Android signing-certificate linking, where needed by Zapstore,
-is a separate publisher-operated prerequisite. CI uses `--skip-certificate-linking` and does
-not load the app-signing keystore into the publication job.
+A valid **NIP-C1 certificate ownership proof** must already authorize the pinned
+publisher as owner or delegate. The publication preflight verifies the exact APK
+hash, app ID, version/code, certificate and signer, and requires the proof to
+remain valid for more than 30 days. Missing, expired, unauthorized or renewal-due
+proofs stop the job before uploads. The Android key holder creates or renews the
+proof locally with the pinned ZSP wizard, using the **direct release APK's signing
+keystore**, not the separate Play upload key. Production CI publication never
+receives that keystore, its password, a Nostr private key, or Hotbox credentials.
+
+The owner completed the production proof during the 2026.10.27 recovery; its
+verified expiry is 2028-10-26T13:52:36Z. Check the live proof before each release;
+this historical receipt does not establish future validity. The immutable
+2026.10.27 build manifest records producer ZSP 0.4.17. Bundle validation checks
+that field against the policy at the bundle's source commit, independently of
+the current publisher pin. Never rewrite a reviewed manifest or rebuild its APK
+to upgrade the publishing tool.
 
 ## Build and review
 
@@ -358,15 +380,17 @@ Dispatch **Android Zapstore - Signer Test (NO publication)**
 Keep the signer available and allow `get_public_key` plus `sign_event` for kinds
 3063, 30063, 32267 and 24242.
 
-The test signs a disposable `invalid.example.zspfixture` APK listing through the
-pinned ZSP binary with `--offline`. It verifies event IDs, Schnorr signatures and
-the pinned publisher, then reconnects with the same CI client and original bunker URI, as publication
-does, and signs an already-expired fixture upload authorization. Keycast permits
-the consumed invitation for its original active client; retain the URI secret.
-No Blossom upload or public release publication is invoked. Raw signed events,
-connection URLs and remote errors are withheld; the log contains only public
-client/publisher keys and test results. This proves signer access and permissions,
-not candidate qualification, certificate linking, upload success or updater behavior.
+The test runs the pinned v2 binary's **read-only `check`** on a disposable
+`invalid.example.zspfixture` APK against an empty loopback catalog, using the
+real bunker and stable CI client identity. It verifies the publisher and that
+ZSP retained the client key, then reconnects with the original bunker URI and
+signs synthetic invalid.example events for kinds 3063, 30063 and 32267 plus an
+already-expired kind 24242 upload authorization. None is uploaded or published.
+Keycast permits the consumed invitation for its original active client; retain
+the URI secret. Raw signed events, connection URLs and remote errors are
+withheld. Logs contain public client/publisher keys and test results only.
+This proves v2 connection compatibility and signing permissions; the public
+candidate's C1 proof, upload, publication and updater still need their own checks.
 
 ```bash
 gh workflow run android-zapstore-signer-test.yml --ref master
@@ -382,27 +406,55 @@ This step makes the release public. Do not use it for a build rehearsal.
    confirmation field, replacing the placeholder with that same version.
 3. Independently review and approve the waiting `zapstore-production` environment
    job. Verify the candidate identity and that public exposure is intended.
-4. The job retrieves and rechecks the existing bundle, restores its listing,
-   and signs a preflight using ZSP offline mode. That preflight can contact the
-   remote signer, but does not upload blobs or publish release events. Each
-   attempt is limited to 2 minutes and retried up to three times.
-5. Only after the publisher check passes, and the relay shows no release or
-   asset event for this version, does the online ZSP command run. Each attempt
-   is limited to 8 minutes.
-6. The job then reads back the app, release and asset events from
-   `ZAPSTORE_RELAY`, requires the pinned publisher and the candidate's version,
-   code, commit, APK hash and signing certificate, and downloads the blob from
-   `ZAPSTORE_BLOSSOM` to compare its hash. Exercise the shipped updater
-   separately; the readback does not prove updater behavior.
+4. The job retrieves and rechecks the existing bundle and restores its archived
+   listing/media into an isolated directory. Its source is restricted to the
+   reviewed local APK; external metadata enrichment and image compression are
+   disabled. A read-only `zsp --json check` validates the APK, signer, C1 proof
+   and monotonic version code. It is bounded to two minutes.
+5. A previously published version uses independent readback only. Otherwise,
+   the relay must finish both release/asset queries with EOSE and report no
+   existing events. CLOSED, disconnects, timeouts and partial releases stop
+   publication. Before public writes, the job retains a sanitized
+   `zapstore-submission-intent-<version>-<run>-<attempt>` artifact.
+6. The job invokes `zsp --json publish` **once**, with the exact APK hash/source
+   commit and channel `main`, bounded to eight minutes. There are no overwrite
+   flags or automatic publication retries. CLI output and signer errors remain
+   private; only allowlisted status/error codes and public identity fields are
+   retained in the receipt.
+7. `pending` means accepted for Zapstore's APK verification, **not public**.
+   Even `published` or exit zero must pass independent readback. For up to ten
+   minutes, CI reads the signed app/release/asset events from `ZAPSTORE_RELAY`,
+   checks the accepted release ID (when returned), publisher, version/code,
+   source commit, certificate, APK hash and size, then downloads the APK from
+   `ZAPSTORE_BLOSSOM` and verifies size/SHA-256. Both the legacy hash path and
+   v2 `<hash>.apk` path are accepted on that exact CDN; redirects are rejected.
+   Exercise the shipped updater separately.
 
-ZSP signs every event before it publishes any release event, so a run stopped
-while waiting for the signer has at most uploaded the APK blob. After a failed
-or stalled online attempt, the job retries once only when the relay still has no
-release or asset event for this version. If any exist, or the relay cannot be
-read, the job stops: inspect relay and Blossom state before another dispatch.
-There is no overwrite-release flag, withdrawal, or legacy-listing removal.
+Only `status: verified_public` in the sanitized `zapstore-publication-<run>-<attempt>`
+receipt means CI verified public delivery. The receipt is uploaded even if the
+job fails. `pending`, `submission_unknown` and `unresolved` require reconciliation;
+a signer timeout or lost response can occur after acceptance. Keep the receipt
+and do **not** resubmit, delete events or overwrite a release to repair the state.
+
+To resume, dispatch the same protected workflow with the same reviewed build,
+version, manifest and typed confirmation, setting **`verify_only: true`**.
+This performs readback without connecting the signer or issuing `publish`.
+Workflow reruns also use verification only, and a prior submission-intent artifact
+from this master workflow blocks another submission for that version. Intent
+artifacts are retained for 90 days; download and preserve them with release
+evidence. Beyond that retention window or after artifact deletion, the automatic
+barrier cannot prove a previous submission absent: use verification only and
+reconcile the retained receipt/relay/CDN before any newly authorized attempt.
+An intent may exist even if no public write occurred (for example, cancellation
+after its upload); that still requires reconciliation rather than a blind retry.
+
+A pending release that does not become public fails CI with its receipt retained.
+Inspect Zapstore processing/rejection and the signed event IDs before deciding
+on a corrective release. C1 renewal remains a holder action. This workflow does
+not enable Zapstore's external forge polling or tag-triggered publication; public
+approval remains separate from build/GitHub/Play internal testing.
 `org.parres.whitenoise` is a different application and cannot migrate installed
-data by publishing this new package.
+data by publishing this package.
 
 ### Diagnose remote-signer reply delivery
 

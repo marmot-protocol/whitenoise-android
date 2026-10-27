@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Contact the real bunker, but sign only an invalid.example APK fixture offline.
+# Read-only ZSP v2 check, then synthetic NIP-46 signing; no public writes.
 # Never print connection URLs, client secrets, or signed event payloads.
 set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -7,7 +7,7 @@ repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 source "$repo_dir/scripts/release-properties.sh"
 [[ "${SIGN_WITH:-}" == bunker://* ]] || { echo 'Missing bunker connection'; exit 1; }
 [[ "${BUNKER_CLIENT_KEY:-}" =~ ^[0-9a-fA-F]{64}$ ]] || { echo 'Invalid client key'; exit 1; }
-[[ "$(release_property ZSP_VERSION)" == 0.4.17 ]] || { echo 'Update signer test source pin'; exit 1; }
+
 umask 077
 temporary_dir="$(mktemp -d)"
 trap 'rm -rf "$temporary_dir"' EXIT
@@ -39,5 +39,5 @@ export EXPECTED_PUBLISHER
 EXPECTED_PUBLISHER="$(release_property ZAPSTORE_PUBLISHER_PUBKEY)"
 "$temporary_dir/test-signer" "$temporary_dir/zsp" "$temporary_dir/fixture.apk"
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-  printf 'Verified pinned ZSP offline signatures for kinds 3063, 30063, 32267; verified a separate expired kind 24242 upload-auth signature. Persistent CI client reused. No files uploaded and no release events published.\n' >> "$GITHUB_STEP_SUMMARY"
+  printf 'Verified pinned ZSP v2 read-only check and synthetic signatures for kinds 3063, 30063, 32267; verified a separate expired kind 24242 upload-auth signature. Persistent CI client reused. No files uploaded and no release events published.\n' >> "$GITHUB_STEP_SUMMARY"
 fi

@@ -1,19 +1,29 @@
-// Run from the checked-out ZSP v0.4.17 source directory to use its pinned Go
-// dependencies: go run /path/to/rehearse-zsp.go /path/to/zsp /path/to/fixture.apk
-// This only invokes --offline, uses disposable keys and a loopback NIP-46
-// signer, and rejects any release event sent to its relay.
+// Exercise the checksummed ZSP v2 binary against disposable loopback services.
+// The NIP-46 relay rejects software events; a separate fixture catalog and Blossom
+// accept only this synthetic APK. No production credentials or services are used.
 package main
 
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -167,17 +177,17 @@ func (relay *offlineSignerRelay) ServeHTTP(w http.ResponseWriter, r *http.Reques
 }
 
 func rehearse() error {
-	if len(os.Args) != 3 {
-		return fmt.Errorf("usage: rehearse-zsp.go PINNED_ZSP DISPOSABLE_APK")
+	if len(os.Args) != 5 {
+		return fmt.Errorf("usage: rehearse-zsp.go PINNED_ZSP DISPOSABLE_APK FIXTURE_KEY_PEM FIXTURE_CERT_DER")
 	}
 	started := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	binary, _ := filepath.Abs(os.Args[1])
 	apk, _ := filepath.Abs(os.Args[2])
 	version, err := exec.CommandContext(ctx, binary, "--version").Output()
-	if err != nil || !strings.Contains("\n"+string(version), "\nv0.4.17\n") {
-		return fmt.Errorf("expected pinned v0.4.17: %q (%v); phase=version elapsed=%s context=%v", version, err, time.Since(started), ctx.Err())
+	if err != nil || !strings.Contains("\n"+string(version), "\nv2.0.0\n") {
+		return fmt.Errorf("expected pinned v2.0.0: %q (%v); phase=version elapsed=%s context=%v", version, err, time.Since(started), ctx.Err())
 	}
 	signerKey, clientKey := nostr.GeneratePrivateKey(), nostr.GeneratePrivateKey()
 	signerPub, _ := nostr.GetPublicKey(signerKey)
@@ -216,11 +226,17 @@ func rehearse() error {
 		return err
 	}
 	defer os.RemoveAll(temporary)
-	listing := fmt.Sprintf("release_source: %q\nname: Offline signer fixture\nsummary: Disposable local test\n", apk)
+	catalog, blob, public, err := fixtureServices(ctx, apk, os.Args[3], os.Args[4], signerKey)
+	if err != nil {
+		return err
+	}
+	defer catalog.Close()
+	defer blob.Close()
+	listing := fmt.Sprintf("release_source: %q\nmetadata_sources: []\nname: Publisher fixture\nsummary: Disposable local test\n", apk)
 	if err := os.WriteFile(filepath.Join(temporary, "zapstore.yaml"), []byte(listing), 0600); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, binary, "publish", "--offline", "--quiet", "--skip-metadata", "--no-compress", "--skip-certificate-linking", "--commit", strings.Repeat("a", 40), "zapstore.yaml")
+	cmd := exec.CommandContext(ctx, binary, "--json", "publish", "--quiet", "--skip-metadata", "--no-compress", "--commit", strings.Repeat("a", 40), "zapstore.yaml")
 	cmd.Dir = temporary
 	// Pass no inherited store/signing credentials; HOME is read only so ZSP and
 	// this harness agree on the platform config path. The unique key is removed.
@@ -229,24 +245,28 @@ func rehearse() error {
 			cmd.Env = append(cmd.Env, name+"="+value)
 		}
 	}
-	cmd.Env = append(cmd.Env, "SIGN_WITH=bunker://"+signerPub+"?relay=ws://"+listener.Addr().String())
+	cmd.Env = append(cmd.Env, "SIGN_WITH=bunker://"+signerPub+"?relay=ws://"+listener.Addr().String(), "RELAYS="+strings.Replace(catalog.URL, "http://", "ws://", 1), "BLOSSOM_URL="+blob.URL)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	publishStarted := time.Now()
 	if err := cmd.Run(); err != nil {
 		return relay.publishFailure(ctx, err, started, publishStarted, stderr.String())
 	}
-	kinds := map[int]int{}
-	for _, line := range bytes.Split(bytes.TrimSpace(stdout.Bytes()), []byte("\n")) {
-		var event nostr.Event
-		if err := json.Unmarshal(line, &event); err != nil {
-			return fmt.Errorf("non-JSON stdout: %w", err)
-		}
-		valid, err := event.CheckSignature()
-		if err != nil || !valid || event.PubKey != signerPub {
-			return fmt.Errorf("invalid event identity/signature")
-		}
-		kinds[event.Kind]++
+	var document struct {
+		OK        bool   `json:"ok"`
+		Operation string `json:"operation"`
+		ID        string `json:"id"`
+		Status    string `json:"status"`
+		App       string `json:"app_id"`
+		Version   string `json:"version_name"`
+		Code      int    `json:"version_code"`
+	}
+	if json.Unmarshal(stdout.Bytes(), &document) != nil || !document.OK || document.Operation != "publish" || document.Status != "pending" || document.App != "invalid.example.zspfixture" || document.Version != "2026.9.9" || document.Code != 1 {
+		return fmt.Errorf("invalid v2 publication document: %s", stdout.String())
+	}
+	kinds, err := public.verify(document.ID, signerPub, blob.URL)
+	if err != nil {
+		return err
 	}
 	restored, err := os.ReadFile(keyPath)
 	if err != nil || strings.TrimSpace(string(restored)) != clientKey {
@@ -255,12 +275,195 @@ func rehearse() error {
 	relay.mu.Lock()
 	defer relay.mu.Unlock()
 	if kinds[32267] != 1 || kinds[30063] != 1 || kinds[3063] != 1 || len(kinds) != 3 || relay.requests < 3 || relay.forbidden != 0 {
-		return fmt.Errorf("unexpected offline contract: kinds=%v requests=%d forbidden=%d", kinds, relay.requests, relay.forbidden)
+		return fmt.Errorf("unexpected loopback publishing contract: kinds=%v requests=%d forbidden=%d", kinds, relay.requests, relay.forbidden)
 	}
 	return json.NewEncoder(os.Stdout).Encode(map[string]any{
-		"version": "v0.4.17", "eventKinds": kinds,
+		"version": "v2.0.0", "eventKinds": kinds,
 		"signerAuthor": signerPub, "preseededClientRestored": true,
-		"nip46Requests": relay.requests, "publicEventsSent": relay.forbidden,
+		"nip46Requests": relay.requests, "eventsSentToSignerRelay": relay.forbidden, "catalog": "loopback only", "blossom": "loopback only", "status": document.Status, "c1ProofVerifiedByCLI": true,
 		"signerRelay": "loopback only", "keyDirectory": "os.UserConfigDir()/zsp/bunker-keys",
 	})
+}
+
+// Catalog and Blossom fixture for the real binary. The first read by release ID
+// deliberately withholds it, exercising ZSP's accepted-but-pending JSON contract.
+type fixtureCatalog struct {
+	mu         sync.Mutex
+	events     []nostr.Event
+	hidden     bool
+	hash, cert string
+	size       int
+}
+
+func fixtureServices(ctx context.Context, apk, keyPath, certPath, signerKey string) (*httptest.Server, *httptest.Server, *fixtureCatalog, error) {
+	data, err := os.ReadFile(apk)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	cert, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	pemBytes, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, nil, nil, fmt.Errorf("missing disposable key PEM")
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	key, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("fixture needs RSA key")
+	}
+	hash := sha256.Sum256(data)
+	certHash := sha256.Sum256(cert)
+	pub, _ := nostr.GetPublicKey(signerKey)
+	now := nostr.Now()
+	expiry := int64(now) + 365*24*3600
+	message := sha256.Sum256([]byte(fmt.Sprintf("Verifying at %d until %d that I control the following Nostr public key: %s", now, expiry, pub)))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, message[:])
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	proof := nostr.Event{Kind: 30509, CreatedAt: now, Tags: nostr.Tags{{"d", hex.EncodeToString(certHash[:])}, {"signature", base64.StdEncoding.EncodeToString(signature)}, {"expiry", fmt.Sprint(expiry)}}}
+	if err := proof.Sign(signerKey); err != nil {
+		return nil, nil, nil, err
+	}
+	public := &fixtureCatalog{events: []nostr.Event{proof}, hash: hex.EncodeToString(hash[:]), cert: hex.EncodeToString(certHash[:]), size: len(data)}
+	catalog := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.CloseNow()
+		for {
+			_, raw, err := conn.Read(ctx)
+			if err != nil {
+				return
+			}
+			var parts []json.RawMessage
+			if json.Unmarshal(raw, &parts) != nil || len(parts) < 2 {
+				return
+			}
+			var kind, id string
+			_ = json.Unmarshal(parts[0], &kind)
+			send := func(values ...any) {
+				payload, _ := json.Marshal(values)
+				_ = conn.Write(ctx, websocket.MessageText, payload)
+			}
+			switch kind {
+			case "REQ":
+				_ = json.Unmarshal(parts[1], &id)
+				var filter nostr.Filter
+				if len(parts) != 3 || json.Unmarshal(parts[2], &filter) != nil {
+					return
+				}
+				public.mu.Lock()
+				for _, event := range public.events {
+					if event.Kind == 30063 && len(filter.IDs) > 0 && !public.hidden {
+						public.hidden = true
+						continue
+					}
+					if filter.Matches(&event) {
+						send("EVENT", id, event)
+					}
+				}
+				public.mu.Unlock()
+				send("EOSE", id)
+			case "EVENT":
+				var event nostr.Event
+				if json.Unmarshal(parts[1], &event) != nil {
+					return
+				}
+				valid, _ := event.CheckSignature()
+				if !valid || event.ID != event.GetID() || event.PubKey != pub || (event.Kind != 3063 && event.Kind != 30063 && event.Kind != 32267) {
+					send("OK", event.ID, false, "invalid fixture event")
+					continue
+				}
+				public.mu.Lock()
+				public.events = append(public.events, event)
+				public.mu.Unlock()
+				send("OK", event.ID, true, "")
+			}
+		}
+	}))
+	var blob *httptest.Server
+	blob = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/upload" {
+			encoded := strings.TrimPrefix(r.Header.Get("Authorization"), "Nostr ")
+			raw, err := base64.StdEncoding.DecodeString(encoded)
+			var auth nostr.Event
+			if err != nil || json.Unmarshal(raw, &auth) != nil {
+				w.WriteHeader(401)
+				return
+			}
+			valid, _ := auth.CheckSignature()
+			if !valid || auth.Kind != 24242 || auth.PubKey != pub {
+				w.WriteHeader(403)
+				return
+			}
+			if r.Method == http.MethodHead {
+				w.WriteHeader(200)
+				return
+			}
+			body, _ := io.ReadAll(io.LimitReader(r.Body, int64(len(data)+1)))
+			if r.Method != http.MethodPut || !bytes.Equal(body, data) {
+				w.WriteHeader(400)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(201)
+			_ = json.NewEncoder(w).Encode(map[string]any{"url": blob.URL + "/" + public.hash + ".apk", "sha256": public.hash, "size": len(data), "type": "application/vnd.android.package-archive", "uploaded": time.Now().Unix()})
+			return
+		}
+		if r.URL.Path == "/"+public.hash+".apk" {
+			_, _ = w.Write(data)
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	return catalog, blob, public, nil
+}
+
+func (public *fixtureCatalog) verify(id, pub, blossom string) (map[int]int, error) {
+	public.mu.Lock()
+	defer public.mu.Unlock()
+	kinds := map[int]int{}
+	assetID := ""
+	var release nostr.Event
+	for _, event := range public.events {
+		if event.Kind == 30509 {
+			continue
+		}
+		valid, err := event.CheckSignature()
+		if err != nil || !valid || event.ID != event.GetID() || event.PubKey != pub {
+			return nil, fmt.Errorf("invalid fixture signature/ID")
+		}
+		kinds[event.Kind]++
+		if event.Kind == 30063 {
+			release = event
+		}
+		if event.Kind == 3063 {
+			for name, want := range map[string]string{"i": "invalid.example.zspfixture", "version": "2026.9.9", "version_code": "1", "x": public.hash, "commit": strings.Repeat("a", 40), "apk_certificate_hash": public.cert, "size": strconv.Itoa(public.size), "url": blossom + "/" + public.hash + ".apk"} {
+				found := event.Tags.Find(name)
+				if len(found) < 2 || found[1] != want {
+					return nil, fmt.Errorf("fixture asset %s mismatch", name)
+				}
+			}
+			assetID = event.ID
+		}
+	}
+	if release.ID != id || assetID == "" {
+		return nil, fmt.Errorf("missing returned release ID or asset")
+	}
+	ref := release.Tags.Find("e")
+	if len(ref) < 2 || ref[1] != assetID {
+		return nil, fmt.Errorf("release does not reference fixture asset")
+	}
+	return kinds, nil
 }

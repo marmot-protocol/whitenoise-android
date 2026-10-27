@@ -269,11 +269,11 @@ class PublicationGuardTests(unittest.TestCase):
 
 
 class ZapstoreIntegrationTests(unittest.TestCase):
-    def publication_fixture(self, root, signer_matches=True, zsp_body='', readback_body=''):
+    def publication_fixture(self, root, signer_matches=True, zsp_body='', readback_body='', producer_version=None):
         (root / 'scripts').mkdir()
         (root / 'config').mkdir()
         (root / 'app').mkdir()
-        for name in ('publish-zapstore.sh', 'release_bundle.py', 'release-properties.sh'):
+        for name in ('publish-zapstore.sh', 'zapstore_publish.py', 'release_bundle.py', 'release-properties.sh'):
             (root / 'scripts' / name).write_bytes((ROOT / 'scripts' / name).read_bytes())
         (root / 'config/android-release.properties').write_bytes((ROOT / 'config/android-release.properties').read_bytes())
         policy = bundle.properties()
@@ -286,10 +286,14 @@ class ZapstoreIntegrationTests(unittest.TestCase):
         (root / 'zapstore.yaml').write_text('release_source: ./build/production-release/*.apk\n')
         def git(*args):
             return subprocess.check_output(['git', *args], cwd=root, stderr=subprocess.DEVNULL).decode().strip()
+        if producer_version:
+            p = root / 'config/android-release.properties'
+            p.write_text(p.read_text().replace('ZSP_VERSION='+policy['ZSP_VERSION'], 'ZSP_VERSION='+producer_version))
         git('init')
         git('add', '.')
         git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Fixture')
         source = git('rev-parse', 'HEAD')
+        (root / 'config/android-release.properties').write_bytes((ROOT / 'config/android-release.properties').read_bytes())
         git('remote', 'add', 'origin', str(root))
         out = root / 'build/production-release'
         out.mkdir(parents=True)
@@ -304,121 +308,145 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                         buildRunId=RUN_ID, buildRunAttempt='1', worktreeDirty=False,
                         productionRuntimeConfigurationComplete=True, missingProductionRuntimeConfiguration=[],
                         applicationId=policy['APPLICATION_ID'], appSigningCertificateSha256=policy['APP_SIGNING_SHA256'],
-                        playUploadCertificateSha256=policy['PLAY_UPLOAD_SHA256'], zspVersion=policy['ZSP_VERSION'],
+                        playUploadCertificateSha256=policy['PLAY_UPLOAD_SHA256'], zspVersion=producer_version or policy['ZSP_VERSION'],
                         files={f.name: {'bytes': f.stat().st_size, 'sha256': bundle.sha256(f)} for f in out.iterdir()})
         (out / 'release-manifest.json').write_text(json.dumps(manifest))
         digest = bundle.sha256(out / 'release-manifest.json')
         (out / 'checksums-sha256.txt').write_text(''.join(
             f'{bundle.sha256(out / name)}  ./{name}\n' for name in sorted(set(manifest['files']) | {'release-manifest.json'})))
-        publisher = policy['ZAPSTORE_PUBLISHER_PUBKEY'] if signer_matches else '0' * 64
-        events = [dict(kind=kind, pubkey=publisher, sig='f' * 128) for kind in (32267, 30063)]
-        # The fakes log each call; a per-mode counter lets a body fail or hang on a given attempt.
+        npub = 'npub1whtn0s68y3cs98zysa4nxrfzss5g5snhndv35tk5m2sudsr7ltms48r3ec'
+        check = dict(ok=True, operation='check', signer=npub if signer_matches else 'npub1wrong', authorized=True,
+                     proof=dict(owner=npub, expires_at='2099-01-01T00:00:00Z'), published_version_code=12,
+                     apk=dict(app_id=policy['APPLICATION_ID'], version_name=VERSION, version_code=13,
+                              certificate_hash=policy['APP_SIGNING_SHA256'],
+                              hash=manifest['files'][f'whitenoise-android-{VERSION}-arm64-v8a.apk']['sha256']))
         fake = root / 'fake-zsp'
         fake.write_text('#!/usr/bin/env python3\nimport json,os,sys,time\n'
-                        'with open(os.environ["ZSP_CALL_LOG"], "a") as log: log.write(" ".join(sys.argv[1:])+"\\n")\n'
-                        'mode = "offline" if "--offline" in sys.argv else "online"\n'
-                        'counter = os.path.join(os.environ["FAKE_STATE"], mode)\n'
-                        'attempt = int(open(counter).read()) + 1 if os.path.exists(counter) else 1\n'
-                        'open(counter, "w").write(str(attempt))\n'
+                        f'with open({str(root / "calls")!r}, "a") as log: log.write(" ".join(sys.argv[1:])+"\\n")\n'
+                        'mode = "check" if "check" in sys.argv else "publish"\n'
+                        f'document = {check!r} if mode == "check" else '
+                        f'dict(ok=True, operation="publish", id="d"*64, status="pending", app_id={policy["APPLICATION_ID"]!r}, version_name={VERSION!r}, version_code=13)\n'
                         f'{zsp_body}\n'
-                        f'if mode == "offline":\n    for event in {events!r}: print(json.dumps(event))\n')
+                        'print(json.dumps(document))\n')
         fake.chmod(0o755)
         readback = root / 'fake-readback'
-        readback.write_text('#!/usr/bin/env python3\nimport os,sys\n'
+        readback.write_text('#!/usr/bin/env python3\nimport os,sys,json\n'
                             'with open(os.environ["ZSP_CALL_LOG"], "a") as log: log.write("readback "+" ".join(sys.argv[1:])+"\\n")\n'
                             'mode = sys.argv[1]\n'
-                            'counter = os.path.join(os.environ["FAKE_STATE"], "readback-" + mode)\n'
-                            'attempt = int(open(counter).read()) + 1 if os.path.exists(counter) else 1\n'
-                            'open(counter, "w").write(str(attempt))\n'
-                            f'{readback_body}\n')
+                            f'{readback_body}\n'
+                            'print(json.dumps(dict(App="a"*64,Release="d"*64,Asset="b"*64,URL="https://cdn.zapstore.dev/fixture.apk")))\n')
         readback.chmod(0o755)
-        (root / 'state').mkdir()
+        gh = root / 'gh'
+        gh.write_text('#!/usr/bin/env python3\nimport os,sys,json\n'
+                      'if os.environ.get("PRIOR_INTENT") != "true": print("[]")\n'
+                      'elif "--paginate" in sys.argv: print(json.dumps([dict(artifacts=[dict(name="zapstore-submission-intent-"+os.environ["EXPECTED_VERSION"]+"-122-1",workflow_run=dict(id=122))])]))\n'
+                      'else: print(json.dumps(dict(path=".github/workflows/android-zapstore-publish.yml",head_branch="master")))\n')
+        gh.chmod(0o755)
         env = {**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'GITHUB_ACTIONS': 'true',
                'GITHUB_REF': 'refs/heads/master', 'GITHUB_WORKFLOW': 'Android Zapstore - PUBLIC Publication',
                'EXPECTED_VERSION': VERSION, 'CONFIRMATION': f'PUBLISH ZAPSTORE {VERSION}',
                'MANIFEST_SHA256': digest, 'SIGN_WITH': 'bunker://' + 'b' * 64,
-               'BUNKER_CLIENT_KEY': 'c' * 64, 'ZSP_CALL_LOG': str(root / 'calls'), 'FAKE_STATE': str(root / 'state'),
-               'ZSP_PREFLIGHT_TIMEOUT_SECONDS': '2', 'ZSP_PUBLISH_TIMEOUT_SECONDS': '2', 'ZSP_RETRY_DELAY_SECONDS': '0'}
-        def publish():
-            result = subprocess.run(['bash', str(root / 'scripts/publish-zapstore.sh'), str(fake), str(readback)],
-                                    env=env, capture_output=True, text=True, timeout=120)
+               'BUNKER_CLIENT_KEY': 'c' * 64, 'ZSP_CALL_LOG': str(root / 'calls'),
+               'PATH': str(root)+os.pathsep+os.environ['PATH'], 'GITHUB_RUN_ATTEMPT':'1',
+               'GITHUB_RUN_ID':'123', 'ZSP_INTENT_RECORDED':'true',
+               'ZSP_PREFLIGHT_TIMEOUT_SECONDS': '1', 'ZSP_PUBLISH_TIMEOUT_SECONDS': '1', 'ZSP_READBACK_TIMEOUT_SECONDS':'1'}
+        def publish(**overrides):
+            fixture_env = {**env, **overrides}
+            results = []
+            for phase in ('prepare','publish'):
+                result = subprocess.run(['bash', str(root / 'scripts/publish-zapstore.sh'), str(fake), str(readback), phase],
+                                        env=fixture_env, capture_output=True, text=True, timeout=20)
+                results.append(result)
+                if result.returncode: break
+            result.stdout = ''.join(r.stdout for r in results)
+            result.stderr = ''.join(r.stderr for r in results)
             calls = (root / 'calls').read_text().splitlines() if (root / 'calls').exists() else []
             return result, calls
         return publish
 
-    def test_online_publication_only_follows_matching_signed_preflight(self):
-        for signer_matches in (False, True):
-            with self.subTest(signer_matches=signer_matches), tempfile.TemporaryDirectory() as directory:
-                result, calls = self.publication_fixture(Path(directory), signer_matches)()
-                self.assertIn('--offline', calls[0])
-                self.assertIn('--no-compress', calls[0])
-                if signer_matches:
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertEqual(len(calls), 4)
-                    self.assertTrue(calls[1].startswith('readback absent'))
-                    self.assertNotIn('--offline', calls[2])
-                    self.assertIn('--no-compress', calls[2])
-                    self.assertIn('--skip-metadata', calls[2])
-                    self.assertIn('--skip-certificate-linking', calls[2])
-                    self.assertTrue(calls[3].startswith('readback verify'))
-                    self.assertIn('-relay wss://relay.zapstore.dev', calls[3])
-                    self.assertIn('-blossom https://cdn.zapstore.dev', calls[3])
-                    self.assertIn('-version-code 13', calls[3])
-                    self.assertIn('verified on the relay and CDN', result.stdout)
+    def test_v2_pending_submission_is_verified_once_after_matching_preflight(self):
+        for matches in (False, True):
+            with self.subTest(matches=matches), tempfile.TemporaryDirectory() as directory:
+                result,calls=self.publication_fixture(Path(directory),matches)()
+                self.assertIn('--json check',calls[0])
+                if matches:
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    self.assertEqual(len(calls),4)
+                    self.assertIn('--json publish',calls[2])
+                    self.assertIn('--apk-hash',calls[2])
+                    self.assertIn('--no-compress',calls[2])
+                    self.assertNotIn('--offline',calls[2])
+                    self.assertNotIn('--skip-certificate-linking',calls[2])
+                    self.assertIn('-release-id '+ 'd'*64,calls[3])
+                    self.assertIn('-apk-bytes',calls[3])
+                    self.assertIn('verified public',result.stdout)
                 else:
-                    self.assertNotEqual(result.returncode, 0)
-                    self.assertEqual(len(calls), 1)
-                    self.assertIn('signer differs', result.stderr)
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertEqual(len(calls),1)
+                    self.assertIn('signer differs',result.stderr)
 
-    def test_unanswered_signing_preflight_is_retried(self):
-        with tempfile.TemporaryDirectory() as directory:
-            hang = 'if mode == "offline" and attempt == 1: time.sleep(30)'
-            result, calls = self.publication_fixture(Path(directory), zsp_body=hang)()
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('did not answer within 2s', result.stderr)
-            self.assertEqual([call.split()[0] for call in calls], ['publish', 'publish', 'readback', 'publish', 'readback'])
-            self.assertIn('--offline', calls[1])
+    def test_proof_and_candidate_failures_stop_before_public_writes(self):
+        for body in [
+            'if mode == "check": document["proof"] = None',
+            'if mode == "check": document["authorized"] = False',
+            'if mode == "check": document["proof"]["expires_at"] = "2000-01-01T00:00:00Z"',
+            'if mode == "check": document["apk"]["hash"] = "0"*64',
+            'if mode == "check": document["published_version_code"] = 14',
+            'if mode == "check": document["next_step"] = {"requires_human":True}',
+            'if mode == "check": time.sleep(10)',
+        ]:
+            with self.subTest(body=body), tempfile.TemporaryDirectory() as directory:
+                result,calls=self.publication_fixture(Path(directory),zsp_body=body)()
+                self.assertNotEqual(result.returncode,0)
+                self.assertEqual(len(calls),1)
 
-    def test_signing_preflight_gives_up_without_publishing(self):
+    def test_intent_must_be_retained_before_submission(self):
         with tempfile.TemporaryDirectory() as directory:
-            result, calls = self.publication_fixture(Path(directory), zsp_body='sys.exit(1)')()
-            self.assertNotEqual(result.returncode, 0)
-            self.assertEqual(len(calls), 3)
-            self.assertTrue(all('--offline' in call for call in calls))
-            self.assertIn('nothing was publicly published', result.stderr)
+            result,calls=self.publication_fixture(Path(directory))(ZSP_INTENT_RECORDED='false')
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse(any('--json publish' in call for call in calls))
 
-    def test_stalled_publication_is_retried_only_when_nothing_was_published(self):
-        with tempfile.TemporaryDirectory() as directory:
-            hang = 'if mode == "online" and attempt == 1: time.sleep(30)'
-            result, calls = self.publication_fixture(Path(directory), zsp_body=hang)()
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('did not finish within 2s', result.stderr)
-            kinds = [' '.join(call.split()[:2]) if call.startswith('readback') else 'online'
-                     for call in calls[1:]]
-            self.assertEqual(kinds, ['readback absent', 'online', 'readback absent', 'online', 'readback verify'])
+    def test_timeout_rejection_and_pending_timeout_never_resubmit(self):
+        for body in ['', 'if mode == "publish": time.sleep(10)',
+                     'if mode == "publish": document = dict(ok=False,error=dict(code="publish_rejected",detail="private-auth-url-secret")); print(json.dumps(document)); sys.exit(1)']:
+            with self.subTest(body=body), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory)
+                result,calls=self.publication_fixture(root,zsp_body=body,readback_body='if mode == "verify": sys.exit(1)')()
+                self.assertNotEqual(result.returncode,0)
+                self.assertEqual(sum('--json publish' in call for call in calls),1)
+                self.assertIn('No automatic resubmission',result.stderr)
+                receipt=(root/'build/zapstore-publication/receipt.json').read_text()
+                self.assertNotIn('private-auth',result.stdout+result.stderr+receipt)
+                self.assertNotIn('bunker://',receipt)
+                self.assertIn('submission_unknown' if body else 'pending',receipt)
 
-    def test_partial_publication_is_not_retried(self):
+    def test_existing_public_candidate_is_only_verified(self):
         with tempfile.TemporaryDirectory() as directory:
-            fail = 'if mode == "online": sys.exit(1)'
-            present_after_attempt = 'if mode == "absent" and attempt > 1: sys.exit(3)'
-            result, calls = self.publication_fixture(Path(directory), zsp_body=fail,
-                                                     readback_body=present_after_attempt)()
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('partial or its state is unknown', result.stderr)
-            self.assertEqual(sum(1 for call in calls if call.startswith('publish') and '--offline' not in call), 1)
+            result,calls=self.publication_fixture(Path(directory),zsp_body='if mode == "check": document["published_version_code"] = 13')()
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(len(calls),2)
+            self.assertIn('readback verify',calls[1])
 
-    def test_existing_release_is_never_published_over(self):
-        with tempfile.TemporaryDirectory() as directory:
-            result, calls = self.publication_fixture(Path(directory), readback_body='if mode == "absent": sys.exit(3)')()
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('already has events for this version', result.stderr)
-            self.assertFalse(any(call.startswith('publish') and '--offline' not in call for call in calls))
+    def test_reruns_and_explicit_verification_cannot_publish(self):
+        for override in [dict(GITHUB_RUN_ATTEMPT='2'),dict(VERIFY_ONLY='true'),dict(PRIOR_INTENT='true')]:
+            with tempfile.TemporaryDirectory() as directory:
+                result,calls=self.publication_fixture(Path(directory))(**override)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual(len(calls),1)
+                self.assertIn('readback verify',calls[0])
 
-    def test_publication_that_does_not_read_back_fails(self):
+    def test_immutable_v1_candidate_can_use_v2_publisher(self):
         with tempfile.TemporaryDirectory() as directory:
-            result, _ = self.publication_fixture(Path(directory), readback_body='if mode == "verify": sys.exit(1)')()
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('does not match the reviewed candidate', result.stderr)
+            result,calls=self.publication_fixture(Path(directory),producer_version='0.4.17')()
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(sum('--json publish' in call for call in calls),1)
+
+    def test_existing_partial_or_unknown_release_blocks_submission(self):
+        for code in (1,3):
+            with tempfile.TemporaryDirectory() as directory:
+                result,calls=self.publication_fixture(Path(directory),readback_body=f'if mode == "absent": sys.exit({code})')()
+                self.assertNotEqual(result.returncode,0)
+                self.assertFalse(any('--json publish' in call for call in calls))
 
 
 class ApkCertificateOutputTests(unittest.TestCase):

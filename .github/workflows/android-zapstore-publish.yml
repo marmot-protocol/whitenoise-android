@@ -17,6 +17,10 @@ on:
         description: SHA-256 of the reviewed release-manifest.json from that build
         required: true
         type: string
+      verify_only:
+        description: Read back a pending/existing submission without publishing again
+        type: boolean
+        default: false
       confirmation:
         description: 'Public release: type PUBLISH ZAPSTORE followed by a space and the exact versionName'
         required: true
@@ -51,7 +55,7 @@ jobs:
     needs: confirm-publication
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    # Signing preflight: 3 x 2 min; publication: 2 x 8 min; plus readback.
+    # Read-only preflight, one bounded submission, then bounded public readback.
     timeout-minutes: 40
     environment: zapstore-production
     steps:
@@ -77,10 +81,11 @@ jobs:
         with:
           go-version: '1.24.11'
           cache: false
-      - name: Build Zapstore readback tool against pinned ZSP sources
+      - name: Build Zapstore readback tool with checksummed protocol dependencies
         run: bash scripts/build-zsp-go-tool.sh scripts/zapstore-readback.go "$RUNNER_TEMP/bin/zapstore-readback"
 
-      - name: Publish reviewed candidate publicly to Zapstore
+      - name: Check ZSP v2 signer, C1 proof and reviewed candidate
+        id: preflight
         env:
           SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
           BUNKER_CLIENT_KEY: ${{ secrets.ZAPSTORE_BUNKER_CLIENT_KEY }}
@@ -88,4 +93,33 @@ jobs:
           CONFIRMATION: ${{ inputs.confirmation }}
           EXPECTED_VERSION: ${{ inputs.expected_version }}
           MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
-        run: ./scripts/publish-zapstore.sh "$RUNNER_TEMP/bin/zsp" "$RUNNER_TEMP/bin/zapstore-readback"
+          VERIFY_ONLY: ${{ inputs.verify_only }}
+        run: ./scripts/publish-zapstore.sh "$RUNNER_TEMP/bin/zsp" "$RUNNER_TEMP/bin/zapstore-readback" prepare
+      # Durable before the public side effect: a lost reply must not cause a retry.
+      - name: Retain submission intent before public writes
+        id: intent
+        if: steps.preflight.outputs.submit == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: zapstore-submission-intent-${{ inputs.expected_version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/zapstore-publication/intent.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Submit once and verify public events and APK bytes
+        env:
+          SIGN_WITH: ${{ secrets.ZAPSTORE_SIGN_WITH }}
+          BUNKER_CLIENT_KEY: ${{ secrets.ZAPSTORE_BUNKER_CLIENT_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+          ZSP_INTENT_RECORDED: ${{ steps.intent.outcome == 'success' }}
+        run: ./scripts/publish-zapstore.sh "$RUNNER_TEMP/bin/zsp" "$RUNNER_TEMP/bin/zapstore-readback" publish
+      - name: Retain sanitized publication receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: zapstore-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/zapstore-publication/receipt.json
+          if-no-files-found: warn
+          retention-days: 90

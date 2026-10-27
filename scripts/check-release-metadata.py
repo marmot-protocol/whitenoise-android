@@ -180,6 +180,7 @@ def main() -> None:
         "APP_SIGNING_SHA256",
         "PLAY_UPLOAD_SHA256",
         "ZSP_VERSION",
+        "ZSP_PUBLISHER_NPUB",
         "BUNDLETOOL_VERSION",
         "BUNDLETOOL_SHA256",
         "ZSP_DARWIN_ARM64_SHA256",
@@ -201,6 +202,8 @@ def main() -> None:
     ):
         if not re.fullmatch(r"[0-9a-f]{64}", properties[key]):
             fail(f"{key} must be a lowercase 64-character hex digest")
+    if not re.fullmatch(r"npub1[023456789acdefghjklmnpqrstuvwxyz]{58}", properties["ZSP_PUBLISHER_NPUB"]):
+        fail("ZSP_PUBLISHER_NPUB must be a pinned Nostr public key")
     if properties["APP_SIGNING_SHA256"] == properties["PLAY_UPLOAD_SHA256"]:
         fail("the Play upload key must remain distinct from the app-signing key")
     for key in ("ZSP_VERSION", "BUNDLETOOL_VERSION"):
