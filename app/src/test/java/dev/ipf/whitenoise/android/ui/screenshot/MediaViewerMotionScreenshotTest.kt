@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerMotion
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailRegistry
+import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerContentAlpha
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerPlatformMotionAllowed
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaViewerThumbnail
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
@@ -118,6 +119,22 @@ class MediaViewerMotionScreenshotTest {
             assertNull(registry.resolve(id))
             assertEquals(3, geometryReads)
         }
+    }
+
+    /** Settled frames have no source-measurement budget; active frames must still resolve current eligibility. */
+    @Test
+    fun settledAndDisabledViewerBodiesNeverProbeThumbnailGeometry() {
+        var reads = 0
+        val available = {
+            reads++
+            true
+        }
+        assertEquals(1f, mediaViewerContentAlpha(false, 0.5f, available), 0f)
+        assertEquals(1f, mediaViewerContentAlpha(true, 1f, available), 0f)
+        assertEquals(0, reads)
+        assertEquals(0f, mediaViewerContentAlpha(true, 0.5f, available), 0f)
+        assertEquals(1, reads)
+        assertEquals(1f, mediaViewerContentAlpha(true, 0.5f) { false }, 0f)
     }
 
     @Test fun thumbnailExpandsAndReturnsToItsCurrentRegistration() = render(false, LayoutDirection.Ltr, 1f, "dark")

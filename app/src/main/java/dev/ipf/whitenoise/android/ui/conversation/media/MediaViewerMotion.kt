@@ -260,7 +260,7 @@ internal fun MediaViewerMotion(
     val bodyModifier =
         remember(geometry, enabled, readThumbnail) {
             Modifier.onGloballyPositioned { geometry[1] = it }.graphicsLayer {
-                alpha = mediaViewerBodyAlpha(enabled, progress.value, readThumbnail)
+                alpha = mediaViewerContentAlpha(enabled, progress.value) { readThumbnail() != null }
             }
         }
     Box(Modifier.fillMaxSize().onGloballyPositioned { geometry[0] = it }) {
@@ -271,14 +271,7 @@ internal fun MediaViewerMotion(
     }
 }
 
-/** A settled canonical viewer no longer observes thumbnail geometry or its timeline layout. */
-private fun mediaViewerBodyAlpha(
-    enabled: Boolean,
-    progress: Float,
-    readThumbnail: () -> MediaViewerThumbnailRegistry.ResolvedThumbnail?,
-): Float =
-    if (!enabled || progress >= 1f) 1f else mediaViewerContentAlpha(true, readThumbnail() != null, progress)
-
+/** Reads actual viewer coordinates only while its traveling copy can still paint. */
 private fun mediaMotionDrawGeometry(
     geometry: Array<LayoutCoordinates?>,
     progress: () -> Float,
@@ -332,6 +325,7 @@ private suspend fun animateMediaViewerMotion(
     if (closing) onClosed()
 }
 
+/** Draws a fresh eligible source with reusable clipping objects and the existing pixel handoff. */
 @Composable
 private fun MediaMotionVisual(
     thumbnail: () -> MediaViewerThumbnailRegistry.ResolvedThumbnail?,
@@ -388,6 +382,7 @@ private data class MediaMotionDrawGeometry(
     val aspectRatio: Float,
 )
 
+/** Fences each fresh lookup by the opening registration or the selected return page's source epoch. */
 private fun MediaViewerThumbnailRegistry.motionThumbnail(
     opening: ConversationMediaViewerAttachmentId,
     selected: ConversationMediaViewerAttachmentId,
@@ -410,12 +405,13 @@ internal fun mediaViewerPlatformMotionAllowed(
     sdk: Int,
 ): Boolean = !isVideo || sdk >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
+/** A settled or disabled canonical viewer never measures its source; active travel still checks live eligibility. */
 internal fun mediaViewerContentAlpha(
     enabled: Boolean,
-    available: Boolean,
     progress: Float,
+    sourceAvailable: () -> Boolean,
 ): Float =
-    if (!enabled || !available) {
+    if (!enabled || progress >= 1f || !sourceAvailable()) {
         1f
     } else {
         ((progress - MEDIA_CONTENT_BLEND_START) / MEDIA_CONTENT_BLEND_INTERVAL).coerceIn(0f, 1f)
@@ -429,6 +425,7 @@ internal data class MediaThumbnailCorners(
     val bottomLeft: Float = 0f,
 )
 
+/** Derives physical outer album corners from the bounds already measured for this source. */
 private fun mediaThumbnailCorners(
     tile: Rect,
     grid: Boolean,

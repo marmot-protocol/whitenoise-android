@@ -190,6 +190,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberAttachmentSta
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerSendMotionMediaGate
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
@@ -3903,7 +3904,7 @@ internal fun ConversationScreen(
                 forwardPayloads = batchSelectionUi.forwardPayloads,
             )
     }
-    composerSendMotion.enabled = sendMotionEnabled && mediaViewerSessionState.active == null
+    ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
     ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled) {
         WhiteNoiseScaffold(
             modifier =

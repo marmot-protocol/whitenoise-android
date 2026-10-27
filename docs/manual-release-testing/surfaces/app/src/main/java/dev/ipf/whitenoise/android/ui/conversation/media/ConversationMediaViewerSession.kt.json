@@ -11,6 +11,15 @@
           "MED-007",
           "MED-015"
         ]
+      },
+      {
+        "surface": "ComposerSendMotionMediaGate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+        "anchor": "fun ComposerSendMotionMediaGate(",
+        "test_ids": [
+          "MED-041",
+          "CON-036"
+        ]
       }
     ],
     "source_coverage": [
@@ -20,6 +29,15 @@
         "anchor": "class ConversationMediaViewerSessionState(",
         "test_ids": [
           "MED-041"
+        ]
+      },
+      {
+        "surface": "Media modal suppresses send ink without recomposing its transcript owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+        "anchor": "fun ComposerSendMotionMediaGate(",
+        "test_ids": [
+          "MED-041",
+          "CON-036"
         ]
       }
     ]
