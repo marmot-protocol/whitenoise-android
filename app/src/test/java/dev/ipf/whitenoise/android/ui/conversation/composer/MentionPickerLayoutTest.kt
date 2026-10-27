@@ -1,12 +1,21 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.content.Context
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -24,6 +33,22 @@ import org.robolectric.annotation.Config
 class MentionPickerLayoutTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Refining a scrolled result set reveals the first new match. */
+    @Test
+    fun changedMatchesStartAtTheFirstResult() {
+        var matches by mutableStateOf((1..5).map(::candidate))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.height(112.dp)) {
+                    MentionPicker(candidates = matches, onPick = {})
+                }
+            }
+        }
+        composeRule.onNodeWithText("Member 5").performScrollTo().assertIsDisplayed()
+        composeRule.runOnIdle { matches = (6..10).map(::candidate) }
+        composeRule.onNodeWithText("Member 6").assertIsDisplayed()
+    }
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 

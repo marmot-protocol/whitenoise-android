@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Keep the existing five-candidate presentation limit; the viewport scrolls when those rows cannot fit. */
@@ -52,9 +53,13 @@ internal fun MentionPicker(
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = amoledOutlineBorder(),
     ) {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
-            candidates.take(MENTION_PICKER_MAX_ROWS).forEach { candidate ->
-                MentionPickerRow(candidate, onPick)
+        val visibleCandidates = candidates.take(MENTION_PICKER_MAX_ROWS)
+        // A changed result set starts at the first match; profile artwork updates retain reading position.
+        key(visibleCandidates.map { it.accountIdHex }) {
+            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
+                visibleCandidates.forEach { candidate ->
+                    MentionPickerRow(candidate, onPick)
+                }
             }
         }
     }

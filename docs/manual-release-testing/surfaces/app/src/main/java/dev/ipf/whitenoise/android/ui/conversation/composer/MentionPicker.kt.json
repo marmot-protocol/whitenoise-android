@@ -42,7 +42,7 @@
       {
         "surface": "Suggestion viewport preserves composer input and actions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
-        "anchor": "Column(Modifier.verticalScroll",
+        "anchor": "Column(Modifier.fadingVerticalScroll",
         "test_ids": [
           "CON-005"
         ]

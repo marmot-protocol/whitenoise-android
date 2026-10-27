@@ -1,8 +1,11 @@
+@file:Suppress("FunctionNaming")
+
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
@@ -29,7 +32,7 @@ internal fun ComposerContentLayout(
         val spacing = 8.dp.roundToPx()
         val suggestions = measurables.indexOfFirst { it.layoutId == COMPOSER_SUGGESTIONS_SLOT }
         val editor = measurables.lastIndex
-        val placeables = arrayOfNulls<androidx.compose.ui.layout.Placeable>(measurables.size)
+        val placeables = arrayOfNulls<Placeable>(measurables.size)
         var usedHeight = 0
         var visibleCount = 0
 
@@ -77,16 +80,24 @@ internal fun ComposerContentLayout(
             constraints.constrainWidth(children.maxOfOrNull { it.width } ?: 0),
             constraints.constrainHeight(usedHeight),
         ) {
-            var y = 0
-            var placed = false
-            children.forEach { child ->
-                if (child.height > 0) {
-                    if (placed) y += spacing
-                    child.placeRelative(0, y)
-                    y += child.height
-                    placed = true
-                }
-            }
+            placeComposerChildren(children, spacing)
+        }
+    }
+}
+
+/** Places only visible slots in their original order, without gaps for an empty suggestion viewport. */
+private fun Placeable.PlacementScope.placeComposerChildren(
+    children: List<Placeable>,
+    spacing: Int,
+) {
+    var y = 0
+    var placed = false
+    children.forEach { child ->
+        if (child.height > 0) {
+            if (placed) y += spacing
+            child.placeRelative(0, y)
+            y += child.height
+            placed = true
         }
     }
 }

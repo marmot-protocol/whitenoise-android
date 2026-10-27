@@ -136,13 +136,15 @@ class ComposerMentionLayoutTest {
     fun manualResizeAndReturnPreserveTheQuery() {
         render(height = 600)
         openMentions()
+        val automaticHeight = composerNodeHeight(composeRule.onNodeWithTag(TAG))
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
             swipe(center, center - Offset(0f, 240f), durationMillis = 320)
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Member 1").assertDoesNotExist()
+        val returnDistance = composerNodeHeight(composeRule.onNodeWithTag(TAG)) - automaticHeight
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
-            swipe(center, center + Offset(0f, 800f), durationMillis = 320)
+            swipe(center, center + Offset(0f, returnDistance), durationMillis = 320)
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Member 1").assertIsDisplayed()
@@ -221,7 +223,8 @@ class ComposerMentionLayoutTest {
     }
 
     /** Reads the editor independently of the suggestion area. */
-    private fun pillHeight() = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().size.height.toFloat()
+    private fun pillHeight() =
+        composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().size.height.toFloat()
 
     /** Records only synthetic production-composer content for public review. */
     private fun capture(name: String) {
@@ -242,7 +245,9 @@ class ComposerMentionLayoutTest {
     ) {
         observed = TextFieldValue("Hi ", TextRange(3))
         composeRule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
                     Surface(Modifier.width(width.dp).height(height.dp)) {
                         Box(contentAlignment = Alignment.BottomCenter) {
@@ -277,7 +282,8 @@ class ComposerMentionLayoutTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = "Parent message",
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
+            contentTokens =
+                MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
             kind = 9uL,
             tags = emptyList(),
             sourceEpoch = null,
