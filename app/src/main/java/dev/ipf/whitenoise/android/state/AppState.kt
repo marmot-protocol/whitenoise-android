@@ -8191,14 +8191,16 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
+    /** Clears audit, dictation, performance and local trace files while surfacing deletion failures. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
         var cacheFailure: Throwable? = null
         val preparedDeleted =
             runCatchingCancellable {
-                withContext(Dispatchers.IO) { clearAuditAndDictationLogShares(appContext.cacheDir) }
+                withContext(Dispatchers.IO) {
+                    clearAuditAndDictationLogShares(appContext.cacheDir, java.io.File(appContext.filesDir, "Marmot"))
+                }
             }.onFailure { cacheFailure = it }.getOrDefault(false)
         val files =
             runCatching { marmotIo { auditLogFiles() } }

@@ -30,6 +30,44 @@ class AuditLogShareTest {
     @get:Rule
     val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
 
+    /** Manual export includes the local native sidecar even with host performance capture stopped. */
+    @Test
+    fun manualExportIncludesLocalSendTraceAndClearPreservesUnrelatedHistory() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val root = File(context.filesDir, "Marmot").apply { mkdirs() }
+        val directory = File(root, LOCAL_SEND_TRACE_DIRECTORY).apply { mkdir() }
+        val database = File(root, "retained-history.sqlite").apply { writeText("retained history") }
+        DictationDiagnostics.attach(context)
+        try {
+            DictationDiagnostics.setEnabled(false)
+            PerformanceDiagnostics.stop()
+            clearAuditAndDictationLogShares(context.cacheDir, root)
+            val row =
+                "{\"schema\":1,\"process\":\"0123456789abcdef0123456789abcdef\",\"seq\":1,\"elapsed_ms\":4," +
+                    "\"kind\":\"selected\",\"owner\":1,\"operation\":2,\"values\":[1,0,0,0,0,0,0,0]}\n"
+            val source = File(directory, "segment-0.jsonl").apply { writeText(row) }
+
+            val archive =
+                requireNotNull(
+                    prepareAuditAndDictationLogArchive(context, emptyList(), performanceLogBytes = null),
+                )
+
+            assertFalse(PerformanceDiagnostics.isActive())
+            assertEquals(row, archive.entries()["local-send-trace-segment-0.jsonl"])
+            assertTrue(archive.entries().containsKey(LOCAL_SEND_TRACE_MANIFEST))
+            assertFalse(archive.entries().containsKey("performance-session.log"))
+            assertEquals(row, source.readText())
+            assertEquals("retained history", database.readText())
+            assertTrue(clearAuditAndDictationLogShares(context.cacheDir, root))
+            assertFalse(source.exists())
+            assertTrue(directory.isDirectory)
+            assertEquals("retained history", database.readText())
+        } finally {
+            clearAuditAndDictationLogShares(context.cacheDir, root)
+            database.delete()
+        }
+    }
+
     /** Retained dictation and performance data export without native audit files and clear locally. */
     @Test
     fun retainedDiagnosticExportAndClearWorkWithoutNativeLogs() {

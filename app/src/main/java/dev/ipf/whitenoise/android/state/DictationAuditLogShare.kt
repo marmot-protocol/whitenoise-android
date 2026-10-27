@@ -18,43 +18,46 @@ internal fun prepareAuditAndDictationLogArchive(
     performanceLogBytes: ByteArray? = PerformanceDiagnostics.storedLogForExport(),
     nativePerformanceLogBytes: ByteArray? = null,
 ): File? {
+    val marmotRoot = File(context.filesDir, "Marmot")
+    val localSendTraceEntries = nativeLocalSendTraceExport(marmotRoot)
     val dmEntries = DmCreationDiagnostics.snapshot()
     val hasDmRecords = dmEntries.keys.any { it.endsWith(".jsonl") } || diagnosticDroppedCount(dmEntries) > 0
-    val entries =
+    val diagnosticEntries =
         DictationDiagnostics.snapshot() +
             (if (hasDmRecords) dmEntries else emptyMap()) +
             (nativePerformanceLogBytes?.let { mapOf(NATIVE_PERFORMANCE_SNAPSHOT_FILE_NAME to it) } ?: emptyMap())
-    val dropped = diagnosticDroppedCount(entries)
-    val hasDictationRecords = entries.keys.any { it.endsWith(".jsonl") } || dropped != 0L
+    val dropped = diagnosticDroppedCount(diagnosticEntries)
+    val hasDictationRecords = diagnosticEntries.keys.any { it.endsWith(".jsonl") } || dropped != 0L
     val hasPerformanceRecords = performanceLogBytes != null || nativePerformanceLogBytes != null
-    if (sourcePaths.isEmpty() && !hasDictationRecords && !hasPerformanceRecords) return null
+    if (sourcePaths.isEmpty() && !hasDictationRecords && !hasPerformanceRecords && localSendTraceEntries.isEmpty()) {
+        return null
+    }
     return prepareAuditLogArchive(
         context.cacheDir,
-        File(context.filesDir, "Marmot"),
+        marmotRoot,
         sourcePaths,
-        entries,
+        diagnosticEntries + localSendTraceEntries,
         performanceLogBytes,
     )
 }
 
 /** Attempts every app-owned diagnostic store; one deletion cannot hide another store's failure. */
-internal fun clearAuditAndDictationLogShares(cacheDir: File): Boolean {
+internal fun clearAuditAndDictationLogShares(
+    cacheDir: File,
+    marmotRoot: File? = null,
+): Boolean {
     val dictation = runCatchingCancellable { DictationDiagnostics.clear() }
     val dmCreation = runCatchingCancellable { DmCreationDiagnostics.clear() }
     val performance = runCatchingCancellable { PerformanceDiagnostics.clearStoredLog() }
+    val localSendTrace = runCatchingCancellable { marmotRoot?.let(::clearNativeLocalSendTrace) ?: false }
     val prepared = runCatchingCancellable { clearPreparedAuditLogShares(cacheDir) }
-    val failure =
-        dictation.exceptionOrNull()
-            ?: dmCreation.exceptionOrNull()
-            ?: performance.exceptionOrNull()
-            ?: prepared.exceptionOrNull()
-    if (failure != null) {
-        dmCreation.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
-        performance.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
-        prepared.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
+    val results = listOf(dictation, dmCreation, performance, localSendTrace, prepared)
+    val failures = results.mapNotNull { it.exceptionOrNull() }
+    failures.firstOrNull()?.let { failure ->
+        failures.drop(1).filter { it !== failure }.forEach(failure::addSuppressed)
         throw failure
     }
-    return dictation.getOrThrow() || dmCreation.getOrThrow() || performance.getOrThrow() || prepared.getOrThrow()
+    return results.any { it.getOrThrow() }
 }
 
 /** Installs independent destinations before startup; collection stops before any native consent update. */
