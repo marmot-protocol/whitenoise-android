@@ -100,7 +100,8 @@ class MediaViewerMotionScreenshotTest {
                 MediaViewerThumbnailRegistry.Thumbnail(layer, 7uL) {
                     geometryReads++
                     bounds to corners
-                }.apply { ready = true }
+                }
+            thumbnail.ready = true
             registry.register(id, thumbnail)
 
             val first = checkNotNull(registry.resolve(id))
