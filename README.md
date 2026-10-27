@@ -142,10 +142,10 @@ one cleaning checkout would erase a slot's compile history.
 `.github/scripts/prepare-persistent-workspace.sh` deletes everything else,
 including reports, test results and outputs, so test tasks still execute on
 every run.
-The runner's job-start hook gives the `static-analysis` slot sixteen times and
-the `tests` slot eight times the CPU weight of other slots: Android lint and
-unit tests are the longest chains of a PR run, and lint uses only two or three
-cores once compiled, so its share costs the tests little.
+The runner's job-start hook gives the `compile` and `static-analysis` slots three
+times and the `tests` slot twice the CPU weight of other slots: they are the
+longest chains of a PR run. Larger ratios starved script jobs with wall-clock
+timeouts.
 
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
 including description edits, without compiling anything. The checker script runs
