@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private const val FOLDER_HEADER_SCROLLED_THRESHOLD = 0.01f
@@ -160,7 +164,10 @@ internal fun ChatFolderPills(
     }
 }
 
-/** Native chip visuals share the existing single gesture/semantics owner, including long-press Edit and full counts. */
+/**
+ * The selected fill settles with folder arrival while the existing gesture/semantics owner changes immediately.
+ * Bulk-selection chips use a separate component and do not opt into this destination feedback.
+ */
 @Suppress("LongParameterList", "FunctionNaming")
 @Composable
 internal fun ChatFolderPill(
@@ -175,6 +182,14 @@ internal fun ChatFolderPill(
     labelMaxWidth: Dp? = null,
 ) {
     val interactions = remember { MutableInteractionSource() }
+    val motionEnabled = rememberSystemAnimationsEnabled()
+    val targetBackground = if (selected) selectedColor else Color.Transparent
+    val background by
+        animateColorAsState(
+            targetValue = targetBackground,
+            animationSpec = if (motionEnabled) tween(CHAT_FOLDER_TRANSITION_MILLIS) else snap(),
+            label = "Folder destination selection",
+        )
     val resources = LocalContext.current.resources
     val description =
         if (unreadMessageCount != null) {
@@ -203,9 +218,9 @@ internal fun ChatFolderPill(
             border = null,
             colors =
                 FilterChipDefaults.filterChipColors(
-                    containerColor = Color.Transparent,
+                    containerColor = if (motionEnabled) background else targetBackground,
                     labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    selectedContainerColor = selectedColor,
+                    selectedContainerColor = if (motionEnabled) background else targetBackground,
                     selectedLabelColor = MaterialTheme.colorScheme.onSurface,
                 ),
             trailingIcon =

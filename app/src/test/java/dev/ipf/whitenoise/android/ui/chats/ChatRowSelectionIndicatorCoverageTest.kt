@@ -53,34 +53,34 @@ class ChatRowSelectionIndicatorCoverageTest {
     }
 
     @Test
-    fun selectedAndUnselectedRowsKeepMetadataReplacedWithoutDuplicateAnnouncements() {
+    fun selectedAndUnselectedRowsKeepMetadataVisibleWithoutDuplicateAnnouncements() {
         val selectionMode = mutableStateOf(true)
         val selected = mutableStateOf(false)
         render(selectionMode, selected, unreadCount = 3uL)
 
         composeRule.onNode(hasClickAction()).assertIsNotSelected()
-        assertSelectionMetadataHidden(unreadCount = 3uL)
+        assertSelectionMetadataVisible(unreadCount = 3uL)
 
         selected.value = true
         composeRule.waitForIdle()
 
         composeRule.onNode(hasClickAction()).assertIsSelected()
-        assertSelectionMetadataHidden(unreadCount = 3uL)
+        assertSelectionMetadataVisible(unreadCount = 3uL)
 
         selected.value = false
         composeRule.waitForIdle()
 
         composeRule.onNode(hasClickAction()).assertIsNotSelected()
-        assertSelectionMetadataHidden(unreadCount = 3uL)
+        assertSelectionMetadataVisible(unreadCount = 3uL)
     }
 
     @Test
-    fun leavingSelectionModeRestoresUnreadTimestampAndBadge() {
+    fun leavingSelectionModeKeepsUnreadTimestampAndBadge() {
         val selectionMode = mutableStateOf(true)
         val selected = mutableStateOf(false)
         render(selectionMode, selected, unreadCount = 3uL, unreadMention = true)
 
-        assertSelectionMetadataHidden(unreadCount = 3uL)
+        assertSelectionMetadataVisible(unreadCount = 3uL, mentions = 1)
 
         selectionMode.value = false
         composeRule.waitForIdle()
@@ -90,9 +90,9 @@ class ChatRowSelectionIndicatorCoverageTest {
         composeRule.onNodeWithContentDescription(mentionDescription).assertExists()
     }
 
-    /** Selection mode replaces invited timestamp and badge. */
+    /** Selection mode preserves invited timestamp and badge. */
     @Test
-    fun selectionModeReplacesInvitedTimestampAndBadge() {
+    fun selectionModePreservesInvitedTimestampAndBadge() {
         val selectionMode = mutableStateOf(false)
         val selected = mutableStateOf(false)
         render(selectionMode, selected, pendingConfirmation = true)
@@ -103,13 +103,13 @@ class ChatRowSelectionIndicatorCoverageTest {
         selectionMode.value = true
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(nowText).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(invitedText).assertDoesNotExist()
+        composeRule.onNodeWithText(nowText).assertExists()
+        composeRule.onNodeWithContentDescription(invitedText).assertExists()
         composeRule.onNode(hasClickAction()).assertIsNotSelected()
     }
 
     @Test
-    fun selectionModeReplacesTimestampForReadRows() {
+    fun selectionModePreservesTimestampForReadRows() {
         val selectionMode = mutableStateOf(false)
         val selected = mutableStateOf(false)
         render(selectionMode, selected)
@@ -119,14 +119,14 @@ class ChatRowSelectionIndicatorCoverageTest {
         selectionMode.value = true
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(nowText).assertDoesNotExist()
+        composeRule.onNodeWithText(nowText).assertExists()
         composeRule.onNode(hasClickAction()).assertIsNotSelected()
     }
 
-    private fun assertSelectionMetadataHidden(unreadCount: ULong) {
-        composeRule.onNodeWithText(nowText).assertDoesNotExist()
-        composeRule.onNodeWithText(unreadCount.toString()).assertDoesNotExist()
-        composeRule.onAllNodesWithContentDescription(mentionDescription).assertCountEquals(0)
+    private fun assertSelectionMetadataVisible(unreadCount: ULong, mentions: Int = 0) {
+        composeRule.onNodeWithText(nowText).assertExists()
+        composeRule.onNodeWithText(unreadCount.toString()).assertExists()
+        composeRule.onAllNodesWithContentDescription(mentionDescription).assertCountEquals(mentions)
         composeRule.onAllNodesWithContentDescription(selectDescription).assertCountEquals(0)
         composeRule.onAllNodesWithContentDescription(selectedDescription).assertCountEquals(0)
     }

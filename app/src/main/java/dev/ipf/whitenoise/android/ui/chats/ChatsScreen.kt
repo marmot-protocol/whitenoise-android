@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
+import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -715,6 +716,8 @@ internal fun ChatsScreen(
             showArchived = showArchived,
         )
     val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
+    val edgeFadeMotion = rememberScrollEdgeFadeMotion(viewportOwner)
+    val folderArrival = rememberChatFolderArrival(viewportOwner, selectedFolderId)
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
         val anchorId = actionSheetChatId ?: return@LaunchedEffect
@@ -2153,7 +2156,8 @@ internal fun ChatsScreen(
                                             .testTag("chats.list")
                                             .trackWhiteNoiseHeader(chatListState)
                                             .clipToBounds()
-                                            .chatListEdgeFade(chatListState)
+                                            .chatListEdgeFade(chatListState, motion = edgeFadeMotion)
+                                            .then(folderArrival)
                                             .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
                                             .onGloballyPositioned { coordinates ->
                                                 chatListWindowTop = coordinates.positionInWindow().y
