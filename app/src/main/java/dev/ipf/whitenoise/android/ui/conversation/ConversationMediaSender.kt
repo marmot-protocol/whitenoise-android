@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
+import dev.ipf.whitenoise.android.media.VideoScrubResult
 import dev.ipf.whitenoise.android.media.dropKeptOversizedCacheEntries
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -20,16 +21,21 @@ import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendStaging
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.PreparedVideoCheck
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
+import dev.ipf.whitenoise.android.ui.conversation.media.isVideoMediaType
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.normalizeDocumentMime
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.readBoundedDocument
 import dev.ipf.whitenoise.android.ui.conversation.media.releaseUnadoptedStagedSources
+import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedVideoMetadata
+import dev.ipf.whitenoise.android.ui.conversation.media.removeVideoMetadataInPlace
 import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import dev.ipf.whitenoise.android.ui.conversation.media.scrubVideoMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
@@ -61,6 +67,9 @@ internal enum class DocumentReadFailure {
     EMPTY,
     UNPROCESSABLE_IMAGE,
     STORAGE,
+
+    /** A video file whose private metadata could not be removed; it is refused, never sent as-is (#3376). */
+    VIDEO_METADATA,
 }
 
 private val DocumentReadFailure.messageResource: Int
@@ -71,12 +80,15 @@ private val DocumentReadFailure.messageResource: Int
             DocumentReadFailure.EMPTY -> R.string.media_file_empty
             DocumentReadFailure.UNPROCESSABLE_IMAGE -> R.string.toast_couldnt_decode_image
             DocumentReadFailure.STORAGE -> R.string.share_import_storage
+            DocumentReadFailure.VIDEO_METADATA -> R.string.media_file_video_metadata_not_removable
         }
 
+/** The visual album read for one send; [videoMetadataRefused] reports a video refused for its private metadata. */
 internal data class VisualReadOutcome(
     val attachments: List<PendingAttachment>,
     val albumOverflowed: Boolean,
     val storageUnavailable: Boolean = false,
+    val videoMetadataRefused: Boolean = false,
 )
 
 /**
@@ -342,21 +354,28 @@ internal class ConversationAttachmentReader(
                 }
                 BoundedDocumentRead.Empty -> state.failures += DocumentReadFailure.EMPTY
                 BoundedDocumentRead.Unreadable -> state.failures += DocumentReadFailure.UNREADABLE
-                is BoundedDocumentRead.Success -> {
-                    state.totalBytes += read.bytes.size
-                    state.attachments +=
-                        PendingAttachment(
-                            plaintextBytes = read.bytes,
-                            mediaType = mediaType,
-                            fileName = safeDocumentDisplayName(queryDisplayName(context.contentResolver, uri)),
-                            dim = null,
-                        )
-                }
+                // A video file loses its private metadata in place first; other documents stay byte-for-byte.
+                is BoundedDocumentRead.Success ->
+                    if (!removeVideoMetadataInPlace(mediaType, read.bytes)) {
+                        state.failures += DocumentReadFailure.VIDEO_METADATA
+                    } else {
+                        state.totalBytes += read.bytes.size
+                        state.attachments +=
+                            PendingAttachment(
+                                plaintextBytes = read.bytes,
+                                mediaType = mediaType,
+                                fileName = safeDocumentDisplayName(queryDisplayName(context.contentResolver, uri)),
+                                dim = null,
+                            )
+                    }
             }
         }
     }
 
-    /** Stages one document that does not fit in memory into a private file under its own message budget. */
+    /**
+     * Stages one document that does not fit in memory into a private file under its own message budget. A video
+     * file's snapshot loses its private metadata inside staging, before the budget reserves disk for it.
+     */
     private fun readFileBackedDocument(
         uri: android.net.Uri,
         mediaType: String,
@@ -364,10 +383,20 @@ internal class ConversationAttachmentReader(
         state: DocumentReadAccumulator,
     ) {
         val budget = fileBackedBudget(state.staging)
-        val pick = budget?.stage(declaredSize, state.checkCancellation) { context.contentResolver.openInputStream(uri) }
+        var metadataRemoved = true
+        val pick =
+            budget?.stage(
+                declaredSize,
+                state.checkCancellation,
+                accept = { source ->
+                    !isVideoMediaType(mediaType) ||
+                        (source.scrubVideoMetadata() is VideoScrubResult.Scrubbed).also { metadataRemoved = it }
+                },
+            ) { context.contentResolver.openInputStream(uri) }
         val source = pick?.source
         if (source == null) {
-            state.failures += pick?.failure.toDocumentReadFailure()
+            state.failures +=
+                if (metadataRemoved) pick?.failure.toDocumentReadFailure() else DocumentReadFailure.VIDEO_METADATA
             return
         }
         state.attachments +=
@@ -397,6 +426,7 @@ internal class ConversationAttachmentReader(
             var consumedBytes = 0L
             var overflowed = false
             var storageUnavailable = false
+            var videoMetadataRefused = false
             for (uri in uris) {
                 val remainingBytes = (inMemoryBytesBudget - consumedBytes).coerceAtLeast(0L)
                 if (remainingBytes == 0L && fileBacked == null) {
@@ -406,6 +436,7 @@ internal class ConversationAttachmentReader(
                 val outcome = readVisualAttachment(uri, remainingBytes, fileBacked, checkCancellation)
                 overflowed = overflowed || outcome.overflowed
                 storageUnavailable = storageUnavailable || outcome.storageUnavailable
+                videoMetadataRefused = videoMetadataRefused || outcome.videoMetadataRefused
                 outcome.attachment?.let { attachment ->
                     // Null when there is no file budget to answer to, or when the item fits it.
                     val refusal = fileBacked?.admit(attachment.byteCount, attachment.sourceFile == null)
@@ -420,7 +451,7 @@ internal class ConversationAttachmentReader(
                     }
                 }
             }
-            VisualReadOutcome(attachments, overflowed, storageUnavailable)
+            VisualReadOutcome(attachments, overflowed, storageUnavailable, videoMetadataRefused)
         }
 
     /** Reads one visual pick through the same transform and in-memory limits used at send time. */
@@ -482,11 +513,14 @@ internal class ConversationAttachmentReader(
                     ImageAttachmentReadOutcome(null, overflowed = true)
                 }
             MediaPipeline.VideoReadResult.Failed -> ImageAttachmentReadOutcome(null)
+            MediaPipeline.VideoReadResult.MetadataNotRemovable ->
+                ImageAttachmentReadOutcome(null, videoMetadataRefused = true)
         }
 
     /**
-     * Stages a large video into a private file and reads its poster metadata from that snapshot. A snapshot
-     * whose metadata cannot be read is refused inside staging, before the budget reserves any disk for it.
+     * Stages a large video into a private file, removes its private metadata in place and reads its poster
+     * metadata from that snapshot. A snapshot whose private metadata cannot be removed, or whose poster metadata
+     * cannot be read, is refused inside staging, before the budget reserves any disk for it.
      */
     private fun readFileBackedVideo(
         uri: android.net.Uri,
@@ -496,19 +530,27 @@ internal class ConversationAttachmentReader(
         checkCancellation: () -> Unit,
     ): ImageAttachmentReadOutcome {
         var metadata: MediaPipeline.VideoFileMetadata? = null
+        var metadataRemoved = true
         val pick =
             fileBacked.stage(
                 declaredSize,
                 checkCancellation,
-                accept = { source -> MediaPipeline.readVideoFileMetadata(source.file).also { metadata = it } != null },
+                accept = { source ->
+                    metadataRemoved = source.scrubVideoMetadata() is VideoScrubResult.Scrubbed
+                    metadataRemoved &&
+                        MediaPipeline.readVideoFileMetadata(source.file).also { metadata = it } != null
+                },
             ) { context.contentResolver.openInputStream(uri) }
         val source = pick.source
         val poster = metadata
         return when {
             source == null || poster == null ->
-                when (pick.failure) {
-                    FileBackedPickFailure.TOO_LARGE -> ImageAttachmentReadOutcome(null, overflowed = true)
-                    FileBackedPickFailure.STORAGE -> ImageAttachmentReadOutcome(null, storageUnavailable = true)
+                when {
+                    !metadataRemoved -> ImageAttachmentReadOutcome(null, videoMetadataRefused = true)
+                    pick.failure == FileBackedPickFailure.TOO_LARGE ->
+                        ImageAttachmentReadOutcome(null, overflowed = true)
+                    pick.failure == FileBackedPickFailure.STORAGE ->
+                        ImageAttachmentReadOutcome(null, storageUnavailable = true)
                     else -> ImageAttachmentReadOutcome(null)
                 }
             else ->
@@ -649,6 +691,7 @@ internal class ConversationMediaSender(
         val imageOverflowed: Boolean,
         val visualFailureToast: Int,
         val imageStorageUnavailable: Boolean = false,
+        val videoMetadataRefused: Boolean = false,
     ) {
         val isEmpty: Boolean
             get() = images.isEmpty() && documents.attachments.isEmpty()
@@ -735,9 +778,11 @@ internal class ConversationMediaSender(
     ): PreparedStagedAttachments? {
         val incomplete = prepared.images.size != imageCount || prepared.documents.attachments.size != documentCount
         if (isReply && incomplete) {
-            // A document that could not be read says why (for example too large) rather than "draft changed".
+            // A document that could not be read says why (for example too large) rather than "draft changed",
+            // and so does a video refused because its private metadata could not be removed.
             val documentFailure = prepared.documents.failures.firstOrNull()
-            appState.present(documentFailure?.messageResource ?: R.string.media_reply_draft_conflict)
+            val videoRefusal = prepared.visualFailureToast.takeIf { prepared.videoMetadataRefused }
+            appState.present(documentFailure?.messageResource ?: videoRefusal ?: R.string.media_reply_draft_conflict)
             return null
         }
         return if (acceptPreparedAttachments(prepared, imageCount)) {
@@ -790,6 +835,8 @@ internal class ConversationMediaSender(
      * Replies pass false: native reply drafts carry attachment bytes, so every reply pick stays in memory.
      * [staging] hears about every snapshot as soon as it exists, so a preparation that fails part-way can
      * still be cleaned up by its caller, and reserves disk for the whole send across the album and documents.
+     * Prepared draft attachments, including native drafts an older app version saved, are re-checked for private
+     * video metadata before anything reuses them; a video that cannot be cleaned is refused, never sent as saved.
      */
     private suspend fun prepareStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
@@ -806,7 +853,8 @@ internal class ConversationMediaSender(
             } else {
                 null
             }
-        val rawImages = readStagedImages(imageSlots, preparedImageAttachments, albumFileBudget)
+        val checkedImages = withContext(Dispatchers.IO) { removePreparedVideoMetadata(preparedImageAttachments) }
+        val rawImages = readStagedImages(imageSlots, checkedImages, albumFileBudget)
         val images = limitAttachmentsToBudget(rawImages.attachments, MEDIA_ALBUM_MAX_TOTAL_BYTES)
         val documentBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - images.totalBytes).coerceAtLeast(0L)
         val documents =
@@ -815,23 +863,25 @@ internal class ConversationMediaSender(
             } else {
                 readStagedDocuments(
                     documentUris,
-                    preparedDocumentAttachments,
+                    withContext(Dispatchers.IO) { removePreparedVideoMetadata(preparedDocumentAttachments) },
                     documentBudget,
                     allowFileBacked,
                     staging,
                 )
             }
-        val pickHasVideo =
-            imageSlots.any {
-                safeGetType(context.contentResolver, it.uri).startsWith("video/", ignoreCase = true)
-            }
+        val pickHasVideo = imageSlots.any { isVideoMediaType(safeGetType(context.contentResolver, it.uri)) }
         return PreparedStagedAttachments(
             images = images.attachments,
             documents = documents,
             imageOverflowed = rawImages.albumOverflowed || images.overflowed,
             visualFailureToast =
-                if (pickHasVideo) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image,
+                when {
+                    rawImages.videoMetadataRefused -> R.string.toast_video_metadata_not_removable
+                    pickHasVideo -> R.string.toast_couldnt_process_video
+                    else -> R.string.toast_couldnt_decode_image
+                },
             imageStorageUnavailable = rawImages.storageUnavailable,
+            videoMetadataRefused = rawImages.videoMetadataRefused,
         )
     }
 
@@ -839,10 +889,11 @@ internal class ConversationMediaSender(
      * Reuses native-draft bytes and reads only picks that have not finished staging. With
      * [allowFileBacked], a draft document that no longer fits the in-memory budget is copied to a
      * private file, and an unstaged pick may be read straight into one. [staging] hears about each copy.
+     * A prepared video refused for its private metadata is reported, never re-read or sent as saved.
      */
     private suspend fun readStagedDocuments(
         documentUris: List<android.net.Uri>,
-        preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
+        preparedDocuments: PreparedVideoCheck<android.net.Uri>,
         bytesBudget: Long,
         allowFileBacked: Boolean,
         staging: FileBackedSendStaging,
@@ -857,8 +908,10 @@ internal class ConversationMediaSender(
                 overflowed = true
                 return@forEach
             }
-            val staged = preparedDocumentAttachments[uri]
-            if (staged != null && staged.plaintextBytes.size.toLong() <= remaining) {
+            val staged = preparedDocuments.ready[uri]
+            if (uri in preparedDocuments.refused) {
+                failures += DocumentReadFailure.VIDEO_METADATA
+            } else if (staged != null && staged.plaintextBytes.size.toLong() <= remaining) {
                 attachments += staged
                 totalBytes += staged.plaintextBytes.size
             } else if (staged != null && !allowFileBacked) {
@@ -885,19 +938,21 @@ internal class ConversationMediaSender(
     /**
      * Reads the visual album in slot order. Without [fileBacked] each slot is read against the whole
      * in-memory budget and trimmed afterwards, as before; with it, each read sees what is left so a
-     * video that no longer fits in memory is staged to a file instead of dropped.
+     * video that no longer fits in memory is staged to a file instead of dropped. A prepared video refused
+     * for its private metadata is reported, never re-read or sent as saved.
      */
     private suspend fun readStagedImages(
         imageSlots: List<PendingMediaSlot>,
-        preparedImageAttachments: Map<String, PendingAttachment>,
+        preparedImages: PreparedVideoCheck<String>,
         fileBacked: FileBackedPickBudget?,
     ): VisualReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var overflowed = false
         var storageUnavailable = false
+        var videoMetadataRefused = false
         var inMemoryBytes = 0L
         imageSlots.forEach { slot ->
-            val prepared = preparedImageAttachments[slot.id]
+            val prepared = preparedImages.ready[slot.id]
             // A draft item after large videos must fit the same native bound and the send's disk, or the album fails.
             // Draft visuals are always held in memory, only a pick staged through the budget lives in a file.
             // The disk check asks the filesystem for free space, so it runs on the IO pool rather than Main.
@@ -907,7 +962,9 @@ internal class ConversationMediaSender(
                 } else {
                     null
                 }
-            if (refusal != null) {
+            if (slot.id in preparedImages.refused) {
+                videoMetadataRefused = true
+            } else if (refusal != null) {
                 overflowed = overflowed || refusal == FileBackedPickFailure.TOO_LARGE
                 storageUnavailable = storageUnavailable || refusal == FileBackedPickFailure.STORAGE
             } else if (prepared != null) {
@@ -925,9 +982,10 @@ internal class ConversationMediaSender(
                 inMemoryBytes += read.attachments.sumOf { it.plaintextBytes.size.toLong() }
                 overflowed = overflowed || read.albumOverflowed
                 storageUnavailable = storageUnavailable || read.storageUnavailable
+                videoMetadataRefused = videoMetadataRefused || read.videoMetadataRefused
             }
         }
-        return VisualReadOutcome(attachments, overflowed, storageUnavailable)
+        return VisualReadOutcome(attachments, overflowed, storageUnavailable, videoMetadataRefused)
     }
 
     /** Presents one notice for what preparation dropped or refused, and reports whether anything is left to send. */

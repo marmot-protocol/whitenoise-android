@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
+import dev.ipf.whitenoise.android.media.minimalMp4Header
 import dev.ipf.whitenoise.android.ui.conversation.ConversationMediaSender
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
@@ -1887,7 +1888,10 @@ class ConversationFileBackedMediaSendTest {
         return PendingAttachment(bytes, "image/jpeg", "photo.jpg")
     }
 
-    /** Publishes one sparse provider file of [size] bytes under [name] and returns its content Uri. */
+    /**
+     * Publishes one sparse provider file of [size] bytes under [name] and returns its content Uri. A video starts
+     * with a minimal movie header, so the metadata scrubber accepts it and its media data is the sparse rest.
+     */
     private fun scriptedPick(
         state: WhiteNoiseAppState,
         name: String,
@@ -1895,7 +1899,10 @@ class ConversationFileBackedMediaSendTest {
         size: Long,
     ): android.net.Uri {
         val file = java.io.File(state.appContext.cacheDir, "sender-$name-${System.nanoTime()}")
-        java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
+        java.io.RandomAccessFile(file, "rw").use { output ->
+            if (mediaType.startsWith("video/")) output.write(minimalMp4Header(size))
+            output.setLength(size)
+        }
         ScriptedPickProvider.picks[name] = ScriptedPick(file, mediaType, size)
         return android.net.Uri.parse("content://$SENDER_PICKS_AUTHORITY/$name")
     }

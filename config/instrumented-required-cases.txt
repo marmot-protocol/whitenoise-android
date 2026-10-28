@@ -170,3 +170,7 @@ dev.ipf.whitenoise.android.media.AttachmentFixturePublicationDeviceTest#smallMem
 
 # #3450: controlled application trim and bounded warm return with cache/frame/memory samples.
 dev.ipf.whitenoise.android.core.AvatarCacheScrollDeviceTest#presentationTrimAndWarmReturnCounters
+
+# #3376: scrubbed tagged fixtures lose location and date and keep every platform-extracted sample.
+dev.ipf.whitenoise.android.media.VideoMetadataScrubberDeviceTest#scrubbedFixturesLoseLocationAndDateAndKeepPlaybackMetadata
+dev.ipf.whitenoise.android.media.VideoMetadataScrubberDeviceTest#scrubbedFixturesKeepEveryMediaSample

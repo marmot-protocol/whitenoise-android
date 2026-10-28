@@ -1122,6 +1122,7 @@
     <string name="media_open">打开</string>
     <string name="media_file_too_large">文件过大,无法附加</string>
     <string name="media_file_unreadable">无法读取此文件。请重新选择。</string>
+    <string name="media_file_video_metadata_not_removable">无法从此视频文件中移除位置等隐私信息，因此未添加该文件。</string>
     <string name="media_file_empty">无法发送空文件。</string>
     <string name="media_album_too_large">所选内容过大,无法发送</string>
     <string name="group_image_search_title">群组头像</string>
@@ -1174,7 +1175,7 @@
     <string name="download_enabled">自动下载遵循你的网络规则</string>
     <string name="download_sent_media">已发送的媒体</string>
     <string name="download_quality">媒体质量</string>
-    <string name="download_quality_help">适用于新的照片和语音消息。视频和音频文件按原样发送。</string>
+    <string name="download_quality_help">适用于新的照片和语音消息。视频和音频文件从不重新编码。</string>
     <string name="download_done">完成</string>
     <string name="download_stop_confirmation">清除此个人资料等待中的自动下载？进行中的下载和你自行开始的下载将继续。</string>
     <string name="media_type_images">图片</string>
@@ -1275,6 +1276,7 @@
     <string name="notification_reacted_to_message">用 %1$s 回应了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回应</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">无法从此视频中移除位置等隐私信息，因此未添加该视频。</string>
     <string name="profile_picture_hint">公开的 HTTPS 图片网址</string>
     <string name="profile_picture_invalid">仅允许公开的 HTTPS 图片网址。</string>
     <string name="profile_picture_edit">编辑头像</string>
@@ -1417,7 +1419,7 @@
     <string name="media_quality_high_subtitle">每张照片约 1.5 MB — 优先保证质量</string>
     <string name="media_quality_original">原始</string>
     <string name="media_quality_original_subtitle">完整分辨率 — 文件最大</string>
-    <string name="media_quality_footer">照片中的位置和设备信息始终会被移除，即使选择“原始”也一样。视频和导入的音频保留原始数据。音频码率仅适用于你录制的语音消息。</string>
+    <string name="media_quality_footer">照片和视频中的位置和设备信息始终会被移除，即使选择“原始”也一样。导入的音频保留原始数据。音频码率仅适用于你录制的语音消息。</string>
     <string name="profile_is_public">个人资料是公开的</string>
     <string name="profile_public_description">您的个人资料信息将对网络上的所有人可见。</string>
     <string name="shared_media">共享媒体</string>

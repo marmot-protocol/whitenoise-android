@@ -1186,6 +1186,7 @@
     <string name="media_open">Открыть</string>
     <string name="media_file_too_large">Файл слишком большой для отправки</string>
     <string name="media_file_unreadable">Не удалось прочитать этот файл. Выберите его снова.</string>
+    <string name="media_file_video_metadata_not_removable">Не удалось удалить из этого видеофайла личные данные, например местоположение, поэтому он не прикреплён.</string>
     <string name="media_file_empty">Пустые файлы нельзя отправить.</string>
     <string name="media_album_too_large">Выбор слишком большой для отправки</string>
     <string name="group_image_search_title">Изображение группы</string>
@@ -1238,7 +1239,7 @@
     <string name="download_enabled">Автоматические загрузки соответствуют правилам вашей сети.</string>
     <string name="download_sent_media">Отправленные медиа</string>
     <string name="download_quality">Качество медиа</string>
-    <string name="download_quality_help">Применяется к новым фотографиям и голосовым сообщениям. Видео и аудио файлы отправляются «как есть».</string>
+    <string name="download_quality_help">Применяется к новым фотографиям и голосовым сообщениям. Видео и аудиофайлы никогда не перекодируются.</string>
     <string name="download_done">Готово</string>
     <string name="download_stop_confirmation">Очистить ожидание автоматической загрузки для этого профиля? Активные загрузки и загрузки, которые вы начали самостоятельно, будут продолжаться.</string>
     <string name="media_type_images">Изображения</string>
@@ -1345,6 +1346,7 @@
     <string name="notification_reacted_to_message">отреагировал(а) %1$s на: \"%2$s\"</string>
     <string name="notification_reacted">отреагировал(а) %1$s</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">Не удалось удалить из этого видео личные данные, например местоположение, поэтому оно не прикреплено.</string>
     <string name="profile_picture_hint">Публичный HTTPS-URL изображения</string>
     <string name="profile_picture_invalid">Разрешены только публичные HTTPS-URL изображений.</string>
     <string name="profile_picture_edit">Изменить фото профиля</string>
@@ -1496,7 +1498,7 @@
     <string name="media_quality_high_subtitle">Около 1,5 МБ на фото — качество важнее трафика</string>
     <string name="media_quality_original">Исходное</string>
     <string name="media_quality_original_subtitle">Полное разрешение — самые большие файлы</string>
-    <string name="media_quality_footer">Геоданные и сведения об устройстве всегда удаляются из фото, даже при качестве «Оригинал». Видео и импортированное аудио сохраняют исходные данные. Битрейт звука применяется только к голосовым сообщениям, которые вы записываете.</string>
+    <string name="media_quality_footer">Геоданные и сведения об устройстве всегда удаляются из фото и видео, даже при качестве «Оригинал». Импортированное аудио сохраняет исходные данные. Битрейт звука применяется только к голосовым сообщениям, которые вы записываете.</string>
     <string name="profile_is_public">Профиль публичный</string>
     <string name="profile_public_description">Информация вашего профиля будет видна всем в сети.</string>
     <string name="shared_media">Общие медиафайлы</string>
