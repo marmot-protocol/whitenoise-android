@@ -121,24 +121,12 @@ MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks a
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
-Android CI, the fuzz PR gate and the invariant gate run on wn-build-server, a
-persistent self-hosted runner pool registered to this repository. The
-path-filtered campaigns (release runtime, reproducible build, instrumented
-tests) and PR screenshots stay on GitHub-hosted runners: together with Android
-CI they need more CPU and memory than the 8-core, 64 GB host has, and hosted
-runners add capacity in parallel. Fork pull requests fall back to
-`ubuntu-latest`, and the runner's job-start hook rejects them anyway. All slots
-share one Gradle user home and build cache, so the GitHub cache is disabled
-there. Every job there checks out with `clean: false` and keeps the module
-`build/` directories and `.gradle` between runs for incremental compilation;
-one cleaning checkout would erase a slot's compile history.
-`.github/scripts/prepare-persistent-workspace.sh` deletes everything else,
-including reports, test results and outputs, so test tasks still execute on
-every run.
-The runner's job-start hook gives the `static-analysis` slot sixteen times and
-the `tests` slot eight times the CPU weight of other slots: Android lint and
-unit tests are the longest chains of a PR run, and lint uses only two or three
-cores once compiled, so its share costs the tests little.
+Android CI, the fuzz PR gate and the invariant gate run on GitHub-hosted
+`ubuntu-latest` runners for both repository branches and fork pull requests.
+Each job starts from a fresh checkout and restores its Gradle cache through
+the pinned setup action. Unit-test jobs use two forks to fit the hosted
+runner's memory. The path-filtered campaigns (release runtime, reproducible
+build, instrumented tests) and PR screenshots also use GitHub-hosted runners.
 
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
 including description edits, without compiling anything. The checker script runs

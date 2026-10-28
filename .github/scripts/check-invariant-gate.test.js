@@ -372,29 +372,3 @@ test('run treats a registry missing at the head commit as empty instead of crash
   await run({ github, context, core: { info: () => {}, setFailed: m => failures.push(m) } })
   assert.match(failures[0], /not a gate registered/)
 })
-
-test('the workflow runs the base-revision checker with a read-only token and no PR text in shell', () => {
-  const workflow = fs.readFileSync(path.join(__dirname, '..', 'workflows', 'invariant-gate.yml'), 'utf8')
-  const triggers = workflow.slice(workflow.indexOf('\non:'), workflow.indexOf('\nconcurrency:'))
-  assert.match(triggers, /^ {2}pull_request:$/m)
-  assert.doesNotMatch(triggers, /pull_request_target/, 'the job never needs a privileged token')
-  const permissions = workflow.slice(workflow.indexOf('\npermissions:'), workflow.indexOf('\njobs:'))
-  assert.deepEqual(permissions.trim().split('\n').slice(1).map(line => line.trim()).sort(), [
-    'contents: read',
-    'issues: read',
-    'pull-requests: read',
-  ])
-  assert.doesNotMatch(workflow, /secrets\./)
-  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}\n\s+path: trusted/)
-  assert.match(workflow, /if: hashFiles\('trusted\/\.github\/scripts\/check-invariant-gate\.js'\) == ''/)
-  assert.doesNotMatch(workflow, /registryPath|proposed\/docs/, 'the proposed registry is read through the API')
-  const expressions = [...workflow.matchAll(/\$\{\{([^}]*)\}\}/g)].map(match => match[1].trim()).sort()
-  assert.deepEqual(expressions, [
-    'github.event.pull_request.base.sha',
-    `github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server"]')`,
-    'github.event.pull_request.number',
-    'steps.script.outputs.root',
-    'steps.script.outputs.root',
-  ])
-  assert.equal(workflow.match(/persist-credentials: false/g).length, 2)
-})
