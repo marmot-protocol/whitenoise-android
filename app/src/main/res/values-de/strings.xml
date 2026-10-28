@@ -2512,4 +2512,10 @@
     <string name="appearance_preview_limits">Künstliches Beispiel mit deinem aktuellen Design und deiner Schriftart. Diese Schalter wirken sich nur auf dieses Beispiel aus. Die Lesereihenfolge des Screenreaders, Vergrößerung, Schalterzugriff und Berührungsflächen müssen separat mit dem tatsächlichen Bedienungshilfedienst getestet werden.</string>
     <string name="appearance_preview_motion_on">Systemanimationen sind aktiviert. Dieses statische Beispiel testet keine Bewegungen.</string>
     <string name="appearance_preview_motion_off">Systemanimationen sind deaktiviert. Dieses Beispiel berücksichtigt diese Einstellung.</string>
+
+    <string name="voice_recording_save_failed">Aufnahme wurde beendet, aber die Audiodatei konnte nicht gespeichert werden. Nimm erneut auf.</string>
+    <string name="voice_recording_stops_in">Endet in %1$s</string>
+    <string name="voice_recording_limit_warning">Die Aufnahme endet in 30 Sekunden am Fünf-Minuten-Limit.</string>
+    <string name="voice_recording_limit_reached">Das Fünf-Minuten-Limit ist erreicht. Prüfe deine Sprachnachricht vor dem Senden.</string>
+    <string name="voice_recording_interrupted">Aufnahme unterbrochen. Prüfe die aufgenommene Audiodatei vor dem Senden.</string>
 </resources>

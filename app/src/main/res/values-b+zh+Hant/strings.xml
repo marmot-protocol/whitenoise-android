@@ -2460,4 +2460,10 @@
     <string name="appearance_preview_limits">使用目前主題和字型的模擬範例。這些開關僅影響此範例。螢幕閱讀器的朗讀順序、放大功能、開關控制和觸控區域需要使用實際的無障礙服務個別測試。</string>
     <string name="appearance_preview_motion_on">系統動畫已啟用。此靜態範例不測試動態效果。</string>
     <string name="appearance_preview_motion_off">系統動畫已停用。此範例遵循該設定。</string>
+
+    <string name="voice_recording_save_failed">錄音已停止，但無法儲存音訊。請重新錄製。</string>
+    <string name="voice_recording_stops_in">將在 %1$s 後停止</string>
+    <string name="voice_recording_limit_warning">錄音將在 30 秒後達到五分鐘上限並停止。</string>
+    <string name="voice_recording_limit_reached">已達到五分鐘錄音上限。傳送前請檢查語音訊息。</string>
+    <string name="voice_recording_interrupted">錄音已中斷。傳送前請檢查已錄製的音訊。</string>
 </resources>

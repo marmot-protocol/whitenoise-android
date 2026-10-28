@@ -2495,4 +2495,10 @@
     <string name="appearance_preview_limits">Esempio fittizio con il tema e il carattere attuali. Questi interruttori modificano solo questo esempio. L’ordine del lettore di schermo, l’ingrandimento, l’accesso tramite interruttori e le aree di tocco richiedono test separati con il servizio di accessibilità effettivo.</string>
     <string name="appearance_preview_motion_on">Le animazioni di sistema sono attivate. Questo esempio statico non verifica il movimento.</string>
     <string name="appearance_preview_motion_off">Le animazioni di sistema sono disattivate. Questo esempio rispetta tale impostazione.</string>
+
+    <string name="voice_recording_save_failed">La registrazione si è interrotta, ma non è stato possibile salvare l’audio. Registra di nuovo.</string>
+    <string name="voice_recording_stops_in">Termina tra %1$s</string>
+    <string name="voice_recording_limit_warning">La registrazione terminerà tra 30 secondi al limite di cinque minuti.</string>
+    <string name="voice_recording_limit_reached">Raggiunto il limite di registrazione di cinque minuti. Riascolta il messaggio vocale prima di inviarlo.</string>
+    <string name="voice_recording_interrupted">Registrazione interrotta. Controlla l’audio registrato prima di inviarlo.</string>
 </resources>

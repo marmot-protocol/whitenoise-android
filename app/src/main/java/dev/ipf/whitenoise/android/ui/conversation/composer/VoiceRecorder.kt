@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,7 +52,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Lock
 
 /**
  * Hold-to-record voice button. Press → start; release inside the button
- * bounds → stop and send. Drag the finger outside the button before
+ * bounds → stop and review. Drag the finger outside the button before
  * releasing → cancel. The cancel threshold is `cancelThresholdPx` away
  * from the down position; the gesture stays as a pointerInput input so
  * Compose doesn't fight us for the up event.
@@ -191,6 +192,10 @@ internal fun RecordingStripLeading(
     val canceling = controller.willCancel
     val locked = controller.locked
     val cancelTint = MaterialTheme.colorScheme.error
+    val nearLimit = controller.isNearLimit
+    val remainingForDisplay = ((controller.remainingMs + 999L) / 1000L) * 1000L
+    val timing = formatRecordingDuration(if (nearLimit) remainingForDisplay else controller.elapsedMs)
+    val timerLabel = stringResource(R.string.voice_recording_stops_in, timing)
 
     Row(
         modifier =
@@ -218,12 +223,13 @@ internal fun RecordingStripLeading(
                     .background(MaterialTheme.colorScheme.error),
         )
         Text(
-            formatRecordingDuration(controller.elapsedMs),
+            timing,
             style = MaterialTheme.typography.labelLarge,
-            color = if (canceling) cancelTint else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (canceling || nearLimit) cancelTint else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = if (nearLimit) Modifier.clearAndSetSemantics { contentDescription = timerLabel } else Modifier,
         )
         Spacer(Modifier.weight(1f))
-        if (locked) {
+        if (locked && !nearLimit) {
             // Locked: the user has handed off control. The hint copy
             // collapses to a compact "Locked" indicator so the row stays
             // visually quiet while the trailing Stop+Trash do the work.
@@ -240,7 +246,7 @@ internal fun RecordingStripLeading(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        } else {
+        } else if (!nearLimit) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = null,

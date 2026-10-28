@@ -2495,4 +2495,10 @@
     <string name="appearance_preview_limits">Exemplo fictício com o tema e o tipo de letra atuais. Estes interruptores afetam apenas este exemplo. A ordem do leitor de ecrã, a ampliação, o acesso por interruptores e as áreas de toque precisam de testes separados com o serviço de acessibilidade real.</string>
     <string name="appearance_preview_motion_on">As animações do sistema estão ativadas. Este exemplo estático não testa movimentos.</string>
     <string name="appearance_preview_motion_off">As animações do sistema estão desativadas. Este exemplo respeita essa definição.</string>
+
+    <string name="voice_recording_save_failed">A gravação parou, mas não foi possível salvar o áudio. Grave novamente.</string>
+    <string name="voice_recording_stops_in">Termina em %1$s</string>
+    <string name="voice_recording_limit_warning">A gravação será interrompida em 30 segundos ao atingir o limite de cinco minutos.</string>
+    <string name="voice_recording_limit_reached">Limite de gravação de cinco minutos atingido. Revise sua mensagem de voz antes de enviar.</string>
+    <string name="voice_recording_interrupted">Gravação interrompida. Revise o áudio gravado antes de enviar.</string>
 </resources>

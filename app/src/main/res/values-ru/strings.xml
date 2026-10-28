@@ -2569,4 +2569,10 @@
     <string name="appearance_preview_limits">Искусственный пример с текущей темой и шрифтом. Эти переключатели влияют только на этот пример. Порядок чтения программой экранного доступа, увеличение, управление переключателями и области касания нужно проверять отдельно с реальной службой специальных возможностей.</string>
     <string name="appearance_preview_motion_on">Системные анимации включены. Этот статичный пример не проверяет движение.</string>
     <string name="appearance_preview_motion_off">Системные анимации отключены. Этот пример учитывает эту настройку.</string>
+
+    <string name="voice_recording_save_failed">Запись остановлена, но не удалось сохранить аудио. Запишите ещё раз.</string>
+    <string name="voice_recording_stops_in">Остановка через %1$s</string>
+    <string name="voice_recording_limit_warning">Запись остановится через 30 секунд по достижении лимита в пять минут.</string>
+    <string name="voice_recording_limit_reached">Достигнут лимит записи в пять минут. Проверьте голосовое сообщение перед отправкой.</string>
+    <string name="voice_recording_interrupted">Запись прервана. Проверьте записанное аудио перед отправкой.</string>
 </resources>
