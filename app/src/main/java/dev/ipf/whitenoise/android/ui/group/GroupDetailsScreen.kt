@@ -343,7 +343,7 @@ internal fun GroupDetailsScreen(
         var reviewedLargeInviteAdmins by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateOf<Set<String>>(emptySet())
         }
-        val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
+        var addMemberAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenAddMember) }
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
         // leave path and the Admins prompt so a trapped sole admin can hand the
         // role to another member (issue #417).
@@ -418,6 +418,7 @@ internal fun GroupDetailsScreen(
         }
         LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
             if (autoOpenAddMember && canAdministerMembers) {
+                addMemberAutoOpened = true
                 showAddMember = true
                 onAutoOpenAddMemberConsumed()
             }
@@ -499,6 +500,7 @@ internal fun GroupDetailsScreen(
                 target = detailsDestination,
                 depth = if (detailsDestination == "details") 0 else 1,
                 ownerKey = controller to appState.runtimeGeneration,
+                suppressMotion = addMemberAutoOpened && detailsDestination == "add-members",
                 animationsEnabled = rememberConversationMotionEnabled(),
             )
 
@@ -1839,7 +1841,10 @@ internal fun GroupDetailsScreen(
                             SettingsLink(
                                 context = rowContext,
                                 title = stringResource(R.string.add_member),
-                                onClick = { showAddMember = true },
+                                onClick = {
+                                    addMemberAutoOpened = false
+                                    showAddMember = true
+                                },
                                 modifier = Modifier.testTag("chat_info.add_people"),
                                 enabled =
                                     memberAdministrationPresentable(
