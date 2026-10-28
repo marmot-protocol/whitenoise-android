@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -121,7 +122,7 @@ private data class DictationFooterSpace(
     val capsuleSlot: Dp,
 )
 
-private val LocalDictationFooterSpace = staticCompositionLocalOf<DictationFooterSpace?> { null }
+private val LocalDictationFooterSpace = compositionLocalOf<DictationFooterSpace?> { null }
 
 /**
  * Registers the complete footer. Ordinary windows scroll only overflowing actions. Short windows
