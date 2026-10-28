@@ -1,0 +1,137 @@
+[
+  {
+    "group": "androidx.compose.runtime",
+    "name": "runtime-tracing",
+    "version": "1.13.0-beta01",
+    "file": "runtime-tracing-1.13.0-beta01.pom",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-tracing/1.13.0-beta01/runtime-tracing-1.13.0-beta01.pom",
+    "sha256": "0380f130e40db7301c4046c57ec6e1be4951eb923374ac97eb5c4d968a286282",
+    "bytes": 4873
+  },
+  {
+    "group": "androidx.compose.runtime",
+    "name": "runtime-tracing",
+    "version": "1.13.0-beta01",
+    "file": "runtime-tracing-1.13.0-beta01.module",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-tracing/1.13.0-beta01/runtime-tracing-1.13.0-beta01.module",
+    "sha256": "61bdf52d9c4df5c31c9cd25ac0cc1f287e3074247a54248ccb221fe3dbcf76e3",
+    "bytes": 15982
+  },
+  {
+    "group": "androidx.compose.runtime",
+    "name": "runtime-tracing",
+    "version": "1.13.0-beta01",
+    "file": "runtime-tracing-1.13.0-beta01.aar",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-tracing/1.13.0-beta01/runtime-tracing-1.13.0-beta01.aar",
+    "sha256": "4841b8461801d10d4489d341cbe581f02a8fcc838f15085062a8d011d9fd6cd7",
+    "bytes": 27286
+  },
+  {
+    "group": "androidx.tracing",
+    "name": "tracing-wire",
+    "version": "2.0.4",
+    "file": "tracing-wire-2.0.4.pom",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-wire/2.0.4/tracing-wire-2.0.4.pom",
+    "sha256": "f4f11ec311e22ded026db677caf8be432729d2371c8376c4071f09050b4fa5a7",
+    "bytes": 3173
+  },
+  {
+    "group": "androidx.tracing",
+    "name": "tracing-wire",
+    "version": "2.0.4",
+    "file": "tracing-wire-2.0.4.module",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-wire/2.0.4/tracing-wire-2.0.4.module",
+    "sha256": "896b961580d9270d18a7d3d99279daaa5fe7795cd4a48f3bc60d33e4f2f55b73",
+    "bytes": 10031
+  },
+  {
+    "group": "androidx.tracing",
+    "name": "tracing-wire",
+    "version": "2.0.4",
+    "file": "tracing-wire-2.0.4.aar",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-wire/2.0.4/tracing-wire-2.0.4.aar",
+    "sha256": "e8f422c41b4bfc5246f8991997902c1c367d86a9fc252cbb2381e192343a251b",
+    "bytes": 4523
+  },
+  {
+    "group": "androidx.tracing",
+    "name": "tracing-wire-android",
+    "version": "2.0.4",
+    "file": "tracing-wire-android-2.0.4.pom",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-wire-android/2.0.4/tracing-wire-android-2.0.4.pom",
+    "sha256": "50d17deea1da6c2b6795886d7e33a95b5076c02d13cffab7e8807775b0bf621a",
+    "bytes": 3394
+  },
+  {
+    "group": "androidx.tracing",
+    "name": "tracing-wire-android",
+    "version": "2.0.4",
+    "file": "tracing-wire-android-2.0.4.module",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-wire-android/2.0.4/tracing-wire-android-2.0.4.module",
+    "sha256": "72d48fe8b162bf596d56433a04d62b155a93a5d337b1c8f36238f35c19f1269a",
+    "bytes": 6784
+  },
+  {
+    "group": "androidx.tracing",
+    "name": "tracing-wire-android",
+    "version": "2.0.4",
+    "file": "tracing-wire-android-2.0.4.aar",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-wire-android/2.0.4/tracing-wire-android-2.0.4.aar",
+    "sha256": "457b96d6dbaad0bea2855b6c848ad512b0344804aa2cb1fb998faffb4cc53b71",
+    "bytes": 192569
+  },
+  {
+    "group": "com.squareup.wire",
+    "name": "wire-runtime",
+    "version": "6.4.7",
+    "file": "wire-runtime-6.4.7.pom",
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/wire/wire-runtime/6.4.7/wire-runtime-6.4.7.pom",
+    "sha256": "fc718c4084b27c283efc4b8d377b7847ec13ab7e5ab43251981c40362d0db83a",
+    "bytes": 1927
+  },
+  {
+    "group": "com.squareup.wire",
+    "name": "wire-runtime",
+    "version": "6.4.7",
+    "file": "wire-runtime-6.4.7.module",
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/wire/wire-runtime/6.4.7/wire-runtime-6.4.7.module",
+    "sha256": "ae7210ad105c39ea2ba361e5483c9ea2b5751b3772c3e8691c07a10a9eb8c0c3",
+    "bytes": 28887
+  },
+  {
+    "group": "com.squareup.wire",
+    "name": "wire-runtime",
+    "version": "6.4.7",
+    "file": "wire-runtime-6.4.7.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/wire/wire-runtime/6.4.7/wire-runtime-6.4.7.jar",
+    "sha256": "6c8997423d5dd5e9fd01412a25f65d6bbea9497d531bf953354ac4305b0632e0",
+    "bytes": 39790
+  },
+  {
+    "group": "com.squareup.wire",
+    "name": "wire-runtime-jvm",
+    "version": "6.4.7",
+    "file": "wire-runtime-jvm-6.4.7.pom",
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/wire/wire-runtime-jvm/6.4.7/wire-runtime-jvm-6.4.7.pom",
+    "sha256": "ff03a3d0c6d0e59be5f088516d3962a822b399cdfa3aade8269d2abc3a5202ff",
+    "bytes": 1931
+  },
+  {
+    "group": "com.squareup.wire",
+    "name": "wire-runtime-jvm",
+    "version": "6.4.7",
+    "file": "wire-runtime-jvm-6.4.7.module",
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/wire/wire-runtime-jvm/6.4.7/wire-runtime-jvm-6.4.7.module",
+    "sha256": "f7c50dd8d1618d15960431ec402dbfe38eaf4b4b44a74fce7bd10d5bd3c10780",
+    "bytes": 3722
+  },
+  {
+    "group": "com.squareup.wire",
+    "name": "wire-runtime-jvm",
+    "version": "6.4.7",
+    "file": "wire-runtime-jvm-6.4.7.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/squareup/wire/wire-runtime-jvm/6.4.7/wire-runtime-jvm-6.4.7.jar",
+    "sha256": "83d56e2b348429ebc975aad62870c1b1e3dd1e9dc6eab6d618abacbeee66280f",
+    "bytes": 263342
+  }
+]

@@ -3,6 +3,10 @@ run-name: PR3439 retained-media admission controlled comparison
 on:
   workflow_dispatch:
     inputs:
+      diagnostic_only:
+        description: Build isolated Compose SDK profiling APKs only; excluded from performance acceptance
+        type: boolean
+        default: false
       checks_only:
         description: Validate the test-only follow-up without rebuilding identical production sources
         type: boolean
@@ -10,10 +14,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: perf3439-physical-ab-${{ inputs.checks_only && 'checks' || 'pair' }}
+  group: perf3439-physical-ab-${{ inputs.diagnostic_only && 'trace' || inputs.checks_only && 'checks' || 'pair' }}
   cancel-in-progress: false
 jobs:
   static:
+    if: inputs.diagnostic_only != true
     name: Motion style and static analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -56,7 +61,7 @@ jobs:
 
   pair:
     needs: static
-    if: inputs.checks_only != true
+    if: inputs.checks_only != true && inputs.diagnostic_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -282,4 +287,183 @@ jobs:
             app/build/outputs/roborazzi/
             app/src/test/snapshots/media_viewer_pressed_feedback.png
           if-no-files-found: ignore
+          retention-days: 7
+
+  compose_trace:
+    name: Isolated Compose in-process profiling APKs
+    if: inputs.diagnostic_only == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
+      PREVIOUS_SHA: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
+      AFTER_SHA: 7eef916cd50e45e9cb42f81482155e646704e11d
+      WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
+      PR_PREVIEW_CHANNEL: isolated
+      PR_NUMBER: '3439'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.AFTER_SHA }}
+          path: after
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.PREVIOUS_SHA }}
+          path: previous
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+        with:
+          cache-read-only: true
+      - name: Check immutable sources and identical native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C after rev-parse HEAD)" = "$AFTER_SHA"
+          test "$(git -C previous rev-parse HEAD)" = "$PREVIOUS_SHA"
+          cmp after/app/src/main/marmotkit/MARMOT_VERSION previous/app/src/main/marmotkit/MARMOT_VERSION
+          mkdir -p artifacts
+          cp after/app/src/main/marmotkit/MARMOT_VERSION artifacts/MARMOT_VERSION
+          pin=$(awk -F= '$1 == "artifact-sha256" {print $2}' artifacts/MARMOT_VERSION)
+          [[ "$pin" =~ ^[0-9a-f]{64}$ ]]
+          printf 'NATIVE_ARTIFACT=%s\nWHITENOISE_MARMOTKIT_CACHE_DIR=%s\nFIXTURE_SUFFIX=.perf3439trace.r%s\n' \
+            "$pin" "$RUNNER_TEMP/marmotkit-cache" "$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ env.NATIVE_ARTIFACT }}
+      - name: Prepare identical isolated packaging and profiling overlays
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -keystore "$RUNNER_TEMP/fixture.p12" -storetype PKCS12 \
+            -storepass fixture-only -keypass fixture-only -alias fixture -keyalg RSA -keysize 2048 \
+            -validity 3650 -dname 'CN=PR3439 Disposable Compose Profiling Fixture'
+          for role in previous after; do
+            mkdir -p "$role/app/src/preview"
+            test ! -e "$role/app/src/preview/AndroidManifest.xml"
+            cat > "$role/app/src/preview/AndroidManifest.xml" <<'XML'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <application><profileable android:shell="true" /></application>
+          </manifest>
+          XML
+          done
+          cat > "$RUNNER_TEMP/perf3439.gradle" <<'GRADLE'
+          gradle.beforeProject { project ->
+              if (project.path != ':app') return
+              project.plugins.withId('com.android.application') {
+                  project.dependencies.add('implementation', 'androidx.compose.runtime:runtime-tracing')
+                  project.dependencies.add('implementation', 'androidx.tracing:tracing-wire:2.0.4')
+                  project.tasks.register('resolvePerf3439TraceInputs') {
+                      doLast {
+                          def graph = [:]
+                          ['previewPlayReleaseCompileClasspath', 'previewPlayReleaseRuntimeClasspath'].each { name ->
+                              def configuration = project.configurations.getByName(name)
+                              configuration.resolve()
+                              def selected = [:]
+                              configuration.incoming.resolutionResult.allComponents.each { component ->
+                                  def id = component.id
+                                  if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                                      selected[id.group + ':' + id.module] = id.version
+                                  }
+                              }
+                              graph[name] = selected
+                          }
+                          project.rootProject.file('trace-resolved-graph.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(graph))
+                      }
+                  }
+                  project.extensions.getByName('androidComponents').finalizeDsl { android ->
+                      def preview = android.productFlavors.getByName('preview')
+                      preview.applicationIdSuffix = System.getenv('FIXTURE_SUFFIX')
+                      preview.manifestPlaceholders['appName'] = 'PR3439 Compose Profiling Fixture'
+                      preview.manifestPlaceholders['deepLinkScheme'] = 'whitenoise-perf3439-trace'
+                      preview.buildConfigField('String', 'WHITENOISE_DEEP_LINK_SCHEME', '"whitenoise-perf3439-trace"')
+                      android.packaging.jniLibs.useLegacyPackaging = true
+                  }
+              }
+          }
+          GRADLE
+      - name: Generate and independently audit isolated diagnostic dependency inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit="$GITHUB_WORKSPACE/tooling/.github/perf3439/audit_trace_inputs.py"
+          proof="$GITHUB_WORKSPACE/tooling/.github/perf3439/trace-supplier-proof.json"
+          cp "$proof" artifacts/trace-supplier-proof.json
+          cp "$RUNNER_TEMP/perf3439.gradle" artifacts/diagnostic-overlay.gradle
+          for role in previous after; do
+            evidence="$GITHUB_WORKSPACE/artifacts/$role-inputs"
+            python3 "$audit" snapshot "$GITHUB_WORKSPACE/$role" "$evidence"
+            (
+              cd "$role"
+              ./gradlew :app:resolvePerf3439TraceInputs --write-locks --write-verification-metadata sha256 \
+                --no-daemon --stacktrace -I "$RUNNER_TEMP/perf3439.gradle"
+            )
+            python3 "$audit" audit "$GITHUB_WORKSPACE/$role" "$evidence" "$proof"
+          done
+      - name: Build, sign and retain both diagnostic variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          for role in previous after; do
+            case "$role" in before) source_sha=$BEFORE_SHA;; previous) source_sha=$PREVIOUS_SHA;; after) source_sha=$AFTER_SHA;; esac
+            (
+              cd "$role"
+              PREVIEW_HEAD_SHA=$source_sha ./gradlew :app:assemblePreviewPlayRelease \
+                -Pandroid.injected.build.abi=arm64-v8a -Pandroid.injected.testOnly=false \
+                --build-cache --no-daemon --stacktrace -I "$RUNNER_TEMP/perf3439.gradle"
+            )
+            python3 "$GITHUB_WORKSPACE/tooling/.github/perf3439/audit_trace_inputs.py" check "$GITHUB_WORKSPACE/$role" "$GITHUB_WORKSPACE/artifacts/$role-inputs"
+            ROLE=$role SOURCE_SHA=$source_sha python3 - <<'PY'
+          import hashlib, json, os, pathlib, re, shutil, subprocess
+          role=os.environ['ROLE']; root=pathlib.Path(role); out=pathlib.Path('artifacts')
+          expected='dev.ipf.whitenoise.android'+os.environ['FIXTURE_SUFFIX']
+          candidates=[]
+          for metadata in (root/'app/build').rglob('output-metadata.json'):
+              data=json.loads(metadata.read_text())
+              if data.get('artifactType',{}).get('type')!='APK' or data.get('variantName')!='previewPlayRelease' or data.get('applicationId')!=expected: continue
+              for element in data.get('elements',[]):
+                  if any(f.get('filterType')=='ABI' and f.get('value')=='arm64-v8a' for f in element.get('filters',[])):
+                      candidate=(metadata.parent/element['outputFile']).resolve()
+                      if candidate.suffix=='.apk': candidates.append(candidate)
+          candidates=list(dict.fromkeys(candidates)); assert len(candidates)==1,candidates
+          sdk=pathlib.Path(os.environ['ANDROID_HOME']); signer=sorted((sdk/'build-tools').glob('*/apksigner'))[-1]
+          target=out/(role+'.apk')
+          subprocess.check_call([str(signer),'sign','--ks',os.environ['RUNNER_TEMP']+'/fixture.p12','--ks-key-alias','fixture','--ks-pass','pass:fixture-only','--key-pass','pass:fixture-only','--out',str(target),str(candidates[0])])
+          verification=subprocess.check_output([str(signer),'verify','--verbose','--print-certs',str(target)],text=True)
+          (out/(role+'-signature.txt')).write_text(verification)
+          certs=re.findall(r'certificate SHA-256 digest: ([0-9a-f]{64})',verification); assert len(set(certs))==1
+          manifest={'role':role,'source_sha':os.environ['SOURCE_SHA'],'workflow_sha':os.environ['GITHUB_SHA'],
+                    'run_id':os.environ['GITHUB_RUN_ID'],'package':expected,'variant':'previewPlayRelease',
+                    'profileable_shell':True,'diagnostic_compose_tracing':True,'runtime_tracing_version':'1.13.0-beta01','tracing_wire_version':'2.0.4','packaging_overlay':'diagnostic only: Compose runtime tracing with Tracing2 in-process backend, audited strict dependency inputs, isolated package, profileable manifest, compressed JNI',
+                    'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'certificate_sha256':certs[0],
+                    'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 or stock XL user12 only'}
+          (out/(role+'.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+          shutil.copyfile(root/'app/build/outputs/mapping/previewPlayRelease/mapping.txt',out/(role+'-mapping.txt'))
+          PY
+          done
+          python3 - <<'PY'
+          import json,pathlib
+          rows=[json.loads(pathlib.Path('artifacts',role+'.json').read_text()) for role in ['previous','after']]
+          for key in ['certificate_sha256','package','variant','native_artifact_sha256']:
+              assert len({row[key] for row in rows})==1,key
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: perf3439-compose-trace-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          compression-level: 6
           retention-days: 7
