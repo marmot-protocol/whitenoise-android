@@ -31,7 +31,7 @@ permissions:
 jobs:
   check:
     name: Bug-fix invariant gate
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Check out the base-revision gate script
@@ -39,7 +39,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: trusted
-          # The trusted tests read the base registry and this workflow, so check them out beside the script.
+          # Base-revision tests can inspect the workflow and registry beside the script.
           sparse-checkout: |
             .github/scripts
             .github/workflows/invariant-gate.yml

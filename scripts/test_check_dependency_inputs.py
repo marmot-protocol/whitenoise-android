@@ -151,6 +151,143 @@ class DependencyInputsTest(unittest.TestCase):
         (review / 'provenance.json').write_text(json.dumps(self.provenance))
         return capture, review
 
+    def stage_dual_capture(self):
+        """Use the producer's nested normal-pass layout without synthesizing a combined report."""
+        import copy
+        import shutil
+        capture, review = self.stage_capture()
+        (capture / 'source-inputs.json').write_text(json.dumps({
+            'schema': 1, 'source_sha': 'b' * 40, 'files': {'build.gradle.kts': 'plugins {}'}}))
+        app_lock = capture / 'candidate-inputs/app/gradle.lockfile'
+        app_lock.write_text(app_lock.read_text().strip() + ',fixtureBenchmark,fixtureNormal\n')
+        normal = self.root / 'normal-capture'
+        shutil.copytree(capture, normal)
+        normal.rename(capture / 'default-capture')
+        benchmark_rows = copy.deepcopy(self.observations)
+        benchmark_rows.append({'project': ':app', 'scope': 'project', 'configuration': 'fixtureBenchmark'})
+        normal_rows = copy.deepcopy(self.observations)
+        normal_rows.append({'project': ':app', 'scope': 'project', 'configuration': 'fixtureNormal'})
+        (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': benchmark_rows}))
+        (capture / 'default-capture/resolution.json').write_text(json.dumps({
+            'schema': 1, 'observations': normal_rows}))
+        return capture, review
+
+    def test_dual_capture_assembly_retains_raw_passes_and_actual_coverage_union(self):
+        """The primary trust root binds both unmodified reports and their observed configuration union."""
+        import gzip
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        destination = self.root / 'staged-candidate'
+        result = assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        expected = set(self.manifest['coverage']) | {
+            ':app project fixtureNormal', ':app project fixtureBenchmark'}
+        self.assertEqual(set(result['coverage']), expected)
+        self.assertEqual((10, 1), inputs.validate_bundle(destination))
+        for prefix in ('', 'default-capture/'):
+            for name in ('resolution.json', 'artifact-evidence.json', 'source-inputs.json'):
+                retained = destination / 'gradle/dependency-evidence' / (prefix + name + '.gz')
+                self.assertEqual(gzip.decompress(retained.read_bytes()), (capture / (prefix + name)).read_bytes())
+            retained = destination / 'gradle/dependency-evidence' / (prefix + 'captured-inputs/app/gradle.lockfile.gz')
+            self.assertEqual(gzip.decompress(retained.read_bytes()),
+                             (capture / (prefix + 'candidate-inputs/app/gradle.lockfile')).read_bytes())
+        nested = destination / 'gradle/dependency-evidence/default-capture/resolution.json.gz'
+        nested.write_bytes(b'changed normal report')
+        with self.assertRaisesRegex(ValueError, 'retained dependency evidence asset'):
+            inputs.validate_bundle(destination)
+
+    def test_dual_capture_assembly_rejects_different_nested_source_before_output(self):
+        """A complete second pass from another revision cannot supply extra coverage."""
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        normal = capture / 'default-capture'
+        (normal / 'source.txt').write_text('c' * 40 + '\n')
+        snapshot = json.loads((normal / 'source-inputs.json').read_text())
+        snapshot['source_sha'] = 'c' * 40
+        (normal / 'source-inputs.json').write_text(json.dumps(snapshot))
+        destination = self.root / 'staged-candidate'
+        with self.assertRaisesRegex(ValueError, 'Capture passes differ in source or build inputs'):
+            assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        self.assertFalse(destination.exists())
+
+    def test_dual_capture_assembly_rejects_different_nested_inputs_before_output(self):
+        """Matching revision labels do not hide different actual captured build inputs."""
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        path = capture / 'default-capture/source-inputs.json'
+        snapshot = json.loads(path.read_text()); snapshot['files']['build.gradle.kts'] = 'changed'
+        path.write_text(json.dumps(snapshot))
+        destination = self.root / 'staged-candidate'
+        with self.assertRaisesRegex(ValueError, 'Capture passes differ in source or build inputs'):
+            assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        self.assertFalse(destination.exists())
+
+    def test_dual_capture_assembly_rejects_conflicting_repeated_configuration(self):
+        """Repeated configuration names must retain the same actual component observations."""
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        path = capture / 'default-capture/resolution.json'
+        resolution = json.loads(path.read_text())
+        resolution['observations'][0]['components'] = [{'coordinate': 'example:changed:2.0'}]
+        path.write_text(json.dumps(resolution))
+        destination = self.root / 'staged-candidate'
+        with self.assertRaisesRegex(ValueError, 'Conflicting captured configuration'):
+            assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        self.assertFalse(destination.exists())
+
+    def test_dual_capture_assembly_rejects_unresolved_nested_configuration(self):
+        """A successful primary pass cannot hide failures in the retained normal pass."""
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        path = capture / 'default-capture/resolution.json'
+        resolution = json.loads(path.read_text()); resolution['observations'][0]['unresolved'] = ['missing']
+        path.write_text(json.dumps(resolution))
+        destination = self.root / 'staged-candidate'
+        with self.assertRaisesRegex(ValueError, 'Unresolved captured dependency configuration'):
+            assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        self.assertFalse(destination.exists())
+
+    def test_dual_capture_assembly_rejects_unaudited_normal_only_artifact(self):
+        """Coverage from the second pass cannot smuggle a runtime artifact outside the trust root."""
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        path = capture / 'default-capture/artifact-evidence.json'
+        path.write_text(json.dumps({'schema': 1, 'artifacts': [{
+            'coordinate': 'example:normal-only:2.0', 'name': 'normal-only-2.0.jar', 'sha256': 'b' * 64}]}))
+        destination = self.root / 'staged-candidate'
+        with self.assertRaisesRegex(ValueError, 'Captured artifact lacks reviewed verification'):
+            assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        self.assertFalse(destination.exists())
+
+    def test_dual_capture_assembly_checks_artifact_hashes_in_every_pass(self):
+        """A known coordinate does not authorize different bytes in either raw pass."""
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        destination = self.root / 'staged-candidate'
+        for prefix in ('', 'default-capture/'):
+            with self.subTest(prefix=prefix):
+                path = capture / (prefix + 'artifact-evidence.json')
+                original = path.read_bytes()
+                path.write_text(json.dumps({'schema': 1, 'artifacts': [{
+                    'coordinate': 'example:library:1.0', 'name': 'library-1.0.jar', 'sha256': 'b' * 64}]}))
+                with self.assertRaisesRegex(ValueError, 'Captured artifact lacks reviewed verification'):
+                    assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+                self.assertFalse(destination.exists())
+                path.write_bytes(original)
+
+    def test_dual_capture_assembly_accepts_audited_normal_only_artifact(self):
+        """The second pass may retain extra runtime rows when their bytes are already independently checked."""
+        import gzip
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_dual_capture()
+        path = capture / 'default-capture/artifact-evidence.json'
+        path.write_text(json.dumps({'schema': 1, 'artifacts': [{
+            'coordinate': 'example:library:1.0', 'name': 'library-1.0.jar', 'sha256': 'a' * 64}]}))
+        destination = self.root / 'staged-candidate'
+        assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        self.assertEqual((10, 1), inputs.validate_bundle(destination))
+        retained = destination / 'gradle/dependency-evidence/default-capture/artifact-evidence.json.gz'
+        self.assertEqual(gzip.decompress(retained.read_bytes()), path.read_bytes())
+
     def test_assembly_rejects_unsafe_retained_paths_before_writing_anything(self):
         """Traversal, absolute, foreign-prefix and symlinked retained paths fail before any file is written.
 

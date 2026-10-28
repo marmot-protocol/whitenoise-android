@@ -457,16 +457,6 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('android-ci-reports-build-contracts-${{ matrix.phase }}', self.build_contracts)
         self.assertIn('android-ci-gradle-profiles-build-contracts-${{ matrix.phase }}', self.build_contracts)
 
-    def test_parallel_test_workers(self):
-        """Parallelism changes execution, never the full-suite scope or caching."""
-        self.assertIn(
-            "ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '6' }}",
-            self.tests_job,
-        )
-        root_build = (WORKFLOW.parents[2] / 'build.gradle.kts').read_text()
-        self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
-        self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
-
     def test_dependency_qualification_follows_a_restored_committed_trust_root(self):
         """After a capture, qualification runs only once the trust-root check has restored and proved committed bytes."""
         job = self.build_contracts

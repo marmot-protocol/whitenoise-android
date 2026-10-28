@@ -53,7 +53,7 @@ jobs:
       contents: read
       issues: read
     name: Classify complete PR changes
-    runs-on: &wn-build-server ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "wn-build-server"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
@@ -66,14 +66,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Test conservative CI classification
         run: python3 -m unittest scripts/test_check_ci_changes.py
@@ -108,20 +103,15 @@ jobs:
   tooling-contracts:
     needs: changes
     name: Validate tooling and documentation contracts
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Validate committed dependency locks and supplier evidence
         run: python3 scripts/check_dependency_inputs.py
@@ -252,18 +242,13 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
     name: Verify real ZSP v2 publishing contract
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -291,7 +276,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
     name: Build contracts (${{ matrix.phase }})
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -302,14 +287,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
           fetch-depth: 0
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -326,7 +306,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
@@ -546,19 +525,14 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false' && needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true')
     name: Compose compiler metrics and stability reports
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -573,7 +547,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
@@ -648,7 +621,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck == 'true'
     name: Compile test sources (${{ matrix.flavor }})
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 35
     strategy:
       # Isolate each distribution's compiler lifetime and keep both diagnostics.
@@ -659,13 +632,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -682,7 +650,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
@@ -760,7 +727,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
     name: Android lint (${{ matrix.flavor }})
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       # Lint each distribution while build-contracts runs the shared style checks.
@@ -772,13 +739,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -795,7 +757,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
@@ -861,13 +822,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
     name: Unit tests, screenshots and coverage (${{ matrix.flavor }})
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      # Each fork peaks near 4 GB with its 2 GiB heap. Hosted runners have
-      # 16 GB; wn-build-server gives this job 30 GB and CPU priority. Eight
-      # forks there finished only 12s sooner than six, at 33 GB.
-      ORG_GRADLE_PROJECT_ciTestForks: ${{ github.event.pull_request.head.repo.fork && '2' || '6' }}
+      # Two test forks leave room for Gradle on 16 GiB hosted runners.
+      ORG_GRADLE_PROJECT_ciTestForks: '2'
     strategy:
       # Keep both variants' diagnostics.
       # PRs test Zapstore only; secondary-variant runs Play's flavor-sensitive tests.
@@ -884,13 +843,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -907,7 +861,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
@@ -1068,19 +1021,14 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && github.event_name == 'pull_request' && needs.changes.outputs.precheck != 'true' && needs.changes.outputs.full_matrix != 'true' && !github.event.pull_request.draft
     name: Compile and flavor-check Play
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          clean: false
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      # Persistent runners keep Gradle's incremental state between jobs.
-      - name: Prepare persistent workspace
-        run: bash .github/scripts/prepare-persistent-workspace.sh
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -1096,7 +1044,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-disabled: ${{ runner.environment == 'self-hosted' }}
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
@@ -1183,7 +1130,7 @@ jobs:
     name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft && ' (draft fast lane)' || '' }}
     needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, compile-tests, static-analysis, tests, secondary-variant]
     if: always()
-    runs-on: *wn-build-server
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every validation job to succeed
