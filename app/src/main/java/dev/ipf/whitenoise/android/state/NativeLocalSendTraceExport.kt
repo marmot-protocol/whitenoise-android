@@ -18,9 +18,10 @@ internal const val LOCAL_SEND_TRACE_MANIFEST = "local-send-trace-manifest.json"
 internal const val MAX_LOCAL_SEND_TRACE_BYTES = 256 * 1024
 private const val MAX_TRACE_DIRECTORY_ENTRIES = 32
 private const val MAX_TRACE_ROW_BYTES = 512
+private const val TRACE_WRITER_SCRATCH = "manifest.tmp"
 private val traceSegments = (0..3).map { "segment-$it.jsonl" }
 private val traceSourceNames = traceSegments + "manifest.json"
-private val traceClearNames = traceSourceNames + "manifest.tmp"
+private val traceKnownNames = traceSourceNames + TRACE_WRITER_SCRATCH
 internal val localSendTraceExportNames =
     traceSegments.map { "local-send-trace-$it" }.toSet() +
         setOf("local-send-trace-native-manifest.json", LOCAL_SEND_TRACE_MANIFEST)
@@ -128,7 +129,7 @@ internal fun nativeLocalSendTraceExport(marmotRoot: File): Map<String, ByteArray
             var seen = 0
             while (iterator.hasNext() && seen < MAX_TRACE_DIRECTORY_ENTRIES) {
                 val name = iterator.next().fileName.toString()
-                if (name !in traceClearNames) unknown += 1
+                if (name !in traceKnownNames) unknown += 1
                 seen += 1
             }
             listingFailed = iterator.hasNext()
@@ -153,7 +154,7 @@ internal fun nativeLocalSendTraceExport(marmotRoot: File): Map<String, ByteArray
                     }
                 }.toMap()
         }
-    val scratchPresent = Files.exists(directory.resolve("manifest.tmp"), LinkOption.NOFOLLOW_LINKS)
+    val scratchPresent = Files.exists(directory.resolve(TRACE_WRITER_SCRATCH), LinkOption.NOFOLLOW_LINKS)
     return exported + traceSnapshotManifest(started, status, files, unknown, scratchPresent)
 }
 
@@ -161,6 +162,8 @@ internal fun nativeLocalSendTraceExport(marmotRoot: File): Map<String, ByteArray
  * Deletes only this recorder's closed file allowlist, leaving its directory and every database alone.
  * The native writer detects its unlinked active inode, drops queued pre-clear rows, and reopens it.
  * A running writer may therefore create fresh post-clear records before this call returns.
+ * The writer's manifest scratch stays. Deleting it between the writer's write and rename fails that
+ * rename and stops the writer for the process, export never includes it, and the next refresh replaces it.
  */
 internal fun clearNativeLocalSendTrace(marmotRoot: File): Boolean {
     val directory = File(marmotRoot, LOCAL_SEND_TRACE_DIRECTORY).toPath()
@@ -169,7 +172,7 @@ internal fun clearNativeLocalSendTrace(marmotRoot: File): Boolean {
     checkNotNull(identity) { "Unable to clear local send trace directory" }
     var removed = false
     var failed = false
-    traceClearNames.forEach { name ->
+    traceSourceNames.forEach { name ->
         runCatching {
             check(traceDirectoryIdentity(marmotRoot.toPath(), directory) == identity)
             val path = directory.resolve(name)

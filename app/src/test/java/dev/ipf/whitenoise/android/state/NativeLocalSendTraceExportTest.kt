@@ -11,6 +11,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 @RunWith(RobolectricTestRunner::class)
 class NativeLocalSendTraceExportTest {
@@ -225,10 +226,27 @@ class NativeLocalSendTraceExportTest {
 
         assertTrue(directory.isDirectory)
         assertFalse(removable.exists())
-        assertFalse(temporary.exists())
+        assertEquals("scratch", temporary.readText())
         assertFalse(traceFile(root, "manifest.json").exists())
         assertEquals("history", retained.readText())
         assertEquals("other history", unknown.readText())
+    }
+
+    /** Clear keeps the writer's manifest scratch, so a rename already in flight still publishes its manifest. */
+    @Test
+    fun clearLeavesWriterScratchSoAnInFlightManifestRenameCompletes() {
+        val root = newTraceRoot()
+        traceFile(root, "segment-0.jsonl").writeText(row())
+        traceFile(root, "manifest.json").writeText(nativeManifest())
+        val scratch = traceFile(root, "manifest.tmp").apply { writeText(nativeManifest()) }
+
+        assertTrue(clearNativeLocalSendTrace(root))
+
+        assertFalse(traceFile(root, "segment-0.jsonl").exists())
+        assertFalse(traceFile(root, "manifest.json").exists())
+        // The native writer's next step after writing its scratch — a failed rename would stop it.
+        Files.move(scratch.toPath(), traceFile(root, "manifest.json").toPath(), StandardCopyOption.ATOMIC_MOVE)
+        assertEquals(nativeManifest(), traceFile(root, "manifest.json").readText())
     }
 
     /** Native rotates only four known filenames; every exported entry still respects the single-file cap. */
