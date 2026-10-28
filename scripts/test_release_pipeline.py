@@ -32,6 +32,7 @@ def load(name, path):
 bundle = load('release_bundle', 'scripts/release_bundle.py')
 metadata = load('release_metadata', 'scripts/check-release-metadata.py')
 apk_signature = load('apk_signature', 'scripts/verify_apk_signature.py')
+publisher = load('zapstore_publish', 'scripts/zapstore_publish.py')
 VERSION = '2026.9.9'
 SOURCE = 'a' * 40
 RUN_ID = '12345'
@@ -121,9 +122,13 @@ class BundleTests(unittest.TestCase):
             self.verify()
 
     def test_source_version_mismatch_is_rejected(self):
-        with patch.object(bundle, 'command', return_value=b'versionName = "2026.1.1"'):
-            with self.assertRaisesRegex(ValueError, 'source commit'):
+        policy = f'ZSP_VERSION={self.manifest["zspVersion"]}\n'.encode()
+        gradle = (f'applicationId = "{self.manifest["applicationId"]}"\n'
+                  f'versionCode = {self.manifest["versionCode"]}\nversionName = "2026.1.1"\n').encode()
+        with patch.object(bundle, 'command', side_effect=[policy, gradle]) as calls:
+            with self.assertRaisesRegex(ValueError, 'Bundle identity differs'):
                 bundle.verify_source_metadata(self.path, self.manifest)
+        self.assertEqual(calls.call_count, 2)
 
 
     def test_producer_tool_version_must_match_immutable_source_policy(self):
@@ -273,6 +278,22 @@ class PublicationGuardTests(unittest.TestCase):
         self.assertIn('unknown argument: --skip-build', result.stderr)
 
 
+class PublisherPolicyTests(unittest.TestCase):
+    def test_publisher_npub_is_derived_from_single_hex_pin(self):
+        self.assertEqual(publisher.publisher_npub(bundle.properties()['ZAPSTORE_PUBLISHER_PUBKEY']),
+                         'npub1whtn0s68y3cs98zysa4nxrfzss5g5snhndv35tk5m2sudsr7ltms48r3ec')
+        for invalid in ('', 'a' * 63, 'A' * 64, 'private-auth-url'):
+            with self.assertRaises(ValueError):
+                publisher.publisher_npub(invalid)
+
+    def test_stable_v2_error_codes_are_retained_without_free_text(self):
+        for code in ('invalid_arguments', 'apk_not_checked', 'apk_selection_required', 'source_failed',
+                     'no_apk', 'too_many_candidates', 'publish_failed', 'signer_unavailable'):
+            self.assertEqual(publisher.error_code(dict(error=dict(code=code, detail='private-auth-url'))), code)
+        self.assertEqual(publisher.error_code(dict(error=dict(code='private-auth-url'))), 'unclassified_failure')
+        self.assertEqual(publisher.error_code(dict(error=dict(code='invalid_config'))), 'unclassified_failure')
+
+
 class ZapstoreIntegrationTests(unittest.TestCase):
     def publication_fixture(self, root, signer_matches=True, zsp_body='', readback_body='', producer_version=None):
         (root / 'scripts').mkdir()
@@ -336,7 +357,7 @@ class ZapstoreIntegrationTests(unittest.TestCase):
         fake.chmod(0o755)
         readback = root / 'fake-readback'
         readback.write_text('#!/usr/bin/env python3\nimport os,sys,json\n'
-                            'with open(os.environ["ZSP_CALL_LOG"], "a") as log: log.write("readback "+" ".join(sys.argv[1:])+"\\n")\n'
+                            f'with open({str(root / "calls")!r}, "a") as log: log.write("readback "+" ".join(sys.argv[1:])+"\\n")\n'
                             'mode = sys.argv[1]\n'
                             f'{readback_body}\n'
                             'print(json.dumps(dict(App="a"*64,Release="d"*64,Asset="b"*64,URL="https://cdn.zapstore.dev/fixture.apk")))\n')
@@ -424,6 +445,14 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                 self.assertNotIn('private-auth',result.stdout+result.stderr+receipt)
                 self.assertNotIn('bunker://',receipt)
                 self.assertIn('submission_unknown' if body else 'pending',receipt)
+
+    def test_readback_failure_exposes_public_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            body = 'if mode == "verify": print("error: CDN blob size differs from reviewed APK", file=sys.stderr); sys.exit(1)'
+            result,calls=self.publication_fixture(Path(directory),readback_body=body)(VERIFY_ONLY='true')
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('CDN blob size differs',result.stderr)
+            self.assertFalse(any('--json publish' in call for call in calls))
 
     def test_existing_public_candidate_is_only_verified(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -20,7 +20,6 @@ import zipfile
 from release_bundle import (ROOT, check_tag, command, properties, require,
                             verify_bundle, verify_source_metadata)
 
-NPUB = "npub1whtn0s68y3cs98zysa4nxrfzss5g5snhndv35tk5m2sudsr7ltms48r3ec"
 WORKFLOW = "Android Zapstore - PUBLIC Publication"
 STATE = ROOT / "build/zapstore-publication"
 
@@ -55,8 +54,28 @@ def error_code(document):
     # A remote free-text field, URL, or unknown error must not leak into logs.
     known = {"proof_required", "proof_unauthorized", "signer_unavailable", "release_already_published",
              "release_downgrade", "no_new_apk", "publish_rejected", "upload_rejected",
-             "rate_limited", "temporary_failure", "cancelled", "invalid_apk", "invalid_config"}
+             "rate_limited", "temporary_failure", "cancelled", "invalid_apk", "invalid_arguments",
+             "apk_not_checked", "apk_selection_required", "source_failed", "no_apk",
+             "too_many_candidates", "publish_failed"}
     return code if code in known else "unclassified_failure"
+
+
+def publisher_npub(public_key):
+    """NIP-19 Bech32 representation of the single pinned hexadecimal public key."""
+    require(re.fullmatch(r"[0-9a-f]{64}", public_key), "Invalid publisher public key")
+    value = int(public_key, 16) << 4  # 256 bits, padded to 52 five-bit values.
+    data = [(value >> (5 * shift)) & 31 for shift in reversed(range(52))]
+    hrp = "npub"
+    checksum = 1
+    for part in [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp] + data + [0] * 6:
+        top = checksum >> 25
+        checksum = ((checksum & 0x1ffffff) << 5) ^ part
+        for bit, generator in enumerate((0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)):
+            if (top >> bit) & 1:
+                checksum ^= generator
+    checksum ^= 1
+    alphabet = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    return hrp + "1" + "".join(alphabet[v] for v in data + [(checksum >> (5 * i)) & 31 for i in reversed(range(6))])
 
 
 def validate_check(document, manifest, apk, policy):
@@ -66,10 +85,11 @@ def validate_check(document, manifest, apk, policy):
                 "certificate_hash": policy["APP_SIGNING_SHA256"]}
     require(isinstance(document.get("apk"), dict) and all(document["apk"].get(k) == v for k, v in expected.items()),
             "ZSP APK identity differs from the reviewed candidate")
-    require(document.get("signer") == NPUB, "ZSP signer differs from the pinned publisher")
+    npub = publisher_npub(policy["ZAPSTORE_PUBLISHER_PUBKEY"])
+    require(document.get("signer") == npub, "ZSP signer differs from the pinned publisher")
     proof = document.get("proof")
     require(isinstance(proof, dict), "C1 proof missing; the Android key holder must create it locally")
-    require(document.get("authorized") is True and NPUB in (proof.get("owner"), proof.get("delegate")),
+    require(document.get("authorized") is True and npub in (proof.get("owner"), proof.get("delegate")),
             "C1 proof does not authorize the pinned publisher")
     try:
         expiry = dt.datetime.fromisoformat(proof["expires_at"].replace("Z", "+00:00"))
@@ -115,14 +135,23 @@ def readback(binary, manifest, apk, policy, expected_id=None):
     if expected_id:
         args += ["-release-id", expected_id]
     try:
-        result = subprocess.run(args, capture_output=True, timeout=timeout("ZSP_READBACK_TIMEOUT_SECONDS", 600))
+        # This verifier receives public inputs only. Its diagnostics contain
+        # relay/CDN facts, never ZSP signer output or credential environment.
+        env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR") if k in os.environ}
+        result = subprocess.run(args, capture_output=True, env=env,
+                                timeout=timeout("ZSP_READBACK_TIMEOUT_SECONDS", 600))
         if result.returncode == 0:
             got = json.loads(result.stdout)
             require(all(re.fullmatch(r"[0-9a-f]{64}", got.get(k, "")) for k in ("App", "Release", "Asset")),
                     "Invalid public verification receipt")
             return got
-    except (subprocess.TimeoutExpired, ValueError):
-        pass
+        lines = result.stderr.decode(errors="replace").strip().splitlines()
+        if lines:
+            print("Zapstore public readback failed: " + lines[-1][-1000:], file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print("Zapstore public readback timed out", file=sys.stderr)
+    except ValueError:
+        print("Zapstore public readback returned an invalid verification receipt", file=sys.stderr)
     return None
 
 
@@ -147,7 +176,6 @@ def main():
                     manifest_sha256=os.environ["MANIFEST_SHA256"], publisher=policy["ZAPSTORE_PUBLISHER_PUBKEY"],
                     zsp_version=policy["ZSP_VERSION"], run_id=os.environ.get("GITHUB_RUN_ID"),
                     run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT", "1"))
-    require(policy["ZSP_PUBLISHER_NPUB"] == NPUB, "Publisher npub policy mismatch")
     receipt_path = STATE / "receipt.json"
     if phase == "publish":
         state = json.loads((STATE / "intent.json").read_text())
@@ -193,15 +221,6 @@ def main():
             apk_dir = listing / "build/production-release"
             apk_dir.mkdir(parents=True)
             shutil.copyfile(bundle / apk, apk_dir / apk)
-            # Replace only the source selector; reviewed metadata and media stay intact.
-            yaml = listing / "zapstore.yaml"
-            text = yaml.read_text()
-            text, count = re.subn(r"^release_source:.*$", "release_source: ./build/production-release/*.apk", text, flags=re.MULTILINE)
-            require(count == 1, "Listing needs one release_source")
-            text = re.sub(r"^metadata_sources:.*(?:\n[ \t]+.*)*", "metadata_sources: []", text, flags=re.MULTILINE)
-            if not re.search(r"^metadata_sources:", text, re.MULTILINE):
-                text += "\nmetadata_sources: []\n"
-            yaml.write_text(text)
             # No inherited HOTBOX/keystore, credential files, or unrelated service secrets.
             env = {k: os.environ[k] for k in ("PATH", "HOME", "TMPDIR") if k in os.environ}
             env.update(SIGN_WITH=connection, XDG_CONFIG_HOME=str(config), RELAYS=policy["ZAPSTORE_RELAY"],

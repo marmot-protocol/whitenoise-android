@@ -149,7 +149,9 @@ This dependency checkout never supplies the publishing binary.
 CI runs `scripts/test-zsp-contract.sh` with a synthetic APK, a disposable Android
 key/C1 proof, a disposable Nostr key, a loopback NIP-46 signer, a loopback catalog
 and a loopback Blossom server. It exercises the checksummed real v2 binary,
-including C1 validation, authenticated upload, pending JSON, signed event IDs,
+including the production `--json check --channel main` authorization gate,
+`publish --apk-hash <reviewed-hash> --channel main`, C1 validation, authenticated
+upload, pending JSON, signed event IDs,
 release-to-asset references and restoration of the preseeded client identity.
 The production readback tool then verifies the accepted event ID, signed metadata
 and exact APK bytes served by the loopback CDN.
@@ -401,15 +403,6 @@ candidate's C1 proof, upload, publication and updater still need their own check
 gh workflow run android-zapstore-signer-test.yml --ref master
 ```
 
-For an isolated candidate-tool rehearsal on a branch, use the same workflow's
-**`fixture_only: true`** input. This runs the release-tooling regressions and real
-v2 loopback fixture on a GitHub-hosted runner with no protected environment or
-production secrets. It does not replace the PR's required aggregate checks:
-
-```bash
-gh workflow run android-zapstore-signer-test.yml --ref <candidate-branch> -f fixture_only=true
-```
-
 ### Publish the reviewed candidate
 
 This step makes the release public. Do not use it for a build rehearsal.
@@ -458,7 +451,8 @@ from this master workflow blocks another submission for that version. Intent
 artifacts are retained for 90 days; download and preserve them with release
 evidence. Beyond that retention window or after artifact deletion, the automatic
 barrier cannot prove a previous submission absent: use verification only and
-reconcile the retained receipt/relay/CDN before any newly authorized attempt.
+reconcile the retained receipt/relay/CDN using the recovery procedure below
+before any newly authorized attempt.
 An intent may exist even if no public write occurred (for example, cancellation
 after its upload); that still requires reconciliation rather than a blind retry.
 
@@ -469,6 +463,50 @@ not enable Zapstore's external forge polling or tag-triggered publication; publi
 approval remains separate from build/GitHub/Play internal testing.
 `org.parres.whitenoise` is a different application and cannot migrate installed
 data by publishing this package.
+
+### Recover a failed submission without losing its evidence
+
+The intent barrier deliberately survives a failed job. A fresh dispatch or a
+workflow rerun does not authorize a second write. There is one holder-operated
+reset procedure; it is never performed automatically by CI:
+
+1. Stop concurrent publication for this version. Download **every** matching
+   `zapstore-submission-intent-<version>` artifact and the corresponding
+   `zapstore-publication-<run>-<attempt>` receipt. Match the original run and
+   attempt recorded in each intent, not a later verification-only rerun. Save
+   the artifacts, their GitHub IDs/run URLs and SHA-256 checksums in the release
+   evidence outside the immutable candidate directory.
+2. Establish the failure stage. An original receipt with `not_submitted` proves
+   this script never invoked the public CLI. `submission_started`,
+   `submission_unknown`, `pending`, a missing receipt, or an exit/error code
+   alone does **not** prove absence of writes. In those cases keep verification
+   only until Zapstore confirms the exact release/asset/hash has no accepted or
+   pending submission. A public relay EOSE with no event is insufficient: the
+   buffer zone can hide accepted events. Rate limiting or signer failure alone
+   is also insufficient evidence.
+3. A release approver must independently confirm the same reviewed candidate,
+   the complete prior-attempt evidence, no matching relay release/asset events,
+   and no accepted/pending Zapstore submission. Record explicit authorization
+   **`RESET ZAPSTORE <version> AFTER RUN <run>/<attempt>`** with the reconciliation
+   evidence. If any of those facts remains unknown, do not reset; retain the
+   barrier and use verification only or prepare a newly versioned candidate.
+4. Only after that authorization, a maintainer may remove the specific GitHub
+   intent artifact(s) identified in step 1, using
+   `gh api --method DELETE repos/marmot-protocol/whitenoise-android/actions/artifacts/<artifact-id>`.
+   Preserve the downloaded audit copies and record the deletion IDs/time and
+   approver. Never delete the workflow runs, receipts, signed events, or release
+   evidence to clear the barrier. No reset/deletion is part of this migration.
+5. Repair the diagnosed cause and run the protected signer test where relevant.
+   Dispatch a **new** public-publication run for the same reviewed build,
+   version and manifest, with `verify_only: false`, the normal version-specific
+   confirmation, and fresh independent `zapstore-production` approval. The new
+   run repeats preflight and records a new intent before its single attempt.
+
+This reset is a separately authorized operation, not a retry inferred from
+`retryable`, a timeout, or an absent public event. If Zapstore cannot establish
+whether a previous submission exists, leave the original version locked. The
+public readback failure logs expose the verifier's public relay/CDN reason
+(for example, missing release versus wrong blob size); signer output stays private.
 
 ### Diagnose remote-signer reply delivery
 

@@ -30,6 +30,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/nbd-wtf/go-nostr/nip46"
 )
 
@@ -239,7 +240,7 @@ func rehearse() error {
 	if err := os.WriteFile(filepath.Join(temporary, "zapstore.yaml"), []byte(listing), 0600); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, binary, "--json", "publish", "--quiet", "--skip-metadata", "--no-compress", "--commit", strings.Repeat("a", 40), "zapstore.yaml")
+	cmd := exec.CommandContext(ctx, binary, "--json", "publish", "--quiet", "--skip-metadata", "--no-compress", "--channel", "main", "--apk-hash", public.hash, "--commit", strings.Repeat("a", 40), "zapstore.yaml")
 	cmd.Dir = temporary
 	// Pass no inherited store/signing credentials; HOME is read only so ZSP and
 	// this harness agree on the platform config path. The unique key is removed.
@@ -249,6 +250,38 @@ func rehearse() error {
 		}
 	}
 	cmd.Env = append(cmd.Env, "SIGN_WITH=bunker://"+signerPub+"?relay=ws://"+listener.Addr().String(), "RELAYS="+strings.Replace(catalog.URL, "http://", "ws://", 1), "BLOSSOM_URL="+blob.URL)
+	// Exercise the actual production decision gate with the same persisted
+	// NIP-46 client, proof and catalog, before invoking the publication flags.
+	check := exec.CommandContext(ctx, binary, "--json", "check", "--channel", "main", "zapstore.yaml")
+	check.Dir, check.Env = cmd.Dir, cmd.Env
+	checked, err := check.Output()
+	if err != nil {
+		return fmt.Errorf("real v2 read-only preflight failed: %w", err)
+	}
+	var preflight struct {
+		OK         bool   `json:"ok"`
+		Operation  string `json:"operation"`
+		Signer     string `json:"signer"`
+		Authorized bool   `json:"authorized"`
+		Proof      struct {
+			Owner string `json:"owner"`
+		} `json:"proof"`
+		Published int64 `json:"published_version_code"`
+		APK       struct {
+			App     string `json:"app_id"`
+			Version string `json:"version_name"`
+			Code    int64  `json:"version_code"`
+			Hash    string `json:"hash"`
+			Cert    string `json:"certificate_hash"`
+		} `json:"apk"`
+	}
+	npub, _ := nip19.EncodePublicKey(signerPub)
+	if json.Unmarshal(checked, &preflight) != nil || !preflight.OK || preflight.Operation != "check" ||
+		preflight.Signer != npub || !preflight.Authorized || preflight.Proof.Owner != npub || preflight.Published != 0 ||
+		preflight.APK.App != "invalid.example.zspfixture" || preflight.APK.Version != "2026.9.9" || preflight.APK.Code != 1 ||
+		preflight.APK.Hash != public.hash || preflight.APK.Cert != public.cert {
+		return fmt.Errorf("real v2 preflight identity, authorization or published version mismatch")
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	publishStarted := time.Now()
@@ -297,7 +330,7 @@ func rehearse() error {
 	return json.NewEncoder(os.Stdout).Encode(map[string]any{
 		"version": "v2.0.0", "eventKinds": kinds,
 		"signerAuthor": signerPub, "preseededClientRestored": true,
-		"nip46Requests": relay.requests, "eventsSentToSignerRelay": relay.forbidden, "catalog": "loopback only", "blossom": "loopback only", "status": document.Status, "c1ProofVerifiedByCLI": true, "verifiedPublicReadback": true,
+		"nip46Requests": relay.requests, "eventsSentToSignerRelay": relay.forbidden, "catalog": "loopback only", "blossom": "loopback only", "status": document.Status, "c1ProofVerifiedByCLI": true, "readOnlyPreflightVerified": true, "verifiedPublicReadback": true,
 		"signerRelay": "loopback only", "keyDirectory": "os.UserConfigDir()/zsp/bunker-keys",
 	})
 }
