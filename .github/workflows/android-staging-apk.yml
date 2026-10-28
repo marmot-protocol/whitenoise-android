@@ -366,19 +366,19 @@ jobs:
           for role in previous after; do
             mkdir -p "$role/app/src/preview"
             test ! -e "$role/app/src/preview/AndroidManifest.xml"
-            cat > "$role/app/src/preview/AndroidManifest.xml" <<'XML'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <application><profileable android:shell="true" /></application>
-          </manifest>
-          XML
+            cp tooling/.github/perf3439/diagnostic-manifest.xml "$role/app/src/preview/AndroidManifest.xml"
+            source="$role/app/src/preview/java/dev/ipf/whitenoise/android/perf3439/Perf3439TraceInitializer.kt"
+            test ! -e "$source"
+            mkdir -p "$(dirname "$source")"
+            cp tooling/.github/perf3439/Perf3439TraceInitializer.kt "$source"
           done
           cat > "$RUNNER_TEMP/perf3439.gradle" <<'GRADLE'
           gradle.beforeProject { project ->
               if (project.path != ':app') return
               project.plugins.withId('com.android.application') {
                   project.afterEvaluate {
-                      project.dependencies.add('previewPlayReleaseRuntimeOnly', 'androidx.compose.runtime:runtime-tracing')
-                      project.dependencies.add('previewPlayReleaseRuntimeOnly', 'androidx.tracing:tracing-wire:2.0.4')
+                      project.dependencies.add('previewPlayReleaseImplementation', 'androidx.compose.runtime:runtime-tracing')
+                      project.dependencies.add('previewPlayReleaseImplementation', 'androidx.tracing:tracing-wire:2.0.4')
                   }
                   project.tasks.register('resolvePerf3439TraceInputs') {
                       doLast {
@@ -417,6 +417,8 @@ jobs:
           proof="$GITHUB_WORKSPACE/tooling/.github/perf3439/trace-supplier-proof.json"
           cp "$proof" artifacts/trace-supplier-proof.json
           cp "$RUNNER_TEMP/perf3439.gradle" artifacts/diagnostic-overlay.gradle
+          cp tooling/.github/perf3439/diagnostic-manifest.xml artifacts/diagnostic-manifest.xml
+          cp tooling/.github/perf3439/Perf3439TraceInitializer.kt artifacts/Perf3439TraceInitializer.kt
           for role in previous after; do
             evidence="$GITHUB_WORKSPACE/artifacts/$role-inputs"
             python3 "$audit" snapshot "$GITHUB_WORKSPACE/$role" "$evidence"
@@ -463,7 +465,7 @@ jobs:
           certs=re.findall(r'certificate SHA-256 digest: ([0-9a-f]{64})',verification); assert len(set(certs))==1
           manifest={'role':role,'source_sha':os.environ['SOURCE_SHA'],'workflow_sha':os.environ['GITHUB_SHA'],
                     'run_id':os.environ['GITHUB_RUN_ID'],'package':expected,'variant':'previewPlayRelease',
-                    'profileable_shell':True,'diagnostic_compose_tracing':True,'runtime_tracing_version':'1.13.0-beta01','tracing_wire_version':'2.0.4','packaging_overlay':'diagnostic only: Compose runtime tracing with Tracing2 in-process backend, audited strict dependency inputs and supplier-reviewed diagnostic notices, isolated package, profileable manifest, compressed JNI',
+                    'profileable_shell':True,'diagnostic_compose_tracing':True,'runtime_tracing_version':'1.13.0-beta01','tracing_wire_version':'2.0.4','ordered_tracing_bootstrap':'ConnectedProfilerTracingInitializer before ComposeTracingInitializer via owned diagnostic initializer','packaging_overlay':'diagnostic only: Compose runtime tracing with Tracing2 in-process backend, audited strict dependency inputs and supplier-reviewed diagnostic notices, isolated package, profileable manifest, compressed JNI',
                     'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'certificate_sha256':certs[0],
                     'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 or stock XL user12 only'}
           (out/(role+'.json')).write_text(json.dumps(manifest,indent=2)+'\n')

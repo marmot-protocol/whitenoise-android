@@ -115,16 +115,22 @@ for config in before:
         assert before[config] == after[config], config
         continue
     prior, current = before[config], after[config]
-    if config == 'previewPlayReleaseCompileClasspath':
-        assert prior == current, 'Diagnostic runtime overlay changed compilation dependencies'
-        continue
+    # Only this diagnostic lane compiles the owned ordering initializer against
+    # the same hash-reviewed tracing modules it packages. Existing pins stay exact.
     assert not set(prior) - set(current), (config, 'Removed dependency')
     for key in set(prior) | set(current):
         if prior.get(key) == current.get(key):
             continue
-        assert (key not in prior and allowed.get(key) == current.get(key)), (config, key, prior.get(key), current.get(key))
+        if config == 'previewPlayReleaseCompileClasspath' and key == 'androidx.startup:startup-runtime':
+            # The wire initializer's API requires 1.2.0, already trusted and
+            # packaged by this source's normal runtime; only diagnostic compile moves.
+            assert prior.get(key) == '1.1.1' and current.get(key) == '1.2.0'
+            assert before['previewPlayReleaseRuntimeClasspath'].get(key) == '1.2.0'
+        else:
+            assert (key not in prior and allowed.get(key) == current.get(key)), (config, key, prior.get(key), current.get(key))
         changes.setdefault(config, {})[key] = [prior.get(key), current.get(key)]
-    assert all(current.get(k) == v for k, v in allowed.items()), config
+    required = {'androidx.compose.runtime:runtime-tracing', 'androidx.tracing:tracing-wire'} if config == 'previewPlayReleaseCompileClasspath' else set(allowed)
+    assert all(current.get(k) == allowed[k] for k in required), config
 resolved = json.loads((root / 'trace-resolved-graph.json').read_text())
 assert set(resolved) == configs
 assert all(resolved[c] == after[c] for c in configs), 'Resolved graph differs from audited locks'

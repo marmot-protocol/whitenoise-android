@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <profileable android:shell="true" />
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.compose.runtime.tracing.ComposeTracingInitializer"
+                tools:node="remove" />
+            <meta-data
+                android:name="dev.ipf.whitenoise.android.perf3439.Perf3439TraceInitializer"
+                android:value="androidx.startup" />
+        </provider>
+    </application>
+</manifest>
