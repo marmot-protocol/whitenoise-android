@@ -301,15 +301,15 @@
   ],
   "files": {
     "app/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "app/gradle.lockfile": "2f7bf0b37c42fe12ce1acb2ffe96875d56547581300ee3429f8142ed02689765",
+    "app/gradle.lockfile": "b3e16f945c14c3c412900df3cffbbe835a7617e1b9f6512ca779932eb7375654",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "benchmark/gradle.lockfile": "c258b6e3914c1935d8eedbef4e8a238bba924f89a57c1648112ef0a8b9ee4351",
+    "benchmark/gradle.lockfile": "6828e1c3d4902e16d9d7a8c8373a4200df07ef34b50c4065c2f0b6c4158c8f4e",
     "buildscript-gradle.lockfile": "372f4c86a0256c61f27b2ec649f2e891f53d71e0d2115cc7ab4bc4ec5d7de6bb",
     "cryptoBenchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "cryptoBenchmark/gradle.lockfile": "b36336785ab80cd067839a7c9ba7d6ba91ca5db8d16aa2a954b98ba1e5431f36",
     "fuzz/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "fuzz/gradle.lockfile": "1a058eacc9b9859109a224af8eb8e18d3eb721405af592ec93f9f3e3b81d923a",
-    "gradle/verification-metadata.xml": "e50ce9996a7e4ee8f08058c7f0b0fad125f54d8f49b9752540e35903269867cb",
+    "gradle/verification-metadata.xml": "95b4f01291bf4c53d669cd69d240f4b44580a4073d0dbe3271f09d36d5a6a691",
     "settings-gradle.lockfile": "e58bb2ed80db9f829601a658d7c33b9802eb7d2191c31e79c28e01f14c225926"
   },
   "post_lock_selection": [
@@ -838,27 +838,16 @@
       "nonliteral_optional_references": [],
       "reason": "Normal strict lint/unit/fuzz resolution exposed bc-jdk18on-bom 1.85 and guava-parent 33.6.0-jre POMs missing from the warm-cache capture. Independently checked exact POM/module counterparts for already reviewed coordinates and recursively followed supplier POM parent/imported-BOM ancestry. Each added record authorizes metadata only, with retained official HTTPS payload SHA-256; no binary, wildcard trust or resolution-lock exception is added.",
       "scope": "metadata"
-    },
-    {
-      "configuration": "benchmarkRelease AndroidTest configurations",
-      "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/39770133039/artifacts/12421094775",
-      "project": ":app",
-      "reason": "The retained normal and benchmark captures from source revision 8066f421b677e98bfb081968f26dd22854143c2e agree on their shared configurations and existing artifact checksums. Restore their twelve benchmark AndroidTest configuration memberships using the separately reviewed current master lock selections, including tracing 2.0.4 in place of the historical captures' tracing 2.0.3. This is a reviewed lock-membership continuation, not a fresh benchmark capture of the current source; supplier records, verification metadata and root plugin lock selections remain unchanged.",
-      "retained": {
-        "path": "gradle/dependency-evidence/post-lock-selection/benchmark-android-test-configurations.json.gz",
-        "sha256": "b78881ed34baa0b924cbf2a8b53778aa0e7d6f90b5775efd50b132e431ff18c5"
-      },
-      "scope": "project"
     }
   ],
   "reviewed_from": {
-    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/40517908164/artifacts/12752230942",
+    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/40589939393/artifacts/12776540156",
     "repository": "marmot-protocol/whitenoise-android",
     "retained": {
       "path": "gradle/dependency-evidence/capture.json",
-      "sha256": "c91afa3d971577736ff118fdf6270d54b8f095085eb18082a2df42dab7c78293"
+      "sha256": "65e6c423d156027b274af7f50f037fbd466699adeb9174ff05581e593e6f9041"
     },
-    "source_sha": "003dbff06340ce7644032ef7fcac4a837020727f"
+    "source_sha": "9c064e9b0ce7acad2d64ac85697873b69cc2f26e"
   },
   "schema": 1,
   "supplemental_tools": {
@@ -1892,6 +1881,7 @@
     "com.google.firebase:firebase-annotations:18.0.0/firebase-annotations-18.0.0.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-annotations/18.0.0/firebase-annotations-18.0.0.pom.sha256",
     "com.google.firebase:firebase-bom:35.0.0/firebase-bom-35.0.0.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-bom/35.0.0/firebase-bom-35.0.0.pom.sha256",
     "com.google.firebase:firebase-bom:35.0.2/firebase-bom-35.0.2.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-bom/35.0.2/firebase-bom-35.0.2.pom.sha256",
+    "com.google.firebase:firebase-bom:35.1.0/firebase-bom-35.1.0.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-bom/35.1.0/firebase-bom-35.1.0.pom",
     "com.google.firebase:firebase-common:23.0.0/firebase-common-23.0.0.aar": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-common/23.0.0/firebase-common-23.0.0.aar",
     "com.google.firebase:firebase-common:23.0.0/firebase-common-23.0.0.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-common/23.0.0/firebase-common-23.0.0.pom.sha256",
     "com.google.firebase:firebase-components:20.0.0/firebase-components-20.0.0.aar": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-components/20.0.0/firebase-components-20.0.0.aar",
@@ -1916,6 +1906,8 @@
     "com.google.firebase:firebase-measurement-connector:19.0.0/firebase-measurement-connector-19.0.0.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-measurement-connector/19.0.0/firebase-measurement-connector-19.0.0.pom.sha256",
     "com.google.firebase:firebase-messaging:26.0.0/firebase-messaging-26.0.0.aar": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-messaging/26.0.0/firebase-messaging-26.0.0.aar",
     "com.google.firebase:firebase-messaging:26.0.0/firebase-messaging-26.0.0.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-messaging/26.0.0/firebase-messaging-26.0.0.pom.sha256",
+    "com.google.firebase:firebase-messaging:26.0.1/firebase-messaging-26.0.1.aar": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-messaging/26.0.1/firebase-messaging-26.0.1.aar",
+    "com.google.firebase:firebase-messaging:26.0.1/firebase-messaging-26.0.1.pom": "https://dl.google.com/dl/android/maven2/com/google/firebase/firebase-messaging/26.0.1/firebase-messaging-26.0.1.pom",
     "com.google.flatbuffers:flatbuffers-java:1.12.0/flatbuffers-java-1.12.0.jar": "https://repo.maven.apache.org/maven2/com/google/flatbuffers/flatbuffers-java/1.12.0/flatbuffers-java-1.12.0.jar",
     "com.google.flatbuffers:flatbuffers-java:1.12.0/flatbuffers-java-1.12.0.pom": "https://repo.maven.apache.org/maven2/com/google/flatbuffers/flatbuffers-java/1.12.0/flatbuffers-java-1.12.0.pom",
     "com.google.gms.google-services:com.google.gms.google-services.gradle.plugin:4.5.0/com.google.gms.google-services.gradle.plugin-4.5.0.pom": "https://dl.google.com/dl/android/maven2/com/google/gms/google-services/com.google.gms.google-services.gradle.plugin/4.5.0/com.google.gms.google-services.gradle.plugin-4.5.0.pom.sha256",
