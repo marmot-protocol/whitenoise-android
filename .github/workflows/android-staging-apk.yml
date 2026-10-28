@@ -414,6 +414,7 @@ jobs:
                 --no-daemon --stacktrace -I "$RUNNER_TEMP/perf3439.gradle"
             )
             python3 "$audit" audit "$GITHUB_WORKSPACE/$role" "$evidence" "$proof"
+            python3 "$GITHUB_WORKSPACE/tooling/.github/perf3439/prepare_trace_notices.py" prepare "$GITHUB_WORKSPACE/$role" "$evidence"
           done
       - name: Build, sign and retain both diagnostic variants
         shell: bash
@@ -428,6 +429,7 @@ jobs:
                 --build-cache --no-daemon --stacktrace -I "$RUNNER_TEMP/perf3439.gradle"
             )
             python3 "$GITHUB_WORKSPACE/tooling/.github/perf3439/audit_trace_inputs.py" check "$GITHUB_WORKSPACE/$role" "$GITHUB_WORKSPACE/artifacts/$role-inputs"
+            python3 "$GITHUB_WORKSPACE/tooling/.github/perf3439/prepare_trace_notices.py" check "$GITHUB_WORKSPACE/$role" "$GITHUB_WORKSPACE/artifacts/$role-inputs"
             ROLE=$role SOURCE_SHA=$source_sha python3 - <<'PY'
           import hashlib, json, os, pathlib, re, shutil, subprocess
           role=os.environ['ROLE']; root=pathlib.Path(role); out=pathlib.Path('artifacts')
@@ -449,7 +451,7 @@ jobs:
           certs=re.findall(r'certificate SHA-256 digest: ([0-9a-f]{64})',verification); assert len(set(certs))==1
           manifest={'role':role,'source_sha':os.environ['SOURCE_SHA'],'workflow_sha':os.environ['GITHUB_SHA'],
                     'run_id':os.environ['GITHUB_RUN_ID'],'package':expected,'variant':'previewPlayRelease',
-                    'profileable_shell':True,'diagnostic_compose_tracing':True,'runtime_tracing_version':'1.13.0-beta01','tracing_wire_version':'2.0.4','packaging_overlay':'diagnostic only: Compose runtime tracing with Tracing2 in-process backend, audited strict dependency inputs, isolated package, profileable manifest, compressed JNI',
+                    'profileable_shell':True,'diagnostic_compose_tracing':True,'runtime_tracing_version':'1.13.0-beta01','tracing_wire_version':'2.0.4','packaging_overlay':'diagnostic only: Compose runtime tracing with Tracing2 in-process backend, audited strict dependency inputs and supplier-reviewed diagnostic notices, isolated package, profileable manifest, compressed JNI',
                     'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'certificate_sha256':certs[0],
                     'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 or stock XL user12 only'}
           (out/(role+'.json')).write_text(json.dumps(manifest,indent=2)+'\n')
