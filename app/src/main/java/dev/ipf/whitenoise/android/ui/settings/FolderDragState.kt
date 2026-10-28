@@ -55,7 +55,10 @@ internal class FolderDragState(
     val targetId by derivedStateOf { target(ids()) }
 
     /** Captures authoritative geometry and pins the held row through release, including rejected offscreen saves. */
-    fun start(id: String, pinnable: PinnableContainer? = null) {
+    fun start(
+        id: String,
+        pinnable: PinnableContainer? = null,
+    ) {
         if (folderId != null) return
         val item = list.layoutInfo.visibleItemsInfo.firstOrNull { it.key == id } ?: return
         pinned = pinnable?.pin()
@@ -122,7 +125,10 @@ internal class FolderDragState(
     }
 
     /** Commits the previewed insertion once, retaining the visible frame until the store responds. */
-    fun drop(ids: List<String>, onMove: (String, Int) -> Unit) {
+    fun drop(
+        ids: List<String>,
+        onMove: (String, Int) -> Unit,
+    ) {
         val id = folderId ?: return
         val from = ids.indexOf(id)
         val to = ids.indexOf(target(ids))

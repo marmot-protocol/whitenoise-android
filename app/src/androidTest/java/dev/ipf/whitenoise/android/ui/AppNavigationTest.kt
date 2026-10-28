@@ -288,8 +288,11 @@ class AppNavigationTest {
             composeRule.waitUntil(timeoutMillis = 10_000) { realImeVisible() }
             assertEquals(
                 "local query",
-                composeRule.onNodeWithTag("chats.searchField").fetchSemanticsNode()
-                    .config[SemanticsProperties.EditableText].text,
+                composeRule
+                    .onNodeWithTag("chats.searchField")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.EditableText]
+                    .text,
             )
             composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
             composeRule.onNodeWithTag("chats.searchField").assertDoesNotExist()
@@ -300,8 +303,11 @@ class AppNavigationTest {
             assertEquals(
                 "closing search deliberately clears its query",
                 "",
-                composeRule.onNodeWithTag("chats.searchField").fetchSemanticsNode()
-                    .config[SemanticsProperties.EditableText].text,
+                composeRule
+                    .onNodeWithTag("chats.searchField")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.EditableText]
+                    .text,
             )
         } finally {
             composeRule.runOnIdle { controller.onCleared() }
@@ -323,15 +329,21 @@ class AppNavigationTest {
             composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
             composeRule.onNodeWithText(context.getString(R.string.appearance)).performScrollTo().performClick()
             val initial = appearanceSampleLayout().layoutInput
-            composeRule.onNodeWithText(context.getString(R.string.appearance_preview_rtl))
-                .performScrollTo().performClick()
-            composeRule.onNodeWithText(context.getString(R.string.appearance_preview_large_text))
-                .performScrollTo().performClick()
+            composeRule
+                .onNodeWithText(context.getString(R.string.appearance_preview_rtl))
+                .performScrollTo()
+                .performClick()
+            composeRule
+                .onNodeWithText(context.getString(R.string.appearance_preview_large_text))
+                .performScrollTo()
+                .performClick()
             val simulated = appearanceSampleLayout().layoutInput
             assertEquals(initial.density.fontScale * 2f, simulated.density.fontScale)
             assertEquals(androidx.compose.ui.unit.LayoutDirection.Rtl, simulated.layoutDirection)
-            composeRule.onNodeWithText(context.getString(R.string.appearance_preview_reset))
-                .performScrollTo().performClick()
+            composeRule
+                .onNodeWithText(context.getString(R.string.appearance_preview_reset))
+                .performScrollTo()
+                .performClick()
             val restored = appearanceSampleLayout().layoutInput
             assertEquals(initial.density.fontScale, restored.density.fontScale)
             assertEquals(initial.layoutDirection, restored.layoutDirection)
@@ -351,11 +363,13 @@ class AppNavigationTest {
     private fun appearanceSampleLayout(): TextLayoutResult {
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.accessibility.preview"))
         val layouts = mutableListOf<TextLayoutResult>()
-        composeRule.onNode(
-            hasText(context.getString(R.string.font_size_sample_received)) and
-                hasAnyAncestor(hasTestTag("appearance.accessibility.sample")),
-            useUnmergedTree = true,
-        ).performScrollTo().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        composeRule
+            .onNode(
+                hasText(context.getString(R.string.font_size_sample_received)) and
+                    hasAnyAncestor(hasTestTag("appearance.accessibility.sample")),
+                useUnmergedTree = true,
+            ).performScrollTo()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         return layouts.single()
     }
 

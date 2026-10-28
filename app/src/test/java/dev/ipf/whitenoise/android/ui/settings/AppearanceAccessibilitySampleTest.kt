@@ -67,7 +67,8 @@ class AppearanceAccessibilitySampleTest {
         composeRule.onNodeWithText(large).performScrollTo().performClick()
         assertEquals(3f, sampleLayout().layoutInput.density.fontScale)
         assertEquals(LayoutDirection.Rtl, sampleLayout().layoutInput.layoutDirection)
-        composeRule.onNodeWithText(context.getString(R.string.appearance_preview_reset))
+        composeRule
+            .onNodeWithText(context.getString(R.string.appearance_preview_reset))
             .performScrollTo()
             .performClick()
         assertEquals(1.5f, sampleLayout().layoutInput.density.fontScale)
@@ -89,8 +90,16 @@ class AppearanceAccessibilitySampleTest {
         }
         val rtl = context.getString(R.string.appearance_preview_rtl)
         val large = context.getString(R.string.appearance_preview_large_text)
-        composeRule.onNodeWithText(rtl).performScrollTo().performClick().assertIsOn()
-        composeRule.onNodeWithText(large).performScrollTo().performClick().assertIsOn()
+        composeRule
+            .onNodeWithText(rtl)
+            .performScrollTo()
+            .performClick()
+            .assertIsOn()
+        composeRule
+            .onNodeWithText(large)
+            .performScrollTo()
+            .performClick()
+            .assertIsOn()
         composeRule.runOnIdle { owner.value = "second-runtime" }
         composeRule.onNodeWithText(rtl).performScrollTo().assertIsOff()
         composeRule.onNodeWithText(large).performScrollTo().assertIsOff()
@@ -100,11 +109,13 @@ class AppearanceAccessibilitySampleTest {
     private fun sampleLayout(): TextLayoutResult {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val layouts = mutableListOf<TextLayoutResult>()
-        composeRule.onNode(
-            hasText(context.getString(R.string.font_size_sample_received)) and
-                hasAnyAncestor(hasTestTag("appearance.accessibility.sample")),
-            useUnmergedTree = true,
-        ).performScrollTo().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        composeRule
+            .onNode(
+                hasText(context.getString(R.string.font_size_sample_received)) and
+                    hasAnyAncestor(hasTestTag("appearance.accessibility.sample")),
+                useUnmergedTree = true,
+            ).performScrollTo()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         return layouts.single()
     }
 }

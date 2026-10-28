@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -50,7 +49,9 @@ class FolderDragAndroidTest {
     /** Hosted emulators default to disabled animations; exercise enabled motion without changing later tests. */
     @Before
     fun enableMotion() {
-        InstrumentationRegistry.getInstrumentation().uiAutomation
+        InstrumentationRegistry
+            .getInstrumentation()
+            .uiAutomation
             .adoptShellPermissionIdentity("android.permission.WRITE_SECURE_SETTINGS")
         val resolver = rule.activity.contentResolver
         previousScale = Settings.Global.getString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE)
@@ -88,7 +89,12 @@ class FolderDragAndroidTest {
         rule.mainClock.advanceTimeBy(160)
         assertEquals(listOf("a", "b", "c"), ids)
         assertTrue(bounds("b").top < b.top)
-        val viewportOrigin = rule.onNodeWithTag("folders.viewport").fetchSemanticsNode().boundsInRoot.topLeft
+        val viewportOrigin =
+            rule
+                .onNodeWithTag("folders.viewport")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .topLeft
         rule.onNodeWithTag("folders.viewport").performTouchInput { moveTo(b.center - viewportOrigin, 80) }
         rule.mainClock.advanceTimeBy(64)
         val beforeRelease = bounds("a")
@@ -213,8 +219,17 @@ class FolderDragAndroidTest {
     }
 
     /** Pointer coordinates use the stable viewport, so moving row transforms cannot move the input origin. */
-    private fun pointerTo(from: Offset, to: Offset, release: Boolean) {
-        val viewport = rule.onNodeWithTag("folders.viewport").fetchSemanticsNode().boundsInRoot.topLeft
+    private fun pointerTo(
+        from: Offset,
+        to: Offset,
+        release: Boolean,
+    ) {
+        val viewport =
+            rule
+                .onNodeWithTag("folders.viewport")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .topLeft
         rule.onNodeWithTag("folders.viewport").performTouchInput {
             down(from - viewport)
             moveTo(to - viewport, 160)
@@ -239,16 +254,18 @@ class FolderDragAndroidTest {
                 ) {
                     items(ids, key = { it }) { id ->
                         Box(
-                            Modifier.fillMaxWidth()
+                            Modifier
+                                .fillMaxWidth()
                                 .height(if (id == "b") 80.dp else 48.dp)
                                 .then(folderDragRowModifier(id, drag))
                                 .folderDragHandle(id, drag, ids) { moved, delta ->
                                     moves += moved to delta
                                     if (acceptSave) {
-                                        ids = ids.toMutableList().apply {
-                                            val from = indexOf(moved)
-                                            add(from + delta, removeAt(from))
-                                        }
+                                        ids =
+                                            ids.toMutableList().apply {
+                                                val from = indexOf(moved)
+                                                add(from + delta, removeAt(from))
+                                            }
                                     }
                                 }.testTag(id),
                         )

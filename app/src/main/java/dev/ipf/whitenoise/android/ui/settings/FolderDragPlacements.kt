@@ -15,12 +15,18 @@ internal class FolderDragPlacements(private val list: LazyListState) {
     fun top(id: String): Float? = tops[id]
 
     /** Normalizes actual placement to the same origin used by visible slots and viewport edge scrolling. */
-    fun record(id: String, top: Float) {
+    fun record(
+        id: String,
+        top: Float,
+    ) {
         tops[id] = top - list.layoutInfo.beforeContentPadding
     }
 
     /** Captures the drawn displacement, including a sibling animation interrupted between its endpoints. */
-    fun recordTranslation(id: String, translation: Float) {
+    fun recordTranslation(
+        id: String,
+        translation: Float,
+    ) {
         translations[id] = translation
     }
 
@@ -32,7 +38,9 @@ internal class FolderDragPlacements(private val list: LazyListState) {
 
     /** Records every surviving placed row's rendered position before authoritative reordering changes its slot. */
     fun capture(ids: List<String>): Map<String, Float> =
-        tops.filterKeys { it in ids }.mapValues { (key, top) -> top + (translations[key] ?: 0f) }
+        tops
+            .filterKeys { it in ids }
+            .mapValues { (key, top) -> top + (translations[key] ?: 0f) }
 
     /** A finished drag retains current row placement but retires its transient displacement history. */
     fun clearTranslations() {

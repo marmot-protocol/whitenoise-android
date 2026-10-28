@@ -271,6 +271,7 @@ class ComposerDraftNavigationAndroidTest {
         const val FLING_OBSERVATION_MS = 1000L
         const val FLING_STARTUP_FRAMES = 3
         const val TEXT_EDIT_OBSERVATION_FRAMES = 24
+
         // A trailing separator keeps the real IME from starting a new composing word after the baseline capture.
         val longDraft = (1..80).joinToString("\n") { "Synthetic device draft line $it" } + "\na "
     }

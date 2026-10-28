@@ -142,9 +142,11 @@ internal fun ChatListTopBar(
     // Measures the bar's own rendered width rather than the full window, so the quick-switch
     // capacity reservation stays correct in a multi-pane layout where this top bar is narrower
     // than the window (#2796 follow-up).
-    val searchHandoff = rememberMeasuredControlHandoff(
-        Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.appLockScreenVisible), searchOpen,
-    )
+    val searchHandoff =
+        rememberMeasuredControlHandoff(
+            Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.appLockScreenVisible),
+            searchOpen,
+        )
     MeasuredControlHandoffHost(
         state = searchHandoff,
         destination = searchOpen,

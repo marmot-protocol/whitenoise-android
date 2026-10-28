@@ -116,7 +116,8 @@ class AppearanceScreenScreenshotTest {
     /** Lazily compose the whole preview before capturing its production content and simulation controls. */
     private fun capturePreview(variant: String) {
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.accessibility.preview"))
-        composeRule.onNodeWithTag("appearance.accessibility.preview")
+        composeRule
+            .onNodeWithTag("appearance.accessibility.preview")
             .captureRoboImage("src/test/snapshots/appearance_accessibility_preview_$variant.png")
     }
 

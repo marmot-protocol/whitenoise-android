@@ -144,6 +144,7 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/AppNavigationTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/navigation/NavigationControlAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/FolderDragAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderDragOwnerAndroidTest.kt'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/java/dev/ipf/whitenoise/android/share/OutboundShare.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt'

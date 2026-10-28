@@ -50,7 +50,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.chats.ChatListBulkArchiveAction
@@ -71,6 +70,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession as RecognitionSession
 
 /** Production shell controls in a real Android window; recognition is controlled and never opens a microphone. */
 @PullRequestDeviceSmoke
@@ -119,7 +119,9 @@ class NavigationControlAndroidTest {
                 },
             )
         }
-        InstrumentationRegistry.getInstrumentation().uiAutomation
+        InstrumentationRegistry
+            .getInstrumentation()
+            .uiAutomation
             .adoptShellPermissionIdentity("android.permission.WRITE_SECURE_SETTINGS")
         val resolver = rule.activity.contentResolver
         previousScale = Settings.Global.getString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE)
@@ -166,8 +168,17 @@ class NavigationControlAndroidTest {
         assertEquals(before + 16L, rule.mainClock.currentTime)
         assertTrue(committedSelection)
         val capsule =
-            rule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val footer = rule.onNodeWithTag("chats.selectionControls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            rule
+                .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val footer =
+            rule
+                .onNodeWithTag("chats.selectionControls")
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
         assertTrue("active capsule overlaps wrapped footer: $capsule / $footer", capsule.bottom <= footer.top)
         rule.onNodeWithTag("chats.selectAllAction").performClick()
         assertEquals(1, selections)
@@ -187,8 +198,11 @@ class NavigationControlAndroidTest {
         height = 140.dp
         render(largeRtl = true)
         val capture = fixture.controller.state
-        rule.onNodeWithContentDescription("Delete selected fixtures")
-            .performScrollTo().assertIsDisplayed().performClick()
+        rule
+            .onNodeWithContentDescription("Delete selected fixtures")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         assertEquals(1, deletes)
         assertSame(capture, fixture.controller.state)
         assertTrue(fixture.writes.isEmpty())
@@ -214,20 +228,26 @@ class NavigationControlAndroidTest {
             rule.runOnUiThread {
                 val insets = ViewCompat.getRootWindowInsets(rule.activity.window.decorView)
                 insets?.isVisible(WindowInsetsCompat.Type.ime()) == true &&
-                    insets.getInsets(WindowInsetsCompat.Type.ime()).bottom > 0 && !imeAnimationRunning
+                    insets.getInsets(WindowInsetsCompat.Type.ime()).bottom > 0 &&
+                    !imeAnimationRunning
             }
         }
         rule.onNodeWithTag("navigation.imeField").assertIsFocused()
         rule.onNodeWithTag("chats.selectAllAction").performScrollTo().assertIsDisplayed()
         rule.waitForIdle()
         val capsule =
-            rule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed().fetchSemanticsNode().boundsInWindow
+            rule
+                .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInWindow
         val action = rule.onNodeWithTag("chats.selectAllAction").fetchSemanticsNode().boundsInWindow
-        val keyboardTop = rule.runOnUiThread {
-            val insets = requireNotNull(ViewCompat.getRootWindowInsets(rule.activity.window.decorView))
-            val windowBottom = rule.activity.windowManager.currentWindowMetrics.bounds.bottom
-            windowBottom - insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-        }
+        val keyboardTop =
+            rule.runOnUiThread {
+                val insets = requireNotNull(ViewCompat.getRootWindowInsets(rule.activity.window.decorView))
+                val windowBottom = rule.activity.windowManager.currentWindowMetrics.bounds.bottom
+                windowBottom - insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            }
         assertTrue("capsule must clear the real keyboard", capsule.bottom <= keyboardTop)
         assertTrue("selection action must clear the real keyboard", action.bottom <= keyboardTop)
         assertTrue("capsule and the current selection action must not overlap", capsule.bottom <= action.top)
@@ -264,7 +284,10 @@ class NavigationControlAndroidTest {
     }
 
     /** Uses the production shell's layout and local endpoint owner rather than a fake anchor/capsule rectangle. */
-    private fun render(largeRtl: Boolean = false, editor: Boolean = false) {
+    private fun render(
+        largeRtl: Boolean = false,
+        editor: Boolean = false,
+    ) {
         rule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -301,8 +324,10 @@ class NavigationControlAndroidTest {
                                             onCancelReply = {},
                                             onSend = { _, _ -> error("This fixture must never send") },
                                             initialDraft = fixture.draft,
-                                            modifier = Modifier.align(Alignment.BottomCenter)
-                                                .composerFabEndpoint(ComposerFabEndpoint.Composer),
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .composerFabEndpoint(ComposerFabEndpoint.Composer),
                                         )
                                     } else if (destination == ComposerFabEndpoint.NewMessage) {
                                         Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
@@ -353,18 +378,19 @@ class NavigationControlAndroidTest {
         val platform = FakePlatform()
         var draft = TextFieldValue(PRIVATE_DRAFT)
         val writes = mutableListOf<Pair<String, String>>()
-        val controller = ConversationDictationController(
-            platform = platform,
-            readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
-            writeDraft = { account, group, _, value ->
-                writes += account to group
-                draft = value
-                0L
-            },
-            disclosureAccepted = { true },
-            markDisclosureAccepted = {},
-            scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
-        )
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
+                writeDraft = { account, group, _, value ->
+                    writes += account to group
+                    draft = value
+                    0L
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+            )
     }
 
     /** Speech events are explicit; no permission prompt, microphone, provider or remote recognizer is involved. */
@@ -375,11 +401,9 @@ class NavigationControlAndroidTest {
 
         override fun recognitionAvailable() = true
 
-        override fun createSession(
-            listener: ConversationDictationRecognitionListener,
-        ): ConversationDictationRecognitionSession {
+        override fun createSession(listener: ConversationDictationRecognitionListener): RecognitionSession {
             this.listener = listener
-            return object : ConversationDictationRecognitionSession {
+            return object : RecognitionSession {
                 override fun start() = Unit
 
                 override fun stop() = Unit

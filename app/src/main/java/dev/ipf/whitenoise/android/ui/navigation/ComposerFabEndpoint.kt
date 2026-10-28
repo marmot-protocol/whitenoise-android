@@ -13,5 +13,6 @@ internal val LocalComposerFabHandoff = staticCompositionLocalOf<MeasuredControlH
 
 /** Registers geometry without replacing the endpoint's existing action or dictation obstacle. */
 @Composable
-internal fun Modifier.composerFabEndpoint(endpoint: ComposerFabEndpoint): Modifier =
-    controlHandoffEndpoint(LocalComposerFabHandoff.current, endpoint)
+internal fun Modifier.composerFabEndpoint(endpoint: ComposerFabEndpoint): Modifier {
+    return controlHandoffEndpoint(LocalComposerFabHandoff.current, endpoint)
+}

@@ -33,6 +33,7 @@ class FloatingDictationAnchorTest {
         anchor.remove(outgoing)
         assertEquals(650f, anchor.topInWindow)
     }
+
     /** A clipped outgoing footer must not win over the visible replacement or its scroll owner. */
     @Test
     fun offscreenFooterCannotClipTheOnlyCapsuleAway() {
@@ -51,5 +52,4 @@ class FloatingDictationAnchorTest {
         assertNull(anchor.scrollingCapsule)
         assertNull(anchor.scrollingState)
     }
-
 }

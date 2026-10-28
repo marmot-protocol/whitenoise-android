@@ -46,7 +46,11 @@ internal class MeasuredControlHandoff(initialDestination: Any?) {
     val opacity: Float get() = (1f - progress.value) * 0.55f
 
     /** Reports measured window bounds; zero-sized or clipped endpoints cannot admit a handoff. */
-    fun report(key: Any, token: Any, bounds: Rect) {
+    fun report(
+        key: Any,
+        token: Any,
+        bounds: Rect,
+    ) {
         if (bounds.width > 0f && bounds.height > 0f) {
             live[key] = token to bounds
         } else {
@@ -55,7 +59,10 @@ internal class MeasuredControlHandoff(initialDestination: Any?) {
     }
 
     /** An outgoing instance cannot remove a replacement with the same endpoint key. */
-    fun remove(key: Any, token: Any) {
+    fun remove(
+        key: Any,
+        token: Any,
+    ) {
         if (live[key]?.first === token) live.remove(key)
     }
 
@@ -63,7 +70,11 @@ internal class MeasuredControlHandoff(initialDestination: Any?) {
      * One committed layout frame supplies the new endpoint. Absent endpoints use direct
      * presentation; late unrelated mounts do not revive an old navigation animation.
      */
-    suspend fun moveTo(destination: Any?, enabled: Boolean, origin: Rect?) {
+    suspend fun moveTo(
+        destination: Any?,
+        enabled: Boolean,
+        origin: Rect?,
+    ) {
         val source = previous
         previous = destination
         val hasEndpoints = source != null && destination != null
@@ -94,8 +105,7 @@ internal class MeasuredControlHandoff(initialDestination: Any?) {
 internal fun rememberMeasuredControlHandoff(
     owner: Any?,
     destination: Any?,
-): MeasuredControlHandoff =
-    remember(owner) { MeasuredControlHandoff(destination) }
+): MeasuredControlHandoff = remember(owner) { MeasuredControlHandoff(destination) }
 
 /** Measures the actual endpoint without changing its size, focus, hit target or semantics. */
 @Composable
