@@ -2652,6 +2652,10 @@ class ConversationSendRetryIntegrationTest {
                                 ),
                             )
                         }
+                        // Native ID handoff preserves a drawn frame before publishing later projections.
+                        repeat(4) {
+                            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+                        }
                         val publishedRows = controller.timeline
                         val publishedIds = publishedRows.map { it.record.messageIdHex }.toSet()
                         assertEquals(admitted.values.map { it.first }.toSet(), publishedIds)
