@@ -2584,8 +2584,9 @@ class ConversationSendRetryIntegrationTest {
                     val releaseRecovery = CompletableDeferred<Unit>()
                     val admitted = linkedMapOf<String, Pair<String, String>>()
                     var failure = initialFailure
+                    val nativeType = MarmotInterface::class.java
                     val metadata =
-                        Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { proxy, method, args ->
+                        Proxy.newProxyInstance(nativeType.classLoader, arrayOf(nativeType)) { proxy, method, args ->
                             when (val name = method.name.substringBefore('-')) {
                                 "equals" -> proxy === args?.firstOrNull()
                                 "hashCode" -> System.identityHashCode(proxy)
@@ -2616,12 +2617,14 @@ class ConversationSendRetryIntegrationTest {
                             }
                         }
                     val state = appState(initialMarmotRuntime = AppMarmotRuntime("test", native))
+                    val noLines = ByteArray(0)
+                    val ast = MarkdownDocumentFfi(blocks = emptyList(), truncated = false, blankLinesBefore = noLines)
                     val controller =
                         ConversationController(
                             appState = state,
                             initialGroup = group(),
                             initialMemberSnapshot = memberSnapshot(),
-                            markdownParser = { MarkdownDocumentFfi(false, emptyList(), ByteArray(0)) },
+                            markdownParser = { ast },
                             customEmojiReader = { emptyList() },
                         )
                     try {
@@ -2636,7 +2639,8 @@ class ConversationSendRetryIntegrationTest {
                         assertFalse(releaseRecovery.isCompleted)
                         assertEquals(listOf("first", "second"), admitted.values.map { it.second })
                         assertEquals(2, admitted.keys.toSet().size)
-                        assertEquals(listOf(MessageStatus.Pending, MessageStatus.Pending), controller.timeline.map { it.status })
+                        val pendingStatuses = controller.timeline.map { it.status }
+                        assertEquals(listOf(MessageStatus.Pending, MessageStatus.Pending), pendingStatuses)
                         admitted.entries.forEachIndexed { index, (token, message) ->
                             applyProjection(
                                 controller,
@@ -2648,8 +2652,10 @@ class ConversationSendRetryIntegrationTest {
                                 ),
                             )
                         }
-                        assertEquals(admitted.values.map { it.first }.toSet(), controller.timeline.map { it.record.messageIdHex }.toSet())
-                        assertEquals(listOf(MessageStatus.Sent, MessageStatus.Sent), controller.timeline.map { it.status })
+                        val publishedRows = controller.timeline
+                        val publishedIds = publishedRows.map { it.record.messageIdHex }.toSet()
+                        assertEquals(admitted.values.map { it.first }.toSet(), publishedIds)
+                        assertEquals(listOf(MessageStatus.Sent, MessageStatus.Sent), publishedRows.map { it.status })
                     } finally {
                         releaseRecovery.complete(Unit)
                         clearAndAwaitConversationTestFixture(controller)
