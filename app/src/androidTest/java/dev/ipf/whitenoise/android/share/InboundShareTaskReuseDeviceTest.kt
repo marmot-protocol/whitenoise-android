@@ -202,6 +202,7 @@ class InboundShareTaskReuseDeviceTest {
 
     /** Large single and multiple external shares retain private retry bytes through grant revocation and recreation. */
     @Test
+    @Suppress("LongMethod") // One sequence owns external grants, recreation, destination handoff and cleanup.
     fun largeDocumentsReachOwnedDestinationHandoffFromRealExternalIntents() =
         kotlinx.coroutines.runBlocking {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
