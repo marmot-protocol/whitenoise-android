@@ -131,8 +131,7 @@ class MediaViewerOpeningWorkTest {
             assertFalse(provider.isInitialized())
             open = true
         }
-        val first = checkNotNull(shown)
-        composeRule.runOnIdle { open = false }
+        val first = composeRule.runOnIdle { checkNotNull(shown).also { open = false } }
         composeRule.runOnIdle { open = true }
         composeRule.runOnIdle {
             assertSame(first, shown)
