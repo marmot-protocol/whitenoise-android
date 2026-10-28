@@ -97,7 +97,9 @@ internal class ChatListArchiveActions(
                         if (ownsIntent(groupIdHex, intent)) {
                             onAttempted(groupIdHex)
                             val updated =
-                                updateGroupWithinDeadline(account, groupIdHex, archived, intent, stepTimeoutMillis)
+                                withArchiveDeadline(stepTimeoutMillis) {
+                                    updateGroup(account, groupIdHex, archived, intent)
+                                }
                             if (updated == null) onTimedOut(groupIdHex)
                             updated == true
                         } else {
@@ -119,20 +121,6 @@ internal class ChatListArchiveActions(
             onSuccess(archived)
         }
         return succeeded
-    }
-
-    /** A deadline bounds one native adapter attempt; timeout remains uncertain for read-only recovery. */
-    private suspend fun updateGroupWithinDeadline(
-        account: String,
-        groupIdHex: String,
-        archived: Boolean,
-        intent: OptimisticArchiveIntent,
-        stepTimeoutMillis: Long?,
-    ): Boolean? {
-        if (stepTimeoutMillis == null) return updateGroup(account, groupIdHex, archived, intent)
-        return withTimeoutOrNull(stepTimeoutMillis) {
-            updateGroup(account, groupIdHex, archived, intent)
-        }
     }
 
     /** Records only changed, retained rows; conversation actions share this same overlay owner. */
@@ -213,4 +201,13 @@ internal class ChatListArchiveActions(
     fun clear() {
         intentsByGroup.clear()
     }
+}
+
+/** Bounds one native attempt; a timeout stays uncertain for explicit read-only recovery. */
+private suspend fun withArchiveDeadline(
+    timeoutMillis: Long?,
+    update: suspend () -> Boolean,
+): Boolean? {
+    if (timeoutMillis == null) return update()
+    return withTimeoutOrNull(timeoutMillis) { update() }
 }
