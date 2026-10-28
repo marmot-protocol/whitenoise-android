@@ -1,14 +1,17 @@
 package dev.ipf.whitenoise.android.media
 
+import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import android.media.MediaMuxer
 import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -43,12 +46,10 @@ class VideoMetadataScrubberDeviceTest {
     /** The platform retriever finds no location or recording date after scrubbing, and playback metadata is kept. */
     @Test
     fun scrubbedFixturesLoseLocationAndDateAndKeepPlaybackMetadata() {
-        var locatedBefore = 0
         FIXTURES.forEach { name ->
             val (original, scrubbed) = copies(name)
             val before = retrieve(original)
             val after = retrieve(scrubbed)
-            if (before.location != null) locatedBefore += 1
             assertNull("$name location", after.location)
             val date = after.date
             val noDate = date == null || date.startsWith("1904") || date.startsWith("1970")
@@ -58,7 +59,17 @@ class VideoMetadataScrubberDeviceTest {
             assertEquals("$name size", before.size, after.size)
             assertTrue("$name must decode a frame", after.decodedFrame)
         }
-        assertTrue("at least one fixture must carry a location the platform reads", locatedBefore > 0)
+        // ffmpeg's tags are not all exposed by every platform extractor, so the location proof uses a file written by
+        // Android's own muxer, which every version reads back.
+        val muxed = muxedWithLocation()
+        assertTrue("MediaMuxer must record the location", retrieve(muxed).location != null)
+        assertTrue("MediaMuxer must record its platform version", carriesAndroidVersion(muxed))
+        val result = VideoMetadataScrubber.scrub(muxed)
+        assertTrue("muxed: $result", result is VideoScrubResult.Scrubbed)
+        val scrubbedMuxed = retrieve(muxed)
+        assertNull("muxed location", scrubbedMuxed.location)
+        assertTrue("muxed must decode a frame", scrubbedMuxed.decodedFrame)
+        assertFalse("muxed version key", carriesAndroidVersion(muxed))
         val rotation = retrieve(copies(MOV).second).rotation
         assertTrue("the rotated QuickTime fixture keeps its matrix, got $rotation", rotation in setOf("90", "270"))
     }
@@ -93,6 +104,59 @@ class VideoMetadataScrubberDeviceTest {
         assertEquals(bytes.size.toLong(), scrubbed.length())
         return original to scrubbed
     }
+
+    /**
+     * Copies the tagged MP4's samples into a new file through Android's own [MediaMuxer] with a location, the way
+     * platform camera stacks record one: it writes the `©xyz` location box the platform retriever reads, and its own
+     * `com.android.version` key. No encoder is needed, so it runs on any emulator.
+     */
+    private fun muxedWithLocation(): File {
+        val (source, _) = copies(MP4)
+        val target = File(directory, "muxed-with-location.mp4")
+        val extractor = MediaExtractor()
+        val muxer = MediaMuxer(target.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        try {
+            extractor.setDataSource(source.absolutePath)
+            val tracks =
+                (0 until extractor.trackCount).associateWith { index ->
+                    muxer.addTrack(extractor.getTrackFormat(index))
+                }
+            muxer.setLocation(MUXED_LATITUDE, MUXED_LONGITUDE)
+            muxer.start()
+            tracks.forEach { (index, muxed) -> copyTrack(extractor, index, muxer, muxed) }
+            muxer.stop()
+        } finally {
+            muxer.release()
+            extractor.release()
+        }
+        return target
+    }
+
+    /** Writes every sample of one extractor track to [muxed], keeping its time and sync flag. */
+    private fun copyTrack(
+        extractor: MediaExtractor,
+        index: Int,
+        muxer: MediaMuxer,
+        muxed: Int,
+    ) {
+        (0 until extractor.trackCount).forEach(extractor::unselectTrack)
+        extractor.selectTrack(index)
+        extractor.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+        val buffer = ByteBuffer.allocate(SAMPLE_BUFFER_BYTES)
+        val info = MediaCodec.BufferInfo()
+        while (true) {
+            buffer.clear()
+            val size = extractor.readSampleData(buffer, 0)
+            if (size < 0) break
+            val sync = extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0
+            info.set(0, size, extractor.sampleTime, if (sync) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+            muxer.writeSampleData(muxed, buffer, info)
+            extractor.advance()
+        }
+    }
+
+    /** Whether [file] still holds the `com.android.version` key MediaMuxer writes into the movie. */
+    private fun carriesAndroidVersion(file: File): Boolean = ANDROID_VERSION_KEY in file.readText(Charsets.ISO_8859_1)
 
     /** What the platform retriever reports for [file]. */
     private fun retrieve(file: File): Retrieved {
@@ -171,7 +235,11 @@ class VideoMetadataScrubberDeviceTest {
 
     private companion object {
         const val MOV = "mov-quicktime-keys.mov"
+        const val MP4 = "mp4-tagged.mp4"
+        const val ANDROID_VERSION_KEY = "com.android.version"
+        const val MUXED_LATITUDE = 37.7749f
+        const val MUXED_LONGITUDE = -122.4194f
         const val SAMPLE_BUFFER_BYTES = 1024 * 1024
-        val FIXTURES = listOf("mp4-tagged.mp4", MOV, "mp4-timecode.mp4", "mkv-tagged.mkv", "webm-live-tagged.webm")
+        val FIXTURES = listOf(MP4, MOV, "mp4-timecode.mp4", "mkv-tagged.mkv", "webm-live-tagged.webm")
     }
 }
