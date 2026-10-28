@@ -32,8 +32,7 @@ internal fun backgroundReceiptNetworkSnapshot(
                     .map { it.name }
                     .sorted(),
             ),
-        )
-        .put("app_active_network", state.hasActiveNetwork())
+        ).put("app_active_network", state.hasActiveNetwork())
         .put("app_validated_internet", state.hasValidatedInternet())
         .put("platform_manager_available", manager != null)
         .put("platform_default_present", network != null)
