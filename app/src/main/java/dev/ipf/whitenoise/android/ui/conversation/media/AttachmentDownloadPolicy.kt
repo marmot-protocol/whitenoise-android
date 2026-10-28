@@ -34,20 +34,15 @@ internal fun shouldMaterializeAttachmentAutomatically(
         (!automaticDownloadsPaused && (mediaAutoDownloadAllowed || mine))
 
 /**
- * An own file whose send is committed but not yet delivered has no native target, so a fetch would only fail and
- * offer Retry. It stays preparing rather than downloadable, which also holds back its automatic fetch until delivery
- * turns the card back to downloadable and it asks once. Delivery, not the epoch, is the signal: a solo group's
- * delivered send can still carry epoch 0.
+ * Whether an own file card that would offer Download is held instead because its send is committed but not yet
+ * delivered. No native target exists until delivery, so a fetch, a cancel or a tap could only end in Retry. A held
+ * card shows preparing and does nothing until delivery turns it back to downloadable, when its automatic fetch asks
+ * once. Delivery, not the epoch, is the signal: a solo group's delivered send can still carry epoch 0.
  */
-internal fun ownFileAwaitingDelivery(
+internal fun ownFileHeldUntilDelivered(
     transferState: AttachmentTransferState,
     awaitingDelivery: Boolean,
-): AttachmentTransferState =
-    if (awaitingDelivery && transferState == AttachmentTransferState.Remote) {
-        AttachmentTransferState.Resolving
-    } else {
-        transferState
-    }
+): Boolean = awaitingDelivery && transferState == AttachmentTransferState.Remote
 
 /**
  * The one decision that lets a materialization reach the network (#2699).

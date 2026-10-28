@@ -95,8 +95,9 @@ internal fun ConversationController.nativeAttachmentSourceId(messageIdHex: Strin
         ?: timelineRecords[messageIdHex]?.sourceMessageIdHex
 
 /**
- * [nativeAttachmentSourceId] for a row already in hand, so a bubble need not observe the whole timeline. An own send
- * is committed before it publishes, and stays null here until delivered, when no native attachment target exists yet.
+ * Whether [item]'s send is committed but not yet delivered, read from the row in hand so a bubble need not observe the
+ * whole timeline. An own send publishes after it commits and has no source event, so no native attachment target,
+ * until then. Received rows always carry their source event.
  */
-internal fun ConversationController.deliveredAttachmentSourceId(item: TimelineMessage): String? =
-    item.projected?.sourceMessageIdHex ?: timelineRecords[item.record.messageIdHex]?.sourceMessageIdHex
+internal fun ConversationController.awaitingDelivery(item: TimelineMessage): Boolean =
+    item.projected?.sourceMessageIdHex == null && timelineRecords[item.record.messageIdHex]?.sourceMessageIdHex == null

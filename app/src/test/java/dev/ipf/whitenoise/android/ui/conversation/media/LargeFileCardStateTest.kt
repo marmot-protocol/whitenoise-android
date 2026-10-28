@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -24,15 +25,12 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
+import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
-import dev.ipf.whitenoise.android.state.deliveredAttachmentSourceId
-import dev.ipf.whitenoise.android.state.projectedTimelineMessage
-import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -109,8 +107,9 @@ class LargeFileCardStateTest {
     }
 
     /**
-     * The sender's own card before its send is delivered shows Preparing and starts no fetch that could only fail.
-     * Once delivered it fetches exactly once, even at epoch 0, which a solo group's delivered send still carries.
+     * The sender's own card before its send is delivered shows Preparing, and neither it nor a tap on the card or its
+     * control starts a fetch or a cancel that could only fail. Once delivered it fetches exactly once, even at epoch 0,
+     * which a solo group's delivered send still carries.
      */
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -130,6 +129,12 @@ class LargeFileCardStateTest {
         assertNoRetry()
         composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_download)).assertCountEquals(0)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/own-large-file-awaiting-delivery.png")
+        composeRule.onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0)).performClick()
+        composeRule.onNodeWithContentDescription(text(R.string.media_preparing_attachment)).performClick()
+        composeRule.waitForIdle()
+        assertEquals("a held card must ignore taps", AttachmentTransferState.Remote, host.value)
+        assertTrue(fixture.calls.isEmpty())
+        assertFalse(controller.automaticAttachmentDownloadSuppressed(request(0).messageIdHex, 0))
 
         composeRule.runOnIdle { awaitingDelivery = false }
         deliverBodyOverTheReadBudget()
@@ -138,16 +143,6 @@ class LargeFileCardStateTest {
         assertNoRetry()
         assertEquals("the delivered send is fetched once", 1, fixture.calls.size)
         controller.releaseAttachmentTransferState(request(0).messageIdHex, 0)
-    }
-
-    /** An own row reads as undelivered until MDK upserts its published source event, then as delivered. */
-    @Test
-    fun anOwnRowIsUndeliveredUntilItsSourceEventArrives() {
-        val delivered = projectedTimelineMessage(timelineAppMessage(request(0).messageIdHex))
-        val committed = delivered.copy(projected = delivered.projected?.copy(sourceMessageIdHex = null))
-
-        assertNull(controller.deliveredAttachmentSourceId(committed))
-        assertEquals(request(0).messageIdHex, controller.deliveredAttachmentSourceId(delivered))
     }
 
     /** Waits for the card's one native transfer, then lets MDK retain a body one byte over the 32 MiB read budget. */

@@ -78,8 +78,8 @@ internal fun fileAttachmentCardTestTag(
  * flight and open a reusable FileProvider artifact in an external viewer.
  * When selected as the message footer owner, the card also carries the timestamp,
  * delivery state and invalidation warning as one contract. An own send not yet
- * delivered ([awaitingDelivery]) waits as preparing instead of fetching a body
- * that has no native target yet.
+ * delivered ([awaitingDelivery]) waits as preparing, with no fetch, cancel or
+ * tap, for a body that has no native target yet.
  */
 @Composable
 internal fun MediaFileBubble(
@@ -163,11 +163,9 @@ internal fun MediaFileBubble(
     // Own-file metadata remains visible while its verified local source is being resolved.
     // A stale native failure must not flash Retry during the outgoing cache handoff.
     val presentationProgress = if (mine && !firstFrameCacheResolved) null else nativeProgress
-    val transferState =
-        ownFileAwaitingDelivery(
-            attachmentFilePresentationState(hostTransferState, presentationProgress, cancellationState),
-            awaitingDelivery,
-        )
+    val presentedState = attachmentFilePresentationState(hostTransferState, presentationProgress, cancellationState)
+    val heldUntilDelivered = ownFileHeldUntilDelivered(presentedState, awaitingDelivery)
+    val transferState = if (heldUntilDelivered) AttachmentTransferState.Resolving else presentedState
     var reconciledCacheRevision by remember(controller, pillKey) { mutableStateOf(cacheRevision) }
     // Later cache writes and evictions still reconcile the controller-owned
     // state, but they never re-hide a card that already crossed the first-frame
@@ -399,7 +397,7 @@ internal fun MediaFileBubble(
                             canRequestAttachmentOpen(transferState, reference.sourceEpoch, mine),
                     onLongClick = onLongPress,
                     onClick = {
-                        if (opening) return@combinedClickable
+                        if (opening || heldUntilDelivered) return@combinedClickable
                         // A file that is not on the device yet is only downloaded, in place: the reader, installer
                         // or viewer opens only from a tap once it has arrived.
                         val downloaded = transferState == AttachmentTransferState.Available
@@ -446,7 +444,11 @@ internal fun MediaFileBubble(
             openPending = opening,
             nativeProgress = presentationProgress,
             cancellationState = cancellationState,
-            onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
+            // A held own card has no native transfer to cancel.
+            onCancelTransfer =
+                {
+                    controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex)
+                }.takeUnless { heldUntilDelivered },
         )
     }
     if (readerOpen && textCandidate != null) {
