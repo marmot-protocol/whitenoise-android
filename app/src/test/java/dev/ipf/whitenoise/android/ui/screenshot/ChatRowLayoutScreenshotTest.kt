@@ -111,6 +111,7 @@ class ChatRowLayoutScreenshotTest {
         }
     }
 
+    /** Renders layout states so selection retains timestamps and supporting metadata beside its leading indicator. */
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean,

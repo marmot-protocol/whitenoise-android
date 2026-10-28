@@ -9,14 +9,16 @@ import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import java.io.File
 
 /** Retains actual ChatsScreen pixels and measured eligibility; the fixture paints real rows green over black. */
-internal class ChatFolderFadeFrameProbe(private val rule: ComposeTestRule) {
+internal class ChatFolderFadeFrameProbe(
+    private val rule: ComposeTestRule,
+) {
     /** Inspect inside the 28dp bands but below the separate 8dp destination arrival displacement. */
     fun assertEdges(
         stage: String,

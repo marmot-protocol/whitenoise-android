@@ -303,8 +303,11 @@ class ChatListContinuityAndroidTest {
             rule.onNodeWithTag("chats.list").assertDoesNotExist()
             rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_empty_folder_detail)).assertExists()
             publishFadeChange { selectedFolder = folders[0] }
+            rule.onNodeWithTag(chatListFilterChipTag(folders[0])).assertIsSelected()
+            // Folder changes retain their keyed viewport; choose an overflowing anchor for renewed fade eligibility.
+            rule.onNodeWithTag("chats.list").performScrollToIndex(6)
             rule.mainClock.advanceTimeBy(240)
-            probe.assertEdges("return-from-empty", top = false, bottom = true)
+            probe.assertEdges("return-from-empty", top = true, bottom = true)
         } finally {
             rule.mainClock.autoAdvance = true
             rule.runOnUiThread {
