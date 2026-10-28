@@ -3,9 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,7 +13,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
@@ -52,7 +49,10 @@ internal fun ChatListSelectionBar(onClose: () -> Unit) {
     TopAppBar(
         title = { Text(stringResource(R.string.chat_selection_title)) },
         navigationIcon = {
-            IconButton(onClose) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close)) }
+            IconButton(
+                onClose,
+                modifier = Modifier.testTag("chats.selection.close"),
+            ) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close)) }
         },
     )
 }
@@ -70,10 +70,6 @@ internal fun ChatListSelectionControls(
     allVisibleSelected: Boolean,
     showMarkRead: Boolean,
     showMarkUnread: Boolean,
-    showMuteToggle: Boolean,
-    muted: Boolean,
-    showPinToggle: Boolean,
-    pinned: Boolean,
     showMovePinnedUp: Boolean,
     showMovePinnedDown: Boolean,
     onArchive: () -> Unit,
@@ -81,8 +77,6 @@ internal fun ChatListSelectionControls(
     onAddToFolder: () -> Unit,
     onMarkRead: () -> Unit,
     onMarkUnread: () -> Unit,
-    onMuteToggle: () -> Unit,
-    onPinToggle: () -> Unit,
     onMovePinned: (Int) -> Unit,
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
@@ -90,6 +84,15 @@ internal fun ChatListSelectionControls(
     deleteLabel: String = stringResource(R.string.delete),
     abandonLabel: String? = null,
     onAbandon: () -> Unit = {},
+    showMute: Boolean = false,
+    showUnmute: Boolean = false,
+    showPin: Boolean = false,
+    showUnpin: Boolean = false,
+    onSetMuted: (Boolean) -> Unit = {},
+    onSetPinned: (Boolean) -> Unit = {},
+    onAlternateArchive: (() -> Unit)? = null,
+    onExcludeFromFolder: (() -> Unit)? = null,
+    onDeleteLocal: (() -> Unit)? = null,
 ) {
     var active by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { active = false } }
@@ -110,41 +113,29 @@ internal fun ChatListSelectionControls(
         stringResource(
             if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.archive else R.string.unarchive,
         )
-    // Whole actions wrap at narrow widths; the selection toggle keeps its label visible.
+    // Icon actions wrap as whole 48 dp targets at narrow widths.
     FlowRow(
         Modifier
             .floatingDictationFooter()
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
-            .testTag("chats.selectionControls"),
+            .testTag("chats.selectionControls")
+            .semantics {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = description
+            },
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = count.toString(),
-            modifier =
-                Modifier
-                    .testTag("chats.selectionCount")
-                    .semantics {
-                        liveRegion = LiveRegionMode.Polite
-                        contentDescription = description
-                    }.padding(horizontal = WhiteNoiseSpacing.Related),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedButton(
-            onClick = { perform(if (allVisibleSelected) onDeselectAll else onSelectAll) },
+        DirectSelectionAction(
+            label = selectAllLabel,
+            icon = if (allVisibleSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all,
             enabled = actionsEnabled,
-            modifier =
-                Modifier
-                    .heightIn(min = 40.dp)
-                    .testTag("chats.selectAllAction"),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-        ) {
-            Text(selectAllLabel, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-        }
+            modifier = Modifier.testTag("chats.selectAllAction"),
+            onClick = { perform(if (allVisibleSelected) onDeselectAll else onSelectAll) },
+        )
         DirectSelectionAction(
             label = archiveLabel,
             icon =
@@ -158,7 +149,7 @@ internal fun ChatListSelectionControls(
         )
         DirectSelectionAction(
             label = stringResource(R.string.chat_list_action_add_to_folder),
-            icon = R.drawable.ic_folder,
+            icon = R.drawable.ic_folder_add,
             enabled = actionsEnabled,
             onClick = { perform(onAddToFolder) },
         )
@@ -180,19 +171,59 @@ internal fun ChatListSelectionControls(
                 perform(onMarkUnread)
             }
         }
-        if (showMuteToggle) {
+        if (showMute) {
             DirectSelectionAction(
-                stringResource(if (muted) R.string.chat_row_action_unmute else R.string.chat_row_action_mute),
-                if (muted) R.drawable.ic_settings_notifications else R.drawable.ic_notifications_off,
+                stringResource(R.string.chat_row_action_mute),
+                R.drawable.ic_notifications_off,
                 actionsEnabled,
-            ) { perform(onMuteToggle) }
+            ) {
+                perform { onSetMuted(true) }
+            }
         }
-        if (showPinToggle) {
+        if (showUnmute) {
             DirectSelectionAction(
-                stringResource(if (pinned) R.string.chat_row_action_unpin else R.string.chat_row_action_pin),
-                if (pinned) R.drawable.ic_unpin else R.drawable.ic_push_pin,
+                stringResource(R.string.chat_row_action_unmute),
+                R.drawable.ic_settings_notifications,
                 actionsEnabled,
-            ) { perform(onPinToggle) }
+            ) {
+                perform { onSetMuted(false) }
+            }
+        }
+        if (showPin) {
+            DirectSelectionAction(
+                stringResource(R.string.chat_row_action_pin),
+                R.drawable.ic_push_pin,
+                actionsEnabled,
+            ) {
+                perform { onSetPinned(true) }
+            }
+        }
+        if (showUnpin) {
+            DirectSelectionAction(stringResource(R.string.chat_row_action_unpin), R.drawable.ic_unpin, actionsEnabled) {
+                perform { onSetPinned(false) }
+            }
+        }
+        onAlternateArchive?.let { alternate ->
+            DirectSelectionAction(
+                stringResource(
+                    if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.unarchive else R.string.archive,
+                ),
+                if (archiveAction == ChatListBulkArchiveAction.Archive) {
+                    R.drawable.ic_unarchive
+                } else {
+                    R.drawable.ic_archive
+                },
+                actionsEnabled,
+            ) { perform(alternate) }
+        }
+        onExcludeFromFolder?.let { exclude ->
+            DirectSelectionAction(
+                stringResource(R.string.folder_exclude_chat),
+                R.drawable.ic_folder_remove,
+                actionsEnabled,
+            ) {
+                perform(exclude)
+            }
         }
         if (showMovePinnedUp) {
             DirectSelectionAction(
@@ -212,9 +243,23 @@ internal fun ChatListSelectionControls(
                 perform { onMovePinned(1) }
             }
         }
+        onDeleteLocal?.let { deleteLocal ->
+            DirectSelectionAction(
+                label = stringResource(R.string.delete_from_device),
+                icon = R.drawable.ic_delete,
+                enabled = actionsEnabled,
+                destructive = true,
+                onClick = { perform(deleteLocal) },
+            )
+        }
         DirectSelectionAction(
             label = deleteLabel,
-            icon = R.drawable.ic_delete,
+            icon =
+                if (deleteLabel == stringResource(R.string.leave_and_delete)) {
+                    R.drawable.ic_logout
+                } else {
+                    R.drawable.ic_delete
+                },
             enabled = actionsEnabled,
             destructive = true,
             onClick = { perform(onDelete) },
@@ -235,11 +280,12 @@ internal fun ChatListSelectionControls(
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
-private fun DirectSelectionAction(
+internal fun DirectSelectionAction(
     label: String,
     @DrawableRes icon: Int,
     enabled: Boolean,
     destructive: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     TooltipBox(
@@ -251,7 +297,7 @@ private fun DirectSelectionAction(
             FilledTonalIconButton(
                 onClick = onClick,
                 enabled = enabled,
-                modifier = Modifier.size(48.dp),
+                modifier = modifier.size(48.dp),
                 colors =
                     IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -259,7 +305,7 @@ private fun DirectSelectionAction(
                     ),
             ) { Icon(painterResource(icon), contentDescription = label) }
         } else {
-            IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+            IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(48.dp)) {
                 Icon(painterResource(icon), contentDescription = label)
             }
         }

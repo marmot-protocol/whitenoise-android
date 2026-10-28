@@ -14,7 +14,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -99,7 +98,9 @@ class ChatOrganizationScreenshotTest {
             }
         }
         val selectionLabel = if (all) R.string.chat_list_deselect_all else R.string.chat_list_select_all
-        composeRule.onNodeWithText(context.getString(selectionLabel), useUnmergedTree = true).assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(context.getString(selectionLabel), useUnmergedTree = true)
+            .assertIsDisplayed()
         if (menu) {
             composeRule.onNodeWithContentDescription(context.getString(R.string.archive)).assertIsDisplayed()
             composeRule.onNodeWithContentDescription(context.getString(R.string.delete)).assertIsDisplayed()

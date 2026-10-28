@@ -2560,6 +2560,12 @@
     <string name="setup_finding_outcome_failure">Проверка не пройдена</string>
     <string name="public_jpeg_previews_title">Предпросмотр изображений в чате</string>
     <string name="public_jpeg_previews_privacy">По умолчанию отключён. Прямые ссылки на JPEG в Blossom могут раскрыть ваш IP-адрес серверу изображений. Предпросмотр использует Wi-Fi, не помеченный как лимитный и ваши правила загрузки фото. Обычные ссылки доступны и без предпросмотра.</string>
+    <string name="chat_batch_progress">Обработано чатов: %1$d из %2$d</string>
+    <string name="chat_batch_result">Изменено: %1$d\nУже в нужном состоянии: %2$d\nПропущено (недоступно): %3$d\nС ошибкой: %4$d\nНе начато: %5$d\nНе подтверждено: %6$d</string>
+    <string name="chat_batch_order_failed">Порядок закреплённых чатов недоступен или изменился. Проверьте текущий список чатов перед следующим перемещением.</string>
+    <string name="chat_batch_order_unchanged">Выбранные закреплённые чаты нельзя переместить дальше. Каждая непрерывная группа выбранных чатов перемещается на одну позицию с сохранением порядка.</string>
+    <string name="chat_batch_check_results">Проверить результаты</string>
+    <string name="chat_batch_order_unconfirmed">Не удалось подтвердить порядок закреплённых чатов. Проверьте список чатов перед повторным перемещением.</string>
     <string name="public_jpeg_preview_image">Предпросмотр JPEG по ссылке</string>
     <string name="public_jpeg_preview_save_failed">Не удалось сохранить настройку предпросмотра изображений. Попробуйте ещё раз.</string>
     <string name="appearance_accessibility_preview">Предпросмотр читаемости</string>
