@@ -8,6 +8,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/coder/websocket"
+	"github.com/nbd-wtf/go-nostr/nip19"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
@@ -71,44 +75,64 @@ func testSigner() error {
 	if err := os.WriteFile(keyPath, []byte(clientKey+"\n"), 0600); err != nil {
 		return fmt.Errorf("cannot restore client identity")
 	}
-	listing := fmt.Sprintf("release_source: %q\nname: Offline signer fixture\nsummary: Signing test only - never publish\n", os.Args[2])
-	if err := os.WriteFile(filepath.Join(temporary, "zapstore.yaml"), []byte(listing), 0600); err != nil {
-		return fmt.Errorf("cannot create fixture listing")
-	}
-	fmt.Println("Testing pinned ZSP offline signing; CI client public key:", clientPub)
-	cmd := exec.CommandContext(ctx, os.Args[1], "publish", "--offline", "--quiet", "--skip-metadata", "--no-compress", "--skip-certificate-linking", "zapstore.yaml")
+	// ZSP v2 has no offline publish. Exercise its actual bunker/client path with
+	// read-only check against an empty loopback catalog and a disposable APK.
+	catalog := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.CloseNow()
+		for {
+			_, raw, err := conn.Read(ctx)
+			if err != nil {
+				return
+			}
+			var parts []json.RawMessage
+			if json.Unmarshal(raw, &parts) != nil || len(parts) < 2 {
+				return
+			}
+			var kind, id string
+			_ = json.Unmarshal(parts[0], &kind)
+			_ = json.Unmarshal(parts[1], &id)
+			if kind == "REQ" {
+				payload, _ := json.Marshal([]any{"EOSE", id})
+				_ = conn.Write(ctx, websocket.MessageText, payload)
+			}
+			if kind == "EVENT" {
+				return
+			} // Catalog never accepts public writes.
+		}
+	}))
+	defer catalog.Close()
+	fmt.Println("Testing pinned ZSP v2 read-only signer connection; CI client public key:", clientPub)
+	cmd := exec.CommandContext(ctx, os.Args[1], "--json", "check", os.Args[2])
 	cmd.Dir = temporary
 	for _, name := range []string{"PATH", "HOME", "TMPDIR"} {
 		if value, ok := os.LookupEnv(name); ok {
 			cmd.Env = append(cmd.Env, name+"="+value)
 		}
 	}
-	cmd.Env = append(cmd.Env, "SIGN_WITH="+connection, "XDG_CONFIG_HOME="+config)
+	cmd.Env = append(cmd.Env, "SIGN_WITH="+connection, "XDG_CONFIG_HOME="+config, "RELAYS="+strings.Replace(catalog.URL, "http://", "ws://", 1))
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("offline ZSP signing failed; check Keycast connection/permission audit (raw output withheld)")
+		return fmt.Errorf("ZSP v2 read-only check failed; inspect signer audit privately (raw output withheld)")
 	}
-	kinds := map[int]int{}
-	for _, line := range bytes.Split(bytes.TrimSpace(stdout.Bytes()), []byte("\n")) {
-		// ZSP may print a connection-approval URL before its JSONL events.
-		if !bytes.HasPrefix(bytes.TrimSpace(line), []byte("{")) {
-			continue
-		}
-		var event nostr.Event
-		if json.Unmarshal(line, &event) != nil || !validSignedEvent(event, publisher) {
-			return fmt.Errorf("invalid offline event identity, ID, or signature")
-		}
-		kinds[event.Kind]++
+	var check struct {
+		OK        bool   `json:"ok"`
+		Operation string `json:"operation"`
+		Signer    string `json:"signer"`
 	}
-	if len(kinds) != 3 || kinds[3063] != 1 || kinds[30063] != 1 || kinds[32267] != 1 {
-		return fmt.Errorf("offline signer did not return exactly the three expected event kinds")
+	npub, err := nip19.EncodePublicKey(publisher)
+	if err != nil || json.Unmarshal(stdout.Bytes(), &check) != nil || !check.OK || check.Operation != "check" || check.Signer != npub {
+		return fmt.Errorf("invalid ZSP v2 check identity or document")
 	}
 	restored, err := os.ReadFile(keyPath)
 	if err != nil || strings.TrimSpace(string(restored)) != clientKey {
 		return fmt.Errorf("persistent client identity changed")
 	}
-	fmt.Println("Verified offline signatures for kinds 3063, 30063, 32267")
+	fmt.Println("Verified ZSP v2 read-only check and persistent client identity")
 	// Reconnect exactly as the publisher does: reuse the persistent client key
 	// with the original bunker URI for the second ZSP invocation.
 	// A reply can be lost between the relays and a new client process, so bound
@@ -138,6 +162,16 @@ func testSigner() error {
 	if err != nil || actualPublisher != publisher {
 		return fmt.Errorf("reconnected signer identity does not match White Noise")
 	}
+	// Test permissions with synthetic, unusable invalid.example software events.
+	// They are returned by the signer only and never sent to any catalog relay.
+	for _, kind := range []int{3063, 30063, 32267} {
+		event := nostr.Event{Kind: kind, PubKey: publisher, CreatedAt: nostr.Now(), Content: "White Noise signer test - never publish",
+			Tags: nostr.Tags{{"d", "invalid.example.zspfixture"}, {"i", "invalid.example.zspfixture"}}}
+		if err := bunker.SignEvent(ctx, &event); err != nil || !validSignedEvent(event, publisher) {
+			return fmt.Errorf("software event signing permission failed (remote details withheld)")
+		}
+	}
+	fmt.Println("Verified synthetic signatures for kinds 3063, 30063, 32267; no publication")
 	// Expired auth for a nonexistent fixture hash: proves permission without
 	// creating a usable upload authorization. Never transmitted to Blossom.
 	auth := nostr.Event{Kind: 24242, PubKey: publisher, CreatedAt: nostr.Now(),
