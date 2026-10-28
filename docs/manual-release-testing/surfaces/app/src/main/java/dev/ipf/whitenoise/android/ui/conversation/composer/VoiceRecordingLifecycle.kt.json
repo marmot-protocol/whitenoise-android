@@ -18,6 +18,30 @@
         "test_ids": [
           "MED-008"
         ]
+      },
+      {
+        "surface": "voice_recording_interrupted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_interrupted",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice_recording_limit_reached",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_limit_reached",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "rememberVoiceRecordingStopNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "fun rememberVoiceRecordingStopNotice(",
+        "test_ids": [
+          "MED-008"
+        ]
       }
     ]
   },

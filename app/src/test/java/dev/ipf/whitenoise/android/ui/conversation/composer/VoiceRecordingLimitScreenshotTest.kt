@@ -63,12 +63,15 @@ class VoiceRecordingLimitScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Captures the ordinary held-recording pill and checks that its entire bright outline survives. */
     @Test
     fun heldAmoledOutline() = runTest { verifyHeldOutline(largeRtl = false) }
 
+    /** Exercises the held-recording outline with narrow RTL layout and enlarged text. */
     @Test
     fun heldNarrowLargeAmoledRtlOutline() = runTest { verifyHeldOutline(largeRtl = true) }
 
+    /** Keeps the pointer hold active through recording-strip recomposition before finalizing its take. */
     private fun TestScope.verifyHeldOutline(largeRtl: Boolean) {
         withRecording {
             render(controller, dark = true, largeRtl = largeRtl)
@@ -95,6 +98,7 @@ class VoiceRecordingLimitScreenshotTest {
         }
     }
 
+    /** Samples all four pill edges so an opaque recording strip cannot hide part of the outline. */
     private fun assertCompleteAmoledOutline() {
         val pixels = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).captureToImage().toPixelMap()
         val middleX = pixels.width / 2
@@ -102,6 +106,8 @@ class VoiceRecordingLimitScreenshotTest {
 
         // Sample the enclosing pill, not the separate rounded recording strip.
         // A one-pixel curved stroke is antialiased (243/255 at the side midpoint).
+
+        /** Recognizes the bright composer stroke in antialiased edge samples. */
         fun Color.isOutline() = red > 0.9f && green > 0.9f && blue > 0.9f
         assertTrue(
             "Top outline must remain visible",
@@ -121,6 +127,7 @@ class VoiceRecordingLimitScreenshotTest {
         )
     }
 
+    /** Captures the thirty-second warning in light mode and verifies explicit Stop offers one take. */
     @Test
     fun countdownLight() =
         runTest {
@@ -147,6 +154,7 @@ class VoiceRecordingLimitScreenshotTest {
             }
         }
 
+    /** Captures the ten-second warning in narrow RTL AMOLED and verifies Cancel offers no take. */
     @Test
     fun countdownNarrowLargeAmoledRtl() =
         runTest {
@@ -173,6 +181,7 @@ class VoiceRecordingLimitScreenshotTest {
             }
         }
 
+    /** Pause releases screen-wake ownership and delivers one take without the ordinary stop tail. */
     @Test
     fun foregroundRecordingKeepsScreenOnAndPausePreservesReviewWithoutATail() =
         runTest {
@@ -201,12 +210,14 @@ class VoiceRecordingLimitScreenshotTest {
                 composeRule.runOnIdle { assertEquals(previous, view.keepScreenOn) }
                 assertFalse(controller.isRecording)
                 assertEquals(1, completed.size)
+                assertEquals("captured audio", completed.single().readText())
                 controller.stop()
                 runCurrent()
                 assertEquals(1, completed.size)
             }
         }
 
+    /** Flushes virtual-time state changes into Compose before UI assertions and image capture. */
     private fun settleRecordingState() {
         // Controller virtual time writes outside Compose's frozen frame clock.
         composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
@@ -214,6 +225,7 @@ class VoiceRecordingLimitScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    /** Requires visible Stop and Cancel actions while the recording strip is displayed. */
     private fun assertRecordingControls() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule
@@ -224,6 +236,7 @@ class VoiceRecordingLimitScreenshotTest {
             .assertIsDisplayed()
     }
 
+    /** Renders the recording composer under the requested theme, text scale and layout direction. */
     private fun render(
         controller: VoiceRecordingController,
         dark: Boolean = false,
@@ -251,6 +264,7 @@ class VoiceRecordingLimitScreenshotTest {
         composeRule.mainClock.advanceTimeBy(350L)
     }
 
+    /** Releases the fake recorder and its temporary output after each composed recording scenario. */
     private inline fun TestScope.withRecording(block: Fixture.() -> Unit) {
         val fixture = Fixture(this)
         try {
@@ -278,10 +292,13 @@ class VoiceRecordingLimitScreenshotTest {
                 onError = { throw it },
                 recorderFactory = { _, file, _ ->
                     object : VoiceRecordingSession {
+                        /** Creates deterministic payload bytes for UI scenarios without a platform microphone. */
                         override fun start() = file.writeText("captured audio")
 
+                        /** Returns a fixed-duration fake take so UI tests depend only on controller timing. */
                         override fun stop() = VoiceRecordingResult(file, 1_000L)
 
+                        /** Leaves fake payload cleanup to the enclosing fixture after the UI scenario completes. */
                         override fun cancel() = Unit
                     }
                 },

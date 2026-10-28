@@ -307,11 +307,13 @@ class VoiceRecordingController internal constructor(
         return true
     }
 
+    /** Finalizes an ordinary release after its short trailing-audio window. */
     fun stop() = finish()
 
     /** Preserve captured audio before Android can silence a background microphone. */
     fun interrupt() = finish(VoiceRecordingStopReason.Interrupted)
 
+    /** Detaches capture once and starts review finalization, skipping the tail for automatic stops. */
     private fun finish(reason: VoiceRecordingStopReason? = null) {
         if (abortPendingRestart()) return
         val r =
@@ -447,6 +449,7 @@ class VoiceRecordingController internal constructor(
         }
     }
 
+    /** Acquires transient speech focus and interrupts only for losses belonging to its current request. */
     private fun requestRecordingFocus(): Boolean {
         val am = audioManager ?: return true
         val attrs =

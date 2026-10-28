@@ -65,22 +65,6 @@
         ]
       },
       {
-        "surface": "voice_recording_interrupted",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "R.string.voice_recording_interrupted",
-        "test_ids": [
-          "MED-008"
-        ]
-      },
-      {
-        "surface": "voice_recording_limit_reached",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "R.string.voice_recording_limit_reached",
-        "test_ids": [
-          "MED-008"
-        ]
-      },
-      {
         "surface": "Interrupted recording save failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.voice_recording_save_failed",

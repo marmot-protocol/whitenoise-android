@@ -26,10 +26,13 @@ import java.io.File
 internal interface VoiceRecordingSession {
     val captureInterrupted: Boolean get() = false
 
+    /** Begins capture or reports the preparation failure to the caller. */
     fun start()
 
+    /** Finalizes captured audio, returning null when no usable payload can be produced. */
     fun stop(): VoiceRecordingResult?
 
+    /** Discards capture without handing a file to the review owner. */
     fun cancel()
 }
 
@@ -77,6 +80,7 @@ internal class VoiceRecorder(
             captureInterrupted = false
             val callback =
                 object : AudioManager.AudioRecordingCallback() {
+                    /** Marks interruption only when this still-registered recorder is silenced by Android. */
                     override fun onRecordingConfigChanged(configs: MutableList<AudioRecordingConfiguration>) {
                         // MediaRecorder scopes this callback to its own capture.
                         // Never infer interruption from quiet audio or another app.
@@ -153,6 +157,7 @@ internal class VoiceRecorder(
         runCatching { outputFile.delete() }
     }
 
+    /** Retires the recording callback before releasing the native recorder. */
     private fun release(recorder: MediaRecorder) {
         val callback = recordingCallback
         recordingCallback = null

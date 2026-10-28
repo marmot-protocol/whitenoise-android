@@ -24,6 +24,7 @@ import java.nio.file.Files
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class VoiceRecordingInterruptionTest {
+    /** Keeps a lock gesture accepted while recorder preparation is still suspended. */
     @Test
     fun lockAcceptedDuringPreparationSurvivesNativeStart() =
         runTest {
@@ -36,6 +37,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** Repeated stop signals deliver one interrupted take without advancing the ordinary tail delay. */
     @Test
     fun interruptPreservesExactlyOneTakeWithoutTheNormalTail() =
         runTest {
@@ -55,6 +57,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** A silenced session finalizes its take without interrupting a later replacement session. */
     @Test
     fun silencedCaptureStopsTheTimerAndRetiredSessionCannotStopANewTake() =
         runTest {
@@ -77,6 +80,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** An interrupted pending start publishes no take and relinquishes its microphone lease. */
     @Test
     fun interruptionBeforePreparationDoesNotPublishOrLeakARecorder() =
         runTest {
@@ -92,6 +96,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** Crossing the cap delivers one limit result and gives the next take a fresh warning budget. */
     @Test
     fun capWarnsThenFinalizesOnceAndTheNextTakeResetsItsBudget() =
         runTest {
@@ -119,6 +124,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** Ordinary release waits for trailing audio, while cancellation adds no review result. */
     @Test
     fun ordinaryReleaseRetainsItsTailAndCancellationNeverOffersAReview() =
         runTest {
@@ -141,6 +147,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** Focus loss finalizes capture, but ducking and stale listeners cannot stop the active replacement. */
     @Test
     fun audioFocusLossFinalizesAndRetiredFocusCannotInterruptReplacement() =
         runTest {
@@ -168,6 +175,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** Disposal during encoder stop removes finalized bytes that never reached the review owner. */
     @Test
     fun disposalDuringInterruptedEncoderStopDeletesTheUnclaimedFile() =
         runTest {
@@ -185,6 +193,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** A failed interrupted save reports its dedicated error without claiming a reviewable take. */
     @Test
     fun failedInterruptedFinalizationReportsSaveFailureWithoutInventingAReview() =
         runTest {
@@ -202,6 +211,7 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** Releases the fixture controller and temporary files even when a recording assertion fails. */
     private fun TestScope.withRecording(
         onError: (Throwable) -> Unit = { throw it },
         block: Fixture.() -> Unit,
@@ -251,8 +261,10 @@ class VoiceRecordingInterruptionTest {
         var saveable = true
         var onStop: (() -> Unit)? = null
 
+        /** Creates deterministic captured bytes without invoking the platform encoder. */
         override fun start() = file.writeText("captured audio")
 
+        /** Counts finalization and optionally simulates an unsaveable capture or disposal race. */
         override fun stop(): VoiceRecordingResult? {
             stops++
             onStop?.invoke()
@@ -263,6 +275,7 @@ class VoiceRecordingInterruptionTest {
             return VoiceRecordingResult(file, 2_000L)
         }
 
+        /** Deletes an unfinished fake capture while leaving an already finalized result to its owner. */
         override fun cancel() {
             if (stops == 0) file.delete()
         }

@@ -2158,6 +2158,17 @@ internal fun ConversationScreen(
         onDispose { voiceReview.release() }
     }
 
+    val voiceRecordingCompletedClip =
+        remember(voiceReview) {
+            mutableStateOf<dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewClip?>(null)
+        }
+    val voiceRecordingStopNotice =
+        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceRecordingStopNotice(
+            voiceReview,
+            appState,
+            conversationAccountRef,
+            controller.group.groupIdHex,
+        )
     val voiceRecordingController =
         // Re-key on every captured dependency: chat.id (basic), controller
         // (avoids dispatching through a stale ConversationController when
@@ -2179,7 +2190,10 @@ internal fun ConversationScreen(
                     }
                     granted
                 },
-                onRecordingComplete = { file, durationMs -> voiceReview.offer(file, durationMs) },
+                onRecordingComplete = { file, durationMs ->
+                    voiceRecordingCompletedClip.value =
+                        if (voiceReview.offer(file, durationMs)) voiceReview.clip else null
+                },
                 onError = { throwable ->
                     presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
                 },
@@ -2189,14 +2203,9 @@ internal fun ConversationScreen(
                 bitrateProvider = { appState.mediaQuality.audioBitrateBps },
                 microphoneCaptures = appState.microphoneCaptureCoordinator,
                 onAutomaticStop = { reason ->
-                    appState.present(
-                        when (reason) {
-                            dev.ipf.whitenoise.android.audio.VoiceRecordingStopReason.LimitReached ->
-                                R.string.voice_recording_limit_reached
-                            dev.ipf.whitenoise.android.audio.VoiceRecordingStopReason.Interrupted ->
-                                R.string.voice_recording_interrupted
-                        },
-                    )
+                    val completedClip = voiceRecordingCompletedClip.value
+                    voiceRecordingCompletedClip.value = null
+                    voiceRecordingStopNotice(reason, completedClip)
                 },
             )
         }
@@ -2204,6 +2213,7 @@ internal fun ConversationScreen(
         .VoiceRecordingLifecycleEffect(voiceRecordingController)
     LaunchedEffect(voiceRecordingController.isRecording, voiceReview.clip) {
         if (voiceRecordingController.isRecording) {
+            voiceRecordingCompletedClip.value = null
             voiceReview.discardForNewRecording()
             voiceReviewRecovery.updatePresence(false)
         }
