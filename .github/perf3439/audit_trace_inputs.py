@@ -80,7 +80,7 @@ if MODE == 'check':
     sys.exit(0)
 assert MODE == 'audit'
 proof = json.loads(pathlib.Path(sys.argv[4]).read_text())
-trusted = {(p['group'], p['name'], p['version'], p['file']): p['sha256'] for p in proof}
+trusted = {(p['group'], p['name'], p['version'], p.get('verification_artifact_name', p['file'])): p['sha256'] for p in proof}
 a_config, a_entries = xml_inputs(evidence / 'baseline' / verification)
 b_config, b_entries = xml_inputs(root / verification)
 assert a_config == b_config, 'Verification configuration changed'
@@ -99,15 +99,14 @@ for config in before:
         assert before[config] == after[config], config
         continue
     prior, current = before[config], after[config]
+    if config == 'previewPlayReleaseCompileClasspath':
+        assert prior == current, 'Diagnostic runtime overlay changed compilation dependencies'
+        continue
     assert not set(prior) - set(current), (config, 'Removed dependency')
     for key in set(prior) | set(current):
         if prior.get(key) == current.get(key):
             continue
-        assert (key not in prior and allowed.get(key) == current.get(key)) or (
-            config == 'previewPlayReleaseCompileClasspath' and
-            key == 'androidx.startup:startup-runtime' and
-            prior[key] == '1.1.1' and current[key] == '1.2.0'
-        ), (config, key, prior.get(key), current.get(key))
+        assert (key not in prior and allowed.get(key) == current.get(key)), (config, key, prior.get(key), current.get(key))
         changes.setdefault(config, {})[key] = [prior.get(key), current.get(key)]
     assert all(current.get(k) == v for k, v in allowed.items()), config
 resolved = json.loads((root / 'trace-resolved-graph.json').read_text())
