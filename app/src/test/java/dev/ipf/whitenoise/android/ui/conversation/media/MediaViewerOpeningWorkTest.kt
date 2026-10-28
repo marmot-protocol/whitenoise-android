@@ -58,7 +58,12 @@ class MediaViewerOpeningWorkTest {
             object : CompositionTracer {
                 override fun isTraceInProgress() = true
 
-                override fun traceEventStart(key: Int, dirty1: Int, dirty2: Int, info: String) {
+                override fun traceEventStart(
+                    key: Int,
+                    dirty1: Int,
+                    dirty2: Int,
+                    info: String,
+                ) {
                     if (info.startsWith("dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame (")) {
                         frames.incrementAndGet()
                     }
