@@ -249,6 +249,7 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/IncomingAttachmentBackgroundDownloadAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptFixtureSupport.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnostics.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptProcessStopDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnosticsAndroidTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
       # Receipt scheduling and durable admission (#3308) are proven by the background receipt fixture.

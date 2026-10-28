@@ -428,20 +428,41 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         requests += request
         HeldAttachmentCancellationProbe.control(blobPort, "/__hold-resumable-acquisition")
         setPolicy(BackgroundReceiptPolicyCase.ProcessStop, receiver, MediaAutoDownloadType.entries.toSet())
-        requireNotNull(state).processNotificationUpdateForTest(receipt(receiver, group, request))
+        val receiverState = requireNotNull(state)
+        val diagnostics =
+            BackgroundReceiptProcessStopDiagnostics(
+                snapshot = {
+                    backgroundReceiptPolicySnapshot(
+                        receiverState.automaticAttachmentPolicy(receiver.label),
+                        MediaAutoDownloadType.entries.toSet(),
+                        emptySet(),
+                        permissions(receiverState).appliedRevision(receiver.label) != null,
+                    )
+                },
+            )
+        diagnostics.trace(BackgroundReceiptProcessStopStage.ReceiptProcessing) {
+            receiverState.processNotificationUpdateForTest(receipt(receiver, group, request))
+        }
         val manager = WorkManager.getInstance(context)
         val name = attachmentDownloadWorkName(request)
         val running =
-            withTimeout(READY_TIMEOUT_MILLIS) {
-                var info: WorkInfo? = null
-                while (info == null) {
-                    val infos = manager.getWorkInfosForUniqueWork(name).get()
-                    info = infos.firstOrNull { it.state == WorkInfo.State.RUNNING }
-                    if (info == null) delay(50L)
+            diagnostics.trace(BackgroundReceiptProcessStopStage.RunningWork) {
+                withTimeout(READY_TIMEOUT_MILLIS) {
+                    var info: WorkInfo? = null
+                    while (info == null) {
+                        val infos = manager.getWorkInfosForUniqueWork(name).get()
+                        diagnostics.observeWork(infos.map { it.state })
+                        info = infos.firstOrNull { it.state == WorkInfo.State.RUNNING }
+                        if (info == null) delay(50L)
+                    }
+                    info
                 }
-                info
             }
-        awaitLedger(blobPort) { events -> events.any { it.getString("kind") == "held" } }
+        diagnostics.trace(BackgroundReceiptProcessStopStage.HeldLedger) {
+            awaitLedger(blobPort, diagnostics::observeLedger) { events ->
+                events.any { it.getString("kind") == "held" }
+            }
+        }
         val job = PlatformInterruptedAttachmentProbe.findScheduledWork(context, running.id.toString())
         HeldAttachmentCancellationProbe.control(blobPort, "/__platform-stop-marker")
         val namespace = if (job.first == null) "" else "-n ${job.first} "
