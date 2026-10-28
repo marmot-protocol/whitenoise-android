@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 82a86c0f4accd6f3d520ad850a4eb58c27a650a2
+          ref: 8113a3f06b1723019930471cc3160cab23b15a34
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -220,7 +220,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 82a86c0f4accd6f3d520ad850a4eb58c27a650a2
+          ref: 8113a3f06b1723019930471cc3160cab23b15a34
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
