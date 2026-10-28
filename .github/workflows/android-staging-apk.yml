@@ -1,8 +1,12 @@
 name: Android Staging APK
-run-name: PR3439 current viewer texture upload controlled comparison
+run-name: PR3439 ${{ inputs.frame_metrics_only && 'window first-draw FrameMetrics diagnostic' || inputs.diagnostic_only && 'Compose userspace diagnostic' || 'viewer texture upload comparison' }}
 on:
   workflow_dispatch:
     inputs:
+      frame_metrics_only:
+        description: Build only the bounded window FrameMetrics diagnostic; never acceptance evidence
+        type: boolean
+        default: false
       diagnostic_only:
         description: Build isolated Compose SDK profiling APKs only; excluded from performance acceptance
         type: boolean
@@ -14,11 +18,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: perf3439-physical-ab-${{ inputs.diagnostic_only && 'trace' || inputs.checks_only && 'checks' || 'pair' }}
+  group: perf3439-physical-ab-${{ inputs.frame_metrics_only && 'frame-metrics' || inputs.diagnostic_only && 'trace' || inputs.checks_only && 'checks' || 'pair' }}
   cancel-in-progress: false
 jobs:
   static:
-    if: inputs.diagnostic_only != true
+    if: inputs.diagnostic_only != true && inputs.frame_metrics_only != true
     name: Motion style and static analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -61,7 +65,7 @@ jobs:
 
   pair:
     needs: static
-    if: inputs.checks_only != true && inputs.diagnostic_only != true
+    if: inputs.checks_only != true && inputs.diagnostic_only != true && inputs.frame_metrics_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -486,6 +490,126 @@ jobs:
         if: always()
         with:
           name: perf3439-compose-trace-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 7
+
+  frame_metrics:
+    name: Isolated window FrameMetrics diagnostic
+    if: inputs.frame_metrics_only == true && inputs.diagnostic_only != true && inputs.checks_only != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AFTER_SHA: 08d4d31f99e88e853f8aa9abb3a21ff9ce2bdb3b
+      WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
+      PR_PREVIEW_CHANNEL: isolated
+      PR_NUMBER: '3439'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.AFTER_SHA }}
+          path: after
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+        with:
+          cache-read-only: true
+      - name: Pin the source and native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C after rev-parse HEAD)" = "$AFTER_SHA"
+          mkdir -p artifacts
+          cp after/app/src/main/marmotkit/MARMOT_VERSION artifacts/MARMOT_VERSION
+          pin=$(awk -F= '$1 == "artifact-sha256" {print $2}' artifacts/MARMOT_VERSION)
+          [[ "$pin" =~ ^[0-9a-f]{64}$ ]]
+          printf 'NATIVE_ARTIFACT=%s\nWHITENOISE_MARMOTKIT_CACHE_DIR=%s\nFIXTURE_SUFFIX=.perf3439fm.r%s\n' \
+            "$pin" "$RUNNER_TEMP/marmotkit-cache" "$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ env.NATIVE_ARTIFACT }}
+      - name: Apply bounded SDK-only window diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p after/app/src/preview/java/dev/ipf/whitenoise/android/perf3439
+          test ! -e after/app/src/preview/AndroidManifest.xml
+          test ! -e after/app/src/preview/java/dev/ipf/whitenoise/android/perf3439/Perf3439FrameMetrics.kt
+          cp tooling/.github/perf3439/frame-metrics-manifest.xml after/app/src/preview/AndroidManifest.xml
+          cp tooling/.github/perf3439/Perf3439FrameMetrics.kt after/app/src/preview/java/dev/ipf/whitenoise/android/perf3439/
+          python3 tooling/.github/perf3439/apply_frame_metrics.py after artifacts
+          cp tooling/.github/perf3439/Perf3439FrameMetrics.kt artifacts/
+          cp tooling/.github/perf3439/frame-metrics-manifest.xml artifacts/
+          cp tooling/.github/perf3439/apply_frame_metrics.py artifacts/
+          git -C after diff --binary > artifacts/diagnostic-source-overlay.diff
+          test "$(git -C after diff --name-only)" = 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerEntryFrame.kt'
+          keytool -genkeypair -keystore "$RUNNER_TEMP/fixture.p12" -storetype PKCS12 \
+            -storepass fixture-only -keypass fixture-only -alias fixture -keyalg RSA -keysize 2048 \
+            -validity 3650 -dname 'CN=PR3439 Disposable Window FrameMetrics'
+          cat > "$RUNNER_TEMP/perf3439.gradle" <<'GRADLE'
+          gradle.beforeProject { project ->
+              if (project.path != ':app') return
+              project.plugins.withId('com.android.application') {
+                  project.extensions.getByName('androidComponents').finalizeDsl { android ->
+                      def preview = android.productFlavors.getByName('preview')
+                      preview.applicationIdSuffix = System.getenv('FIXTURE_SUFFIX')
+                      preview.manifestPlaceholders['appName'] = 'PR3439 FrameMetrics Diagnostic'
+                      preview.manifestPlaceholders['deepLinkScheme'] = 'whitenoise-perf3439-fm'
+                      preview.buildConfigField('String', 'WHITENOISE_DEEP_LINK_SCHEME', '"whitenoise-perf3439-fm"')
+                      android.packaging.jniLibs.useLegacyPackaging = true
+                  }
+              }
+          }
+          GRADLE
+          cp "$RUNNER_TEMP/perf3439.gradle" artifacts/diagnostic-overlay.gradle
+      - name: Build and sign the diagnostic candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd after
+            PREVIEW_HEAD_SHA=$AFTER_SHA ./gradlew :app:assemblePreviewPlayRelease \
+              -Pandroid.injected.build.abi=arm64-v8a -Pandroid.injected.testOnly=false \
+              --build-cache --no-daemon --stacktrace -I "$RUNNER_TEMP/perf3439.gradle"
+          )
+          python3 - <<'PYTHON'
+          import hashlib,json,os,pathlib,re,shutil,subprocess
+          root=pathlib.Path('after');out=pathlib.Path('artifacts');expected='dev.ipf.whitenoise.android'+os.environ['FIXTURE_SUFFIX']
+          candidates=[]
+          for metadata in (root/'app/build').rglob('output-metadata.json'):
+              data=json.loads(metadata.read_text())
+              if data.get('artifactType',{}).get('type')!='APK' or data.get('variantName')!='previewPlayRelease' or data.get('applicationId')!=expected:continue
+              for element in data.get('elements',[]):
+                  if any(f.get('filterType')=='ABI' and f.get('value')=='arm64-v8a' for f in element.get('filters',[])):
+                      candidate=(metadata.parent/element['outputFile']).resolve()
+                      if candidate.suffix=='.apk':candidates.append(candidate)
+          candidates=list(dict.fromkeys(candidates));assert len(candidates)==1,candidates
+          sdk=pathlib.Path(os.environ['ANDROID_HOME']);signer=sorted((sdk/'build-tools').glob('*/apksigner'))[-1];target=out/'after.apk'
+          subprocess.check_call([str(signer),'sign','--ks',os.environ['RUNNER_TEMP']+'/fixture.p12','--ks-key-alias','fixture','--ks-pass','pass:fixture-only','--key-pass','pass:fixture-only','--out',str(target),str(candidates[0])])
+          verification=subprocess.check_output([str(signer),'verify','--verbose','--print-certs',str(target)],text=True)
+          (out/'after-signature.txt').write_text(verification)
+          certs=re.findall(r'certificate SHA-256 digest: ([0-9a-f]{64})',verification);assert len(set(certs))==1
+          overlay={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in out.iterdir() if p.suffix in ('.kt','.xml','.py','.gradle','.diff')}
+          manifest={'role':'after','source_sha':os.environ['AFTER_SHA'],'workflow_sha':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'package':expected,'variant':'previewPlayRelease','profileable_shell':True,'diagnostic_only':True,'diagnostic_window_frame_metrics':True,'production_admission_unchanged':True,'overlay_sha256':overlay,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'certificate_sha256':certs[0],'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 or stock XL user12 only'}
+          (out/'after.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          shutil.copyfile(root/'app/build/outputs/mapping/previewPlayRelease/mapping.txt',out/'after-mapping.txt')
+          PYTHON
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: perf3439-frame-metrics-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: error
           compression-level: 6
