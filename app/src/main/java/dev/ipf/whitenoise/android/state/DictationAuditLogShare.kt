@@ -29,9 +29,8 @@ internal fun prepareAuditAndDictationLogArchive(
     val dropped = diagnosticDroppedCount(diagnosticEntries)
     val hasDictationRecords = diagnosticEntries.keys.any { it.endsWith(".jsonl") } || dropped != 0L
     val hasPerformanceRecords = performanceLogBytes != null || nativePerformanceLogBytes != null
-    if (sourcePaths.isEmpty() && !hasDictationRecords && !hasPerformanceRecords && localSendTraceEntries.isEmpty()) {
-        return null
-    }
+    val hasSupplementalRecords = hasDictationRecords || hasPerformanceRecords || localSendTraceEntries.isNotEmpty()
+    if (sourcePaths.isEmpty() && !hasSupplementalRecords) return null
     return prepareAuditLogArchive(
         context.cacheDir,
         marmotRoot,
