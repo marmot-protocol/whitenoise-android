@@ -7,7 +7,9 @@ import androidx.compose.runtime.mutableStateMapOf
  * Actual pre-offset lazy-row positions, normalized to the list's content origin. Pinned offscreen
  * rows collapse uncomposed slots, so neither total consumed scroll nor visibleItemsInfo locates them.
  */
-internal class FolderDragPlacements(private val list: LazyListState) {
+internal class FolderDragPlacements(
+    private val list: LazyListState,
+) {
     private val tops = mutableStateMapOf<String, Float>()
     private val translations = mutableMapOf<String, Float>()
 

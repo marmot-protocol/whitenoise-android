@@ -222,17 +222,18 @@ internal fun SettingsBottomAction(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(modifier = modifier, color = color, tonalElevation = tonalElevation) {
-        AdaptiveContent {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .floatingDictationFooter()
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(WhiteNoiseSpacing.PinnedActionInset),
-                content = content,
-            )
+        Box(Modifier.fillMaxWidth().floatingDictationFooter()) {
+            AdaptiveContent {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(WhiteNoiseSpacing.PinnedActionInset),
+                    content = content,
+                )
+            }
         }
     }
 }

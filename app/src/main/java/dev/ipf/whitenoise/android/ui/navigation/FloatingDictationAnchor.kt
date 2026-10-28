@@ -146,8 +146,7 @@ internal fun Modifier.floatingDictationFooter(): Modifier {
                     if (space.capsuleSlot > 0.dp) {
                         anchor?.reportFooter(token, viewport = it.boundsInWindow(), scroll = scroll)
                     }
-                }
-                .verticalScroll(scroll)
+                }.verticalScroll(scroll)
                 .onPlaced {
                     if (space.capsuleSlot > 0.dp) {
                         val origin = it.positionInWindow()
@@ -156,8 +155,7 @@ internal fun Modifier.floatingDictationFooter(): Modifier {
                             slot = Rect(origin.x, origin.y, origin.x + it.size.width, origin.y + it.size.height),
                         )
                     }
-                }
-                .layout { measurable, constraints ->
+                }.layout { measurable, constraints ->
                     val actions = measurable.measure(constraints)
                     val slot = space.capsuleSlot.roundToPx()
                     layout(actions.width, actions.height + slot) { actions.placeRelative(0, slot) }
@@ -198,8 +196,7 @@ internal fun FloatingDictationLayout(
                 ) {
                     control()
                 }
-            }
-                .single()
+            }.single()
                 .measure(constraints.copy(minWidth = 0, minHeight = 0))
                 .takeIf { it.width > 0 && it.height > 0 }
         val safeTop = (statusBarTop - rootTop).roundToInt().coerceAtLeast(0)
@@ -216,8 +213,7 @@ internal fun FloatingDictationLayout(
         val body =
             subcompose("content") {
                 CompositionLocalProvider(LocalDictationFooterSpace provides footerSpace, content = content)
-            }
-                .single()
+            }.single()
                 .measure(constraints)
         layout(constraints.maxWidth, constraints.maxHeight) {
             body.place(0, 0)

@@ -2455,7 +2455,7 @@
     <string name="public_jpeg_preview_save_failed">无法保存图片预览设置，请重试。</string>
     <string name="appearance_accessibility_preview">可读性预览</string>
     <string name="appearance_preview_rtl">预览从右到左的布局</string>
-    <string name="appearance_preview_large_text">以当前文字大小的两倍预览</string>
+    <string name="appearance_preview_large_text">预览更大文字</string>
     <string name="appearance_preview_reset">重置示例</string>
     <string name="appearance_preview_limits">使用当前主题和字体的模拟示例。这些开关仅影响此示例。屏幕阅读器的朗读顺序、放大功能、开关控制和触摸区域需要使用实际的无障碍服务单独测试。</string>
     <string name="appearance_preview_motion_on">系统动画已启用。此静态示例不测试动态效果。</string>

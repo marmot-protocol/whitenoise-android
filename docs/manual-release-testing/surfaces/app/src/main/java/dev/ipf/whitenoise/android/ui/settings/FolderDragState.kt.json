@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun folderDragRowModifier(",
         "test_ids": [
+          "FLD-002",
           "FLD-006"
         ]
       },
@@ -16,6 +17,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun rememberFolderDrag(",
         "test_ids": [
+          "FLD-002",
           "FLD-006"
         ]
       },
@@ -24,6 +26,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun Modifier.folderDragHandle(",
         "test_ids": [
+          "FLD-002",
           "FLD-006"
         ]
       }

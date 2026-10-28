@@ -329,6 +329,9 @@ class AppNavigationTest {
             composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
             composeRule.onNodeWithText(context.getString(R.string.appearance)).performScrollTo().performClick()
             val initial = appearanceSampleLayout().layoutInput
+            // Compose's text input retains a live Density; snapshot its value before changing the preview.
+            val initialFontScale = initial.density.fontScale
+            val initialDirection = initial.layoutDirection
             composeRule
                 .onNodeWithText(context.getString(R.string.appearance_preview_rtl))
                 .performScrollTo()
@@ -338,15 +341,15 @@ class AppNavigationTest {
                 .performScrollTo()
                 .performClick()
             val simulated = appearanceSampleLayout().layoutInput
-            assertEquals(initial.density.fontScale * 2f, simulated.density.fontScale)
+            assertEquals(initialFontScale * 2f, simulated.density.fontScale)
             assertEquals(androidx.compose.ui.unit.LayoutDirection.Rtl, simulated.layoutDirection)
             composeRule
                 .onNodeWithText(context.getString(R.string.appearance_preview_reset))
                 .performScrollTo()
                 .performClick()
             val restored = appearanceSampleLayout().layoutInput
-            assertEquals(initial.density.fontScale, restored.density.fontScale)
-            assertEquals(initial.layoutDirection, restored.layoutDirection)
+            assertEquals(initialFontScale, restored.density.fontScale)
+            assertEquals(initialDirection, restored.layoutDirection)
             composeRule.runOnIdle {
                 assertEquals(appFont, appState.appFont)
                 assertEquals(appScale, appState.fontScale)

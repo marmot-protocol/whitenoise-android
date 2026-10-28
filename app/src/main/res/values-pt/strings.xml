@@ -2490,7 +2490,7 @@
     <string name="public_jpeg_preview_save_failed">Não foi possível salvar a configuração de prévia de imagens. Tente novamente.</string>
     <string name="appearance_accessibility_preview">Pré-visualização da legibilidade</string>
     <string name="appearance_preview_rtl">Pré-visualizar disposição da direita para a esquerda</string>
-    <string name="appearance_preview_large_text">Pré-visualizar com o dobro do tamanho atual do texto</string>
+    <string name="appearance_preview_large_text">Pré-visualizar texto maior</string>
     <string name="appearance_preview_reset">Repor exemplo</string>
     <string name="appearance_preview_limits">Exemplo fictício com o tema e o tipo de letra atuais. Estes interruptores afetam apenas este exemplo. A ordem do leitor de ecrã, a ampliação, o acesso por interruptores e as áreas de toque precisam de testes separados com o serviço de acessibilidade real.</string>
     <string name="appearance_preview_motion_on">As animações do sistema estão ativadas. Este exemplo estático não testa movimentos.</string>

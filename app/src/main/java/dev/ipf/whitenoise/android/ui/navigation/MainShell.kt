@@ -1765,8 +1765,12 @@ internal fun MainShell(
         handoffOwner = appState.activeAccountRef to appState.runtimeGeneration,
         handoffDestination =
             when {
-                !navAccountStable || appState.appLockScreenVisible || routingNotification || routingShare ||
-                    routingAppUpdate || pendingTtsDestinationNavigation != null -> null
+                !navAccountStable ||
+                    appState.appLockScreenVisible ||
+                    routingNotification ||
+                    routingShare ||
+                    routingAppUpdate ||
+                    pendingTtsDestinationNavigation != null -> null
                 selectedChat != null -> ComposerFabEndpoint.Composer
                 section == MainSection.Chats -> ComposerFabEndpoint.NewMessage
                 else -> null

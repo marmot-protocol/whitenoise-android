@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -15,6 +16,8 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderManageItem
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersContent
 import dev.ipf.whitenoise.android.ui.settings.chatFoldersState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,6 +37,7 @@ class ChatFoldersScreenScreenshotTest {
     @Test
     fun chatFoldersScreenLight() = capture("chat_folders_screen_light", dark = false, amoled = false)
 
+    /** A held folder occupies the opened insertion gap after its siblings finish moving. */
     @Test
     fun draggingFolderLight() = capture("chat_folders_drag_light", dark = false, amoled = false, drag = true)
 
@@ -102,21 +106,50 @@ class ChatFoldersScreenScreenshotTest {
             }
         }
         if (drag) {
-            composeRule.mainClock.autoAdvance = false
-            val handle = composeRule.onNodeWithTag("folder.drag.unread", useUnmergedTree = true)
-            handle.performTouchInput {
-                down(center)
-                moveBy(Offset(0f, 80f))
-            }
-            composeRule.mainClock.advanceTimeBy(32L)
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
-            handle.performTouchInput { up() }
-            composeRule.mainClock.autoAdvance = true
+            captureHeldInsertion(name)
         } else if (menu) {
             composeRule.onNodeWithTag("folder.row.work").performTouchInput { longClick() }
             composeRule.onNodeWithTag("folder.menu.work").captureRoboImage("src/test/snapshots/$name.png")
         } else {
             composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        }
+    }
+
+    /** Pins a real held pointer at the target row's center and verifies the opened gap before recording it. */
+    private fun captureHeldInsertion(name: String) {
+        val root = composeRule.onRoot()
+        val rootOrigin = root.fetchSemanticsNode().boundsInRoot.topLeft
+        val source = composeRule.onNodeWithTag("folder.row.unread")
+        val sibling = composeRule.onNodeWithTag("folder.row.archived")
+        val original = source.fetchSemanticsNode().boundsInRoot
+        val target = sibling.fetchSemanticsNode().boundsInRoot
+        val handle =
+            composeRule
+                .onNodeWithTag("folder.drag.unread", useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        composeRule.mainClock.autoAdvance = false
+        try {
+            root.performTouchInput {
+                down(handle.center - rootOrigin)
+                moveBy(Offset(0f, target.center.y - original.center.y))
+            }
+            composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            val held = source.fetchSemanticsNode().boundsInRoot
+            root.performTouchInput { moveBy(Offset(0f, target.center.y - held.center.y)) }
+            composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
+            composeRule.mainClock.advanceTimeBy(160)
+            composeRule.waitForIdle()
+            val positioned = source.fetchSemanticsNode().boundsInRoot
+            val shifted = sibling.fetchSemanticsNode().boundsInRoot
+            assertEquals(target.center.y, positioned.center.y, 1f)
+            assertTrue(shifted.top < target.top && shifted.bottom <= positioned.top + 1f)
+            root.captureRoboImage("src/test/snapshots/$name.png")
+        } finally {
+            root.performTouchInput { up() }
+            composeRule.mainClock.autoAdvance = true
         }
     }
 

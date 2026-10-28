@@ -30,6 +30,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -175,6 +176,54 @@ class FloatingDictationBottomObstacleCoverageTest {
             "the system-bar inset must retain the footer paint",
             insetPixel.green > 0.9f && insetPixel.red < 0.1f,
         )
+    }
+
+    /** The shell-edge capsule stays painted and reachable when adaptive actions occupy a narrower centered pane. */
+    @Test
+    @Config(qualifiers = "en-w1200dp-h780dp-mdpi")
+    fun wideShortSettingsFooterKeepsTheCapsuleInsideItsFullWidthViewport() {
+        val anchor = FloatingDictationAnchor()
+        composeRule.setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalFloatingDictationAnchor provides anchor) {
+                    Box(Modifier.size(1200.dp, 100.dp).testTag("wide.root")) {
+                        FloatingDictationLayout(
+                            anchor = anchor,
+                            content = {
+                                Box(Modifier.fillMaxSize()) {
+                                    SettingsBottomAction(Modifier.align(Alignment.BottomCenter)) {
+                                        repeat(3) { index ->
+                                            Button(onClick = {}, modifier = Modifier.height(48.dp)) {
+                                                Text("Wide action $index")
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            control = {
+                                Box(Modifier.size(168.dp, 48.dp).background(Color.Green).testTag("wide.capsule"))
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        val root = composeRule.onNodeWithTag("wide.root")
+        val rootBounds = root.fetchSemanticsNode().boundsInRoot
+        val capsule =
+            composeRule.onNodeWithTag("wide.capsule").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        composeRule.runOnIdle {
+            assertEquals(rootBounds.width, requireNotNull(anchor.scrollingCapsule).second.width, 0.5f)
+        }
+        val pixels = root.captureToImage().toPixelMap()
+        val painted =
+            pixels[(capsule.center.x - rootBounds.left).toInt(), (capsule.center.y - rootBounds.top).toInt()]
+        assertTrue(
+            "the capsule must be painted outside the adaptive action pane",
+            painted.green > 0.9f && painted.red < 0.1f,
+        )
+        composeRule.onNodeWithText("Wide action 2").performScrollTo().assertIsDisplayed()
+        composeRule.runOnIdle { assertTrue(requireNotNull(anchor.scrollingState).value > 0) }
     }
 
     /** Short windows scroll full-size controls together instead of giving actions a zero-height viewport. */

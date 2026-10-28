@@ -3,13 +3,15 @@
 The Appearance sample renders synthetic content with the same `FontAppearanceSample`
 used by the font-family and font-size dialogs. It contains no account or chat content.
 It follows the current app theme, font family and effective OS × app font size.
-The RTL and double-size switches affect only this sample. Reset, leaving the screen,
-or replacing the account/runtime discards those local switches.
+The RTL and large-text switches affect only this sample. Reset, leaving the screen,
+or replacing the account/runtime discards those local switches. The large-text simulation
+doubles the inherited font-scale setting; Android nonlinear scaling means it does
+not promise exactly twice the rendered glyph size.
 
 | Setting or concern | Sample coverage | Required separate qualification |
 | --- | --- | --- |
 | Font family | Current app typography and selectable dialog sample | Actual long labels, missing glyphs and emoji in production routes |
-| Font size | Current OS × app scale; labeled local 2× stress simulation | Real system size changes, rotation and constrained windows |
+| Font size | Current OS × app scale; labeled local large-text simulation | Real system size changes, rotation and constrained windows |
 | Bubble colors | Production preview token resolver in Light/Dark/AMOLED | Received/sent/selected/deleted/attachment states in actual conversations |
 | Action colors | Current theme/action controls; existing production color picker preview | Focus, pressed, disabled and contrast states on real actions |
 | RTL | Local direction simulation, not a locale/preference change | Real RTL localization, bidi messages, icons and gesture direction |

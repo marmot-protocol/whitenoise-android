@@ -2490,7 +2490,7 @@
     <string name="public_jpeg_preview_save_failed">No se pudo guardar la configuración de las vistas previas. Inténtalo de nuevo.</string>
     <string name="appearance_accessibility_preview">Vista previa de legibilidad</string>
     <string name="appearance_preview_rtl">Vista previa del diseño de derecha a izquierda</string>
-    <string name="appearance_preview_large_text">Vista previa con el doble del tamaño de texto actual</string>
+    <string name="appearance_preview_large_text">Vista previa con texto más grande</string>
     <string name="appearance_preview_reset">Restablecer ejemplo</string>
     <string name="appearance_preview_limits">Ejemplo ficticio con el tema y la fuente actuales. Estos interruptores solo afectan a este ejemplo. El orden del lector de pantalla, la ampliación, el acceso con interruptores y las áreas táctiles deben probarse por separado con el servicio de accesibilidad real.</string>
     <string name="appearance_preview_motion_on">Las animaciones del sistema están activadas. Este ejemplo estático no prueba el movimiento.</string>

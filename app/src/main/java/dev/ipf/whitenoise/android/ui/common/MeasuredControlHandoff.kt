@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.dp
  * Geometry only: no text, bitmap, input, focus or route state enters a handoff. Live registrations
  * admit each endpoint. The source is captured before the same composition replaces its child.
  */
-internal class MeasuredControlHandoff(initialDestination: Any?) {
+internal class MeasuredControlHandoff(
+    initialDestination: Any?,
+) {
     private val live = mutableStateMapOf<Any, Pair<Any, Rect>>()
     private var previous = initialDestination
     private var start: Rect? by mutableStateOf(null)

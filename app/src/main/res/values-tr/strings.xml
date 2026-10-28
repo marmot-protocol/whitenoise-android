@@ -2488,7 +2488,7 @@
     <string name="public_jpeg_preview_save_failed">Görsel önizleme ayarı kaydedilemedi. Lütfen tekrar deneyin.</string>
     <string name="appearance_accessibility_preview">Okunabilirlik önizlemesi</string>
     <string name="appearance_preview_rtl">Sağdan sola düzeni önizle</string>
-    <string name="appearance_preview_large_text">Geçerli metin boyutunun iki katıyla önizle</string>
+    <string name="appearance_preview_large_text">Daha büyük metni önizle</string>
     <string name="appearance_preview_reset">Örneği sıfırla</string>
     <string name="appearance_preview_limits">Geçerli tema ve yazı tipini kullanan yapay bir örnek. Bu anahtarlar yalnızca bu örneği etkiler. Ekran okuyucu sırası, büyütme, anahtarla erişim ve dokunma alanları gerçek erişilebilirlik hizmetiyle ayrıca test edilmelidir.</string>
     <string name="appearance_preview_motion_on">Sistem animasyonları etkin. Bu statik örnek hareketi test etmez.</string>

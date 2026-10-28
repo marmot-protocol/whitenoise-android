@@ -2490,7 +2490,7 @@
     <string name="public_jpeg_preview_save_failed">Impossibile salvare la preferenza delle anteprime. Riprova.</string>
     <string name="appearance_accessibility_preview">Anteprima della leggibilità</string>
     <string name="appearance_preview_rtl">Anteprima del layout da destra a sinistra</string>
-    <string name="appearance_preview_large_text">Anteprima con testo di dimensioni doppie</string>
+    <string name="appearance_preview_large_text">Anteprima con testo più grande</string>
     <string name="appearance_preview_reset">Reimposta esempio</string>
     <string name="appearance_preview_limits">Esempio fittizio con il tema e il carattere attuali. Questi interruttori modificano solo questo esempio. L’ordine del lettore di schermo, l’ingrandimento, l’accesso tramite interruttori e le aree di tocco richiedono test separati con il servizio di accessibilità effettivo.</string>
     <string name="appearance_preview_motion_on">Le animazioni di sistema sono attivate. Questo esempio statico non verifica il movimento.</string>

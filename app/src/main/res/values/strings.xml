@@ -2659,7 +2659,7 @@
     <string name="public_jpeg_preview_save_failed">Could not save the image preview setting. Please try again.</string>
     <string name="appearance_accessibility_preview">Readability preview</string>
     <string name="appearance_preview_rtl">Preview right-to-left layout</string>
-    <string name="appearance_preview_large_text">Preview twice the current text size</string>
+    <string name="appearance_preview_large_text">Preview larger text</string>
     <string name="appearance_preview_reset">Reset sample</string>
     <string name="appearance_preview_limits">Synthetic sample using your current theme and font. These switches affect only this sample. Screen-reader order, magnification, switch access and touch targets need separate testing with the real accessibility service.</string>
     <string name="appearance_preview_motion_on">System animations are enabled. This static sample does not test motion.</string>
