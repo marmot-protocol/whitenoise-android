@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.AttachmentTransferCancelledByUserException
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -31,6 +32,22 @@ internal fun shouldMaterializeAttachmentAutomatically(
         hasMaterializedFile ||
         hasRetainedPlaintext ||
         (!automaticDownloadsPaused && (mediaAutoDownloadAllowed || mine))
+
+/**
+ * An own file whose reference MDK has not projected yet (epoch 0) has no native target, so a fetch would only fail
+ * and offer Retry. It stays preparing rather than downloadable, which also holds back its automatic fetch until the
+ * projected reference arrives and the card, keyed by that epoch, asks once.
+ */
+internal fun ownFileAwaitingProjection(
+    transferState: AttachmentTransferState,
+    sourceEpoch: ULong,
+    mine: Boolean,
+): AttachmentTransferState =
+    if (mine && sourceEpoch == 0uL && transferState == AttachmentTransferState.Remote) {
+        AttachmentTransferState.Resolving
+    } else {
+        transferState
+    }
 
 /**
  * The one decision that lets a materialization reach the network (#2699).

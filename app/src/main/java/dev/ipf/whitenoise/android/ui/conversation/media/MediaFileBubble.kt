@@ -161,10 +161,10 @@ internal fun MediaFileBubble(
     // A stale native failure must not flash Retry during the outgoing cache handoff.
     val presentationProgress = if (mine && !firstFrameCacheResolved) null else nativeProgress
     val transferState =
-        attachmentFilePresentationState(
-            hostTransferState,
-            presentationProgress,
-            cancellationState,
+        ownFileAwaitingProjection(
+            attachmentFilePresentationState(hostTransferState, presentationProgress, cancellationState),
+            reference.sourceEpoch,
+            mine,
         )
     var reconciledCacheRevision by remember(controller, pillKey) { mutableStateOf(cacheRevision) }
     // Later cache writes and evictions still reconcile the controller-owned

@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentDownloadPolicy.kt",
+  "legacy_sha256": "250e93ffa4dac23af60cb2561d1f068904054256f39111c9f400572ac780f21a",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "One canonical decision lets an attachment transfer reach the network",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentDownloadPolicy.kt",
+        "anchor": "internal fun attachmentTransferAllowsNetwork(",
+        "test_ids": [
+          "MED-019",
+          "SET-012"
+        ]
+      },
+      {
+        "surface": "Own large file waits for its projected reference instead of failing a premature fetch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentDownloadPolicy.kt",
+        "anchor": "internal fun ownFileAwaitingProjection(",
+        "test_ids": [
+          "MED-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

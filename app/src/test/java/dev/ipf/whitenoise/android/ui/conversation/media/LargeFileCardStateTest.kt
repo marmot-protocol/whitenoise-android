@@ -2,15 +2,21 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture
@@ -19,7 +25,9 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companio
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -29,8 +37,9 @@ import org.robolectric.annotation.Config
 
 /**
  * A file larger than a byte-returning read may hold still lands on the device: its card settles on the file's type
- * rather than Tap to retry, both after a reader's Download and on the sender's own card, which fetches its own body.
- * The composable and controller are the production ones; only the native transfer is replaced.
+ * rather than Tap to retry, both after a reader's Download and on the sender's own card, which fetches its own body
+ * only once MDK has projected its reference. The composable and controller are the production ones, only the native
+ * transfer is replaced.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h800dp-mdpi")
@@ -90,6 +99,33 @@ class LargeFileCardStateTest {
         assertNoRetry()
     }
 
+    /**
+     * The sender's own card before MDK projects its reference shows Preparing, starts no fetch that could only fail,
+     * and fetches exactly once when the projected reference arrives.
+     */
+    @Test
+    fun anOwnFileWaitsForItsProjectionInsteadOfFailing() {
+        var reference by mutableStateOf(pdfReference().copy(sourceEpoch = 0uL))
+        val host = controller.attachmentTransferState(request(0).messageIdHex, 0, initiallyAvailable = false)
+        composeRule.setContent { WhiteNoiseTheme { LargeFileCard(mine = true, reference = reference) } }
+
+        composeRule.waitUntil(WAIT_MILLIS) { host.value != AttachmentTransferState.Resolving }
+        composeRule.waitForIdle()
+        assertEquals("an unprojected own file must not start a fetch", AttachmentTransferState.Remote, host.value)
+        assertTrue(fixture.calls.isEmpty())
+        composeRule.onNodeWithText(text(R.string.media_preparing_attachment)).assertExists()
+        assertNoRetry()
+        composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_download)).assertCountEquals(0)
+
+        composeRule.runOnIdle { reference = pdfReference() }
+        deliverBodyOverTheReadBudget()
+
+        awaitDescribed(text(R.string.attachment_type_pdf_description))
+        assertNoRetry()
+        assertEquals("the projected reference is fetched once", 1, fixture.calls.size)
+        controller.releaseAttachmentTransferState(request(0).messageIdHex, 0)
+    }
+
     /** Waits for the card's one native transfer, then lets MDK retain a body one byte over the 32 MiB read budget. */
     private fun deliverBodyOverTheReadBudget() {
         composeRule.waitUntil(WAIT_MILLIS) {
@@ -114,13 +150,19 @@ class LargeFileCardStateTest {
         }
     }
 
+    /** The fixture's first attachment as a projected PDF document. */
+    private fun pdfReference() = reference(0).copy(mediaType = "application/pdf", fileName = "archive.pdf")
+
     /** The production file card for the fixture's first attachment, as a document from the reader or the sender. */
     @Composable
-    private fun LargeFileCard(mine: Boolean) {
+    private fun LargeFileCard(
+        mine: Boolean,
+        reference: MediaAttachmentReferenceFfi = pdfReference(),
+    ) {
         MediaFileBubble(
             messageIdHex = request(0).messageIdHex,
             attachmentIndex = 0,
-            reference = reference(0).copy(mediaType = "application/pdf", fileName = "archive.pdf"),
+            reference = reference,
             controller = controller,
             appState = fixture.state,
             senderKey = "sender",
