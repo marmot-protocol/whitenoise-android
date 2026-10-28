@@ -5,7 +5,15 @@ import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_ATTACHMENT_M
 import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_TAG_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -44,6 +52,78 @@ class SharedFileImportLimitParityCoverageTest {
         assertEquals(FILE_BACKED_ATTACHMENT_MAX_BYTES, native.documentBytes)
         assertEquals(64L * MIB, native.imageBytes)
     }
+
+    /** Larger trusted allowances retain the legacy copy-rate budget without unbounded or overflowing deadlines. */
+    @Test fun batchDeadlineScalesAtAllowanceBoundariesAndKeepsLegacyFallback() {
+        fun deadline(bytes: Long) = ShareImportLimits(0L, 0L, bytes).importTimeoutMs()
+        assertEquals(60_000L, LEGACY_SHARE_IMPORT_LIMITS.importTimeoutMs())
+        assertEquals(60_000L, deadline(0L))
+        assertEquals(60_000L, deadline(1L))
+        assertEquals(60_000L, deadline(256L * MIB))
+        assertEquals(120_000L, deadline(256L * MIB + 1L))
+        assertEquals(120_000L, deadline(512L * MIB))
+        assertEquals(180_000L, deadline(512L * MIB + 1L))
+        val native = shareImportLimits(FileBackedSendLimits(FILE_BACKED_ATTACHMENT_MAX_BYTES, 900L * MIB))
+        assertEquals(240_000L, native.importTimeoutMs())
+        assertEquals(2_061_584_302_080_000L, deadline(Long.MAX_VALUE))
+    }
+
+    /** The production default admits steady 56 MiB progress beyond the old deadline without disabling time bounds. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun defaultDeadlineAllowsLargeProgressAndStillBoundsTheBatch() =
+        runBlocking {
+            val testScheduler = TestCoroutineScheduler()
+            val length = 56L * MIB
+            for (batchMiB in listOf(256L, 900L)) {
+                val limits = shareImportLimits(FileBackedSendLimits(FILE_BACKED_ATTACHMENT_MAX_BYTES, batchMiB * MIB))
+                val files = PrivateShareFiles(File(root, "timed-$batchMiB"), authority, limits)
+                val started = testScheduler.currentTime
+                val importer =
+                    ShareFileImporter(
+                        files,
+                        { _, _ -> ShareSourceMetadata("archive.zip", "application/zip", null) },
+                        { _, _ -> sizedStream(length) { testScheduler.advanceTimeBy(32L) } },
+                        ioDispatcher = StandardTestDispatcher(testScheduler),
+                    )
+                val task = async(StandardTestDispatcher(testScheduler)) { importer.import(request(listOf(source))) }
+                val imported = awaitTimedImport(task, testScheduler)
+                if (batchMiB == 256L) {
+                    assertEquals(listOf(ShareImportError.Interrupted), imported.payload.importErrors)
+                    assertTrue(imported.payload.streamUris.isEmpty())
+                    assertTrue(files.availableBytes() > 56L * MIB)
+                } else {
+                    assertTrue(imported.payload.importErrors.isEmpty())
+                    assertEquals(length, files.metadata(imported.payload.streamUris.single())!!.getLong("size"))
+                    val elapsed = testScheduler.currentTime - started
+                    assertTrue(elapsed > 60_000L && elapsed < 240_000L)
+                    files.leases.releaseRequest(imported.requestId)
+                }
+                assertTrue(File(root, "timed-$batchMiB").listFiles().orEmpty().none { it.extension == "bin" })
+            }
+        }
+
+    /** No progress cannot extend the finite production deadline; interrupted private originals are removed. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun defaultDeadlineStopsAStalledReadAndCleansItsOriginal() =
+        runBlocking {
+            val testScheduler = TestCoroutineScheduler()
+            val limits = shareImportLimits(FileBackedSendLimits(FILE_BACKED_ATTACHMENT_MAX_BYTES, 900L * MIB))
+            val files = PrivateShareFiles(root, authority, limits)
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> ShareSourceMetadata("archive.zip", "application/zip", null) },
+                    { _, _ -> sizedStream(1L) { testScheduler.advanceTimeBy(limits.importTimeoutMs() + 1L) } },
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            val task = async(StandardTestDispatcher(testScheduler)) { importer.import(request(listOf(source))) }
+            val imported = awaitTimedImport(task, testScheduler)
+            assertEquals(listOf(ShareImportError.Interrupted), imported.payload.importErrors)
+            assertTrue(imported.payload.streamUris.isEmpty())
+            assertTrue(root.listFiles().orEmpty().none { it.extension == "bin" })
+        }
 
     /** A real 56 MiB ZIP-like source and a 64 MiB document stream without allocating either whole body. */
     @Test fun largeOpaqueDocumentsImportAndRemainRetryableAfterRepositoryRecreation() =
@@ -172,6 +252,31 @@ class SharedFileImportLimitParityCoverageTest {
             assertEquals(listOf(ShareImportError.Storage), imported.payload.importErrors)
             assertTrue(root.listFiles().orEmpty().none { it.extension == "bin" })
         }
+
+    /** Pumps ready test work only; real cancellation cleanup must not advance the virtual copy deadline. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private suspend fun awaitTimedImport(
+        task: Deferred<ShareRequest>,
+        scheduler: TestCoroutineScheduler,
+    ): ShareRequest {
+        suspend fun pump() {
+            withTimeout(30_000L) {
+                while (!task.isCompleted) {
+                    scheduler.runCurrent()
+                    delay(1L)
+                }
+            }
+        }
+        try {
+            pump()
+            return task.await()
+        } finally {
+            if (!task.isCompleted) {
+                task.cancel()
+                withContext(NonCancellable) { pump() }
+            }
+        }
+    }
 
     private fun request(uris: List<Uri>) =
         ShareRequest(

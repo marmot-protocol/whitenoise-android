@@ -4,6 +4,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_TAG_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 
+private const val BASE_SHARE_IMPORT_TIMEOUT_MS = 60_000L
+
 /** Android intake bounds; file transport uses the sender contract while image decoding remains separately bounded. */
 internal data class ShareImportLimits(
     val imageBytes: Long,
@@ -18,6 +20,12 @@ internal data class ShareImportLimits(
     fun remainingPlaintext(usedCiphertextBytes: Long): Long {
         val remaining = batchCiphertextBytes - usedCiphertextBytes - FILE_BACKED_TAG_BYTES
         return remaining.coerceAtLeast(0L)
+    }
+
+    /** Scales the finite batch deadline with trusted byte allowance, preserving the legacy throughput budget. */
+    fun importTimeoutMs(): Long {
+        val windows = 1L + (batchCiphertextBytes - 1L).coerceAtLeast(0L) / PRIVATE_SHARE_BATCH_MAX_BYTES
+        return BASE_SHARE_IMPORT_TIMEOUT_MS * windows
     }
 
     /** Private originals are bounded independently of available filesystem space. */
