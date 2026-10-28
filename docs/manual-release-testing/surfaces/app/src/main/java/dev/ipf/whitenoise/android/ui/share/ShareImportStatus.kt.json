@@ -30,6 +30,15 @@
           "SCR-002",
           "SCR-003"
         ]
+      },
+      {
+        "surface": "ShareImportError.message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "fun ShareImportError.message(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
       }
     ],
     "source_coverage": [
@@ -200,6 +209,14 @@
         "anchor": "testTag(\"share.import.indeterminate\")",
         "test_ids": [
           "SYS-002"
+        ]
+      },
+      {
+        "surface": "Effective imported document limit explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "payload.importDocumentLimitBytes",
+        "test_ids": [
+          "SYS-004"
         ]
       }
     ]

@@ -200,6 +200,95 @@ class InboundShareTaskReuseDeviceTest {
             instrumentation.runOnMainSync { delivery.acknowledgeInboundShareForTest(imported.requestId) }
         }
 
+    /** Large single and multiple external shares retain private retry bytes through grant revocation and recreation. */
+    @Test
+    fun largeDocumentsReachOwnedDestinationHandoffFromRealExternalIntents() =
+        kotlinx.coroutines.runBlocking {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val target = instrumentation.targetContext
+            val bytes = 56L * 1024L * 1024L
+            val token =
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
+            for (names in listOf(listOf("$token-single.zip"), listOf("$token-first.zip", "$token-second.zip"))) {
+                instrumentation.context.startActivity(
+                    Intent(instrumentation.context, ExternalShareDispatchActivity::class.java)
+                        .putExtra(ExternalShareDispatchActivity.EXTRA_TARGET_PACKAGE, target.packageName)
+                        .putExtra(ExternalShareDispatchActivity.EXTRA_STREAM_NAMES, names.toTypedArray())
+                        .putExtra(ExternalShareDispatchActivity.EXTRA_STREAM_BYTES, bytes)
+                        .putExtra(ExternalShareDispatchActivity.EXTRA_SHARE_TEXT, "large-file caption")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                var delivery = awaitPendingStreams(names, timeoutMillis = 90_000L)
+                val imported = checkNotNull(delivery.pendingInboundShareRequestForTest)
+                val files = PrivateShareFiles(target)
+                val account = "share-limit-test-$token"
+                val groups = listOf("first-chat", "second-chat")
+                try {
+                    assertTrue(imported.payload.importErrors.isEmpty())
+                    assertEquals(names.size, imported.payload.streamUris.size)
+                    imported.payload.streamUris.forEach { uri ->
+                        assertEquals(bytes, files.metadata(uri)!!.getLong("size"))
+                        assertEquals("${target.packageName}.private-share", uri.authority)
+                    }
+                    names.forEach { name ->
+                        val source =
+                            ExternalShareTestFileProvider.uriFor(
+                                instrumentation.context,
+                                java.io.File(instrumentation.context.cacheDir, name),
+                            )
+                        target.contentResolver.query(source, arrayOf("revoke_read_grant"), null, null, null)!!.close()
+                    }
+                    val previous = delivery
+                    instrumentation.runOnMainSync { previous.recreate() }
+                    delivery =
+                        awaitResumedMainActivity(excluding = previous, timeoutMillis = 90_000L) {
+                            it.pendingInboundShareRequestForTest?.requestId == imported.requestId &&
+                                it.pendingInboundShareRequestForTest?.payload?.importReady == true
+                        }
+                    assertEquals(imported, delivery.pendingInboundShareRequestForTest)
+                    val handoff = ShareStagingStore()
+                    val captions = mutableListOf<Triple<String, String, String>>()
+                    val stager =
+                        ShareInboundStager(
+                            stageText = { selectedAccount, group, text ->
+                                captions += Triple(selectedAccount, group, text)
+                            },
+                            shareStaging = handoff,
+                            resolveMime = ::shareResolveMime,
+                        )
+                    val prepared = stager.prepare(target, imported.payload)
+                    assertTrue(
+                        retainShareAtDestination(target, account, groups, imported.payload) { dropped ->
+                            assertEquals(0, dropped)
+                            instrumentation.runOnMainSync {
+                                stager.stagePreparedToChats(account, groups, prepared, account)
+                            }
+                            true
+                        },
+                    )
+                    files.leases.releaseRequest(imported.requestId)
+                    assertNull(handoff.consume("other-account", groups.first()))
+                    groups.forEach { group ->
+                        assertEquals(imported.payload.streamUris, handoff.consume(account, group)!!.documentUris)
+                        assertNull(handoff.consume(account, group))
+                        assertEquals(
+                            imported.payload.streamUris,
+                            PrivateShareFiles(target).leases.loadShelf(account, group),
+                        )
+                    }
+                    assertEquals(groups.map { Triple(account, it, "large-file caption") }, captions)
+                } finally {
+                    files.leases.releaseRequest(imported.requestId)
+                    groups.forEach { files.leases.saveShelf(account, it, emptyList()) }
+                    instrumentation.runOnMainSync { delivery.acknowledgeInboundShareForTest(imported.requestId) }
+                    names.forEach { java.io.File(instrumentation.context.cacheDir, it).delete() }
+                }
+                imported.payload.streamUris.forEach { assertNull(files.resolve(it)) }
+            }
+        }
+
     private fun dispatchExternalShare(streamName: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.context.startActivity(
@@ -265,8 +354,11 @@ class InboundShareTaskReuseDeviceTest {
         }
 
     /** Waits until every ordered stream name is retained by the target Activity. */
-    private fun awaitPendingStreams(streamNames: List<String>): MainActivity =
-        awaitResumedMainActivity { activity ->
+    private fun awaitPendingStreams(
+        streamNames: List<String>,
+        timeoutMillis: Long = TIMEOUT_MILLIS,
+    ): MainActivity =
+        awaitResumedMainActivity(timeoutMillis = timeoutMillis) { activity ->
             activity.pendingInboundShareRequestForTest
                 ?.payload
                 ?.streamUris
@@ -303,10 +395,11 @@ class InboundShareTaskReuseDeviceTest {
      */
     private fun awaitResumedMainActivity(
         excluding: MainActivity? = null,
+        timeoutMillis: Long = TIMEOUT_MILLIS,
         predicate: (MainActivity) -> Boolean = { true },
     ): MainActivity {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val deadline = SystemClock.uptimeMillis() + TIMEOUT_MILLIS
+        val deadline = SystemClock.uptimeMillis() + timeoutMillis
         var lastState = "no resumed MainActivity"
         while (SystemClock.uptimeMillis() < deadline) {
             composeRule.waitForIdle()

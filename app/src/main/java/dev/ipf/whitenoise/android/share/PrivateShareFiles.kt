@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.share
 
 import android.content.Context
 import android.net.Uri
+import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
+import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_TAG_BYTES
+import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -13,23 +16,32 @@ internal const val PRIVATE_SHARE_MAX_BYTES = 64L * 1024 * 1024
 internal const val PRIVATE_SHARE_DOCUMENT_MAX_BYTES =
     dev.ipf.whitenoise.android.state.ConversationController.MEDIA_RETAINED_MAX_BYTES
 internal const val PRIVATE_SHARE_BATCH_MAX_BYTES = 256L * 1024 * 1024
-private const val PRIVATE_SHARE_STORAGE_BUDGET = PRIVATE_SHARE_BATCH_MAX_BYTES
 internal const val PRIVATE_SHARE_MAX_AGE_MS = 24L * 60 * 60 * 1000
 
 /** Android intake files, never protocol data. Only the non-exported provider can read them. */
 internal class PrivateShareFiles private constructor(
     rootForIo: () -> File,
     private val authority: String,
+    limitsForIo: () -> ShareImportLimits,
+    private val usableBytes: (File) -> Long,
 ) {
-    constructor(root: File, authority: String) : this({ root }, authority)
+    constructor(
+        root: File,
+        authority: String,
+        limits: ShareImportLimits = LEGACY_SHARE_IMPORT_LIMITS,
+        usableBytes: (File) -> Long = ::usableSpaceFor,
+    ) : this({ root }, authority, { limits }, usableBytes)
 
     constructor(context: Context) : this(
         privateShareRootForIo(context),
         "${context.packageName}.private-share",
+        ::nativeShareImportLimits,
+        ::usableSpaceFor,
     )
 
     private val root by lazy(rootForIo)
-    val leases by lazy { PrivateShareLeases(root, ::owns, ::metadata, ::delete) }
+    val limits by lazy(limitsForIo)
+    val leases by lazy { PrivateShareLeases(root, ::owns, ::metadata, ::delete) { limits } }
 
     /** Checks only the app-private provider identity, without touching storage or granting external access. */
     fun owns(uri: Uri): Boolean = uri.scheme == "content" && uri.authority == authority
@@ -38,7 +50,7 @@ internal class PrivateShareFiles private constructor(
     fun newFile(): Pair<Uri, File> =
         synchronized(privateShareLock) {
             privateShareDirectory(root)
-            if (availableBytes() <= 0) {
+            if (availableBytes() <= FILE_BACKED_TAG_BYTES) {
                 throw IOException("Share storage budget exhausted")
             }
             val id = UUID.randomUUID().toString()
@@ -56,8 +68,17 @@ internal class PrivateShareFiles private constructor(
     /** Only serialized intake writes source bytes; retained shelves and sends can release them concurrently. */
     fun availableBytes(): Long =
         synchronized(privateShareLock) {
-            val used = root.listFiles().orEmpty().sumOf { if (it.extension == "bin") it.length() else 0L }
-            (PRIVATE_SHARE_STORAGE_BUDGET - used).coerceAtLeast(0)
+            val used = storedBytes()
+            minOf(
+                (limits.storageBytes - used).coerceAtLeast(0),
+                (usableBytes(root) - FILE_BACKED_DISK_RESERVE_BYTES).coerceAtLeast(0),
+            )
+        }
+
+    /** Includes each retained source's future encryption tag in the shared staging quota. */
+    private fun storedBytes(): Long =
+        root.listFiles().orEmpty().sumOf { file ->
+            if (file.extension == "bin") file.length() + FILE_BACKED_TAG_BYTES else 0L
         }
 
     /**
@@ -80,6 +101,10 @@ internal class PrivateShareFiles private constructor(
         size: Long,
     ) {
         val file = requireNotNull(resolve(uri))
+        if (size != file.length() || size !in 1..limits.fileBytes(mime)) throw IOException("Invalid share size")
+        if (storedBytes() > limits.storageBytes || usableBytes(root) < FILE_BACKED_DISK_RESERVE_BYTES) {
+            throw IOException("Share storage reserve exhausted")
+        }
         writePrivateShareJson(
             File(root, "${file.nameWithoutExtension}.json"),
             JSONObject()
@@ -93,7 +118,8 @@ internal class PrivateShareFiles private constructor(
     fun metadata(uri: Uri): JSONObject? =
         resolve(uri)?.let { file ->
             readPrivateShareJson(File(root, "${file.nameWithoutExtension}.json"))?.takeIf {
-                it.optLong("size", -1) == file.length() && file.length() in 1..PRIVATE_SHARE_MAX_BYTES
+                it.optLong("size", -1) == file.length() &&
+                    file.length() in 1..limits.fileBytes(it.optString("mime"))
             }
         }
 
@@ -153,7 +179,12 @@ internal fun validateImportedShare(
     if (request.payload.streamUris.isEmpty() && ShareImportError.Interrupted in request.payload.importErrors) {
         files.leases.releaseRequest(request.requestId)
     }
-    val retained = request.payload.streamUris.filter { files.owns(it) && files.metadata(it) != null }
+    val retained =
+        capPrivateShareShelf(
+            request.payload.streamUris.filter(files::owns),
+            files::metadata,
+            files.limits,
+        )
     return if (retained.size == request.payload.streamUris.size) {
         request
     } else {

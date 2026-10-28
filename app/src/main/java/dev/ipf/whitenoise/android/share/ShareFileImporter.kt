@@ -89,6 +89,9 @@ internal class ShareFileImporter(
                             importReady = true,
                             importErrors = batch.errors,
                             importRejectedCount = sources.size - batch.accepted.size,
+                            importImageLimitBytes = files.limits.imageBytes,
+                            importDocumentLimitBytes = files.limits.documentBytes,
+                            importBatchLimitBytes = files.limits.batchCiphertextBytes,
                         ),
                 )
             } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
@@ -102,6 +105,9 @@ internal class ShareFileImporter(
                             importReady = true,
                             importErrors = batch.errors + ShareImportError.Interrupted,
                             importRejectedCount = sources.size - batch.accepted.size,
+                            importImageLimitBytes = files.limits.imageBytes,
+                            importDocumentLimitBytes = files.limits.documentBytes,
+                            importBatchLimitBytes = files.limits.batchCiphertextBytes,
                         ),
                 )
             } finally {
@@ -129,7 +135,7 @@ internal class ShareFileImporter(
                     importOne(
                         uri,
                         intentMime,
-                        minOf(PRIVATE_SHARE_MAX_BYTES, PRIVATE_SHARE_BATCH_MAX_BYTES - batch.used),
+                        files.limits.remainingPlaintext(batch.used),
                         progress = { bytes, total ->
                             progress(
                                 ShareImportProgress(
@@ -174,7 +180,7 @@ internal class ShareFileImporter(
                 errors += requireNotNull(result.error)
             } else {
                 accepted += uri
-                used += result.size
+                used += result.size + dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_TAG_BYTES
             }
         }
     }
@@ -245,7 +251,7 @@ internal class ShareFileImporter(
             resolveShareMime(info.mime, intentMime).startsWith("image/") ||
                 dev.ipf.whitenoise.android.media.MediaPipeline
                     .sniffImageMediaType(header) != null
-        return if (isImage) PRIVATE_SHARE_MAX_BYTES else PRIVATE_SHARE_DOCUMENT_MAX_BYTES
+        return if (isImage) files.limits.imageBytes else files.limits.documentBytes
     }
 
     private data class ImportedFile(

@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.share
 
+import android.text.format.Formatter
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
@@ -15,9 +16,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.share.LEGACY_SHARE_IMPORT_LIMITS
 import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareImportProgress
 import dev.ipf.whitenoise.android.share.SharePayload
@@ -92,7 +95,7 @@ internal fun ShareImportErrorDialog(
                 if (payload.importRejectedCount > 0) {
                     Text(stringResource(R.string.share_import_rejected_count, payload.importRejectedCount))
                 }
-                payload.importErrors.distinct().forEach { Text(stringResource(it.messageResource())) }
+                payload.importErrors.distinct().forEach { Text(it.message(payload)) }
                 Text(stringResource(R.string.share_import_recovery))
             }
         },
@@ -107,6 +110,28 @@ internal fun ShareImportErrorDialog(
             if (hasContent) TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
         },
     )
+}
+
+/** Formats the imported policy snapshot without linking native code or reading providers during composition. */
+@Composable
+private fun ShareImportError.message(payload: SharePayload): String {
+    val context = LocalContext.current
+
+    fun size(bytes: Long) = Formatter.formatShortFileSize(context, bytes)
+    return when (this) {
+        ShareImportError.FileTooLarge ->
+            stringResource(
+                R.string.share_import_file_limit,
+                size(payload.importImageLimitBytes ?: LEGACY_SHARE_IMPORT_LIMITS.imageBytes),
+                size(payload.importDocumentLimitBytes ?: LEGACY_SHARE_IMPORT_LIMITS.documentBytes),
+            )
+        ShareImportError.BatchTooLarge ->
+            stringResource(
+                R.string.share_import_batch_limit,
+                size(payload.importBatchLimitBytes ?: LEGACY_SHARE_IMPORT_LIMITS.batchCiphertextBytes),
+            )
+        else -> stringResource(messageResource())
+    }
 }
 
 /** Maps bounded import outcomes to localized, payload-free recovery explanations. */
