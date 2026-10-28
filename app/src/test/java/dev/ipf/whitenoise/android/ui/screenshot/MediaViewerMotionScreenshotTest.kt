@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -23,14 +24,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -259,17 +263,19 @@ class MediaViewerMotionScreenshotTest {
                         )
                         MediaViewerThumbnailHost(registry) {
                             if (visible) {
-                                Canvas(
-                                    Modifier
-                                        .offset(24.dp, 8.dp)
-                                        .size(144.dp, 104.dp)
-                                        .clip(ConversationRichContentShape)
-                                        .testTag("motion-thumbnail")
-                                        .clickable { open = true }
-                                        .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL),
-                                ) {
-                                    drawSharedFixtureImage(crop = true)
-                                }
+                                Image(
+                                    painter = sharedFixturePainter,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier =
+                                        Modifier
+                                            .offset(24.dp, 8.dp)
+                                            .size(144.dp, 104.dp)
+                                            .clip(ConversationRichContentShape)
+                                            .testTag("motion-thumbnail")
+                                            .clickable { open = true }
+                                            .mediaViewerThumbnail(id.messageIdHex, id.attachmentIndex, 0uL),
+                                )
                             }
                         }
                         if (open) {
@@ -294,9 +300,12 @@ class MediaViewerMotionScreenshotTest {
                                     bodyModifier = motionBodyModifier,
                                     actionsEnabled = !closing,
                                 ) {
-                                    Canvas(Modifier.fillMaxSize()) {
-                                        drawSharedFixtureImage(crop = false)
-                                    }
+                                    Image(
+                                        painter = sharedFixturePainter,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
                                 }
                             }
                         }
@@ -360,6 +369,7 @@ class MediaViewerMotionScreenshotTest {
         capture("media_motion_${name}_first")
         advance(112)
         capture("media_motion_${name}_middle")
+        assertCroppedCopyCoversTravel(sourceBounds)
         advance(96)
         assertSharedImageLandmarks(settled = false)
         advance(144)
@@ -383,11 +393,20 @@ class MediaViewerMotionScreenshotTest {
         assertNull(registry.find(id))
     }
 
-    /** A single intrinsic16:9 scene is center-cropped by the tile and fitted by the real viewer. */
-    private fun DrawScope.drawSharedFixtureImage(crop: Boolean) {
+    // Image puts its own rectangular clip inside the recorder, just like InlineAttachmentImage.
+    // Both owners draw the same intrinsic scene; neither decodes or fetches another image.
+    private val sharedFixturePainter =
+        object : Painter() {
+            override val intrinsicSize = Size(144f, 81f)
+
+            override fun DrawScope.onDraw() = drawSharedFixtureImage()
+        }
+
+    /** Image owns Crop/Fit; the painter only draws one intrinsic16:9 scene. */
+    private fun DrawScope.drawSharedFixtureImage() {
         val xScale = size.width / 144f
         val yScale = size.height / 81f
-        val factor = if (crop) maxOf(xScale, yScale) else minOf(xScale, yScale)
+        val factor = minOf(xScale, yScale)
         translate((size.width - 144f * factor) / 2f, (size.height - 81f * factor) / 2f) {
             scale(factor, factor, pivot = Offset.Zero) {
                 clipRect(0f, 0f, 144f, 81f) {
@@ -418,14 +437,64 @@ class MediaViewerMotionScreenshotTest {
         val pixels = composeRule.onRoot().captureToImage().toPixelMap()
         val center = pixels[(body.left + body.width * .7f).toInt(), y]
         val cropEdge = pixels[(body.left + body.width * .555f).toInt(), y]
-        // Native compositing can round one channel by one8-bit step at these two positions.
-        val centerChannels = listOf(center.red, center.green, center.blue).map { (it * 255).roundToInt() }
-        val edgeChannels = listOf(cropEdge.red, cropEdge.green, cropEdge.blue).map { (it * 255).roundToInt() }
         assertEquals("the shared image keeps its alpha", center.alpha, cropEdge.alpha)
-        centerChannels.zip(edgeChannels).forEach { (expected, actual) ->
-            assertTrue("the shared crop keeps its landmark aligned", abs(expected - actual) <= 1)
+        if (settled) {
+            // Only the fitted full image can reveal pixels discarded by the source's center crop.
+            // Native compositing can round one channel by one8-bit step at these two positions.
+            val centerChannels = listOf(center.red, center.green, center.blue).map { (it * 255).roundToInt() }
+            val edgeChannels = listOf(cropEdge.red, cropEdge.green, cropEdge.blue).map { (it * 255).roundToInt() }
+            centerChannels.zip(edgeChannels).forEach { (expected, actual) ->
+                assertTrue("the settled full image keeps its landmark aligned", abs(expected - actual) <= 1)
+            }
+            assertEquals("the real full image owns the same landmark", Color(0xffffc45d), center)
         }
-        if (settled) assertEquals("the real full image owns the same landmark", Color(0xffffc45d), center)
+    }
+
+    /** Before blending, actual scene ink must cover the whole interpolated clip, including its width. */
+    private fun assertCroppedCopyCoversTravel(source: Rect) {
+        val body = composeRule.onNodeWithTag(MEDIA_VIEWER_CONTENT_TAG).fetchSemanticsNode().boundsInRoot
+        val pixels = composeRule.onRoot().captureToImage().toPixelMap()
+        val palette = setOf(Color(0xff195563), Color(0xff5bb89d), Color(0xffffc45d))
+        var left = pixels.width
+        var top = pixels.height
+        var right = -1
+        var bottom = -1
+        for (y in 0 until pixels.height) {
+            for (x in 0 until pixels.width) {
+                if (pixels[x, y] in palette) {
+                    left = minOf(left, x)
+                    top = minOf(top, y)
+                    right = maxOf(right, x)
+                    bottom = maxOf(bottom, y)
+                }
+            }
+        }
+        assertTrue("the opaque traveling scene has real painted pixels", right >= left && bottom >= top)
+        val ink = Rect(left.toFloat(), top.toFloat(), (right + 1).toFloat(), (bottom + 1).toFloat())
+        val fittedHeight = body.width * 9f / 16f
+        val progress = (ink.height - source.height) / (fittedHeight - source.height)
+        assertTrue("the measured copy is in motion before the blend starts", progress > .1f && progress < .85f)
+        val expectedWidth = source.width + (body.width - source.width) * progress
+        assertEquals("the clipped source fills the moving width without letterbox bands", expectedWidth, ink.width, 3f)
+        val expectedCenter = source.center + (body.center - source.center) * progress
+        assertEquals("the moving scene stays horizontally centered", expectedCenter.x, ink.center.x, 3f)
+        assertEquals("the moving scene stays vertically centered", expectedCenter.y, ink.center.y, 3f)
+        // The recorded144x104 tile has already cropped the intrinsic144x81 image. Its intrinsic
+        // center remains centered as the tile covers wider bounds; discarded side pixels cannot return.
+        val factor = ink.width / source.width
+        val sceneScale = source.height / 81f * factor
+
+        fun scenePixel(
+            x: Float,
+            y: Float,
+        ): Color =
+            pixels[
+                (ink.center.x + (x - 72f) * sceneScale).roundToInt(),
+                (ink.center.y + (y - 40.5f) * sceneScale).roundToInt(),
+            ]
+        assertEquals("the cropped copy retains its yellow landmark", Color(0xffffc45d), scenePixel(100.8f, 24.3f))
+        assertEquals("the cropped copy retains its diagonal landmark", Color(0xff5bb89d), scenePixel(72f, 40.5f))
+        assertEquals("the cropped copy stays opaque", 1f, scenePixel(72f, 40.5f).alpha, 0f)
     }
 
     @Test

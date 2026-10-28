@@ -165,7 +165,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun FullScreenMediaViewer(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -173,7 +173,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "onSourceDismiss = onDismiss",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -181,7 +181,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "actionsEnabled: Boolean = true",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       }
     ],
@@ -192,7 +192,7 @@
         "anchor": "R.string.media_couldnt_open",
         "test_ids": [
           "MED-001",
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -201,7 +201,7 @@
         "anchor": "R.string.media_save_failed",
         "test_ids": [
           "MED-001",
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -210,7 +210,7 @@
         "anchor": "R.string.media_saved",
         "test_ids": [
           "MED-001",
-          "MED-041"
+          "MED-043"
         ]
       }
     ]

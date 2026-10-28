@@ -23,3 +23,9 @@ internal fun mediaViewerMotionBounds(
     return androidx.compose.ui.geometry
         .lerp(source, destination, progress.coerceIn(0f, 1f))
 }
+
+/** Cover the morphing rounded clip with the already-recorded thumbnail, centered by its draw owner. */
+internal fun mediaViewerThumbnailScale(
+    thumbnail: Size,
+    bounds: Rect,
+): Float = maxOf(bounds.width / thumbnail.width, bounds.height / thumbnail.height)

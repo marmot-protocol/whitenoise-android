@@ -282,7 +282,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "readingViewport = { timelineViewport.readingBoundsInWindow }",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       }
     ]

@@ -9,7 +9,7 @@
         "anchor": "class ComposerSendMotion",
         "test_ids": [
           "MSG-042",
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -36,7 +36,7 @@
         "anchor": "fun Overlay(",
         "test_ids": [
           "MSG-042",
-          "MED-041"
+          "MED-043"
         ]
       }
     ]

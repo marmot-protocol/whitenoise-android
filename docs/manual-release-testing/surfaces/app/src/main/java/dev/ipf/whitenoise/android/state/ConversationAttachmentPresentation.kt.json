@@ -25,7 +25,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationAttachmentPresentation.kt",
         "anchor": "suspend fun downloadAttachment(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       }
     ]

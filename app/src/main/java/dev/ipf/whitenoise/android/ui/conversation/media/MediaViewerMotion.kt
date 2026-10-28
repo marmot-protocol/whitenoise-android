@@ -375,8 +375,7 @@ private fun MediaMotionVisual(
                 drawContext.canvas.saveLayer(bounds, blendPaint.apply { this.alpha = alpha })
             }
             try {
-                val factor =
-                    minOf(bounds.width / layer.size.width, bounds.height / layer.size.height)
+                val factor = mediaViewerThumbnailScale(layer.size.toSize(), bounds)
                 translate(
                     bounds.center.x - layer.size.width * factor / 2f,
                     bounds.center.y - layer.size.height * factor / 2f,

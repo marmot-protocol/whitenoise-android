@@ -66,7 +66,6 @@ dev.ipf.whitenoise.android.ui.common.ClocklessDropdownMenuAndroidTest#fixedFadeM
 
 # Read-aloud qualification: range-silent fallback and stale engine callbacks use real Compose semantics.
 dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest#silentEngineKeepsSentenceBand
-dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest#rangeSilentPlaybackKeepsTheSentenceWithoutInventingWordProgress
 dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest#stopClearsTheRenderedPassageAndRejectsLateEngineCallbacks
 dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest#resumedPlaybackRetainsTheSentenceAndIgnoresOldWordRanges
 

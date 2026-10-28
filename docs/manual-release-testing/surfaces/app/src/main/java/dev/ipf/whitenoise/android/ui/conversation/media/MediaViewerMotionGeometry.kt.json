@@ -8,7 +8,15 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotionGeometry.kt",
         "anchor": "fun mediaViewerMotionBounds(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
+        ]
+      },
+      {
+        "surface": "Recorded thumbnail covers morphing rounded bounds for portrait and wide photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotionGeometry.kt",
+        "anchor": "internal fun mediaViewerThumbnailScale(",
+        "test_ids": [
+          "MED-043"
         ]
       }
     ]

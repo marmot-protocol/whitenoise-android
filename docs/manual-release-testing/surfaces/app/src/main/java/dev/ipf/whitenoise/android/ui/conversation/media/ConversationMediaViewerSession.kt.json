@@ -17,7 +17,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
         "anchor": "fun ComposerSendMotionMediaGate(",
         "test_ids": [
-          "MED-041",
+          "MED-043",
           "CON-036"
         ]
       }
@@ -28,7 +28,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
         "anchor": "class ConversationMediaViewerSessionState(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -36,7 +36,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
         "anchor": "fun ComposerSendMotionMediaGate(",
         "test_ids": [
-          "MED-041",
+          "MED-043",
           "CON-036"
         ]
       }

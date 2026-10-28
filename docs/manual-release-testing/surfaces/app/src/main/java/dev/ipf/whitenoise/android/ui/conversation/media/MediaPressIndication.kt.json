@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
         "anchor": "private class MediaPressNode(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -17,7 +17,7 @@
         "anchor": "R.string.close",
         "test_ids": [
           "MED-015",
-          "MED-041"
+          "MED-043"
         ]
       }
     ],
@@ -27,7 +27,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
         "anchor": "fun rememberMediaPressIndication(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -35,7 +35,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
         "anchor": "fun MediaViewerCloseButton(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       },
       {
@@ -43,7 +43,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
         "anchor": "fun rememberMediaViewerPressIndication(",
         "test_ids": [
-          "MED-041"
+          "MED-043"
         ]
       }
     ]

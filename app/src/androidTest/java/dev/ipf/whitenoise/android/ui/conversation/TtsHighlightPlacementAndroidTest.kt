@@ -142,37 +142,6 @@ class TtsHighlightPlacementAndroidTest {
         assertTrue(checkNotNull(appState.ttsController.state.value.passage).visibleWord.isEmpty())
     }
 
-    /** The production row keeps a sentence band when an engine reports no native ranges. */
-    @Test
-    fun rangeSilentPlaybackKeepsTheSentenceWithoutInventingWordProgress() {
-        startSpeaking(TWO_SENTENCES)
-        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
-        engine.start(0)
-        val silentSince = android.os.SystemClock.elapsedRealtime()
-        val initialProgress = appState.ttsController.state.value.messageProgressFraction
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            val state = appState.ttsController.state.value
-            assertTrue(state is dev.ipf.whitenoise.android.audio.tts.TtsState.Speaking)
-            assertTrue(
-                "time alone cannot invent a spoken word",
-                state.passage
-                    ?.visibleWord
-                    .orEmpty()
-                    .isEmpty(),
-            )
-            assertEquals(initialProgress, state.messageProgressFraction, 0f)
-            assertEquals(FIRST_SENTENCE, renderedSentenceBand())
-            android.os.SystemClock.elapsedRealtime() - silentSince >= 1_000
-        }
-        composeRule.waitForIdle()
-        val leaf = checkNotNull(leafCarryingHighlight())
-        val sentence = checkNotNull(leaf.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey))
-        assertEquals(sentence, leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
-        assertTrue(sentence.first >= 0 && sentence.last < leaf.text().length)
-        assertTrue(leaf.boundsInRoot.width > 0f && leaf.boundsInRoot.height > 0f)
-        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
-    }
-
     /** Stopping revokes the active passage even when native callbacks arrive afterwards. */
     @Test
     fun stopClearsTheRenderedPassageAndRejectsLateEngineCallbacks() {

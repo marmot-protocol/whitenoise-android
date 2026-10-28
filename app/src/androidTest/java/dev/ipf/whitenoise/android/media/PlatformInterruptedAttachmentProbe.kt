@@ -137,7 +137,6 @@ internal object PlatformInterruptedAttachmentProbe {
                     while (scenario.state != Lifecycle.State.CREATED) delay(10L)
                 }
                 withContext(Dispatchers.Main.immediate) { state.setAppInForeground(false) }
-                reportPolicyBoundary(state, request, "before-stop")
                 step = "stop-job"
                 val job = findScheduledWork(context, firstRun.id.toString())
                 val beforeLogs = workerStopLogs()
@@ -167,7 +166,6 @@ internal object PlatformInterruptedAttachmentProbe {
                 step = "resumed-run"
                 awaitResumedRun(states, firstRun)
                 val runningAt = SystemClock.elapsedRealtime()
-                reportPolicyBoundary(state, request, "resumed-run")
                 step = "resume-request"
                 awaitResumedAcquisition(port, nativeStates, nativeObservationBeforeStop)
                 val requestedAt = SystemClock.elapsedRealtime()
@@ -211,7 +209,6 @@ internal object PlatformInterruptedAttachmentProbe {
                 )
             }
         } catch (failure: Throwable) {
-            reportPolicyBoundary(state, request, "failure")
             reportFailure(step, failure, observations, port, stoppedAt)
             throw failure
         } finally {
@@ -366,32 +363,6 @@ internal object PlatformInterruptedAttachmentProbe {
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )
-    }
-
-    /** Observe the real applied host revision without changing policy, demand, retries or the deadline. */
-    private fun reportPolicyBoundary(
-        state: WhiteNoiseAppState,
-        request: AttachmentTransferRequest,
-        boundary: String,
-    ) {
-        // Diagnostics must never replace the original assertion or timeout with a reflection/report failure.
-        runCatching {
-            val permissions =
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("nativeAttachmentPermissions")
-                    .apply {
-                        isAccessible = true
-                    }.get(state) as dev.ipf.whitenoise.android.state.NativeAttachmentPermissions
-            val revision = permissions.appliedRevision(request.accountRef)
-            ControlledAttachmentProbe.report(
-                JSONObject()
-                    .put("phase", "automatic-policy-boundary")
-                    .put("boundary", boundary)
-                    .put("validated_network", state.hasValidatedInternet())
-                    .put("host_documents_allowed", state.shouldAutoDownloadMedia(MediaAutoDownloadType.Document))
-                    .put("applied_revision", revision ?: JSONObject.NULL),
-            )
-        }
     }
 
     /** Observe the same identity leaving its first run and returning to RUNNING without force-running it. */
