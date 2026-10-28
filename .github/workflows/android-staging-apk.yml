@@ -1,5 +1,5 @@
 name: Android Staging APK
-run-name: PR3439 opening composition controlled comparison
+run-name: PR3439 current viewer texture upload controlled comparison
 on:
   workflow_dispatch:
     inputs:
@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: c26bec880432961dcc60cd5abc0f2d856ef8bbf0
+          ref: 08d4d31f99e88e853f8aa9abb3a21ff9ce2bdb3b
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -66,8 +66,8 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      PREVIOUS_SHA: b29670ec976f5a5d8399892eec40e5e2a33456f7
-      AFTER_SHA: 5b54d17f1b3e2d43eb55d19264c494186b11ddde
+      PREVIOUS_SHA: c494af2ba461915c647b55da4200971b1eddedae
+      AFTER_SHA: 08d4d31f99e88e853f8aa9abb3a21ff9ce2bdb3b
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -182,7 +182,7 @@ jobs:
                     'run_id':os.environ['GITHUB_RUN_ID'],'package':expected,'variant':'previewPlayRelease',
                     'profileable_shell':True,'packaging_overlay':'identical isolated package, profileable manifest, compressed JNI',
                     'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'certificate_sha256':certs[0],
-                    'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 only'}
+                    'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 or stock XL user12 only'}
           (out/(role+'.json')).write_text(json.dumps(manifest,indent=2)+'\n')
           shutil.copyfile(root/'app/build/outputs/mapping/previewPlayRelease/mapping.txt',out/(role+'-mapping.txt'))
           PY
@@ -216,7 +216,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: c26bec880432961dcc60cd5abc0f2d856ef8bbf0
+          ref: 08d4d31f99e88e853f8aa9abb3a21ff9ce2bdb3b
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -245,6 +245,9 @@ jobs:
             --tests '*MediaViewerMotionScreenshotTest'
             --tests '*MediaViewerEntryFrameTest'
             --tests '*MediaViewerOpeningWorkTest'
+            --tests '*MediaViewerFirstFrameTest'
+            --tests '*ConversationMediaViewerLifetimeTest'
+            --tests '*OwnedMediaDecodeTest'
             --tests '*MediaViewerWindowAdmissionTest'
             --tests '*MediaViewerPagerRecompositionTest'
             --tests '*MediaViewerContentBoundsCoverageTest'
