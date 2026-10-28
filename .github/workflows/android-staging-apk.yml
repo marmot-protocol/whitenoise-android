@@ -1,5 +1,5 @@
 name: Android Staging APK
-run-name: PR3439 opening feedback controlled comparison
+run-name: PR3439 retained-media admission controlled comparison
 on:
   workflow_dispatch:
     inputs:
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
+          ref: 7eef916cd50e45e9cb42f81482155e646704e11d
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -61,8 +61,8 @@ jobs:
     timeout-minutes: 60
     env:
       BEFORE_SHA: 1da42bc66a3c66b035a7aa67d841e42867048645
-      PREVIOUS_SHA: f8aadcdc91d89bd4536003e208af09bd54977141
-      AFTER_SHA: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
+      PREVIOUS_SHA: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
+      AFTER_SHA: 7eef916cd50e45e9cb42f81482155e646704e11d
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -211,7 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: a1d7e916ee7468d136e162c6e66dcf14e7c896aa
+          ref: 7eef916cd50e45e9cb42f81482155e646704e11d
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -240,6 +240,12 @@ jobs:
             --tests '*MediaViewerMotionScreenshotTest'
             --tests '*MediaViewerEntryFrameTest'
             --tests '*MediaPressIndicationTest'
+            --tests '*RetainedAttachmentDownloadAdmissionTest'
+            --tests '*MediaDownloadHostRegressionTest'
+            --tests '*AttachmentPlaintextResolverTest'
+            --tests '*CachedAttachmentPlaintextBoundedReadTest'
+            --tests '*MainThreadConfinementCoverageTest'
+            --tests '*AttachmentDownloadIntentStoreTest'
             --tests '*ConversationTimelineUnderlayTest'
             --tests '*MediaVideoShareParityTest'
             --tests '*ConversationMediaViewerSessionTest'
