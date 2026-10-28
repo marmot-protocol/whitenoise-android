@@ -10,8 +10,10 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
@@ -34,6 +36,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * A file larger than a byte-returning read may hold still lands on the device: its card settles on the file's type
@@ -77,6 +80,7 @@ class LargeFileCardStateTest {
 
     /** A reader's Download of a file over the read budget ends on its type glyph, not Tap to retry. */
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun aReceivedFileOverTheReadBudgetSettlesDownloaded() {
         composeRule.setContent { WhiteNoiseTheme { LargeFileCard(mine = false) } }
         awaitDescribed(text(R.string.media_tap_to_download))
@@ -86,6 +90,7 @@ class LargeFileCardStateTest {
 
         awaitDescribed(text(R.string.attachment_type_pdf_description))
         assertNoRetry()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/large-received-file-downloaded.png")
     }
 
     /** The sender's own card fetches its own body, and one over the read budget also ends on its type glyph. */
@@ -104,6 +109,7 @@ class LargeFileCardStateTest {
      * and fetches exactly once when the projected reference arrives.
      */
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun anOwnFileWaitsForItsProjectionInsteadOfFailing() {
         var reference by mutableStateOf(pdfReference().copy(sourceEpoch = 0uL))
         val host = controller.attachmentTransferState(request(0).messageIdHex, 0, initiallyAvailable = false)
@@ -116,6 +122,7 @@ class LargeFileCardStateTest {
         composeRule.onNodeWithText(text(R.string.media_preparing_attachment)).assertExists()
         assertNoRetry()
         composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_download)).assertCountEquals(0)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/own-large-file-awaiting-projection.png")
 
         composeRule.runOnIdle { reference = pdfReference() }
         deliverBodyOverTheReadBudget()
