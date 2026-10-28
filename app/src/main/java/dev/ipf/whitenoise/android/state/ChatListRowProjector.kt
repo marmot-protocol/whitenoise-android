@@ -57,6 +57,7 @@ internal class ChatListRowProjector(
             null,
         )
 
+    /** Combines the supplied selection with archive, roster and preview inputs without retaining another snapshot. */
     private fun project(
         authoritativeRow: ChatListRowFfi,
         presentation: ConversationPresentationFfi?,

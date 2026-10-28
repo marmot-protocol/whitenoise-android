@@ -14,6 +14,7 @@ import org.junit.Test
 /** Exercises the production presentation lifetime rather than matching controller source text. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatsControllerListVisibilityTest {
+    /** Returning publishes the latest folded state immediately and prevents an older queued publication. */
     @Test
     fun returningFlushesFoldedStateSynchronouslyAndCancelsTheQueuedPublication() =
         runTest {
@@ -42,6 +43,7 @@ class ChatsControllerListVisibilityTest {
             assertEquals(3, visible)
         }
 
+    /** Returning before the debounce expires publishes once without waiting for its timer. */
     @Test
     fun returningBeforeTheFirstDebounceStillPublishesImmediately() =
         runTest {
@@ -59,6 +61,7 @@ class ChatsControllerListVisibilityTest {
             assertEquals(1, publications)
         }
 
+    /** A burst of scheduled updates coalesces into one publication of the newest backing state. */
     @Test
     fun burstPublishesOnceUsingTheLatestBackingState() =
         runTest {
@@ -80,6 +83,7 @@ class ChatsControllerListVisibilityTest {
             assertEquals(listOf(8), published)
         }
 
+    /** Reset cancels queued work while preserving the hidden state until the list returns. */
     @Test
     fun resetRejectsOldQueuedWorkAndKeepsTheHiddenPresentation() =
         runTest {
@@ -96,6 +100,7 @@ class ChatsControllerListVisibilityTest {
             assertEquals(1, calls)
         }
 
+    /** Clearing permanently stops presentation work without cancelling unrelated work in the supplied scope. */
     @Test
     fun clearCancelsOnlyPresentationWorkAndCannotBeReactivated() =
         runTest {

@@ -3696,14 +3696,16 @@ class ChatsController private constructor(
                 ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
     }
 
-    /** Projects the existing backing rows without retaining another presentation snapshot. */
+    /** Resolves the bound account identity, falling back to the active account before binding completes. */
     private fun projectionAccountIdHex(): String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
 
+    /** Projects the existing backing rows without retaining another presentation snapshot. */
     private fun currentProjectedItems(activeAccountIdHex: String? = projectionAccountIdHex()): List<ChatListItem> {
         val projector = rowProjector(activeAccountIdHex)
         return chatRows.map(projector::retained)
     }
 
+    /** Creates a synchronous projector over the current controller-owned inputs for the selected account. */
     private fun rowProjector(activeAccountIdHex: String?): ChatListRowProjector =
         ChatListRowProjector(
             activeAccountIdHex = activeAccountIdHex,
@@ -5248,7 +5250,7 @@ class ChatsController private constructor(
     private val recomputeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val presentationLifetime = ChatListPresentationLifetime(recomputeScope) { recompute() }
 
-    // Folded native updates remain synchronous; only their visible publication is coalesced.
+    /** Keeps folded native updates synchronous while coalescing only their visible publication. */
     private fun scheduleRecompute() = presentationLifetime.schedule()
 
     /**
@@ -5319,6 +5321,7 @@ class ChatsController private constructor(
         return !isCleared && bindLifetime.isCurrent(epoch) && bound
     }
 
+    /** Refreshes account unread state and publishes the visible projection when its presentation lifetime permits. */
     private fun recompute(scheduleBackgroundEnrichment: Boolean = true) {
         if (isCleared) return
         // currentProjectedItems() reads backing maps that remain warm while the

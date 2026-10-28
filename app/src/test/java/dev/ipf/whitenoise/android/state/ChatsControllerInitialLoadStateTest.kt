@@ -166,6 +166,7 @@ class ChatsControllerInitialLoadStateTest {
         }
     }
 
+    /** Seeds a controller from the supplied local snapshot and optionally suspends independent roster enrichment. */
     private fun seededController(
         row: ChatListRowFfi,
         presentation: ConversationPresentationFfi,
@@ -209,6 +210,7 @@ class ChatsControllerInitialLoadStateTest {
             },
         )
 
+    /** Creates a read, preview-free row for initial-snapshot publication assertions. */
     private fun seededRow(): ChatListRowFfi =
         notificationChatListRow().copy(
             title = "Seeded conversation",
@@ -218,6 +220,7 @@ class ChatsControllerInitialLoadStateTest {
             unreadCount = 0uL,
         )
 
+    /** Provides the seeded row's fallback title and placeholder avatar. */
     private fun seededPresentation() =
         ConversationPresentationFfi(
             title = PresentationTextFfi.Literal("Seeded conversation"),

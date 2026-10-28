@@ -27,6 +27,7 @@ import org.junit.Test
 
 /** Pins the actual retained/off-window projector boundary using the existing controller inputs. */
 class ChatListRowProjectorTest {
+    /** Retained and off-window rows keep their own selected presentation and optimistic-send context. */
     @Test
     fun retainedAndOffWindowRowsUseTheirOwnSelectedPresentationAndOptimisticContext() {
         val row = row(preview())
@@ -58,6 +59,7 @@ class ChatListRowProjectorTest {
         assertEquals(members(), first.memberSnapshot?.members)
     }
 
+    /** Applying the archive overlay preserves the pure projection and leaves the authoritative row unchanged. */
     @Test
     fun projectorPreservesTheExistingPureProjectionAndArchiveOverlay() {
         val row = row(preview())
@@ -78,6 +80,7 @@ class ChatListRowProjectorTest {
         assertFalse(projector(null, null, archives).retained(row).group.archived)
     }
 
+    /** Selected actions, preview, avatar and fallback inputs reach the retained row unchanged. */
     @Test
     fun selectedCapabilitiesPreviewAndFallbackInputsSurviveProjection() {
         val row = row(preview())
@@ -122,6 +125,7 @@ class ChatListRowProjectorTest {
         assertEquals(expected, context.retained(row))
     }
 
+    /** Builds a projector with a fixed roster and activity order plus the supplied selection and send overlay. */
     private fun projector(
         presentation: ConversationPresentationFfi?,
         optimistic: OptimisticChatListPreviewState?,
@@ -144,6 +148,7 @@ class ChatListRowProjectorTest {
         actions = emptyMap(),
     )
 
+    /** Provides an in-memory archive overlay for the supplied authoritative row without persisting changes. */
     private fun archiveActions(row: ChatListRowFfi) =
         ChatListArchiveActions(
             rowForGroup = { row.takeIf { requested -> requested.groupIdHex == it } },
@@ -154,6 +159,7 @@ class ChatListRowProjectorTest {
             onSuccess = {},
         )
 
+    /** Creates an MDK fallback title and placeholder avatar for the test group. */
     private fun presentation(title: String) =
         ConversationPresentationFfi(
             title = PresentationTextFfi.Literal(title),
@@ -164,6 +170,7 @@ class ChatListRowProjectorTest {
             resolution = PresentationResolutionFfi.FALLBACK,
         )
 
+    /** Returns a local member and a remote peer to exercise account-aware roster projection. */
     private fun members(): List<AppGroupMemberRecordFfi> =
         listOf(
             AppGroupMemberRecordFfi(memberIdHex = ACTIVE_ACCOUNT, account = null, local = true),
@@ -190,6 +197,7 @@ class ChatListRowProjectorTest {
             deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
         )
 
+    /** Builds a stable group row with the supplied last-message preview and no unread or archive state. */
     private fun row(lastMessage: ChatListMessagePreviewFfi?) =
         ChatListRowFfi(
             groupIdHex = GROUP_ID,
@@ -224,6 +232,7 @@ class ChatListRowProjectorTest {
             leaveRequestedAtMs = null,
         )
 
+    /** Builds the matching authoritative group record with default encrypted-media capabilities. */
     private fun group() =
         AppGroupRecordFfi(
             groupIdHex = GROUP_ID,
@@ -254,6 +263,7 @@ class ChatListRowProjectorTest {
             disbandRequest = null,
         )
 
+    /** Supplies the fixture group's supported encrypted-media version and Blossom locator capabilities. */
     private fun encryptedMedia() =
         AppGroupEncryptedMediaComponentFfi(
             componentId = 0x8008u,

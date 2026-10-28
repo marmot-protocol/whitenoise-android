@@ -1325,6 +1325,7 @@ class OptimisticSentPreviewMetadataTest {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class LocalDeletedGroupProjectionTest {
+    /** A restart keeps a locally deleted group absent until MDK publishes a newer authoritative row. */
     @Test
     fun restartSnapshotKeepsDeletedGroupAbsentUntilMdkRepublishesThatRow() {
         val deleted = row("deleted-group", "Deleted", 10uL)
