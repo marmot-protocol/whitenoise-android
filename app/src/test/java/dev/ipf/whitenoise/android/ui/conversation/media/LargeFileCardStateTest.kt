@@ -130,9 +130,12 @@ class LargeFileCardStateTest {
         composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_download)).assertCountEquals(0)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/own-large-file-awaiting-delivery.png")
         composeRule.onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0)).performClick()
+        composeRule.waitForIdle()
+        assertEquals("a held card must ignore a body tap", AttachmentTransferState.Remote, host.value)
+        assertTrue("a body tap on a held card must not fetch", fixture.calls.isEmpty())
         composeRule.onNodeWithContentDescription(text(R.string.media_preparing_attachment)).performClick()
         composeRule.waitForIdle()
-        assertEquals("a held card must ignore taps", AttachmentTransferState.Remote, host.value)
+        assertEquals("a held card must offer no cancel", AttachmentTransferState.Remote, host.value)
         assertTrue(fixture.calls.isEmpty())
         assertFalse(controller.automaticAttachmentDownloadSuppressed(request(0).messageIdHex, 0))
 
