@@ -170,3 +170,8 @@ dev.ipf.whitenoise.android.media.AttachmentFixturePublicationDeviceTest#smallMem
 
 # #3450: controlled application trim and bounded warm return with cache/frame/memory samples.
 dev.ipf.whitenoise.android.core.AvatarCacheScrollDeviceTest#presentationTrimAndWarmReturnCounters
+
+# Emulator acceptance for the presentation continuity batch.
+dev.ipf.whitenoise.android.ui.chats.ChatListContinuityAndroidTest#actualFolderSwitchRetiresOldRowsAndCapturedActionsDuringReversal
+dev.ipf.whitenoise.android.ui.chats.ChatListContinuityAndroidTest#actualSelectionKeepsUnreadMetadataAndOneCurrentRowThroughExitReversal
+dev.ipf.whitenoise.android.ui.chats.ChatListContinuityAndroidTest#heldUnreadPullCannotFilterTheReplacementFolderAndSearchHasOneEditor

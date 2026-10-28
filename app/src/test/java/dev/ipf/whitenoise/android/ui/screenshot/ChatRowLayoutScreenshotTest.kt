@@ -152,13 +152,13 @@ class ChatRowLayoutScreenshotTest {
                         )
                         ChatRowFixture(
                             title = "Selected conversation",
-                            preview = "Normal metadata is replaced",
+                            preview = "Normal metadata remains visible",
                             selectionMode = true,
                             selected = true,
                         )
                         ChatRowFixture(
                             title = "Unselected conversation",
-                            preview = "Normal metadata is replaced",
+                            preview = "Normal metadata remains visible",
                             selectionMode = true,
                         )
                     }

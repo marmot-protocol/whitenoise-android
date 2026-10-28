@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import android.provider.Settings
 import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
@@ -36,9 +37,11 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -52,13 +55,34 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ScrollEdgeFadeImeAndroidTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
+    private var previousAnimationScale: String? = null
 
     @Before
     @Suppress("DEPRECATION")
     fun configureWindow() {
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .adoptShellPermissionIdentity("android.permission.WRITE_SECURE_SETTINGS")
+        val resolver = composeRule.activity.contentResolver
+        previousAnimationScale = Settings.Global.getString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE)
+        check(Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f))
         composeRule.runOnUiThread {
             composeRule.activity.enableEdgeToEdge()
             composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+    }
+
+    /** Keep the runner's animation policy unchanged for subsequent emulator cases, even after an assertion failure. */
+    @After
+    fun restoreAnimationPolicy() {
+        composeRule.mainClock.autoAdvance = true
+        try {
+            Settings.Global.putString(
+                composeRule.activity.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                previousAnimationScale,
+            )
+        } finally {
+            InstrumentationRegistry.getInstrumentation().uiAutomation.dropShellPermissionIdentity()
         }
     }
 
@@ -98,11 +122,28 @@ class ScrollEdgeFadeImeAndroidTest {
         val keyboardEdges = edgeLevels()
         assertTrue("keyboard viewport must remain unmasked: $keyboardEdges", keyboardEdges.all { it > 0.95f })
 
+        composeRule.mainClock.autoAdvance = false
         composeRule.runOnUiThread {
             val window = WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }
             ViewCompat.getWindowInsetsController(window)?.hide(WindowInsetsCompat.Type.ime())
         }
         composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() == null }
+        // The first Compose layout after the real IME closes must reuse the retained mask.
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        val firstRestored = edgeLevels()
+        assertTrue(
+            "the first restored frame must not restart either fade: $firstRestored",
+            firstRestored.first() < 0.5f && firstRestored.last() < 0.5f,
+        )
+        composeRule.mainClock.advanceTimeBy(60)
+        val middleRestored = edgeLevels()
+        assertTrue(
+            "the mid-transition frame retains both cues: $middleRestored",
+            middleRestored.first() < 0.5f && middleRestored.last() < 0.5f,
+        )
+        composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
         assertEquals(
             "keyboard transition must preserve scroll ownership",

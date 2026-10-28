@@ -115,7 +115,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
-import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -130,6 +129,7 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
@@ -1580,7 +1580,7 @@ internal fun ChatsScreen(
                     }
                 }
 
-                /** True while the row menu still belongs to the account and runtime that opened it. */
+                /** Admits row navigation and menu commands only while their measured row and account scope remain current. */
                 fun menuActionsCurrent(): Boolean {
                     val ownsAccount =
                         menuAccount != null &&
@@ -1675,12 +1675,16 @@ internal fun ChatsScreen(
                         },
                         bodyMatch = bodyMatch,
                         onOpen = {
-                            searchViewport?.selection?.selected =
-                                bodyMatch?.let { GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex) }
-                                    ?: GlobalSearchSelectedResult()
-                            openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false)
+                            if (menuActionsCurrent()) {
+                                searchViewport?.selection?.selected =
+                                    bodyMatch?.let { GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex) }
+                                        ?: GlobalSearchSelectedResult()
+                                openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false)
+                            }
                         },
-                        onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
+                        onOpenProfile = { npub ->
+                            if (menuActionsCurrent()) presentProfileFromVisibleList(npub)
+                        },
                         onOpenActions = {
                             if (menuActionsCurrent()) {
                                 val continuingHold =
@@ -1722,9 +1726,11 @@ internal fun ChatsScreen(
                         },
                         rangeDragActive = dragAnchorChatId == rowId,
                         onToggleSelection = {
-                            val updated = toggleChatListSelection(selectedChatIds, rowId)
-                            selectedChatIds.clear()
-                            selectedChatIds.addAll(updated)
+                            if (menuActionsCurrent()) {
+                                val updated = toggleChatListSelection(selectedChatIds, rowId)
+                                selectedChatIds.clear()
+                                selectedChatIds.addAll(updated)
+                            }
                         },
                     )
                 }
