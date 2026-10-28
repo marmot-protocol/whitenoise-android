@@ -11,7 +11,7 @@ MODE, ROOT, EVIDENCE = sys.argv[1:4]
 root, evidence = pathlib.Path(ROOT), pathlib.Path(EVIDENCE)
 ns = {'v': 'https://schema.gradle.org/dependency-verification'}
 verification = 'gradle/verification-metadata.xml'
-configs = {'previewPlayReleaseCompileClasspath', 'previewPlayReleaseRuntimeClasspath'}
+configs = {'previewPlayReleaseCompileClasspath', 'previewPlayReleaseRuntimeClasspath', 'previewPlayReleaseLintChecksClasspath'}
 allowed = {
     'androidx.compose.runtime:runtime-tracing': '1.13.0-beta01',
     'androidx.tracing:tracing-wire': '2.0.4',
@@ -92,10 +92,19 @@ assert a_config == b_config, 'Verification configuration changed'
 assert all(b_entries.get(k) == v for k, v in a_entries.items()), 'Existing trust changed'
 new_entries = {k: v for k, v in b_entries.items() if k not in a_entries}
 assert new_entries and all(trusted.get(k) == v for k, v in new_entries.items()), new_entries
+discarded_removals = {}
 for name in files:
     if name not in ('app/gradle.lockfile', verification):
-        assert lock_inputs(root / name) == lock_inputs(evidence / 'baseline' / name), ('Unrelated lock graph changed', name)
-        # Gradle may rewrite lockfile comments/order; keep unrelated reviewed bytes exactly.
+        prior = lock_inputs(evidence / 'baseline' / name)
+        generated = lock_inputs(root / name)
+        assert set(prior) == set(generated), ('Unrelated lock configurations changed', name)
+        for config, selected in generated.items():
+            assert all(prior[config].get(k) == v for k, v in selected.items()), ('Unrelated dependency addition/version change', name, config)
+            removed = {k: v for k, v in prior[config].items() if k not in selected}
+            if removed:
+                discarded_removals.setdefault(name, {})[config] = removed
+        # Candidate generation may discard locks it did not need. Never export those removals:
+        # the actual assembly consumes original reviewed inputs with normal STRICT validation.
         shutil.copyfile(evidence / 'baseline' / name, root / name)
 before = lock_inputs(evidence / 'baseline' / 'app/gradle.lockfile')
 after = lock_inputs(root / 'app/gradle.lockfile')
@@ -124,6 +133,6 @@ for name in files:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(root / name, target)
 shutil.copyfile(root / 'trace-resolved-graph.json', evidence / 'resolved-graph.json')
-(evidence / 'changes.json').write_text(json.dumps({'locks': changes, 'new_hashes': [list(k) + [v] for k, v in new_entries.items()]}, indent=2))
+(evidence / 'changes.json').write_text(json.dumps({'locks': changes, 'discarded_generated_removals': discarded_removals, 'new_hashes': [list(k) + [v] for k, v in new_entries.items()]}, indent=2))
 (evidence / 'audited-hashes.json').write_text(json.dumps({p: digest(root / p) for p in files}, indent=2))
 print(json.dumps({'audited_new_artifacts': len(new_entries), 'configurations': sorted(configs), 'dependency_changes': changes}, indent=2))

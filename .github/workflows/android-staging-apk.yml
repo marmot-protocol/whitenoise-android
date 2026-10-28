@@ -371,7 +371,7 @@ jobs:
                   project.tasks.register('resolvePerf3439TraceInputs') {
                       doLast {
                           def graph = [:]
-                          ['previewPlayReleaseCompileClasspath', 'previewPlayReleaseRuntimeClasspath'].each { name ->
+                          ['previewPlayReleaseCompileClasspath', 'previewPlayReleaseRuntimeClasspath', 'previewPlayReleaseLintChecksClasspath'].each { name ->
                               def configuration = project.configurations.getByName(name)
                               configuration.resolve()
                               def selected = [:]
