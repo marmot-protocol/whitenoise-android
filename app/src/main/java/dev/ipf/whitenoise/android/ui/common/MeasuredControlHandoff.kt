@@ -66,7 +66,8 @@ internal class MeasuredControlHandoff(initialDestination: Any?) {
     suspend fun moveTo(destination: Any?, enabled: Boolean, origin: Rect?) {
         val source = previous
         previous = destination
-        if (!enabled || source == null || destination == null || source == destination) {
+        val hasEndpoints = source != null && destination != null
+        if (!enabled || !hasEndpoints || source == destination) {
             start = null
             end = null
             progress.snapTo(1f)
@@ -82,7 +83,7 @@ internal class MeasuredControlHandoff(initialDestination: Any?) {
         start = origin
         end = target
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(180))
+        progress.animateTo(1f, tween(CONTROL_HANDOFF_MILLIS))
         start = null
         end = null
     }
@@ -142,3 +143,5 @@ internal fun MeasuredControlHandoffHost(
             },
     ) { content() }
 }
+
+private const val CONTROL_HANDOFF_MILLIS = 180

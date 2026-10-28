@@ -103,7 +103,13 @@ class AppearanceScreenScreenshotTest {
     @Test
     @Config(qualifiers = "en-rUS-w360dp-h2400dp-mdpi")
     fun accessibilityPreviewAmoledLargeRtl() {
-        render(mode = AppThemeMode.Amoled, darkTheme = true, amoled = true, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        render(
+            mode = AppThemeMode.Amoled,
+            darkTheme = true,
+            amoled = true,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
         capturePreview("amoled_large_rtl")
     }
 

@@ -221,12 +221,13 @@ internal fun SettingsBottomAction(
     tonalElevation: Dp = SettingsBottomActionElevation,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(modifier = modifier.floatingDictationFooter(), color = color, tonalElevation = tonalElevation) {
+    Surface(modifier = modifier, color = color, tonalElevation = tonalElevation) {
         AdaptiveContent {
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .floatingDictationFooter()
                         .navigationBarsPadding()
                         .imePadding()
                         .padding(WhiteNoiseSpacing.PinnedActionInset),

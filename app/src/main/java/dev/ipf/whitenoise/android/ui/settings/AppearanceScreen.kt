@@ -6,6 +6,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -77,6 +78,7 @@ internal fun AppearanceScreen(
     var fontFamilyOpen by rememberSaveable { mutableStateOf(false) }
     var fontSizeOpen by rememberSaveable { mutableStateOf(false) }
     var enterOpen by rememberSaveable { mutableStateOf(false) }
+    val previewState = remember(appState.activeAccountRef, appState.runtimeGeneration) { AppearancePreviewState() }
     val familyLabels = AppFont.entries.associateWith { it.pickerLabel() }
     val fontLabels = AppFontScale.entries.associateWith { stringResource(it.labelRes) }
     val enterLabels = EnterKeyBehavior.entries.associateWith { stringResource(it.labelRes) }
@@ -236,7 +238,7 @@ internal fun AppearanceScreen(
             item {
                 val previewTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
                 AppearanceAccessibilitySample(
-                    owner = appState.activeAccountRef to appState.runtimeGeneration,
+                    state = previewState,
                     theme = previewTheme,
                     mineArgb = appState.globalBubbleColorArgb(previewTheme, BubbleSide.Mine),
                     otherArgb = appState.globalBubbleColorArgb(previewTheme, BubbleSide.Other),

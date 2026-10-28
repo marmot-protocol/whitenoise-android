@@ -9,10 +9,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -25,17 +21,15 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 
-/** Synthetic, account-lifetime sample; simulation state never writes to app or system preferences. */
+/** Synthetic sample; the screen retains simulation state without writing app or system preferences. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun AppearanceAccessibilitySample(
-    owner: Any,
+    state: AppearancePreviewState,
     theme: BubbleTheme,
     mineArgb: Long?,
     otherArgb: Long?,
 ) {
-    var rtl by remember(owner) { mutableStateOf(false) }
-    var largeText by remember(owner) { mutableStateOf(false) }
     val density = LocalDensity.current
     val direction = LocalLayoutDirection.current
     val motion = rememberSystemAnimationsEnabled()
@@ -50,22 +44,22 @@ internal fun AppearanceAccessibilitySample(
                 SettingsSwitch(
                     context = context,
                     title = stringResource(R.string.appearance_preview_rtl),
-                    checked = rtl,
-                    onCheckedChange = { rtl = it },
+                    checked = state.rtl,
+                    onCheckedChange = { state.rtl = it },
                 )
             }
             row("preview_large") { context ->
                 SettingsSwitch(
                     context = context,
                     title = stringResource(R.string.appearance_preview_large_text),
-                    checked = largeText,
-                    onCheckedChange = { largeText = it },
+                    checked = state.largeText,
+                    onCheckedChange = { state.largeText = it },
                 )
             }
         }
         CompositionLocalProvider(
-            LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else direction,
-            LocalDensity provides Density(density.density, density.fontScale * if (largeText) 2f else 1f),
+            LocalLayoutDirection provides if (state.rtl) LayoutDirection.Rtl else direction,
+            LocalDensity provides Density(density.density, density.fontScale * if (state.largeText) 2f else 1f),
         ) {
             FontAppearanceSample(theme, mineArgb, otherArgb, Modifier.testTag("appearance.accessibility.sample"))
         }
@@ -76,10 +70,7 @@ internal fun AppearanceAccessibilitySample(
             style = MaterialTheme.typography.bodySmall,
         )
         TextButton(
-            onClick = {
-                rtl = false
-                largeText = false
-            },
+            onClick = state::reset,
         ) {
             Text(stringResource(R.string.appearance_preview_reset))
         }

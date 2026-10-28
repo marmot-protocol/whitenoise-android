@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -23,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LocalPinnableContainer
 import androidx.compose.ui.layout.PinnableContainer
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -38,12 +41,11 @@ internal class FolderDragState(
     var folderId: String? by mutableStateOf(null)
         private set
     private var center by mutableFloatStateOf(0f)
-    private var initialOffset = 0
     private var height = 0
-    private var scrolled by mutableFloatStateOf(0f)
+    private var pinned: PinnableContainer.PinnedHandle? = null
     private var sourceIds = emptyList<String>()
     private var expectedIds = emptyList<String>()
-    private val renderedTranslations = mutableMapOf<String, Float>()
+    val placements = FolderDragPlacements(list)
     private var releasePositions = emptyMap<String, Float>()
     private var releaseFraction by mutableFloatStateOf(0f)
     var releasing by mutableStateOf(false)
@@ -52,20 +54,19 @@ internal class FolderDragState(
         private set
     val targetId by derivedStateOf { target(ids()) }
 
-    /** Captures authoritative order and the grabbed row's measured height, not a fixed row size. */
-    fun start(id: String) {
+    /** Captures authoritative geometry and pins the held row through release, including rejected offscreen saves. */
+    fun start(id: String, pinnable: PinnableContainer? = null) {
         if (folderId != null) return
         val item = list.layoutInfo.visibleItemsInfo.firstOrNull { it.key == id } ?: return
+        pinned = pinnable?.pin()
         releaseGeneration++
         sourceIds = ids().toList()
-        center = item.offset + item.size / 2f
-        initialOffset = item.offset
+        center = (placements.top(id) ?: item.offset.toFloat()) + item.size / 2f
         height = item.size
-        scrolled = 0f
         folderId = id
     }
 
-    /** Pointer deltas stay in viewport coordinates; consumed scrolling is tracked separately. */
+    /** Pointer deltas stay in viewport coordinates while each row reports its actual lazy-list placement. */
     fun drag(distance: Float) {
         if (releasing) return
         center += distance
@@ -76,18 +77,29 @@ internal class FolderDragState(
         folderId = null
         releasing = false
         releasePositions = emptyMap()
-        renderedTranslations.clear()
+        placements.clearTranslations()
+        pinned?.release()
+        pinned = null
     }
 
     /** The dragged row follows the finger; siblings leave a measured insertion-sized gap. */
-    fun translation(id: String): Float {
-        if (folderId == null) return 0f
-        if (releasing) {
-            val position = releasePositions[id] ?: return 0f
-            val layout = list.layoutInfo.visibleItemsInfo.firstOrNull { it.key == id } ?: return 0f
-            return (position - layout.offset) * (1f - releaseFraction)
+    fun translation(id: String): Float =
+        when {
+            folderId == null -> 0f
+            releasing -> releaseTranslation(id)
+            id == folderId -> center - (placements.top(id) ?: center - height / 2f) - height / 2f
+            else -> siblingTranslation(id)
         }
-        if (id == folderId) return center - initialOffset + scrolled - height / 2f
+
+    /** A surviving measured row settles from the captured release frame to its authoritative position. */
+    private fun releaseTranslation(id: String): Float {
+        val position = releasePositions[id]
+        val placedTop = placements.top(id)
+        return if (position != null && placedTop != null) (position - placedTop) * (1f - releaseFraction) else 0f
+    }
+
+    /** Only siblings between the source and insertion target move by the grabbed row's measured footprint. */
+    private fun siblingTranslation(id: String): Float {
         val current = ids()
         val from = current.indexOf(folderId)
         val to = current.indexOf(targetId)
@@ -98,16 +110,6 @@ internal class FolderDragState(
             to >= 0 && to < from && index >= to && index < from -> displacement
             else -> 0f
         }
-    }
-
-    /** Records actual placed offsets so a release starts at the visible, possibly mid-animation frame. */
-    fun recordTranslation(id: String, translation: Float) {
-        renderedTranslations[id] = translation
-    }
-
-    /** Only consumed scroll changes the grabbed point's compensation. */
-    fun recordScroll(distance: Float) {
-        scrolled += distance
     }
 
     /** Original layout slots remain stable while sibling draw offsets animate around the gap. */
@@ -122,15 +124,11 @@ internal class FolderDragState(
     /** Commits the previewed insertion once, retaining the visible frame until the store responds. */
     fun drop(ids: List<String>, onMove: (String, Int) -> Unit) {
         val id = folderId ?: return
-        if (releasing || ids != sourceIds) return cancel()
         val from = ids.indexOf(id)
         val to = ids.indexOf(target(ids))
-        if (from < 0 || to < 0) return cancel()
-        releasePositions =
-            list.layoutInfo.visibleItemsInfo
-                .mapNotNull { item ->
-                    (item.key as? String)?.let { key -> key to (item.offset + (renderedTranslations[key] ?: 0f)) }
-                }.toMap()
+        val missingEndpoint = from < 0 || to < 0
+        if (releasing || ids != sourceIds || missingEndpoint) return cancel()
+        releasePositions = placements.capture(ids)
         expectedIds = ids.toMutableList().apply { add(to, removeAt(from)) }
         releaseFraction = 0f
         releasing = true
@@ -153,7 +151,7 @@ internal class FolderDragState(
         val generation = releaseGeneration
         withFrameNanos { }
         if (!releasing) return
-        Animatable(0f).animateTo(1f, if (enabled) tween(180) else snap()) {
+        Animatable(0f).animateTo(1f, if (enabled) tween(RELEASE_MILLIS) else snap()) {
             if (generation == releaseGeneration) releaseFraction = value
         }
         if (generation == releaseGeneration) cancel()
@@ -172,6 +170,7 @@ internal class FolderDragState(
 
     private companion object {
         const val SCROLL_PER_FRAME = 12f
+        const val RELEASE_MILLIS = 180
     }
 }
 
@@ -191,7 +190,7 @@ internal fun rememberFolderDrag(
         while (drag.folderId != null) {
             withFrameNanos { }
             val distance = drag.edgeScroll(edge)
-            if (distance != 0f) drag.recordScroll(list.scrollBy(distance))
+            if (distance != 0f) list.scrollBy(distance)
         }
     }
     return drag
@@ -209,29 +208,16 @@ internal fun Modifier.folderDragHandle(
     val latestMove by rememberUpdatedState(onMove)
     val pinnable = LocalPinnableContainer.current
     return pointerInput(id, drag) {
-        var pinned: PinnableContainer.PinnedHandle? = null
         try {
             detectDragGestures(
-                onDragStart = {
-                    pinned = pinnable?.pin()
-                    drag.start(id)
-                },
-                onDragEnd = {
-                    if (drag.folderId == id) drag.drop(latestIds, latestMove)
-                    pinned?.release()
-                    pinned = null
-                },
-                onDragCancel = {
-                    if (drag.folderId == id) drag.cancel()
-                    pinned?.release()
-                    pinned = null
-                },
+                onDragStart = { drag.start(id, pinnable) },
+                onDragEnd = { if (drag.folderId == id) drag.drop(latestIds, latestMove) },
+                onDragCancel = { if (drag.folderId == id) drag.cancel() },
             ) { change, amount ->
                 change.consume()
                 if (drag.folderId == id) drag.drag(amount.y)
             }
         } finally {
-            pinned?.release()
             if (drag.folderId == id) drag.cancel()
         }
     }
@@ -251,9 +237,13 @@ internal fun folderDragRowModifier(
             animationSpec = if (enabled) tween(120) else snap(),
             label = "folder insertion gap",
         )
-    return Modifier.zIndex(if (moving) 1f else 0f).offset {
-        val translation = if (moving || drag.releasing) drag.translation(id) else siblingOffset
-        drag.recordTranslation(id, translation)
-        IntOffset(0, translation.roundToInt())
-    }
+    DisposableEffect(id, drag) { onDispose { drag.placements.forget(id) } }
+    return Modifier
+        .zIndex(if (moving) 1f else 0f)
+        .onPlaced { drag.placements.record(id, it.positionInParent().y) }
+        .offset {
+            val translation = if (moving || drag.releasing) drag.translation(id) else siblingOffset
+            drag.placements.recordTranslation(id, translation)
+            IntOffset(0, translation.roundToInt())
+        }
 }

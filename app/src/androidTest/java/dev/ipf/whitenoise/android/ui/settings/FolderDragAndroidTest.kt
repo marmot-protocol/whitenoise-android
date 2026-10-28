@@ -4,6 +4,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -17,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -63,7 +65,11 @@ class FolderDragAndroidTest {
             if (::drag.isInitialized) rule.runOnUiThread { drag.cancel() }
         } finally {
             try {
-                Settings.Global.putString(rule.activity.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, previousScale)
+                Settings.Global.putString(
+                    rule.activity.contentResolver,
+                    Settings.Global.ANIMATOR_DURATION_SCALE,
+                    previousScale,
+                )
             } finally {
                 InstrumentationRegistry.getInstrumentation().uiAutomation.dropShellPermissionIdentity()
             }
@@ -121,18 +127,89 @@ class FolderDragAndroidTest {
         render()
         rule.mainClock.autoAdvance = false
         val origin = bounds("folder-0")
-        val edge = with(rule.density) { Offset(120.dp.toPx(), 280.dp.toPx()) }
+        val viewport = rule.onNodeWithTag("folders.viewport").fetchSemanticsNode().boundsInRoot
+        val edge = viewport.topLeft + with(rule.density) { Offset(120.dp.toPx(), 280.dp.toPx()) }
         pointerTo(origin.center, edge, release = false)
         rule.mainClock.advanceTimeBy(240)
-        assertTrue("the pointer must consume real list scrolling", list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 0)
+        assertTrue(
+            "the pointer must consume real list scrolling",
+            list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 0,
+        )
         val heldCenter = bounds("folder-0").center.y
-        assertTrue("scroll must not drag the held row away from the pointer", kotlin.math.abs(heldCenter - edge.y) < with(rule.density) { 32.dp.toPx() })
+        assertTrue(
+            "scroll must not move held center $heldCenter away from pointer ${edge.y}",
+            kotlin.math.abs(heldCenter - edge.y) < with(rule.density) { 32.dp.toPx() },
+        )
         rule.runOnIdle { ids = ids.drop(1) }
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
         rule.onNodeWithTag("folders.viewport").performTouchInput { up() }
         rule.mainClock.advanceTimeBy(240)
         assertNull(drag.folderId)
         assertTrue(moves.isEmpty())
+    }
+
+    /** A pinned row retains its grabbed point through scrolling, pointer reversal and a saved insertion. */
+    @Test
+    fun offscreenPinnedRowReversesAndReleasesFromItsDisplayedPosition() {
+        ids = (0 until 20).map { "folder-$it" }
+        render()
+        rule.mainClock.autoAdvance = false
+        val viewport = rule.onNodeWithTag("folders.viewport").fetchSemanticsNode().boundsInRoot
+        val edge = viewport.topLeft + with(rule.density) { Offset(120.dp.toPx(), 280.dp.toPx()) }
+        pointerTo(bounds("folder-0").center, edge, release = false)
+        rule.mainClock.advanceTimeBy(240)
+        val heldCenter = bounds("folder-0").center.y
+        rule.mainClock.advanceTimeBy(400)
+        assertTrue("several original slots must leave the composed viewport", list.firstVisibleItemIndex > 1)
+        assertEquals("scrolling preserves the grabbed point", heldCenter, bounds("folder-0").center.y, 2f)
+        rule.onNodeWithTag("folders.viewport").performTouchInput { moveTo(viewport.center - viewport.topLeft, 80) }
+        rule.mainClock.advanceTimeBy(64)
+        val beforeRelease = bounds("folder-0")
+        assertEquals(
+            "reversed pointer keeps its grabbed point",
+            heldCenter + viewport.center.y - edge.y,
+            beforeRelease.center.y,
+            2f,
+        )
+        val targetIndex = ids.indexOf(drag.targetId)
+        assertTrue("release must target a later, actually visible slot", targetIndex > 1)
+        val expected = ids.toMutableList().apply { add(targetIndex, removeAt(0)) }
+        rule.onNodeWithTag("folders.viewport").performTouchInput { up() }
+        rule.mainClock.advanceTimeByFrame()
+        assertEquals(
+            "release must retain the pinned row's visible frame",
+            beforeRelease.top,
+            bounds("folder-0").top,
+            2f,
+        )
+        rule.mainClock.advanceTimeBy(240)
+        assertEquals(listOf("folder-0" to targetIndex), moves)
+        assertEquals(expected, ids)
+        assertNull(drag.folderId)
+    }
+
+    /** A rejected edge-scroll drop retains its pinned row through settlement without saving the preview order. */
+    @Test
+    fun rejectedOffscreenDropRetainsTheRenderedReleaseFrame() {
+        ids = (0 until 20).map { "folder-$it" }
+        val originalIds = ids
+        render(acceptSave = false)
+        rule.mainClock.autoAdvance = false
+        val viewport = rule.onNodeWithTag("folders.viewport").fetchSemanticsNode().boundsInRoot
+        val edge = viewport.topLeft + with(rule.density) { Offset(120.dp.toPx(), 280.dp.toPx()) }
+        pointerTo(bounds("folder-0").center, edge, release = false)
+        rule.mainClock.advanceTimeBy(640)
+        assertTrue(list.firstVisibleItemIndex > 1)
+        val beforeRelease = bounds("folder-0")
+        val targetIndex = ids.indexOf(drag.targetId)
+        rule.onNodeWithTag("folders.viewport").performTouchInput { up() }
+        rule.mainClock.advanceTimeByFrame()
+        assertEquals("rejected save keeps the pinned release frame", beforeRelease.top, bounds("folder-0").top, 2f)
+        rule.mainClock.advanceTimeBy(240)
+        assertEquals(listOf("folder-0" to targetIndex), moves)
+        assertEquals(originalIds, ids)
+        assertNull(drag.folderId)
+        rule.onNodeWithTag("folder-0").assertDoesNotExist()
     }
 
     /** Pointer coordinates use the stable viewport, so moving row transforms cannot move the input origin. */
@@ -157,6 +234,7 @@ class FolderDragAndroidTest {
                 LazyColumn(
                     Modifier.size(240.dp, 300.dp).testTag("folders.viewport"),
                     state = list,
+                    contentPadding = PaddingValues(vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(ids, key = { it }) { id ->

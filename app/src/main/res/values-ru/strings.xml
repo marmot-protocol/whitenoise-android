@@ -2562,4 +2562,11 @@
     <string name="public_jpeg_previews_privacy">По умолчанию отключён. Прямые ссылки на JPEG в Blossom могут раскрыть ваш IP-адрес серверу изображений. Предпросмотр использует Wi-Fi, не помеченный как лимитный и ваши правила загрузки фото. Обычные ссылки доступны и без предпросмотра.</string>
     <string name="public_jpeg_preview_image">Предпросмотр JPEG по ссылке</string>
     <string name="public_jpeg_preview_save_failed">Не удалось сохранить настройку предпросмотра изображений. Попробуйте ещё раз.</string>
+    <string name="appearance_accessibility_preview">Предпросмотр читаемости</string>
+    <string name="appearance_preview_rtl">Предпросмотр макета справа налево</string>
+    <string name="appearance_preview_large_text">Предпросмотр с удвоенным размером текста</string>
+    <string name="appearance_preview_reset">Сбросить пример</string>
+    <string name="appearance_preview_limits">Искусственный пример с текущей темой и шрифтом. Эти переключатели влияют только на этот пример. Порядок чтения программой экранного доступа, увеличение, управление переключателями и области касания нужно проверять отдельно с реальной службой специальных возможностей.</string>
+    <string name="appearance_preview_motion_on">Системные анимации включены. Этот статичный пример не проверяет движение.</string>
+    <string name="appearance_preview_motion_off">Системные анимации отключены. Этот пример учитывает эту настройку.</string>
 </resources>

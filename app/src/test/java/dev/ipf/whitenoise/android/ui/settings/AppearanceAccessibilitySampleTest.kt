@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -51,8 +52,9 @@ class AppearanceAccessibilitySampleTest {
                     LocalDensity provides Density(1f, 1.5f),
                     LocalLayoutDirection provides LayoutDirection.Ltr,
                 ) {
+                    val state = remember { AppearancePreviewState() }
                     Column(Modifier.verticalScroll(rememberScrollState())) {
-                        AppearanceAccessibilitySample("account-runtime", BubbleTheme.Light, null, null)
+                        AppearanceAccessibilitySample(state, BubbleTheme.Light, null, null)
                     }
                 }
             }
@@ -79,8 +81,9 @@ class AppearanceAccessibilitySampleTest {
         val owner = mutableStateOf("first-runtime")
         composeRule.setContent {
             WhiteNoiseTheme {
+                val state = remember(owner.value) { AppearancePreviewState() }
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    AppearanceAccessibilitySample(owner.value, BubbleTheme.Light, null, null)
+                    AppearanceAccessibilitySample(state, BubbleTheme.Light, null, null)
                 }
             }
         }

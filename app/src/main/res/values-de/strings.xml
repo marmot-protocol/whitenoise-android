@@ -2505,4 +2505,11 @@
     <string name="public_jpeg_previews_privacy">Standardmäßig deaktiviert. Direkte Blossom-JPEG-Links können dem Bildhost deine IP-Adresse offenlegen. Vorschauen nutzen ungetaktetes WLAN und deine Regeln zum Herunterladen von Fotos. Normale Links bleiben bei deaktivierter Vorschau verfügbar.</string>
     <string name="public_jpeg_preview_image">Vorschau eines verlinkten JPEG-Bildes</string>
     <string name="public_jpeg_preview_save_failed">Die Einstellung für Bildvorschauen konnte nicht gespeichert werden. Bitte versuche es erneut.</string>
+    <string name="appearance_accessibility_preview">Lesbarkeitsvorschau</string>
+    <string name="appearance_preview_rtl">Layout von rechts nach links anzeigen</string>
+    <string name="appearance_preview_large_text">Doppelte aktuelle Textgröße anzeigen</string>
+    <string name="appearance_preview_reset">Beispiel zurücksetzen</string>
+    <string name="appearance_preview_limits">Künstliches Beispiel mit deinem aktuellen Design und deiner Schriftart. Diese Schalter wirken sich nur auf dieses Beispiel aus. Die Lesereihenfolge des Screenreaders, Vergrößerung, Schalterzugriff und Berührungsflächen müssen separat mit dem tatsächlichen Bedienungshilfedienst getestet werden.</string>
+    <string name="appearance_preview_motion_on">Systemanimationen sind aktiviert. Dieses statische Beispiel testet keine Bewegungen.</string>
+    <string name="appearance_preview_motion_off">Systemanimationen sind deaktiviert. Dieses Beispiel berücksichtigt diese Einstellung.</string>
 </resources>

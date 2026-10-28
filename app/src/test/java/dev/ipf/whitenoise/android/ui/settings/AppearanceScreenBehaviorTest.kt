@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
@@ -242,6 +243,24 @@ class AppearanceScreenBehaviorTest {
             assertEquals(AppFontScale.Default, appState.fontScale)
             assertEquals(AppThemeMode.System, appState.themeMode)
         }
+    }
+
+    /** Lazy disposal must not reset sample-only switches while the Appearance route stays open. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h640dp-mdpi")
+    fun previewSwitchesSurviveScrollingAwayAndBack() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val preview = hasTestTag("appearance.accessibility.preview")
+        val rtl = context.getString(R.string.appearance_preview_rtl)
+        val large = context.getString(R.string.appearance_preview_large_text)
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(preview)
+        composeRule.onNodeWithText(rtl).performScrollTo().performClick().assertIsOn()
+        composeRule.onNodeWithText(large).performScrollTo().performClick().assertIsOn()
+        composeRule.onNodeWithTag("settings.list").performScrollToIndex(0)
+        composeRule.onNode(preview).assertDoesNotExist()
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(preview)
+        composeRule.onNodeWithText(rtl).performScrollTo().assertIsOn()
+        composeRule.onNodeWithText(large).performScrollTo().assertIsOn()
     }
 
     /** A theme row is the node with that label inside the theme group, not the language value. */

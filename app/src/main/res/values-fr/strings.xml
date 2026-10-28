@@ -2488,4 +2488,11 @@
     <string name="public_jpeg_previews_privacy">Désactivés par défaut. Les liens directs vers des JPEG Blossom peuvent révéler votre adresse IP au serveur des images. Les aperçus utilisent le Wi-Fi non limité et vos règles de téléchargement des photos. Les liens restent accessibles lorsque les aperçus sont désactivés.</string>
     <string name="public_jpeg_preview_image">Aperçu du JPEG lié</string>
     <string name="public_jpeg_preview_save_failed">Impossible de sauvegarder le réglage des aperçus. Veuillez réessayer.</string>
+    <string name="appearance_accessibility_preview">Aperçu de la lisibilité</string>
+    <string name="appearance_preview_rtl">Aperçu de la disposition de droite à gauche</string>
+    <string name="appearance_preview_large_text">Aperçu avec une taille de texte doublée</string>
+    <string name="appearance_preview_reset">Réinitialiser l’exemple</string>
+    <string name="appearance_preview_limits">Exemple fictif utilisant le thème et la police actuels. Ces interrupteurs ne modifient que cet exemple. L’ordre du lecteur d’écran, l’agrandissement, l’accès par contacteurs et les zones tactiles doivent être testés séparément avec le service d’accessibilité réel.</string>
+    <string name="appearance_preview_motion_on">Les animations du système sont activées. Cet exemple statique ne teste pas les mouvements.</string>
+    <string name="appearance_preview_motion_off">Les animations du système sont désactivées. Cet exemple respecte ce réglage.</string>
 </resources>

@@ -31,7 +31,7 @@ internal fun StickyFormActionBar(
     content: @Composable RowScope.() -> Unit,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth().floatingDictationFooter(),
+        modifier = modifier.fillMaxWidth(),
         border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
     ) {
@@ -39,6 +39,7 @@ internal fun StickyFormActionBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .floatingDictationFooter()
                     .navigationBarsPadding()
                     .imePadding()
                     .padding(

@@ -134,7 +134,11 @@ class NavigationControlAndroidTest {
             rule.runOnUiThread { fixture.controller.cancel() }
         } finally {
             try {
-                Settings.Global.putString(rule.activity.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, previousScale)
+                Settings.Global.putString(
+                    rule.activity.contentResolver,
+                    Settings.Global.ANIMATOR_DURATION_SCALE,
+                    previousScale,
+                )
             } finally {
                 InstrumentationRegistry.getInstrumentation().uiAutomation.dropShellPermissionIdentity()
             }
@@ -161,7 +165,8 @@ class NavigationControlAndroidTest {
         rule.waitForIdle()
         assertEquals(before + 16L, rule.mainClock.currentTime)
         assertTrue(committedSelection)
-        val capsule = rule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val capsule =
+            rule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val footer = rule.onNodeWithTag("chats.selectionControls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue("active capsule overlaps wrapped footer: $capsule / $footer", capsule.bottom <= footer.top)
         rule.onNodeWithTag("chats.selectAllAction").performClick()
@@ -182,7 +187,8 @@ class NavigationControlAndroidTest {
         height = 140.dp
         render(largeRtl = true)
         val capture = fixture.controller.state
-        rule.onNodeWithContentDescription("Delete selected fixtures").performScrollTo().assertIsDisplayed().performClick()
+        rule.onNodeWithContentDescription("Delete selected fixtures")
+            .performScrollTo().assertIsDisplayed().performClick()
         assertEquals(1, deletes)
         assertSame(capture, fixture.controller.state)
         assertTrue(fixture.writes.isEmpty())
@@ -214,11 +220,13 @@ class NavigationControlAndroidTest {
         rule.onNodeWithTag("navigation.imeField").assertIsFocused()
         rule.onNodeWithTag("chats.selectAllAction").performScrollTo().assertIsDisplayed()
         rule.waitForIdle()
-        val capsule = rule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed().fetchSemanticsNode().boundsInWindow
+        val capsule =
+            rule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed().fetchSemanticsNode().boundsInWindow
         val action = rule.onNodeWithTag("chats.selectAllAction").fetchSemanticsNode().boundsInWindow
         val keyboardTop = rule.runOnUiThread {
             val insets = requireNotNull(ViewCompat.getRootWindowInsets(rule.activity.window.decorView))
-            rule.activity.windowManager.currentWindowMetrics.bounds.bottom - insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val windowBottom = rule.activity.windowManager.currentWindowMetrics.bounds.bottom
+            windowBottom - insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
         }
         assertTrue("capsule must clear the real keyboard", capsule.bottom <= keyboardTop)
         assertTrue("selection action must clear the real keyboard", action.bottom <= keyboardTop)
@@ -268,7 +276,8 @@ class NavigationControlAndroidTest {
                         MainShellNoticeLayout(
                             notice = null,
                             dictationController = fixture.controller,
-                            dictationComposerRoute = ConversationDictationComposerRoute(null, null, null, ACCOUNT, true, true),
+                            dictationComposerRoute =
+                                ConversationDictationComposerRoute(null, null, null, ACCOUNT, true, true),
                             appLockScreenVisible = locked,
                             handoffOwner = ACCOUNT,
                             handoffDestination = destination,
@@ -366,7 +375,9 @@ class NavigationControlAndroidTest {
 
         override fun recognitionAvailable() = true
 
-        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
+        override fun createSession(
+            listener: ConversationDictationRecognitionListener,
+        ): ConversationDictationRecognitionSession {
             this.listener = listener
             return object : ConversationDictationRecognitionSession {
                 override fun start() = Unit
