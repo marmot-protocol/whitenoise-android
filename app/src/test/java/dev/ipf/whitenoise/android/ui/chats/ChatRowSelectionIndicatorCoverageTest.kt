@@ -52,6 +52,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         assertSame(Icons.Default.CheckCircle, chatRowSelectionIcon(selected = true))
     }
 
+    /** Selection belongs to the row; its decorative indicator must not duplicate timestamp or badge announcements. */
     @Test
     fun selectedAndUnselectedRowsKeepMetadataVisibleWithoutDuplicateAnnouncements() {
         val selectionMode = mutableStateOf(true)
@@ -74,6 +75,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         assertSelectionMetadataVisible(unreadCount = 3uL)
     }
 
+    /** Exiting selection retains current unread and mention metadata instead of replacing the row content. */
     @Test
     fun leavingSelectionModeKeepsUnreadTimestampAndBadge() {
         val selectionMode = mutableStateOf(true)
@@ -108,6 +110,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         composeRule.onNode(hasClickAction()).assertIsNotSelected()
     }
 
+    /** Read rows retain their timestamp while gaining the same selection owner as unread rows. */
     @Test
     fun selectionModePreservesTimestampForReadRows() {
         val selectionMode = mutableStateOf(false)
@@ -123,6 +126,7 @@ class ChatRowSelectionIndicatorCoverageTest {
         composeRule.onNode(hasClickAction()).assertIsNotSelected()
     }
 
+    /** Verifies visible metadata with no extra Select/Selected announcement on the decorative icon. */
     private fun assertSelectionMetadataVisible(unreadCount: ULong, mentions: Int = 0) {
         composeRule.onNodeWithText(nowText).assertExists()
         composeRule.onNodeWithText(unreadCount.toString()).assertExists()

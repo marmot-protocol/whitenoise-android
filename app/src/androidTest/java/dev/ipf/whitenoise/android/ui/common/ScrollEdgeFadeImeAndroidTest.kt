@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import android.provider.Settings
+import android.view.View
 import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
@@ -34,6 +35,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
@@ -56,7 +58,9 @@ import org.junit.runner.RunWith
 class ScrollEdgeFadeImeAndroidTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
     private var previousAnimationScale: String? = null
+    private var imeAnimationRunning = false
 
+    /** Enables real emulator motion for frame assertions and configures resizing around the keyboard. */
     @Before
     @Suppress("DEPRECATION")
     fun configureWindow() {
@@ -92,6 +96,7 @@ class ScrollEdgeFadeImeAndroidTest {
     @Test
     fun sheetFormUsesItsOwnKeyboardWindowWithoutMovingTheFooterIntoIme() = exerciseMask(modal = true)
 
+    /** Checks activity/modal IME removal and first, middle and settled fade restoration with live actions. */
     @OptIn(ExperimentalMaterial3Api::class)
     private fun exerciseMask(modal: Boolean) {
         lateinit var scroll: ScrollState
@@ -122,12 +127,33 @@ class ScrollEdgeFadeImeAndroidTest {
         val keyboardEdges = edgeLevels()
         assertTrue("keyboard viewport must remain unmasked: $keyboardEdges", keyboardEdges.all { it > 0.95f })
 
+        hideKeyboardAndCheckRetainedMask()
+        assertEquals(
+            "keyboard transition must preserve scroll ownership",
+            position,
+            composeRule.runOnIdle { scroll.value },
+        )
+        val restored = edgeLevels()
+        assertTrue("both continuation cues must return: $restored", restored.first() < 0.5f && restored.last() < 0.5f)
+        assertTrue("the viewport middle must stay readable", restored[1] > 0.95f)
+        composeRule.onNodeWithTag(FOOTER).assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, submissions) }
+    }
+
+    /** Samples the retained mask on the first observed restored layout and during its old transition window. */
+    private fun hideKeyboardAndCheckRetainedMask() {
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnUiThread {
-            val window = WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }
-            ViewCompat.getWindowInsetsController(window)?.hide(WindowInsetsCompat.Type.ime())
+        val window = composeRule.runOnUiThread {
+            WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }.also {
+                observeImeAnimation(it)
+                ViewCompat.getWindowInsetsController(it)?.hide(WindowInsetsCompat.Type.ime())
+            }
         }
-        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() == null }
+        try {
+            composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { hiddenImeSettled(window) }
+        } finally {
+            composeRule.runOnUiThread { ViewCompat.setWindowInsetsAnimationCallback(window, null) }
+        }
         // The first Compose layout after the real IME closes must reuse the retained mask.
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeByFrame()
@@ -145,17 +171,37 @@ class ScrollEdgeFadeImeAndroidTest {
         )
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
-        assertEquals(
-            "keyboard transition must preserve scroll ownership",
-            position,
-            composeRule.runOnIdle { scroll.value },
-        )
-        val restored = edgeLevels()
-        assertTrue("both continuation cues must return: $restored", restored.first() < 0.5f && restored.last() < 0.5f)
-        assertTrue("the viewport middle must stay readable", restored[1] > 0.95f)
-        composeRule.onNodeWithTag(FOOTER).assertIsDisplayed().performClick()
-        composeRule.runOnIdle { assertEquals(1, submissions) }
     }
+
+    /** Target visibility changes before animated insets settle; keep the Compose clock paused through native motion. */
+    private fun observeImeAnimation(window: View) {
+        ViewCompat.setWindowInsetsAnimationCallback(
+            window,
+            object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                override fun onPrepare(animation: WindowInsetsAnimationCompat) {
+                    if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) imeAnimationRunning = true
+                }
+
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    runningAnimations: List<WindowInsetsAnimationCompat>,
+                ): WindowInsetsCompat = insets
+
+                override fun onEnd(animation: WindowInsetsAnimationCompat) {
+                    if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) imeAnimationRunning = false
+                }
+            },
+        )
+    }
+
+    /** The actual focused Activity or Dialog window must finish hiding, independently of Compose fade progress. */
+    private fun hiddenImeSettled(window: View): Boolean =
+        composeRule.runOnUiThread {
+            val insets = ViewCompat.getRootWindowInsets(window) ?: return@runOnUiThread false
+            !insets.isVisible(WindowInsetsCompat.Type.ime()) &&
+                insets.getInsets(WindowInsetsCompat.Type.ime()).bottom == 0 &&
+                !imeAnimationRunning
+        }
 
     @Composable
     private fun Form(

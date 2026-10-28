@@ -30,10 +30,12 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatFolderPreferences
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,7 +68,8 @@ class ChatListContinuityAndroidTest {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         automation.adoptShellPermissionIdentity("android.permission.WRITE_SECURE_SETTINGS")
         val context = rule.activity
-        previousAnimationScale = Settings.Global.getString(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE)
+        previousAnimationScale =
+            Settings.Global.getString(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE)
         check(Settings.Global.putFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f))
         context.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE).edit().clear().commit()
         rule.runOnUiThread {
@@ -78,7 +81,9 @@ class ChatListContinuityAndroidTest {
                 activeAccountRef = account,
             )
             controller = ChatsController(state, account) { _, _ -> emptyList() }
-            controller.applyChatListRow(chatRow(firstRow, "First local group", 2uL).copy(unreadCount = 3uL, hasUnread = true))
+            controller.applyChatListRow(
+                chatRow(firstRow, "First local group", 2uL).copy(unreadCount = 3uL, hasUnread = true),
+            )
             controller.applyChatListRow(chatRow(secondRow, "Second local group", 1uL))
         }
         rule.waitUntil(5_000) { controller.items.size == 2 }
@@ -116,7 +121,7 @@ class ChatListContinuityAndroidTest {
         state.chatFolderPreferences.setChatInFolder(account, second.id, secondRow, true)
         selectedFolder = first.id
         render()
-        val oldOpen = rule.onNodeWithTag("chat.row.$firstRow").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldOpen = rule.onNodeWithTag("chat.row.$firstRow").captureClickCallbackForReplay()
         rule.mainClock.autoAdvance = false
         rule.runOnIdle { selectedFolder = second.id }
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
@@ -134,12 +139,42 @@ class ChatListContinuityAndroidTest {
         assertEquals(1, opens)
     }
 
+    /** Active/archived viewports keep separate scroll state but share one interruptible arrival owner. */
+    @Test
+    fun archivedFolderArrivalSurvivesViewportReplacementAndReversal() {
+        rule.runOnIdle {
+            controller.applyChatListRow(chatRow(secondRow, "Archived local group", 1uL).copy(archived = true))
+        }
+        render()
+        val activeTop = rule.onNodeWithTag("chat.row.$firstRow").fetchSemanticsNode().boundsInRoot.top
+        rule.mainClock.autoAdvance = false
+        rule.runOnIdle { selectedFolder = ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID }
+        repeat(2) { rule.mainClock.advanceTimeByFrame() }
+        rule.onNodeWithTag("chat.row.$firstRow").assertDoesNotExist()
+        rule.onAllNodesWithTag("chat.row.$secondRow").assertCountEquals(1)
+        rule.mainClock.advanceTimeBy(64)
+        rule.runOnIdle { selectedFolder = null }
+        repeat(2) { rule.mainClock.advanceTimeByFrame() }
+        val returningTop = rule.onNodeWithTag("chat.row.$firstRow").fetchSemanticsNode().boundsInRoot.top
+        assertTrue("reversal must retain the in-flight arrival", returningTop > activeTop)
+        rule.mainClock.advanceTimeBy(240)
+        assertEquals(activeTop, rule.onNodeWithTag("chat.row.$firstRow").fetchSemanticsNode().boundsInRoot.top, 1f)
+        rule.runOnIdle { selectedFolder = ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID }
+        repeat(2) { rule.mainClock.advanceTimeByFrame() }
+        val arrivingTop = rule.onNodeWithTag("chat.row.$secondRow").fetchSemanticsNode().boundsInRoot.top
+        rule.mainClock.advanceTimeBy(240)
+        val settledTop = rule.onNodeWithTag("chat.row.$secondRow").fetchSemanticsNode().boundsInRoot.top
+        assertTrue("Archived must animate despite replacing its scroll viewport", arrivingTop > settledTop)
+        rule.onNodeWithTag("chat.row.$firstRow").assertDoesNotExist()
+    }
+
     /** The real selection command owns semantics immediately while the decorative leading strip animates. */
     @Test
     fun actualSelectionKeepsUnreadMetadataAndOneCurrentRowThroughExitReversal() {
         render()
         val row = rule.onNodeWithTag("chat.row.$firstRow")
         row.performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        rule.onNodeWithTag("chat.action.Select").assertExists()
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("chat.action.Select").performClick()
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
@@ -155,9 +190,11 @@ class ChatListContinuityAndroidTest {
             controller.items.first { it.id == firstRow }.effectiveHasUnread(state.activeAccount?.accountIdHex),
         )
         rule.mainClock.advanceTimeBy(64)
+        val exitStarted = rule.mainClock.currentTime
         rule.runOnIdle { rule.activity.onBackPressedDispatcher.onBackPressed() }
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
         row.performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        awaitSelectDuringExit(exitStarted)
         rule.onNodeWithTag("chat.action.Select").performClick()
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
         row.assertIsSelected()
@@ -168,6 +205,19 @@ class ChatListContinuityAndroidTest {
         assertEquals("selection never opens a conversation", 0, opens)
         rule.mainClock.advanceTimeBy(240)
         assertTrue(controller.items.first { it.id == firstRow }.effectiveHasUnread(state.activeAccount?.accountIdHex))
+    }
+
+    /** Admit the real popup without allowing the 160 ms selection-strip exit to finish before reversal. */
+    private fun awaitSelectDuringExit(exitStarted: Long) {
+        repeat(2) { rule.mainClock.advanceTimeByFrame() }
+        rule.waitForIdle()
+        rule.onNodeWithTag("chat.menu.$firstRow").assertExists()
+        while (rule.onAllNodesWithTag("chat.action.Select").fetchSemanticsNodes().isEmpty()) {
+            assertTrue("popup must become actionable during the exit", rule.mainClock.currentTime - exitStarted < 100)
+            rule.mainClock.advanceTimeByFrame()
+            rule.waitForIdle()
+        }
+        assertTrue("selection must reverse before its exit settles", rule.mainClock.currentTime - exitStarted < 120)
     }
 
     /** Changing the folder while a real unread pull is held invalidates its old pointer owner. */

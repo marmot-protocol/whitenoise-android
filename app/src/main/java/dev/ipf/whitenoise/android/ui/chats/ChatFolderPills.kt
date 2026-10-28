@@ -182,14 +182,7 @@ internal fun ChatFolderPill(
     labelMaxWidth: Dp? = null,
 ) {
     val interactions = remember { MutableInteractionSource() }
-    val motionEnabled = rememberSystemAnimationsEnabled()
-    val targetBackground = if (selected) selectedColor else Color.Transparent
-    val background by
-        animateColorAsState(
-            targetValue = targetBackground,
-            animationSpec = if (motionEnabled) tween(CHAT_FOLDER_TRANSITION_MILLIS) else snap(),
-            label = "Folder destination selection",
-        )
+    val background = folderPillBackground(selected, selectedColor)
     val resources = LocalContext.current.resources
     val description =
         if (unreadMessageCount != null) {
@@ -218,9 +211,9 @@ internal fun ChatFolderPill(
             border = null,
             colors =
                 FilterChipDefaults.filterChipColors(
-                    containerColor = if (motionEnabled) background else targetBackground,
+                    containerColor = background,
                     labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    selectedContainerColor = if (motionEnabled) background else targetBackground,
+                    selectedContainerColor = background,
                     selectedLabelColor = MaterialTheme.colorScheme.onSurface,
                 ),
             trailingIcon =
@@ -260,4 +253,18 @@ private fun FolderPillLabel(
         maxLines = if (maxWidth == null) Int.MAX_VALUE else 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+/** Retains selected fill through folder arrival while disabled motion uses the current target immediately. */
+@Composable
+private fun folderPillBackground(selected: Boolean, selectedColor: Color): Color {
+    val motionEnabled = rememberSystemAnimationsEnabled()
+    val targetBackground = if (selected) selectedColor else Color.Transparent
+    val background by
+        animateColorAsState(
+            targetValue = targetBackground,
+            animationSpec = if (motionEnabled) tween(CHAT_FOLDER_TRANSITION_MILLIS) else snap(),
+            label = "Folder destination selection",
+        )
+    return if (motionEnabled) background else targetBackground
 }

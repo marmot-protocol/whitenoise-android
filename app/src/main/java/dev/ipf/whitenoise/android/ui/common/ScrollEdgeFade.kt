@@ -91,6 +91,10 @@ private class ScrollEdgeSource(
     val forward: () -> Boolean,
 )
 
+/**
+ * Retains only decorative edge motion. Live eligibility hides fitting edges immediately; the IME
+ * removes the paint layer without replacing caller-owned scrolling or its retained animation state.
+ */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun Modifier.scrollEdgeFade(

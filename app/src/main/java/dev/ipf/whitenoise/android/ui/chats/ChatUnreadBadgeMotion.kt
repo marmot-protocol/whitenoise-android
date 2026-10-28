@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
@@ -50,18 +51,7 @@ internal fun ChatUnreadBadgeMotion(
         val changed = current != previous
         previous = current
         if (current != null) retained = current
-        if (!enabled) {
-            visibility.snapTo(if (current == null) 0f else 1f)
-            emphasis.snapTo(1f)
-        } else {
-            coroutineScope {
-                launch { visibility.animateTo(if (current == null) 0f else 1f, tween(120)) }
-                launch {
-                    if (changed && current != null) emphasis.animateTo(0.92f, tween(60))
-                    emphasis.animateTo(1f, tween(100))
-                }
-            }
-        }
+        animateUnreadBadge(current != null, changed, enabled, visibility, emphasis)
         if (current == null) retained = null
     }
     val visual = current ?: retained.takeIf { enabled } ?: return
@@ -104,3 +94,31 @@ internal fun ChatUnreadBadgeMotion(
         }
     }
 }
+
+/** Visibility and count emphasis share cancellation, so a replacement count reverses from the current frame. */
+private suspend fun animateUnreadBadge(
+    visible: Boolean,
+    changed: Boolean,
+    enabled: Boolean,
+    visibility: Animatable<Float, AnimationVector1D>,
+    emphasis: Animatable<Float, AnimationVector1D>,
+) {
+    val target = if (visible) 1f else 0f
+    if (!enabled) {
+        visibility.snapTo(target)
+        emphasis.snapTo(1f)
+    } else {
+        coroutineScope {
+            launch { visibility.animateTo(target, tween(BADGE_VISIBILITY_MILLIS)) }
+            launch {
+                if (changed && visible) emphasis.animateTo(BADGE_EMPHASIS_SCALE, tween(BADGE_EMPHASIS_IN_MILLIS))
+                emphasis.animateTo(1f, tween(BADGE_EMPHASIS_OUT_MILLIS))
+            }
+        }
+    }
+}
+
+private const val BADGE_VISIBILITY_MILLIS = 120
+private const val BADGE_EMPHASIS_IN_MILLIS = 60
+private const val BADGE_EMPHASIS_OUT_MILLIS = 100
+private const val BADGE_EMPHASIS_SCALE = 0.92f

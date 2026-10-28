@@ -717,7 +717,8 @@ internal fun ChatsScreen(
         )
     val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
     val edgeFadeMotion = rememberScrollEdgeFadeMotion(viewportOwner)
-    val folderArrival = rememberChatFolderArrival(viewportOwner, selectedFolderId)
+    val folderArrival =
+        rememberChatFolderArrival(appState.activeAccountRef to appState.runtimeGeneration, selectedFolderId)
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
         val anchorId = actionSheetChatId ?: return@LaunchedEffect
@@ -1580,7 +1581,9 @@ internal fun ChatsScreen(
                     }
                 }
 
-                /** Admits row navigation and menu commands only while their measured row and account scope remain current. */
+                /**
+                 * Admits navigation and menu commands only while the measured row and account scope remain current.
+                 */
                 fun menuActionsCurrent(): Boolean {
                     val ownsAccount =
                         menuAccount != null &&
@@ -1677,7 +1680,9 @@ internal fun ChatsScreen(
                         onOpen = {
                             if (menuActionsCurrent()) {
                                 searchViewport?.selection?.selected =
-                                    bodyMatch?.let { GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex) }
+                                    bodyMatch?.let {
+                                        GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex)
+                                    }
                                         ?: GlobalSearchSelectedResult()
                                 openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false)
                             }

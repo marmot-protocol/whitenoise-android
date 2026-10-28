@@ -151,6 +151,7 @@ class ChatRowAdaptiveLayoutTest {
         assertTrue(metadataBounds.right <= previewBounds.left)
     }
 
+    /** Selection adds its leading strip while retaining both existing metadata rows at their measured positions. */
     @Test
     fun selectionModePreservesTimestampAndSupportingMetadata() {
         render(
