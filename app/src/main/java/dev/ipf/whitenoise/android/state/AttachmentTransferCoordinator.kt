@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -171,9 +172,11 @@ internal class AttachmentTransferCoordinator(
     /**
      * Returns the existing transfer when present, otherwise starts one owner.
      * A cache-hot load keeps [AttachmentTransferState.Available] to avoid a
-     * one-frame spinner while bytes are read for external opening.
+     * one-frame spinner while bytes are read for external opening. A body
+     * acquired but too large for [load]'s byte array settles as retained or
+     * not, never as Failed, while its awaiters still receive the exception.
      */
-    @Suppress("TooGenericExceptionCaught") // The owner must publish Failed for every non-cancellation MDK/IO exception.
+    @Suppress("TooGenericExceptionCaught") // The owner must settle a terminal state for any non-cancellation exception.
     fun request(
         key: String,
         load: suspend () -> ByteArray,
@@ -218,7 +221,8 @@ internal class AttachmentTransferCoordinator(
                             )
                             throw cancellation
                         } catch (exception: Exception) {
-                            publishOwnedTerminalState(key, state, lifetime, token, exception.failedTransferState())
+                            val terminal = loadFailureState(exception, availableAfterLoad)
+                            publishOwnedTerminalState(key, state, lifetime, token, terminal)
                             throw exception
                         }
                     }.also {
@@ -330,6 +334,21 @@ internal class AttachmentTransferCoordinator(
             availabilitySignals.onTerminal(key, value)
         }
     }
+
+    /**
+     * The state a failed load leaves. A body acquired but too large for a byte-returning read did not fail to
+     * transfer and a retry cannot shrink it, so it settles on whether it is retained, while byte consumers still get
+     * the exception and take a file-backed path. Every other failure is a failure.
+     */
+    private suspend fun loadFailureState(
+        exception: Exception,
+        availableAfterLoad: suspend () -> Boolean,
+    ): AttachmentTransferState =
+        if (exception is AttachmentTooLargeToPresentException) {
+            attachmentStateAfterRetention(probeAvailability(availableAfterLoad))
+        } else {
+            exception.failedTransferState()
+        }
 
     /** Converts a non-cancellation cache probe failure into an unavailable result. */
     private suspend fun probeAvailability(probe: suspend () -> Boolean): Boolean =

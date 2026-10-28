@@ -1,0 +1,138 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import android.content.Context
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
+import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
+import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
+import org.junit.Assert.assertFalse
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+/**
+ * A file larger than a byte-returning read may hold still lands on the device: its card settles on the file's type
+ * rather than Tap to retry, both after a reader's Download and on the sender's own card, which fetches its own body.
+ * The composable and controller are the production ones; only the native transfer is replaced.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+class LargeFileCardStateTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private lateinit var fixture: MediaDownloadIntegrationFixture
+    private lateinit var controller: ConversationController
+
+    /** Uses the real controller with only its native download boundary replaced, on a visible conversation. */
+    @Before
+    fun setUp() {
+        fixture = MediaDownloadIntegrationFixture()
+        controller =
+            ConversationController(
+                appState = fixture.state,
+                initialGroup = conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
+            )
+        fixture.state.attachmentOpens.setDestination(
+            AttachmentOpenDestination(
+                accountRef = MediaDownloadIntegrationFixture.ACCOUNT,
+                groupIdHex = MediaDownloadIntegrationFixture.GROUP,
+                navigationGeneration = 1L,
+            ),
+        )
+        assertFalse(fixture.state.shouldAutoDownloadMedia(MediaAutoDownloadType.Document))
+    }
+
+    /** Cancels fixture transfers and removes its private temporary cache. */
+    @After
+    fun tearDown() {
+        fixture.close()
+    }
+
+    /** A reader's Download of a file over the read budget ends on its type glyph, not Tap to retry. */
+    @Test
+    fun aReceivedFileOverTheReadBudgetSettlesDownloaded() {
+        composeRule.setContent { WhiteNoiseTheme { LargeFileCard(mine = false) } }
+        awaitDescribed(text(R.string.media_tap_to_download))
+
+        composeRule.onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0)).performClick()
+        deliverBodyOverTheReadBudget()
+
+        awaitDescribed(text(R.string.attachment_type_pdf_description))
+        assertNoRetry()
+    }
+
+    /** The sender's own card fetches its own body, and one over the read budget also ends on its type glyph. */
+    @Test
+    fun anOwnFileOverTheReadBudgetSettlesDownloaded() {
+        composeRule.setContent { WhiteNoiseTheme { LargeFileCard(mine = true) } }
+
+        deliverBodyOverTheReadBudget()
+
+        awaitDescribed(text(R.string.attachment_type_pdf_description))
+        assertNoRetry()
+    }
+
+    /** Waits for the card's one native transfer, then lets MDK retain a body one byte over the 32 MiB read budget. */
+    private fun deliverBodyOverTheReadBudget() {
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            fixture.calls.size == 1
+        }
+        composeRule.runOnIdle {
+            fixture.calls.single().succeed(ByteArray(ATTACHMENT_PRESENTATION_MAX_BYTES.toInt() + 1))
+        }
+    }
+
+    /** No control offers Retry for a body that is on the device. */
+    private fun assertNoRetry() {
+        composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_retry)).assertCountEquals(0)
+    }
+
+    /** Waits until some node is described exactly as [description]. */
+    private fun awaitDescribed(description: String) {
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            composeRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /** The production file card for the fixture's first attachment, as a document from the reader or the sender. */
+    @Composable
+    private fun LargeFileCard(mine: Boolean) {
+        MediaFileBubble(
+            messageIdHex = request(0).messageIdHex,
+            attachmentIndex = 0,
+            reference = reference(0).copy(mediaType = "application/pdf", fileName = "archive.pdf"),
+            controller = controller,
+            appState = fixture.state,
+            senderKey = "sender",
+            senderDisplayName = "Sender",
+            mine = mine,
+        )
+    }
+
+    /** Localized text for a string resource. */
+    private fun text(id: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(id)
+
+    private companion object {
+        const val WAIT_MILLIS = 10_000L
+    }
+}
