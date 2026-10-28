@@ -2505,4 +2505,10 @@
     <string name="public_jpeg_previews_privacy">Standardmäßig deaktiviert. Direkte Blossom-JPEG-Links können dem Bildhost deine IP-Adresse offenlegen. Vorschauen nutzen ungetaktetes WLAN und deine Regeln zum Herunterladen von Fotos. Normale Links bleiben bei deaktivierter Vorschau verfügbar.</string>
     <string name="public_jpeg_preview_image">Vorschau eines verlinkten JPEG-Bildes</string>
     <string name="public_jpeg_preview_save_failed">Die Einstellung für Bildvorschauen konnte nicht gespeichert werden. Bitte versuche es erneut.</string>
+
+    <string name="voice_recording_save_failed">Aufnahme wurde beendet, aber die Audiodatei konnte nicht gespeichert werden. Nimm erneut auf.</string>
+    <string name="voice_recording_stops_in">Endet in %1$s</string>
+    <string name="voice_recording_limit_warning">Die Aufnahme endet in 30 Sekunden am Fünf-Minuten-Limit.</string>
+    <string name="voice_recording_limit_reached">Das Fünf-Minuten-Limit ist erreicht. Prüfe deine Sprachnachricht vor dem Senden.</string>
+    <string name="voice_recording_interrupted">Aufnahme unterbrochen. Prüfe die aufgenommene Audiodatei vor dem Senden.</string>
 </resources>

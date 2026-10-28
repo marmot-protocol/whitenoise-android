@@ -2488,4 +2488,10 @@
     <string name="public_jpeg_previews_privacy">Disattivate per impostazione predefinita. I link diretti a JPEG su Blossom possono rivelare il tuo indirizzo IP al server delle immagini. Le anteprime usano Wi-Fi senza limiti di dati e le tue regole di download delle foto. I normali link restano disponibili quando sono disattivate.</string>
     <string name="public_jpeg_preview_image">Anteprima del JPEG collegato</string>
     <string name="public_jpeg_preview_save_failed">Impossibile salvare la preferenza delle anteprime. Riprova.</string>
+
+    <string name="voice_recording_save_failed">La registrazione si è interrotta, ma non è stato possibile salvare l’audio. Registra di nuovo.</string>
+    <string name="voice_recording_stops_in">Termina tra %1$s</string>
+    <string name="voice_recording_limit_warning">La registrazione terminerà tra 30 secondi al limite di cinque minuti.</string>
+    <string name="voice_recording_limit_reached">Raggiunto il limite di registrazione di cinque minuti. Riascolta il messaggio vocale prima di inviarlo.</string>
+    <string name="voice_recording_interrupted">Registrazione interrotta. Controlla l’audio registrato prima di inviarlo.</string>
 </resources>

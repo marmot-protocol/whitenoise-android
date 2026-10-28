@@ -72,6 +72,14 @@
         "test_ids": [
           "CON-035"
         ]
+      },
+      {
+        "surface": "Voice recording composer outline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "recordingContent?.invoke(this)",
+        "test_ids": [
+          "MED-008"
+        ]
       }
     ],
     "source_coverage": [
