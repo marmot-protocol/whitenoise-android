@@ -95,16 +95,24 @@ public final class ExternalShareDispatchActivity extends Activity {
             throw new IllegalArgumentException("External fixture size is outside its bounded test range");
         }
         File source = new File(directory, streamName);
+        try {
+            writeExternalFixture(source, emptyStream, streamBytes);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to create the external share fixture", exception);
+        }
+        return ExternalShareTestFileProvider.uriFor(this, source);
+    }
+
+    /** Replaces fixture contents without retaining bytes from an earlier cache file. */
+    static void writeExternalFixture(File source, boolean emptyStream, long streamBytes) throws IOException {
         try (java.io.RandomAccessFile output = new java.io.RandomAccessFile(source, "rw")) {
+            output.setLength(0L);
             output.setLength(emptyStream ? 0L : streamBytes);
             if (!emptyStream && streamBytes == 3L) {
                 output.write(new byte[] {1, 2, 3});
             } else if (!emptyStream && streamBytes >= 4L) {
                 output.write(new byte[] {80, 75, 3, 4});
             }
-        } catch (IOException exception) {
-            throw new IllegalStateException("Unable to create the external share fixture", exception);
         }
-        return ExternalShareTestFileProvider.uriFor(this, source);
     }
 }
