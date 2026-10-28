@@ -432,9 +432,22 @@ class ZapstoreIntegrationTests(unittest.TestCase):
             self.assertNotEqual(result.returncode,0)
             self.assertFalse(any('--json publish' in call for call in calls))
 
+    def test_preflight_stderr_errors_keep_only_the_allowlisted_code(self):
+        for code in ('proof_required', 'signer_unavailable', 'rate_limited'):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
+                body = (f'if mode == "check": print(json.dumps(dict(ok=False, operation="check", '
+                        f'error=dict(code={code!r}, summary="private-auth-url", detail="private-auth-url"))), '
+                        'file=sys.stderr); sys.exit(1)')
+                result,calls=self.publication_fixture(Path(directory),zsp_body=body)()
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('ZSP read-only preflight failed: '+code,result.stderr)
+                self.assertNotIn('private-auth-url',result.stdout+result.stderr)
+                self.assertEqual(len(calls),1)
+                self.assertIn('--json check',calls[0])
+
     def test_timeout_rejection_and_pending_timeout_never_resubmit(self):
         for body in ['', 'if mode == "publish": time.sleep(10)',
-                     'if mode == "publish": document = dict(ok=False,error=dict(code="publish_rejected",detail="private-auth-url-secret")); print(json.dumps(document)); sys.exit(1)']:
+                     'if mode == "publish": document = dict(ok=False,error=dict(code="publish_rejected",detail="private-auth-url-secret")); print(json.dumps(document),file=sys.stderr); sys.exit(1)']:
             with self.subTest(body=body), tempfile.TemporaryDirectory() as directory:
                 root=Path(directory)
                 result,calls=self.publication_fixture(root,zsp_body=body,readback_body='if mode == "verify": sys.exit(1)')()
@@ -445,6 +458,23 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                 self.assertNotIn('private-auth',result.stdout+result.stderr+receipt)
                 self.assertNotIn('bunker://',receipt)
                 self.assertIn('submission_unknown' if body else 'pending',receipt)
+                if 'publish_rejected' in body:
+                    self.assertEqual(json.loads(receipt)['error_code'],'publish_rejected')
+
+    def test_partial_result_from_stderr_retains_release_id_without_retry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            body = ('if mode == "publish": print(json.dumps(dict(ok=False, operation="publish", '
+                    'error=dict(code="publish_rejected",detail="private-auth-url"), '
+                    'result=dict(id="d"*64,status="partial"))),file=sys.stderr); sys.exit(1)')
+            result,calls=self.publication_fixture(root,zsp_body=body,readback_body='if mode == "verify": sys.exit(1)')()
+            self.assertNotEqual(result.returncode,0)
+            receipt=json.loads((root/'build/zapstore-publication/receipt.json').read_text())
+            self.assertEqual(receipt['error_code'],'publish_rejected')
+            self.assertEqual(receipt['release_id'],'d'*64)
+            self.assertIn('-release-id '+'d'*64,calls[-1])
+            self.assertEqual(sum('--json publish' in call for call in calls),1)
+            self.assertNotIn('private-auth-url',result.stdout+result.stderr+json.dumps(receipt))
 
     def test_readback_failure_exposes_public_reason(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -43,7 +43,8 @@ def cli(binary, args, cwd, env, seconds):
     except subprocess.TimeoutExpired:
         return 124, {}
     try:
-        document = json.loads(result.stdout)
+        # ZSP v2 emits success on stdout and failure envelopes on stderr.
+        document = json.loads(result.stdout if result.returncode == 0 else result.stderr)
     except (ValueError, UnicodeDecodeError):
         document = {}
     return result.returncode, document if isinstance(document, dict) else {}

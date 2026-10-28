@@ -139,7 +139,8 @@ publisher before any public write. Direct nsec signing is not supported by this 
 
 ZSP **2.0.0** is pinned with platform-specific SHA-256 checksums in
 `config/android-release.properties`. Its `--json check` and `--json publish`
-commands return one JSON document; v1 JSONL event parsing, `--offline`,
+commands return one JSON document: success on stdout, failure on stderr.
+V1 JSONL event parsing, `--offline`,
 `--skip-certificate-linking` and `RELAY_URLS` no longer apply. CI sets `RELAYS`
 and `BLOSSOM_URL` explicitly. The Go protocol helpers use separately pinned,
 checksummed dependencies from upstream commit `c50c1ccbf32d7fa6ae00f74990ce2c83f3bac6a1`:

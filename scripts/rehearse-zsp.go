@@ -250,6 +250,22 @@ func rehearse() error {
 		}
 	}
 	cmd.Env = append(cmd.Env, "SIGN_WITH=bunker://"+signerPub+"?relay=ws://"+listener.Addr().String(), "RELAYS="+strings.Replace(catalog.URL, "http://", "ws://", 1), "BLOSSOM_URL="+blob.URL)
+	// A rejected selection cannot publish. Verify the pinned CLI's error stream
+	// as well as its successful JSON contract so mocks cannot hide this boundary.
+	rejected := exec.CommandContext(ctx, binary, "--json", "check", "--apk-hash", strings.Repeat("0", 64), "zapstore.yaml")
+	rejected.Dir, rejected.Env = cmd.Dir, cmd.Env
+	var rejectedOut, rejectedErr bytes.Buffer
+	rejected.Stdout, rejected.Stderr = &rejectedOut, &rejectedErr
+	rejectedStatus := rejected.Run()
+	var failure struct {
+		OK    bool `json:"ok"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if rejectedStatus == nil || rejectedOut.Len() != 0 || json.Unmarshal(rejectedErr.Bytes(), &failure) != nil || failure.OK || failure.Error.Code != "apk_not_checked" {
+		return fmt.Errorf("real v2 error document did not use stderr with apk_not_checked")
+	}
 	// Exercise the actual production decision gate with the same persisted
 	// NIP-46 client, proof and catalog, before invoking the publication flags.
 	check := exec.CommandContext(ctx, binary, "--json", "check", "--channel", "main", "zapstore.yaml")
@@ -331,7 +347,7 @@ func rehearse() error {
 		"version": "v2.0.0", "eventKinds": kinds,
 		"signerAuthor": signerPub, "preseededClientRestored": true,
 		"nip46Requests": relay.requests, "eventsSentToSignerRelay": relay.forbidden, "catalog": "loopback only", "blossom": "loopback only", "status": document.Status, "c1ProofVerifiedByCLI": true, "readOnlyPreflightVerified": true, "verifiedPublicReadback": true,
-		"signerRelay": "loopback only", "keyDirectory": "os.UserConfigDir()/zsp/bunker-keys",
+		"signerRelay": "loopback only", "keyDirectory": "os.UserConfigDir()/zsp/bunker-keys", "errorDocumentOnStderrVerified": true,
 	})
 }
 
