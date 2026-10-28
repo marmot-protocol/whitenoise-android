@@ -12,10 +12,13 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -71,15 +74,20 @@ class ChatListContinuityAndroidTest {
         previousAnimationScale =
             Settings.Global.getString(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE)
         check(Settings.Global.putFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f))
-        context.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         rule.runOnUiThread {
-            state = WhiteNoiseAppState(
-                context = context,
-                draftStore = DraftStore(DiscardedDrafts),
-                accountIdHexResolver = { null },
-                accounts = listOf(AccountSummaryFfi(account, "a0".repeat(32), true, false, false, true)),
-                activeAccountRef = account,
-            )
+            state =
+                WhiteNoiseAppState(
+                    context = context,
+                    draftStore = DraftStore(DiscardedDrafts),
+                    accountIdHexResolver = { null },
+                    accounts = listOf(AccountSummaryFfi(account, "a0".repeat(32), true, false, false, true)),
+                    activeAccountRef = account,
+                )
             controller = ChatsController(state, account) { _, _ -> emptyList() }
             controller.applyChatListRow(
                 chatRow(firstRow, "First local group", 2uL).copy(unreadCount = 3uL, hasUnread = true),
@@ -146,7 +154,12 @@ class ChatListContinuityAndroidTest {
             controller.applyChatListRow(chatRow(secondRow, "Archived local group", 1uL).copy(archived = true))
         }
         render()
-        val activeTop = rule.onNodeWithTag("chat.row.$firstRow").fetchSemanticsNode().boundsInRoot.top
+        val activeTop =
+            rule
+                .onNodeWithTag("chat.row.$firstRow")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .top
         rule.mainClock.autoAdvance = false
         rule.runOnIdle { selectedFolder = ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID }
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
@@ -155,15 +168,38 @@ class ChatListContinuityAndroidTest {
         rule.mainClock.advanceTimeBy(64)
         rule.runOnIdle { selectedFolder = null }
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
-        val returningTop = rule.onNodeWithTag("chat.row.$firstRow").fetchSemanticsNode().boundsInRoot.top
+        val returningTop =
+            rule
+                .onNodeWithTag("chat.row.$firstRow")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .top
         assertTrue("reversal must retain the in-flight arrival", returningTop > activeTop)
         rule.mainClock.advanceTimeBy(240)
-        assertEquals(activeTop, rule.onNodeWithTag("chat.row.$firstRow").fetchSemanticsNode().boundsInRoot.top, 1f)
+        assertEquals(
+            activeTop,
+            rule
+                .onNodeWithTag("chat.row.$firstRow")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .top,
+            1f,
+        )
         rule.runOnIdle { selectedFolder = ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID }
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
-        val arrivingTop = rule.onNodeWithTag("chat.row.$secondRow").fetchSemanticsNode().boundsInRoot.top
+        val arrivingTop =
+            rule
+                .onNodeWithTag("chat.row.$secondRow")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .top
         rule.mainClock.advanceTimeBy(240)
-        val settledTop = rule.onNodeWithTag("chat.row.$secondRow").fetchSemanticsNode().boundsInRoot.top
+        val settledTop =
+            rule
+                .onNodeWithTag("chat.row.$secondRow")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .top
         assertTrue("Archived must animate despite replacing its scroll viewport", arrivingTop > settledTop)
         rule.onNodeWithTag("chat.row.$firstRow").assertDoesNotExist()
     }
@@ -179,10 +215,7 @@ class ChatListContinuityAndroidTest {
         rule.onNodeWithTag("chat.action.Select").performClick()
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
         row.assertIsSelected()
-        rule.onNodeWithContentDescription(
-            rule.activity.resources.getQuantityString(R.plurals.unread_messages_count, 3, 3),
-            useUnmergedTree = true,
-        ).assertExists()
+        assertCurrentUnreadBadge()
         rule.onNodeWithTag("chat.row.$secondRow").assertIsNotSelected()
         rule.onAllNodesWithTag("chat.row.$firstRow").assertCountEquals(1)
         assertTrue(
@@ -198,13 +231,21 @@ class ChatListContinuityAndroidTest {
         rule.onNodeWithTag("chat.action.Select").performClick()
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
         row.assertIsSelected()
-        rule.onNodeWithContentDescription(
-            rule.activity.resources.getQuantityString(R.plurals.unread_messages_count, 3, 3),
-            useUnmergedTree = true,
-        ).assertExists()
+        assertCurrentUnreadBadge()
         assertEquals("selection never opens a conversation", 0, opens)
         rule.mainClock.advanceTimeBy(240)
         assertTrue(controller.items.first { it.id == firstRow }.effectiveHasUnread(state.activeAccount?.accountIdHex))
+    }
+
+    /** Selects the authoritative count slot; the visual badge also supplies an unmerged description. */
+    private fun assertCurrentUnreadBadge() {
+        val description = rule.activity.resources.getQuantityString(R.plurals.unread_messages_count, 3, 3)
+        rule
+            .onNode(
+                hasText("3") and hasContentDescription(description) and
+                    hasAnyAncestor(hasTestTag("chat.row.$firstRow")),
+                useUnmergedTree = true,
+            ).assertExists()
     }
 
     /** Admit the real popup without allowing the 160 ms selection-strip exit to finish before reversal. */
@@ -312,6 +353,9 @@ class ChatListContinuityAndroidTest {
     private object DiscardedDrafts : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
 
-        override fun write(key: String, value: String?) = Unit
+        override fun write(
+            key: String,
+            value: String?,
+        ) = Unit
     }
 }

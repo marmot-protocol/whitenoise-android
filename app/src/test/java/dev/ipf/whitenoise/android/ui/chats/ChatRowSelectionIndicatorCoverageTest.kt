@@ -127,7 +127,10 @@ class ChatRowSelectionIndicatorCoverageTest {
     }
 
     /** Verifies visible metadata with no extra Select/Selected announcement on the decorative icon. */
-    private fun assertSelectionMetadataVisible(unreadCount: ULong, mentions: Int = 0) {
+    private fun assertSelectionMetadataVisible(
+        unreadCount: ULong,
+        mentions: Int = 0,
+    ) {
         composeRule.onNodeWithText(nowText).assertExists()
         composeRule.onNodeWithText(unreadCount.toString()).assertExists()
         composeRule.onAllNodesWithContentDescription(mentionDescription).assertCountEquals(mentions)

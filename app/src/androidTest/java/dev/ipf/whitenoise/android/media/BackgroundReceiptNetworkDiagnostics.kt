@@ -23,7 +23,16 @@ internal fun backgroundReceiptNetworkSnapshot(
     val capabilities = manager?.getNetworkCapabilities(network)
     return JSONObject()
         .put("requested_wifi_enabled", wifiEnabled)
-        .put("app_networks", JSONArray(state.automaticAttachmentPolicy(account).networks.map { it.name }.sorted()))
+        .put(
+            "app_networks",
+            JSONArray(
+                state
+                    .automaticAttachmentPolicy(account)
+                    .networks
+                    .map { it.name }
+                    .sorted(),
+            ),
+        )
         .put("app_active_network", state.hasActiveNetwork())
         .put("app_validated_internet", state.hasValidatedInternet())
         .put("platform_manager_available", manager != null)

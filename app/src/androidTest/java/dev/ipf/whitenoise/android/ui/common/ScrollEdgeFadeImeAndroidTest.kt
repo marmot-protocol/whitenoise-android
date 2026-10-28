@@ -64,7 +64,9 @@ class ScrollEdgeFadeImeAndroidTest {
     @Before
     @Suppress("DEPRECATION")
     fun configureWindow() {
-        InstrumentationRegistry.getInstrumentation().uiAutomation
+        InstrumentationRegistry
+            .getInstrumentation()
+            .uiAutomation
             .adoptShellPermissionIdentity("android.permission.WRITE_SECURE_SETTINGS")
         val resolver = composeRule.activity.contentResolver
         previousAnimationScale = Settings.Global.getString(resolver, Settings.Global.ANIMATOR_DURATION_SCALE)
@@ -143,12 +145,13 @@ class ScrollEdgeFadeImeAndroidTest {
     /** Samples the retained mask on the first observed restored layout and during its old transition window. */
     private fun hideKeyboardAndCheckRetainedMask() {
         composeRule.mainClock.autoAdvance = false
-        val window = composeRule.runOnUiThread {
-            WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }.also {
-                observeImeAnimation(it)
-                ViewCompat.getWindowInsetsController(it)?.hide(WindowInsetsCompat.Type.ime())
+        val window =
+            composeRule.runOnUiThread {
+                WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }.also {
+                    observeImeAnimation(it)
+                    ViewCompat.getWindowInsetsController(it)?.hide(WindowInsetsCompat.Type.ime())
+                }
             }
-        }
         try {
             composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { hiddenImeSettled(window) }
         } finally {

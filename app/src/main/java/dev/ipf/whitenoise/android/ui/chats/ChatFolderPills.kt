@@ -257,7 +257,10 @@ private fun FolderPillLabel(
 
 /** Retains selected fill through folder arrival while disabled motion uses the current target immediately. */
 @Composable
-private fun folderPillBackground(selected: Boolean, selectedColor: Color): Color {
+private fun folderPillBackground(
+    selected: Boolean,
+    selectedColor: Color,
+): Color {
     val motionEnabled = rememberSystemAnimationsEnabled()
     val targetBackground = if (selected) selectedColor else Color.Transparent
     val background by

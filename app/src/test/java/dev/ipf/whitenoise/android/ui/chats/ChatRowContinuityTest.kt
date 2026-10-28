@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -13,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -27,15 +31,18 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Production-row regressions: metadata semantics never wait for decorative motion to finish. */
@@ -65,36 +72,39 @@ class ChatRowContinuityTest {
     @Test
     fun unreadArrivalRapidReplacementAndMarkReadKeepAuthoritativeSemantics() {
         val item = mutableStateOf(ChatRowPortFixtures.item())
+        var committedItem = item.value
         val appState = ChatRowPortFixtures.state(context)
         composeRule.setContent {
+            val currentItem = item.value
+            SideEffect { committedItem = currentItem }
             WhiteNoiseTheme {
-                ChatRow(item.value, appState, onClick = {}, onOpenProfile = {})
+                ChatRow(currentItem, appState, onClick = {}, onOpenProfile = {})
             }
         }
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle {
+        publishChange {
             item.value =
                 item.value.copy(
                     projection = requireNotNull(item.value.projection).copy(hasUnread = true, unreadCount = 1uL),
                 )
         }
-        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(item.value, committedItem)
         badge(1).assertIsDisplayed()
         val oneWidth = badge(1).fetchSemanticsNode().boundsInRoot.width
-        composeRule.runOnIdle {
+        publishChange {
             item.value = item.value.copy(projection = requireNotNull(item.value.projection).copy(unreadCount = 1_001uL))
         }
-        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(item.value, committedItem)
         badge(1).assertDoesNotExist()
         badge(1_001).assertIsDisplayed()
         assertEquals(oneWidth, badge(1_001).fetchSemanticsNode().boundsInRoot.width, 0.5f)
-        composeRule.runOnIdle {
+        publishChange {
             item.value =
                 item.value.copy(
                     projection = requireNotNull(item.value.projection).copy(hasUnread = false, unreadCount = 0uL),
                 )
         }
-        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(item.value, committedItem)
         badge(1_001).assertDoesNotExist()
         composeRule.mainClock.advanceTimeBy(240)
         badge(1_001).assertDoesNotExist()
@@ -104,9 +114,12 @@ class ChatRowContinuityTest {
     @Test
     fun selectionReversalKeepsOneTargetAndMetadataWhileWidthMoves() {
         val selecting = mutableStateOf(false)
+        var committedSelection = false
         val appState = ChatRowPortFixtures.state(context)
         val item = ChatRowPortFixtures.item(unread = true)
         composeRule.setContent {
+            val currentSelection = selecting.value
+            SideEffect { committedSelection = currentSelection }
             WhiteNoiseTheme {
                 Box(Modifier.width(320.dp)) {
                     ChatRow(
@@ -114,8 +127,8 @@ class ChatRowContinuityTest {
                         appState,
                         onClick = {},
                         onOpenProfile = {},
-                        selectionMode = selecting.value,
-                        selected = selecting.value,
+                        selectionMode = currentSelection,
+                        selected = currentSelection,
                         modifier = Modifier.testTag("row"),
                     )
                 }
@@ -123,19 +136,31 @@ class ChatRowContinuityTest {
         }
         composeRule.mainClock.autoAdvance = false
         val initial = titleLeft()
-        composeRule.runOnIdle { selecting.value = true }
-        composeRule.mainClock.advanceTimeByFrame()
+        publishChange { selecting.value = true }
+        assertTrue(committedSelection)
         composeRule.onNodeWithTag("row").assertIsSelected()
         composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
         composeRule.onNodeWithText("3").assertExists()
         composeRule.mainClock.advanceTimeBy(80)
+        composeRule.waitForIdle()
         val middle = titleLeft()
         assertTrue(middle > initial)
-        composeRule.runOnIdle { selecting.value = false }
+        publishChange { selecting.value = false }
+        assertFalse(committedSelection)
+        composeRule.onNodeWithTag("row").assertIsNotSelected()
+        // The target's recomposition frame first advances the old animation once.
+        val reversalAdmission = titleLeft()
+        val fullWidth = with(composeRule.density) { 32.dp.toPx() }
+        assertTrue(reversalAdmission >= middle && reversalAdmission < initial + fullWidth)
         composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        assertEquals(reversalAdmission, titleLeft(), 1f)
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.waitForIdle()
         val reversed = titleLeft()
-        assertTrue(reversed >= initial && reversed <= middle + 1f)
+        assertTrue(reversed >= initial && reversed < reversalAdmission)
         composeRule.mainClock.advanceTimeBy(240)
+        composeRule.waitForIdle()
         val settled = titleLeft()
         assertEquals(initial, settled, 0.5f)
         composeRule.onNodeWithText("3").assertExists()
@@ -205,29 +230,42 @@ class ChatRowContinuityTest {
     @Test
     fun liveReducedMotionSettlesSelectionWithoutWaitingForItsOldAnimation() {
         val selecting = mutableStateOf(false)
+        var committedSelection = false
+        var observedAnimationsEnabled = true
         val appState = ChatRowPortFixtures.state(context)
         val item = ChatRowPortFixtures.item()
         composeRule.setContent {
+            val currentSelection = selecting.value
+            val animationsEnabled = rememberSystemAnimationsEnabled()
+            SideEffect {
+                committedSelection = currentSelection
+                observedAnimationsEnabled = animationsEnabled
+            }
             WhiteNoiseTheme {
                 ChatRow(
                     item,
                     appState,
                     onClick = {},
                     onOpenProfile = {},
-                    selectionMode = selecting.value,
+                    selectionMode = currentSelection,
                 )
             }
         }
         val initial = titleLeft()
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle { selecting.value = true }
+        publishChange { selecting.value = true }
+        assertTrue(committedSelection)
         composeRule.mainClock.advanceTimeBy(64)
+        composeRule.waitForIdle()
         val partial = titleLeft()
-        composeRule.runOnIdle { setAnimatorScale(0f) }
-        composeRule.mainClock.advanceTimeByFrame()
+        publishChange {
+            setAnimatorScale(0f)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        assertFalse(observedAnimationsEnabled)
         assertTrue(titleLeft() > partial)
-        composeRule.runOnIdle { selecting.value = false }
-        composeRule.mainClock.advanceTimeByFrame()
+        publishChange { selecting.value = false }
+        assertFalse(committedSelection)
         assertEquals(initial, titleLeft(), 0.5f)
     }
 
@@ -236,13 +274,16 @@ class ChatRowContinuityTest {
     fun manualUnreadDotRetainsAuthoritativeSemanticsDuringExit() {
         val original = ChatRowPortFixtures.item()
         val item = mutableStateOf(original)
+        var committedItem = original
         val appState = ChatRowPortFixtures.state(context)
         val description = context.getString(R.string.chat_row_marked_unread)
         composeRule.setContent {
-            WhiteNoiseTheme { ChatRow(item.value, appState, onClick = {}, onOpenProfile = {}) }
+            val currentItem = item.value
+            SideEffect { committedItem = currentItem }
+            WhiteNoiseTheme { ChatRow(currentItem, appState, onClick = {}, onOpenProfile = {}) }
         }
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle {
+        publishChange {
             item.value =
                 original.copy(
                     projection =
@@ -252,11 +293,21 @@ class ChatRowContinuityTest {
                         ),
                 )
         }
-        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(item.value, committedItem)
         composeRule.onNodeWithContentDescription(description).assertExists()
-        composeRule.runOnIdle { item.value = original }
-        composeRule.mainClock.advanceTimeByFrame()
+        publishChange { item.value = original }
+        assertEquals(item.value, committedItem)
         composeRule.onNodeWithContentDescription(description).assertDoesNotExist()
+    }
+
+    /** Publishes fixture state and commits one frame, then lets Android draw without settling the animation. */
+    private fun publishChange(block: () -> Unit) {
+        composeRule.runOnUiThread {
+            block()
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
     }
 
     /** Reads production text geometry without adding a test-only layout seam. */
