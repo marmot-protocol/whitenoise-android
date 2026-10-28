@@ -23,6 +23,37 @@ import java.io.IOException
 /** Enforces shared transport, bounded ownership and independent row cancellation through the production owner. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RemoteGiphyAcquisitionCoverageTest {
+    /** Trimming cache references cannot retire a shared transport or duplicate it for a new subscriber. */
+    @Test
+    fun memoryTrimKeepsInFlightSubscribersAndLaterCacheReuse() =
+        runTest {
+            val response = CompletableDeferred<ByteArray>()
+            val cache = RemoteGiphyByteCache(1024)
+            var gets = 0
+            val acquisition =
+                RemoteGiphyAcquisition(backgroundScope, cache) {
+                    gets++
+                    response.await()
+                }
+            val owner = Any()
+            val first = async { acquisition.useBytes(owner, request(), { true }) { it } }
+            runCurrent()
+            cache.trimToSize(0)
+            val second = async { acquisition.useBytes(owner, request(), { true }) { it } }
+            runCurrent()
+            assertEquals(1, gets)
+            val bytes = byteArrayOf(1, 2, 3)
+            response.complete(bytes)
+            assertSame(bytes, first.await())
+            assertSame(bytes, second.await())
+            assertEquals(3L, cache.trimToSize(0))
+            assertNull(cache.get(request().url))
+            assertEquals(listOf<Byte>(1, 2, 3), bytes.toList())
+            cache.put(request().url, bytes)
+            assertSame(bytes, acquisition.useBytes(owner, request(), { true }) { it })
+            assertEquals(1, gets)
+        }
+
     /** More than the six capacity slots still share one GET and each retain a separate decoded result. */
     @Test
     fun twelveRowsShareOneRequestAndKeepSeparatePresentations() =

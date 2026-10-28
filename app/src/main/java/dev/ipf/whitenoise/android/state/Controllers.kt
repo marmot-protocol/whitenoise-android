@@ -9190,6 +9190,9 @@ class ConversationController(
                             acceptedPendingMessageIdHex in projectedMessageIds
                     if (acceptedPendingProjectionAlreadyLanded) {
                         val confirmedMessageIdHex = requireNotNull(acceptedPendingMessageIdHex)
+                        // The early echo may have seeded only L1 before upload supplied the ciphertext tag.
+                        // Register the guarded durable host copy before releasing its retained plaintext.
+                        handoffOwnMediaCacheOnReconcile(key, confirmedMessageIdHex)
                         appState.commitOptimisticSentPreview(
                             accountRef = conversationAccountRef,
                             groupIdHex = group.groupIdHex,
@@ -10503,6 +10506,16 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
     ): android.graphics.Bitmap? = attachmentPresentation.thumbnailFor(messageIdHex, attachmentIndex)
+
+    /** Keeps a displayed kept-card thumbnail eligible for rereads until its surface releases the hold. */
+    internal fun retainThumbnail(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): AutoCloseable? =
+        attachmentPresentation.retainThumbnail(
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+        )
 
     /** Returns cached pixels together with the largest request they can satisfy. */
     internal fun thumbnailEntryFor(

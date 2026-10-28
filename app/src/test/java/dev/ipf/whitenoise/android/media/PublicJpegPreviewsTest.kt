@@ -176,6 +176,32 @@ class PublicJpegPreviewsTest {
         )
     }
 
+    /** A cache-only trim leaves drawn pixels valid and subsequent access still respects consent. */
+    @Test
+    fun trimmedPreviewKeepsDisplayedPixelsAndReacquiresThroughExistingPolicy() =
+        runBlocking {
+            val output = ByteArrayOutputStream()
+            val seed = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+            assertTrue(seed.compress(Bitmap.CompressFormat.JPEG, 80, output))
+            val bytes = output.toByteArray()
+            val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            val url = "https://images.example/$hash.jpg"
+            val loader = PublicJpegPreviewLoader()
+            var calls = 0
+            val fetch: suspend (String, ULong) -> ByteArray = { _, _ ->
+                calls++
+                bytes
+            }
+            val displayed = requireNotNull(loader.load("alice", url, { true }, fetch))
+            loader.trimMemory(PresentationMemoryTrim.EMPTY)
+            assertFalse(displayed.isRecycled)
+            assertNull(loader.load("alice", url, { false }, fetch))
+            assertEquals(1, calls)
+            val restored = requireNotNull(loader.load("alice", url, { true }, fetch))
+            org.junit.Assert.assertSame(restored, loader.load("alice", url, { true }, fetch))
+            assertEquals(2, calls)
+        }
+
     @Test
     fun rejectsWrongPayloadOnceAndReusesTheBoundedFailureEntry() =
         runBlocking {

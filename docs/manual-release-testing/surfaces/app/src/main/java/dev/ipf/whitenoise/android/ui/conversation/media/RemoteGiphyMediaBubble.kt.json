@@ -94,6 +94,16 @@
           "MED-021"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Presentation memory trim preserves live images and data",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "internal fun trimRemoteGiphyMemory(",
+        "test_ids": [
+          "STB-006"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

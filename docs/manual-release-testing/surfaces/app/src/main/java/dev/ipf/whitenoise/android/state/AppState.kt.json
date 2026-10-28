@@ -468,6 +468,14 @@
         ]
       },
       {
+        "surface": "Presentation memory trim preserves live images and data",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun trimPresentationMemory(",
+        "test_ids": [
+          "STB-006"
+        ]
+      },
+      {
         "surface": "Ordered off-main app-lock timestamp persistence",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "persistAppLockTimestamp",

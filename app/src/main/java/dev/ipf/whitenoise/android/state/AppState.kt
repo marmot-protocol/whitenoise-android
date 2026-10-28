@@ -151,6 +151,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
+import dev.ipf.whitenoise.android.notifications.PinnedConversationPicture
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
@@ -1361,6 +1362,9 @@ class WhiteNoiseAppState private constructor(
             sizeOf = { it.size },
         )
 
+    /** UI leases prevent trimming a kept card's only decoded pixels; explicit removal still wins. */
+    private val mediaThumbnailHolds = mutableMapOf<String, MutableSet<Any>>()
+
     /**
      * App-lifetime cache of *decoded* attachment thumbnails (sampled bitmaps),
      * keyed identically to [mediaPlaintextCache]. Lets a bubble render its
@@ -1445,6 +1449,35 @@ class WhiteNoiseAppState private constructor(
         val previous = mediaThumbnailCache.put(cacheKey, entry)
         if (mediaThumbnailCache.get(cacheKey) === entry || previous != null) {
             mediaThumbnailRevisionState.update { it + 1L }
+        }
+    }
+
+    /**
+     * Releases expendable L1 references on the main thread. Displayed bitmaps remain valid and existing
+     * transfer/upload owners, retained retry bytes, account fences and durable L2/native media survive.
+     */
+    internal fun trimPresentationMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+        assertMainThread { "trimPresentationMemory" }
+        val plaintextRemoved = mediaPlaintextCache.trimToSize(trim.targetBytes(MEDIA_PLAINTEXT_CACHE_MAX_BYTES))
+        val thumbnailsRemoved =
+            mediaThumbnailCache.trimToSize(
+                targetBytes = trim.targetBytes(MEDIA_THUMBNAIL_CACHE_MAX_BYTES),
+                keep = mediaThumbnailHolds::containsKey,
+            )
+        if (plaintextRemoved > 0) bumpMediaCacheRevision()
+        if (thumbnailsRemoved > 0) mediaThumbnailRevisionState.update { it + 1L }
+        publicJpegPreviewLoader.trimMemory(trim)
+    }
+
+    /** Holds an actively displayed kept thumbnail through cache trims, never through explicit invalidation. */
+    internal fun retainMediaThumbnail(cacheKey: String): AutoCloseable {
+        assertMainThread { "retainMediaThumbnail" }
+        val token = Any()
+        mediaThumbnailHolds.getOrPut(cacheKey) { mutableSetOf() }.add(token)
+        return AutoCloseable {
+            assertMainThread { "releaseMediaThumbnail" }
+            val holds = mediaThumbnailHolds[cacheKey]
+            if (holds?.remove(token) == true && holds.isEmpty()) mediaThumbnailHolds.remove(cacheKey)
         }
     }
 
@@ -4114,15 +4147,46 @@ class WhiteNoiseAppState private constructor(
         return PinnedConversationPresentation(
             title = title,
             contact = peer,
-            currentAvatar = {
-                val available = accounts.any { it.label == account && !it.signedOut }
-                if (!available || appLockScreenVisible || isContactRefBeingCleared(account)) {
-                    null
-                } else {
-                    peer?.let { contactAvatarOverride(account, it).second }
-                        ?: firstFrameGroupAvatarSeed(item, account, ::avatarUrl)?.image?.asAndroidBitmap()
+            currentPicture = { pinnedConversationPicture(account, item, peer) },
+        )
+    }
+
+    /** Resolve pixels and their opaque selection together; cache eviction cannot impersonate a picture removal. */
+    private fun pinnedConversationPicture(
+        account: String,
+        item: ChatListItem,
+        peer: String?,
+    ): PinnedConversationPicture {
+        val available = accounts.any { it.label == account && !it.signedOut }
+        if (!available || appLockScreenVisible || isContactRefBeingCleared(account)) {
+            return PinnedConversationPicture(null)
+        }
+        val privatePeer = peer?.takeIf { contactNicknameAccountRefForAccess(account, accounts, it) != null }
+        val privateRef = privatePeer?.let { contactPictureStore.reference(account, it) }
+        val publicFallback =
+            privatePeer?.takeIf { contactPictureStore.hasChoice(account, it) }?.let {
+                synchronized(profilePresentationLock) { profilePresentations[it]?.avatarUrl }
+            }
+        val sources =
+            sequence {
+                privateRef?.let { ref ->
+                    val read = { AvatarImageLoader.cachedImage(ref.cacheKey)?.asAndroidBitmap() }
+                    yield("private:${ref.cacheKey}" to read)
                 }
-            },
+                publicFallback?.let { url -> yield("public:$url" to { AvatarImageLoader.peekBitmap(url) }) }
+                val nativeSources =
+                    firstFrameGroupAvatarSources(item, account) { contact ->
+                        synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
+                    }
+                for ((kind, key) in nativeSources) {
+                    val read = { firstFrameGroupAvatarSeed(sequenceOf(kind to key), account)?.image?.asAndroidBitmap() }
+                    yield("$kind:$key" to read)
+                }
+            }
+        return dev.ipf.whitenoise.android.notifications.resolvePinnedConversationPicture(
+            account,
+            AvatarImageLoader.currentCacheLifetime(),
+            sources,
         )
     }
 

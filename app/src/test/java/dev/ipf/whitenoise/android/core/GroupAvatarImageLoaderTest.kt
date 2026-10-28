@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core
 
+import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -24,6 +25,25 @@ class GroupAvatarImageLoaderTest {
     /** Each case owns the bounded singleton's cache lifetime. */
     @After
     fun resetLoader() = GroupAvatarImageLoader.clear()
+
+    /** Group trim drops both pixel/source references without invalidating an already displayed bitmap. */
+    @Test
+    fun groupTrimReacquiresOnceAndKeepsSharedPixelsValid() =
+        runBlocking {
+            var calls = 0
+            val load: suspend () -> ByteArray = {
+                calls++
+                twoFrameGif()
+            }
+            val displayed = requireNotNull(GroupAvatarImageLoader.load("trim-group", load))
+            GroupAvatarImageLoader.trimMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+            assertNull(GroupAvatarImageLoader.peek("trim-group"))
+            assertNull(GroupAvatarImageLoader.peekAnimatedSource("trim-group"))
+            assertFalse(displayed.asAndroidBitmap().isRecycled)
+            assertNotNull(GroupAvatarImageLoader.load("trim-group", load))
+            assertNotNull(GroupAvatarImageLoader.load("trim-group") { error("warm result must be reused") })
+            assertEquals(2, calls)
+        }
 
     /** Old queued group downloads never run after recovery, and new waiters use a new request. */
     @Test

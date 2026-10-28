@@ -471,6 +471,8 @@ private fun refreshedState(
         available == true -> AttachmentTransferState.Available
         available == null && previous == AttachmentTransferState.Resolving -> AttachmentTransferState.Remote
         available == null -> previous
+        // Loss of a previously displayed body is not a new automatic-download demand.
+        previous == AttachmentTransferState.Available -> AttachmentTransferState.NotRetained
         previous == AttachmentTransferState.NotRetained -> AttachmentTransferState.NotRetained
         previous == AttachmentTransferState.Failed -> AttachmentTransferState.Failed
         previous == AttachmentTransferState.StorageBlocked -> AttachmentTransferState.StorageBlocked

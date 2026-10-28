@@ -76,6 +76,11 @@ private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
 
 private val giphyByteCache = RemoteGiphyByteCache(GIPHY_MEMORY_CACHE_MAX_BYTES)
 
+/** Trims encoded presentation bytes without creating or retiring the shared acquisition controller. */
+internal fun trimRemoteGiphyMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+    giphyByteCache.trimToSize(trim.targetBytes(GIPHY_MEMORY_CACHE_MAX_BYTES))
+}
+
 /** Creates the supervised transport only for an actual row; pure policy/cache reads need no Android dispatcher. */
 private val giphyAcquisition by lazy {
     RemoteGiphyAcquisition(
@@ -117,6 +122,10 @@ internal class RemoteGiphyByteCache(
     ) {
         delegate.put(url, bytes)
     }
+
+    /** Drops LRU references without cancelling coalesced downloads or changing the insertion budget. */
+    @Synchronized
+    fun trimToSize(targetBytes: Long): Long = delegate.trimToSize(targetBytes)
 
     /** Removes bytes that no longer decode successfully. */
     @Synchronized

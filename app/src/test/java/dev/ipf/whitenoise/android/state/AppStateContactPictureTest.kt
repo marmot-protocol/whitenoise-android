@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.setAppLockScreenVisibleForTest
 import dev.ipf.whitenoise.android.ui.share.group
@@ -105,15 +106,34 @@ class AppStateContactPictureTest {
             val dm = ChatListItem(group("dm"), null, "contact", 2, null)
             val captured = app.pinnedConversationPresentation("a", dm, "Local")
             assertEquals("contact", captured.contact)
-            assertEquals(Color.RED, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            assertEquals(Color.RED, checkNotNull(captured.currentPicture?.invoke()?.bitmap).getPixel(0, 0))
             assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", picture(Color.BLUE)) { true })
-            assertEquals(Color.BLUE, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            assertEquals(Color.BLUE, checkNotNull(captured.currentPicture?.invoke()?.bitmap).getPixel(0, 0))
             val owned = dm.copy(group = dm.group.copy(avatarUrl = "https://group.example/picture"))
             val groupPin = app.pinnedConversationPresentation("a", owned, "Group")
             assertNull(groupPin.contact)
-            assertNull(groupPin.currentAvatar?.invoke())
+            assertNull(groupPin.currentPicture?.invoke()?.bitmap)
             assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
-            assertNull(captured.currentAvatar?.invoke())
+            assertNull(captured.currentPicture?.invoke()?.bitmap)
+        }
+
+    /** Eviction preserves a private selection token; Clear and App Lock revoke its launcher retention authority. */
+    @Test fun trimmedPrivatePinSelectionIsStableUntilClearOrLock() =
+        runBlocking {
+            val app = app()
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", picture(Color.RED)) { true })
+            val dm = ChatListItem(group("dm"), null, "contact", 2, null)
+            val captured = app.pinnedConversationPresentation("a", dm, "Local")
+            val before = checkNotNull(captured.currentPicture?.invoke())
+            assertTrue(before.identity != null)
+            AvatarImageLoader.trimMemory(PresentationMemoryTrim.EMPTY)
+            val evicted = checkNotNull(captured.currentPicture?.invoke())
+            assertNull(evicted.bitmap)
+            assertTrue(before.identity in evicted.missingIdentities)
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
+            assertTrue(checkNotNull(captured.currentPicture?.invoke()).missingIdentities.isEmpty())
+            app.setAppLockScreenVisibleForTest(true)
+            assertTrue(checkNotNull(captured.currentPicture?.invoke()).missingIdentities.isEmpty())
         }
 
     /** Clearing a private choice uses cached native public pixels without reviving private or locked-account pixels. */
@@ -149,15 +169,15 @@ class AppStateContactPictureTest {
                         ),
                 )
             val captured = app.pinnedConversationPresentation("a", item, "Local")
-            assertEquals(Color.RED, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            assertEquals(Color.RED, checkNotNull(captured.currentPicture?.invoke()?.bitmap).getPixel(0, 0))
             assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
             AvatarImageLoader.loadStored(checkNotNull(asset.cacheKey("a")), AvatarImageLoader.currentCacheLifetime()) {
                 contactPicturePng(Color.GREEN)
             }
-            assertEquals(Color.GREEN, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            assertEquals(Color.GREEN, checkNotNull(captured.currentPicture?.invoke()?.bitmap).getPixel(0, 0))
             assertEquals("contact", captured.contact)
             app.setAppLockScreenVisibleForTest(true)
-            assertNull(captured.currentAvatar?.invoke())
+            assertNull(captured.currentPicture?.invoke()?.bitmap)
         }
 
     /** A narrow approval waits for both broad jobs without invalidating their other pins' pending presentation. */

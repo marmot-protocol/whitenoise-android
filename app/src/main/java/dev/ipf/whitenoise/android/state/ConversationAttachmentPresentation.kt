@@ -244,6 +244,15 @@ internal class ConversationAttachmentPresentation(
         return appState.cachedMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex))
     }
 
+    /** Holds only the cache identity currently displayed by a kept card; no acquisition is admitted. */
+    fun retainThumbnail(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): AutoCloseable? {
+        val account = accountRef ?: return null
+        return appState.retainMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex))
+    }
+
     /** Returns pixels with their decode ceiling under the same immutable account/group/attachment identity. */
     fun thumbnailEntryFor(
         messageIdHex: String,

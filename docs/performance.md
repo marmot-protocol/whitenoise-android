@@ -974,3 +974,53 @@ the benchmark JSON artifact, and link the relevant traces.
 | Open group → members visible | _ms_ | _ms_ | _%_ |
 
 The mention benchmark retains a three-second collection tail after visible read completion so Compose animation and highlight spans can finish. This is not a completion assertion or a latency budget: the report still rejects missing, unfinished, ambiguous or stale landings. Qualified mention frame metrics use tap-to-landing, excluding the highlight and collection tail; `journey_ms` includes collection time.
+
+## Presentation cache trim policy
+
+`WhiteNoiseApplication.onTrimMemory` handles Android's supported visibility
+signals without initializing an unused app state. UI_HIDDEN (20 and intermediate
+levels below 40) trims each image-cache tier to half its configured capacity.
+BACKGROUND (40+) releases its expendable references. On API 33 and earlier,
+running pressure at 5–14 uses the half-budget target and 15–19 uses zero.
+On API 34+, those retired running-pressure signals are ignored. This follows
+[Android's callback contract](https://developer.android.com/reference/android/content/ComponentCallbacks2).
+No `onLowMemory` dependency, extra lifecycle observer or forced GC is required.
+
+Targets are based on capacity, not current occupancy, so repeating a hidden
+callback does not keep halving a warm cache. These are one-shot trims: admitted
+work may finish and publish through its original account fence, and subsequent
+inserts retain their normal bounded budget. Trimming does not restart acquisition
+or cancel its existing shared request. Existing displayed bitmap/source references
+remain valid; no shared bitmap is recycled. Mounted kept cards hold their thumbnail
+keys against trim only, so a later unrelated cache publication cannot blank them.
+Explicit removal/account teardown still wins over those holds, and disposal releases
+the exact hold. Held pixels can keep occupancy above a trim target, while normal
+insertion capacity stays bounded. Cache-only avatar eviction does not publish a
+picture-change signal that would overwrite a launcher shortcut with initials.
+Later shortcut refreshes also distinguish a missing cache entry from a changed
+selection: the launcher stores only an opaque picture-selection digest alongside
+its existing icon. A still-selected owning source that missed before any
+available fallback, and a current privacy epoch, permit an icon-omitting update.
+An actual clear/replacement, account/cache lifetime change or privacy transition
+cannot retain the old photo. Changes to a lower-priority public fallback do not
+revoke an unchanged private-photo selection. No extra decoded-pixel store is
+introduced. A confirmed cache miss for a previously available attachment
+settles as NotRetained, which permits an explicit retry but does not issue a new
+automatic-download demand; an inconclusive probe keeps its prior state.
+
+The coordinated image tiers are L1 attachment bytes/thumbnails, profile/banner
+pixels and profile animation sources, encrypted-group pixels/sources, public JPEG
+pixels and GIPHY bytes. Durable L2/native media, upload/retry payloads, account
+lifetimes, decoder workers, failure cooldowns, playback and small metadata caches
+are outside this expendable image-retention policy. Avatar eviction counters
+include trim removals; byte totals describe retained references, not measured RSS.
+
+Use STB-006 for the controlled return workload. Unit/Compose regressions check
+exact retained bytes, idempotence, shared-request counts, durable disk retention
+and displayed-pixel/account isolation. They do not measure device RSS, GPU frames
+or establish an existing OOM. Record those runtime measurements separately before
+claiming the corresponding performance qualification. The hosted
+`AvatarCacheScrollDeviceTest.presentationTrimAndWarmReturnCounters` records the
+existing cache, frame and process-memory counters on the same synthetic scroll
+workload around repeated application callbacks. Its raw PSS/heap samples are
+measurements, not a forced-GC estimate or a guaranteed process-memory reduction.
