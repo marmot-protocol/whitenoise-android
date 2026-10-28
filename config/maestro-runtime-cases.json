@@ -985,8 +985,17 @@
         "CHL-006",
         "CHL-012"
       ],
-      "assertions": "Select one generated native group and apply batch Pin then Unpin. Each dialog directly asserts Changed 1 and zero other outcomes, then Close; exiting selection offers Pin again. Native verification requires the restored unpinned owner row while the peer row exists and remains unpinned.",
+      "assertions": "Select one generated native group and apply silent batch Pin then Unpin. Wait for the opposite action after each native state change; exiting selection offers Pin again. Native verification requires the restored unpinned owner row while the peer row exists and remains unpinned.",
       "postcondition": "chat-unpinned"
+    },
+    "chatstate-folder-exclude": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-012",
+        "FLD-002"
+      ],
+      "assertions": "Create Maestro saved folder from one selected group, open that folder and exclude the group. The folder-owned result dialog directly asserts Changed 1 and zero other outcomes, then Close; the group is absent from that folder. Native verification separately confirms the saved folder preference. Planned assertions, not execution evidence.",
+      "postcondition": "folder-saved"
     },
     "chatstate-delete-confirm": {
       "suite": "chatstate",

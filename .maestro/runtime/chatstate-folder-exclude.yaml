@@ -1,0 +1,46 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chatstate-folder-exclude
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- longPressOn:
+    text: "Maestro group"
+- tapOn: "Select"
+- assertVisible:
+    id: "chats.selectionControls"
+- tapOn: "Add to folder"
+- assertVisible: "New folder"
+- tapOn: "New folder"
+- assertVisible:
+    id: "folder.name"
+- tapOn:
+    id: "folder.name"
+- inputText: "Maestro saved folder"
+- hideKeyboard
+- tapOn:
+    id: "folder.save"
+- assertVisible: "Maestro group"
+- repeat:
+    times: 6
+    commands:
+      - runFlow:
+          when:
+            notVisible: "Maestro saved folder"
+          commands:
+            - swipe:
+                from:
+                  id: "chats.folders"
+                direction: LEFT
+- assertVisible: "Maestro saved folder"
+- tapOn: "Maestro saved folder"
+- assertVisible: "Maestro group"
+- longPressOn:
+    text: "Maestro group"
+- tapOn: "Select"
+- assertVisible:
+    id: "chats.selectionControls"
+- tapOn: "Exclude from this folder"
+- assertVisible: "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+- assertVisible: "Close"
+- tapOn: "Close"
+- assertNotVisible: "Maestro group"

@@ -18,6 +18,14 @@
         "test_ids": [
           "CHL-012"
         ]
+      },
+      {
+        "surface": "ChatListBatchRecoveryControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+        "anchor": "fun ChatListBatchRecoveryControls(",
+        "test_ids": [
+          "CHL-012"
+        ]
       }
     ],
     "source_coverage": [
@@ -129,6 +137,14 @@
         "surface": "R.string.unarchive",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
         "anchor": "R.string.unarchive",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+        "anchor": "R.string.dismiss",
         "test_ids": [
           "CHL-012"
         ]

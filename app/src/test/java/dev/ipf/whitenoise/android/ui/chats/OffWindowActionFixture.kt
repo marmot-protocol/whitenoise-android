@@ -53,6 +53,8 @@ internal class OffWindowActionFixture(
     var nativeEntered: CountDownLatch? = null
     var releaseNative: CountDownLatch? = null
     var archiveFails = false
+    var loseMuteReadback = false
+    var targetReadUnavailable = false
     val state: WhiteNoiseAppState
     val controller: ChatsController
 
@@ -83,7 +85,7 @@ internal class OffWindowActionFixture(
                     keyedReads++
                     lookupEntered?.complete(Unit)
                     releaseLookup?.await()
-                    presented(if (id == ACTION_TARGET) row.get() else retainedRow.get())
+                    if (id == ACTION_TARGET && targetReadUnavailable) null else presented(if (id == ACTION_TARGET) row.get() else retainedRow.get())
                 },
             )
         controller =
@@ -167,6 +169,7 @@ internal class OffWindowActionFixture(
             calls += "mute:$muted"
             holdNativeCommand()
             row.updateAndGet { it.copy(muted = muted) }
+            if (loseMuteReadback) targetReadUnavailable = true
         }
         return ChatNotificationSettingsFfi(
             accountRef = ACTION_ACCOUNT,

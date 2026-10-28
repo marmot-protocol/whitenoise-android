@@ -2,17 +2,31 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -21,6 +35,8 @@ import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.launch
 
 internal fun ChatListBatchCommand.labelResource(): Int =
     when (this) {
@@ -153,4 +169,77 @@ internal fun ChatListBatchStatusDialog(
             }
         },
     )
+}
+
+/** Recovery stays in the list after filtering removes selected rows; ordinary success has no surface. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
+@Composable
+internal fun ChatListBatchRecoveryControls(
+    command: ChatListBatchCommand,
+    result: ChatListBatchResult,
+    current: Boolean,
+    running: Boolean,
+    onCheck: () -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val summary =
+        stringResource(command.labelResource()) + "\n" +
+            stringResource(
+                R.string.chat_batch_result,
+                result.changed,
+                result.satisfied,
+                result.skipped,
+                result.failed,
+                result.notStarted,
+                result.unconfirmed,
+            )
+    val tooltip = rememberTooltipState()
+    val scope = rememberCoroutineScope()
+    FlowRow(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                .testTag("chats.batchRecovery"),
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    ) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+            tooltip = { PlainTooltip { Text(summary) } },
+            state = tooltip,
+        ) {
+            IconButton(
+                onClick = { scope.launch { tooltip.show() } },
+                enabled = !running,
+                modifier = Modifier.size(48.dp).testTag("chats.batchRecovery.summary"),
+            ) { Icon(painterResource(R.drawable.ic_error), contentDescription = summary) }
+        }
+        if (current && result.unconfirmed > 0) {
+            DirectSelectionAction(
+                label = stringResource(R.string.chat_batch_check_results),
+                icon = R.drawable.ic_search,
+                enabled = !running,
+                modifier = Modifier.testTag("chats.batchRecovery.check"),
+                onClick = onCheck,
+            )
+        }
+        if (current && result.retryIds.isNotEmpty()) {
+            DirectSelectionAction(
+                label = stringResource(R.string.retry),
+                icon = R.drawable.ic_refresh,
+                enabled = !running,
+                modifier = Modifier.testTag("chats.batchRecovery.retry"),
+                onClick = onRetry,
+            )
+        }
+        DirectSelectionAction(
+            label = stringResource(R.string.dismiss),
+            icon = R.drawable.ic_close,
+            enabled = !running,
+            modifier = Modifier.testTag("chats.batchRecovery.close"),
+            onClick = onDismiss,
+        )
+    }
 }

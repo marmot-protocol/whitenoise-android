@@ -48,7 +48,10 @@ internal fun ChatListSelectionBar(onClose: () -> Unit) {
     TopAppBar(
         title = { Text(stringResource(R.string.chat_selection_title)) },
         navigationIcon = {
-            IconButton(onClose) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close)) }
+            IconButton(
+                onClose,
+                modifier = Modifier.testTag("chats.selection.close"),
+            ) { Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close)) }
         },
     )
 }
@@ -272,7 +275,7 @@ internal fun ChatListSelectionControls(
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
-private fun DirectSelectionAction(
+internal fun DirectSelectionAction(
     label: String,
     @DrawableRes icon: Int,
     enabled: Boolean,

@@ -4826,6 +4826,7 @@ class ChatsController private constructor(
         wording: LocalRemovalWording = LocalRemovalWording.Delete,
         observer: LocalChatDeleteObserver = LocalChatDeleteObserver(),
         forgetProtocol: Boolean = false,
+        requireNativeEligibility: Boolean = false,
     ): Boolean =
         accountRef?.let { account ->
             val epoch = bindEpoch
@@ -4838,6 +4839,18 @@ class ChatsController private constructor(
             var nativeCommitted = false
             val wipe =
                 runCatching {
+                    if (requireNativeEligibility) {
+                        val row =
+                            kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
+                                liveSubscriptions.presentedRowByGroup?.invoke(account, groupIdHex)
+                            }
+                        if (!isCurrent()) throw CancellationException("Account replaced")
+                        check(
+                            row != null &&
+                                row.row.groupIdHex.equals(groupIdHex, ignoreCase = true) &&
+                                row.actions.canDeleteLocal,
+                        ) { "Native local deletion is unavailable" }
+                    }
                     appState.deleteChatGroupLocalWithRecovery(
                         LocalGroupRemovalRequest(account, groupIdHex, forgetProtocol),
                         isCurrent,
@@ -4874,6 +4887,7 @@ class ChatsController private constructor(
                                     groupIdHex,
                                     wording = wording,
                                     forgetProtocol = forgetProtocol,
+                                    requireNativeEligibility = requireNativeEligibility,
                                 )
                             },
                     )

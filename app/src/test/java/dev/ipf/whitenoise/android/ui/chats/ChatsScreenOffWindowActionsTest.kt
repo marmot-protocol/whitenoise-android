@@ -196,6 +196,47 @@ class ChatsScreenOffWindowActionsTest {
         assertOffWindow(model)
     }
 
+    @Test fun uncertainMuteIsCheckedWithoutRepeatingNativeMutation() {
+        val model = selectTarget()
+        model.loseMuteReadback = true
+        rule.onNodeWithContentDescription(rule.activity.getString(R.string.chat_row_action_mute)).performClick()
+        awaitProgress { "mute:true" in model.calls }
+        awaitDirectBatch(model)
+        rule.onNodeWithTag("chats.batchRecovery").assertIsDisplayed()
+        rule.onNodeWithTag("chats.batchRecovery.check").assertIsDisplayed()
+        rule.onNodeWithTag("chats.batchRecovery.retry").assertDoesNotExist()
+        model.targetReadUnavailable = false
+        val reads = model.keyedReads
+        rule.onNodeWithTag("chats.batchRecovery.check").performClick()
+        awaitProgress { model.keyedReads > reads }
+        awaitDirectBatch(model)
+        rule.onNodeWithTag("chats.batchRecovery").assertDoesNotExist()
+        assertEquals(listOf("mute:true"), model.calls.toList())
+        assertTrue(model.row.get().muted)
+    }
+
+    @Test fun failedArchiveRetainsRecoveryAfterSelectionClosesAndRetriesOnlyFailure() {
+        val model = selectTarget()
+        model.archiveFails = true
+        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").performClick()
+        rule.onNodeWithContentDescription(rule.activity.getString(R.string.archive)).performClick()
+        awaitProgress { "archive:true" in model.calls && "archive-survivor:true" in model.calls }
+        awaitDirectBatch(model)
+        rule.onNodeWithTag("chats.batchRecovery").assertIsDisplayed()
+        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertDoesNotExist()
+        // The captured request must remain reachable when selection UI is explicitly closed.
+        rule.onNodeWithTag("chats.selection.close").performClick()
+        rule.onNodeWithTag("chats.batchRecovery").assertIsDisplayed()
+        model.archiveFails = false
+        rule.onNodeWithTag("chats.batchRecovery.retry").performClick()
+        awaitProgress { model.calls.count { it == "archive:true" } == 2 }
+        awaitDirectBatch(model)
+        rule.onNodeWithTag("chats.batchRecovery").assertDoesNotExist()
+        assertEquals(1, model.calls.count { it == "archive-survivor:true" })
+        assertTrue(model.row.get().archived)
+        assertTrue(model.retainedRow.get().archived)
+    }
+
     @Test fun mixedArchivedBulkSelectionArchivesThenUnarchivesBothRetentionKinds() {
         val model = mount(mixedArchived = true)
         openMenu("Unarchive")

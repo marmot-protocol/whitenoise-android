@@ -4,9 +4,15 @@ import android.content.Context
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
+import dev.ipf.marmotkit.PresentationResolutionFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -43,12 +49,13 @@ internal fun TestScope.localGroupDeleteFixture(
     failing: String? = null,
     onRowRead: () -> Unit = {},
     beforeDelete: suspend () -> Unit = {},
+    localDeleteEligible: () -> Boolean = { true },
     configureState: (WhiteNoiseAppState, AtomicBoolean) -> Unit = { _, _ -> },
 ): LocalGroupDeleteFixture {
     val calls = ConcurrentLinkedQueue<String>()
     val failureMethod = AtomicReference(failing)
     val present = AtomicBoolean(true)
-    val native = localDeleteNative(calls, present, failureMethod, onRowRead, beforeDelete)
+    val native = localDeleteNative(calls, present, failureMethod, onRowRead, beforeDelete, localDeleteEligible)
     val context = ApplicationProvider.getApplicationContext<Context>()
     val fixtureAccount = AccountSummaryFfi(LOCAL_DELETE_ACCOUNT, LOCAL_DELETE_ACCOUNT_ID, true, false, false, true)
     val state =
@@ -88,6 +95,7 @@ private fun localDeleteNative(
     failing: AtomicReference<String?>,
     onRowRead: () -> Unit,
     beforeDelete: suspend () -> Unit,
+    localDeleteEligible: () -> Boolean,
 ): MarmotInterface =
     Proxy.newProxyInstance(
         MarmotInterface::class.java.classLoader,
@@ -108,6 +116,29 @@ private fun localDeleteNative(
             "chatListRow" -> {
                 onRowRead()
                 if (present.get()) chatRow(LOCAL_DELETE_GROUP) else null
+            }
+            "presentedChatListRow" -> {
+                onRowRead()
+                if (!present.get()) {
+                    null
+                } else {
+                    val row = chatRow(LOCAL_DELETE_GROUP)
+                    PresentedChatRowFfi(
+                        null,
+                        emptyChatRowPreview(),
+                        noChatRowActions().copy(canDeleteLocal = localDeleteEligible()),
+                        row,
+                        ConversationPresentationFfi(
+                            PresentationTextFfi.Literal("Local delete test"),
+                            SelectedAvatarFfi.Placeholder(row.groupIdHex, PresentationSourceFfi.GROUP_FALLBACK),
+                            PresentationSourceFfi.GROUP_FALLBACK,
+                            PresentationSourceFfi.GROUP_FALLBACK,
+                            null,
+                            PresentationResolutionFfi.FALLBACK,
+                        ),
+                        null,
+                    )
+                }
             }
             "listMedia" -> emptyList<Any>()
             "catchUpAccounts" -> Unit

@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
 import dev.ipf.whitenoise.android.state.chatListItemFromProjection
 import dev.ipf.whitenoise.android.state.chatRow
 import dev.ipf.whitenoise.android.state.deleteLocalChatsBatch
+import dev.ipf.whitenoise.android.state.noChatRowActions
 import dev.ipf.whitenoise.android.state.setLocalDeleteTestReactivation
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
@@ -81,6 +82,30 @@ class LocalGroupDeleteConfirmationOwnerTest {
         assertTrue(retry.isCurrent(state, controller))
         state.advanceLocalDeleteTestRuntime()
         assertFalse(retry.isCurrent(state, controller))
+    }
+
+    @Test
+    fun nativeEligibleConfirmationCapturesOnlyOfferedTargetsAndRetainsItsRetryFence() {
+        val state = emptyAppState()
+        val controller = ChatsController(state, ACCOUNT_REF) { _, _ -> emptyList() }
+        val items =
+            listOf("eligible", "ineligible").map { id ->
+                chatListItemFromProjection(chatRow(id)).copy(
+                    actions = noChatRowActions().copy(canDeleteLocal = id == "eligible"),
+                )
+            }
+        val request = PendingLocalChatDelete.capture(items, controller, state, requireNativeEligibility = true)
+        assertEquals(listOf("eligible"), request.groupIds)
+        assertEquals(listOf("eligible"), request.reviewItems.map { it.group.groupIdHex })
+        assertTrue(request.requireNativeEligibility)
+        assertTrue(request.remaining(0).requireNativeEligibility)
+        assertTrue(request.remaining(0).isCurrent(state, controller))
+        assertTrue(
+            PendingLocalChatDelete
+                .capture(items.drop(1), controller, state, requireNativeEligibility = true)
+                .groupIds
+                .isEmpty(),
+        )
     }
 
     @Test

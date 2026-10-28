@@ -10,6 +10,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
@@ -220,6 +221,52 @@ class ChatListSelectionBarScreenshotTest {
         for (label in listOf(R.string.retry, R.string.chat_batch_check_results, R.string.close)) {
             composeRule.onNodeWithText(context.getString(label)).assertIsDisplayed()
         }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    @Test fun recoveryLight() = captureRecovery("selection_recovery_light")
+
+    @Test fun recoveryAmoled() = captureRecovery("selection_recovery_amoled", amoled = true)
+
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w280dp-h700dp-mdpi")
+    fun recoveryBusyNarrow() = captureRecovery("selection_recovery_busy_narrow", running = true)
+
+    @Test
+    @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
+    fun recoveryRtlLarge() = captureRecovery("selection_recovery_rtl_large", amoled = true, rtl = true)
+
+    private fun captureRecovery(
+        name: String,
+        amoled: Boolean = false,
+        running: Boolean = false,
+        rtl: Boolean = false,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = amoled, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
+                CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        ChatListBatchRecoveryControls(
+                            command = dev.ipf.whitenoise.android.state.ChatListBatchCommand.MUTE,
+                            result =
+                                dev.ipf.whitenoise.android.state.ChatListBatchResult(
+                                    mapOf(
+                                        "changed" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.CHANGED,
+                                        "failed" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.FAILED,
+                                        "unknown" to dev.ipf.whitenoise.android.state.ChatListBatchOutcome.UNCONFIRMED,
+                                    ),
+                                ),
+                            current = true,
+                            running = running,
+                            onCheck = {},
+                            onRetry = {},
+                            onDismiss = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag("chats.batchRecovery").assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 

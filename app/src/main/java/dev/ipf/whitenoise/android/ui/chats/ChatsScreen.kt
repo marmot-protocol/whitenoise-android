@@ -258,32 +258,66 @@ internal fun ChatsScreen(
     val batchScope = remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { AtomicBoolean(true) }
     DisposableEffect(batchScope) { onDispose { batchScope.set(false) } }
     var pendingStateBatch by remember(batchScope) { mutableStateOf<PendingChatListBatch?>(null) }
+    var directBatchResult by remember(batchScope) { mutableStateOf<dev.ipf.whitenoise.android.state.ChatListBatchResult?>(null) }
+    var directBatchAttempt by remember(batchScope) { mutableIntStateOf(0) }
+    var directBatchChecking by remember(batchScope) { mutableStateOf(false) }
+    var directBatchRunning by remember(batchScope) { mutableStateOf(false) }
 
     fun startStateBatch(command: ChatListBatchCommand) {
         if (pendingStateBatch != null || controller.chatListBatchInProgress) return
         val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
         if (!controller.chatListActionIsCurrent(owner)) return
+        directBatchResult = null
+        directBatchAttempt = 0
+        directBatchChecking = false
+        directBatchRunning = true
         pendingStateBatch = PendingChatListBatch(selectedChatIds.toList(), command, owner)
     }
     pendingStateBatch?.let { request ->
         if (request.command == ChatListBatchCommand.EXCLUDE_FOLDER) {
             ChatListBatchDialog(request, controller) { pendingStateBatch = null }
         } else {
-            // Keep the captured request alive even when changed rows leave the filter.
-            // Routine state changes run directly; only folder actions need a dialog.
-            LaunchedEffect(request) {
+            // This owner and immutable capture outlive selected rows leaving the active filter.
+            LaunchedEffect(request, directBatchAttempt) {
+                directBatchRunning = true
                 try {
-                    val result =
-                        controller.runChatListBatch(request.ids, request.command, request.owner)
-                    if (
-                        controller.chatListActionSessionIsCurrent(request.owner) &&
-                        result != null &&
-                        result.failed + result.skipped + result.notStarted + result.unconfirmed > 0
-                    ) {
-                        appState.presentTransient(resources.getString(R.string.toast_couldnt_update_chat))
+                    val previous = directBatchResult
+                    val attempt =
+                        if (directBatchChecking && previous != null) {
+                            controller.reconcileChatListBatch(previous, request.command, request.owner)
+                        } else {
+                            controller.runChatListBatch(
+                                previous?.retryIds ?: request.ids,
+                                request.command,
+                                request.owner,
+                            )
+                        }
+                    if (controller.chatListActionSessionIsCurrent(request.owner)) {
+                        val result =
+                            if (attempt == null && previous == null) {
+                                dev.ipf.whitenoise.android.state.ChatListBatchResult(
+                                    request.ids.associateWith { dev.ipf.whitenoise.android.state.ChatListBatchOutcome.NOT_STARTED },
+                                )
+                            } else {
+                                (
+                                    previous ?: dev.ipf.whitenoise.android.state
+                                        .ChatListBatchResult(emptyMap())
+                                ).withAttempt(attempt)
+                            }
+                        directBatchResult = result
+                        if (result.failed + result.skipped + result.notStarted + result.unconfirmed == 0) {
+                            directBatchResult = null
+                            pendingStateBatch = null
+                        } else if (previous == null) {
+                            appState.presentTransient(resources.getString(R.string.toast_couldnt_update_chat))
+                        }
+                    } else {
+                        directBatchResult = null
+                        pendingStateBatch = null
                     }
                 } finally {
-                    if (pendingStateBatch === request) pendingStateBatch = null
+                    directBatchChecking = false
+                    directBatchRunning = false
                 }
             }
         }
@@ -1903,6 +1937,36 @@ internal fun ChatsScreen(
                         )
                     }
                 }
+                val recoveryRequest = pendingStateBatch
+                val recoveryResult = directBatchResult
+                if (recoveryRequest != null && recoveryResult != null && recoveryRequest.command != ChatListBatchCommand.EXCLUDE_FOLDER) {
+                    ChatListBatchRecoveryControls(
+                        command = recoveryRequest.command,
+                        result = recoveryResult,
+                        current = controller.chatListActionSessionIsCurrent(recoveryRequest.owner),
+                        running = directBatchRunning,
+                        onCheck = {
+                            if (!directBatchRunning && controller.chatListActionIsCurrent(recoveryRequest.owner)) {
+                                directBatchRunning = true
+                                directBatchChecking = true
+                                directBatchAttempt++
+                            }
+                        },
+                        onRetry = {
+                            if (!directBatchRunning && controller.chatListActionIsCurrent(recoveryRequest.owner)) {
+                                directBatchRunning = true
+                                directBatchChecking = false
+                                directBatchAttempt++
+                            }
+                        },
+                        onDismiss = {
+                            if (!directBatchRunning) {
+                                directBatchResult = null
+                                pendingStateBatch = null
+                            }
+                        },
+                    )
+                }
             }
         },
         bottomBar = {
@@ -2016,6 +2080,7 @@ internal fun ChatsScreen(
                                             selectedVisibleItems,
                                             controller,
                                             appState,
+                                            requireNativeEligibility = true,
                                         )
                                 }
                             } else {
@@ -2607,6 +2672,7 @@ internal fun ChatsScreen(
                                 groupId,
                                 notify = false,
                                 observer = observer,
+                                requireNativeEligibility = request.requireNativeEligibility,
                             )
                         }
                     if (isCurrent() && result.deleted < result.total) {
@@ -2614,7 +2680,13 @@ internal fun ChatsScreen(
                         appState.presentStoppedLocalChatDeleteBatch(
                             result,
                             failure,
-                            notice = appState.localDeleteBatchRetryNotice(controller, remaining.groupIds, isCurrent),
+                            notice =
+                                appState.localDeleteBatchRetryNotice(
+                                    controller,
+                                    remaining.groupIds,
+                                    isCurrent,
+                                    requireNativeEligibility = request.requireNativeEligibility,
+                                ),
                         )
                     } else if (isCurrent() && result.deleted > 0 && !cleanupDeferred) {
                         appState.presentTransient(

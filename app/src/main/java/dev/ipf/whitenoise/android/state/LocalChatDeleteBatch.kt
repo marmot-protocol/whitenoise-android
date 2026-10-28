@@ -62,12 +62,13 @@ internal fun WhiteNoiseAppState.localDeleteBatchRetryNotice(
     controller: ChatsController,
     groupIds: List<String>,
     isCurrent: () -> Boolean,
+    requireNativeEligibility: Boolean = false,
 ): LocalDeleteNotice =
     LocalDeleteNotice(requireNotNull(controller.accountRef), groupIds.toSet()) { targets ->
         val wanted = targets.map { it.lowercase() }.toSet()
         val remaining = groupIds.filter { it.lowercase() in wanted }
         launchMutation {
-            retryLocalChatDeleteBatch(controller, remaining, isCurrent)
+            retryLocalChatDeleteBatch(controller, remaining, isCurrent, requireNativeEligibility)
         }
     }
 
@@ -75,19 +76,31 @@ private suspend fun WhiteNoiseAppState.retryLocalChatDeleteBatch(
     controller: ChatsController,
     groupIds: List<String>,
     isCurrent: () -> Boolean,
+    requireNativeEligibility: Boolean,
 ) {
     if (!isCurrent()) return
     var failure: Throwable? = null
     val observer = LocalChatDeleteObserver(onFailure = { failure = it })
     val result =
         deleteLocalChatsBatch(groupIds, isCurrent) { groupId ->
-            controller.deleteGroupLocalFromChatList(groupId, notify = false, observer = observer)
+            controller.deleteGroupLocalFromChatList(
+                groupId,
+                notify = false,
+                observer = observer,
+                requireNativeEligibility = requireNativeEligibility,
+            )
         }
     if (isCurrent() && result.deleted < result.total) {
         presentStoppedLocalChatDeleteBatch(
             result,
             failure,
-            notice = localDeleteBatchRetryNotice(controller, groupIds.drop(result.deleted), isCurrent),
+            notice =
+                localDeleteBatchRetryNotice(
+                    controller,
+                    groupIds.drop(result.deleted),
+                    isCurrent,
+                    requireNativeEligibility = requireNativeEligibility,
+                ),
         )
     }
 }
