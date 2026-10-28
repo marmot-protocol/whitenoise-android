@@ -42,12 +42,21 @@ def cli(binary, args, cwd, env, seconds):
                                 capture_output=True, timeout=seconds)
     except subprocess.TimeoutExpired:
         return 124, {}
-    try:
-        # ZSP v2 emits success on stdout and failure envelopes on stderr.
-        document = json.loads(result.stdout if result.returncode == 0 else result.stderr)
-    except (ValueError, UnicodeDecodeError):
-        document = {}
-    return result.returncode, document if isinstance(document, dict) else {}
+    # Success is one stdout document. On failure, go-nostr NOTICE log lines
+    # may surround ZSP's single-line stderr envelope; never expose that noise.
+    payloads = [result.stdout] if result.returncode == 0 else reversed(result.stderr.splitlines())
+    for payload in payloads:
+        try:
+            document = json.loads(payload)
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if not isinstance(document, dict):
+            continue
+        if result.returncode == 0 or (document.get("ok") is False and document.get("operation") == args[0]
+                                     and isinstance(document.get("error"), dict)
+                                     and isinstance(document["error"].get("code"), str)):
+            return result.returncode, document
+    return result.returncode, {}
 
 
 def error_code(document):
