@@ -4,15 +4,22 @@ import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.SyntheticTrack
 import dev.ipf.whitenoise.android.media.VideoMetadataScrubber
 import dev.ipf.whitenoise.android.media.ascii
+import dev.ipf.whitenoise.android.media.audioOnlyWebm
 import dev.ipf.whitenoise.android.media.aviVideoBytes
+import dev.ipf.whitenoise.android.media.avifSequenceShaped
 import dev.ipf.whitenoise.android.media.concat
 import dev.ipf.whitenoise.android.media.containsAscii
+import dev.ipf.whitenoise.android.media.cr3ShapedPhoto
+import dev.ipf.whitenoise.android.media.dvShapedVideo
+import dev.ipf.whitenoise.android.media.heicShapedImage
 import dev.ipf.whitenoise.android.media.isoBox
+import dev.ipf.whitenoise.android.media.matroskaRefusedBeforeTracks
 import dev.ipf.whitenoise.android.media.samples
 import dev.ipf.whitenoise.android.media.syntheticMovie
 import dev.ipf.whitenoise.android.media.videoFixture
@@ -21,13 +28,14 @@ import dev.ipf.whitenoise.android.share.ShareFileImporter
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.ShareSourceMetadata
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.acceptedUploadResult
-import dev.ipf.whitenoise.android.state.finishUploadCapturingFixture
+import dev.ipf.whitenoise.android.state.finishMediaFixture
 import dev.ipf.whitenoise.android.state.mediaSendReconciliationAppState
 import dev.ipf.whitenoise.android.state.uploadCapturingController
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
@@ -63,10 +71,12 @@ import java.io.File
  * Invariant gate for #3376: every way a local video becomes an outgoing attachment hands MDK only bytes whose
  * private container metadata is gone, and a video that cannot be cleaned is refused instead of sent as-is.
  *
- * Two cases drive the real `ConversationMediaSender.sendStagedAttachments` against a controller that captures the
- * native upload requests. They read the bytes of every request handed to MDK: the in-memory plaintext, and each
- * `sourcePath` while the upload holds it, which covers a staged large pick and a legacy native draft snapshotted
- * beside it. The other cases check the reader and draft re-check that feed that send:
+ * Three cases drive the real `ConversationMediaSender.sendStagedAttachments` against a controller that captures the
+ * native upload requests. Two read the bytes of every request handed to MDK: the in-memory plaintext, and each
+ * `sourcePath` while the upload holds it, which covers a staged large pick and legacy native visual and Files drafts.
+ * The third proves that an unreadable container (a tagged MP4 with a trailer, reported as a generic file) produces no
+ * upload request at all, fresh or as a legacy draft. The other cases check the reader and draft re-check that feed
+ * that send:
  * - the visual picker in memory, as a native draft and staged to a file
  * - incoming shares imported into private files
  * - the Files picker, routed by content, in memory and staged
@@ -81,6 +91,9 @@ class VideoUploadMetadataCoverageTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val tagged = videoFixture("mp4-tagged.mp4")
     private val clean = tagged.copyOf().also { VideoMetadataScrubber.scrub(it) }
+
+    // The tagged fixture with one non-box trailing byte: a recognised movie whose scrub is refused as malformed.
+    private val taggedWithTrailer = concat(tagged, byteArrayOf(1))
 
     /** Registers the scripted provider and starts from an empty staging directory. */
     @Before
@@ -134,7 +147,7 @@ class VideoUploadMetadataCoverageTest {
                 files.forEach(::assertClean)
                 assertArrayEquals("the native draft's own array is never rewritten", tagged, legacyNative.plaintext)
             } finally {
-                finishUploadCapturingFixture(controller, state)
+                finishMediaFixture(controller, state)
                 Dispatchers.resetMain()
             }
         }
@@ -180,7 +193,58 @@ class VideoUploadMetadataCoverageTest {
                 requests.forEach(::assertClean)
                 assertArrayEquals("the native draft's own array is never rewritten", tagged, legacyNative.plaintext)
             } finally {
-                finishUploadCapturingFixture(controller, state)
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * Through the real send, a tagged MP4 with a trailer reported as `application/octet-stream` never reaches MDK: as
+     * a fresh Files pick in memory, as a fresh Files pick staged to a file, and as a legacy native Files draft. The
+     * metadata refusal notice is shown, no snapshot is left behind, and the native draft's own array is untouched.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun unreadableFilesPicksNeverReachMdk() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val small = pick("refused-small.bin", "application/octet-stream", taggedWithTrailer, 5_302L)
+            val large = pick("refused-large.bin", "application/octet-stream", taggedWithTrailer, LARGE)
+            val draftUri = pick("refused-draft.bin", "application/octet-stream", taggedWithTrailer, 5_302L)
+            val legacyNative = draft("refused-draft.bin", "application/octet-stream", taggedWithTrailer.copyOf())
+            val uploads = java.util.Collections.synchronizedList(mutableListOf<String>())
+            val rejected = CompletableDeferred<Unit>()
+            val controller =
+                uploadCapturingController(
+                    state,
+                    inMemory = { request ->
+                        uploads += request.attachments.map { it.fileName }
+                        acceptedUploadResult(request.attachments.size)
+                    },
+                    fromFiles = { request ->
+                        uploads += request.attachments.map { it.fileName }
+                        acceptedUploadResult(request.attachments.size)
+                    },
+                )
+            try {
+                controller.retryMembers()
+                sender(state, controller).sendStagedAttachments(
+                    imageSlots = emptyList(),
+                    documentUris = listOf(small, large, draftUri),
+                    caption = "",
+                    preparedDocumentAttachments = mapOf(draftUri to legacyNative.toPendingAttachment()),
+                    onRejected = { rejected.complete(Unit) },
+                )
+
+                rejected.await()
+                assertTrue("no refused attachment reaches MDK: $uploads", uploads.isEmpty())
+                assertEquals(AppText.Resource(R.string.media_file_video_metadata_not_removable), state.toast?.title)
+                assertTrue(stagedFiles().isEmpty())
+                val untouched = legacyNative.plaintext
+                assertArrayEquals("the native draft's own array is never rewritten", taggedWithTrailer, untouched)
+            } finally {
+                finishMediaFixture(controller, state)
                 Dispatchers.resetMain()
             }
         }
@@ -217,9 +281,11 @@ class VideoUploadMetadataCoverageTest {
         }
 
     /**
-     * Files picks are routed by content, in memory and staged alike: a video container is scrubbed whatever its type
-     * (even `application/octet-stream`), an uncleanable video reported as video is refused, and a TypeScript file
-     * reported as `video/mp2t`, an Ogg reported as `audio/ogg` and an audio-only MP4 arrive byte-for-byte.
+     * Files picks are routed by content, in memory and staged alike. A video-branded video container is scrubbed
+     * whatever its type (even `application/octet-stream`), and refused when it cannot be (a tagged MP4 with a
+     * trailer). An uncleanable video reported as video (AVI, DV) is refused. TypeScript reported as `video/mp2t`, an
+     * Ogg as `audio/ogg`, an audio-only MP4, DV, and a Canon CR3 raw photo, an AVIF sequence and a HEIC image
+     * reported as generic files all arrive byte-for-byte.
      */
     @Test
     fun filesPickerRoutesByContent() =
@@ -236,6 +302,7 @@ class VideoUploadMetadataCoverageTest {
                     if (case.expected == null) {
                         assertNull(label, attachment)
                         assertEquals(label, setOf(DocumentReadFailure.VIDEO_METADATA), outcome.failures)
+                        assertTrue("$label leaves no snapshot", stagedFiles().isEmpty())
                     } else {
                         assertArrayEquals(label, case.expected, bytes)
                         assertEquals(label, case.mime, attachment?.mediaType)
@@ -371,7 +438,9 @@ class VideoUploadMetadataCoverageTest {
      */
     private fun filesCases(): List<FilesCase> {
         val typeScript = ascii("export const greeting: string = 'hello';\n")
+        val shortTypeScript = ascii("let skipped = 0;\n")
         val ogg = concat(ascii("OggS"), ByteArray(60) { 7 })
+        val river = ascii("The wide river ran past the old mill and on to the sea.\n")
         val audioOnly =
             syntheticMovie(
                 listOf(SyntheticTrack("soun", samples(listOf(8, 8), 0x31))),
@@ -380,11 +449,30 @@ class VideoUploadMetadataCoverageTest {
         return listOf(
             FilesCase("tagged.mp4", "video/mp4", tagged, clean),
             FilesCase("movie.bin", "application/octet-stream", tagged, clean),
+            FilesCase("trailer.bin", "application/octet-stream", taggedWithTrailer, null),
+            FilesCase("song-trailer.m4a", "audio/mp4", concat(audioOnly, byteArrayOf(1)), null),
+            FilesCase("broken.mka", "audio/x-matroska", matroskaRefusedBeforeTracks(), null),
+            FilesCase("broken.bin", "application/octet-stream", matroskaRefusedBeforeTracks(), null),
             FilesCase("index.ts", "video/mp2t", typeScript, typeScript),
+            FilesCase("skipped.ts", "video/mp2t", shortTypeScript, shortTypeScript),
+            FilesCase("river.ts", "video/mp2t", river, river),
+            FilesCase("river.txt", "application/octet-stream", river, river),
             FilesCase("voice.ogg", "audio/ogg", ogg, ogg),
             FilesCase("song.m4a", "audio/mp4", audioOnly, audioOnly),
+            FilesCase("voice.webm", "audio/webm", audioOnlyWebm(), audioOnlyWebm()),
             FilesCase("old.avi", "video/x-msvideo", aviVideoBytes(), null),
+            FilesCase("tape.dv", "video/dv", dvShapedVideo(), null),
+            FilesCase("tape.bin", "application/octet-stream", dvShapedVideo(), dvShapedVideo()),
+            FilesCase("IMG_0001.CR3", "application/octet-stream", cr3ShapedPhoto(), cr3ShapedPhoto()),
+            FilesCase("sequence.avifs", "application/octet-stream", avifSequenceShaped(), avifSequenceShaped()),
+            FilesCase("photo.heic", "application/octet-stream", heicShapedImage(), heicShapedImage()),
         )
+    }
+
+    /** Files left in this process's staging directory. */
+    private fun stagedFiles(): List<File> {
+        val root = File(context.cacheDir, MediaCacheDirs.UPLOAD_SOURCES)
+        return root.walk().filter(File::isFile).toList()
     }
 
     /** One Files routing case: [expected] is what must be sent, or null when the pick must be refused. */

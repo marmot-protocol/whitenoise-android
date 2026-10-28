@@ -828,7 +828,7 @@ class ConversationMediaEarlyProjectionCacheTest {
 /**
  * Joins every fixture-owned IO handoff before resetting Main, including after timeout.
  */
-private suspend fun finishMediaFixture(
+internal suspend fun finishMediaFixture(
     controller: ConversationController,
     state: WhiteNoiseAppState,
 ) = withContext(NonCancellable) {
@@ -2084,12 +2084,6 @@ internal fun acceptedUploadResult(count: Int) =
         attachments = List(count) { MediaUploadAttachmentResultFfi(mediaReference(), 4uL) },
         sent = null,
     )
-
-/** Joins every fixture-owned IO handoff of an [uploadCapturingController] before the caller resets Main. */
-internal suspend fun finishUploadCapturingFixture(
-    controller: ConversationController,
-    state: WhiteNoiseAppState,
-) = finishMediaFixture(controller, state)
 
 /** A video pick already staged to a private snapshot under the app's upload directory. */
 private fun stagedVideo(state: WhiteNoiseAppState): PendingAttachment {

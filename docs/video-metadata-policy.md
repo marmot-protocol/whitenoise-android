@@ -42,9 +42,10 @@ Not covered:
 - The file name, which follows the existing display-name sanitizing, and what
   the choice of codec or container reveals.
 - Through Files, a video in a format the classifier does not recognise (for
-  example a raw elementary stream or DV), and an ISO BMFF or Matroska file
-  reported with a non-video type whose walk is refused before it reaches a video
-  track. Both are sent as ordinary documents, byte-for-byte.
+  example a raw H.264 or HEVC elementary stream), and a well-formed
+  video-handler ISO BMFF file whose brand is not on the video allowlist, when
+  either is reported with a non-video type. They are sent as ordinary
+  documents, byte-for-byte.
 - Forwarding an existing message, which re-uploads its original plaintext
   unchanged. Earlier uploads are not sanitized retroactively.
 
@@ -60,10 +61,32 @@ as `video/mp2t`) and some providers report videos as `application/octet-stream`:
 
 | Content | Reported `video/*` | Reported anything else |
 | --- | --- | --- |
-| ISO BMFF or Matroska with a video track | Scrubbed, refused if that fails | Scrubbed, refused if that fails |
-| ISO BMFF or Matroska without a video track (for example `.m4a` or audio-only WebM) | Scrubbed, refused if that fails | Sent byte-for-byte |
-| A video container the scrubber cannot clean: AVI, MPEG-TS or M2TS, MPEG-PS, ASF, FLV, Ogg, RealMedia or MXF | Refused | Sent byte-for-byte (for example `audio/ogg` or `.wma`) |
-| Anything else | Sent byte-for-byte | Sent byte-for-byte |
+| A proven video: Matroska or WebM with a video track, or ISO BMFF with a video brand (or no `ftyp`, as old QuickTime) and a video track | Scrubbed, refused if that fails | Scrubbed, refused if that fails |
+| An unreadable container: ISO BMFF or Matroska whose first box or element parsed, refused as malformed (for example by a non-box trailer) or before its track list could be read (a compressed QuickTime movie), with no video track proven | Refused | Refused |
+| Any other ISO BMFF or Matroska, read without a malformed structure: no video track (for example `.m4a` or audio-only WebM), a still-image or unrecognised brand (a Canon CR3 raw photo, HEIF or AVIF), or no movie at all (a HEIF still) | Scrubbed, refused if that fails | Sent byte-for-byte |
+| A video container the scrubber cannot clean: AVI, MPEG-TS or M2TS, MPEG-PS, ASF, FLV, Ogg, RealMedia, MXF or DV | Refused | Sent byte-for-byte (for example `audio/ogg` or `.wma`) |
+| Anything else, including text whose first box does not parse even though bytes 4 to 7 spell a box type (`let skipped = 0;` in a `.ts` file) | Sent byte-for-byte | Sent byte-for-byte |
+
+Content overrides a non-video reported type only for a proven video. ISO BMFF
+counts as one only when its `ftyp` major brand is a known video brand (`isom`,
+`iso2` to `iso9`, `mp41`, `mp42`, `mp71`, `avc1`, `M4V `, `M4VH`, `M4VP`,
+`qt  `, `MSNV`, `dash`, `f4v `, `mmp4`, `dby1`, the `3gp`, `3g2` and `3gs`
+families, the Sony `ND…` and `XAVC` brands) and no major or compatible brand
+names a still image (`crx `, `heic`, `heix`, `heim`, `heis`, `hevc`, `hevx`,
+`hevm`, `hevs`, `mif1`, `mif2`, `msf1`, `miaf`, `avif`, `avis`, `avio`, `jpeg`,
+`jpgs`, `avci`, `avcs`, `vvic`, `vvis`), or when it has no `ftyp` at all. Canon
+CR3 raw photos and HEIF or AVIF image sequences keep their image tracks under
+the video handler, so without this rule they would be rewritten. A movie is
+walked before a non-box trailer can refuse the file, so a trailer never hides a
+video track: a tagged MP4 with a trailer, reported as a generic file, is a
+proven video whose scrub fails, and is refused rather than sent with its tags.
+A failed walk proves nothing about video, so a recognised container that the
+walk refuses is never sent unchanged, whatever its reported type.
+
+A still-image brand is a document whether or not its walk succeeds. Its
+metadata is outside this video policy: a well-formed CR3 or HEIF image sent
+through Files already goes out unchanged, so refusing only the malformed ones
+would add no privacy.
 
 Imported audio keeps its original data, so audio-only containers are cleaned
 only when they are reported as video.
@@ -111,8 +134,9 @@ same readers. The in-app camera captures photos only.
 timecode MP4, Matroska and live WebM fixtures with ffmpeg. The JVM tests
 `VideoMetadataScrubberFixtureTest`, `IsoBmffMetadataScrubberTest` and
 `MatroskaMetadataScrubberTest` check removal, sample identity, size, idempotence
-and malformed input, and `VideoContentClassifierTest` checks every routing row
-and container signature. `VideoUploadMetadataCoverageTest` sends tagged picks
+and malformed input, and `VideoContentClassifierTest` checks every routing row,
+brand rule and container signature. The CR3, HEIF and AVIF cases follow the
+published box layouts. No real CR3 file has been tested. `VideoUploadMetadataCoverageTest` sends tagged picks
 and a legacy draft through `ConversationMediaSender.sendStagedAttachments` and
 reads the exact bytes and files handed to MDK, and drives every reader path
 above. `VideoMetadataScrubberDeviceTest` scrubs a video written by Android's own

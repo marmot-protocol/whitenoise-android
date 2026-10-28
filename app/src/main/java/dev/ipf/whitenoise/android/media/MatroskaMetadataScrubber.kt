@@ -25,10 +25,18 @@ internal class MatroskaMetadataScrubber(
     override var videoTracks = 0
         private set
 
+    /** Whether the EBML header parsed, which tells Matroska apart from bytes that merely start with its magic. */
+    override var structureRecognised = false
+        private set
+
+    /** Never true: no Matroska refusal other than a malformed structure stops the walk before the track list. */
+    override val trackListHidden = false
+
     /** Validates the EBML header, scrubs every Segment and summarizes the rewrite. */
     override fun scrub(): VideoScrubSummary {
         val header = readElement(0L, reader.size)
         if (header.id != EBML || header.unknownSize) malformedVideo()
+        structureRecognised = true
         checkDocType(header)
         var segments = 0
         var position = header.end

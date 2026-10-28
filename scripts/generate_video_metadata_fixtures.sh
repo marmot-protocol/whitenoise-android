@@ -3,7 +3,7 @@
 #
 # Every clip is a synthetic one-second 48x32 test pattern with a sine tone, tagged with obviously fake private
 # values (WNPrivate* strings, made-up coordinates and a fixed 2024 date). No real recording or person is involved.
-# H.264 SEI NAL units are dropped so the x264 banner does not sit in the bitstream; the AAC encoder still writes
+# H.264 SEI NAL units are dropped so the x264 banner does not sit in the bitstream. The AAC encoder still writes
 # its own banner into the first audio frame, which is bitstream data the scrubber deliberately leaves alone.
 #
 # Usage: scripts/generate_video_metadata_fixtures.sh
@@ -27,13 +27,13 @@ h264_aac=(-c:v libx264 -preset veryfast -profile:v baseline -pix_fmt yuv420p -bs
 common_tags=(-metadata title=WNPrivateTitle -metadata comment=WNPrivateComment -metadata artist=WNPrivateAuthor
   -metadata location=+48.8584+002.2945/ -metadata creation_time=2024-05-06T07:08:09Z)
 
-# MP4 with iTunes-style tags, a 3GPP location box, recording times and custom handler names; movie box first.
+# MP4 with iTunes-style tags, a 3GPP location box, recording times and custom handler names, movie box first.
 ff "${pattern[@]}" "${tone[@]}" "${h264_aac[@]}" "${common_tags[@]}" \
   -metadata:s:v handler_name=WNPrivateVideoHandler -metadata:s:a handler_name=WNPrivateAudioHandler \
   -movflags +faststart "$work/mp4-tagged.mp4"
 
 # QuickTime with Apple-style keys (make, model, software, ISO 6709 location, creation date), a QuickTime location
-# string and a 90 degree display matrix; movie box after the media data.
+# string and a 90 degree display matrix, movie box after the media data.
 ff "${pattern[@]}" "${tone[@]}" "${h264_aac[@]}" "$work/mov-base.mov"
 ff -display_rotation:v:0 90 -i "$work/mov-base.mov" -c copy -movflags use_metadata_tags \
   -metadata com.apple.quicktime.make=WNPrivateMake \

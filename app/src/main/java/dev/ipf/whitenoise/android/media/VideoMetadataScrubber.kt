@@ -130,15 +130,16 @@ internal object VideoMetadataScrubber {
     fun classify(bytes: ByteArray): VideoContent = classify(ArrayScrubStore(bytes))
 
     /**
-     * Runs the container's walk over a read-only view of [store] and reports whether it met a video track. A walk
-     * that refuses part-way still reports the video tracks it met before the refusal.
+     * Runs the container's walk over a read-only view of [store] and reports what its content proves. A walk that
+     * refuses part-way still reports the video tracks it met before the refusal, and ISO BMFF must also carry a video
+     * brand, so a still image such as a Canon CR3 raw photo is never taken for a video.
      */
     internal fun classify(store: ScrubStore): VideoContent {
         val reader = ScrubReader(ReadOnlyScrubStore(store))
         return when {
-            isEbml(reader) -> containerContent(MatroskaMetadataScrubber(reader).videoTracksMet())
+            isEbml(reader) -> containerContent(MatroskaMetadataScrubber(reader), IsoBrand.Video)
             IsoBmffMetadataScrubber.looksLikeIsoBmff(reader) ->
-                containerContent(IsoBmffMetadataScrubber(reader).videoTracksMet())
+                containerContent(IsoBmffMetadataScrubber(reader), IsoBrands.classify(reader))
             VideoContainerSignatures.matches(reader) -> VideoContent.UnsupportedContainer
             else -> VideoContent.Other
         }
@@ -163,10 +164,29 @@ internal object VideoMetadataScrubber {
     /** Whether [reader] starts with the EBML magic of Matroska and WebM. */
     private fun isEbml(reader: ScrubReader): Boolean = reader.size >= Int.SIZE_BYTES && reader.u32(0L) == EBML_MAGIC
 
-    /** A video container when the walk met a video track, otherwise a container without one. */
-    private fun containerContent(videoTracks: Int): VideoContent {
-        val hasVideo = videoTracks > 0
-        return if (hasVideo) VideoContent.VideoContainer else VideoContent.ContainerWithoutVideo
+    /**
+     * Runs [walk] for classification and decides in this order:
+     * - Input whose very first box or element does not parse is not a container at all, so weak magic in text stays
+     *   text.
+     * - A still-image [brand] is a document whatever the walk found, because a well-formed one is sent unchanged too.
+     * - A video [brand] whose walk met a video track is a video, even if a later part, such as a trailer, was refused.
+     * - A recognised container whose walk was refused as malformed, or before it could read the track list, is
+     *   unreadable, because a failed walk proves nothing about video.
+     * - Anything else, such as an audio-only file or a HEIF still without a movie, is unconfirmed.
+     */
+    private fun containerContent(
+        walk: ContainerWalk,
+        brand: IsoBrand,
+    ): VideoContent {
+        val refusal = walk.refusalOrNull()
+        val unreadable = refusal == VideoScrubResult.Malformed || (refusal != null && walk.trackListHidden)
+        return when {
+            !walk.structureRecognised -> VideoContent.Other
+            brand == IsoBrand.StillImage -> VideoContent.UnconfirmedContainer
+            brand == IsoBrand.Video && walk.videoTracks > 0 -> VideoContent.VideoContainer
+            unreadable -> VideoContent.UnreadableContainer
+            else -> VideoContent.UnconfirmedContainer
+        }
     }
 }
 
@@ -174,21 +194,26 @@ internal object VideoMetadataScrubber {
 internal interface ContainerWalk {
     val videoTracks: Int
 
+    /** Whether the walk parsed the first top-level box or element, so the input really is this container. */
+    val structureRecognised: Boolean
+
+    /** Whether a track list exists that a refusal stopped the walk from reading in full. */
+    val trackListHidden: Boolean
+
     /** Walks and rewrites the whole container, or ends with a [VideoScrubRefusal]. */
     fun scrub(): VideoScrubSummary
 }
 
 /**
- * Runs this walk for classification only: a refusal or read failure just ends it, and the result is the video tracks
- * it met by then.
+ * Runs this walk for classification only and returns how it ended: null when it completed, otherwise its refusal, with
+ * a read failure reported as malformed. The video tracks it met before a refusal stay counted on the walk.
  */
-private fun ContainerWalk.videoTracksMet(): Int {
+private fun ContainerWalk.refusalOrNull(): VideoScrubResult? =
     try {
         scrub()
-    } catch (_: VideoScrubRefusal) {
-        // The tracks met before the refusal still count.
+        null
+    } catch (refusal: VideoScrubRefusal) {
+        refusal.result
     } catch (_: IOException) {
-        // A truncated or unreadable input keeps what was counted.
+        VideoScrubResult.Malformed
     }
-    return videoTracks
-}

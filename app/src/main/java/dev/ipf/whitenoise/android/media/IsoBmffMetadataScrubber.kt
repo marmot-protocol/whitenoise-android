@@ -71,20 +71,46 @@ internal class IsoBmffMetadataScrubber(
     override var videoTracks = 0
         private set
 
-    /** Validates, rewrites and summarizes the whole file. */
+    /** Whether the first top-level box parsed, which tells ISO BMFF apart from text that merely looks like it. */
+    override var structureRecognised = false
+        private set
+
+    // The movie box was found by the first pass, and later walked to its end, so its track list is known.
+    private var movieSeen = false
+    private var movieRead = false
+
+    /** Whether a movie box exists whose walk was refused before its track list was read, as in a compressed movie. */
+    override val trackListHidden: Boolean get() = movieSeen && !movieRead
+
+    /**
+     * Validates, rewrites and summarizes the whole file. A refusal in the first pass, such as a non-box trailer, is
+     * held until the movie box has been walked, so the video tracks before it are still counted. The second pass
+     * meets the same refusal at the same place, and the held one is raised if it somehow does not.
+     */
     override fun scrub(): VideoScrubSummary {
         var movies = 0
-        forEachTopLevelBox { box ->
-            when (box.type) {
-                MOOV -> movies += 1
-                MDAT -> mediaData.add(box.payload, box.end)
-                MOOF -> fragmented = true
+        val firstPassRefusal =
+            try {
+                forEachTopLevelBox { box ->
+                    structureRecognised = true
+                    when (box.type) {
+                        MOOV -> {
+                            movies += 1
+                            movieSeen = true
+                        }
+                        MDAT -> mediaData.add(box.payload, box.end)
+                        MOOF -> fragmented = true
+                    }
+                }
+                null
+            } catch (refusal: VideoScrubRefusal) {
+                refusal
             }
-        }
         // Without a movie box this is not a video (a HEIF image, for example), and two make it ambiguous.
-        if (movies == 0) unsupportedVideo()
+        if (movies == 0) throw firstPassRefusal ?: VideoScrubRefusal(VideoScrubResult.Unsupported)
         if (movies > 1) malformedVideo()
         forEachTopLevelBox(::scrubTopLevel)
+        if (firstPassRefusal != null) throw firstPassRefusal
         val samples = IsoSampleZeroing(reader, mediaData)
         var zeroedSampleBytes = 0L
         tracks.forEach { track -> zeroedSampleBytes += finishTrack(track, samples) }
@@ -116,7 +142,10 @@ internal class IsoBmffMetadataScrubber(
     /** Keeps the movie layout, opens the movie and fragments, and neutralizes every other top-level box. */
     private fun scrubTopLevel(box: IsoBox) {
         when (box.type) {
-            MOOV -> walk(box, IsoLevel.Movie, depth = 1)
+            MOOV -> {
+                walk(box, IsoLevel.Movie, depth = 1)
+                movieRead = true
+            }
             MOOF -> walk(box, IsoLevel.Fragment, depth = 1)
             FREE, SKIP, WIDE -> editor.zeroPayload(box)
             in KEPT_TOP_LEVEL -> Unit

@@ -28,11 +28,17 @@ internal enum class DocumentVideoAction {
 }
 
 /**
- * Decides a Files pick by its [content] first and its [reportedMime] second (#3376). A container with a video track
- * is scrubbed whatever its reported type, so an MP4 reported as `application/octet-stream` is cleaned too. A container
- * without one (for example an `.m4a`) is scrubbed only when reported as video, and an uncleanable video container
- * (for example AVI) is refused only when reported as video, so `audio/ogg` or `.wma` still send unchanged. Anything
- * else, such as a TypeScript file that Android's MIME table reports as `video/mp2t`, is an ordinary document.
+ * Decides a Files pick by its [content] first and its [reportedMime] second (#3376):
+ * - Content proven to be a video (a video-branded container with a video track) is scrubbed whatever its reported
+ *   type, so an MP4 reported as `application/octet-stream` is cleaned too.
+ * - A recognised container whose walk was refused, such as an MP4 with a non-box trailer, is refused whatever its
+ *   reported type, because its content proves nothing about video.
+ * - Any other ISO BMFF or Matroska file, such as an `.m4a`, a Canon CR3 raw photo or a HEIF image, is scrubbed only
+ *   when reported as video.
+ * - An uncleanable video container (for example AVI or DV) is refused only when reported as video, so `audio/ogg` or
+ *   `.wma` still send unchanged.
+ * - Anything else, such as a TypeScript file that Android's MIME table reports as `video/mp2t`, is an ordinary
+ *   document.
  */
 internal fun documentVideoAction(
     content: VideoContent,
@@ -40,10 +46,11 @@ internal fun documentVideoAction(
 ): DocumentVideoAction =
     when (content) {
         VideoContent.VideoContainer -> DocumentVideoAction.Scrub
-        VideoContent.ContainerWithoutVideo ->
+        VideoContent.UnconfirmedContainer ->
             if (isVideoMediaType(reportedMime)) DocumentVideoAction.Scrub else DocumentVideoAction.Keep
         VideoContent.UnsupportedContainer ->
             if (isVideoMediaType(reportedMime)) DocumentVideoAction.Refuse else DocumentVideoAction.Keep
+        VideoContent.UnreadableContainer -> DocumentVideoAction.Refuse
         VideoContent.Other -> DocumentVideoAction.Keep
     }
 

@@ -47,7 +47,7 @@ class VideoContentClassifierTest {
     @Test
     fun isoBmffNeedsAVideoTrack() {
         val audio = syntheticMovie(listOf(SyntheticTrack("soun", samples(listOf(8), 0x31)))).bytes
-        assertEquals(VideoContent.ContainerWithoutVideo, VideoMetadataScrubber.classify(audio))
+        assertEquals(VideoContent.UnconfirmedContainer, VideoMetadataScrubber.classify(audio))
 
         val fragmentedWithTelemetry =
             syntheticMovie(
@@ -57,16 +57,107 @@ class VideoContentClassifierTest {
             ).bytes
         assertEquals(VideoScrubResult.Unsupported, VideoMetadataScrubber.scrub(fragmentedWithTelemetry.copyOf()))
         assertEquals(VideoContent.VideoContainer, VideoMetadataScrubber.classify(fragmentedWithTelemetry))
+    }
 
-        val textThatLooksLikeABox = ascii("The wide river ran past the old mill and on to the sea.\n")
-        assertEquals(VideoContent.ContainerWithoutVideo, VideoMetadataScrubber.classify(textThatLooksLikeABox))
+    /**
+     * Text whose bytes 4 to 7 happen to spell a box type is not a container at all, because its very first box does
+     * not parse. The same holds for bytes that merely start with the EBML magic.
+     */
+    @Test
+    fun inputWhoseFirstBoxDoesNotParseIsOther() {
+        listOf(
+            "The wide river ran past the old mill and on to the sea.\n",
+            "let skipped = 0;\n",
+            "/** free software, see LICENSE */\n",
+            "abc moov is a word too\n",
+        ).forEach { text -> assertEquals(text, VideoContent.Other, VideoMetadataScrubber.classify(ascii(text))) }
+        val badEbml = concat(beBytes(0x1A45DFA3L, 4), byteArrayOf(0, 0x42, 0x86.toByte()))
+        assertEquals(VideoContent.Other, VideoMetadataScrubber.classify(badEbml))
+    }
+
+    /**
+     * A non-box trailer after the movie cannot hide its video track: the movie is walked before the trailer refuses
+     * the file, so a tagged MP4 with a trailer is still a video, which the scrubber then refuses.
+     */
+    @Test
+    fun aTrailerCannotHideTheVideoTrack() {
+        listOf("mp4-tagged.mp4", "mp4-timecode.mp4").forEach { name ->
+            val trailers = listOf(byteArrayOf(1), ascii("SEFH\u0001\u0000WNPrivateTrailerSEFT"))
+            trailers.forEach { trailer ->
+                val withTrailer = concat(videoFixture(name), trailer)
+                assertEquals(name, VideoContent.VideoContainer, VideoMetadataScrubber.classify(withTrailer))
+                assertEquals(name, VideoScrubResult.Malformed, VideoMetadataScrubber.scrub(withTrailer.copyOf()))
+            }
+        }
+    }
+
+    /**
+     * A recognised container whose walk is refused as malformed, or before it could read the track list, is
+     * unreadable, never "without video": an audio-only movie with a trailer, a WebM refused before its track list
+     * and a compressed QuickTime movie. A HEIC still without a movie and a well-formed audio-only file read to the
+     * end, so they stay unconfirmed, and a still-image brand stays a document even when its walk is refused.
+     */
+    @Test
+    fun refusedWalksAreUnreadableNotVideoFree() {
+        val audioOnly = syntheticMovie(listOf(SyntheticTrack("soun", samples(listOf(8), 0x31)))).bytes
+        val compressed = syntheticMovie(emptyList(), movieExtras = listOf(isoBox("cmov", ByteArray(12)))).bytes
+        val unreadable =
+            mapOf(
+                "audio-only movie with a trailer" to concat(audioOnly, byteArrayOf(1)),
+                "WebM refused before its tracks" to matroskaRefusedBeforeTracks(),
+                "compressed movie" to compressed,
+            )
+        unreadable.forEach { (name, bytes) ->
+            assertEquals(name, VideoContent.UnreadableContainer, VideoMetadataScrubber.classify(bytes))
+        }
+        val unconfirmed =
+            mapOf(
+                "audio-only movie" to audioOnly,
+                "audio-only WebM" to audioOnlyWebm(),
+                "HEIC still" to heicShapedImage(),
+                "CR3 with a trailer" to concat(cr3ShapedPhoto(), byteArrayOf(1)),
+            )
+        unconfirmed.forEach { (name, bytes) ->
+            assertEquals(name, VideoContent.UnconfirmedContainer, VideoMetadataScrubber.classify(bytes))
+        }
+    }
+
+    /**
+     * Content proves a video only under a video brand. A Canon CR3 raw photo, an AVIF sequence and a HEIC still are
+     * unconfirmed even with a video-handler track, and so is a video-handler file whose brand is unknown or whose
+     * compatible brands name a still image. Old QuickTime without `ftyp`, and 3GPP, are videos.
+     */
+    @Test
+    fun onlyVideoBrandsLetContentProveAVideo() {
+        val video = listOf(SyntheticTrack("vide", samples(listOf(8), 0x21)))
+        val unconfirmed =
+            mapOf(
+                "CR3" to cr3ShapedPhoto(),
+                "AVIF sequence" to avifSequenceShaped(),
+                "HEIC" to heicShapedImage(),
+                "unknown brand" to syntheticMovie(video, brands = listOf("wxyz", "isom")).bytes,
+                "still compatible brand" to syntheticMovie(video, brands = listOf("isom", "isom", "mif1")).bytes,
+            )
+        unconfirmed.forEach { (name, bytes) ->
+            assertEquals(name, VideoContent.UnconfirmedContainer, VideoMetadataScrubber.classify(bytes))
+        }
+        val proven =
+            mapOf(
+                "QuickTime without ftyp" to syntheticMovie(video, brands = emptyList()).bytes,
+                "3GPP" to syntheticMovie(video, brands = listOf("3gp5", "3gp5", "isom")).bytes,
+                "QuickTime" to syntheticMovie(video, brands = listOf("qt  ", "qt  ")).bytes,
+                "MP4" to syntheticMovie(video, brands = listOf("mp42", "mp42", "isom", "dby1")).bytes,
+            )
+        proven.forEach { (name, bytes) ->
+            assertEquals(name, VideoContent.VideoContainer, VideoMetadataScrubber.classify(bytes))
+        }
     }
 
     /** Matroska is a video container only when a TrackEntry's TrackType is video. */
     @Test
     fun matroskaNeedsAVideoTrack() {
         assertEquals(VideoContent.VideoContainer, VideoMetadataScrubber.classify(matroskaWithTrackType(1)))
-        assertEquals(VideoContent.ContainerWithoutVideo, VideoMetadataScrubber.classify(matroskaWithTrackType(2)))
+        assertEquals(VideoContent.UnconfirmedContainer, VideoMetadataScrubber.classify(matroskaWithTrackType(2)))
     }
 
     /** Each uncleanable video container is recognised, and the same signature one byte short is not. */
@@ -85,6 +176,8 @@ class VideoContentClassifierTest {
                 "Ogg" to ascii("OggS"),
                 "RealMedia" to ascii(".RMF"),
                 "MXF" to bytes(0x06, 0x0E, 0x2B, 0x34),
+                "DV" to bytes(0x1F, 0x07, 0x00, 0x3F),
+                "DV with its variable bit set" to bytes(0x1F, 0x07, 0x00, 0xBF),
             )
         signatures.forEach { (name, signature) ->
             assertEquals(name, VideoContent.UnsupportedContainer, VideoMetadataScrubber.classify(signature))
@@ -94,6 +187,7 @@ class VideoContentClassifierTest {
         val wave = concat(ascii("RIFF"), beBytes(100, 4), ascii("WAVE"))
         assertEquals(VideoContent.Other, VideoMetadataScrubber.classify(wave))
         assertEquals(VideoContent.Other, VideoMetadataScrubber.classify(bytes('F'.code, 'L'.code, 'V'.code, 0x02)))
+        assertEquals(VideoContent.Other, VideoMetadataScrubber.classify(bytes(0x1F, 0x07, 0x01, 0x3F)))
     }
 
     /**
@@ -128,8 +222,9 @@ class VideoContentClassifierTest {
         val expected =
             mapOf(
                 VideoContent.VideoContainer to listOf(Scrub, Scrub, Scrub),
-                VideoContent.ContainerWithoutVideo to listOf(Scrub, Keep, Keep),
+                VideoContent.UnconfirmedContainer to listOf(Scrub, Keep, Keep),
                 VideoContent.UnsupportedContainer to listOf(Refuse, Keep, Keep),
+                VideoContent.UnreadableContainer to listOf(Refuse, Refuse, Refuse),
                 VideoContent.Other to listOf(Keep, Keep, Keep),
             )
         expected.forEach { (content, actions) ->
@@ -137,7 +232,7 @@ class VideoContentClassifierTest {
                 assertEquals("$content reported $mime", action, documentVideoAction(content, mime))
             }
         }
-        assertEquals(Scrub, documentVideoAction(VideoContent.ContainerWithoutVideo, "VIDEO/MP4"))
+        assertEquals(Scrub, documentVideoAction(VideoContent.UnconfirmedContainer, "VIDEO/MP4"))
     }
 
     /** A minimal Matroska file with one TrackEntry of [trackType]. */

@@ -31,17 +31,24 @@ internal data class SyntheticMovie(
 )
 
 /**
- * Builds `ftyp`, then `mdat` holding every track's samples back to back, then `moov` (or `moov` before `mdat` with
- * [mediaDataLast], whose `mdat` then runs to the end of the file through a zero size). [movieExtras] are appended to
- * the movie box and [topLevelExtras] to the file.
+ * Builds an `ftyp` of [brands] (major first, then the compatible brands, none when empty), then `mdat` holding every
+ * track's samples back to back, then `moov` (or `moov` before `mdat` with [mediaDataLast], whose `mdat` then runs to
+ * the end of the file through a zero size). [movieExtras] are appended to the movie box and [topLevelExtras] to the
+ * file.
  */
 internal fun syntheticMovie(
     tracks: List<SyntheticTrack>,
     movieExtras: List<ByteArray> = emptyList(),
     topLevelExtras: List<ByteArray> = emptyList(),
     mediaDataLast: Boolean = false,
+    brands: List<String> = listOf("isom", "isom", "iso2"),
 ): SyntheticMovie {
-    val ftyp = isoBox("ftyp", ascii("isom"), beBytes(512, 4), ascii("isomiso2"))
+    val ftyp =
+        if (brands.isEmpty()) {
+            ByteArray(0)
+        } else {
+            isoBox("ftyp", ascii(brands.first()), beBytes(512, 4), *brands.drop(1).map(::ascii).toTypedArray())
+        }
     val sampleBytes = concat(*tracks.flatMap { it.samples }.toTypedArray())
     val probe = movieBox(tracks, movieExtras, 0L)
     val mediaStart = if (mediaDataLast) ftyp.size + probe.size + 8 else ftyp.size + 8

@@ -35,6 +35,75 @@ internal fun appleVendorMov(): ByteArray {
     return bytes
 }
 
+/**
+ * A file shaped like a Canon CR3 raw photo, following its published layout: a `crx ` brand, a Canon `uuid` box in the
+ * movie holding the compressor version and TIFF/EXIF/GPS blocks, an image track with a video handler, a timed
+ * metadata track, and top-level `uuid` boxes for XMP and the preview. Every value is fake. No real CR3 was available.
+ */
+internal fun cr3ShapedPhoto(): ByteArray {
+    val canon =
+        isoBox(
+            "uuid",
+            uuid("85c0b687820f11e08111f4ce462b6a48"),
+            isoBox("CNCV", ascii("CanonCR3_001/01.09.00/00.00.00")),
+            isoBox("CMT1", ascii("II*\u0000WNPrivateCanon EOS R5")),
+            isoBox("CMT4", ascii("II*\u0000WNPrivateGPS 48N 2E")),
+        )
+    return syntheticMovie(
+        listOf(SyntheticTrack("vide", samples(listOf(64), 0x11)), SyntheticTrack("meta", samples(listOf(8), 0x51))),
+        movieExtras = listOf(canon),
+        topLevelExtras =
+            listOf(
+                isoBox("uuid", uuid("be7acfcb97a942e89c71999491e3afac"), ascii("<x:xmpmeta>WNPrivateXmp</x:xmpmeta>")),
+                isoBox("uuid", uuid("eaf42b5e1c984b88b9fbb7dc406e4d16"), isoBox("PRVW", ascii("WNPrivatePreview"))),
+            ),
+        brands = listOf("crx ", "crx ", "isom"),
+    ).bytes
+}
+
+/** An AVIF image sequence shaped file: an `avis` brand and an image track that uses the video handler. */
+internal fun avifSequenceShaped(): ByteArray =
+    syntheticMovie(
+        listOf(SyntheticTrack("vide", samples(listOf(32, 32), 0x21))),
+        movieExtras = listOf(isoBox("udta", ascii("WNPrivateSequence"))),
+        brands = listOf("avis", "avif", "msf1", "miaf"),
+    ).bytes
+
+/** A HEIC still image: a `heic` brand, a top-level `meta` box and media data, without a movie. */
+internal fun heicShapedImage(): ByteArray {
+    val handler = isoFullBox("hdlr", 0, 0, ByteArray(4), ascii("pict"), ByteArray(12), ByteArray(1))
+    return concat(
+        isoBox("ftyp", ascii("heic"), beBytes(0, 4), ascii("mif1heic")),
+        isoFullBox("meta", 0, 0, handler),
+        isoBox("mdat", ByteArray(16) { 1 }),
+    )
+}
+
+/** A valid WebM header and Segment with one audio TrackEntry, read to its end without a refusal. */
+internal fun audioOnlyWebm(): ByteArray {
+    val entry = ebml(0xAEL, ebml(0xD7L, byteArrayOf(1)), ebml(0x83L, byteArrayOf(2)), ebml(0x86L, ascii("A_OPUS")))
+    return concat(ebmlHeader("webm"), ebml(0x18538067L, ebml(0x1654AE6BL, entry)))
+}
+
+/**
+ * A valid WebM header and Segment whose walk is refused before its video track list: an element in the Segment
+ * declares a size beyond it. The video TrackEntry after it is never reached.
+ */
+internal fun matroskaRefusedBeforeTracks(): ByteArray {
+    val video = ebml(0x1654AE6BL, ebml(0xAEL, ebml(0xD7L, byteArrayOf(1)), ebml(0x83L, byteArrayOf(1))))
+    val overrun = concat(ebmlId(0x1549A966L), ebmlSize(500), ByteArray(4))
+    return concat(ebmlHeader("webm"), ebml(0x18538067L, overrun, video))
+}
+
+/** A DV stream as ffmpeg probes it: a DIF header block, then fake frame data. */
+internal fun dvShapedVideo(): ByteArray = concat(byteArrayOf(0x1F, 0x07, 0x00, 0x3F), ByteArray(476) { 0x62 })
+
+/** The 16 bytes of the hexadecimal UUID [hex]. */
+private fun uuid(hex: String): ByteArray {
+    val pairs = hex.chunked(2)
+    return ByteArray(pairs.size) { index -> pairs[index].toInt(16).toByte() }
+}
+
 /** How many times [text] occurs in [bytes] as ASCII. */
 internal fun ByteArray.countAscii(text: String): Int {
     val needle = text.toByteArray(Charsets.US_ASCII)
