@@ -507,7 +507,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      AFTER_SHA: 08d4d31f99e88e853f8aa9abb3a21ff9ce2bdb3b
+      AFTER_SHA: 8113a3f06b1723019930471cc3160cab23b15a34
       WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
       PR_PREVIEW_CHANNEL: isolated
       PR_NUMBER: '3439'
@@ -561,7 +561,12 @@ jobs:
           cp tooling/.github/perf3439/frame-metrics-manifest.xml artifacts/
           cp tooling/.github/perf3439/apply_frame_metrics.py artifacts/
           git -C after diff --binary > artifacts/diagnostic-source-overlay.diff
-          test "$(git -C after diff --name-only)" = 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerEntryFrame.kt'
+          python3 - <<'PYTHON'
+          import pathlib,subprocess
+          changed=subprocess.check_output(['git','-C','after','diff','--name-only'],text=True).splitlines()
+          base='app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/'
+          assert set(changed)=={base+'MediaViewer.kt',base+'MediaViewerEntryFrame.kt'},changed
+          PYTHON
           keytool -genkeypair -keystore "$RUNNER_TEMP/fixture.p12" -storetype PKCS12 \
             -storepass fixture-only -keypass fixture-only -alias fixture -keyalg RSA -keysize 2048 \
             -validity 3650 -dname 'CN=PR3439 Disposable Window FrameMetrics'
@@ -609,7 +614,7 @@ jobs:
           (out/'after-signature.txt').write_text(verification)
           certs=re.findall(r'certificate SHA-256 digest: ([0-9a-f]{64})',verification);assert len(set(certs))==1
           overlay={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in out.iterdir() if p.suffix in ('.kt','.xml','.py','.gradle','.diff')}
-          manifest={'role':'after','source_sha':os.environ['AFTER_SHA'],'workflow_sha':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'package':expected,'variant':'previewPlayRelease','profileable_shell':True,'diagnostic_only':True,'diagnostic_window_frame_metrics':True,'production_admission_unchanged':True,'overlay_sha256':overlay,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'certificate_sha256':certs[0],'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 or stock XL user12 only'}
+          manifest={'role':'after','source_sha':os.environ['AFTER_SHA'],'workflow_sha':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'package':expected,'variant':'previewPlayRelease','profileable_shell':True,'diagnostic_only':True,'diagnostic_window_frame_metrics':True,'diagnostic_composition_layout_spans':True,'host_creation_is_window_unbound':True,'production_admission_unchanged':True,'overlay_sha256':overlay,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'certificate_sha256':certs[0],'native_artifact_sha256':os.environ['NATIVE_ARTIFACT'],'device_scope':'authorized disposable Pixel9a user10 or stock XL user12 only'}
           (out/'after.json').write_text(json.dumps(manifest,indent=2)+'\n')
           shutil.copyfile(root/'app/build/outputs/mapping/previewPlayRelease/mapping.txt',out/'after-mapping.txt')
           PYTHON
