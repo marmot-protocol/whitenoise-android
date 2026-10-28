@@ -2486,12 +2486,18 @@
     <string name="setup_finding_outcome_failure">Comprobación fallida</string>
     <string name="public_jpeg_previews_title">Vistas previas de imágenes en el chat</string>
     <string name="public_jpeg_previews_privacy">Desactivadas de forma predeterminada. Los enlaces directos a JPEG de Blossom pueden revelar tu dirección IP al servidor de imágenes. Las vistas previas usan Wi-Fi sin límite de datos y tus reglas de descarga de fotos. Los enlaces normales siguen disponibles cuando están desactivadas.</string>
-    <string name="public_jpeg_preview_image">Vista previa del JPEG enlazado</string>
-    <string name="public_jpeg_preview_save_failed">No se pudo guardar la configuración de las vistas previas. Inténtalo de nuevo.</string>
     <string name="chat_batch_progress">Se han procesado %1$d de %2$d conversaciones</string>
     <string name="chat_batch_result">Con cambios: %1$d\nYa cumplían el estado solicitado: %2$d\nOmitidas (no disponibles): %3$d\nCon errores: %4$d\nSin iniciar: %5$d\nSin confirmar: %6$d</string>
     <string name="chat_batch_order_failed">El orden de las conversaciones fijadas no está disponible o ha cambiado. Revisa la lista actual antes de volver a moverlas.</string>
     <string name="chat_batch_order_unchanged">Las conversaciones fijadas seleccionadas no pueden moverse más. Cada bloque de conversaciones seleccionadas se mueve una posición sin cambiar su orden.</string>
     <string name="chat_batch_check_results">Comprobar resultados</string>
     <string name="chat_batch_order_unconfirmed">No se pudo confirmar el orden de las conversaciones fijadas. Revisa la lista antes de volver a mover conversaciones.</string>
+    <string name="public_jpeg_preview_image">Vista previa del JPEG enlazado</string>
+    <string name="public_jpeg_preview_save_failed">No se pudo guardar la configuración de las vistas previas. Inténtalo de nuevo.</string>
+
+    <string name="voice_recording_save_failed">La grabación se detuvo, pero no se pudo guardar el audio. Graba de nuevo.</string>
+    <string name="voice_recording_stops_in">Se detiene en %1$s</string>
+    <string name="voice_recording_limit_warning">La grabación se detendrá en 30 segundos al alcanzar el límite de cinco minutos.</string>
+    <string name="voice_recording_limit_reached">Se alcanzó el límite de grabación de cinco minutos. Revisa tu nota de voz antes de enviarla.</string>
+    <string name="voice_recording_interrupted">Grabación interrumpida. Revisa el audio grabado antes de enviarlo.</string>
 </resources>
