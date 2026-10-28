@@ -162,8 +162,8 @@ required check. A `master` failure in any of them is fixed through an owned PR.
 
 ## Supplemental campaigns and draft PRs
 
-With queue prechecks disabled, draft PRs run the fast lane: classification, tooling contracts, the offline
-signer contract, Zapstore lint and unit/screenshot tests, compilation, ktlint and
+With queue prechecks disabled, draft PRs run the fast lane: classification, tooling contracts, the ZSP v2
+publishing contract, Zapstore lint and unit/screenshot tests, compilation, ktlint and
 detekt. They defer coverage, baseline packaging, Compose reports, the Play check,
 emulator workflows and release verification. `ready_for_review` starts a new run
 with every applicable lane, so the required aggregate is recomputed for the ready
