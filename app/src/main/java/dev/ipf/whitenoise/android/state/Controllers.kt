@@ -4492,9 +4492,10 @@ class ChatsController private constructor(
         intent: OptimisticArchiveIntent,
     ): Boolean =
         appState.withGroupCommitLock(account, groupIdHex) {
+            currentCoroutineContext().ensureActive()
             if (!archiveActions.ownsIntent(groupIdHex, intent)) return@withGroupCommitLock false
             val updated = groupArchivedUpdater(account, groupIdHex, archived)
-            if (archiveActions.ownsCompletion(groupIdHex, intent)) {
+            if (currentCoroutineContext().isActive && archiveActions.ownsCompletion(groupIdHex, intent)) {
                 applyLocalGroupUpdate(updated)
                 true
             } else {
@@ -4839,25 +4840,12 @@ class ChatsController private constructor(
             var nativeCommitted = false
             val wipe =
                 runCatching {
-                    if (requireNativeEligibility) {
-                        val row =
-                            kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
-                                liveSubscriptions.presentedRowByGroup?.invoke(account, groupIdHex)
-                            }
-                        if (!isCurrent()) throw CancellationException("Account replaced")
-                        check(
-                            row != null &&
-                                row.row.groupIdHex.equals(groupIdHex, ignoreCase = true) &&
-                                row.actions.canDeleteLocal,
-                        ) { "Native local deletion is unavailable" }
-                    }
+                    requireLocalDeleteEligibility(account, groupIdHex, requireNativeEligibility, isCurrent)
                     appState.deleteChatGroupLocalWithRecovery(
                         LocalGroupRemovalRequest(account, groupIdHex, forgetProtocol),
                         isCurrent,
                         observer.readinessBudget,
-                        onAdmitted = {
-                            removedSnapshot = removeChatRowOptimistically(groupIdHex)
-                        },
+                        onAdmitted = { removedSnapshot = removeChatRowOptimistically(groupIdHex) },
                     ) {
                         nativeCommitted = true
                         if (isCurrent()) observer.onNativeCommitted()
@@ -4902,6 +4890,26 @@ class ChatsController private constructor(
                 false
             }
         } ?: false
+
+    /** Recheck the captured native capability before the row can be hidden or local deletion admitted. */
+    private suspend fun requireLocalDeleteEligibility(
+        account: String,
+        groupIdHex: String,
+        required: Boolean,
+        isCurrent: () -> Boolean,
+    ) {
+        if (!required) return
+        val row =
+            kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
+                liveSubscriptions.presentedRowByGroup?.invoke(account, groupIdHex)
+            }
+        if (!isCurrent()) throw CancellationException("Account replaced")
+        check(
+            row != null &&
+                row.row.groupIdHex.equals(groupIdHex, ignoreCase = true) &&
+                row.actions.canDeleteLocal,
+        ) { "Native local deletion is unavailable" }
+    }
 
     /** Settles a committed removal, confirming it with [success] only once its Android cleanup also finished. */
     private fun completeChatLocalRemoval(
@@ -5130,6 +5138,7 @@ class ChatsController private constructor(
     ): ChatListBatchResult {
         val outcomes = targets.associateWith { ChatListBatchOutcome.NOT_STARTED }.toMutableMap()
         val attemptedIds = mutableSetOf<String>()
+        val timedOutIds = mutableSetOf<String>()
         val rows = mutableListOf<ChatListRowFfi>()
         for (id in targets) {
             if (!chatListActionIsCurrent(owner)) break
@@ -5155,36 +5164,35 @@ class ChatsController private constructor(
             }
         }
         if (chatListActionIsCurrent(owner)) {
-            val settled =
-                kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
-                    val commitContext = currentCoroutineContext()
-                    val commitIsCurrent = { commitContext.isActive && chatListActionIsCurrent(owner) }
-                    archiveActions.setArchivedRows(
-                        owner.accountRef,
-                        owner.bindEpoch,
-                        ResolvedArchiveRows(rows, commitIsCurrent),
-                        command == ChatListBatchCommand.ARCHIVE,
-                        false,
-                        onAttempted = { id ->
-                            val key = id.lowercase(java.util.Locale.ROOT)
-                            attemptedIds += key
-                            outcomes[key] = ChatListBatchOutcome.UNCONFIRMED
-                        },
-                    ) { id, changed ->
-                        if (commitIsCurrent()) {
-                            outcomes[id.lowercase(java.util.Locale.ROOT)] =
-                                if (changed) ChatListBatchOutcome.CHANGED else ChatListBatchOutcome.UNCONFIRMED
-                            onProgress(outcomes.values.count { it != ChatListBatchOutcome.NOT_STARTED }, targets.size)
-                        }
+            val commitContext = currentCoroutineContext()
+            val commitIsCurrent = { commitContext.isActive && chatListActionIsCurrent(owner) }
+            archiveActions.setArchivedRows(
+                owner.accountRef,
+                owner.bindEpoch,
+                ResolvedArchiveRows(rows, commitIsCurrent),
+                command == ChatListBatchCommand.ARCHIVE,
+                false,
+                onAttempted = { id ->
+                    val key = id.lowercase(java.util.Locale.ROOT)
+                    attemptedIds += key
+                    outcomes[key] = ChatListBatchOutcome.UNCONFIRMED
+                },
+                onSettled = { id, changed ->
+                    if (commitIsCurrent()) {
+                        outcomes[id.lowercase(java.util.Locale.ROOT)] =
+                            if (changed) ChatListBatchOutcome.CHANGED else ChatListBatchOutcome.UNCONFIRMED
+                        onProgress(outcomes.values.count { it != ChatListBatchOutcome.NOT_STARTED }, targets.size)
                     }
-                    true
-                }
-            // Keep uncertain attempts distinct from untouched targets; recovery remains read-only.
-            if (settled == null) return ChatListBatchResult(outcomes.toMap(), attemptedIds.toSet())
+                },
+                stepTimeoutMillis = CHAT_LIST_BATCH_STEP_TIMEOUT_MS,
+                onTimedOut = { id -> timedOutIds += id.lowercase(java.util.Locale.ROOT) },
+                notifyFailures = false,
+            )
         }
         for (id in targets) {
             if (!chatListActionIsCurrent(owner)) break
-            if (id in attemptedIds) {
+            // A timed-out native attempt stays uncertain until an explicit read-only Check results.
+            if (id in attemptedIds && id !in timedOutIds) {
                 val confirmed = reconcileChatListBatchTarget(id, command, owner)
                 outcomes[id] =
                     if (confirmed == ChatListBatchOutcome.SATISFIED) ChatListBatchOutcome.CHANGED else confirmed
@@ -5220,6 +5228,7 @@ class ChatsController private constructor(
         }
     }
 
+    /** Read the captured target again without replaying its native mutation. */
     private suspend fun reconcileChatListBatchTarget(
         id: String,
         command: ChatListBatchCommand,
@@ -5255,6 +5264,7 @@ class ChatsController private constructor(
         return true
     }
 
+    /** Read the current native pin universe before applying any complete-order projection. */
     @Suppress("ReturnCount") // Refuse retired or unavailable whole-list pin reads before they can alter a projection.
     private suspend fun authoritativePinOrder(owner: ChatListActionOwner): List<String>? {
         if (!chatListActionIsCurrent(owner)) return null
@@ -5270,6 +5280,7 @@ class ChatsController private constructor(
         return order
     }
 
+    /** Apply direct state commands after archive and folder requests have selected their dedicated owners. */
     private suspend fun applyChatListBatchCommand(
         item: ChatListItem,
         command: ChatListBatchCommand,
@@ -5286,11 +5297,10 @@ class ChatsController private constructor(
                     item.group.groupIdHex,
                     command == ChatListBatchCommand.MUTE,
                 ) { chatListActionIsCurrent(owner) }
-            ChatListBatchCommand.EXCLUDE_FOLDER -> false // Folder commands use their existing host preference owner.
-            // Shared archive owner handles these batches.
-            ChatListBatchCommand.ARCHIVE, ChatListBatchCommand.RESTORE -> false
+            else -> error("Command $command must use its dedicated batch owner")
         }
 
+    /** Exclude the captured ID only from the still-current captured folder preference owner. */
     @Suppress("ReturnCount") // Guard missing folders and satisfied exclusions before the existing preference mutation.
     private fun excludeChatListBatchTarget(
         id: String,

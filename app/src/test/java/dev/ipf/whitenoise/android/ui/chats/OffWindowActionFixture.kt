@@ -55,6 +55,7 @@ internal class OffWindowActionFixture(
     var archiveFails = false
     var loseMuteReadback = false
     var targetReadUnavailable = false
+    var targetMuteEligible = true
     val state: WhiteNoiseAppState
     val controller: ChatsController
 
@@ -85,7 +86,11 @@ internal class OffWindowActionFixture(
                     keyedReads++
                     lookupEntered?.complete(Unit)
                     releaseLookup?.await()
-                    if (id == ACTION_TARGET && targetReadUnavailable) null else presented(if (id == ACTION_TARGET) row.get() else retainedRow.get())
+                    if (id == ACTION_TARGET && targetReadUnavailable) {
+                        null
+                    } else {
+                        presented(if (id == ACTION_TARGET) row.get() else retainedRow.get())
+                    }
                 },
             )
         controller =
@@ -136,7 +141,7 @@ internal class OffWindowActionFixture(
                     canMarkUnread = true,
                     canPin = true,
                     canUnpin = true,
-                    canMute = true,
+                    canMute = value.groupIdHex != ACTION_TARGET || targetMuteEligible,
                     canUnmute = true,
                     canArchive = true,
                     canRestore = true,

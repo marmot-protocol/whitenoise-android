@@ -98,7 +98,9 @@ class ChatOrganizationScreenshotTest {
             }
         }
         val selectionLabel = if (all) R.string.chat_list_deselect_all else R.string.chat_list_select_all
-        composeRule.onNodeWithContentDescription(context.getString(selectionLabel), useUnmergedTree = true).assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(context.getString(selectionLabel), useUnmergedTree = true)
+            .assertIsDisplayed()
         if (menu) {
             composeRule.onNodeWithContentDescription(context.getString(R.string.archive)).assertIsDisplayed()
             composeRule.onNodeWithContentDescription(context.getString(R.string.delete)).assertIsDisplayed()

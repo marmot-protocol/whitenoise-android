@@ -196,6 +196,27 @@ class ChatsScreenOffWindowActionsTest {
         assertOffWindow(model)
     }
 
+    /** A fresh native capability denial finishes silently and leaves the selected bar usable. */
+    @Test fun skippedMuteFinishesSilentlyWithoutRecoveryOrDisabledActions() {
+        val model = selectTarget()
+        val noticeBefore = model.state.transientNotice?.id
+        model.targetMuteEligible = false
+        val readsBefore = model.keyedReads
+        rule.onNodeWithContentDescription(rule.activity.getString(R.string.chat_row_action_mute)).performClick()
+        awaitProgress { model.keyedReads > readsBefore }
+        awaitDirectBatch(model)
+        rule.onNodeWithTag("chats.batchRecovery").assertDoesNotExist()
+        assertEquals(noticeBefore, model.state.transientNotice?.id)
+        assertTrue(model.calls.isEmpty())
+        rule
+            .onNodeWithContentDescription(rule.activity.getString(R.string.chat_row_action_pin))
+            .assertIsEnabled()
+            .performClick()
+        awaitProgress { "pin:true" in model.calls }
+        awaitDirectBatch(model)
+        assertEquals(listOf("pin:true"), model.calls.toList())
+    }
+
     @Test fun uncertainMuteIsCheckedWithoutRepeatingNativeMutation() {
         val model = selectTarget()
         model.loseMuteReadback = true

@@ -33,6 +33,7 @@ import java.lang.reflect.Proxy
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Keep causal batch cases beside their shared production-controller/native adapter fixture.
 class ChatsControllerBatchActionsTest {
+    /** Native batches keep captured targets after filtering and retry confirmed failures only. */
     @Test fun mixedBatchSurvivesFilterRemovalCountsSatisfiedAndRetriesOnlyFailures() =
         runTest {
             val fixture = Fixture(this)
@@ -75,6 +76,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** A suspended native lookup retains one batch owner and rejects another dispatch. */
     @Test fun duplicateTapIsRejectedWhileNativeLookupIsSuspended() =
         runTest {
             val fixture = Fixture(this)
@@ -97,6 +99,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Replacing the account during lookup prevents every native mutation. */
     @Test fun accountReplacementDuringLookupRejectsEveryMutation() =
         runTest {
             val fixture = Fixture(this)
@@ -117,6 +120,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Runtime retirement after a commit stops later targets and prevents stale projection. */
     @Test fun runtimeReplacementAfterFirstCommitStopsRemainingTargetsAndLateProjection() =
         runTest {
             val fixture = Fixture(this)
@@ -145,6 +149,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Explicit mute, pin and archive commands count satisfied native rows without duplicate writes. */
     @Test fun mutePinAndArchiveUseNativeExplicitStateAndReportSatisfiedTargets() =
         runTest {
             for (command in listOf(
@@ -202,6 +207,7 @@ class ChatsControllerBatchActionsTest {
             }
         }
 
+    /** Manual pin ordering includes authoritative native rows beyond the retained window. */
     @Test fun orderingUsesCompleteNativePinnedSetOutsideRetainedWindow() =
         runTest {
             val fixture = Fixture(this, setOf(C))
@@ -224,6 +230,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Native unread counters already satisfy Mark unread without another setter. */
     @Test fun numericUnreadTargetsStayUnreadWithoutAnotherSetterOrToggle() =
         runTest {
             val fixture = Fixture(this)
@@ -260,6 +267,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Authoritative readback can confirm read and archive commits that returned errors. */
     @Test fun commitThenErrorIsReconciledForReadAndArchive() =
         runTest {
             for (command in listOf(ChatListBatchCommand.READ, ChatListBatchCommand.ARCHIVE)) {
@@ -279,6 +287,7 @@ class ChatsControllerBatchActionsTest {
             }
         }
 
+    /** An unreadable completion remains uncertain until explicit read-only recovery. */
     @Test fun unreadableCommitIsNotRetryableUntilReadOnlyReconciliation() =
         runTest {
             val fixture = Fixture(this)
@@ -299,6 +308,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** A mismatched postcondition ID never replaces the captured row or invites retry. */
     @Test fun wrongPostconditionIdentityRemainsUnconfirmedWithoutApplyingAnotherRow() =
         runTest {
             val fixture = Fixture(this)
@@ -320,6 +330,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Retrying a confirmed failure preserves another target's unconfirmed result. */
     @Test fun failedTargetCanRetryWhileAnotherAttemptRemainsUnconfirmed() =
         runTest {
             val fixture = Fixture(this)
@@ -340,7 +351,8 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
-    @Test fun archiveCommitLockTimeoutReleasesBatchAndKeepsUnstartedTargetsDistinct() =
+    /** A busy group exhausts only its own deadline; successful targets are never retried with it. */
+    @Test fun archiveCommitLockTimeoutContinuesOtherTargetsAndRequiresReadOnlyRecovery() =
         runTest {
             val fixture = Fixture(this)
             val entered = CompletableDeferred<Unit>()
@@ -354,17 +366,19 @@ class ChatsControllerBatchActionsTest {
                 }
             entered.await()
             val owner = fixture.controller.captureChatListActionOwner()!!
-            val batch = async { fixture.controller.runChatListBatch(listOf(A, B), ChatListBatchCommand.ARCHIVE, owner) }
+            val batch =
+                async { fixture.controller.runChatListBatch(listOf(A, B, C), ChatListBatchCommand.ARCHIVE, owner) }
             runCurrent()
             advanceTimeBy(30_001)
             runCurrent()
             val result = batch.await()!!
             assertEquals(ChatListBatchOutcome.UNCONFIRMED, result.outcomes[A])
-            assertEquals(ChatListBatchOutcome.NOT_STARTED, result.outcomes[B])
-            assertEquals(setOf(A), result.attemptedIds)
+            assertEquals(ChatListBatchOutcome.CHANGED, result.outcomes[B])
+            assertEquals(ChatListBatchOutcome.CHANGED, result.outcomes[C])
+            assertEquals(setOf(A, B, C), result.attemptedIds)
             assertEquals(emptyList<String>(), result.retryIds)
             assertFalse(fixture.controller.chatListBatchInProgress)
-            assertEquals(emptyList<Pair<String, Boolean>>(), fixture.commands)
+            assertEquals(listOf(B to true, C to true), fixture.commands)
             val retained = fixture.controller.chatRows.first { it.groupIdHex == A }
             assertFalse(
                 fixture.controller
@@ -374,25 +388,45 @@ class ChatsControllerBatchActionsTest {
             release.complete(Unit)
             holder.await()
             runCurrent()
-            assertEquals(emptyList<Pair<String, Boolean>>(), fixture.commands)
+            assertEquals(listOf(B to true, C to true), fixture.commands)
+
+            val checked =
+                result.withAttempt(
+                    fixture.controller.reconcileChatListBatch(result, ChatListBatchCommand.ARCHIVE, owner),
+                )
+            assertEquals(ChatListBatchOutcome.FAILED, checked.outcomes[A])
+            assertEquals(listOf(A), checked.retryIds)
+            val completed =
+                checked.withAttempt(
+                    fixture.controller.runChatListBatch(checked.retryIds, ChatListBatchCommand.ARCHIVE, owner),
+                )
+            assertEquals(3, completed.changed)
+            assertEquals(0, completed.unconfirmed)
+            assertEquals(listOf(B to true, C to true, A to true), fixture.commands)
             fixture.controller.onCleared()
         }
 
-    @Test fun archiveUpdaterCompletionAtCancellationCannotPublishLateProjection() =
+    /** A cancellation-insensitive native return cannot publish through its expired per-target context. */
+    @Test fun archiveTimedOutCompletionKeepsUnknownUntilCheckedAndContinuesOtherTargets() =
         runTest {
             val fixture = Fixture(this)
-            fixture.archiveUpdater = { _, id, archived ->
-                try {
-                    awaitCancellation()
-                } catch (_: CancellationException) {
-                    fixture.rows[id] = fixture.rows.getValue(id).copy(archived = archived)
-                    emptyGroupRecord(fixture.rows.getValue(id))
+            fixture.archiveUpdater = { account, id, archived ->
+                if (id == A) {
+                    fixture.commands += id to archived
+                    try {
+                        awaitCancellation()
+                    } catch (_: CancellationException) {
+                        fixture.rows[id] = fixture.rows.getValue(id).copy(archived = archived)
+                        emptyGroupRecord(fixture.rows.getValue(id))
+                    }
+                } else {
+                    fixture.state.marmotIo { setGroupArchived(account, id, archived) }
                 }
             }
             val owner = fixture.controller.captureChatListActionOwner()!!
-            val result = fixture.controller.runChatListBatch(listOf(A, B), ChatListBatchCommand.ARCHIVE, owner)!!
+            val result = fixture.controller.runChatListBatch(listOf(A, B, C), ChatListBatchCommand.ARCHIVE, owner)!!
             assertEquals(ChatListBatchOutcome.UNCONFIRMED, result.outcomes[A])
-            assertEquals(ChatListBatchOutcome.NOT_STARTED, result.outcomes[B])
+            assertEquals(2, result.changed)
             assertEquals(emptyList<String>(), result.retryIds)
             assertEquals(true, fixture.rows.getValue(A).archived)
             assertFalse(
@@ -407,9 +441,47 @@ class ChatsControllerBatchActionsTest {
                     .group.archived,
             )
             assertFalse(fixture.controller.chatListBatchInProgress)
+            assertEquals(listOf(A to true, B to true, C to true), fixture.commands)
+
+            val checked =
+                result.withAttempt(
+                    fixture.controller.reconcileChatListBatch(result, ChatListBatchCommand.ARCHIVE, owner),
+                )
+            assertEquals(3, checked.changed)
+            assertEquals(0, checked.unconfirmed)
+            assertEquals(
+                true,
+                fixture.controller.chatRows
+                    .first { it.groupIdHex == A }
+                    .archived,
+            )
+            assertEquals(listOf(A to true, B to true, C to true), fixture.commands)
             fixture.controller.onCleared()
         }
 
+    /** Batch-owned feedback suppresses the legacy error notice without changing other archive callers. */
+    @Test fun batchArchiveDefersFailureNoticeWhileLegacyArchiveStillReportsIt() =
+        runTest {
+            val fixture = Fixture(this)
+            var failures = 0
+            val actions =
+                ChatListArchiveActions(
+                    rowForGroup = { fixture.rows[it] },
+                    isCurrent = { true },
+                    onChanged = {},
+                    updateGroup = { _, _, _, _ -> error("rejected") },
+                    onFailure = { failures++ },
+                    onSuccess = {},
+                )
+            val rows = ResolvedArchiveRows(listOf(fixture.rows.getValue(A)), isCurrent = { true })
+            actions.setArchivedRows(ACCOUNT, 0L, rows, true, false, notifyFailures = false)
+            assertEquals(0, failures)
+            actions.setArchivedRows(ACCOUNT, 0L, rows, true, false)
+            assertEquals(1, failures)
+            fixture.controller.onCleared()
+        }
+
+    /** A wrong archive lookup ID fails only its captured target while later targets continue. */
     @Test fun wrongArchiveLookupIdentityFailsOnlyThatTargetAndContinuesBatch() =
         runTest {
             val fixture = Fixture(this)
@@ -434,6 +506,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Failed admission never claims that an already archived target was changed. */
     @Test fun failedArchiveLookupNeverClaimsItChangedAnAlreadyArchivedTarget() =
         runTest {
             val fixture = Fixture(this)
@@ -453,6 +526,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Native pin readback recovers every affected neighbour after a hydration error. */
     @Test fun pinCommitThenHydrationErrorRecoversEveryNeighbourPosition() =
         runTest {
             for ((command, target) in listOf(ChatListBatchCommand.PIN to C, ChatListBatchCommand.UNPIN to A)) {
@@ -479,6 +553,7 @@ class ChatsControllerBatchActionsTest {
             }
         }
 
+    /** Read-only pin recovery preserves cumulative counts and restores the complete order. */
     @Test fun pinReadOnlyRecoveryRetainsChangedCountAndRestoresFullOrder() =
         runTest {
             val fixture = Fixture(this)
@@ -518,6 +593,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Owner retirement keeps a possibly committed archive result uncertain. */
     @Test fun archiveCommitErrorThenOwnerLossCannotBecomeAConfirmedFailure() =
         runTest {
             val fixture = Fixture(this)
@@ -534,6 +610,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** A missing post-attempt row remains uncertain without an automatic retry. */
     @Test fun missingPostattemptRowRemainsUnknownAndCannotBeRetried() =
         runTest {
             val fixture = Fixture(this)
@@ -549,6 +626,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** A pre-commit move failure restores the unchanged authoritative pin order. */
     @Test fun movePrecommitFailureReadbackRestoresTheUnchangedNativeOrder() =
         runTest {
             val fixture = Fixture(this)
@@ -577,6 +655,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** A move committed before an error settles its complete native order without a new event. */
     @Test fun moveCommitThenErrorSettlesTheCompleteOrderWithoutAnEvent() =
         runTest {
             val fixture = Fixture(this)
@@ -606,6 +685,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** Unreadable move completion neither claims a failure nor repeats the native mutation. */
     @Test fun moveWithUnreadableCommitDoesNotClaimFailureOrReplay() =
         runTest {
             val fixture = Fixture(this)
@@ -630,6 +710,7 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** A retired owner cannot publish an order after its move may have committed. */
     @Test fun moveOwnerLossAfterCommitCannotApplyTheRetiredAccountsOrder() =
         runTest {
             val fixture = Fixture(this)

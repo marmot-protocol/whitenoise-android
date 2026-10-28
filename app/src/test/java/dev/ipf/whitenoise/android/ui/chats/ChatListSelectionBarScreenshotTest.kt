@@ -244,7 +244,9 @@ class ChatListSelectionBarScreenshotTest {
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = amoled, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
-                CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         ChatListBatchRecoveryControls(
                             command = dev.ipf.whitenoise.android.state.ChatListBatchCommand.MUTE,
@@ -297,10 +299,6 @@ class ChatListSelectionBarScreenshotTest {
                             allVisibleSelected = false,
                             showMarkRead = single || bulk,
                             showMarkUnread = bulk,
-                            showMuteToggle = single,
-                            muted = false,
-                            showPinToggle = single,
-                            pinned = false,
                             showMovePinnedUp = false,
                             showMovePinnedDown = false,
                             onArchive = {},
@@ -308,8 +306,8 @@ class ChatListSelectionBarScreenshotTest {
                             onAddToFolder = {},
                             onMarkRead = {},
                             onMarkUnread = {},
-                            onMuteToggle = {},
-                            onPinToggle = {},
+                            onSetMuted = {},
+                            onSetPinned = {},
                             onMovePinned = {},
                             onSelectAll = {},
                             onDeselectAll = {},

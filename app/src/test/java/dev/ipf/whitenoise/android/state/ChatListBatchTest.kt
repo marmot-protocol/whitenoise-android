@@ -1,10 +1,32 @@
 package dev.ipf.whitenoise.android.state
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatListBatchTest {
+    /** Ineligible targets complete silently, but real failures or uncertain work retain recovery. */
+    @Test fun skippedTargetsDoNotRetainRecoveryAfterOtherTargetsFinish() {
+        val complete =
+            ChatListBatchResult(
+                mapOf(
+                    "changed" to ChatListBatchOutcome.CHANGED,
+                    "satisfied" to ChatListBatchOutcome.SATISFIED,
+                    "skipped" to ChatListBatchOutcome.SKIPPED,
+                ),
+            )
+        assertFalse(complete.needsRecovery)
+        assertEquals(1, complete.skipped)
+        val incomplete =
+            listOf(ChatListBatchOutcome.FAILED, ChatListBatchOutcome.UNCONFIRMED, ChatListBatchOutcome.NOT_STARTED)
+        for (outcome in incomplete) {
+            assertTrue(ChatListBatchResult(mapOf("target" to outcome)).needsRecovery)
+        }
+    }
+
+    /** A refused attempt preserves every captured count and failure-only retry set. */
     @Test fun refusedControllerAttemptKeepsPriorUnconfirmedAndFailedOutcomes() {
         val previous =
             ChatListBatchResult(
@@ -21,6 +43,7 @@ class ChatListBatchTest {
         assertEquals(listOf("failed"), previous.withAttempt(null).retryIds)
     }
 
+    /** Each explicit destination is classified against native desired state and capabilities. */
     @Test fun mixedStateCommandsAlwaysDescribeOneExplicitDestination() {
         val row =
             presentedRow("chat").copy(
@@ -80,6 +103,7 @@ class ChatListBatchTest {
         )
     }
 
+    /** Each selected contiguous pin run crosses one neighbour while both orders remain stable. */
     @Test fun selectedRunsMoveOnePositionWithoutChangingRelativeOrders() {
         val order = listOf("a", "b", "c", "d", "e", "f")
         assertEquals(listOf("b", "c", "a", "e", "d", "f"), moveSelectedPinnedChats(order, setOf("b", "c", "e"), -1))

@@ -95,6 +95,8 @@ import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListBatchCommand
+import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
+import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatListPinMoveResult
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -259,11 +261,14 @@ internal fun ChatsScreen(
     val batchScope = remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { AtomicBoolean(true) }
     DisposableEffect(batchScope) { onDispose { batchScope.set(false) } }
     var pendingStateBatch by remember(batchScope) { mutableStateOf<PendingChatListBatch?>(null) }
-    var directBatchResult by remember(batchScope) { mutableStateOf<dev.ipf.whitenoise.android.state.ChatListBatchResult?>(null) }
+    var directBatchResult by remember(batchScope) {
+        mutableStateOf<ChatListBatchResult?>(null)
+    }
     var directBatchAttempt by remember(batchScope) { mutableIntStateOf(0) }
     var directBatchChecking by remember(batchScope) { mutableStateOf(false) }
     var directBatchRunning by remember(batchScope) { mutableStateOf(false) }
 
+    /** Capture the selected IDs and owner before any native action can change the visible filter. */
     fun startStateBatch(command: ChatListBatchCommand) {
         if (pendingStateBatch != null || controller.chatListBatchInProgress) return
         val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
@@ -296,17 +301,16 @@ internal fun ChatsScreen(
                     if (controller.chatListActionSessionIsCurrent(request.owner)) {
                         val result =
                             if (attempt == null && previous == null) {
-                                dev.ipf.whitenoise.android.state.ChatListBatchResult(
-                                    request.ids.associateWith { dev.ipf.whitenoise.android.state.ChatListBatchOutcome.NOT_STARTED },
+                                ChatListBatchResult(
+                                    request.ids.associateWith {
+                                        ChatListBatchOutcome.NOT_STARTED
+                                    },
                                 )
                             } else {
-                                (
-                                    previous ?: dev.ipf.whitenoise.android.state
-                                        .ChatListBatchResult(emptyMap())
-                                ).withAttempt(attempt)
+                                (previous ?: ChatListBatchResult(emptyMap())).withAttempt(attempt)
                             }
                         directBatchResult = result
-                        if (result.failed + result.skipped + result.notStarted + result.unconfirmed == 0) {
+                        if (!result.needsRecovery) {
                             directBatchResult = null
                             pendingStateBatch = null
                         } else if (previous == null) {
@@ -984,10 +988,11 @@ internal fun ChatsScreen(
         remember(visibleItems, searchActive, selectedChatIds.size) {
             visibleItems.filter { visibleRowId(it) in selectedChatIds }
         }
-    val bulkArchiveAction =
-        remember(selectedVisibleItems) {
-            chatListBulkArchiveAction(selectedVisibleItems.map { it.group.archived })
+    val selectionActions =
+        remember(selectedVisibleItems, appState.activeAccount?.accountIdHex) {
+            chatListSelectionActions(selectedVisibleItems, appState.activeAccount?.accountIdHex)
         }
+    val bulkArchiveAction = selectionActions.archiveAction
     // Engine-normalized manual order of the pinned block, for the selection
     // bar's move actions. Ids keep the projection's casing — they round-trip
     // straight back into setPinnedChatOrder, which must receive the pinned
@@ -1940,7 +1945,11 @@ internal fun ChatsScreen(
                 }
                 val recoveryRequest = pendingStateBatch
                 val recoveryResult = directBatchResult
-                if (recoveryRequest != null && recoveryResult != null && recoveryRequest.command != ChatListBatchCommand.EXCLUDE_FOLDER) {
+                if (
+                    recoveryRequest != null &&
+                    recoveryResult != null &&
+                    recoveryRequest.command != ChatListBatchCommand.EXCLUDE_FOLDER
+                ) {
                     ChatListBatchRecoveryControls(
                         command = recoveryRequest.command,
                         result = recoveryResult,
@@ -2000,33 +2009,14 @@ internal fun ChatsScreen(
                                 selectedVisibleItems.isNotEmpty() &&
                                 selectedVisibleItems.none { it.group.groupIdHex in leavingAndDeleting },
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
-                        showMarkRead =
-                            selectedVisibleItems.any {
-                                it.effectiveHasUnread(appState.activeAccount?.accountIdHex) &&
-                                    it.actions?.canMarkRead == true
-                            },
-                        showMarkUnread =
-                            selectedVisibleItems.any {
-                                !it.effectiveHasUnread(appState.activeAccount?.accountIdHex) &&
-                                    it.actions?.canMarkUnread == true
-                            },
-                        showMuteToggle = false,
-                        muted = false,
-                        showPinToggle = false,
-                        pinned = false,
-                        showMute = selectedVisibleItems.any { !it.engineMuted() && it.actions?.canMute == true },
-                        showUnmute = selectedVisibleItems.any { it.engineMuted() && it.actions?.canUnmute == true },
-                        showPin =
-                            selectedVisibleItems.any {
-                                !it.group.archived &&
-                                    !it.pinned() &&
-                                    it.actions?.canPin == true
-                            },
-                        showUnpin = selectedVisibleItems.any { it.pinned() && it.actions?.canUnpin == true },
-                        showMovePinnedUp =
-                            selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
-                        showMovePinnedDown =
-                            selectedVisibleItems.isNotEmpty() && selectedVisibleItems.all { it.pinned() },
+                        showMarkRead = selectionActions.showMarkRead,
+                        showMarkUnread = selectionActions.showMarkUnread,
+                        showMute = selectionActions.showMute,
+                        showUnmute = selectionActions.showUnmute,
+                        showPin = selectionActions.showPin,
+                        showUnpin = selectionActions.showUnpin,
+                        showMovePinnedUp = selectionActions.showMovePinned,
+                        showMovePinnedDown = selectionActions.showMovePinned,
                         onSetMuted =
                             { startStateBatch(if (it) ChatListBatchCommand.MUTE else ChatListBatchCommand.UNMUTE) },
                         onSetPinned =
@@ -2044,8 +2034,7 @@ internal fun ChatsScreen(
                         },
                         onAlternateArchive =
                             if (
-                                selectedVisibleItems.any { it.group.archived } &&
-                                selectedVisibleItems.any { !it.group.archived }
+                                selectionActions.showAlternateArchive
                             ) {
                                 { startStateBatch(ChatListBatchCommand.RESTORE) }
                             } else {
@@ -2114,8 +2103,6 @@ internal fun ChatsScreen(
                         },
                         onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
                         onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
-                        onMuteToggle = {},
-                        onPinToggle = {},
                         onMovePinned = { delta ->
                             val owner = controller.captureChatListActionOwner { batchScope.get() }
                             val ids = selectedChatIds.toSet()

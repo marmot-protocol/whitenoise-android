@@ -104,13 +104,7 @@ private fun localDeleteNative(
         val name = method.name.substringBefore('-')
         calls += name
         if (name == failing.get()) {
-            val failure = MarmotKitException.TransportClosed()
-            val continuation = arguments?.lastOrNull() as? Continuation<*>
-            if (continuation != null) {
-                continuation.resumeWith(Result.failure(failure))
-                return@newProxyInstance COROUTINE_SUSPENDED
-            }
-            throw failure
+            return@newProxyInstance failLocalDeleteNative(arguments)
         }
         when (name) {
             "chatListRow" -> {
@@ -160,6 +154,17 @@ private fun localDeleteNative(
             else -> error("Unexpected local-delete native call: $name")
         }
     } as MarmotInterface
+
+/** Deliver the synthetic transport failure through the binding's suspend continuation when present. */
+private fun failLocalDeleteNative(arguments: Array<out Any?>?): Any {
+    val failure = MarmotKitException.TransportClosed()
+    val continuation = arguments?.lastOrNull() as? Continuation<*>
+    if (continuation != null) {
+        continuation.resumeWith(Result.failure(failure))
+        return COROUTINE_SUSPENDED
+    }
+    throw failure
+}
 
 /** The revision is passed opaquely to the fake — never invoke or load its native handle. */
 private fun draftRevisionStub(): MessageDraftRevisionFfi {

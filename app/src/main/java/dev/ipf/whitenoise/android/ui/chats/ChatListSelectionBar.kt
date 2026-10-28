@@ -69,10 +69,6 @@ internal fun ChatListSelectionControls(
     allVisibleSelected: Boolean,
     showMarkRead: Boolean,
     showMarkUnread: Boolean,
-    showMuteToggle: Boolean,
-    muted: Boolean,
-    showPinToggle: Boolean,
-    pinned: Boolean,
     showMovePinnedUp: Boolean,
     showMovePinnedDown: Boolean,
     onArchive: () -> Unit,
@@ -80,8 +76,6 @@ internal fun ChatListSelectionControls(
     onAddToFolder: () -> Unit,
     onMarkRead: () -> Unit,
     onMarkUnread: () -> Unit,
-    onMuteToggle: () -> Unit,
-    onPinToggle: () -> Unit,
     onMovePinned: (Int) -> Unit,
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
@@ -89,12 +83,12 @@ internal fun ChatListSelectionControls(
     deleteLabel: String = stringResource(R.string.delete),
     abandonLabel: String? = null,
     onAbandon: () -> Unit = {},
-    showMute: Boolean = showMuteToggle && !muted,
-    showUnmute: Boolean = showMuteToggle && muted,
-    showPin: Boolean = showPinToggle && !pinned,
-    showUnpin: Boolean = showPinToggle && pinned,
-    onSetMuted: ((Boolean) -> Unit)? = null,
-    onSetPinned: ((Boolean) -> Unit)? = null,
+    showMute: Boolean = false,
+    showUnmute: Boolean = false,
+    showPin: Boolean = false,
+    showUnpin: Boolean = false,
+    onSetMuted: (Boolean) -> Unit = {},
+    onSetPinned: (Boolean) -> Unit = {},
     onAlternateArchive: (() -> Unit)? = null,
     onExcludeFromFolder: (() -> Unit)? = null,
     onDeleteLocal: (() -> Unit)? = null,
@@ -181,7 +175,7 @@ internal fun ChatListSelectionControls(
                 R.drawable.ic_notifications_off,
                 actionsEnabled,
             ) {
-                perform { onSetMuted?.invoke(true) ?: onMuteToggle() }
+                perform { onSetMuted(true) }
             }
         }
         if (showUnmute) {
@@ -190,7 +184,7 @@ internal fun ChatListSelectionControls(
                 R.drawable.ic_settings_notifications,
                 actionsEnabled,
             ) {
-                perform { onSetMuted?.invoke(false) ?: onMuteToggle() }
+                perform { onSetMuted(false) }
             }
         }
         if (showPin) {
@@ -199,12 +193,12 @@ internal fun ChatListSelectionControls(
                 R.drawable.ic_push_pin,
                 actionsEnabled,
             ) {
-                perform { onSetPinned?.invoke(true) ?: onPinToggle() }
+                perform { onSetPinned(true) }
             }
         }
         if (showUnpin) {
             DirectSelectionAction(stringResource(R.string.chat_row_action_unpin), R.drawable.ic_unpin, actionsEnabled) {
-                perform { onSetPinned?.invoke(false) ?: onPinToggle() }
+                perform { onSetPinned(false) }
             }
         }
         onAlternateArchive?.let { alternate ->
@@ -221,7 +215,11 @@ internal fun ChatListSelectionControls(
             ) { perform(alternate) }
         }
         onExcludeFromFolder?.let { exclude ->
-            DirectSelectionAction(stringResource(R.string.folder_exclude_chat), R.drawable.ic_folder_remove, actionsEnabled) {
+            DirectSelectionAction(
+                stringResource(R.string.folder_exclude_chat),
+                R.drawable.ic_folder_remove,
+                actionsEnabled,
+            ) {
                 perform(exclude)
             }
         }
@@ -254,7 +252,12 @@ internal fun ChatListSelectionControls(
         }
         DirectSelectionAction(
             label = deleteLabel,
-            icon = if (deleteLabel == stringResource(R.string.leave_and_delete)) R.drawable.ic_logout else R.drawable.ic_delete,
+            icon =
+                if (deleteLabel == stringResource(R.string.leave_and_delete)) {
+                    R.drawable.ic_logout
+                } else {
+                    R.drawable.ic_delete
+                },
             enabled = actionsEnabled,
             destructive = true,
             onClick = { perform(onDelete) },

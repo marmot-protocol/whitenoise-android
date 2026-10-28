@@ -99,10 +99,6 @@ class ChatsScreenSelectionActionsCoverageTest {
             "ChatListBatchCommand.PIN else ChatListBatchCommand.UNPIN" in controls,
         )
         assertTrue(
-            "archived rows cannot be newly pinned",
-            "!it.group.archived && !it.pinned() && it.actions?.canPin == true" in controls,
-        )
-        assertTrue(
             "ordering uses complete native universe",
             "controller.movePinnedSelection(ids, delta, owner)" in controls,
         )

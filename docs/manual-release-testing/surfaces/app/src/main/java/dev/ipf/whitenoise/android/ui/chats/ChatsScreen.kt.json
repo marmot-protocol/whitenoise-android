@@ -318,6 +318,15 @@
         "test_ids": [
           "CHL-012"
         ]
+      },
+      {
+        "surface": "Selection directions and silent skipped-only completion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "chatListSelectionActions(",
+        "test_ids": [
+          "CHL-011",
+          "CHL-012"
+        ]
       }
     ]
   },

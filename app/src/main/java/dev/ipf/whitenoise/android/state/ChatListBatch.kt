@@ -13,6 +13,7 @@ internal data class ChatListBatchResult(
     val outcomes: Map<String, ChatListBatchOutcome>,
     val attemptedIds: Set<String> = emptySet(),
 ) {
+    /** Merge only returned target outcomes; a refused attempt never erases previous evidence. */
     fun withAttempt(attempt: ChatListBatchResult?): ChatListBatchResult =
         if (attempt == null) {
             this
@@ -27,6 +28,9 @@ internal data class ChatListBatchResult(
     val unconfirmed get() = outcomes.values.count { it == ChatListBatchOutcome.UNCONFIRMED }
     val notStarted get() = outcomes.values.count { it == ChatListBatchOutcome.NOT_STARTED }
     val retryIds get() = outcomes.filterValues { it == ChatListBatchOutcome.FAILED }.keys.toList()
+
+    /** Ineligible targets finish silently; only failed, unknown or unstarted work retains recovery. */
+    val needsRecovery get() = failed + unconfirmed + notStarted > 0
 }
 
 /** Classifies the latest native row before attempting a transition. Native remains the authority. */

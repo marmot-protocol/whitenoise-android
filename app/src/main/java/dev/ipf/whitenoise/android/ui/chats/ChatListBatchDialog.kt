@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
 
+/** Localized explicit destination used by folder dialogs and icon recovery status. */
 internal fun ChatListBatchCommand.labelResource(): Int =
     when (this) {
         ChatListBatchCommand.READ -> R.string.chat_row_action_mark_read

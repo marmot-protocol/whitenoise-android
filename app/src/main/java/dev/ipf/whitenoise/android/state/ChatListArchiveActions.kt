@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Identity-scoped presentation intent; an older completion must not retire a replacement. */
 internal class OptimisticArchiveIntent(
@@ -53,9 +54,22 @@ internal class ChatListArchiveActions(
         notify: Boolean,
         onAttempted: (String) -> Unit = {},
         onSettled: (String, Boolean) -> Unit = { _, _ -> },
+        stepTimeoutMillis: Long? = null,
+        onTimedOut: (String) -> Unit = {},
+        notifyFailures: Boolean = true,
     ): Int {
         val intents = beginRows(resolved.rows, archived, epoch, resolved.isCurrent, resolved.completionIsCurrent)
-        return commit(account, intents, archived, notify, onAttempted, onSettled)
+        return commit(
+            account,
+            intents,
+            archived,
+            notify,
+            onAttempted,
+            onSettled,
+            stepTimeoutMillis,
+            onTimedOut,
+            notifyFailures,
+        )
     }
 
     /**
@@ -70,6 +84,9 @@ internal class ChatListArchiveActions(
         notify: Boolean,
         onAttempted: (String) -> Unit = {},
         onSettled: (String, Boolean) -> Unit = { _, _ -> },
+        stepTimeoutMillis: Long? = null,
+        onTimedOut: (String) -> Unit = {},
+        notifyFailures: Boolean = true,
     ): Int {
         if (intents.isEmpty()) return 0
         var succeeded = 0
@@ -79,12 +96,15 @@ internal class ChatListArchiveActions(
                     runCatchingCancellable {
                         if (ownsIntent(groupIdHex, intent)) {
                             onAttempted(groupIdHex)
-                            updateGroup(account, groupIdHex, archived, intent)
+                            val updated =
+                                updateGroupWithinDeadline(account, groupIdHex, archived, intent, stepTimeoutMillis)
+                            if (updated == null) onTimedOut(groupIdHex)
+                            updated == true
                         } else {
                             false
                         }
                     }.onFailure { error ->
-                        if (isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()) onFailure(error)
+                        if (notifyFailures && isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()) onFailure(error)
                     }.getOrDefault(false)
                 if (applied) succeeded += 1
                 finish(groupIdHex, intent)
@@ -99,6 +119,20 @@ internal class ChatListArchiveActions(
             onSuccess(archived)
         }
         return succeeded
+    }
+
+    /** A deadline bounds one native adapter attempt; timeout remains uncertain for read-only recovery. */
+    private suspend fun updateGroupWithinDeadline(
+        account: String,
+        groupIdHex: String,
+        archived: Boolean,
+        intent: OptimisticArchiveIntent,
+        stepTimeoutMillis: Long?,
+    ): Boolean? {
+        if (stepTimeoutMillis == null) return updateGroup(account, groupIdHex, archived, intent)
+        return withTimeoutOrNull(stepTimeoutMillis) {
+            updateGroup(account, groupIdHex, archived, intent)
+        }
     }
 
     /** Records only changed, retained rows; conversation actions share this same overlay owner. */
