@@ -2662,4 +2662,10 @@
     <string name="public_jpeg_previews_privacy">Off by default. Direct Blossom JPEG links may reveal your IP address to the image host. Previews use unmetered Wi-Fi and your photo download rules. Ordinary links remain available when off.</string>
     <string name="public_jpeg_preview_image">Linked JPEG preview</string>
     <string name="public_jpeg_preview_save_failed">Could not save the image preview setting. Please try again.</string>
+    <string name="chat_batch_progress">Processed %1$d of %2$d chats</string>
+    <string name="chat_batch_result">Changed: %1$d\nAlready satisfied: %2$d\nSkipped (unavailable): %3$d\nFailed: %4$d\nNot started: %5$d\nUnconfirmed: %6$d</string>
+    <string name="chat_batch_order_failed">Pinned order is unavailable or changed. Review the current chat list before another move.</string>
+    <string name="chat_batch_order_unchanged">No selected pinned chats can move further. Selected runs move one position while keeping their order.</string>
+    <string name="chat_batch_check_results">Check results</string>
+    <string name="chat_batch_order_unconfirmed">Could not confirm the pinned order. Check the chat list before moving chats again.</string>
 </resources>

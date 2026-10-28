@@ -70,153 +70,79 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
-    /** Single selection overflow wires mark read. */
-    @Test
-    fun singleSelectionOverflowWiresMarkRead() {
+    /** Bulk actions must enter one fixed-scope command, never loop the selection-clearing row callbacks. */
+    @Test fun selectionCapturesExplicitTargetsAndDirections() {
         val source = chatsScreenSource().readText()
-        val selectionBar =
-            source.requiredSection(
-                start = "ChatListSelectionControls(",
-                end = "\n                    )\n                }\n            }\n        },",
-            )
-        val markReadHandler =
-            selectionBar.requiredSection(
-                start = "onMarkRead = {",
-                end = "\n                        onMarkUnread = {",
-            )
-        val markUnreadHandler =
-            selectionBar.requiredSection(
-                start = "onMarkUnread = {",
-                end = "\n                        onMuteToggle = {",
-            )
-        val markReadHelper =
-            source.requiredSection(
-                start = "fun markChatRead(",
-                end = "\n    fun toggleChatMute(",
-            )
-
+        val controls =
+            source
+                .requiredSection("ChatListSelectionControls(", "\n        floatingActionButton =")
+                .replace(Regex("\\s+"), " ")
         assertTrue(
-            "selection bar must expose mark-read only for an effective unread selection",
-            "singleSelectedItem?.effectiveHasUnread" in selectionBar,
+            "fixed scope captured before launch",
+            "PendingChatListBatch(selectedChatIds.toList(), command, owner)" in source,
         )
         assertTrue(
-            "mark-read overflow must route to controller.markAllRead",
-            "markChatRead(item, unread = false)" in markReadHandler &&
-                "controller.markAllRead(current, owner)" in markReadHelper,
+            "screen lifetime guards admission",
+            "controller.captureChatListActionOwner { batchScope.get() }" in source,
+        )
+        assertTrue("mark read is explicit", "onMarkRead = { startStateBatch(ChatListBatchCommand.READ) }" in controls)
+        assertTrue(
+            "mark unread is explicit",
+            "onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) }" in controls,
         )
         assertTrue(
-            "selection actions must resolve the current row with the captured presentation owner",
-            "controller.captureChatListActionOwner { actionScope.get() }" in markReadHelper &&
-                "controller.resolveChatListActionItem(item.id, owner)" in markReadHelper,
+            "mute and unmute remain separate destinations",
+            "ChatListBatchCommand.MUTE else ChatListBatchCommand.UNMUTE" in controls,
         )
         assertTrue(
-            "mark-read overflow must exit selection mode",
-            "clearSelection()" in markReadHelper,
+            "pin and unpin remain separate destinations",
+            "ChatListBatchCommand.PIN else ChatListBatchCommand.UNPIN" in controls,
         )
         assertTrue(
-            "mark-unread overflow must route to controller.markUnread",
-            "markChatRead(item, unread = true)" in markUnreadHandler &&
-                "controller.markUnread(current, owner)" in markReadHelper,
+            "ordering uses complete native universe",
+            "controller.movePinnedSelection(ids, delta, owner)" in controls,
         )
-        assertTrue(
-            "mark-unread overflow must exit selection mode",
-            "clearSelection()" in markReadHelper,
+        assertFalse(
+            "bulk never forwards to a selection-clearing helper",
+            "markChatRead(item" in controls || "toggleChatMute(item" in controls,
         )
     }
 
-    /** Single selection overflow wires mute. */
-    @Test
-    fun singleSelectionOverflowWiresMute() {
+    /** Row/menu callbacks retain the existing captured presentation and session ownership boundaries. */
+    @Test fun singleContextActionsKeepOwnershipAndAuthoritativeResolution() {
         val source = chatsScreenSource().readText()
-        val selectionBar =
-            source.requiredSection(
-                start = "ChatListSelectionControls(",
-                end = "\n                    )\n                }\n            }\n        },",
-            )
-        val muteHandler =
-            selectionBar.requiredSection(
-                start = "onMuteToggle = {",
-                end = "\n                        onSelectAll = {",
-            )
-        val muteHelper =
-            source.requiredSection(
-                start = "fun toggleChatMute(",
-                end = "\n    // Hoisted list state",
-            )
-
+        val helper = source.requiredSection("fun markChatRead(", "\n    fun toggleChatMute(")
         assertTrue(
-            "selection bar must expose mute toggle for a single selection",
-            "showMuteToggle = singleSelectedItem != null" in selectionBar,
+            "single callbacks still resolve native rows",
+            "controller.resolveChatListActionItem(item.id, owner)" in helper,
         )
         assertTrue(
-            "mute overflow must route to appState.setConversationMuted",
-            "toggleChatMute(item, singleSelectionMuted)" in muteHandler &&
-                "appState.setConversationMuted" in muteHelper,
+            "single callbacks still own their presentation",
+            "controller.captureChatListActionOwner { actionScope.get() }" in helper,
         )
-        assertTrue("mute overflow must exit selection mode", "clearSelection()" in muteHelper)
+        assertTrue("single mark read uses original controller", "controller.markAllRead(current, owner)" in helper)
+        assertTrue("single mark unread uses original controller", "controller.markUnread(current, owner)" in helper)
+        assertTrue("single callbacks retain their selection dismissal", "clearSelection()" in helper)
     }
 
-    /** Single selection overflow wires pin and manual order. */
-    @Test
-    fun singleSelectionOverflowWiresPinAndManualOrder() {
-        val source = chatsScreenSource().readText()
-        val selectionBar =
+    @Test fun batchRunnerRetainsNativeAuthorityAndSingleFlightAcrossFilterRemoval() {
+        val source = File(chatsScreenSource().parentFile, "../../state/Controllers.kt").readText()
+        val batch =
             source.requiredSection(
-                start = "ChatListSelectionControls(",
-                end = "\n                    )\n                }\n            }\n        },",
+                "internal suspend fun runChatListBatch(",
+                "private suspend fun applyChatListBatchCommand(",
             )
-        val pinHandler =
-            selectionBar.requiredSection(
-                start = "onPinToggle = {",
-                end = "\n                        onMovePinned = {",
-            )
-        val moveHandler =
-            selectionBar.requiredSection(
-                start = "onMovePinned = {",
-                end = "\n                        onSelectAll = {",
-            )
-        val pinHelper =
-            source.requiredSection(
-                start = "fun toggleChatPin(",
-                end = "\n    fun movePinnedChat(",
-            )
-        val moveHelper =
-            source.requiredSection(
-                start = "fun movePinnedChat(",
-                end = "\n    // Hoisted list state",
-            )
-
         assertTrue(
-            "the engine only pins unarchived chats, so archived selections must not offer the toggle",
-            "showPinToggle = singleSelectedItem?.group?.archived == false" in selectionBar,
+            "admission is single flight",
+            "if (chatListBatchInProgress || !chatListActionIsCurrent(owner)) return null" in batch,
         )
+        assertTrue("targets are copied before suspension", "val targets = ids.map" in batch)
         assertTrue(
-            "pin overflow must route to controller.setPinned",
-            "toggleChatPin(item)" in pinHandler &&
-                "controller.setPinned(current, nextPinned, owner)" in pinHelper,
+            "eligibility and satisfied state come from keyed native projection",
+            "liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id)" in batch,
         )
-        assertTrue(
-            "selection actions must resolve the current row with the captured presentation owner",
-            "controller.captureChatListActionOwner { actionScope.get() }" in pinHelper &&
-                "controller.resolveChatListActionItem(item.id, owner)" in pinHelper,
-        )
-        assertTrue(
-            "pin overflow must exit selection mode",
-            "clearSelection()" in pinHelper,
-        )
-        assertTrue(
-            "manual order must route the full pinned set to controller.setPinnedOrder",
-            "movePinnedChat(item, delta)" in moveHandler &&
-                "controller.setPinnedOrder(reordered)" in moveHelper,
-        )
-        assertTrue(
-            "a move must stay inside the pinned block",
-            "if (target !in pinnedOrderedIds.indices) return" in moveHelper,
-        )
-        assertTrue(
-            "move overflow must exit selection mode",
-            "clearSelection()" in moveHelper,
-        )
+        assertTrue("results retain every target", "targets.associateWith" in batch)
+        assertTrue("retired owners stop remaining targets", "if (!chatListActionIsCurrent(owner)) break" in batch)
     }
 
     /** Long press sheet reuses pin and manual order mutations. */

@@ -2484,6 +2484,12 @@
     <string name="setup_finding_outcome_failure">Kontrol başarısız</string>
     <string name="public_jpeg_previews_title">Sohbet içi görsel önizlemeleri</string>
     <string name="public_jpeg_previews_privacy">Varsayılan olarak kapalıdır. Doğrudan Blossom JPEG bağlantıları IP adresinizi görsel sunucusuna gösterebilir. Önizlemeler, ölçülmeyen Wi-Fi bağlantısını ve fotoğraf indirme kurallarınızı kullanır. Kapalıyken normal bağlantılar kullanılabilir.</string>
+    <string name="chat_batch_progress">%2$d sohbetten %1$d tanesi işlendi</string>
+    <string name="chat_batch_result">Değiştirilen: %1$d\nİstenen durumda olan: %2$d\nAtlanan (kullanılamıyor): %3$d\nBaşarısız: %4$d\nBaşlatılmayan: %5$d\nDoğrulanamayan: %6$d</string>
+    <string name="chat_batch_order_failed">Sabitlenmiş sohbetlerin sırası kullanılamıyor veya değişti. Yeniden taşımadan önce mevcut sohbet listesini kontrol edin.</string>
+    <string name="chat_batch_order_unchanged">Seçili sabitlenmiş sohbetler daha fazla taşınamıyor. Bitişik seçili sohbetlerden oluşan her grup, sırasını koruyarak bir konum taşınır.</string>
+    <string name="chat_batch_check_results">Sonuçları kontrol et</string>
+    <string name="chat_batch_order_unconfirmed">Sabitlenmiş sohbetlerin sırası doğrulanamadı. Sohbetleri yeniden taşımadan önce sohbet listesini kontrol edin.</string>
     <string name="public_jpeg_preview_image">Bağlantılı JPEG önizlemesi</string>
     <string name="public_jpeg_preview_save_failed">Görsel önizleme ayarı kaydedilemedi. Lütfen tekrar deneyin.</string>
 

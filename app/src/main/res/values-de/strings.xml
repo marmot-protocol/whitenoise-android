@@ -2503,6 +2503,12 @@
     <string name="setup_finding_outcome_failure">Prüfung fehlgeschlagen</string>
     <string name="public_jpeg_previews_title">Bildvorschauen im Chat</string>
     <string name="public_jpeg_previews_privacy">Standardmäßig deaktiviert. Direkte Blossom-JPEG-Links können dem Bildhost deine IP-Adresse offenlegen. Vorschauen nutzen ungetaktetes WLAN und deine Regeln zum Herunterladen von Fotos. Normale Links bleiben bei deaktivierter Vorschau verfügbar.</string>
+    <string name="chat_batch_progress">%1$d von %2$d Unterhaltungen verarbeitet</string>
+    <string name="chat_batch_result">Geändert: %1$d\nBereits erfüllt: %2$d\nÜbersprungen (nicht verfügbar): %3$d\nFehlgeschlagen: %4$d\nNicht gestartet: %5$d\nUnbestätigt: %6$d</string>
+    <string name="chat_batch_order_failed">Die Reihenfolge der angehefteten Unterhaltungen ist nicht verfügbar oder hat sich geändert. Prüfe vor einem weiteren Verschieben die aktuelle Unterhaltungsliste.</string>
+    <string name="chat_batch_order_unchanged">Die ausgewählten angehefteten Unterhaltungen können nicht weiter verschoben werden. Zusammenhängende ausgewählte Unterhaltungen werden um eine Position verschoben und behalten ihre Reihenfolge.</string>
+    <string name="chat_batch_check_results">Ergebnisse prüfen</string>
+    <string name="chat_batch_order_unconfirmed">Die Reihenfolge der angehefteten Unterhaltungen konnte nicht bestätigt werden. Prüfe die Unterhaltungsliste, bevor du Unterhaltungen erneut verschiebst.</string>
     <string name="public_jpeg_preview_image">Vorschau eines verlinkten JPEG-Bildes</string>
     <string name="public_jpeg_preview_save_failed">Die Einstellung für Bildvorschauen konnte nicht gespeichert werden. Bitte versuche es erneut.</string>
 

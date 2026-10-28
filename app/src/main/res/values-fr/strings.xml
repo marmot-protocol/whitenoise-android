@@ -2486,6 +2486,12 @@
     <string name="setup_finding_outcome_failure">Échec de la vérification</string>
     <string name="public_jpeg_previews_title">Aperçus des images dans la discussion</string>
     <string name="public_jpeg_previews_privacy">Désactivés par défaut. Les liens directs vers des JPEG Blossom peuvent révéler votre adresse IP au serveur des images. Les aperçus utilisent le Wi-Fi non limité et vos règles de téléchargement des photos. Les liens restent accessibles lorsque les aperçus sont désactivés.</string>
+    <string name="chat_batch_progress">%1$d discussions traitées sur %2$d</string>
+    <string name="chat_batch_result">Modifiées : %1$d\nÉtat demandé déjà atteint : %2$d\nIgnorées (indisponibles) : %3$d\nEn échec : %4$d\nNon démarrées : %5$d\nNon confirmées : %6$d</string>
+    <string name="chat_batch_order_failed">L’ordre des discussions épinglées est indisponible ou a changé. Vérifiez la liste actuelle avant de les déplacer à nouveau.</string>
+    <string name="chat_batch_order_unchanged">Les discussions épinglées sélectionnées ne peuvent pas aller plus loin. Chaque bloc de discussions sélectionnées se déplace d’une position en conservant son ordre.</string>
+    <string name="chat_batch_check_results">Vérifier les résultats</string>
+    <string name="chat_batch_order_unconfirmed">L’ordre des discussions épinglées n’a pas pu être confirmé. Vérifiez la liste avant de déplacer à nouveau des discussions.</string>
     <string name="public_jpeg_preview_image">Aperçu du JPEG lié</string>
     <string name="public_jpeg_preview_save_failed">Impossible de sauvegarder le réglage des aperçus. Veuillez réessayer.</string>
 
