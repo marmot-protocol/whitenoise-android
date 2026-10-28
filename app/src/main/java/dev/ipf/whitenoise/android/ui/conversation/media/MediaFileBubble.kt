@@ -77,7 +77,9 @@ internal fun fileAttachmentCardTestTag(
  * in-app reader. Other files join any automatic/durable fetch already in
  * flight and open a reusable FileProvider artifact in an external viewer.
  * When selected as the message footer owner, the card also carries the timestamp,
- * delivery state and invalidation warning as one contract.
+ * delivery state and invalidation warning as one contract. An own send not yet
+ * delivered ([awaitingDelivery]) waits as preparing instead of fetching a body
+ * that has no native target yet.
  */
 @Composable
 internal fun MediaFileBubble(
@@ -94,6 +96,7 @@ internal fun MediaFileBubble(
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Received,
     footerWarningText: String? = null,
+    awaitingDelivery: Boolean = false,
 ) {
     val context = LocalContext.current
     val openAttachment = rememberAttachmentOpener()
@@ -161,10 +164,9 @@ internal fun MediaFileBubble(
     // A stale native failure must not flash Retry during the outgoing cache handoff.
     val presentationProgress = if (mine && !firstFrameCacheResolved) null else nativeProgress
     val transferState =
-        ownFileAwaitingProjection(
+        ownFileAwaitingDelivery(
             attachmentFilePresentationState(hostTransferState, presentationProgress, cancellationState),
-            reference.sourceEpoch,
-            mine,
+            awaitingDelivery,
         )
     var reconciledCacheRevision by remember(controller, pillKey) { mutableStateOf(cacheRevision) }
     // Later cache writes and evictions still reconcile the controller-owned

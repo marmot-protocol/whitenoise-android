@@ -13,9 +13,9 @@
         ]
       },
       {
-        "surface": "Own large file waits for its projected reference instead of failing a premature fetch",
+        "surface": "Own large file waits for its send to be delivered instead of failing a premature fetch",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentDownloadPolicy.kt",
-        "anchor": "internal fun ownFileAwaitingProjection(",
+        "anchor": "internal fun ownFileAwaitingDelivery(",
         "test_ids": [
           "MED-030"
         ]

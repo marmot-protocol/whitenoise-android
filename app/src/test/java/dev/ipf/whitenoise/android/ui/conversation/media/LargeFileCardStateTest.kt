@@ -25,10 +25,14 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
+import dev.ipf.whitenoise.android.state.deliveredAttachmentSourceId
+import dev.ipf.whitenoise.android.state.projectedTimelineMessage
+import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -41,7 +45,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * A file larger than a byte-returning read may hold still lands on the device: its card settles on the file's type
  * rather than Tap to retry, both after a reader's Download and on the sender's own card, which fetches its own body
- * only once MDK has projected its reference. The composable and controller are the production ones, only the native
+ * only once its send is delivered. The composable and controller are the production ones, only the native
  * transfer is replaced.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -105,32 +109,45 @@ class LargeFileCardStateTest {
     }
 
     /**
-     * The sender's own card before MDK projects its reference shows Preparing, starts no fetch that could only fail,
-     * and fetches exactly once when the projected reference arrives.
+     * The sender's own card before its send is delivered shows Preparing and starts no fetch that could only fail.
+     * Once delivered it fetches exactly once, even at epoch 0, which a solo group's delivered send still carries.
      */
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun anOwnFileWaitsForItsProjectionInsteadOfFailing() {
-        var reference by mutableStateOf(pdfReference().copy(sourceEpoch = 0uL))
+    fun anOwnFileWaitsForDeliveryInsteadOfFailing() {
+        var awaitingDelivery by mutableStateOf(true)
+        val soloGroupReference = pdfReference().copy(sourceEpoch = 0uL)
         val host = controller.attachmentTransferState(request(0).messageIdHex, 0, initiallyAvailable = false)
-        composeRule.setContent { WhiteNoiseTheme { LargeFileCard(mine = true, reference = reference) } }
+        composeRule.setContent {
+            WhiteNoiseTheme { LargeFileCard(true, soloGroupReference, awaitingDelivery) }
+        }
 
         composeRule.waitUntil(WAIT_MILLIS) { host.value != AttachmentTransferState.Resolving }
         composeRule.waitForIdle()
-        assertEquals("an unprojected own file must not start a fetch", AttachmentTransferState.Remote, host.value)
+        assertEquals("an undelivered own file must not start a fetch", AttachmentTransferState.Remote, host.value)
         assertTrue(fixture.calls.isEmpty())
         composeRule.onNodeWithText(text(R.string.media_preparing_attachment)).assertExists()
         assertNoRetry()
         composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_download)).assertCountEquals(0)
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/own-large-file-awaiting-projection.png")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/own-large-file-awaiting-delivery.png")
 
-        composeRule.runOnIdle { reference = pdfReference() }
+        composeRule.runOnIdle { awaitingDelivery = false }
         deliverBodyOverTheReadBudget()
 
         awaitDescribed(text(R.string.attachment_type_pdf_description))
         assertNoRetry()
-        assertEquals("the projected reference is fetched once", 1, fixture.calls.size)
+        assertEquals("the delivered send is fetched once", 1, fixture.calls.size)
         controller.releaseAttachmentTransferState(request(0).messageIdHex, 0)
+    }
+
+    /** An own row reads as undelivered until MDK upserts its published source event, then as delivered. */
+    @Test
+    fun anOwnRowIsUndeliveredUntilItsSourceEventArrives() {
+        val delivered = projectedTimelineMessage(timelineAppMessage(request(0).messageIdHex))
+        val committed = delivered.copy(projected = delivered.projected?.copy(sourceMessageIdHex = null))
+
+        assertNull(controller.deliveredAttachmentSourceId(committed))
+        assertEquals(request(0).messageIdHex, controller.deliveredAttachmentSourceId(delivered))
     }
 
     /** Waits for the card's one native transfer, then lets MDK retain a body one byte over the 32 MiB read budget. */
@@ -165,6 +182,7 @@ class LargeFileCardStateTest {
     private fun LargeFileCard(
         mine: Boolean,
         reference: MediaAttachmentReferenceFfi = pdfReference(),
+        awaitingDelivery: Boolean = false,
     ) {
         MediaFileBubble(
             messageIdHex = request(0).messageIdHex,
@@ -175,6 +193,7 @@ class LargeFileCardStateTest {
             senderKey = "sender",
             senderDisplayName = "Sender",
             mine = mine,
+            awaitingDelivery = awaitingDelivery,
         )
     }
 

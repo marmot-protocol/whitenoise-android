@@ -34,16 +34,16 @@ internal fun shouldMaterializeAttachmentAutomatically(
         (!automaticDownloadsPaused && (mediaAutoDownloadAllowed || mine))
 
 /**
- * An own file whose reference MDK has not projected yet (epoch 0) has no native target, so a fetch would only fail
- * and offer Retry. It stays preparing rather than downloadable, which also holds back its automatic fetch until the
- * projected reference arrives and the card, keyed by that epoch, asks once.
+ * An own file whose send is committed but not yet delivered has no native target, so a fetch would only fail and
+ * offer Retry. It stays preparing rather than downloadable, which also holds back its automatic fetch until delivery
+ * turns the card back to downloadable and it asks once. Delivery, not the epoch, is the signal: a solo group's
+ * delivered send can still carry epoch 0.
  */
-internal fun ownFileAwaitingProjection(
+internal fun ownFileAwaitingDelivery(
     transferState: AttachmentTransferState,
-    sourceEpoch: ULong,
-    mine: Boolean,
+    awaitingDelivery: Boolean,
 ): AttachmentTransferState =
-    if (mine && sourceEpoch == 0uL && transferState == AttachmentTransferState.Remote) {
+    if (awaitingDelivery && transferState == AttachmentTransferState.Remote) {
         AttachmentTransferState.Resolving
     } else {
         transferState
