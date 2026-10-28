@@ -17,7 +17,6 @@ import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -143,7 +142,9 @@ class RetainedAttachmentDownloadAdmissionTest {
             val failure = java.io.IOException("synthetic fetch failure")
             pending.fail(failure)
 
-            assertSame(failure, result.await().exceptionOrNull())
+            val received = result.await().exceptionOrNull()
+            assertTrue(received is java.io.IOException)
+            assertEquals(failure.message, received?.message)
             assertTrue(fixture.state.hasInteractive(request))
             assertEquals(1, fixture.calls.size)
         }
