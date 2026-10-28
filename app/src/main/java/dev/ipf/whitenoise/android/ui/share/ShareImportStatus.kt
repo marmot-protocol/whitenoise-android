@@ -95,7 +95,7 @@ internal fun ShareImportErrorDialog(
                 if (payload.importRejectedCount > 0) {
                     Text(stringResource(R.string.share_import_rejected_count, payload.importRejectedCount))
                 }
-                payload.importErrors.distinct().forEach { Text(it.message(payload)) }
+                payload.importErrors.distinct().forEach { Text(it.localizedMessage(payload)) }
                 Text(stringResource(R.string.share_import_recovery))
             }
         },
@@ -114,7 +114,7 @@ internal fun ShareImportErrorDialog(
 
 /** Formats the imported policy snapshot without linking native code or reading providers during composition. */
 @Composable
-private fun ShareImportError.message(payload: SharePayload): String {
+private fun ShareImportError.localizedMessage(payload: SharePayload): String {
     val context = LocalContext.current
 
     fun size(bytes: Long) = Formatter.formatShortFileSize(context, bytes)
