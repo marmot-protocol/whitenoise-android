@@ -213,6 +213,7 @@ internal class ConversationAttachmentPresentation(
     /**
      * Resolves one attachment's plaintext as an array of at most [maxBytes], which defaults to the presentation
      * budget so a preview cannot allocate an unbounded array, explicit Save and Share name their own budget.
+     * Retained reads do not start transfer jobs; a miss persists interactive work before acquisition begins.
      */
     suspend fun downloadAttachment(
         messageIdHex: String,
@@ -223,14 +224,16 @@ internal class ConversationAttachmentPresentation(
     ): ByteArray {
         val account = accountRef ?: error("no active account")
         val request = attachmentRequest(account, messageIdHex, attachmentIndex)
-        if (priority == AttachmentDownloadPriority.Interactive) {
-            appState.enqueueAttachmentDownload(request, priority)
-        }
         return appState.downloadAttachmentPlaintext(
             request = request,
             reference = reference,
             priority = priority,
             maxBytes = maxBytes,
+            onCacheMiss = {
+                if (priority == AttachmentDownloadPriority.Interactive) {
+                    appState.enqueueAttachmentDownload(request, priority)
+                }
+            },
         )
     }
 

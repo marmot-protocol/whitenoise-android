@@ -29,26 +29,30 @@ internal suspend fun resolveAttachmentCacheAvailability(
  * [maxBytes] of the retained source onto the heap. A larger source is rejected with
  * [dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException] before any array is allocated, and
  * stays retained for the file-backed consumers. The lease is closed whether the copy completes, fails or is
- * cancelled.
+ * cancelled. [onCacheMiss] admits caller-owned durable work only after every retained source misses.
  */
+@Suppress("LongParameterList") // Byte budget, durable intent and miss-only admission are independent controls.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
     maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
+    onCacheMiss: suspend () -> Unit = {},
 ): ByteArray =
     downloadAttachmentPlaintextSource(
         request = request,
         reference = reference,
         priority = priority,
         persistInteractiveIntent = persistInteractiveIntent,
+        onCacheMiss = onCacheMiss,
     ).use { source -> source.readWithin(maxBytes) }
 
-/** Returns bounded memory or an owner-private file lease that the caller must close. */
+/** Returns bounded memory or an owner-private file lease; [onCacheMiss] precedes acquisition, never a retained read. */
 @Suppress(
     "UnusedParameter",
     "LongMethod",
+    "LongParameterList",
 ) // Cache, acquisition, and telemetry spans intentionally share one retained-source ownership boundary.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
@@ -56,6 +60,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
     demandIntent: AttachmentDemandIntent = AttachmentDemandIntent.Join,
+    onCacheMiss: suspend () -> Unit = {},
 ): AttachmentPlaintext {
     val diagnostics = AttachmentFetchDiagnostics.begin(priority)
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
@@ -98,6 +103,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             loadNative = { openNativeAttachment(request) },
             preferNative = outgoingAttachmentCachePublications.isPending(cacheKey),
             loadMiss = {
+                onCacheMiss()
                 diagnostics?.phase(
                     phase = PerformancePhase.ATTACHMENT_ACQUISITION_START,
                     result = PerformanceResult.PENDING,

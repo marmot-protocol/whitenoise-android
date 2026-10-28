@@ -19,6 +19,14 @@
           "MED-008",
           "MED-009"
         ]
+      },
+      {
+        "surface": "Retained media reads avoid unnecessary interactive transfer jobs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationAttachmentPresentation.kt",
+        "anchor": "suspend fun downloadAttachment(",
+        "test_ids": [
+          "MED-041"
+        ]
       }
     ]
   },
