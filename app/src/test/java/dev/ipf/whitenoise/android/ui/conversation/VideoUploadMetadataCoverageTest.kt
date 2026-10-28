@@ -6,22 +6,43 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.SyntheticTrack
 import dev.ipf.whitenoise.android.media.VideoMetadataScrubber
+import dev.ipf.whitenoise.android.media.ascii
 import dev.ipf.whitenoise.android.media.aviVideoBytes
+import dev.ipf.whitenoise.android.media.concat
 import dev.ipf.whitenoise.android.media.containsAscii
+import dev.ipf.whitenoise.android.media.isoBox
+import dev.ipf.whitenoise.android.media.samples
+import dev.ipf.whitenoise.android.media.syntheticMovie
 import dev.ipf.whitenoise.android.media.videoFixture
 import dev.ipf.whitenoise.android.share.PrivateShareFiles
 import dev.ipf.whitenoise.android.share.ShareFileImporter
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.ShareSourceMetadata
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.acceptedUploadResult
+import dev.ipf.whitenoise.android.state.finishUploadCapturingFixture
+import dev.ipf.whitenoise.android.state.mediaSendReconciliationAppState
+import dev.ipf.whitenoise.android.state.uploadCapturingController
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
+import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedDocumentVideoMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedVideoMetadata
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -39,15 +60,20 @@ import java.io.ByteArrayInputStream
 import java.io.File
 
 /**
- * Invariant gate for #3376: every way a local video becomes an outgoing attachment hands onward only bytes whose
+ * Invariant gate for #3376: every way a local video becomes an outgoing attachment hands MDK only bytes whose
  * private container metadata is gone, and a video that cannot be cleaned is refused instead of sent as-is.
  *
- * The entry points are the visual picker (in memory, as a native draft and staged to a file), the Files picker (the
- * same three forms), incoming Android shares (imported into private files and read through the same readers) and
- * prepared drafts, including a native draft an older app version saved before videos were scrubbed. The in-app
- * camera captures photos only, so recorded videos reach the app through these same paths. Assertions inspect the
- * bytes and files the send queues for upload, not previews. Source checks pin the order inside the paths that a
- * behavioral fixture cannot reach without native bindings.
+ * Two cases drive the real `ConversationMediaSender.sendStagedAttachments` against a controller that captures the
+ * native upload requests. They read the bytes of every request handed to MDK: the in-memory plaintext, and each
+ * `sourcePath` while the upload holds it, which covers a staged large pick and a legacy native draft snapshotted
+ * beside it. The other cases check the reader and draft re-check that feed that send:
+ * - the visual picker in memory, as a native draft and staged to a file
+ * - incoming shares imported into private files
+ * - the Files picker, routed by content, in memory and staged
+ * - prepared visual and Files drafts
+ *
+ * The in-app camera captures photos only, so recorded videos reach the app through these same paths. One source
+ * check pins that the staged visual probe runs after the scrub, an order no JVM fixture can observe.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -69,6 +95,95 @@ class VideoUploadMetadataCoverageTest {
         ScriptedPickProvider.picks.clear()
         File(context.cacheDir, MediaCacheDirs.UPLOAD_SOURCES).deleteRecursively()
     }
+
+    /**
+     * Through the real send, the files MDK uploads from carry only scrubbed bytes: a large tagged pick staged to a
+     * file, and a tagged legacy native draft in the same album that the upload snapshots beside it. The native
+     * draft's own array is left untouched.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun fileBackedSendHandsMdkOnlyScrubbedFiles() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val large = pick("send-large.mp4", "video/mp4", tagged, declaredSize = LARGE)
+            val draftSlot = pick("send-draft.mp4", "video/mp4", tagged, declaredSize = tagged.size.toLong())
+            val legacyNative = draft("legacy.mp4", "video/mp4", tagged.copyOf())
+            val uploaded = CompletableDeferred<List<ByteArray>>()
+            val controller =
+                uploadCapturingController(
+                    state,
+                    inMemory = { error("a message with a staged pick uploads from files") },
+                    fromFiles = { request ->
+                        uploaded.complete(request.attachments.map { File(it.sourcePath).readBytes() })
+                        acceptedUploadResult(request.attachments.size)
+                    },
+                )
+            try {
+                controller.retryMembers()
+                sender(state, controller).sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("large", large), PendingMediaSlot("draft", draftSlot)),
+                    documentUris = emptyList(),
+                    caption = "",
+                    preparedImageAttachments = mapOf("draft" to legacyNative.toPendingAttachment()),
+                )
+
+                val files = uploaded.await()
+                assertEquals(2, files.size)
+                files.forEach(::assertClean)
+                assertArrayEquals("the native draft's own array is never rewritten", tagged, legacyNative.plaintext)
+            } finally {
+                finishUploadCapturingFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * Through the real send, the in-memory plaintext MDK uploads is scrubbed: a Photo Picker video, a Files pick whose
+     * MP4 content its provider reports as `application/octet-stream`, and a legacy native Files draft saved with its
+     * tags. The native draft's own array is left untouched.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun inMemorySendHandsMdkOnlyScrubbedBytes() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val visual = pick("send-small.mp4", "video/mp4", tagged, declaredSize = tagged.size.toLong())
+            val document = pick("send-movie.bin", "application/octet-stream", tagged, tagged.size.toLong())
+            val draftDocument = pick("send-draft.bin", "application/octet-stream", tagged, tagged.size.toLong())
+            val legacyNative = draft("legacy.bin", "application/octet-stream", tagged.copyOf())
+            val requests = java.util.Collections.synchronizedList(mutableListOf<ByteArray>())
+            val uploaded = CompletableDeferred<Unit>()
+            val controller =
+                uploadCapturingController(
+                    state,
+                    inMemory = { request ->
+                        requests += request.attachments.map { it.plaintext }
+                        if (requests.size == EXPECTED_IN_MEMORY_UPLOADS) uploaded.complete(Unit)
+                        acceptedUploadResult(request.attachments.size)
+                    },
+                    fromFiles = { error("an all-in-memory message uploads from memory") },
+                )
+            try {
+                controller.retryMembers()
+                sender(state, controller).sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("small", visual)),
+                    documentUris = listOf(document, draftDocument),
+                    caption = "",
+                    preparedDocumentAttachments = mapOf(draftDocument to legacyNative.toPendingAttachment()),
+                )
+
+                uploaded.await()
+                assertEquals(EXPECTED_IN_MEMORY_UPLOADS, requests.size)
+                requests.forEach(::assertClean)
+                assertArrayEquals("the native draft's own array is never rewritten", tagged, legacyNative.plaintext)
+            } finally {
+                finishUploadCapturingFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
 
     /** Photo Picker videos read in memory, for a send or a native draft, carry only scrubbed bytes. */
     @Test
@@ -101,32 +216,33 @@ class VideoUploadMetadataCoverageTest {
             source.close()
         }
 
-    /** Files-picker videos are scrubbed in memory, as native drafts and as staged files; other files stay as-is. */
+    /**
+     * Files picks are routed by content, in memory and staged alike: a video container is scrubbed whatever its type
+     * (even `application/octet-stream`), an uncleanable video reported as video is refused, and a TypeScript file
+     * reported as `video/mp2t`, an Ogg reported as `audio/ogg` and an audio-only MP4 arrive byte-for-byte.
+     */
     @Test
-    fun filesPickerVideosAreScrubbedAndOtherDocumentsKeepTheirBytes() =
+    fun filesPickerRoutesByContent() =
         runBlocking {
-            val small = pick("document.mp4", "video/mp4", tagged, declaredSize = tagged.size.toLong())
-            val large = pick("document-large.mp4", "video/mp4", tagged, declaredSize = LARGE)
-            val generic = pick("movie.bin", "application/octet-stream", tagged, declaredSize = tagged.size.toLong())
             val reader = reader()
-
-            val inMemory = reader.readPickedDocuments(listOf(small)).attachments.single()
-            assertEquals("video/mp4", inMemory.mediaType)
-            assertClean(inMemory.plaintextBytes)
-            assertClean(checkNotNull(reader.readDocumentDraft(small)).plaintextBytes)
-            val stagedRead = reader.readPickedDocuments(listOf(large), allowFileBacked = true)
-            val staged = checkNotNull(stagedRead.attachments.single().sourceFile)
-            assertClean(staged.file.readBytes())
-            staged.close()
-            assertArrayEquals(
-                "generic documents stay byte-for-byte",
-                tagged,
-                reader
-                    .readPickedDocuments(listOf(generic))
-                    .attachments
-                    .single()
-                    .plaintextBytes,
-            )
+            filesCases().forEachIndexed { index, case ->
+                listOf(false, true).forEach { staged ->
+                    val declared = if (staged) LARGE else case.bytes.size.toLong()
+                    val uri = pick("files-$index-$staged-${case.name}", case.mime, case.bytes, declared)
+                    val outcome = reader.readPickedDocuments(listOf(uri), allowFileBacked = staged)
+                    val label = "${case.name} reported ${case.mime}, staged=$staged"
+                    val attachment = outcome.attachments.singleOrNull()
+                    val bytes = attachment?.sourceFile?.file?.readBytes() ?: attachment?.plaintextBytes
+                    if (case.expected == null) {
+                        assertNull(label, attachment)
+                        assertEquals(label, setOf(DocumentReadFailure.VIDEO_METADATA), outcome.failures)
+                    } else {
+                        assertArrayEquals(label, case.expected, bytes)
+                        assertEquals(label, case.mime, attachment?.mediaType)
+                    }
+                    attachment?.sourceFile?.close()
+                }
+            }
         }
 
     /** An incoming Android share is imported to a private file and read through the same scrubbing readers. */
@@ -174,29 +290,46 @@ class VideoUploadMetadataCoverageTest {
         }
 
     /**
-     * Prepared drafts are re-checked before a send reuses them: a legacy draft saved with private metadata is sent
-     * scrubbed without mutating the native draft's array, clean drafts and photos are reused as-is, and a video that
-     * cannot be cleaned is refused.
+     * Prepared drafts are re-checked before a send reuses them, without mutating the native draft's array: visual
+     * drafts by reported type (a legacy tagged video is scrubbed, a clean one and a photo are reused as-is, AVI and a
+     * video draft carrying a staged file are refused), and Files drafts by content like a fresh Files pick.
      */
     @Test
     fun preparedDraftsAreScrubbedBeforeTheyAreReused() {
         val legacyNative = draft("legacy.mp4", "video/mp4", tagged.copyOf())
-        val legacy = legacyNative.toPendingAttachment()
         val alreadyClean = PendingAttachment(clean.copyOf(), "video/mp4", "clean.mp4")
         val photo = PendingAttachment(byteArrayOf(1, 2, 3), "image/jpeg", "photo.jpg")
         val avi = draft("old.avi", "video/x-msvideo", aviVideoBytes()).toPendingAttachment()
+        val stagedSource = stagedVideoSnapshot()
+        val staged = PendingAttachment(ByteArray(0), "video/mp4", "staged.mp4", sourceFile = stagedSource)
+        val stagedBefore = stagedSource.file.readBytes()
 
-        val checked =
+        val visual =
             removePreparedVideoMetadata(
-                mapOf("legacy" to legacy, "clean" to alreadyClean, "photo" to photo, "avi" to avi),
+                mapOf(
+                    "legacy" to legacyNative.toPendingAttachment(),
+                    "clean" to alreadyClean,
+                    "photo" to photo,
+                    "avi" to avi,
+                    "staged" to staged,
+                ),
             )
 
-        assertClean(checkNotNull(checked.ready["legacy"]).plaintextBytes)
+        assertClean(checkNotNull(visual.ready["legacy"]).plaintextBytes)
         assertArrayEquals("the native draft's own array is never rewritten", tagged, legacyNative.plaintext)
-        assertSame(alreadyClean, checked.ready["clean"])
-        assertSame(photo, checked.ready["photo"])
-        assertEquals(setOf("avi"), checked.refused)
-        assertNull(checked.ready["avi"])
+        assertSame(alreadyClean, visual.ready["clean"])
+        assertSame(photo, visual.ready["photo"])
+        assertEquals(setOf("avi", "staged"), visual.refused)
+        val stagedAfter = stagedSource.file.readBytes()
+        assertArrayEquals("a staged draft file is never rewritten in place", stagedBefore, stagedAfter)
+        stagedSource.close()
+
+        val documents = filesCases().associate { case -> case.name to draft(case.name, case.mime, case.bytes.copyOf()) }
+        val checked = removePreparedDocumentVideoMetadata(documents.mapValues { (_, it) -> it.toPendingAttachment() })
+        filesCases().forEach { case ->
+            assertArrayEquals(case.name, case.expected, checked.ready[case.name]?.plaintextBytes)
+            assertEquals(case.name, case.expected == null, case.name in checked.refused)
+        }
     }
 
     /** A video whose metadata cannot be removed is refused on every reader path, never sent with its own bytes. */
@@ -222,35 +355,45 @@ class VideoUploadMetadataCoverageTest {
             assertTrue(File(context.cacheDir, MediaCacheDirs.UPLOAD_SOURCES).walk().none(File::isFile))
         }
 
-    /** Scrubbing precedes the probe and the upload read in memory, and the staged probe in a file-backed read. */
+    /** The staged visual probe reads the snapshot only after the scrub succeeded inside staging. */
     @Test
-    fun scrubbingPrecedesEveryProbeAndRead() {
-        val pipeline = source("media/MediaPipeline.kt").functionBody("readVideoForUpload")
-        val scrub = pipeline.indexOf("VideoMetadataScrubber.scrub(tmp)")
-        assertTrue(scrub in 0 until pipeline.indexOf("readVideoFileMetadata(tmp)"))
-        assertTrue(pipeline.indexOf("readVideoFileMetadata(tmp)") < pipeline.indexOf("readFileBytesExact(tmp)"))
-        assertTrue(pipeline.contains("return VideoReadResult.MetadataNotRemovable"))
-
-        val reader = source("ui/conversation/ConversationMediaSender.kt")
-        val fileBacked = reader.functionBody("readFileBackedVideo")
-        assertTrue(fileBacked.indexOf("scrubVideoMetadata()") in 0 until fileBacked.indexOf("readVideoFileMetadata("))
-        assertTrue(reader.functionBody("readRawDocument").contains("removeVideoMetadataInPlace(mediaType, read.bytes)"))
-        assertTrue(reader.functionBody("readFileBackedDocument").contains("scrubVideoMetadata()"))
-        val inMemory = reader.functionBody("readInMemoryVideo")
-        assertTrue(inMemory.contains("MetadataNotRemovable ->") && inMemory.contains("videoMetadataRefused = true"))
+    fun fileBackedProbeRunsOnTheScrubbedSnapshot() {
+        val reader = File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt")
+        val fileBacked = reader.readText().functionBody("readFileBackedVideo")
+        val scrub = fileBacked.indexOf("scrubVideoMetadata()")
+        assertTrue(scrub in 0 until fileBacked.indexOf("readVideoFileMetadata("))
+        assertTrue(fileBacked.contains("metadataRemoved &&"))
     }
 
-    /** A send reaches prepared draft attachments only through the metadata re-check, never as saved. */
-    @Test
-    fun preparedDraftAttachmentsReachTheSendOnlyThroughTheRecheck() {
-        val prepare = source("ui/conversation/ConversationMediaSender.kt").functionBody("prepareStagedAttachments")
-
-        assertEquals(1, Regex("preparedImageAttachments").findAll(prepare).count())
-        assertEquals(1, Regex("preparedDocumentAttachments").findAll(prepare).count())
-        assertTrue(prepare.contains("removePreparedVideoMetadata(preparedImageAttachments)"))
-        assertTrue(prepare.contains("removePreparedVideoMetadata(preparedDocumentAttachments)"))
-        assertTrue(prepare.contains("readStagedImages(imageSlots, checkedImages, albumFileBudget)"))
+    /**
+     * The Files routing table: what each pick's content and reported type must produce, null meaning refused. The
+     * audio-only MP4 and the Ogg keep their tags, because imported audio keeps its original data.
+     */
+    private fun filesCases(): List<FilesCase> {
+        val typeScript = ascii("export const greeting: string = 'hello';\n")
+        val ogg = concat(ascii("OggS"), ByteArray(60) { 7 })
+        val audioOnly =
+            syntheticMovie(
+                listOf(SyntheticTrack("soun", samples(listOf(8, 8), 0x31))),
+                movieExtras = listOf(isoBox("udta", ascii("WNPrivateSong"))),
+            ).bytes
+        return listOf(
+            FilesCase("tagged.mp4", "video/mp4", tagged, clean),
+            FilesCase("movie.bin", "application/octet-stream", tagged, clean),
+            FilesCase("index.ts", "video/mp2t", typeScript, typeScript),
+            FilesCase("voice.ogg", "audio/ogg", ogg, ogg),
+            FilesCase("song.m4a", "audio/mp4", audioOnly, audioOnly),
+            FilesCase("old.avi", "video/x-msvideo", aviVideoBytes(), null),
+        )
     }
+
+    /** One Files routing case: [expected] is what must be sent, or null when the pick must be refused. */
+    private class FilesCase(
+        val name: String,
+        val mime: String,
+        val bytes: ByteArray,
+        val expected: ByteArray?,
+    )
 
     /** Checks that [bytes] are the scrubbed fixture and that none of its private fields survive. */
     private fun assertClean(bytes: ByteArray) {
@@ -258,8 +401,18 @@ class VideoUploadMetadataCoverageTest {
         PRIVATE.forEach { assertFalse("$it reached the upload", bytes.containsAscii(it)) }
     }
 
-    /** One production source file, relative to the app module. */
-    private fun source(relative: String): String = File("src/main/java/dev/ipf/whitenoise/android/$relative").readText()
+    /** The production sender over [controller], with generous native file limits. */
+    private fun sender(
+        state: WhiteNoiseAppState,
+        controller: ConversationController,
+    ) = ConversationMediaSender(state, controller, state.appContext, fileBackedLimits = { LIMITS }) {}
+
+    /** A tagged video staged to a private snapshot, as a file-backed pick would be. */
+    private fun stagedVideoSnapshot(): StagedUploadSource {
+        val uri = pick("staged-draft.mp4", "video/mp4", tagged, declaredSize = LARGE)
+        val budget = checkNotNull(reader().fileBackedBudget())
+        return checkNotNull(budget.stage(tagged.size.toLong()) { context.contentResolver.openInputStream(uri) }.source)
+    }
 
     /** A native draft attachment as MarmotKit stores it. */
     private fun draft(
@@ -284,7 +437,7 @@ class VideoUploadMetadataCoverageTest {
                 /** Starts every reader with no saved drafts. */
                 override fun read(): Map<String, String> = emptyMap()
 
-                /** Drops draft writes; these tests read picks only. */
+                /** Drops draft writes, because these tests read picks only. */
                 override fun write(
                     key: String,
                     value: String?,
@@ -299,11 +452,7 @@ class VideoUploadMetadataCoverageTest {
                 "fixture",
                 inboundShareTextStager = { _, _, _ -> },
             )
-        return ConversationAttachmentReader(
-            state,
-            context,
-            fileBackedLimits = { FileBackedSendLimits(perFileBytes = 64L * MIB, batchCiphertextBytes = 900L * MIB) },
-        )
+        return ConversationAttachmentReader(state, context, fileBackedLimits = { LIMITS })
     }
 
     /** Publishes one scripted pick through the provider and returns its content Uri. */
@@ -322,6 +471,10 @@ class VideoUploadMetadataCoverageTest {
         const val AUTHORITY = "dev.ipf.whitenoise.test.videometadata"
         const val MIB = 1024L * 1024L
         const val LARGE = 40L * MIB
+
+        // The visual album, the fresh Files pick and the Files draft each upload as their own message.
+        const val EXPECTED_IN_MEMORY_UPLOADS = 3
+        val LIMITS = FileBackedSendLimits(perFileBytes = 64L * MIB, batchCiphertextBytes = 900L * MIB)
         val PRIVATE =
             listOf("WNPrivateTitle", "WNPrivateAuthor", "WNPrivateComment", "WNPrivateVideoHandler", "Lavf", "libx264")
     }

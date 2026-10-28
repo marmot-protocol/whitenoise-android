@@ -2056,6 +2056,41 @@ private fun fileBackedController(
     markdownParser = { emptyMarkdownDocument() },
 )
 
+/**
+ * A controller whose native uploads go to [inMemory] or [fromFiles], so a test in another package can inspect the
+ * exact bytes and files a send hands to MDK. Each upload result is accepted and publication succeeds as in
+ * [fileBackedController].
+ */
+internal fun uploadCapturingController(
+    state: WhiteNoiseAppState,
+    inMemory: suspend (MediaUploadRequestFfi) -> MediaUploadResultFfi,
+    fromFiles: suspend (MediaFileUploadRequestFfi) -> MediaUploadResultFfi,
+) = ConversationController(
+    appState = state,
+    initialGroup = group(),
+    initialMemberSnapshot = memberSnapshot(),
+    groupRosterReader = { _, _ -> authoritativeRoster() },
+    mediaUploader = { _, _, request -> inMemory(request) },
+    mediaFileUploader = { _, _, request, _ -> fromFiles(request) },
+    fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
+    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+    mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(mediaReference()).sent) },
+    markdownParser = { emptyMarkdownDocument() },
+)
+
+/** An accepted, not yet published upload result for [count] attachments. */
+internal fun acceptedUploadResult(count: Int) =
+    MediaUploadResultFfi(
+        attachments = List(count) { MediaUploadAttachmentResultFfi(mediaReference(), 4uL) },
+        sent = null,
+    )
+
+/** Joins every fixture-owned IO handoff of an [uploadCapturingController] before the caller resets Main. */
+internal suspend fun finishUploadCapturingFixture(
+    controller: ConversationController,
+    state: WhiteNoiseAppState,
+) = finishMediaFixture(controller, state)
+
 /** A video pick already staged to a private snapshot under the app's upload directory. */
 private fun stagedVideo(state: WhiteNoiseAppState): PendingAttachment {
     val directory = uploadSourcesDirectory(state.appContext.cacheDir)

@@ -20,7 +20,7 @@ class VideoMetadataScrubberFixtureTest {
     @get:Rule
     val temporary = TemporaryFolder()
 
-    /** MP4 tags, 3GPP location, handler names, compressor name and every header time are removed; samples stay. */
+    /** MP4 tags, 3GPP location, handler names, compressor name and every header time go, and samples stay. */
     @Test
     fun taggedMp4LosesItsPrivateFieldsAndKeepsEverySample() {
         val original = videoFixture("mp4-tagged.mp4")
@@ -37,7 +37,7 @@ class VideoMetadataScrubberFixtureTest {
         assertMediaSamplesUnchanged(original, scrubbed)
     }
 
-    /** QuickTime make, model, software, ISO 6709 location and creation date go; the 90 degree matrix stays. */
+    /** QuickTime make, model, software, ISO 6709 location and creation date go, and the 90° matrix stays. */
     @Test
     fun quickTimeKeysAreRemovedAndTheRotationMatrixIsKept() {
         val original = videoFixture("mov-quicktime-keys.mov")
@@ -72,6 +72,21 @@ class VideoMetadataScrubberFixtureTest {
         }
     }
 
+    /**
+     * QuickTime vendor codes are removed everywhere the policy names them: handler component manufacturers and the
+     * vendor of every audio and video sample entry, while every sample stays identical.
+     */
+    @Test
+    fun appleVendorCodesAreZeroedInHandlersAndSampleEntries() {
+        val original = appleVendorMov()
+        assertTrue("four handlers and two sample entries carry the code", original.countAscii("appl") >= 6)
+
+        val scrubbed = scrubbedCopy(original)
+
+        assertEquals(0, scrubbed.countAscii("appl"))
+        assertMediaSamplesUnchanged(original, scrubbed)
+    }
+
     /** The timecode track's time-of-day sample is zeroed in place while video and audio samples stay identical. */
     @Test
     fun timecodeTrackSamplesAreZeroedAndMediaSamplesAreKept() {
@@ -90,7 +105,7 @@ class VideoMetadataScrubberFixtureTest {
         assertMediaSamplesUnchanged(original, scrubbed)
     }
 
-    /** Matroska Tags, attachment, title, date and track names go; mandatory app strings stay empty; clusters stay. */
+    /** Matroska Tags, attachment, title, date and track names go, app strings stay empty and clusters stay. */
     @Test
     fun matroskaTagsAttachmentsAndNamesAreVoidedAndClustersAreKept() {
         assertMatroskaScrubbed(

@@ -87,7 +87,7 @@ internal fun movieHeader(): ByteArray =
         ByteArray(80),
     )
 
-/** One `trak` whose single chunk starts at [chunkOffset]; its `tkhd` uses version 1 to cover 64-bit times. */
+/** One `trak` whose single chunk starts at [chunkOffset]. Its `tkhd` uses version 1 to cover 64-bit times. */
 internal fun trackBox(
     id: Int,
     track: SyntheticTrack,

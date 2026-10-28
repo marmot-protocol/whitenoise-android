@@ -21,9 +21,11 @@ import java.io.File
 import java.nio.ByteBuffer
 
 /**
- * Platform proof for #3376 on a real device or emulator: every tagged fixture, scrubbed in place, loses its location
- * and recording date in Android's own retriever while its frames, duration, rotation and every audio and video sample
- * (bytes, timestamps and flags) through Android's own extractor stay identical to the original.
+ * Platform proof for #3376 on a real device or emulator. A video written by Android's own [MediaMuxer] with a
+ * location and its platform version key loses both when scrubbed, while it still decodes and keeps every sample. The
+ * tagged ffmpeg fixtures, scrubbed in place, report no location or recording date through Android's retriever, keep
+ * their frames, duration, rotation and size, and keep every audio and video sample (bytes, timestamps and flags)
+ * through Android's extractor.
  */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
@@ -43,7 +45,11 @@ class VideoMetadataScrubberDeviceTest {
         directory.deleteRecursively()
     }
 
-    /** The platform retriever finds no location or recording date after scrubbing, and playback metadata is kept. */
+    /**
+     * The platform retriever finds no location or recording date after scrubbing, and playback metadata is kept. The
+     * location proof uses a file Android's own muxer wrote, because the platform extractor reads no location from
+     * the ffmpeg fixtures.
+     */
     @Test
     fun scrubbedFixturesLoseLocationAndDateAndKeepPlaybackMetadata() {
         FIXTURES.forEach { name ->
@@ -51,9 +57,7 @@ class VideoMetadataScrubberDeviceTest {
             val before = retrieve(original)
             val after = retrieve(scrubbed)
             assertNull("$name location", after.location)
-            val date = after.date
-            val noDate = date == null || date.startsWith("1904") || date.startsWith("1970")
-            assertTrue("$name date $date", noDate)
+            assertTrue("$name date ${after.date}", isEmptyDate(after.date))
             assertEquals("$name duration", before.duration, after.duration)
             assertEquals("$name rotation", before.rotation, after.rotation)
             assertEquals("$name size", before.size, after.size)
@@ -64,12 +68,16 @@ class VideoMetadataScrubberDeviceTest {
         val muxed = muxedWithLocation()
         assertTrue("MediaMuxer must record the location", retrieve(muxed).location != null)
         assertTrue("MediaMuxer must record its platform version", carriesAndroidVersion(muxed))
+        val muxedOriginal = muxed.copyTo(File(directory, "muxed-original.mp4"))
         val result = VideoMetadataScrubber.scrub(muxed)
         assertTrue("muxed: $result", result is VideoScrubResult.Scrubbed)
+        assertEquals("muxed size", muxedOriginal.length(), muxed.length())
         val scrubbedMuxed = retrieve(muxed)
         assertNull("muxed location", scrubbedMuxed.location)
+        assertTrue("muxed date ${scrubbedMuxed.date}", isEmptyDate(scrubbedMuxed.date))
         assertTrue("muxed must decode a frame", scrubbedMuxed.decodedFrame)
         assertFalse("muxed version key", carriesAndroidVersion(muxed))
+        assertEquals("muxed samples", mediaSamples(muxedOriginal), mediaSamples(muxed))
         val rotation = retrieve(copies(MOV).second).rotation
         assertTrue("the rotated QuickTime fixture keeps its matrix, got $rotation", rotation in setOf("90", "270"))
     }
@@ -154,6 +162,9 @@ class VideoMetadataScrubberDeviceTest {
             extractor.advance()
         }
     }
+
+    /** Whether a retriever [date] is absent or a zeroed MP4 time, read as 1904 or the Unix epoch. */
+    private fun isEmptyDate(date: String?): Boolean = date == null || date.startsWith("1904") || date.startsWith("1970")
 
     /** Whether [file] still holds the `com.android.version` key MediaMuxer writes into the movie. */
     private fun carriesAndroidVersion(file: File): Boolean = ANDROID_VERSION_KEY in file.readText(Charsets.ISO_8859_1)

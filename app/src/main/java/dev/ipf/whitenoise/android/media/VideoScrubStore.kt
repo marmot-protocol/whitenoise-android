@@ -6,7 +6,7 @@ import java.io.RandomAccessFile
 // Bytes read ahead from a file, so a sequential walk over small headers costs one system call per window.
 private const val FILE_WINDOW_BYTES = 16 * 1024
 
-// Header and field reads at most this long use the window; table and zero-scan blocks read the file directly.
+// Header and field reads at most this long use the window. Table and zero-scan blocks read the file directly.
 private const val FILE_WINDOWED_READ_BYTES = 64
 
 // Shared zero source for overwriting file ranges in bounded writes.
@@ -48,7 +48,7 @@ private fun checkStoreRange(
     if (position < 0L || length < 0L || position > size - length) throw EOFException("range outside the video")
 }
 
-/** A writable file with a read-ahead window; writes update the window so later reads see them. */
+/** A writable file with a read-ahead window. Writes update the window so later reads see them. */
 internal class FileScrubStore(
     private val file: RandomAccessFile,
 ) : ScrubStore {
@@ -222,6 +222,35 @@ internal class CopyOnWriteScrubStore(
     }
 }
 
+/** Reads through to [delegate] and drops every write, so the scrubber's walk can classify bytes it must not change. */
+internal class ReadOnlyScrubStore(
+    private val delegate: ScrubStore,
+) : ScrubStore {
+    override val size: Long get() = delegate.size
+
+    /** Reads from the delegate. */
+    override fun read(
+        position: Long,
+        target: ByteArray,
+        offset: Int,
+        length: Int,
+    ) = delegate.read(position, target, offset, length)
+
+    /** Drops the write. */
+    override fun write(
+        position: Long,
+        source: ByteArray,
+        offset: Int,
+        length: Int,
+    ) = Unit
+
+    /** Drops the write. */
+    override fun zero(
+        position: Long,
+        length: Long,
+    ) = Unit
+}
+
 /** Big-endian field reads over a [ScrubStore] through one reusable scratch buffer. */
 internal class ScrubReader(
     val store: ScrubStore,
@@ -242,7 +271,7 @@ internal class ScrubReader(
     /** One unsigned big-endian 32-bit value at [position]. */
     fun u32(position: Long): Long = unsigned(position, Int.SIZE_BYTES)
 
-    /** One big-endian 64-bit value at [position]; values above [Long.MAX_VALUE] read as negative. */
+    /** One big-endian 64-bit value at [position], where values above [Long.MAX_VALUE] read as negative. */
     fun u64(position: Long): Long = unsigned(position, Long.SIZE_BYTES)
 
     /** The [width] bytes at [position] as one big-endian number. */
@@ -260,7 +289,7 @@ internal class ScrubReader(
 
     /**
      * Whether every byte from [position] to the end of the store is zero, which some writers leave as padding after
-     * the last box or element. A non-zero first byte answers from the read window; the rest is read in blocks.
+     * the last box or element. A non-zero first byte answers from the read window, and the rest is read in blocks.
      */
     fun isZeroTail(position: Long): Boolean {
         if (position < size && u8(position) != 0) return false
@@ -295,7 +324,7 @@ internal class ScrubReader(
 
 /**
  * Bounds one walk: the total number of boxes or elements visited and their nesting depth. Hostile files reach a
- * refusal quickly instead of spending unbounded time; real recordings stay far below both limits.
+ * refusal quickly instead of spending unbounded time, and real recordings stay far below both limits.
  */
 internal class ScrubBudget {
     private var visited = 0

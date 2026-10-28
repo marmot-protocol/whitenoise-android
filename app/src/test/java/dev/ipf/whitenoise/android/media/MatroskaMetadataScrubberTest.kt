@@ -11,7 +11,7 @@ import org.junit.Test
  * size forms, CRC-32 handling, and malformed or unsupported EBML. Each case states the result and what changed.
  */
 class MatroskaMetadataScrubberTest {
-    /** Open-ended Segments and Clusters end at the next segment-level element; metadata goes, frames stay. */
+    /** Open-ended Segments and Clusters end at the next segment-level element. Metadata goes and frames stay. */
     @Test
     fun unknownSizeSegmentAndClustersAreScrubbedAndTheirFramesKept() {
         val firstCluster = openCluster(0, "frame-one")
@@ -136,7 +136,7 @@ class MatroskaMetadataScrubberTest {
         }
     }
 
-    /** Zero padding after the last element is accepted; another open-ended Segment ends the previous one. */
+    /** Zero padding after the last element is accepted, and another open-ended Segment ends the previous one. */
     @Test
     fun paddingAndChainedSegmentsAreAccepted() {
         val padded = concat(ebmlHeader(), ebml(SEGMENT, info()), ByteArray(12))

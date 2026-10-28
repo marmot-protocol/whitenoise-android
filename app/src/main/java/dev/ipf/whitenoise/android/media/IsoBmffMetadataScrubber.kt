@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.media.IsoBoxTypes.MOOV
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.MVEX
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.MVHD
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.SKIP
+import dev.ipf.whitenoise.android.media.IsoBoxTypes.SOUN
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.STBL
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.STCO
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.STSC
@@ -29,7 +30,7 @@ import dev.ipf.whitenoise.android.media.IsoBoxTypes.TRAK
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.VIDE
 import dev.ipf.whitenoise.android.media.IsoBoxTypes.WIDE
 
-/** What the walk learned about one track; its samples are handled once the whole movie box has been read. */
+/** What the walk learned about one track, whose samples are handled once the whole movie box has been read. */
 internal class IsoTrackScan {
     var handler: Int = 0
     var sampleDescriptions: IsoBox? = null
@@ -39,7 +40,7 @@ internal class IsoTrackScan {
     var externalData: Boolean = false
 }
 
-/** Nesting levels the walk descends into; every other box is kept or rewritten without being opened. */
+/** Nesting levels the walk descends into. Every other box is kept or rewritten without being opened. */
 private enum class IsoLevel {
     Movie,
     Track,
@@ -54,11 +55,11 @@ private enum class IsoLevel {
 
 /**
  * Scrubs one ISO BMFF or QuickTime file in place, following the policy documented on [VideoMetadataScrubber].
- * A first pass validates the top level and records the movie, media data and fragments; the second rewrites.
+ * A first pass validates the top level and records the movie, media data and fragments, and a second rewrites.
  */
 internal class IsoBmffMetadataScrubber(
     private val reader: ScrubReader,
-) {
+) : ContainerWalk {
     private val budget = ScrubBudget()
     private val editor = IsoBoxEditor(reader, budget)
     private val mediaData = MediaDataRanges()
@@ -66,8 +67,12 @@ internal class IsoBmffMetadataScrubber(
     private var currentTrack: IsoTrackScan? = null
     private var fragmented = false
 
+    /** Tracks whose media handler is video, counted as the walk meets them, so a refused walk still reports them. */
+    override var videoTracks = 0
+        private set
+
     /** Validates, rewrites and summarizes the whole file. */
-    fun scrub(): VideoScrubSummary {
+    override fun scrub(): VideoScrubSummary {
         var movies = 0
         forEachTopLevelBox { box ->
             when (box.type) {
@@ -83,7 +88,13 @@ internal class IsoBmffMetadataScrubber(
         val samples = IsoSampleZeroing(reader, mediaData)
         var zeroedSampleBytes = 0L
         tracks.forEach { track -> zeroedSampleBytes += finishTrack(track, samples) }
-        return VideoScrubSummary(VideoContainer.IsoBmff, editor.neutralized, editor.zeroedFields, zeroedSampleBytes)
+        return VideoScrubSummary(
+            VideoContainer.IsoBmff,
+            editor.neutralized,
+            editor.zeroedFields,
+            zeroedSampleBytes,
+            videoTracks,
+        )
     }
 
     /** Calls [action] for every top-level box, tolerating only zero padding after the last one. */
@@ -113,7 +124,7 @@ internal class IsoBmffMetadataScrubber(
         }
     }
 
-    /** Visits each child of [container]; QuickTime may end a child list with a few zero bytes. */
+    /** Visits each child of [container]. QuickTime may end a child list with a few zero bytes. */
     private fun walk(
         container: IsoBox,
         level: IsoLevel,
@@ -160,7 +171,7 @@ internal class IsoBmffMetadataScrubber(
         }
     }
 
-    /** Movie header times, tracks and fragment declarations; a compressed movie cannot be inspected. */
+    /** Movie header times, tracks and fragment declarations — a compressed movie cannot be inspected. */
     private fun scrubMovieChild(
         child: IsoBox,
         depth: Int,
@@ -190,8 +201,9 @@ internal class IsoBmffMetadataScrubber(
         when (child.type) {
             MDHD -> editor.zeroTimes(child)
             HDLR -> {
-                val handler = editor.zeroHandlerName(child)
+                val handler = editor.zeroHandlerVendorAndName(child)
                 currentTrack?.handler = handler
+                if (handler == VIDE) videoTracks += 1
             }
             MINF -> walk(child, IsoLevel.MediaInfo, depth + 1)
         }
@@ -203,13 +215,13 @@ internal class IsoBmffMetadataScrubber(
         depth: Int,
     ) {
         when (child.type) {
-            HDLR -> editor.zeroHandlerName(child)
+            HDLR -> editor.zeroHandlerVendorAndName(child)
             DINF -> walk(child, IsoLevel.DataInfo, depth + 1)
             STBL -> walk(child, IsoLevel.SampleTable, depth + 1)
         }
     }
 
-    /** Remembers the sample tables a track's policy needs; a duplicate table is ambiguous. */
+    /** Remembers the sample tables a track's policy needs, refusing a duplicate table as ambiguous. */
     private fun recordSampleTable(child: IsoBox) {
         val track = currentTrack ?: return
         when (child.type) {
@@ -230,8 +242,8 @@ internal class IsoBmffMetadataScrubber(
     ): Long {
         if (track.externalData) unsupportedVideo()
         return when {
-            track.handler == VIDE -> {
-                track.sampleDescriptions?.let(editor::zeroVisualEntryNames)
+            track.handler == VIDE || track.handler == SOUN -> {
+                track.sampleDescriptions?.let { editor.zeroSampleEntryVendors(it, visual = track.handler == VIDE) }
                 0L
             }
             track.handler in KEPT_HANDLERS -> 0L
@@ -247,7 +259,7 @@ internal class IsoBmffMetadataScrubber(
         // Boxes that only carry descriptive metadata at every level the walk opens.
         private val NEUTRALIZED = setOf("udta", "meta", "uuid", "prft").map(::isoFourCc).toSet()
 
-        // Top-level boxes that make up a movie's layout; every other top-level box is neutralized.
+        // Top-level boxes that make up a movie's layout. Every other top-level box is neutralized.
         private val KEPT_TOP_LEVEL = setOf(FTYP, MDAT) + setOf("styp", "sidx", "ssix", "pdin", "mfra").map(::isoFourCc)
 
         // Track handlers whose samples are audio-visual or user-visible content and are never touched.

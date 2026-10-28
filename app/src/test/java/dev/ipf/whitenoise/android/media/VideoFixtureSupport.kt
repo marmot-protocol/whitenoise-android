@@ -19,6 +19,28 @@ internal fun videoFixture(name: String): ByteArray {
 /** Anchors resource lookups to this test source set. */
 private object VideoFixtureMarker
 
+/**
+ * The QuickTime fixture with Apple's `appl` vendor code written into every handler's component manufacturer and
+ * every audio and video sample entry's vendor, as QuickTime writers record them.
+ */
+internal fun appleVendorMov(): ByteArray {
+    val bytes = videoFixture("mov-quicktime-keys.mov")
+    val iso = TestIso(bytes)
+    val boxes = iso.descendants()
+    val appl = ascii("appl")
+    boxes.filter { it.type == "hdlr" }.forEach { appl.copyInto(bytes, it.payload + 12) }
+    boxes.filter { it.type == "stsd" }.forEach { stsd ->
+        iso.children(stsd.payload + 8, stsd.end).forEach { entry -> appl.copyInto(bytes, entry.payload + 12) }
+    }
+    return bytes
+}
+
+/** How many times [text] occurs in [bytes] as ASCII. */
+internal fun ByteArray.countAscii(text: String): Int {
+    val needle = text.toByteArray(Charsets.US_ASCII)
+    return (0..size - needle.size).count { start -> needle.indices.all { this[start + it] == needle[it] } }
+}
+
 /** Whether [bytes] contain [text] as ASCII. */
 internal fun ByteArray.containsAscii(text: String): Boolean = indexOf(text.toByteArray(Charsets.US_ASCII)) >= 0
 
@@ -98,6 +120,7 @@ internal class TestIso(
     fun descendants(): List<TestBox> {
         val found = mutableListOf<TestBox>()
 
+        /** Records [box] and, when it is a container this reader opens, every box inside it. */
         fun visit(box: TestBox) {
             found += box
             val start =

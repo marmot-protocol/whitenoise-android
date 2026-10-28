@@ -11,7 +11,7 @@ import org.junit.Test
  * external references and malformed sizes. Each case states the result and what changed, and never throws.
  */
 class IsoBmffMetadataScrubberTest {
-    /** Timed-metadata samples are zeroed through every size and offset table form; media samples stay. */
+    /** Timed-metadata samples are zeroed through every size and offset table form, and media samples stay. */
     @Test
     fun timedMetadataSamplesAreZeroedThroughEverySampleTableForm() {
         val forms =
@@ -42,7 +42,7 @@ class IsoBmffMetadataScrubberTest {
         }
     }
 
-    /** Header times, handler names and the video vendor and compressor name are zeroed; layout and size stay. */
+    /** Header times, handler names and the video vendor and compressor name are zeroed, and layout and size stay. */
     @Test
     fun headerTimesHandlerNamesAndCompressorNamesAreZeroed() {
         val movie = syntheticMovie(listOf(SyntheticTrack("vide", samples(listOf(8), 0x21))))
@@ -86,7 +86,7 @@ class IsoBmffMetadataScrubberTest {
         assertTrue(iso.descendants().none { it.type == "udta" || it.type == "uuid" })
     }
 
-    /** A media data box with size zero runs to the end of the file; inside a container the same size is refused. */
+    /** A media data box with size zero runs to the end of the file, but inside a container that size is refused. */
     @Test
     fun sizeZeroIsOnlyAcceptedAtTheTopLevel() {
         val movie = syntheticMovie(listOf(SyntheticTrack("meta", samples(listOf(6), 0x51))), mediaDataLast = true)
@@ -169,7 +169,7 @@ class IsoBmffMetadataScrubberTest {
         assertTrue(scrubbed.indexOf(sidx) > 0)
     }
 
-    /** Zero padding after the last box is accepted; anything else after it is refused. */
+    /** Zero padding after the last box is accepted, and anything else after it is refused. */
     @Test
     fun onlyZeroPaddingMayFollowTheLastBox() {
         val movie = syntheticMovie(listOf(SyntheticTrack("vide", samples(listOf(8), 0x21))))

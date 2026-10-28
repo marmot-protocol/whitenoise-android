@@ -8,7 +8,7 @@ internal class MediaDataRanges {
     private val bounds = LongArray(MAX_RANGES * 2)
     private var count = 0
 
-    /** Records one `mdat` payload; ranges beyond the cap are not recorded, so samples there are refused. */
+    /** Records one `mdat` payload. Ranges beyond the cap are not recorded, so samples there are refused. */
     fun add(
         start: Long,
         end: Long,
@@ -119,7 +119,7 @@ internal class SampleSizes(
         return total
     }
 
-    /** One table entry; 4-bit fields hold two samples per byte, the first in the high nibble. */
+    /** One table entry. 4-bit fields hold two samples per byte, the first in the high nibble. */
     private fun nextSize(cursor: TableCursor): Long =
         when {
             fieldBits != NIBBLE_BITS -> cursor.next(fieldBits / Byte.SIZE_BITS)
@@ -166,7 +166,7 @@ internal class SampleToChunkRuns(
     }
 
     /**
-     * Samples in the 1-based [chunk]; chunks are asked for in increasing order from 1, so a table whose first run
+     * Samples in the 1-based [chunk]. Chunks are asked for in increasing order from 1, so a table whose first run
      * does not start at chunk 1 is refused before any chunk is zeroed.
      */
     fun samplesIn(chunk: Long): Long {
@@ -247,7 +247,7 @@ internal class ChunkOffsets(
     private val width = if (box.type == IsoBoxTypes.CO64) Long.SIZE_BYTES else Int.SIZE_BYTES
     private val cursor: TableCursor
 
-    /** How many chunks the table declares; it was checked against the table's length. */
+    /** How many chunks the table declares, checked against the table's length. */
     val count: Long
 
     init {
@@ -258,7 +258,7 @@ internal class ChunkOffsets(
         cursor = TableCursor(reader, start, start + count * width)
     }
 
-    /** The next chunk's file offset; a 64-bit offset above [Long.MAX_VALUE] reads as negative. */
+    /** The next chunk's file offset, where a 64-bit offset above [Long.MAX_VALUE] reads as negative. */
     fun next(): Long = cursor.next(width)
 
     private companion object {

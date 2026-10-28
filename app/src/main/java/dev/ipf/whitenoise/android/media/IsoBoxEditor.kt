@@ -42,6 +42,7 @@ internal object IsoBoxTypes {
     val CO64 = isoFourCc("co64")
     val TRAF = isoFourCc("traf")
     val VIDE = isoFourCc("vide")
+    val SOUN = isoFourCc("soun")
 }
 
 /**
@@ -59,7 +60,7 @@ internal class IsoBoxEditor(
 
     /**
      * Reads the box header at [position], refusing one that does not fit inside [limit]. A 64-bit largesize is
-     * supported; a zero size runs to [limit] and is only valid at the top level ([allowToEnd]).
+     * supported, and a zero size runs to [limit] and is only valid at the top level ([allowToEnd]).
      */
     fun readBox(
         position: Long,
@@ -109,31 +110,37 @@ internal class IsoBoxEditor(
     }
 
     /**
-     * Zeroes the name after a handler's fixed fields, an empty string in both ISO and QuickTime form, and returns
-     * the handler type.
+     * Zeroes everything after a handler's type: the QuickTime component manufacturer, flags and mask (reserved zero
+     * in ISO) and the name, which becomes an empty string in both forms. Returns the handler type.
      */
-    fun zeroHandlerName(hdlr: IsoBox): Int {
+    fun zeroHandlerVendorAndName(hdlr: IsoBox): Int {
         if (hdlr.payloadSize < HANDLER_NAME_OFFSET) malformedVideo()
-        val nameStart = hdlr.payload + HANDLER_NAME_OFFSET
-        if (hdlr.end > nameStart) {
-            reader.store.zero(nameStart, hdlr.end - nameStart)
-            zeroedFields += 1
-        }
+        val vendorStart = hdlr.payload + HANDLER_VENDOR_OFFSET
+        reader.store.zero(vendorStart, hdlr.end - vendorStart)
+        zeroedFields += 1
         return reader.u32(hdlr.payload + HANDLER_TYPE_OFFSET).toInt()
     }
 
-    /** Zeroes the vendor and compressor name of every visual sample entry in a video track's `stsd`. */
-    fun zeroVisualEntryNames(stsd: IsoBox) {
+    /**
+     * Zeroes the four-byte vendor of every sample entry in an audio or video track's `stsd` (reserved zero in ISO),
+     * and with [visual] also each visual entry's compressor name.
+     */
+    fun zeroSampleEntryVendors(
+        stsd: IsoBox,
+        visual: Boolean,
+    ) {
         forEachEntry(stsd) { entry ->
-            if (entry.payloadSize >= COMPRESSOR_NAME_END) {
+            if (entry.payloadSize >= VENDOR_OFFSET + Int.SIZE_BYTES) {
                 reader.store.zero(entry.payload + VENDOR_OFFSET, Int.SIZE_BYTES.toLong())
-                reader.store.zero(entry.payload + COMPRESSOR_NAME_OFFSET, COMPRESSOR_NAME_END - COMPRESSOR_NAME_OFFSET)
                 zeroedFields += 1
+            }
+            if (visual && entry.payloadSize >= COMPRESSOR_NAME_END) {
+                reader.store.zero(entry.payload + COMPRESSOR_NAME_OFFSET, COMPRESSOR_NAME_END - COMPRESSOR_NAME_OFFSET)
             }
         }
     }
 
-    /** Whether every entry of a `dref` is self-contained; any other entry names a file outside this one. */
+    /** Whether every entry of a `dref` is self-contained. Any other entry names a file outside this one. */
     fun dataReferencesSelfContained(dref: IsoBox): Boolean {
         var selfContained = true
         forEachEntry(dref) { entry ->
@@ -167,9 +174,10 @@ internal class IsoBoxEditor(
         private const val FULL_BOX_FIELDS = 4L
         private const val SELF_CONTAINED_FLAG = 1L
         private const val HANDLER_TYPE_OFFSET = 8L
+        private const val HANDLER_VENDOR_OFFSET = 12L
         private const val HANDLER_NAME_OFFSET = 24L
 
-        // Visual sample entry fields, counted from the end of the entry's box header.
+        // Sample entry fields, counted from the end of the entry's box header. Audio and video share the vendor.
         private const val VENDOR_OFFSET = 12L
         private const val COMPRESSOR_NAME_OFFSET = 42L
         private const val COMPRESSOR_NAME_END = 74L

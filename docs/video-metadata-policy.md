@@ -18,15 +18,18 @@ The output therefore has the input's size, every offset and index stays valid,
 the audio and video sample bytes are never touched, and scrubbing a scrubbed
 file changes nothing.
 
-Content decides the container, never the reported MIME type. Every size and
-offset is checked against the file, nesting depth and element count are
-bounded, and sample tables are streamed through fixed buffers.
+The scrubber detects the container from the content, never from the reported
+MIME type. Every size and offset is checked against the file, nesting depth and
+element count are bounded, and sample tables are streamed through fixed
+buffers. `VideoMetadataScrubber.classify` runs the same walk over a read-only
+view of the bytes, so deciding whether a file is a video and cleaning it never
+disagree.
 
 ## Policy
 
 | Container | Removed | Kept |
 | --- | --- | --- |
-| ISO BMFF and QuickTime (MP4, MOV, M4V, 3GP, 3G2) | `udta` (including `©xyz` and 3GPP `loci` locations, authors, titles, comments and the encoder tag), `meta` (including QuickTime keys such as make, model, software, ISO 6709 location and creation date), `uuid` (for example XMP) and `prft` boxes in the movie, track, media and fragment structure, and every top-level box outside the movie layout, all become zeroed `free` boxes. Existing `free`, `skip` and `wide` payloads are zeroed. `mvhd`, `tkhd` and `mdhd` creation and modification times are zeroed. Handler names, and the vendor and compressor name of video sample entries, are zeroed. Every sample of a timed-metadata track is zeroed inside its `mdat`: any handler other than video, audio, auxiliary video, picture, subtitle and text, for example location, timecode, camera motion, hint or vendor telemetry tracks. | `ftyp`, the track structure, timing, edit lists, the display matrix (rotation), dimensions, sample descriptions and codec configuration, language, track references, `sidx`, `mfra`, the metadata tracks themselves (with zeroed samples) and every audio and video sample. |
+| ISO BMFF and QuickTime (MP4, MOV, M4V, 3GP, 3G2) | `udta` (including `©xyz` and 3GPP `loci` locations, authors, titles, comments and the encoder tag), `meta` (including QuickTime keys such as make, model, software, ISO 6709 location and creation date), `uuid` (for example XMP) and `prft` boxes in the movie, track, media and fragment structure, and every top-level box outside the movie layout, all become zeroed `free` boxes. Existing `free`, `skip` and `wide` payloads are zeroed. `mvhd`, `tkhd` and `mdhd` creation and modification times are zeroed. Everything after each handler's type is zeroed: the QuickTime component manufacturer, flags and mask, and the handler name. The vendor of every audio and video sample entry, and the compressor name of video sample entries, are zeroed. Every sample of a timed-metadata track is zeroed inside its `mdat`: any handler other than video, audio, auxiliary video, picture, subtitle and text, for example location, timecode, camera motion, hint or vendor telemetry tracks. | `ftyp`, the track structure, timing, edit lists, the display matrix (rotation), dimensions, sample descriptions other than their vendor and compressor name, codec configuration, language, track references, `sidx`, `mfra`, the metadata tracks themselves (with zeroed samples) and every audio and video sample. |
 | Matroska and WebM | `Tags`, `Attachments`, `Chapters` and unknown Segment-level elements become `Void` elements of the same length. Segment and neighbouring file names, the recording date (`DateUTC`), the title, and track and codec names are voided. The mandatory muxing and writing application strings are kept as empty strings. `CRC-32` elements of the rewritten `Info` and `Tracks` are voided, and existing `Void` bodies are zeroed. | The EBML header, `SeekHead`, `Cues`, every `Cluster`, track numbers, codec IDs and private data, language, timestamp scale, duration and the random Segment and track identifiers. |
 
 Not covered:
@@ -38,19 +41,47 @@ Not covered:
   Some cameras, such as drones, write location telemetry into subtitle tracks.
 - The file name, which follows the existing display-name sanitizing, and what
   the choice of codec or container reveals.
-- A video whose provider reports a non-video MIME type. It is sent through the
-  Files path as a generic document, and generic documents stay byte-for-byte.
-- Forwarding an existing message, which reuses its uploaded reference. Earlier
-  uploads are not sanitized retroactively.
+- Through Files, a video in a format the classifier does not recognise (for
+  example a raw elementary stream or DV), and an ISO BMFF or Matroska file
+  reported with a non-video type whose walk is refused before it reaches a video
+  track. Both are sent as ordinary documents, byte-for-byte.
+- Forwarding an existing message, which re-uploads its original plaintext
+  unchanged. Earlier uploads are not sanitized retroactively.
+
+## How each path decides
+
+The visual picker (Photo Picker, gallery and shared media) and its drafts decide
+by reported type: anything reported as `video/*` is scrubbed, and refused if the
+scrubber cannot clean it.
+
+The Files picker and its drafts decide by content first, because Android's MIME
+table maps some ordinary files to `video/*` (a TypeScript `.ts` file is reported
+as `video/mp2t`) and some providers report videos as `application/octet-stream`:
+
+| Content | Reported `video/*` | Reported anything else |
+| --- | --- | --- |
+| ISO BMFF or Matroska with a video track | Scrubbed, refused if that fails | Scrubbed, refused if that fails |
+| ISO BMFF or Matroska without a video track (for example `.m4a` or audio-only WebM) | Scrubbed, refused if that fails | Sent byte-for-byte |
+| A video container the scrubber cannot clean: AVI, MPEG-TS or M2TS, MPEG-PS, ASF, FLV, Ogg, RealMedia or MXF | Refused | Sent byte-for-byte (for example `audio/ogg` or `.wma`) |
+| Anything else | Sent byte-for-byte | Sent byte-for-byte |
+
+Imported audio keeps its original data, so audio-only containers are cleaned
+only when they are reported as video.
 
 ## Refusals
 
-A container the scrubber does not handle (for example AVI, MPEG transport
-streams or WMV), a malformed structure, a fragmented MP4 with timed-metadata
-tracks, a compressed QuickTime movie box and a track whose samples live in
-another file are refused. The user sees a notice that private details could not
-be removed and the video is not attached. The app never falls back to the
-original bytes.
+A visual pick reported as video, or a Files pick refused by the table above, is
+not attached when the scrubber cannot clean it: an unsupported container (for
+example AVI, MPEG transport streams or WMV), a malformed structure, a fragmented
+MP4 with timed-metadata tracks, a compressed QuickTime movie box or a track
+whose samples live in another file. The user sees a notice that private details
+could not be removed. The app never falls back to the original bytes.
+
+Known limit: bytes after the last top-level box are accepted only when they are
+all zero, so a recording with a non-box trailer after the movie is refused rather
+than cleaned. Recordings from real phones (Pixel, Samsung including slow
+motion, and iPhone) have not been measured against this rule yet, and nothing
+here claims that every phone recording is accepted.
 
 ## Entry points
 
@@ -62,12 +93,14 @@ Every local video selection reaches the scrubber before preparation accepts it:
 - Large videos staged to a private file:
   `ConversationAttachmentReader.readFileBackedVideo` scrubs the snapshot inside
   `FileBackedPickBudget.stage`, before the probe and before any disk is reserved.
-- Files picker: a document whose MIME type is `video/*` is scrubbed in memory in
-  `readRawDocument` or as a staged snapshot in `readFileBackedDocument`.
+- Files picker: `readRawDocument` (in memory) and `readFileBackedDocument`
+  (staged snapshot) apply the content routing above.
 - Prepared and native drafts, including drafts an older app version saved:
-  `prepareStagedAttachments` re-checks every prepared video with
-  `removePreparedVideoMetadata` on a copy, so the native draft's own array is
-  never rewritten and clean drafts are reused without a copy.
+  `prepareStagedAttachments` re-checks visual drafts with
+  `removePreparedVideoMetadata` and Files drafts with
+  `removePreparedDocumentVideoMetadata`. Both work on a copy, so the native
+  draft's own array is never rewritten and clean drafts are reused without a
+  copy. A video draft that carries a staged file instead of bytes is refused.
 
 Incoming shares are imported into app-private files and then read through the
 same readers. The in-app camera captures photos only.
@@ -78,7 +111,10 @@ same readers. The in-app camera captures photos only.
 timecode MP4, Matroska and live WebM fixtures with ffmpeg. The JVM tests
 `VideoMetadataScrubberFixtureTest`, `IsoBmffMetadataScrubberTest` and
 `MatroskaMetadataScrubberTest` check removal, sample identity, size, idempotence
-and malformed input. `VideoUploadMetadataCoverageTest` drives every entry point
-above. `VideoMetadataScrubberDeviceTest` plays each scrubbed fixture through
-Android's own retriever and extractor and compares every sample with the
-original.
+and malformed input, and `VideoContentClassifierTest` checks every routing row
+and container signature. `VideoUploadMetadataCoverageTest` sends tagged picks
+and a legacy draft through `ConversationMediaSender.sendStagedAttachments` and
+reads the exact bytes and files handed to MDK, and drives every reader path
+above. `VideoMetadataScrubberDeviceTest` scrubs a video written by Android's own
+`MediaMuxer` with a location, and plays each scrubbed fixture through Android's
+retriever and extractor, comparing every sample with the original.

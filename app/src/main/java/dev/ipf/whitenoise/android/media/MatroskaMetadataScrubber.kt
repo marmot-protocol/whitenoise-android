@@ -11,18 +11,22 @@ internal data class EbmlElement(
 
 /**
  * Scrubs one Matroska or WebM file in place, following the policy documented on [VideoMetadataScrubber]. Only the
- * Segment's Info and Tracks are opened; clusters are skipped by size, and an unknown-size Segment or Cluster ends at
+ * Segment's Info and Tracks are opened. Clusters are skipped by size, and an unknown-size Segment or Cluster ends at
  * the first element that can only appear at its own level.
  */
 internal class MatroskaMetadataScrubber(
     private val reader: ScrubReader,
-) {
+) : ContainerWalk {
     private val budget = ScrubBudget()
     private var voided = 0
     private var zeroedFields = 0
 
+    /** TrackEntries whose TrackType is video, counted as the walk meets them, so a refused walk still reports them. */
+    override var videoTracks = 0
+        private set
+
     /** Validates the EBML header, scrubs every Segment and summarizes the rewrite. */
-    fun scrub(): VideoScrubSummary {
+    override fun scrub(): VideoScrubSummary {
         val header = readElement(0L, reader.size)
         if (header.id != EBML || header.unknownSize) malformedVideo()
         checkDocType(header)
@@ -38,10 +42,10 @@ internal class MatroskaMetadataScrubber(
                 }
         }
         if (segments == 0) malformedVideo()
-        return VideoScrubSummary(VideoContainer.Matroska, voided, zeroedFields, 0L)
+        return VideoScrubSummary(VideoContainer.Matroska, voided, zeroedFields, 0L, videoTracks)
     }
 
-    /** Only Matroska and WebM document types are understood; a missing DocType means Matroska. */
+    /** Only Matroska and WebM document types are understood, and a missing DocType means Matroska. */
     private fun checkDocType(header: EbmlElement) {
         forEachChild(header, depth = 1) { child ->
             if (child.id == DOC_TYPE) {
@@ -110,11 +114,19 @@ internal class MatroskaMetadataScrubber(
                     zeroedFields += 1
                 }
                 TRACK_ENTRY -> if (master.id == TRACKS) walkMaster(child, depth + 1)
+                TRACK_TYPE -> if (master.id == TRACK_ENTRY) countVideoTrack(child)
             }
         }
     }
 
-    /** Visits the sized children of [master]; an unknown-size child is only valid for Segments and Clusters. */
+    /** Counts a TrackEntry whose TrackType, an unsigned integer of 1 to 8 bytes, says video. */
+    private fun countVideoTrack(trackType: EbmlElement) {
+        val length = trackType.end - trackType.dataStart
+        if (length !in 1..Long.SIZE_BYTES) malformedVideo()
+        if (reader.unsigned(trackType.dataStart, length.toInt()) == VIDEO_TRACK_TYPE) videoTracks += 1
+    }
+
+    /** Visits the sized children of [master]. An unknown-size child is only valid for Segments and Clusters. */
     private inline fun forEachChild(
         master: EbmlElement,
         depth: Int,
@@ -159,17 +171,17 @@ internal class MatroskaMetadataScrubber(
 
     /**
      * Reads the element header at [position]: a 1 to 4 byte ID and a 1 to 8 byte size. An unknown (all ones) size
-     * runs to [limit]; any other size must fit inside it.
+     * runs to [limit], and any other size must fit inside it.
      */
     private fun readElement(
         position: Long,
         limit: Long,
     ): EbmlElement {
         budget.visit()
-        val idLength = vintLength(position, limit, MAX_ID_BYTES)
+        val idLength = reader.vintLength(position, limit, MAX_ID_BYTES)
         val id = reader.unsigned(position, idLength)
         val sizePosition = position + idLength
-        val sizeLength = vintLength(sizePosition, limit, MAX_SIZE_BYTES)
+        val sizeLength = reader.vintLength(sizePosition, limit, MAX_SIZE_BYTES)
         val valueBits = (Byte.SIZE_BITS - 1) * sizeLength
         val unknownValue = (1L shl valueBits) - 1
         val size = reader.unsigned(sizePosition, sizeLength) and unknownValue
@@ -177,20 +189,6 @@ internal class MatroskaMetadataScrubber(
         val unknown = size == unknownValue
         if (!unknown && size > limit - dataStart) malformedVideo()
         return EbmlElement(id, position, dataStart, if (unknown) limit else dataStart + size, unknown)
-    }
-
-    /** The byte length of the variable-length integer at [position], from its leading marker bit. */
-    private fun vintLength(
-        position: Long,
-        limit: Long,
-        maxLength: Int,
-    ): Int {
-        if (position >= limit) malformedVideo()
-        val first = reader.u8(position)
-        if (first == 0) malformedVideo()
-        val length = Integer.numberOfLeadingZeros(first) - (Int.SIZE_BITS - Byte.SIZE_BITS) + 1
-        if (length > maxLength || length > limit - position) malformedVideo()
-        return length
     }
 
     private companion object {
@@ -215,6 +213,8 @@ internal class MatroskaMetadataScrubber(
         const val VOID = 0xECL
         const val CRC32 = 0xBFL
         const val TRACK_ENTRY = 0xAEL
+        const val TRACK_TYPE = 0x83L
+        const val VIDEO_TRACK_TYPE = 1L
 
         // Optional strings and dates that identify the recording, its files or its device: removed entirely.
         val VOIDED_FIELDS =
@@ -238,4 +238,18 @@ internal class MatroskaMetadataScrubber(
         // IDs that can only start a new Segment-level element, so they end an unknown-size Cluster.
         val SEGMENT_LEVEL = setOf(CLUSTER, CUES, TAGS, ATTACHMENTS, CHAPTERS, INFO, TRACKS, SEEK_HEAD, SEGMENT, EBML)
     }
+}
+
+/** The byte length of the variable-length integer at [position], from its leading marker bit, at most [maxLength]. */
+private fun ScrubReader.vintLength(
+    position: Long,
+    limit: Long,
+    maxLength: Int,
+): Int {
+    if (position >= limit) malformedVideo()
+    val first = u8(position)
+    if (first == 0) malformedVideo()
+    val length = Integer.numberOfLeadingZeros(first) - (Int.SIZE_BITS - Byte.SIZE_BITS) + 1
+    if (length > maxLength || length > limit - position) malformedVideo()
+    return length
 }

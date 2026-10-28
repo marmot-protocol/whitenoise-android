@@ -36,7 +36,7 @@ class MediaPipelineVideoReadTest {
     }
 
     /**
-     * A copied video whose probe fails still releases the retriever; the probe already sees the scrubbed copy, so
+     * A copied video whose probe fails still releases the retriever. The probe already sees the scrubbed copy, so
      * private metadata is removed before anything reads the file.
      */
     @Test
@@ -45,7 +45,7 @@ class MediaPipelineVideoReadTest {
         val uri = Uri.parse("content://$AUTHORITY/corrupt.mp4")
         val tagged = videoFixture("mp4-tagged.mp4")
 
-        // The provider passes the video MIME gate; the stream supplier supplies a real tagged clip
+        // The provider passes the video MIME gate, and the stream supplier supplies a real tagged clip,
         // so the test reaches MediaMetadataRetriever and can verify release cleanup.
         ShadowContentResolver.registerProviderInternal(AUTHORITY, VideoMimeProvider())
         shadowOf(context.contentResolver)
@@ -86,11 +86,15 @@ class MediaPipelineVideoReadTest {
             .orEmpty()
             .filter { it.name.startsWith("vidmeta-") }
 
+    /** A provider that reports every Uri as an MP4 video, so a read reaches the video path. */
     private class VideoMimeProvider : ContentProvider() {
+        /** Needs no setup. */
         override fun onCreate(): Boolean = true
 
+        /** Reports the video type that admits the pick to the video reader. */
         override fun getType(uri: Uri): String = "video/mp4"
 
+        /** Answers no metadata queries, so the reader falls back to its default name. */
         override fun query(
             uri: Uri,
             projection: Array<out String>?,
@@ -99,17 +103,20 @@ class MediaPipelineVideoReadTest {
             sortOrder: String?,
         ): Cursor? = null
 
+        /** Read-only provider. */
         override fun insert(
             uri: Uri,
             values: ContentValues?,
         ): Uri? = null
 
+        /** Read-only provider. */
         override fun delete(
             uri: Uri,
             selection: String?,
             selectionArgs: Array<out String>?,
         ): Int = 0
 
+        /** Read-only provider. */
         override fun update(
             uri: Uri,
             values: ContentValues?,

@@ -10,17 +10,21 @@ internal enum class VideoContainer {
     Matroska,
 }
 
-/** What one scrub removed, for diagnostics and tests. It never carries the removed values. */
+/**
+ * What one scrub removed, for diagnostics and tests, and how many video tracks the container declares. It never
+ * carries the removed values.
+ */
 internal data class VideoScrubSummary(
     val container: VideoContainer,
     val neutralizedElements: Int,
     val zeroedFields: Int,
     val zeroedSampleBytes: Long,
+    val videoTracks: Int,
 )
 
 /** Outcome of removing private metadata from one local video. */
 internal sealed interface VideoScrubResult {
-    /** Every private field the policy names is gone; the file is still the same size. */
+    /** Every private field the policy names is gone, and the file is still the same size. */
     data class Scrubbed(
         val summary: VideoScrubSummary,
     ) : VideoScrubResult
@@ -32,7 +36,7 @@ internal sealed interface VideoScrubResult {
     data object Malformed : VideoScrubResult
 }
 
-/** Raised inside a walker to end the scrub with a refusal; it never escapes [VideoMetadataScrubber]. */
+/** Raised inside a walker to end the scrub with a refusal. It never escapes [VideoMetadataScrubber]. */
 internal class VideoScrubRefusal(
     val result: VideoScrubResult,
 ) : Exception() {
@@ -49,33 +53,43 @@ internal fun unsupportedVideo(): Nothing = throw VideoScrubRefusal(VideoScrubRes
 /**
  * Removes private container metadata from a local video before it is accepted for upload (#3376).
  *
- * The scrub rewrites the container in place and never re-encodes or remuxes: a platform muxer would stamp its own
- * version, device and time fields back into the file. Removed fields are overwritten with zeros, and whole metadata
- * boxes or elements become padding of exactly the same length, so the output has the input's size, every offset and
- * index stays valid, the audio and video sample bytes are never touched, and a second scrub changes nothing.
+ * The scrub rewrites the container in place and never re-encodes or remuxes, because a platform muxer would stamp its
+ * own version, device and time fields back into the file. Removed fields are overwritten with zeros, and whole
+ * metadata boxes or elements become padding of exactly the same length. The output therefore has the input's size,
+ * every offset and index stays valid, the audio and video sample bytes are never touched, and a second scrub changes
+ * nothing.
  *
- * ISO BMFF and QuickTime (MP4, MOV, M4V, 3GP, 3G2): `udta`, `meta`, `uuid` and `prft` boxes in the movie, track,
- * media and fragment structure, and every top-level box that is not part of the movie layout, become `free` boxes
- * with zeroed payloads; existing `free`, `skip` and `wide` payloads are zeroed; `mvhd`, `tkhd` and `mdhd` creation
- * and modification times are zeroed; handler names and video compressor names and vendors are zeroed; and every
- * sample of a timed-metadata track (any handler other than video, audio, auxiliary video, picture, subtitle and
- * text, for example location, timecode, camera motion or hint tracks) is zeroed inside its `mdat`. A fragmented file
- * with such a track is unsupported, and so is a track whose samples live in another file.
+ * ISO BMFF and QuickTime (MP4, MOV, M4V, 3GP, 3G2):
+ * - `udta`, `meta`, `uuid` and `prft` boxes in the movie, track, media and fragment structure, and every top-level
+ *   box that is not part of the movie layout, become `free` boxes with zeroed payloads.
+ * - Existing `free`, `skip` and `wide` payloads are zeroed.
+ * - `mvhd`, `tkhd` and `mdhd` creation and modification times are zeroed.
+ * - Everything after each handler's type is zeroed: the QuickTime component manufacturer, flags and mask, and the
+ *   handler name.
+ * - The vendor of every audio and video sample entry, and each video entry's compressor name, are zeroed.
+ * - Every sample of a timed-metadata track (any handler other than video, audio, auxiliary video, picture, subtitle
+ *   and text, for example location, timecode, camera motion or hint tracks) is zeroed inside its `mdat`.
  *
- * Matroska and WebM: `Tags`, `Attachments`, `Chapters`, unknown segment-level elements and `CRC-32` elements of the
- * rewritten masters become `Void` elements of the same length; segment and neighbouring file names, the recording
- * date, the title and track and codec names are voided; the muxing and writing application strings are zeroed.
+ * A fragmented file with such a track is unsupported, and so is a track whose samples live in another file. Bytes
+ * after the last top-level box are accepted only when they are all zero, so a recording with a non-box trailer is
+ * refused.
  *
- * Kept: track structure, timing, edit lists, rotation matrices, sample descriptions, codec configuration, language,
- * random segment identifiers, seek and cue indexes, and subtitle and text tracks as user-visible content. Not
- * covered: data inside the coded audio or video bitstreams (for example H.264 or HEVC SEI user data and encoder
- * banners), telemetry some cameras write into subtitle tracks, the file name, and what the codec choice reveals.
- * Forwarding an existing message reuses its uploaded reference and is not re-scrubbed.
+ * Matroska and WebM: `Tags`, `Attachments`, `Chapters`, unknown segment-level elements and the `CRC-32` elements of
+ * the rewritten masters become `Void` elements of the same length. Segment and neighbouring file names, the
+ * recording date, the title and track and codec names are voided, and the muxing and writing application strings
+ * are zeroed.
  *
- * Content decides the container, never the MIME type. [VideoScrubResult.Unsupported] and
- * [VideoScrubResult.Malformed] may leave the input partly rewritten; the caller must discard it and must never send
- * the original bytes instead. Every size and offset is checked against the input, nesting depth and element count are
- * bounded, and no allocation depends on a size read from the input.
+ * Kept: track structure, timing, edit lists, rotation matrices, sample descriptions other than their vendor and
+ * compressor name, codec configuration, language, random segment identifiers, seek and cue indexes, and subtitle and
+ * text tracks as user-visible content. Not covered: data inside the coded audio or video bitstreams (for example H.264
+ * or HEVC SEI user data and encoder banners), telemetry some cameras write into subtitle tracks, the file name, and
+ * what the codec choice reveals. Forwarding an existing message re-uploads its original plaintext unchanged.
+ *
+ * Content decides the container, never the MIME type. [classify] runs the same walk over a read-only view, so the
+ * Files picker can decide by content whether a pick is a video. [VideoScrubResult.Unsupported] and
+ * [VideoScrubResult.Malformed] may leave the input partly rewritten, so the caller must discard it and must never
+ * send the original bytes instead. Every size and offset is checked against the input, nesting depth and element
+ * count are bounded, and no allocation depends on a size read from the input.
  */
 internal object VideoMetadataScrubber {
     // EBML magic that opens every Matroska and WebM file.
@@ -89,7 +103,7 @@ internal object VideoMetadataScrubber {
             VideoScrubResult.Malformed
         }
 
-    /** Scrubs [bytes] in place; callers own the array and discard it unless the result is scrubbed. */
+    /** Scrubs [bytes] in place. Callers own the array and discard it unless the result is scrubbed. */
     fun scrub(bytes: ByteArray): VideoScrubResult = scrub(ArrayScrubStore(bytes))
 
     /**
@@ -101,13 +115,41 @@ internal object VideoMetadataScrubber {
         return if (scrub(store) is VideoScrubResult.Scrubbed) store.bytes else null
     }
 
+    /**
+     * Classifies [file] by content without changing it, by running the scrubber's own walk over a read-only view, so
+     * classification and scrubbing agree. An unreadable file reads as [VideoContent.Other].
+     */
+    fun classify(file: File): VideoContent =
+        try {
+            RandomAccessFile(file, "r").use { classify(FileScrubStore(it)) }
+        } catch (_: IOException) {
+            VideoContent.Other
+        }
+
+    /** Classifies [bytes] by content without changing them. */
+    fun classify(bytes: ByteArray): VideoContent = classify(ArrayScrubStore(bytes))
+
+    /**
+     * Runs the container's walk over a read-only view of [store] and reports whether it met a video track. A walk
+     * that refuses part-way still reports the video tracks it met before the refusal.
+     */
+    internal fun classify(store: ScrubStore): VideoContent {
+        val reader = ScrubReader(ReadOnlyScrubStore(store))
+        return when {
+            isEbml(reader) -> containerContent(MatroskaMetadataScrubber(reader).videoTracksMet())
+            IsoBmffMetadataScrubber.looksLikeIsoBmff(reader) ->
+                containerContent(IsoBmffMetadataScrubber(reader).videoTracksMet())
+            VideoContainerSignatures.matches(reader) -> VideoContent.UnsupportedContainer
+            else -> VideoContent.Other
+        }
+    }
+
     /** Detects the container by content and runs its walker over [store]. */
     internal fun scrub(store: ScrubStore): VideoScrubResult =
         try {
             val reader = ScrubReader(store)
             when {
-                store.size >= Int.SIZE_BYTES && reader.u32(0L) == EBML_MAGIC ->
-                    VideoScrubResult.Scrubbed(MatroskaMetadataScrubber(reader).scrub())
+                isEbml(reader) -> VideoScrubResult.Scrubbed(MatroskaMetadataScrubber(reader).scrub())
                 IsoBmffMetadataScrubber.looksLikeIsoBmff(reader) ->
                     VideoScrubResult.Scrubbed(IsoBmffMetadataScrubber(reader).scrub())
                 else -> VideoScrubResult.Unsupported
@@ -117,4 +159,36 @@ internal object VideoMetadataScrubber {
         } catch (_: IOException) {
             VideoScrubResult.Malformed
         }
+
+    /** Whether [reader] starts with the EBML magic of Matroska and WebM. */
+    private fun isEbml(reader: ScrubReader): Boolean = reader.size >= Int.SIZE_BYTES && reader.u32(0L) == EBML_MAGIC
+
+    /** A video container when the walk met a video track, otherwise a container without one. */
+    private fun containerContent(videoTracks: Int): VideoContent {
+        val hasVideo = videoTracks > 0
+        return if (hasVideo) VideoContent.VideoContainer else VideoContent.ContainerWithoutVideo
+    }
+}
+
+/** One container's scrub walk, which counts the video tracks it meets as it goes. */
+internal interface ContainerWalk {
+    val videoTracks: Int
+
+    /** Walks and rewrites the whole container, or ends with a [VideoScrubRefusal]. */
+    fun scrub(): VideoScrubSummary
+}
+
+/**
+ * Runs this walk for classification only: a refusal or read failure just ends it, and the result is the video tracks
+ * it met by then.
+ */
+private fun ContainerWalk.videoTracksMet(): Int {
+    try {
+        scrub()
+    } catch (_: VideoScrubRefusal) {
+        // The tracks met before the refusal still count.
+    } catch (_: IOException) {
+        // A truncated or unreadable input keeps what was counted.
+    }
+    return videoTracks
 }

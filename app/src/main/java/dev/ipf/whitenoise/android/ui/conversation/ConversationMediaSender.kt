@@ -31,8 +31,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.readBoundedDocument
 import dev.ipf.whitenoise.android.ui.conversation.media.releaseUnadoptedStagedSources
+import dev.ipf.whitenoise.android.ui.conversation.media.removeDocumentVideoMetadata
+import dev.ipf.whitenoise.android.ui.conversation.media.removeDocumentVideoMetadataInPlace
+import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedDocumentVideoMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedVideoMetadata
-import dev.ipf.whitenoise.android.ui.conversation.media.removeVideoMetadataInPlace
 import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.scrubVideoMetadata
@@ -68,7 +70,7 @@ internal enum class DocumentReadFailure {
     UNPROCESSABLE_IMAGE,
     STORAGE,
 
-    /** A video file whose private metadata could not be removed; it is refused, never sent as-is (#3376). */
+    /** A video file whose private metadata could not be removed. It is refused, never sent as-is (#3376). */
     VIDEO_METADATA,
 }
 
@@ -83,7 +85,7 @@ private val DocumentReadFailure.messageResource: Int
             DocumentReadFailure.VIDEO_METADATA -> R.string.media_file_video_metadata_not_removable
         }
 
-/** The visual album read for one send; [videoMetadataRefused] reports a video refused for its private metadata. */
+/** The visual album read for one send. [videoMetadataRefused] reports a video refused for its private metadata. */
 internal data class VisualReadOutcome(
     val attachments: List<PendingAttachment>,
     val albumOverflowed: Boolean,
@@ -354,9 +356,10 @@ internal class ConversationAttachmentReader(
                 }
                 BoundedDocumentRead.Empty -> state.failures += DocumentReadFailure.EMPTY
                 BoundedDocumentRead.Unreadable -> state.failures += DocumentReadFailure.UNREADABLE
-                // A video file loses its private metadata in place first; other documents stay byte-for-byte.
+                // Content decides: a video container loses its private metadata in place first, an uncleanable
+                // video reported as video is refused, and every other document stays byte-for-byte.
                 is BoundedDocumentRead.Success ->
-                    if (!removeVideoMetadataInPlace(mediaType, read.bytes)) {
+                    if (!removeDocumentVideoMetadataInPlace(mediaType, read.bytes)) {
                         state.failures += DocumentReadFailure.VIDEO_METADATA
                     } else {
                         state.totalBytes += read.bytes.size
@@ -373,8 +376,9 @@ internal class ConversationAttachmentReader(
     }
 
     /**
-     * Stages one document that does not fit in memory into a private file under its own message budget. A video
-     * file's snapshot loses its private metadata inside staging, before the budget reserves disk for it.
+     * Stages one document that does not fit in memory into a private file under its own message budget. A snapshot
+     * whose content is a video container loses its private metadata inside staging, before the budget reserves disk
+     * for it, by the same content rule as an in-memory document.
      */
     private fun readFileBackedDocument(
         uri: android.net.Uri,
@@ -388,10 +392,7 @@ internal class ConversationAttachmentReader(
             budget?.stage(
                 declaredSize,
                 state.checkCancellation,
-                accept = { source ->
-                    !isVideoMediaType(mediaType) ||
-                        (source.scrubVideoMetadata() is VideoScrubResult.Scrubbed).also { metadataRemoved = it }
-                },
+                accept = { source -> source.removeDocumentVideoMetadata(mediaType).also { metadataRemoved = it } },
             ) { context.contentResolver.openInputStream(uri) }
         val source = pick?.source
         if (source == null) {
@@ -836,7 +837,8 @@ internal class ConversationMediaSender(
      * [staging] hears about every snapshot as soon as it exists, so a preparation that fails part-way can
      * still be cleaned up by its caller, and reserves disk for the whole send across the album and documents.
      * Prepared draft attachments, including native drafts an older app version saved, are re-checked for private
-     * video metadata before anything reuses them; a video that cannot be cleaned is refused, never sent as saved.
+     * video metadata before anything reuses them, visual drafts by reported type and Files drafts by content. A
+     * video that cannot be cleaned is refused, never sent as saved.
      */
     private suspend fun prepareStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
@@ -863,7 +865,7 @@ internal class ConversationMediaSender(
             } else {
                 readStagedDocuments(
                     documentUris,
-                    withContext(Dispatchers.IO) { removePreparedVideoMetadata(preparedDocumentAttachments) },
+                    withContext(Dispatchers.IO) { removePreparedDocumentVideoMetadata(preparedDocumentAttachments) },
                     documentBudget,
                     allowFileBacked,
                     staging,
