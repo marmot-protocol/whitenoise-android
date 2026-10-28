@@ -262,7 +262,7 @@ private fun folderPillBackground(
     selectedColor: Color,
 ): Color {
     val motionEnabled = rememberSystemAnimationsEnabled()
-    val targetBackground = if (selected) selectedColor else Color.Transparent
+    val targetBackground = if (selected) selectedColor else selectedColor.copy(alpha = 0f)
     val background by
         animateColorAsState(
             targetValue = targetBackground,
