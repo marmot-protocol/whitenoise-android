@@ -233,6 +233,15 @@ internal fun AppearanceScreen(
                     }
                 }
             }
+            item {
+                val previewTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
+                AppearanceAccessibilitySample(
+                    owner = appState.activeAccountRef to appState.runtimeGeneration,
+                    theme = previewTheme,
+                    mineArgb = appState.globalBubbleColorArgb(previewTheme, BubbleSide.Mine),
+                    otherArgb = appState.globalBubbleColorArgb(previewTheme, BubbleSide.Other),
+                )
+            }
         }
     }
 }

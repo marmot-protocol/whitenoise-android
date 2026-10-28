@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StickyFormActionBar.kt",
+  "legacy_sha256": "307b4110c78d89dc1a7199be2c9f80dfeca5ad40b8ae7d405796f3c60d68227f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StickyFormActionBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StickyFormActionBar.kt",
+        "anchor": "fun StickyFormActionBar(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
