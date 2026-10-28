@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 5b54d17f1b3e2d43eb55d19264c494186b11ddde
+          ref: c26bec880432961dcc60cd5abc0f2d856ef8bbf0
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -216,7 +216,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 5b54d17f1b3e2d43eb55d19264c494186b11ddde
+          ref: c26bec880432961dcc60cd5abc0f2d856ef8bbf0
           persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
@@ -379,6 +379,7 @@ jobs:
                   project.afterEvaluate {
                       project.dependencies.add('previewPlayReleaseImplementation', 'androidx.compose.runtime:runtime-tracing')
                       project.dependencies.add('previewPlayReleaseImplementation', 'androidx.tracing:tracing-wire:2.0.4')
+                      project.dependencies.add('previewPlayReleaseImplementation', 'com.squareup.wire:wire-runtime:6.4.7')
                   }
                   project.tasks.register('resolvePerf3439TraceInputs') {
                       doLast {
