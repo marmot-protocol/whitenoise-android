@@ -22,7 +22,10 @@ class VoiceRecordingOwnershipCoverageTest {
         assertTrue(lifecycle.contains("R.string.voice_recording_interrupted"))
         assertTrue(lifecycle.contains("appState.presentConversationTransient("))
         assertTrue(lifecycle.contains("appState::clearTransientNotice"))
-        val automaticStop = conversation.substringAfter("onAutomaticStop = { reason ->").substringBefore("\n                },")
+        val automaticStop =
+            conversation
+                .substringAfter("onAutomaticStop = { reason ->")
+                .substringBefore("\n                },")
         assertFalse(automaticStop.contains("appState.present("))
     }
 
