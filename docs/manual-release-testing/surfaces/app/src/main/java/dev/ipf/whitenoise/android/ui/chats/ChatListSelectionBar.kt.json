@@ -32,15 +32,6 @@
           "CHL-011",
           "CHL-012"
         ]
-      },
-      {
-        "surface": "LabeledSelectionAction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
-        "anchor": "fun LabeledSelectionAction(",
-        "test_ids": [
-          "CHL-011",
-          "CHL-012"
-        ]
       }
     ],
     "source_coverage": [
@@ -197,6 +188,14 @@
         "surface": "R.string.folder_exclude_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
         "anchor": "R.string.folder_exclude_chat",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.leave_and_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.leave_and_delete",
         "test_ids": [
           "CHL-012"
         ]

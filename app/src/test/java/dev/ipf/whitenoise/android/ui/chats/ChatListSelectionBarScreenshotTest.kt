@@ -24,7 +24,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The labeled Select all action remains visible at compact widths and across the supported themes. */
+/** Icon-only actions stay reachable at compact widths and across the supported themes. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -160,7 +160,7 @@ class ChatListSelectionBarScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 ChatListBatchStatusDialog(
-                    dev.ipf.whitenoise.android.state.ChatListBatchCommand.READ,
+                    dev.ipf.whitenoise.android.state.ChatListBatchCommand.EXCLUDE_FOLDER,
                     3,
                     3,
                     dev.ipf.whitenoise.android.state.ChatListBatchResult(
@@ -199,7 +199,7 @@ class ChatListSelectionBarScreenshotTest {
                     LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
                     ChatListBatchStatusDialog(
-                        dev.ipf.whitenoise.android.state.ChatListBatchCommand.READ,
+                        dev.ipf.whitenoise.android.state.ChatListBatchCommand.EXCLUDE_FOLDER,
                         3,
                         3,
                         dev.ipf.whitenoise.android.state.ChatListBatchResult(
@@ -281,7 +281,8 @@ class ChatListSelectionBarScreenshotTest {
         }
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val selectAllLabel = context.getString(R.string.chat_list_select_all)
-        composeRule.onNodeWithText(selectAllLabel, useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText(selectAllLabel, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(selectAllLabel).assertIsDisplayed()
         departureLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
         abandonLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")

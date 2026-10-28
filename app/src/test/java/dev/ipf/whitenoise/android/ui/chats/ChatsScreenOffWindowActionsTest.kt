@@ -4,13 +4,13 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.R
@@ -148,6 +148,38 @@ class ChatsScreenOffWindowActionsTest {
         assertOffWindow(model)
     }
 
+    @Test fun selectionReadRunsWithoutDialogAsItsUnreadRowDisappears() {
+        val model = selectTarget()
+        rule.onNodeWithContentDescription(rule.activity.getString(R.string.chat_row_action_mark_read)).performClick()
+        awaitProgress { "read:false" in model.calls }
+        awaitDirectBatch(model)
+        rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertDoesNotExist()
+        rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").assertExists()
+        assertEquals(listOf("read:false"), model.calls.toList())
+    }
+
+    @Test fun selectionMuteAndPinRunWithoutDialogAndKeepSelectionUsable() {
+        val model = selectTarget()
+        for ((label, call) in listOf(
+            R.string.chat_row_action_mute to "mute:true",
+            R.string.chat_row_action_unmute to "mute:false",
+            R.string.chat_row_action_pin to "pin:true",
+            R.string.chat_row_action_unpin to "pin:false",
+        )) {
+            rule.onNodeWithContentDescription(rule.activity.getString(label)).performClick()
+            awaitProgress { call in model.calls }
+            awaitDirectBatch(model)
+        }
+        assertEquals(listOf("mute:true", "mute:false", "pin:true", "pin:false"), model.calls.toList())
+    }
+
+    private fun selectTarget(): OffWindowActionFixture {
+        val model = mount()
+        openMenu()
+        rule.onNodeWithTag("chat.action.Select").performClick()
+        return model
+    }
+
     @Test fun bulkArchiveCombinesRetainedAndOffWindowUnreadRows() {
         val model = mount()
         openMenu()
@@ -155,7 +187,7 @@ class ChatsScreenOffWindowActionsTest {
         rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").performClick()
         rule.onNodeWithContentDescription(rule.activity.getString(R.string.archive)).performClick()
         awaitProgress { "archive:true" in model.calls && "archive-survivor:true" in model.calls }
-        closeCompletedBatch()
+        awaitDirectBatch(model)
         assertTrue(model.row.get().archived)
         assertTrue(model.retainedRow.get().archived)
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertDoesNotExist()
@@ -171,7 +203,7 @@ class ChatsScreenOffWindowActionsTest {
         rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR").performClick()
         rule.onNodeWithContentDescription(rule.activity.getString(R.string.archive)).performClick()
         awaitProgress { "archive-survivor:true" in model.calls }
-        closeCompletedBatch()
+        awaitDirectBatch(model)
         assertTrue(model.row.get().archived)
         assertTrue(model.retainedRow.get().archived)
         assertFalse("already archived target is not redundantly written", "archive:true" in model.calls)
@@ -179,7 +211,7 @@ class ChatsScreenOffWindowActionsTest {
         // Completed batches retain selection; the next explicit direction reuses those same two chats.
         rule.onNodeWithContentDescription(rule.activity.getString(R.string.unarchive)).performClick()
         awaitProgress { "archive:false" in model.calls && "archive-survivor:false" in model.calls }
-        closeCompletedBatch()
+        awaitDirectBatch(model)
         assertFalse(model.row.get().archived)
         assertFalse(model.retainedRow.get().archived)
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
@@ -337,11 +369,10 @@ class ChatsScreenOffWindowActionsTest {
         assertFalse("unread actions must not grow the retained window", model.controller.containsGroup(ACTION_TARGET))
     }
 
-    private fun closeCompletedBatch() {
-        val closeLabel = rule.activity.getString(R.string.close)
-        awaitProgress { rule.onAllNodesWithText(closeLabel).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText(closeLabel).performClick()
+    private fun awaitDirectBatch(model: OffWindowActionFixture) {
+        awaitProgress { !model.controller.chatListBatchInProgress }
         settle()
+        rule.onAllNodes(isDialog()).assertCountEquals(0)
     }
 
     private fun awaitProgress(ready: () -> Boolean) {

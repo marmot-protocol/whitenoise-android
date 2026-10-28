@@ -220,6 +220,14 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.toast_couldnt_update_chat",
+        "test_ids": [
+          "CHL-012"
+        ]
       }
     ],
     "source_coverage": [

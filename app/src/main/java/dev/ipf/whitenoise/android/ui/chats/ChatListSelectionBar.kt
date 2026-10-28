@@ -3,21 +3,16 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
@@ -120,40 +115,28 @@ internal fun ChatListSelectionControls(
         stringResource(
             if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.archive else R.string.unarchive,
         )
-    // Whole actions wrap at narrow widths; the selection toggle keeps its label visible.
+    // Icon actions wrap as whole 48 dp targets at narrow widths.
     FlowRow(
         Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
-            .testTag("chats.selectionControls"),
+            .testTag("chats.selectionControls")
+            .semantics {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = description
+            },
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = count.toString(),
-            modifier =
-                Modifier
-                    .testTag("chats.selectionCount")
-                    .semantics {
-                        liveRegion = LiveRegionMode.Polite
-                        contentDescription = description
-                    }.padding(horizontal = WhiteNoiseSpacing.Related),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedButton(
-            onClick = { perform(if (allVisibleSelected) onDeselectAll else onSelectAll) },
+        DirectSelectionAction(
+            label = selectAllLabel,
+            icon = if (allVisibleSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all,
             enabled = actionsEnabled,
-            modifier =
-                Modifier
-                    .heightIn(min = 40.dp)
-                    .testTag("chats.selectAllAction"),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-        ) {
-            Text(selectAllLabel, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-        }
+            modifier = Modifier.testTag("chats.selectAllAction"),
+            onClick = { perform(if (allVisibleSelected) onDeselectAll else onSelectAll) },
+        )
         DirectSelectionAction(
             label = archiveLabel,
             icon =
@@ -165,19 +148,12 @@ internal fun ChatListSelectionControls(
             enabled = actionsEnabled,
             onClick = { perform(onArchive) },
         )
-        if (onExcludeFromFolder != null) {
-            LabeledSelectionAction(
-                stringResource(R.string.chat_list_action_add_to_folder),
-                actionsEnabled,
-            ) { perform(onAddToFolder) }
-        } else {
-            DirectSelectionAction(
-                label = stringResource(R.string.chat_list_action_add_to_folder),
-                icon = R.drawable.ic_folder,
-                enabled = actionsEnabled,
-                onClick = { perform(onAddToFolder) },
-            )
-        }
+        DirectSelectionAction(
+            label = stringResource(R.string.chat_list_action_add_to_folder),
+            icon = R.drawable.ic_folder_add,
+            enabled = actionsEnabled,
+            onClick = { perform(onAddToFolder) },
+        )
         if (showMarkRead) {
             DirectSelectionAction(
                 stringResource(R.string.chat_row_action_mark_read),
@@ -242,7 +218,9 @@ internal fun ChatListSelectionControls(
             ) { perform(alternate) }
         }
         onExcludeFromFolder?.let { exclude ->
-            LabeledSelectionAction(stringResource(R.string.folder_exclude_chat), actionsEnabled) { perform(exclude) }
+            DirectSelectionAction(stringResource(R.string.folder_exclude_chat), R.drawable.ic_folder_remove, actionsEnabled) {
+                perform(exclude)
+            }
         }
         if (showMovePinnedUp) {
             DirectSelectionAction(
@@ -263,24 +241,21 @@ internal fun ChatListSelectionControls(
             }
         }
         onDeleteLocal?.let { deleteLocal ->
-            LabeledSelectionAction(
+            DirectSelectionAction(
                 label = stringResource(R.string.delete_from_device),
+                icon = R.drawable.ic_delete,
                 enabled = actionsEnabled,
                 destructive = true,
                 onClick = { perform(deleteLocal) },
             )
         }
-        if (onDeleteLocal != null) {
-            LabeledSelectionAction(deleteLabel, actionsEnabled, destructive = true) { perform(onDelete) }
-        } else {
-            DirectSelectionAction(
-                label = deleteLabel,
-                icon = R.drawable.ic_delete,
-                enabled = actionsEnabled,
-                destructive = true,
-                onClick = { perform(onDelete) },
-            )
-        }
+        DirectSelectionAction(
+            label = deleteLabel,
+            icon = if (deleteLabel == stringResource(R.string.leave_and_delete)) R.drawable.ic_logout else R.drawable.ic_delete,
+            enabled = actionsEnabled,
+            destructive = true,
+            onClick = { perform(onDelete) },
+        )
         abandonLabel?.let { label ->
             DirectSelectionAction(
                 label = label,
@@ -302,6 +277,7 @@ private fun DirectSelectionAction(
     @DrawableRes icon: Int,
     enabled: Boolean,
     destructive: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     TooltipBox(
@@ -313,7 +289,7 @@ private fun DirectSelectionAction(
             FilledTonalIconButton(
                 onClick = onClick,
                 enabled = enabled,
-                modifier = Modifier.size(48.dp),
+                modifier = modifier.size(48.dp),
                 colors =
                     IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -321,39 +297,9 @@ private fun DirectSelectionAction(
                     ),
             ) { Icon(painterResource(icon), contentDescription = label) }
         } else {
-            IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+            IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(48.dp)) {
                 Icon(painterResource(icon), contentDescription = label)
             }
-        }
-    }
-}
-
-/** Visible labels distinguish paired actions which share a folder or delete icon. */
-@Suppress("FunctionNaming")
-@Composable
-private fun LabeledSelectionAction(
-    label: String,
-    enabled: Boolean,
-    destructive: Boolean = false,
-    onClick: () -> Unit,
-) {
-    val modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = label }
-    val padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-    if (destructive) {
-        FilledTonalButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier,
-            contentPadding = padding,
-            colors =
-                ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
-        ) { Text(label, style = MaterialTheme.typography.labelMedium) }
-    } else {
-        OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier, contentPadding = padding) {
-            Text(label, style = MaterialTheme.typography.labelMedium)
         }
     }
 }

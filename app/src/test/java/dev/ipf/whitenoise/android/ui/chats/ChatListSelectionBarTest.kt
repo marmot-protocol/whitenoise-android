@@ -6,10 +6,12 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -28,16 +30,9 @@ class ChatListSelectionBarTest {
 
     private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
 
-    /** Plural. */
-    private fun plural(
-        res: Int,
-        quantity: Int,
-        vararg args: Any,
-    ): String = ApplicationProvider.getApplicationContext<android.content.Context>().resources.getQuantityString(res, quantity, *args)
-
-    /** Shows count and routes actions. */
+    /** Hides the count and routes accessible icon actions. */
     @Test
-    fun showsCountAndRoutesActions() {
+    fun hidesCountAndRoutesIconActions() {
         var closes = 0
         var archives = 0
         var deletes = 0
@@ -74,16 +69,12 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText("2").assertIsDisplayed()
-        composeRule
-            .onNodeWithContentDescription(
-                plural(R.plurals.chat_list_selected_count, 2, 2),
-            ).assertIsDisplayed()
+        composeRule.onNodeWithText("2").assertDoesNotExist()
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         composeRule.onAllNodesWithContentDescription(string(R.string.actions)).assertCountEquals(0)
         composeRule.onNodeWithContentDescription(string(R.string.archive)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.delete)).performClick()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).performClick()
 
         assertEquals(1, closes)
         assertEquals(1, archives)
@@ -179,10 +170,14 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).performClick()
+
+        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).performTouchInput { longClick() }
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).performClick()
 
         assertEquals(1, selectAll)
         assertEquals(0, deselectAll)
@@ -222,10 +217,10 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all), useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).performClick()
 
         assertEquals(0, selectAll)
         assertEquals(1, deselectAll)
@@ -264,7 +259,7 @@ class ChatListSelectionBarTest {
         }
 
         composeRule.onNodeWithContentDescription(string(R.string.unarchive)).assertIsNotEnabled()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(string(R.string.delete)).assertIsNotEnabled()
     }
 
@@ -302,7 +297,7 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertDoesNotExist()
@@ -409,7 +404,7 @@ class ChatListSelectionBarTest {
         composeRule.onNodeWithContentDescription(string(R.string.archive)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_action_add_to_folder)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.leave_and_delete)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_pin)).performClick()
@@ -422,7 +417,8 @@ class ChatListSelectionBarTest {
                 R.string.leave_and_delete,
             )
         for (label in pairedLabels) {
-            composeRule.onNodeWithText(string(label)).assertIsDisplayed().performClick()
+            composeRule.onNodeWithText(string(label)).assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(string(label)).assertIsDisplayed().performClick()
         }
         assertEquals(listOf("add", "exclude"), folderTargets)
         assertEquals(listOf("local", "leave"), deleteTargets)

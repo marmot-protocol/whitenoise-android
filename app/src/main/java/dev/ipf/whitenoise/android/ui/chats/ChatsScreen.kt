@@ -254,6 +254,7 @@ internal fun ChatsScreen(
     var pendingAbandonment by remember(appState.activeAccountRef, appState.runtimeGeneration) {
         mutableStateOf<PendingChatAbandonment?>(null)
     }
+    val resources = LocalResources.current
     val batchScope = remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { AtomicBoolean(true) }
     DisposableEffect(batchScope) { onDispose { batchScope.set(false) } }
     var pendingStateBatch by remember(batchScope) { mutableStateOf<PendingChatListBatch?>(null) }
@@ -265,7 +266,27 @@ internal fun ChatsScreen(
         pendingStateBatch = PendingChatListBatch(selectedChatIds.toList(), command, owner)
     }
     pendingStateBatch?.let { request ->
-        ChatListBatchDialog(request, controller) { pendingStateBatch = null }
+        if (request.command == ChatListBatchCommand.EXCLUDE_FOLDER) {
+            ChatListBatchDialog(request, controller) { pendingStateBatch = null }
+        } else {
+            // Keep the captured request alive even when changed rows leave the filter.
+            // Routine state changes run directly; only folder actions need a dialog.
+            LaunchedEffect(request) {
+                try {
+                    val result =
+                        controller.runChatListBatch(request.ids, request.command, request.owner)
+                    if (
+                        controller.chatListActionSessionIsCurrent(request.owner) &&
+                        result != null &&
+                        result.failed + result.skipped + result.notStarted + result.unconfirmed > 0
+                    ) {
+                        appState.presentTransient(resources.getString(R.string.toast_couldnt_update_chat))
+                    }
+                } finally {
+                    if (pendingStateBatch === request) pendingStateBatch = null
+                }
+            }
+        }
     }
     val selectionMode = selectedChatIds.isNotEmpty()
     val searchOpen = globalSearchState.isOpen
@@ -427,7 +448,6 @@ internal fun ChatsScreen(
     }
     val switchAccount: (String) -> Unit = onQuickSwitchAccount ?: ::switchAccountDirectly
     val context = LocalContext.current
-    val resources = LocalResources.current
 
     fun clearSelection() {
         selectedChatIds.clear()
