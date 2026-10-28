@@ -137,6 +137,7 @@ dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#eachStil
 
 # Debug-only selected-descriptor A/V capability capture; focused containment and full suites.
 dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityDeviceTest#characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid
+dev.ipf.whitenoise.android.media.sandbox.AvCapabilityLogCaptureDeviceTest#workerDiagnosticsSurviveUnrelatedProcessLogTraffic
 
 # Reply constraint overflow on the native Android layout pipeline (#3387).
 dev.ipf.whitenoise.android.ui.conversation.messages.ReplyConstraintSafetyAndroidTest#oversizedReplyBodyFitsAndReturnsToNormalSize
