@@ -2,14 +2,19 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
 import android.provider.Settings
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
@@ -21,7 +26,9 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
@@ -249,6 +256,97 @@ class ChatListContinuityAndroidTest {
             ).assertExists()
     }
 
+    /** Samples actual list paint across folder/search keys, independently of the separate real-IME cases. */
+    @Test
+    fun actualFolderAndSearchKeysRetainEligibleFadePixels() {
+        val folders = prepareFadeFolders()
+        selectedFolder = folders[0]
+        val originalImeFlag =
+            rule.runOnIdle {
+                rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+            }
+        rule.runOnUiThread { rule.activity.window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) }
+        try {
+            render(fadeProbe = true)
+            rule.onNodeWithTag(chatListFilterChipTag(folders[0])).assertIsSelected()
+            rule.onNodeWithTag("chats.list").performScrollToIndex(6)
+            rule.mainClock.advanceTimeBy(240)
+            rule.waitForIdle()
+            val probe = ChatFolderFadeFrameProbe(rule)
+            probe.assertEdges("scrolled-a", top = true, bottom = true)
+            rule.mainClock.autoAdvance = false
+            publishFadeChange { selectedFolder = folders[1] }
+            rule.onNodeWithTag(chatListFilterChipTag(folders[1])).assertIsSelected()
+            probe.assertEdges("b-first", top = true, bottom = true)
+            rule.mainClock.advanceTimeBy(60)
+            probe.assertEdges("b-middle", top = true, bottom = true)
+            publishFadeChange { selectedFolder = folders[0] }
+            rule.onNodeWithTag(chatListFilterChipTag(folders[0])).assertIsSelected()
+            probe.assertEdges("a-reversed", top = true, bottom = true)
+            rule.mainClock.advanceTimeBy(240)
+            probe.assertEdges("a-settled", top = true, bottom = true)
+            publishFadeChange { search = search.copy(isOpen = true) }
+            rule.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+            rule.onNodeWithTag("chats.searchField").assertIsFocused()
+            probe.assertEdges("search-first", top = true, bottom = true)
+            rule.mainClock.advanceTimeBy(60)
+            probe.assertEdges("search-middle", top = true, bottom = true)
+            publishFadeChange { search = search.copy(isOpen = false) }
+            rule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+            rule.onNodeWithTag("chats.searchField").assertDoesNotExist()
+            probe.assertEdges("search-return", top = true, bottom = true)
+            publishFadeChange { selectedFolder = folders[2] }
+            rule.onNodeWithTag(chatListFilterChipTag(folders[2])).assertIsSelected()
+            probe.assertFitting("short-first")
+            publishFadeChange { selectedFolder = folders[3] }
+            rule.onNodeWithTag(chatListFilterChipTag(folders[3])).assertIsSelected()
+            rule.onNodeWithTag("chats.list").assertDoesNotExist()
+            rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_empty_folder_detail)).assertExists()
+            publishFadeChange { selectedFolder = folders[0] }
+            rule.mainClock.advanceTimeBy(240)
+            probe.assertEdges("return-from-empty", top = false, bottom = true)
+        } finally {
+            rule.mainClock.autoAdvance = true
+            rule.runOnUiThread {
+                rule.activity.window.setFlags(originalImeFlag, WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+            }
+        }
+    }
+
+    /** Uses identical authoritative rows in the long folders so membership cannot change edge eligibility. */
+    private fun prepareFadeFolders(): List<String> {
+        val rows = (3..34).map { it.toString(16).padStart(64, '0') }
+        rule.runOnUiThread {
+            rows.forEachIndexed { index, id -> controller.applyChatListRow(chatRow(id, "Fade row $index", 1uL)) }
+        }
+        rule.waitUntil(5_000) { controller.items.size == rows.size + 2 }
+        state.chatFolderPreferences.foldersFor(account)
+        val memberships = listOf(rows.toSet(), rows.toSet(), setOf(rows.first()), emptySet())
+        return memberships.mapIndexed { index, ids ->
+            requireNotNull(
+                state.chatFolderPreferences.commitFolderDraft(
+                    accountRef = account,
+                    folderId = null,
+                    name = "Fade $index",
+                    description = "",
+                    manualChatIds = ids,
+                    rule = null,
+                    showWhenEmpty = true,
+                ),
+            ).id
+        }
+    }
+
+    /** Publishes the new key, then captures its first measured/drawn frame without completing the fade window. */
+    private fun publishFadeChange(change: () -> Unit) {
+        rule.runOnUiThread {
+            change()
+            Snapshot.sendApplyNotifications()
+        }
+        repeat(2) { rule.mainClock.advanceTimeByFrame() }
+        rule.waitForIdle()
+    }
+
     /** Admit the real popup without allowing the 160 ms selection-strip exit to finish before reversal. */
     private fun awaitSelectDuringExit(exitStarted: Long) {
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
@@ -289,21 +387,25 @@ class ChatListContinuityAndroidTest {
     }
 
     /** Composes the same screen and state callbacks used by MainShell, without creating a native account. */
-    private fun render() {
+    private fun render(fadeProbe: Boolean = false) {
         rule.setContent {
             WhiteNoiseTheme {
-                Surface {
-                    if (mounted) {
-                        ChatsScreen(
-                            appState = state,
-                            controller = controller,
-                            onOpenSettings = {},
-                            onOpenGroup = { _, _, _, _ -> opens++ },
-                            selectedFolderId = selectedFolder,
-                            onSelectFolder = { selectedFolder = it },
-                            globalSearchState = search,
-                            onGlobalSearchStateChange = { transform -> search = transform(search) },
-                        )
+                val scheme = MaterialTheme.colorScheme
+                val colors = if (fadeProbe) scheme.copy(surface = Color.Green, background = Color.Black) else scheme
+                MaterialTheme(colorScheme = colors) {
+                    Surface {
+                        if (mounted) {
+                            ChatsScreen(
+                                appState = state,
+                                controller = controller,
+                                onOpenSettings = {},
+                                onOpenGroup = { _, _, _, _ -> opens++ },
+                                selectedFolderId = selectedFolder,
+                                onSelectFolder = { selectedFolder = it },
+                                globalSearchState = search,
+                                onGlobalSearchStateChange = { transform -> search = transform(search) },
+                            )
+                        }
                     }
                 }
             }

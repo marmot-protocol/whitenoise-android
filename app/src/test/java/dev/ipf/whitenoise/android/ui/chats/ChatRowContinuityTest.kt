@@ -202,8 +202,7 @@ class ChatRowContinuityTest {
                 .onNodeWithContentDescription(
                     context.getString(R.string.chat_list_mention_badge),
                     useUnmergedTree = true,
-                )
-                .assertIsDisplayed()
+                ).assertIsDisplayed()
                 .fetchSemanticsNode()
                 .boundsInRoot
         val delivered =

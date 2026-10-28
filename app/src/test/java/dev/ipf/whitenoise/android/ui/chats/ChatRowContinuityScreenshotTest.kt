@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +23,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -138,8 +141,16 @@ class ChatRowContinuityScreenshotTest {
                 )
             else -> assertEquals(fullStripWidth, movement, 0.5f)
         }
-        rule.onNodeWithText("3", useUnmergedTree = true).assertExists()
+        assertAuthoritativeUnreadBadge()
         rule.onNodeWithTag("continuity.row").captureRoboImage("src/test/snapshots/chat_row_continuity_$variant.png")
+    }
+
+    /** Selects the semantic count host rather than its duplicate decorative text child. */
+    private fun assertAuthoritativeUnreadBadge() {
+        val unreadDescription = context.resources.getQuantityString(R.plurals.unread_messages_count, 3, 3)
+        rule
+            .onNode(hasText("3") and hasContentDescription(unreadDescription), useUnmergedTree = true)
+            .assertExists()
     }
 
     /** Reads the title's leading edge so the same phase contract applies to LTR and RTL rows. */
