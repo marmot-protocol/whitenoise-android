@@ -1419,7 +1419,7 @@
     <string name="media_quality_high_subtitle">每张照片约 1.5 MB — 优先保证质量</string>
     <string name="media_quality_original">原始</string>
     <string name="media_quality_original_subtitle">完整分辨率 — 文件最大</string>
-    <string name="media_quality_footer">照片和视频中的位置和设备信息始终会被移除，即使选择“原始”也一样。导入的音频保留原始数据。音频码率仅适用于你录制的语音消息。</string>
+    <string name="media_quality_footer">照片中的位置和设备信息始终会被移除，即使选择“原始”也一样。视频文件中的位置和设备标签会被移除，但字幕和视频流内部的数据不会改变。导入的音频保留原始数据。音频码率仅适用于你录制的语音消息。</string>
     <string name="profile_is_public">个人资料是公开的</string>
     <string name="profile_public_description">您的个人资料信息将对网络上的所有人可见。</string>
     <string name="shared_media">共享媒体</string>

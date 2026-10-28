@@ -1442,7 +1442,7 @@
     <string name="media_quality_high_subtitle">Etwa 1,5 MB pro Foto — Qualität vor Datenverbrauch</string>
     <string name="media_quality_original">Originalgröße</string>
     <string name="media_quality_original_subtitle">Volle Auflösung — größte Dateien</string>
-    <string name="media_quality_footer">Aus Fotos und Videos werden Standort- und Geräteangaben immer entfernt, auch bei Original. Importierte Audiodateien behalten ihre ursprünglichen Daten. Die Audio-Bitrate gilt nur für Sprachnachrichten, die du aufnimmst.</string>
+    <string name="media_quality_footer">Aus Fotos werden Standort- und Geräteangaben immer entfernt, auch bei Original. Aus Videodateien werden Standort- und Gerätetags entfernt, Untertitel und Daten im Videostream bleiben aber unverändert. Importierte Audiodateien behalten ihre ursprünglichen Daten. Die Audio-Bitrate gilt nur für Sprachnachrichten, die du aufnimmst.</string>
     <string name="profile_is_public">Profil ist öffentlich</string>
     <string name="profile_public_description">Deine Profilinformationen sind für alle im Netzwerk sichtbar.</string>
     <string name="shared_media">Geteilte Medien</string>

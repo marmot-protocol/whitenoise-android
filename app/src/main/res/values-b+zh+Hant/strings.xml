@@ -1419,7 +1419,7 @@
     <string name="media_quality_high_subtitle">每張照片約 1.5 MB — 優先保留品質</string>
     <string name="media_quality_original">原始</string>
     <string name="media_quality_original_subtitle">完整解析度 — 檔案最大</string>
-    <string name="media_quality_footer">相片和影片中的位置與裝置資訊一律會移除，即使選擇「原始」也一樣。匯入的音訊會保留原始資料。音訊位元率僅適用於你錄製的語音訊息。</string>
+    <string name="media_quality_footer">相片中的位置與裝置資訊一律會移除，即使選擇「原始」也一樣。影片檔案中的位置與裝置標籤會被移除，但字幕和影片串流內的資料不會變更。匯入的音訊會保留原始資料。音訊位元率僅適用於你錄製的語音訊息。</string>
     <string name="profile_is_public">個人檔案是公開的</string>
     <string name="profile_public_description">您的個人檔案資訊會讓網路上的所有人看見。</string>
     <string name="shared_media">共用媒體</string>

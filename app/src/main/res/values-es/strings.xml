@@ -1431,7 +1431,7 @@
     <string name="media_quality_high_subtitle">Unos 1,5 MB por foto — prioridad a la calidad</string>
     <string name="media_quality_original">Sin modificar</string>
     <string name="media_quality_original_subtitle">Resolución completa — archivos más grandes</string>
-    <string name="media_quality_footer">A las fotos y los vídeos siempre se les quitan la ubicación y los datos del dispositivo, incluso en Original. El audio importado conserva sus datos originales. La tasa de bits de audio solo se aplica a las notas de voz que grabas.</string>
+    <string name="media_quality_footer">A las fotos siempre se les quitan la ubicación y los datos del dispositivo, incluso en Original. A los archivos de vídeo se les quitan las etiquetas de ubicación y del dispositivo, pero los subtítulos y los datos dentro de la secuencia de vídeo no se modifican. El audio importado conserva sus datos originales. La tasa de bits de audio solo se aplica a las notas de voz que grabas.</string>
     <string name="profile_is_public">El perfil es público</string>
     <string name="profile_public_description">La información de tu perfil será visible para todos en la red.</string>
     <string name="shared_media">Multimedia compartido</string>

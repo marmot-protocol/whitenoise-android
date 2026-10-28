@@ -1444,7 +1444,7 @@
     <string name="media_quality_high_subtitle">Circa 1,5 MB per foto — qualità prima del consumo dati</string>
     <string name="media_quality_original">Originale</string>
     <string name="media_quality_original_subtitle">Risoluzione completa — file più grandi</string>
-    <string name="media_quality_footer">Da foto e video vengono sempre rimossi la posizione e i dettagli del dispositivo, anche con Originale. L’audio importato mantiene i dati originali. Il bitrate audio vale solo per i messaggi vocali che registri.</string>
+    <string name="media_quality_footer">Dalle foto vengono sempre rimossi la posizione e i dettagli del dispositivo, anche con Originale. Dai file video vengono rimossi i tag di posizione e del dispositivo, ma i sottotitoli e i dati all’interno del flusso video non vengono modificati. L’audio importato mantiene i dati originali. Il bitrate audio vale solo per i messaggi vocali che registri.</string>
     <string name="profile_is_public">Il profilo è pubblico</string>
     <string name="profile_public_description">Le informazioni del tuo profilo saranno visibili a tutti sulla rete.</string>
     <string name="shared_media">Media condivisi</string>

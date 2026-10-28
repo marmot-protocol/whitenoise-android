@@ -1444,7 +1444,7 @@
     <string name="media_quality_high_subtitle">Environ 1,5 Mo par photo — priorité à la qualité</string>
     <string name="media_quality_original">Originale</string>
     <string name="media_quality_original_subtitle">Résolution complète — fichiers les plus volumineux</string>
-    <string name="media_quality_footer">La localisation et les informations de l’appareil sont toujours retirées des photos et des vidéos, même en qualité Originale. L’audio importé conserve ses données d’origine. Le débit audio s’applique uniquement aux messages vocaux que vous enregistrez.</string>
+    <string name="media_quality_footer">La localisation et les informations de l’appareil sont toujours retirées des photos, même en qualité Originale. Les balises de localisation et d’appareil sont retirées des fichiers vidéo, mais les sous-titres et les données du flux vidéo ne sont pas modifiés. L’audio importé conserve ses données d’origine. Le débit audio s’applique uniquement aux messages vocaux que vous enregistrez.</string>
     <string name="profile_is_public">Le profil est public</string>
     <string name="profile_public_description">Les informations de votre profil seront visibles par tous sur le réseau.</string>
     <string name="shared_media">Médias partagés</string>

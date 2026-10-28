@@ -1607,7 +1607,7 @@
     <string name="media_quality_high_subtitle">About 1.5 MB per photo — quality over data cost</string>
     <string name="media_quality_original">Original</string>
     <string name="media_quality_original_subtitle">Full resolution — largest files</string>
-    <string name="media_quality_footer">Photos and videos always have location and device details removed, even at Original. Imported audio keeps its original data. Audio bitrate applies only to voice notes you record.</string>
+    <string name="media_quality_footer">Photos always have location and device details removed, even at Original. Videos have location and device tags removed from the file, but subtitles and data inside the video stream are not changed. Imported audio keeps its original data. Audio bitrate applies only to voice notes you record.</string>
     <string name="enter_key_behavior_title">Enter key behavior</string>
     <string name="enter_key_behavior_send">Send message</string>
     <string name="enter_key_behavior_newline">New line</string>
@@ -2453,7 +2453,7 @@
     <string name="photo_editor_coordinate_value" translatable="false">%1$s: %2$d%%</string>
     <string name="photo_editor_keep_editing">Keep editing</string>
     <string name="photo_editor_quality_low">Low</string>
-    <string name="photo_editor_quality_explanation">Photos always have location and device details removed. Original keeps the image data where the format allows; other formats are re-encoded. Videos lose location and device details without re-encoding; other files are sent unchanged.</string>
+    <string name="photo_editor_quality_explanation">Photos always have location and device details removed. Original keeps the image data where the format allows; other formats are re-encoded. Videos have location and device tags removed from the file without re-encoding, but subtitles and data inside the video stream are not changed. Other files are sent unchanged.</string>
     <string name="photo_editor_original_edited">Edited photos use High quality. The original image is kept for further editing.</string>
     <string name="audit_upload_title">Share group diagnostic logs</string>
     <string name="audit_upload_subtitle">Shares group diagnostic logs for every profile on this device.</string>
