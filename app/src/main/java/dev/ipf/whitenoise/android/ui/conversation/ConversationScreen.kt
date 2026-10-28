@@ -206,6 +206,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOut
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationCameraCapture
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationMediaViewerSessionState
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChromeIconProvider
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberOriginGuardedResultLauncher
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
@@ -5142,6 +5143,7 @@ internal fun ConversationScreen(
                 mediaViewerSessionState.active?.let { mediaViewerSessionState.dismiss(it.sessionId) }
             }
         }
+        val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
         if (mediaOwnerCurrent) {
             ConversationMediaViewerSessionHost(mediaViewerSessionState) { active ->
                 val request = active.request
@@ -5157,6 +5159,7 @@ internal fun ConversationScreen(
                     mine = request.mine,
                     onDismiss = { mediaViewerSessionState.dismiss(active.sessionId) },
                     thumbnails = mediaViewerSessionState.thumbnails,
+                    icons = viewerChromeIcons.value,
                     forwardActions = mediaViewerForwardActions,
                     onGoToMessage = { page ->
                         if (mediaViewerSessionState.dismiss(active.sessionId)) scrollToSearchMatch(page.messageIdHex)

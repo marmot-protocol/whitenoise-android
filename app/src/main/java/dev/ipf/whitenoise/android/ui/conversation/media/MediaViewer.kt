@@ -55,12 +55,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -68,7 +67,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
@@ -351,6 +352,7 @@ internal fun ConversationMediaViewer(
     forwardActions: MediaViewerForwardActions? = null,
     imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
     thumbnails: MediaViewerThumbnailRegistry? = null,
+    icons: MediaViewerChromeIcons = rememberMediaViewerChromeIconProvider().value,
 ) {
     val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
@@ -388,6 +390,7 @@ internal fun ConversationMediaViewer(
         forwardActions = forwardActions,
         imageBytes = imageBytes,
         thumbnails = thumbnails,
+        icons = icons,
     )
 }
 
@@ -411,6 +414,7 @@ internal fun FullScreenMediaViewer(
     forwardActions: MediaViewerForwardActions? = null,
     imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
     thumbnails: MediaViewerThumbnailRegistry? = null,
+    icons: MediaViewerChromeIcons = rememberMediaViewerChromeIconProvider().value,
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -761,6 +765,7 @@ internal fun FullScreenMediaViewer(
                 snackbarHostState = snackbarHostState,
                 chromeVisible = chromeVisible,
                 bodyModifier = motionBodyModifier,
+                icons = icons,
             ) {
                 StableMediaViewerPager(
                     pages = pages,
@@ -864,11 +869,11 @@ internal fun MediaViewerFrame(
     groupPictureBusy: Boolean = false,
     bodyModifier: Modifier = Modifier,
     actionsEnabled: Boolean = true,
+    icons: MediaViewerChromeIcons = rememberMediaViewerChromeIconProvider().value,
     body: @Composable BoxScope.() -> Unit,
 ) {
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
-    var topChromeHeight by remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
+    var topChromeHeight by remember { mutableIntStateOf(0) }
     // An open overflow menu keeps its chrome until dismissed, even when a video's controls time out under it.
     val chromeShown = chromeVisible || moreExpanded
     // The viewer's own snackbars sit below its top chrome, like every temporary banner (#3312).
@@ -884,7 +889,7 @@ internal fun MediaViewerFrame(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .onSizeChanged { topChromeHeight = with(density) { it.height.toDp() } }
+                        .onSizeChanged { topChromeHeight = it.height }
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
@@ -899,7 +904,7 @@ internal fun MediaViewerFrame(
                             .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    MediaViewerCloseButton(onDismiss = onDismiss, enabled = actionsEnabled)
+                    MediaViewerCloseButton(onDismiss = onDismiss, enabled = actionsEnabled, icon = icons.close)
                     Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                         Text(
                             text = senderLabel,
@@ -931,7 +936,7 @@ internal fun MediaViewerFrame(
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                painterResource(R.drawable.ic_more_vert),
+                                icons.more,
                                 contentDescription = stringResource(R.string.more_options),
                             )
                         }
@@ -1013,7 +1018,7 @@ internal fun MediaViewerFrame(
                         enabled = actionsEnabled,
                         modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.share"),
                     ) {
-                        Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
+                        Icon(icons.share, contentDescription = stringResource(R.string.share))
                     }
                     if (onForwardMessage != null) {
                         IconButton(
@@ -1022,7 +1027,7 @@ internal fun MediaViewerFrame(
                             modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.forward"),
                         ) {
                             Icon(
-                                painterResource(R.drawable.ic_forward),
+                                icons.forward,
                                 contentDescription = stringResource(R.string.media_viewer_forward_message),
                             )
                         }
@@ -1057,7 +1062,14 @@ internal fun MediaViewerFrame(
             modifier =
                 Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = if (chromeShown) topChromeHeight else 0.dp)
+                    .layout { measurable, constraints ->
+                        // Read measured chrome in layout, without recomposing the viewer after its first measure.
+                        val inset = if (chromeShown) topChromeHeight else 0
+                        val placeable = measurable.measure(constraints.offset(vertical = -inset))
+                        layout(placeable.width, constraints.constrainHeight(placeable.height + inset)) {
+                            placeable.placeRelative(0, inset)
+                        }
+                    }
                     .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )

@@ -24,10 +24,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.invalidateDraw
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.launch
@@ -57,6 +58,7 @@ internal fun rememberMediaPressIndication(circle: Boolean = false): IndicationNo
 internal fun MediaViewerCloseButton(
     onDismiss: () -> Unit,
     enabled: Boolean,
+    icon: ImageVector = ImageVector.vectorResource(R.drawable.ic_close),
 ) {
     val source = remember { MutableInteractionSource() }
     val lightweight = LocalMediaViewerPressFeedback.current
@@ -65,7 +67,7 @@ internal fun MediaViewerCloseButton(
     val ripple = if (lightweight) null else LocalRippleConfiguration.current
     CompositionLocalProvider(LocalRippleConfiguration provides ripple) {
         IconButton(onClick = onDismiss, enabled = enabled, modifier = modifier, interactionSource = source) {
-            Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
+            Icon(icon, contentDescription = stringResource(R.string.close))
         }
     }
 }
