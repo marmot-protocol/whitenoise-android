@@ -167,8 +167,7 @@ class AppearanceScreenBehaviorTest {
                 .onNode(
                     hasText(sampleText) and hasAnyAncestor(hasTestTag("font_family.preview")),
                     useUnmergedTree = true,
-                )
-                .performScrollTo()
+                ).performScrollTo()
                 .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             return layouts
                 .single()

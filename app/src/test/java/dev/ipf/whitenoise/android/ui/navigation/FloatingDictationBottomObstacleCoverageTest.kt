@@ -160,7 +160,8 @@ class FloatingDictationBottomObstacleCoverageTest {
         }
         composeRule.runOnUiThread {
             val insets =
-                WindowInsetsCompat.Builder()
+                WindowInsetsCompat
+                    .Builder()
                     .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 48))
                     .setVisible(WindowInsetsCompat.Type.navigationBars(), true)
                     .build()
@@ -211,7 +212,11 @@ class FloatingDictationBottomObstacleCoverageTest {
         val root = composeRule.onNodeWithTag("wide.root")
         val rootBounds = root.fetchSemanticsNode().boundsInRoot
         val capsule =
-            composeRule.onNodeWithTag("wide.capsule").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            composeRule
+                .onNodeWithTag("wide.capsule")
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
         composeRule.runOnIdle {
             assertEquals(rootBounds.width, requireNotNull(anchor.scrollingCapsule).second.width, 0.5f)
         }

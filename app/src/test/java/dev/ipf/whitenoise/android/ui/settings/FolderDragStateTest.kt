@@ -68,7 +68,13 @@ class FolderDragStateTest {
         assertEquals(listOf("a" to 2), moves)
         assertEquals(listOf("b", "c", "a"), ids.value)
         val settled = composeRule.onNodeWithTag("a").fetchSemanticsNode().boundsInRoot
-        assertTrue(settled.top > composeRule.onNodeWithTag("c").fetchSemanticsNode().boundsInRoot.top)
+        assertTrue(
+            settled.top >
+                composeRule
+                    .onNodeWithTag("c")
+                    .fetchSemanticsNode()
+                    .boundsInRoot.top,
+        )
     }
 
     /** A rejected synchronous save settles back to the real order rather than retaining a fictional insertion. */
@@ -95,7 +101,14 @@ class FolderDragStateTest {
             assertEquals(listOf("a", "b", "c"), ids.value)
             assertNull(drag.folderId)
         }
-        assertEquals(initial.top, composeRule.onNodeWithTag("a").fetchSemanticsNode().boundsInRoot.top, 0.5f)
+        assertEquals(
+            initial.top,
+            composeRule
+                .onNodeWithTag("a")
+                .fetchSemanticsNode()
+                .boundsInRoot.top,
+            0.5f,
+        )
     }
 
     /** Cancel and a newer authoritative order both retire the preview without a store write. */
