@@ -145,12 +145,13 @@ internal fun nativeLocalSendTraceExport(marmotRoot: File): Map<String, ByteArray
         if (directoryChanged) {
             emptyMap()
         } else {
-            files.mapNotNull { (name, snapshot) ->
-                snapshot.bytes?.let { bytes ->
-                    val exportName = if (name == "manifest.json") "native-manifest.json" else name
-                    "local-send-trace-$exportName" to bytes
-                }
-            }.toMap()
+            files
+                .mapNotNull { (name, snapshot) ->
+                    snapshot.bytes?.let { bytes ->
+                        val exportName = if (name == "manifest.json") "native-manifest.json" else name
+                        "local-send-trace-$exportName" to bytes
+                    }
+                }.toMap()
         }
     val scratchPresent = Files.exists(directory.resolve("manifest.tmp"), LinkOption.NOFOLLOW_LINKS)
     return exported + traceSnapshotManifest(started, status, files, unknown, scratchPresent)
@@ -219,8 +220,11 @@ private fun readNativeTraceFile(path: Path): TraceFileSnapshot {
                 Files.readAttributes(path, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
             }.getOrNull()
         val changed =
-            after == null || !after.isRegularFile || before.fileKey() != after.fileKey() ||
-                before.size() != after.size() || before.lastModifiedTime() != after.lastModifiedTime() ||
+            after == null ||
+                !after.isRegularFile ||
+                before.fileKey() != after.fileKey() ||
+                before.size() != after.size() ||
+                before.lastModifiedTime() != after.lastModifiedTime() ||
                 buffer.position().toLong() != before.size()
         val snapshot = parseNativeTraceBytes(path.fileName.toString(), buffer.array().copyOf(buffer.position()))
         snapshot.copy(changed = changed)
@@ -313,10 +317,13 @@ private fun traceSnapshotManifest(
     scratchPresent: Boolean = false,
 ): Map<String, ByteArray> {
     val partial =
-        status != "captured" || unknown > 0 ||
+        status != "captured" ||
+            unknown > 0 ||
             files.any { (name, file) ->
                 (file.status != "included" && (name == "manifest.json" || file.status != "absent")) ||
-                    file.rejectedRows > 0 || file.partialTailBytes > 0 || file.changed
+                    file.rejectedRows > 0 ||
+                    file.partialTailBytes > 0 ||
+                    file.changed
             }
     val manifest =
         JSONObject()
