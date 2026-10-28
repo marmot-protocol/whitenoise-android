@@ -114,6 +114,7 @@ import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
@@ -2121,7 +2122,7 @@ internal fun ChatsScreen(
                             if (owner != null) {
                                 appState.launchMutation {
                                     val result =
-                                        runCatching { controller.movePinnedSelection(ids, delta, owner) }
+                                        runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
                                             .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
                                     if (
                                         controller.chatListActionIsCurrent(owner) &&
