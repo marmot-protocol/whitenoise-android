@@ -79,6 +79,11 @@ if MODE == 'check':
     assert {p: digest(root / p) for p in files} == audited, 'Build mutated audited inputs'
     sys.exit(0)
 assert MODE == 'audit'
+for name in files:
+    target = evidence / 'generated' / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / name, target)
+shutil.copyfile(root / 'trace-resolved-graph.json', evidence / 'generated-resolved-graph.json')
 proof = json.loads(pathlib.Path(sys.argv[4]).read_text())
 trusted = {(p['group'], p['name'], p['version'], p.get('verification_artifact_name', p['file'])): p['sha256'] for p in proof}
 a_config, a_entries = xml_inputs(evidence / 'baseline' / verification)
@@ -89,7 +94,9 @@ new_entries = {k: v for k, v in b_entries.items() if k not in a_entries}
 assert new_entries and all(trusted.get(k) == v for k, v in new_entries.items()), new_entries
 for name in files:
     if name not in ('app/gradle.lockfile', verification):
-        assert digest(root / name) == digest(evidence / 'baseline' / name), name
+        assert lock_inputs(root / name) == lock_inputs(evidence / 'baseline' / name), ('Unrelated lock graph changed', name)
+        # Gradle may rewrite lockfile comments/order; keep unrelated reviewed bytes exactly.
+        shutil.copyfile(evidence / 'baseline' / name, root / name)
 before = lock_inputs(evidence / 'baseline' / 'app/gradle.lockfile')
 after = lock_inputs(root / 'app/gradle.lockfile')
 assert set(before) == set(after), 'Configurations changed'
