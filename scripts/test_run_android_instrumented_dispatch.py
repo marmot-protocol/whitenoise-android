@@ -121,7 +121,8 @@ class InstrumentedDispatchTest(unittest.TestCase):
         required = (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
         for line in required:
             if any("." + name + "#" in line for name in (
-                "IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest", "MediaCodecCorpusDeviceTest"
+                "IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest", "MediaCodecCorpusDeviceTest",
+                "MediaWorkerDomainDeviceTest", "MediaWorkerUiDeviceTest",
             )):
                 self.assertIn(line, focused)
         smoke = self.run_dispatch("pull_request")
