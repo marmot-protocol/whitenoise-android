@@ -3,8 +3,12 @@
 The workflow's own PR `paths` list decides whether the instrumented workflow
 starts at all. This narrows it further: fixture-only inputs do not boot the
 connected-test emulator, and changes outside the fixture's inputs do not boot
-the two attachment-fixture emulators. Every other event, and any diff that
-cannot be read or classified, runs both lanes.
+the two attachment-fixture emulators. A fixture change confined to the focused
+video-metadata scenario's own inputs runs only that scenario. A change to the
+dispatch plumbing every scenario shares runs the whole campaign, because the
+workflow has no merge-queue run to catch what a narrower PR run skipped. Every
+other event, and any diff that cannot be read or classified, runs both lanes
+and the whole fixture campaign.
 """
 
 import argparse
@@ -58,7 +62,47 @@ FIXTURE_SHARED = (
     'app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt',
 )
 
-BOTH = {'attachment_fixture': True, 'connected': True}
+# The focused #3376 video-metadata scenario reads only these test inputs, and
+# none carries the @PullRequestDeviceSmoke annotation.
+VIDEO_METADATA_FIXTURE_ONLY = (
+    'tools/attachment-fixture/video_metadata_runner.py',
+    'tools/attachment-fixture/video_metadata_checker.py',
+    'tools/attachment-fixture/test_video_metadata_runner.py',
+    'tools/attachment-fixture/test_video_metadata_checker.py',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataFixtureDeviceTest.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataFixtureEvidence.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/GeneratedVideoDocuments.java',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/GeneratedDocumentProvider.java',
+    # Routing that only the video-metadata send exercises on a device.
+    'app/src/main/java/dev/ipf/whitenoise/android/media/VideoContentClassifier.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/media/UncleanableContainerStreams.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataRemoval.kt',
+)
+
+# Production scrubber inputs and fixtures: the scenario sends through them and
+# the connected lane's platform proof reads them too.
+VIDEO_METADATA_SHARED = (
+    'app/src/main/java/dev/ipf/whitenoise/android/media/VideoMetadataScrubber.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/media/VideoScrubStore.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/media/IsoBmffMetadataScrubber.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/media/IsoBoxEditor.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/media/IsoSampleZeroing.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/media/MatroskaMetadataScrubber.kt',
+    'app/src/androidTest/assets/video-metadata/**',
+)
+
+# Plumbing that dispatches every fixture scenario, so a change to it always runs
+# the whole campaign, even beside video-metadata inputs.
+FIXTURE_DISPATCH = (
+    '.github/workflows/android-instrumented.yml',
+    'scripts/select_instrumented_lanes.py',
+    'scripts/run-controlled-attachment-fixture.sh',
+    'tools/attachment-fixture/README.md',
+)
+
+FULL_FIXTURE = 'full'
+VIDEO_METADATA_FIXTURE = 'video-metadata'
+BOTH = {'attachment_fixture': True, 'attachment_fixture_scope': FULL_FIXTURE, 'connected': True}
 
 
 def glob_regex(pattern):
@@ -102,6 +146,17 @@ def changed_paths(base, head):
     return paths[:-1] or None
 
 
+def fixture_scope(paths):
+    """The fixture campaign [paths] can affect: the whole campaign, only the video-metadata scenario, or none."""
+    video = VIDEO_METADATA_FIXTURE_ONLY + VIDEO_METADATA_SHARED
+    focused = any(matches(path, video) for path in paths)
+    other = any(matches(path, FIXTURE_ONLY + FIXTURE_SHARED + FIXTURE_DISPATCH) and not matches(path, video)
+                for path in paths)
+    if other:
+        return FULL_FIXTURE
+    return VIDEO_METADATA_FIXTURE if focused else ''
+
+
 def select(event, paths, triggers):
     """Fail open: anything other than a readable PR diff runs both lanes."""
     if event != 'pull_request' or not paths or not triggers:
@@ -111,13 +166,23 @@ def select(event, paths, triggers):
         # The workflow started, so some path matched. A mismatch with GitHub's
         # matcher means this reader cannot be trusted for this diff.
         return dict(BOTH)
+    scope = fixture_scope(paths)
     return {
-        'attachment_fixture': any(matches(path, FIXTURE_ONLY + FIXTURE_SHARED) for path in paths),
-        'connected': any(not matches(path, FIXTURE_ONLY) for path in triggering),
+        'attachment_fixture': bool(scope),
+        'attachment_fixture_scope': scope,
+        'connected': any(not matches(path, FIXTURE_ONLY + VIDEO_METADATA_FIXTURE_ONLY) for path in triggering),
     }
 
 
+def output_value(value):
+    """A GitHub step output: booleans as true or false, and a scope as its name."""
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    return value
+
+
 def main():
+    """Print the selected lanes and fixture scope, and append them to the step outputs on GitHub."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--event', required=True)
     parser.add_argument('--base', default='')
@@ -130,7 +195,7 @@ def main():
         except (OSError, TriggerPolicyError):
             triggers = None
         lanes = select(args.event, changed_paths(args.base, args.head), triggers)
-    line = ''.join(f'{key}={"true" if value else "false"}\n' for key, value in lanes.items())
+    line = ''.join(f'{key}={output_value(value)}\n' for key, value in lanes.items())
     print(line, end='')
     if output := os.environ.get('GITHUB_OUTPUT'):
         with open(output, 'a', encoding='utf-8') as stream:

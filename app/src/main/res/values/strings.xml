@@ -1447,6 +1447,7 @@
     <string name="toast_couldnt_decode_image">Couldn\'t decode that image</string>
     <string name="toast_couldnt_prepare_image">Couldn\'t download or prepare that image.</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">Couldn\'t remove private details like location from this video, so it wasn\'t attached.</string>
     <string name="toast_reattach_to_retry_media">Re-attach to retry</string>
     <string name="media_uploading">Uploading…</string>
     <string name="media_upload_failed">Upload failed</string>
@@ -1538,6 +1539,7 @@
     <string name="attachment_type_file">File</string>
     <string name="media_file_too_large">File too large to attach</string>
     <string name="media_file_unreadable">Couldn\'t read this file. Select it again.</string>
+    <string name="media_file_video_metadata_not_removable">Couldn\'t remove private details like location from this video file, so it wasn\'t attached.</string>
     <string name="media_file_empty">Empty files can\'t be sent</string>
     <string name="media_album_too_large">Selection too large to send</string>
     <string name="group_image_search_title">Group image</string>
@@ -1590,7 +1592,7 @@
     <string name="download_enabled">Automatic downloads follow your network rules</string>
     <string name="download_sent_media">Sent media</string>
     <string name="download_quality">Media quality</string>
-    <string name="download_quality_help">Applies to new photos and voice messages. Videos and audio files are sent as-is.</string>
+    <string name="download_quality_help">Applies to new photos and voice messages. Videos and audio files are never re-encoded.</string>
     <string name="download_done">Done</string>
     <string name="download_stop_confirmation">Clear waiting automatic downloads for this profile? Active downloads and downloads you started yourself will continue.</string>
     <string name="media_type_images">Images</string>
@@ -1605,7 +1607,7 @@
     <string name="media_quality_high_subtitle">About 1.5 MB per photo — quality over data cost</string>
     <string name="media_quality_original">Original</string>
     <string name="media_quality_original_subtitle">Full resolution — largest files</string>
-    <string name="media_quality_footer">Photos always have location and device details removed, even at Original. Videos and imported audio keep their original data. Audio bitrate applies only to voice notes you record.</string>
+    <string name="media_quality_footer">Photos always have location and device details removed, even at Original. Videos have location and device tags removed from the file, but subtitles and data inside the video stream are not changed. Imported audio keeps its original data. Audio bitrate applies only to voice notes you record.</string>
     <string name="enter_key_behavior_title">Enter key behavior</string>
     <string name="enter_key_behavior_send">Send message</string>
     <string name="enter_key_behavior_newline">New line</string>
@@ -2456,7 +2458,7 @@
     <string name="photo_editor_coordinate_value" translatable="false">%1$s: %2$d%%</string>
     <string name="photo_editor_keep_editing">Keep editing</string>
     <string name="photo_editor_quality_low">Low</string>
-    <string name="photo_editor_quality_explanation">Photos always have location and device details removed. Original keeps the image data where the format allows; other formats are re-encoded. Videos and files are sent unchanged.</string>
+    <string name="photo_editor_quality_explanation">Photos always have location and device details removed. Original keeps the image data where the format allows; other formats are re-encoded. Videos have location and device tags removed from the file without re-encoding, but subtitles and data inside the video stream are not changed. Other files are sent unchanged.</string>
     <string name="photo_editor_original_edited">Edited photos use High quality. The original image is kept for further editing.</string>
     <string name="audit_upload_title">Share group diagnostic logs</string>
     <string name="audit_upload_subtitle">Shares group diagnostic logs for every profile on this device.</string>

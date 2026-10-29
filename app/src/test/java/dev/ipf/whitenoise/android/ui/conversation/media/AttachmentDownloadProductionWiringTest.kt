@@ -148,7 +148,7 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue("appState.present(couldntLoadMessage)" in file)
     }
 
-    /** Guards foreground enqueueing, source single-flight, and terminal durable cleanup wiring. */
+    /** Guards foreground enqueueing, source single-flight, budgeted byte reads, and terminal durable cleanup wiring. */
     @Test
     fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
         val controller = projectSource("state/Controllers.kt").normalized()
@@ -171,6 +171,14 @@ class AttachmentDownloadProductionWiringTest {
             "downloadAttachmentPlaintextSource(" in byteDownload && ".use" in byteDownload,
         )
         assertFalse("downloadMedia(" in byteDownload)
+        assertTrue(
+            "A byte-returning read must hand its budget to the native open, so an oversized body is never copied",
+            "nativeReadBudget = maxBytes" in byteDownload,
+        )
+        assertFalse(
+            "Both native opens in the resolver must carry the caller's budget",
+            "::openNativeAttachment" in resolver || "openNativeAttachment(request)" in resolver,
+        )
         val sourceDownload =
             sourceController.substringAfter(
                 "internal suspend fun ConversationController.downloadAttachmentSource(",
@@ -187,6 +195,10 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue(
             "Durable cache hits must close a source lease instead of materializing large byte arrays",
             "downloadAttachmentPlaintextSource(" in durableDownload && ").use { }" in durableDownload,
+        )
+        assertFalse(
+            "File-backed consumers must receive the whole lease, never a budgeted refusal",
+            "nativeReadBudget" in sourceDownload || "nativeReadBudget" in durableDownload,
         )
         val retryDecision = worker.indexOf("if (shouldRetryAttachmentDownloadWork(")
         val terminalCleanup = worker.indexOf("intentStore.setInteractive(request, interactive = false)", retryDecision)
@@ -242,7 +254,10 @@ class AttachmentDownloadProductionWiringTest {
                 .normalized()
                 .substringAfter("fun ConversationController.retainedNativeAttachmentBytes(")
                 .substringBefore("/** Reconcile presentation state")
-        assertTrue("the read must be a local open", "appState.openNativeAttachment(request)" in read)
+        assertTrue(
+            "the read must be a local open carrying the budget, so an oversized body is never copied",
+            "appState.openNativeAttachment(request, maxBytes)" in read,
+        )
         assertTrue("the read must go through the guarded off-main helper", "readRetainedAttachmentBytes(" in read)
         val transferStarts = listOf("downloadAttachment", "acquireNativeAttachment", "enqueue", "requestAttachment")
         assertFalse("a cache-only read must never start a transfer", transferStarts.any { it in read })

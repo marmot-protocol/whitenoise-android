@@ -1163,16 +1163,22 @@ object MediaPipeline {
         data object TooLarge : VideoReadResult()
 
         data object Failed : VideoReadResult()
+
+        /** The private container metadata could not be removed, so the video must not be attached (#3376). */
+        data object MetadataNotRemovable : VideoReadResult()
     }
 
     /**
-     * Read the picked video URI as-is — no transcoding, matching the
-     * White Noise iOS and desktop behavior. Extracts dimensions
+     * Read the picked video URI without transcoding, matching the White Noise
+     * iOS and desktop behavior, after removing its private container metadata
+     * in place with [VideoMetadataScrubber] (#3376). Extracts dimensions
      * and a thumbhash from the poster frame so receivers paint a blurred
      * preview before the full payload downloads. Returns a typed result so
      * callers can surface "too large" vs "decode failed" as distinct
      * toasts: [VideoReadResult.TooLarge] fires when the source exceeds
-     * [VIDEO_MAX_BYTES] OR the caller's remaining album budget, while
+     * [VIDEO_MAX_BYTES] OR the caller's remaining album budget,
+     * [VideoReadResult.MetadataNotRemovable] when the container is unsupported
+     * or malformed (the original bytes are never returned instead), and
      * [VideoReadResult.Failed] is for I/O / metadata extraction errors.
      */
     fun readVideoForUpload(
@@ -1209,6 +1215,10 @@ object MediaPipeline {
                 null -> return VideoReadResult.Failed
             }
 
+            // Scrubbing precedes the probe and the read, so nothing downstream ever sees the private fields.
+            if (VideoMetadataScrubber.scrub(tmp) !is VideoScrubResult.Scrubbed) {
+                return VideoReadResult.MetadataNotRemovable
+            }
             val metadata = readVideoFileMetadata(tmp) ?: return VideoReadResult.Failed
             val bytes = runCatching { readFileBytesExact(tmp) }.getOrElse { return VideoReadResult.Failed }
             return VideoReadResult.Success(

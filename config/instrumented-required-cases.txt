@@ -187,3 +187,7 @@ dev.ipf.whitenoise.android.ui.settings.FolderDragAndroidTest#rejectedOffscreenDr
 dev.ipf.whitenoise.android.ui.AppNavigationTest#actualSearchCloseAndReentryKeepOneEditorAndExistingClearPolicy
 dev.ipf.whitenoise.android.ui.AppNavigationTest#actualAppearanceSampleResetsWithoutChangingAppOrSystemPreferences
 dev.ipf.whitenoise.android.ui.navigation.NavigationControlAndroidTest#realKeyboardKeepsDictationAndSelectionActionsAboveItsWindow
+
+# #3376: scrubbed tagged fixtures lose location and date and keep every platform-extracted sample.
+dev.ipf.whitenoise.android.media.VideoMetadataScrubberDeviceTest#scrubbedFixturesLoseLocationAndDateAndKeepPlaybackMetadata
+dev.ipf.whitenoise.android.media.VideoMetadataScrubberDeviceTest#scrubbedFixturesKeepEveryMediaSample

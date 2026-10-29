@@ -1140,6 +1140,7 @@
     <string name="media_open">Aç</string>
     <string name="media_file_too_large">Dosya eklenemeyecek kadar büyük</string>
     <string name="media_file_unreadable">Bu dosya okunamadı. Yeniden seçin.</string>
+    <string name="media_file_video_metadata_not_removable">Bu video dosyasından konum gibi özel bilgiler kaldırılamadı, bu yüzden eklenmedi.</string>
     <string name="media_file_empty">Boş dosyalar gönderilemez.</string>
     <string name="media_album_too_large">Seçim gönderilemeyecek kadar büyük</string>
     <string name="group_image_search_title">Grup görseli</string>
@@ -1192,7 +1193,7 @@
     <string name="download_enabled">Otomatik indirmeler ağ kurallarınıza uyar</string>
     <string name="download_sent_media">Gönderilen medya</string>
     <string name="download_quality">Medya kalitesi</string>
-    <string name="download_quality_help">Yeni fotoğraflar ve sesli mesajlar için geçerlidir. Videolar ve ses dosyaları olduğu gibi gönderilir.</string>
+    <string name="download_quality_help">Yeni fotoğraflar ve sesli mesajlar için geçerlidir. Videolar ve ses dosyaları hiçbir zaman yeniden kodlanmaz.</string>
     <string name="download_done">Bitti</string>
     <string name="download_stop_confirmation">Bu profil için bekleyen otomatik indirmeler temizlensin mi? Aktif indirmeler ve kendi başlattığınız indirmeler devam edecektir.</string>
     <string name="media_type_images">Görseller</string>
@@ -1282,6 +1283,7 @@
     <string name="notification_reacted_to_message">\"%2$s\" iletisine %1$s ile tepki verdi</string>
     <string name="notification_reacted">%1$s ile tepki verdi</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">Bu videodan konum gibi özel bilgiler kaldırılamadı, bu yüzden eklenmedi.</string>
     <string name="profile_picture_hint">Herkese açık HTTPS resim URL\'si</string>
     <string name="profile_picture_invalid">Yalnızca herkese açık HTTPS resim URL\'lerine izin verilir.</string>
     <string name="profile_picture_edit">Profil resmini düzenle</string>
@@ -1427,7 +1429,7 @@
     <string name="media_quality_high_subtitle">Fotoğraf başına yaklaşık 1,5 MB — kalite öncelikli</string>
     <string name="media_quality_original">Özgün</string>
     <string name="media_quality_original_subtitle">Tam çözünürlük — en büyük dosyalar</string>
-    <string name="media_quality_footer">Fotoğraflardan konum ve cihaz bilgileri her zaman kaldırılır, Özgün seçildiğinde bile. Videolar ve içe aktarılan ses dosyaları özgün verilerini korur. Ses bit hızı yalnızca kaydettiğiniz sesli notlara uygulanır.</string>
+    <string name="media_quality_footer">Fotoğraflardan konum ve cihaz bilgileri her zaman kaldırılır, Özgün seçildiğinde bile. Video dosyalarından konum ve cihaz etiketleri kaldırılır, ancak altyazılar ve video akışının içindeki veriler değiştirilmez. İçe aktarılan ses dosyaları özgün verilerini korur. Ses bit hızı yalnızca kaydettiğiniz sesli notlara uygulanır.</string>
     <string name="profile_is_public">Profil herkese açık</string>
     <string name="profile_public_description">Profil bilgileriniz ağdaki herkes tarafından görülebilir.</string>
     <string name="shared_media">Paylaşılan medya</string>
