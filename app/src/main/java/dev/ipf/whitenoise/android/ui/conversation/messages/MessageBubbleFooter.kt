@@ -306,8 +306,11 @@ internal fun bubbleCollapsedFooterWidth(
     gap: Int,
     allowInline: Boolean = true,
 ): Int =
-    maxOf(contentWidth, if (allowInline) readMoreWidth + gap + footerWidth else maxOf(readMoreWidth, footerWidth), minWidth)
-        .coerceAtMost(maxWidth)
+    maxOf(
+        contentWidth,
+        if (allowInline) readMoreWidth + gap + footerWidth else maxOf(readMoreWidth, footerWidth),
+        minWidth,
+    ).coerceAtMost(maxWidth)
 
 internal fun collapsedFooterFitsOnOneRow(
     containerWidth: Int,

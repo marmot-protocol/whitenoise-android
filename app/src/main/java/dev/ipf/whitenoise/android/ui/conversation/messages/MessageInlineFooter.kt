@@ -56,6 +56,7 @@ internal fun BoxScope.MediaFooterOverlay(
             editedLabel = null,
             onEditedClick = null,
             statusContainerColor = Color.Black,
+            allowWrap = false,
         )
     }
 }
@@ -72,6 +73,7 @@ internal fun MessageInlineFooter(
     showTime: Boolean = true,
     modifier: Modifier = Modifier,
     statusContainerColor: Color? = null,
+    allowWrap: Boolean = true,
 ) {
     val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showStatus)
     Layout(
@@ -91,7 +93,12 @@ internal fun MessageInlineFooter(
     ) { measurables, constraints ->
         val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
         val gap = FooterItemSpacing.roundToPx()
-        val rows = footerItemRows(placeables.map { it.width }, constraints.maxWidth, gap)
+        val rows =
+            if (allowWrap || placeables.isEmpty()) {
+                footerItemRows(placeables.map { it.width }, constraints.maxWidth, gap)
+            } else {
+                listOf(placeables.indices.toList())
+            }
         val rowWidths = rows.map { indices -> indices.sumOf { placeables[it].width } + gap * (indices.size - 1) }
         val rowHeights = rows.map { indices -> indices.maxOf { placeables[it].height } }
         val width = (rowWidths.maxOrNull() ?: 0).coerceIn(constraints.minWidth, constraints.maxWidth)
@@ -100,7 +107,7 @@ internal fun MessageInlineFooter(
         layout(width, height, alignmentLines) {
             var y = 0
             rows.forEachIndexed { rowIndex, indices ->
-                var x = width - rowWidths[rowIndex]
+                var x = if (allowWrap) width - rowWidths[rowIndex] else 0
                 indices.forEach { index ->
                     val placeable = placeables[index]
                     placeable.placeRelative(x, y + (rowHeights[rowIndex] - placeable.height) / 2)

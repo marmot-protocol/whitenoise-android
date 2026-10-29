@@ -167,8 +167,15 @@ class MessageInlineFooterScreenshotTest {
         bodyNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
         val layout = results.single()
         val time = composeRule.onNodeWithText("12:45", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val status = composeRule.onNodeWithContentDescription("Sent", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val footer = Rect(minOf(time.left, status.left), minOf(time.top, status.top), maxOf(time.right, status.right), maxOf(time.bottom, status.bottom))
+        val status =
+            composeRule.onNodeWithContentDescription("Sent", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val footer =
+            Rect(
+                minOf(time.left, status.left),
+                minOf(time.top, status.top),
+                maxOf(time.right, status.right),
+                maxOf(time.bottom, status.bottom),
+            )
         val lines =
             (0 until layout.lineCount).map { line ->
                 Rect(
@@ -180,7 +187,10 @@ class MessageInlineFooterScreenshotTest {
             }
         println("RTL focused footer: text=$text, footer=$footer, lines=$lines")
         assertTrue("preview must actually wrap", layout.lineCount > 1)
-        assertTrue("footer $footer must not intersect rendered preview lines $lines", lines.none { it.overlaps(footer) })
+        assertTrue(
+            "footer $footer must not intersect rendered preview lines $lines",
+            lines.none { it.overlaps(footer) },
+        )
     }
 
     /** The warning follows the terminal timestamp baseline, not a preceding metadata label. */
@@ -202,7 +212,10 @@ class MessageInlineFooterScreenshotTest {
         val warning = composeRule.onNodeWithText("Note").fetchSemanticsNode().boundsInRoot
         val edited = composeRule.onNodeWithText("Edited").fetchSemanticsNode().boundsInRoot
         val time = composeRule.onNodeWithText("12:45").fetchSemanticsNode().boundsInRoot
-        assertTrue("warning must align to time rather than edited label", kotlin.math.abs(warning.bottom - time.bottom) <= 1f)
+        assertTrue(
+            "warning must align to time rather than edited label",
+            kotlin.math.abs(warning.bottom - time.bottom) <= 1f,
+        )
         assertTrue("warning must follow the preceding metadata row", warning.top >= edited.bottom)
         capture("message_footer_warning_multiline_metadata")
     }

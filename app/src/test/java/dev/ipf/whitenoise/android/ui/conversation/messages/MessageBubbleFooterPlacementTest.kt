@@ -215,7 +215,10 @@ class MessageBubbleFooterPlacementTest {
         val time = composeRule.onNodeWithText("12:45").fetchSemanticsNode().boundsInRoot
         assertTrue("the warning must actually wrap", warning.height > time.height)
         assertTrue("a multiline footer must remain below the whole body", warning.top >= body.bottom)
-        assertTrue("timestamp remains on the terminal warning line", kotlin.math.abs(warning.bottom - time.bottom) <= 1f)
+        assertTrue(
+            "timestamp remains on the terminal warning line",
+            kotlin.math.abs(warning.bottom - time.bottom) <= 1f,
+        )
     }
 
     /** A paragraph and a link stacked as separate blocks, with the footer beside them. */

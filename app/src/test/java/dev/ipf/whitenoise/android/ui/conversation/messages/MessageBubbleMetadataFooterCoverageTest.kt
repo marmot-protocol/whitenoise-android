@@ -20,8 +20,16 @@ class MessageBubbleMetadataFooterCoverageTest {
         val footerIndex = body.indexOf("MessageBubbleMetadataFooter(")
         assertTrue(body.indexOf("retryFailedSend(item)") in 0 until footerIndex)
         assertTrue(body.indexOf("discardFailedSend(item)") in 0 until footerIndex)
-        assertTrue(body.contains("val allowInlineFooter = invalidationWarning == null && !(mine && item.status == MessageStatus.Failed)"))
-        assertTrue("both body branches prevent tall footers rising into text", Regex("allowInline = allowInlineFooter").findAll(body).count() == 2)
+        assertTrue(
+            body.contains(
+                "val allowInlineFooter = invalidationWarning == null && " +
+                    "!(mine && item.status == MessageStatus.Failed)",
+            ),
+        )
+        assertTrue(
+            "both body branches prevent tall footers rising into text",
+            Regex("allowInline = allowInlineFooter").findAll(body).count() == 2,
+        )
     }
 
     @Test
@@ -29,10 +37,10 @@ class MessageBubbleMetadataFooterCoverageTest {
         val footer = source("MessageBubbleFooter.kt")
         assertTrue(footer.contains("measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))"))
         assertTrue(footer.contains("measurables[2].measure(constraints.copy(minWidth = 0, minHeight = 0))"))
-        val placement = footer.functionBody("layoutMeasuredBubbleFooter")
+        val placement = footer.functionBody("MeasureScope.layoutMeasuredBubbleFooter")
         assertTrue(placement.contains("footer.hasSingleFooterBaseline()"))
         assertTrue(placement.contains("footer.placeRelative(geometry.x, geometry.y)"))
-        val collapsed = footer.functionBody("layoutCollapsedBubbleFooter")
+        val collapsed = footer.functionBody("MeasureScope.layoutCollapsedBubbleFooter")
         assertTrue(collapsed.contains("footer.hasSingleFooterBaseline()"))
     }
 
@@ -55,7 +63,10 @@ class MessageBubbleMetadataFooterCoverageTest {
     fun allBodyFooterCallersUseTheCurrentLogicalLastLineExtent() {
         listOf("BubbleContentBlocks.kt", "FocusedMessagePreview.kt").forEach { name ->
             val body = source(name)
-            assertTrue("$name must use logical occupied extent", body.contains("bubbleFooterLastLineWidth(layoutDirection)"))
+            assertTrue(
+                "$name must use logical occupied extent",
+                body.contains("bubbleFooterLastLineWidth(layoutDirection)"),
+            )
             assertTrue("$name must observe current direction", body.contains("LocalLayoutDirection.current"))
             assertFalse("$name cannot pass a physical right edge to relative placement", body.contains("getLineRight("))
         }

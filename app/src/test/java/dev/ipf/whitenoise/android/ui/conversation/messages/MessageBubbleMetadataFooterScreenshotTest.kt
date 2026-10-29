@@ -130,7 +130,11 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
         assertUnconfirmedFooter(unconfirmed, "01:01", rtl = false)
         composeRule.onNodeWithContentDescription("Sending").assertDoesNotExist()
         composeRule.runOnIdle {
-            item = unconfirmed.copy(status = MessageStatus.Sent, projected = unconfirmed.projected?.copy(invalidationStatus = null))
+            item =
+                unconfirmed.copy(
+                    status = MessageStatus.Sent,
+                    projected = unconfirmed.projected?.copy(invalidationStatus = null),
+                )
         }
         composeRule.onNodeWithText("Delivery not confirmed", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onAllNodesWithText("01:01", useUnmergedTree = true).assertCountEquals(1)
@@ -183,8 +187,15 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
         bodyNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
         val layout = results.single()
         val time = composeRule.onNodeWithText("01:01", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val status = composeRule.onNodeWithContentDescription("Sent", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val footer = Rect(minOf(time.left, status.left), minOf(time.top, status.top), maxOf(time.right, status.right), maxOf(time.bottom, status.bottom))
+        val status =
+            composeRule.onNodeWithContentDescription("Sent", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val footer =
+            Rect(
+                minOf(time.left, status.left),
+                minOf(time.top, status.top),
+                maxOf(time.right, status.right),
+                maxOf(time.bottom, status.bottom),
+            )
         val lines =
             (0 until layout.lineCount).map { line ->
                 Rect(
@@ -207,7 +218,8 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
         val item = textMessage(60, body, status = MessageStatus.Pending, unconfirmed = true)
         render(listOf(item), dark = true, amoled = true)
         val readMore = composeRule.onNodeWithText("Read More", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val warning = composeRule.onNodeWithText("Delivery not confirmed", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val warning =
+            composeRule.onNodeWithText("Delivery not confirmed", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val time = composeRule.onNodeWithText("01:01", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val text = composeRule.onNodeWithText(body, useUnmergedTree = true).getUnclippedBoundsInRoot()
         val bubble =
@@ -218,8 +230,13 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
         val expectedWidth = maxOf(text.right - text.left, readMore.right - readMore.left, footerWidth)
         val leadingInset = minOf(text.left, readMore.left, warning.left) - bubble.left
         val trailingInset = bubble.right - maxOf(text.right, readMore.right, time.right)
-        println("Production collapsed footer: body=$text, readMore=$readMore, warning=$warning, time=$time, bubble=$bubble")
-        assertTrue("independent rows must not reserve unused inline width", bubble.right - bubble.left <= expectedWidth + leadingInset + trailingInset + 1.dp)
+        println(
+            "Production collapsed footer: body=$text, readMore=$readMore, warning=$warning, time=$time, bubble=$bubble",
+        )
+        assertTrue(
+            "independent rows must not reserve unused inline width",
+            bubble.right - bubble.left <= expectedWidth + leadingInset + trailingInset + 1.dp,
+        )
         assertTrue("production warning must follow Read More", warning.top >= readMore.bottom)
         assertTrue("timestamp must remain terminal", time.bottom >= warning.bottom)
         assertTrue("warning and time must not intersect", warning.bottom <= time.top || warning.right <= time.left)
@@ -244,12 +261,19 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
             composeRule.onAllNodesWithText(it, useUnmergedTree = true).assertCountEquals(1)
         }
         assertUnconfirmedFooter(rows[3], "01:03", rtl = false)
-        val warning = composeRule.onNodeWithText("Delivery not confirmed", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val warning =
+            composeRule.onNodeWithText("Delivery not confirmed", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val time = composeRule.onNodeWithText("01:03", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals("warning and time share their last baseline when they fit", warning.bottom.value, time.bottom.value, 1f)
+        assertEquals(
+            "warning and time share their last baseline when they fit",
+            warning.bottom.value,
+            time.bottom.value,
+            1f,
+        )
         val failedTime = composeRule.onNodeWithText("01:04", useUnmergedTree = true).getUnclippedBoundsInRoot()
         listOf("Retry", "Discard failed message").forEach {
-            val control = composeRule.onNodeWithContentDescription(it, useUnmergedTree = true).getUnclippedBoundsInRoot()
+            val control =
+                composeRule.onNodeWithContentDescription(it, useUnmergedTree = true).getUnclippedBoundsInRoot()
             assertTrue("recovery controls must precede terminal metadata", control.bottom <= failedTime.top)
         }
         capture(
@@ -269,20 +293,28 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
         rtl: Boolean,
     ) {
         composeRule.onAllNodesWithText("Delivery not confirmed", useUnmergedTree = true).assertCountEquals(1)
-        val warning = composeRule.onNodeWithText("Delivery not confirmed", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val warning =
+            composeRule.onNodeWithText("Delivery not confirmed", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val timestamp = composeRule.onNodeWithText(time, useUnmergedTree = true).getUnclippedBoundsInRoot()
         val bubble =
             composeRule
                 .onNodeWithTag(messageBubbleColumnTestTag(item.record.messageIdHex), useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
         listOf(warning, timestamp).forEach {
-            assertTrue("footer must stay horizontally inside its bubble", it.left >= bubble.left && it.right <= bubble.right)
-            assertTrue("footer must stay vertically inside its bubble", it.top >= bubble.top && it.bottom <= bubble.bottom)
+            assertTrue(
+                "footer must stay horizontally inside its bubble",
+                it.left >= bubble.left && it.right <= bubble.right,
+            )
+            assertTrue(
+                "footer must stay vertically inside its bubble",
+                it.top >= bubble.top && it.bottom <= bubble.bottom,
+            )
         }
         assertTrue("no warning may follow the terminal timestamp", warning.bottom <= timestamp.bottom)
         assertTrue(
             "warning and timestamp must not intersect",
-            warning.bottom <= timestamp.top || if (rtl) timestamp.right <= warning.left else warning.right <= timestamp.left,
+            warning.bottom <= timestamp.top ||
+                if (rtl) timestamp.right <= warning.left else warning.right <= timestamp.left,
         )
     }
 

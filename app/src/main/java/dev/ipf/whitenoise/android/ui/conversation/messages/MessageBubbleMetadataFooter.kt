@@ -9,6 +9,7 @@ import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 
@@ -52,19 +53,25 @@ internal fun MessageBubbleMetadataFooter(
                 ?: metadataPlaceable.height
         val warningBaseline =
             warningPlaceable[LastBaseline].takeIf { it != AlignmentLine.Unspecified } ?: warningPlaceable.height
-        val baseline = if (stacked) warningPlaceable.height + gap + metadataBaseline else maxOf(warningBaseline, metadataBaseline)
+        val baseline =
+            if (stacked) warningPlaceable.height + gap + metadataBaseline else maxOf(warningBaseline, metadataBaseline)
         val warningY = if (stacked) 0 else baseline - warningBaseline
         val metadataY = baseline - metadataBaseline
         val width =
-            (if (stacked) maxOf(warningPlaceable.width, metadataPlaceable.width) else warningPlaceable.width + gap + metadataPlaceable.width)
-                .coerceIn(constraints.minWidth, constraints.maxWidth)
+            (
+                if (stacked) {
+                    maxOf(warningPlaceable.width, metadataPlaceable.width)
+                } else {
+                    warningPlaceable.width + gap + metadataPlaceable.width
+                }
+            ).coerceIn(constraints.minWidth, constraints.maxWidth)
         val height =
             maxOf(warningY + warningPlaceable.height, metadataY + metadataPlaceable.height)
                 .coerceIn(constraints.minHeight, constraints.maxHeight)
         val firstBaseline =
             minOf(
-                warningPlaceable[FirstBaseline].takeIf { it != AlignmentLine.Unspecified }?.let { warningY + it } ?: baseline,
-                metadataPlaceable[FirstBaseline].takeIf { it != AlignmentLine.Unspecified }?.let { metadataY + it } ?: baseline,
+                warningPlaceable.positionedFirstBaseline(warningY, baseline),
+                metadataPlaceable.positionedFirstBaseline(metadataY, baseline),
             )
         layout(width, height, mapOf(FirstBaseline to firstBaseline, LastBaseline to baseline)) {
             warningPlaceable.placeRelative(0, warningY)
@@ -72,3 +79,8 @@ internal fun MessageBubbleMetadataFooter(
         }
     }
 }
+
+private fun Placeable.positionedFirstBaseline(
+    y: Int,
+    fallback: Int,
+): Int = this[FirstBaseline].takeIf { it != AlignmentLine.Unspecified }?.let { y + it } ?: fallback
