@@ -288,7 +288,9 @@ internal class AppProfileSignUp(
 
 /**
  * MDK coalesces generated creation onto any account whose setup is still unfinished. Never adopt, activate
- * or rename an account this app already lists as though it were new; iOS guards the same way.
+ * or rename an account this app already lists as though it were new; iOS guards the same way. An earlier
+ * attempt's half-created account is refused too once the list includes it; MDK finishes it in the background,
+ * and the next attempt after that creates normally.
  */
 private fun AccountSummaryFfi.requireNewAccount(knownAccounts: Set<String>): AccountSummaryFfi {
     if (label in knownAccounts) throw MarmotKitException.AccountSetupRetryRequired()
