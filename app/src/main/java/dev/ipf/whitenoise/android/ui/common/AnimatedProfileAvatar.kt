@@ -317,21 +317,6 @@ internal suspend fun AvatarFaultBudget.playAvatarAnimation(
     }
 }
 
-/** Only transient worker contention parks playback; unsupported/corrupt sources keep static fallback. */
-internal suspend fun decodeAvatarWhenAvailable(decode: suspend () -> Drawable?): Drawable? {
-    while (true) {
-        val attempt =
-            dev.ipf.whitenoise.android.state
-                .runCatchingCancellable { decode() }
-        val failure = attempt.exceptionOrNull()
-        if (failure is AnimationStartupException) throw failure
-        val busy = failure as? dev.ipf.whitenoise.android.media.AnimationAdmissionBusyException
-        if (busy == null) return attempt.getOrNull()
-        busy.awaitAvailability()
-        currentCoroutineContext().ensureActive()
-    }
-}
-
 /** Draws a self-invalidating [Drawable], redrawing on each frame it reports. */
 private class AnimatedDrawablePainter(
     private val drawable: Drawable,
