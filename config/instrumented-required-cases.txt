@@ -12,7 +12,7 @@
 # coverage gated by @SdkSuppress(maxSdkVersion) below the runner's API level.
 
 # #3415: policy timeout diagnostics retain closed evidence without changing the fixture outcome.
-dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#timeoutReportsEachStageAndRethrowsTheOriginalFailure
+dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#timeoutReportsBothStagesAndRethrowsTheOriginalFailure
 dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#successfulWaitDoesNotCollectDiagnostics
 dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#otherFailuresDoNotCollectDiagnostics
 dev.ipf.whitenoise.android.media.BackgroundReceiptPolicyDiagnosticsAndroidTest#diagnosticFailuresCannotReplaceTheOriginalTimeout

@@ -24,9 +24,9 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
 class BackgroundReceiptPolicyDiagnosticsAndroidTest {
-    /** Every wait reports its exact case/stage and current closed facts, even when no coroutine frames survive. */
+    /** Both waits report their exact case/stage and current closed facts, even when no coroutine frames survive. */
     @Test
-    fun timeoutReportsEachStageAndRethrowsTheOriginalFailure() =
+    fun timeoutReportsBothStagesAndRethrowsTheOriginalFailure() =
         runBlocking {
             val timeout = timeout()
             val cases =
