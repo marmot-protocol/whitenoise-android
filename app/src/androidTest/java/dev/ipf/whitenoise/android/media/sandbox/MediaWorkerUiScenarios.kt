@@ -189,7 +189,9 @@ internal object MediaWorkerUiScenarios {
     /** Another conversation whose notification arrives while the open one decodes. */
     private val OTHER_CONVERSATION = MediaTrustDomain.Conversation("ui-account", "other")
     private val PROFILES = MediaTrustDomain.PublicProfiles("ui-account")
-    private val LOCAL_PICKS = MediaTrustDomain.Local("ui-account")
+
+    /** The user's own picks to send into the open conversation, which the photo editor decodes. */
+    private val OUTGOING_PICKS = MediaTrustDomain.Outgoing("ui-account", "open")
 
     /**
      * Scrolls a real three-column Compose grid of distinct JPEG tiles to its end with touch swipes, each
@@ -259,12 +261,15 @@ internal object MediaWorkerUiScenarios {
      * measured separately. With [BurstPlacement.NONE], notifications arrive one at a time, 300 ms apart, each
      * with one avatar and one emoji. Otherwise a burst of grid-sized decodes in the open conversation is queued
      * first, as when a media-heavy chat is open, and all notifications arrive at once behind it, with their
-     * emoji in another conversation ([BurstPlacement.OTHER]) or in the open one ([BurstPlacement.SAME]).
+     * emoji in another conversation ([BurstPlacement.OTHER]) or in the open one ([BurstPlacement.SAME]). With
+     * [groupUrlPictures], each avatar is instead a group's URL picture, whose host chooses its bytes, so it
+     * decodes single-use on every lane, and the scenario name gains a `_group_url` suffix.
      */
     fun notificationArtwork(
         lane: UiLane,
         placement: BurstPlacement,
         attempt: Int,
+        groupUrlPictures: Boolean = false,
     ): JSONObject =
         runBlocking {
             val tiles = (0 until BURST).map { jpeg(TILE_SOURCE_EDGE, TILE_SOURCE_EDGE, 1_000 + attempt * BURST + it) }
@@ -272,7 +277,8 @@ internal object MediaWorkerUiScenarios {
             val open = lane.domain(OPEN_CONVERSATION)
             val emojiConversation = if (placement == BurstPlacement.SAME) OPEN_CONVERSATION else OTHER_CONVERSATION
             val emojiDomain = lane.domain(emojiConversation)
-            val avatarDomain = lane.domain(PROFILES)
+            val avatarDomain = if (groupUrlPictures) MediaTrustDomain.Unique else lane.domain(PROFILES)
+            val avatarPath = if (groupUrlPictures) "notify-group" else "notify"
             val warmUp = png(EMOJI_EDGE, WARM_UP_SEED - attempt)
             MediaPipeline.decodeSampledBitmap(warmUp, TILE_EDGE, domain = open)?.recycle()
             delay(IDLE_SETTLE_MS)
@@ -296,7 +302,7 @@ internal object MediaWorkerUiScenarios {
                     wave.map { index ->
                         async(Dispatchers.IO) {
                             timed(AVATAR_NOTIFICATION_DEADLINE_MS, cached = true) {
-                                val url = "https://fixture.invalid/notify/$attempt/$index"
+                                val url = "https://fixture.invalid/$avatarPath/$attempt/$index"
                                 AvatarImageLoader.loadBitmap(url, avatarDomain)
                             }
                         }
@@ -315,7 +321,7 @@ internal object MediaWorkerUiScenarios {
             }
             burst.awaitAll()
             JSONObject()
-                .put("scenario", placement.scenario)
+                .put("scenario", if (groupUrlPictures) "${placement.scenario}_group_url" else placement.scenario)
                 .put("lane", lane.name)
                 .put("avatar_deadline_ms", AVATAR_NOTIFICATION_DEADLINE_MS)
                 .put("avatar_hits", avatarTimes.count { it != null })
@@ -340,9 +346,9 @@ internal object MediaWorkerUiScenarios {
             )?.bitmap
         }
 
-    /** The same cancellation check through the photo editor's preview decode of a local pick. */
+    /** The same cancellation check through the photo editor's preview decode of a pick to send. */
     fun editorCancellation(lane: UiLane): JSONObject {
-        val domain = lane.domain(LOCAL_PICKS)
+        val domain = lane.domain(OUTGOING_PICKS)
         val renderer = PhotoEditorRenderer(domain = { domain })
         return cancellation(lane, "editor_cancel", sentPerRequest = 2) { bytes ->
             renderer.decodePreview(bytes)

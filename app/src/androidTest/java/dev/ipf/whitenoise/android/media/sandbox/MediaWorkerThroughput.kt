@@ -133,6 +133,14 @@ internal object MediaWorkerThroughput {
             } +
             ThroughputScenario("scroll_rounds") { lane, corpus, rows ->
                 concurrent(lane, corpus, rows, SCROLL_TILES, SCROLL_ROUNDS, SCROLL_ROUND_MS)
+            } +
+            ThroughputScenario("chat_list_url") { lane, corpus, rows ->
+                // The same cold chat list where every group shows a URL picture, whose host chooses its bytes, so
+                // each group image decodes single-use while the people's pictures share the public profiles.
+                concurrent(lane, corpus, rows, CHAT_LIST_ROWS, rounds = 1, roundMs = 0L) { index ->
+                    val groupRow = index % CHAT_LIST_GROUP_EVERY == CHAT_LIST_GROUP_EVERY - 1
+                    if (groupRow) dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique else PROFILES
+                }
             }
 
     /**

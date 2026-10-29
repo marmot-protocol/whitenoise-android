@@ -55,7 +55,26 @@ class MediaWorkerUiThroughputDeviceTest {
         }
     }
 
+    /** Repeated notification artwork whose avatar is a group's URL picture, decoded single-use, idle and in bursts. */
+    @Test
+    fun measureGroupNotificationArtwork() {
+        AvatarImageLoader.clear()
+        val avatar = MediaWorkerUiScenarios.png(AVATAR_EDGE, AVATAR_SEED)
+        AvatarImageLoader.attachProfileImageFetcher { _, _ -> avatar }
+        UiLane.install(lane).use { installed ->
+            repeat(repeats) { attempt ->
+                BurstPlacement.entries.forEachIndexed { offset, placement ->
+                    val seed = GROUP_SEED_OFFSET + attempt * BurstPlacement.entries.size + offset
+                    MediaWorkerUiReport.emit(
+                        MediaWorkerUiScenarios.notificationArtwork(installed, placement, seed, groupUrlPictures = true),
+                    )
+                }
+            }
+        }
+    }
+
     private companion object {
+        const val GROUP_SEED_OFFSET = 500
         const val AVATAR_EDGE = 256
         const val AVATAR_SEED = 7
     }
