@@ -185,11 +185,130 @@ means for each worker differs by OS:
 - GrapheneOS with exec spawning turned off for the app behaves like stock
   Android.
 
+### Measurements and proposed budget
+
+Measured on API 30 and API 36 arm64 emulators (4 vCPUs, 2 GiB and 2.4 GiB)
+with debug builds of this change. *Before* is the reusable worker on a build
+that differs only by dropping the application-zygote attributes, which is how
+`master` ships it. *After* is the per-input lane with two spares, launched
+through the application zygote. Before and after ran from separate APKs on
+the same emulator within the same hour, with each APK's variants in ABBA
+order. The throughput rows come from `MediaWorkerThroughputDeviceTest`, as
+p50/p95 milliseconds; the queue wait is the p95 admission wait. The UI rows
+come from `MediaWorkerUiThroughputDeviceTest`; see
+[the still-worker baseline](media-worker-baseline.md#matched-throughput-comparison).
+
+| Throughput | API 30 before | API 30 after | API 36 before | API 36 after |
+| --- | ---: | ---: | ---: | ---: |
+| First image after launch, cold application zygote | 324/367 | 401/500 | 228/280 | 274/325 |
+| First image on a new lane, application zygote still warm | 320/333 | 39/78 | 227/259 | 37/44 |
+| Idle thumbnail, 400 ms apart | 4/7 | 16/20 | 5/9 | 12/18 |
+| Idle 1920×1440 viewer | 27/32 | 34/49 | 23/32 | 28/61 |
+| Six-operation mix, back to back | 1/26 | 19/42 | 1/24 | 23/60 |
+| Burst of 24 (queue wait) | 28/44 (42) | 196/369 (348) | 32/48 (46) | 280/501 (492) |
+| Burst of 48 (queue wait) | 46/71 (70) | 392/743 (723) | 50/77 (76) | 489/900 (892) |
+| Burst of 96 (queue wait) | 69/115 (113) | 797/1512 (1494) | 65/113 (112) | 1058/1992 (1964) |
+| Scroll, 8 tiles every 400 ms | 13/20 | 65/125 | 12/21 | 79/147 |
+| No result or admission timeout | 0 | 0 | 0 | 0 |
+| Live image workers, at most | 1–2 | 3 | 1–2 | 3 |
+| Idle PSS, workers and zygote (MiB) | 47.8 | 70.6 | 59.5 | 74.0 |
+| Caller FDs, at most | 64 | 64 | 104 | 106 |
+
+Before, the first image after launch and the first on a new lane are the same
+cold isolated start. After, only the first image after launch pays for the
+application zygote; a new lane while the zygote is still up is about 0.2–0.3 s
+faster than before. Before reaches two workers only while a closed lane's
+worker exits.
+
+UI times are milliseconds.
+
+| UI level | API 30 before | API 30 after | API 36 before | API 36 after |
+| --- | ---: | ---: | ---: | ---: |
+| Grid of 120 tiles, passes | 6 | 6 | 6 | 6 |
+| Tiles loaded while on screen, median per pass | 33 | 99 | 66 | 110 |
+| Tiles that failed | 0 | 0 | 53, in 3 passes | 0 |
+| Visible tiles still blank 10 s after scrolling stops | 0 | 0 | 14, in 1 pass | 0 |
+| Tile p50/p95, median of passes | 268/422 | 156/441 | 10/383 | 160/542 |
+| Slowest tile | 1050 | 605 | 1052 | 10834 |
+| Frame p95, median of passes | 18 | 19 | 45 | 43 |
+| Notification avatar, idle, p50/worst p95 | 12/18 | 60/67 | 13/19 | 67/106 |
+| Notification avatar behind a 24-image burst, p50/worst p95 | 42/60 | 480/589 | 46/56 | 608/1235 |
+| Emoji artwork within 250 ms, idle | 60 of 60 | 60 of 60 | 60 of 60 | 60 of 60 |
+| Emoji artwork within 250 ms, behind a 24-image burst | 60 of 60 | 0 of 60 | 60 of 60 | 0 of 60 |
+| Viewer cancelled mid-decode: pixels delivered | 0 of 10 | 0 of 10 | 0 of 10 | 0 of 10 |
+| Next image after a viewer cancel, p50 (first attempt succeeded) | 395 (0 of 10) | 59 (10 of 10) | 315 (0 of 10) | 50 (10 of 10) |
+| Editor cancel, then next image, p50 | 17, 19 | 25, 33 | 14, 16 | 26, 54 |
+
+Before, the reusable lane retires its worker for every tile that leaves the
+screen mid-decode and starts a cold one, so most tiles of a fast scroll never
+load. On API 36 it also failed 17 or 18 tiles in three of six passes. After a
+cancelled viewer decode, its next request returned nothing and only the
+scenario's retry succeeded. The 10.8 s tile came from one API 36 pass that
+ran at a 47 ms frame p50 against 17 ms in the others. Its start was not
+recorded. Four later passes recorded the slowest tile's start, and none
+exceeded 0.7 s. The outlier is unexplained.
+
+The budget below is proposed, not approved. Status is after against before
+on each API.
+
+| Proposed budget item | API 30 | API 36 |
+| --- | --- | --- |
+| No failed request or admission timeout in any throughput scenario | Met | Met |
+| Idle thumbnail p95 within 50 ms of before | Met, +13 | Met, +9 |
+| Idle viewer p95 within 100 ms of before | Met, +17 | Met, +29 |
+| First image after launch p95 within 150 ms of before | Met, +133 | Met, +45 |
+| First image on a new lane p95 within 150 ms of before | Met, −255 | Met, −215 |
+| Burst p95 within 0.6, 1.2 and 2.5 s for 24, 48 and 96 requests | Met: 0.37, 0.74, 1.51 s | Met: 0.50, 0.90, 1.99 s |
+| Scroll-round p95 within 250 ms | Met, 125 | Met, 147 |
+| At most three live workers plus the application zygote | Met | Met |
+| No caller FD growth across scenarios | Met, 64 throughout | Met, a constant two more (106 at most) |
+| Idle PSS growth within 40 MiB | Met, +22.8 | Met, +14.5 |
+| Grid: no failed tile and no visible tile left blank | Met | Met |
+| Grid frame p95 within one 60 Hz frame of before | Met, +1 | Met, −2 |
+| Notification avatar within its 2.5 s bound, idle and behind a burst | Met | Met |
+| Emoji artwork within its 250 ms bound, idle | Met | Met |
+| Emoji artwork within its 250 ms bound behind a 24-image burst | **Not met**, 0 of 60 | **Not met**, 0 of 60 |
+| Cancelled viewer and editor decodes deliver nothing, the next image arrives within 2 s | Met | Met |
+
+The grid, notification and cancellation items were added with these UI
+measurements; the others predate them. Two results need a decision rather than
+a tick:
+
+- Emoji artwork behind a burst. Each notification's emoji waits behind the
+  queued grid decodes, roughly half a second for 24, and the presenter then
+  posts the notification as text without the emoji image. The reusable lane
+  clears the same queue within the bound. The options are to accept it, to
+  admit notification artwork ahead of grid decodes (visible-first priority,
+  which this change does not implement), or to keep the reusable default.
+- The first image after launch. It is 77 ms (API 30) and 46 ms (API 36)
+  slower at p50, within the proposed bound but a regression. Only images on a
+  lane opened while the application zygote is still up are faster.
+
+These are emulator debug figures. Release builds, physical devices,
+GrapheneOS and API 34 (no local emulator image) are unmeasured.
+
+Rejected alternatives, on the same emulators:
+
+- Two spares without the application zygote: burst-of-24 p95 of 3.7 s
+  (API 30) and 2.8 s (API 36), 94 and 58 of 192 burst-of-96 requests past the
+  eight-second admission deadline, and scroll-round p95 of 7.4 s and 4.6 s.
+- The application zygote with no spare: burst-of-48 p95 of 1.47 s (API 30) and
+  1.69 s (API 36). With one spare: 0.58, 1.15 and 2.33 s (API 30) and 0.65,
+  1.30 and 2.65 s (API 36) for 24, 48 and 96 requests. API 36 misses all three
+  limits, so the lane keeps two spares.
+- In earlier runs on the same emulators, preloading the worker classes cut a
+  fresh worker's first decode from about 10 ms to 3 ms. Unbinding together
+  with RETIRE raised the death wait from 2.4 ms to 48 ms at p95, so unbinding
+  is only an escalation.
+- Same-source grouping and visible-first priority are not implemented.
+  Visible-first priority is the change that would address the emoji result.
+
 ### Default
 
 Production installation keeps the reusable worker. The per-input lane is
 selected only through the debug `installForLifetimeQualification` seam until
-its proposed regression budget and the UI-level checks are reviewed.
+its [proposed budget](#measurements-and-proposed-budget), including the unmet
+emoji item, is reviewed.
 `ReusableMediaTransport` therefore stays in production code. Removing it waits
 for that decision and for #3439, which edits the facade's animation type checks.
 
@@ -208,7 +327,8 @@ for that decision and for #3439, which edits the facade's animation type checks.
   unmeasured.
 - There is no visible-first priority. Callers cancelled through interruption,
   such as the image bubble decode, leave the queue; other callers wait within
-  the eight-second admission bound.
+  the eight-second admission bound. Emoji artwork misses its 250 ms bound
+  behind a burst; see the [proposed budget](#measurements-and-proposed-budget).
 
 The test-only [still-worker baseline](media-worker-baseline.md) records the
 historical reuse characterization and the matched throughput harness. The
