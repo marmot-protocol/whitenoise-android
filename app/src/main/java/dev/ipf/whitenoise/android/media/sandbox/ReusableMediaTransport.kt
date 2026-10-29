@@ -21,7 +21,13 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-/** One serialized reusable worker. A live worker that misses its deadline poisons further admission. */
+/**
+ * One serialized reusable worker. A live worker that misses its deadline poisons further admission.
+ *
+ * Production no longer installs this lane — per-input generations replaced it (#3373), pending approval of
+ * their proposed budget. It stays as the lane to restore if that budget is rejected and as the measurement
+ * baseline. Removing it is a follow-up after that decision and after #3439, which edits the facade's type checks.
+ */
 @Suppress("TooManyFunctions") // Cohesive binding, admission and descriptor lifecycle for one decoder lane.
 internal class ReusableMediaTransport(
     private val context: Context,

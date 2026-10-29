@@ -3,7 +3,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Production reusable isolated still-image worker",
+        "surface": "Reusable isolated still-image worker, kept but no longer installed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/ReusableMediaTransport.kt",
         "anchor": "internal class ReusableMediaTransport(",
         "test_ids": [
