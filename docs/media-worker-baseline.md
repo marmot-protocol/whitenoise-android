@@ -2,8 +2,8 @@
 
 This characterization was introduced before worker-per-input retirement, when
 the production transport reused its worker after successful requests. Preserve
-those measurements separately from successor lifetime candidates. The full
-isolation goals of #3373 remain pending qualification.
+those measurements separately from later lifetime measurements. Production now
+uses per-input worker generations (#3373); the baseline drives that transport.
 The audio/video containment, sender-trust, video-metadata and document-privacy
 work in #3374–#3377 remains pending.
 
@@ -90,12 +90,11 @@ test-only baseline slice. The lifetime implementation has separate behavioral
 tests and platform requirements. All five issues remain open. Existing permanent
 manual IDs and unchecked results are retained.
 
-The [still-image lifetime candidate](media-worker-lifetime.md) documents the
-successor owner and its separate qualification requirements.
+The [still-image worker lifetime](media-worker-lifetime.md) documents the
+production owner and its qualification boundaries.
 
-Production installation uses the current reusable worker. The per-input lifetime
-transport remains explicit qualification code; its timing and failure evidence
-do not approve production adoption.
+Production installation now uses the per-input transport. Its adoption rests
+on the matched throughput comparison below, not on this sequential corpus.
 
 ## Healthy startup timing
 
@@ -115,3 +114,33 @@ before comparing measurements. Debug characterization results must not be
 relabeled as release performance.
 
 The release-like trace mode does not retain its benchmark APK through the existing debug-APK failure upload. Preserve the trace reports; a failed run without a retained exact benchmark APK cannot qualify a performance comparison.
+
+## Matched throughput comparison
+
+`MediaWorkerThroughputDeviceTest` is an opt-in `ManualDeviceFixture`, excluded
+from every hosted suite. It drives named transport variants through the same
+synthetic corpus on one APK and device: `reuse` (the pre-#3373 reusable worker),
+`per_input` (one cold generation per input) and `prewarm1`/`prewarm2` (per-input
+generations with one or two clean spares). Repeat names for ABBA ordering:
+
+```sh
+adb -s <your-emulator> shell am instrument -w -r \
+  -e class dev.ipf.whitenoise.android.media.sandbox.MediaWorkerThroughputDeviceTest \
+  -e throughput_variants reuse,prewarm2,prewarm1,per_input,per_input,prewarm1,prewarm2,reuse \
+  dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Scenarios: eight cold first thumbnails, each on a new lane; 24 idle
+thumbnails 400 ms apart; ten 1920×1440 viewer decodes 600 ms apart; the
+six-operation mix back to back; 24-, 48- and 96-request bursts released
+together; and eight overlapping scroll rounds of eight tiles every 400 ms.
+Every input has distinct bytes. Rows go to instrumentation status key
+`media_worker_throughput_json` and, when available, a
+`media-worker-throughput-*.jsonl` file. Each request records latency, admission
+wait and whether it reached the lane within the eight-second deadline.
+Each scenario records worker starts, bind-to-connect times, the most live worker
+processes and their RSS sum (read through `ps` as the shell UID), caller RSS
+and FD maxima and the lowest system MemAvailable. RSS counts pages shared with
+the zygote once per process; measure PSS separately with `dumpsys meminfo`.
+Results are performance observations, never a security qualification. Compare
+only matching corpus digests on the same device, API and build configuration.

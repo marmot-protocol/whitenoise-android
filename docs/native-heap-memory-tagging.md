@@ -3,6 +3,8 @@
 The main application requests `android:memtagMode="async"`. Debug builds replace
 that value with `sync` for fault attribution. Play, Zapstore and preview overlays
 inherit this policy, as do the isolated image and animation decoder processes.
+Still-image workers fork from the app's application zygote (#3373); that launch
+path's effective tagging needs its own device evidence.
 Native libraries, ABIs, the minimum Android version and package/signing identities
 retain their existing configuration.
 
@@ -35,7 +37,8 @@ Release qualification requires the following evidence in addition to the source 
   distributions, persistent preview and debug: the release ASYNC request, debug SYNC
   request and inherited process policy. Bind observations to the exact APK and native dependency.
 - On MTE-capable arm64 hardware, record OS/build, manifest requests and MTE state
-  (enabled, disabled or unverified) in the app and both decoder processes. Require
+  (enabled, disabled or unverified) in the app, both decoder processes and the
+  image worker's application zygote. Require
   MTE enabled on capable hardware; no fault-mode probe is required. Ordinary emulators and
   unsupported hardware establish compatibility only. Test GrapheneOS separately
   when available; retain separate results for each OS.

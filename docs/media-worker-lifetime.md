@@ -1,32 +1,39 @@
-# Still-image worker lifetime candidate
+# Still-image worker lifetime
 
-Production installation retains the existing reusable isolated worker. Per-input
-retirement is an off-default experimental transport, selected only by the debug
-`installForLifetimeQualification` seam or direct qualification fixtures. The
-facade preserves that explicit selection across account reset; normal install
-always selects the reusable transport. No in-process decoding fallback is added.
+Production installation uses per-input worker generations (#3373). The facade
+installs one process-owned `IsolatedMediaTransport` and keeps it across clear,
+install and account reset, so a held generation survives facade replacement.
+Each session has its own source access, refusal cache and epoch. No in-process
+decoding fallback exists. [Media containment](media-containment.md#per-input-worker-generations)
+states the contract; this page records the owner, deadline and test boundaries.
 
-Each admitted still-image operation uses one binding generation. The parent
-registers its exact Binder death recipient before admitting input and output
-descriptors. A terminal reply revokes the reply capability, requests retirement
-and waits for that Binder death before reading shared pixels. Another input
-remains held until the generation has a death witness or Android definitively
-refuses its bind.
+## Owner and ordering
 
-Binding, reply and retirement share one eight-second host deadline after the
-existing provider-staging phase. The worker retains its six-second watchdog.
-Acknowledgements, disconnection callbacks, null bindings and expired deadlines
-all retain the generation. Accepted startup without a Binder can hold the image
-lane until app-process restart. Cooperative retirement improves recovery; the
-admission fence remains effective when a worker ignores it.
+`MediaWorkerPool` owns generations, `IsolatedMediaTransport` owns requests.
+One request is admitted at a time. Its claim waits until the previous
+input-bearing generation has a Binder death callback, then takes a clean
+connected spare or binds one. The parent registers its exact death recipient
+before admitting input and output descriptors. After dispatch it warms the next
+spare. A terminal reply revokes the reply capability, the parent sends RETIRE,
+and it waits for that Binder death before reading shared pixels. A revoked or
+failed reply skips that wait; the next claim still enforces it.
 
-The facade keeps one real transport owner across clear, install and account
-reset. Each session has its own source access, refusal cache and epoch. Reset
-revokes pending replies and retires the captured old worker. Late callbacks
-remain bound to that worker. A request admitted before reset may transfer its
-descriptors; its result is discarded after session invalidation. Standalone
-transport close is terminal and releases its callback resources after observed
-death. Animation and platform audio/video retain their existing separate owners.
+Binding, reply and death share one eight-second host deadline after the
+existing provider-staging phase, separate from the eight-second admission wait.
+The worker keeps its six-second watchdog. RETIRE acknowledgements,
+disconnection callbacks, null bindings, unbind requests and expired deadlines
+never reopen admission. A worker alive 250 ms after RETIRE is unbound so
+Android stops it; that call is an escalation, not a witness. Accepted startup
+without a Binder can hold a slot until app-process restart, and a late
+connection becomes a clean spare. Live generations never exceed one plus two
+spares.
+
+A session reset captures the generations that predate it, revokes the pending
+reply and retires them, clean spares included; a generation started for the new
+session is never swept up by a slow old-source close. A request admitted before
+reset may transfer its descriptors; its result is discarded. Standalone close is
+terminal: it unbinds every generation and releases callback resources after
+the last death. Animation and platform audio/video keep their own owners.
 
 ## Output and threat boundary
 
@@ -40,23 +47,24 @@ process-group cleanup remain outside that witness. A compromised descendant
 could retain a writable mapping during the copy; pixel atomicity and authenticity
 are outside this contract. The copied bitmap remains private after the copy.
 Android service isolation, descriptor bounds and permission checks remain
-required. This candidate addresses the still-worker lifetime portion of #3373;
-the other attachment-security issues retain their separate acceptance gates.
+required.
 
-## Validation still required
+## Validation
 
-`MediaBindingRecoveryTest` controls callbacks through the real transport for
-reply retirement, reset, terminal close, missing and late connections, duplicate
-death callbacks and old-source cleanup races. Those JVM fixtures exercise owner
-ordering. Hosted instrumentation supplies the operating-system evidence.
+`MediaWorkerGenerationTest` and `MediaBindingRecoveryTest` drive the real
+transport and pool through controlled callbacks: per-request retirement,
+distinct generations, late and revoked replies, refused and throwing binds,
+startup timeout and late connection, death/close and reset races, a worker
+that ignores RETIRE, spare bounds and fail-closed replacement. Those JVM
+fixtures exercise owner ordering only.
 
-`eachStillInputWaitsForItsExactBinderDeathBeforeReturningPixels` checks the exact
-Binder is dead at return, records its independent death callback and verifies
-pixels across two binding generations. Sequential Android UIDs may be reused;
-the witness follows the exact Binder and generation.
-
-Hosted API 30 and current-API containment campaigns, the corrected 100-operation
-corpus and matched-source latency measurements remain pending. Historical reuse
-measurements and the failed 84/100 diagnostic dataset remain separate. Default
-adoption requires review of those results. The existing MED-031 and MED-032
-manual cases retain their image, account-switching and format checks.
+`IsolatedMediaDecoderDeviceTest` supplies the operating-system evidence on a
+real device. A debug worker-state canary shows source A's retained digest and
+duplicated descriptor are absent from source B's worker, and A's process is
+gone (`ps`). Each input's DECODE is sent only after its predecessor's Binder
+death, recorded by an independent witness. Debug fixtures that ignore RETIRE,
+after a reply or while abandoned mid-request, hold the next input until Android
+stops them. Android records that exit as `isolated not needed`, not a self-exit.
+These cases ran on API 30 and API 36 emulators and run in the hosted API 34
+pull-request lane. MED-031 and MED-032 keep their image, account-switching and
+format checks.

@@ -4,7 +4,7 @@
 
 Still-image decode and inspection, EXIF inspection and SVG preparation use a nonexported `android:isolatedProcess` service. The worker has a separate UID and no application permissions. Application startup skips account state, diagnostics, locale preferences, playback, transfers and background scheduling in that process.
 
-The app lazily binds one serialized image worker. Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
+Still images use one serialized lane that gives every untrusted input its own short-lived worker process; see [Per-input worker generations](#per-input-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
 
 Input bytes are written only after their temporary file is unlinked, then passed by read-only descriptor. Picked images and media use a process-wide staging gate, with provider cancellation and bounded reads. Whole-file seekable videos pass their descriptor without a full-video array copy. Provider subranges are copied into their own unlinked inode, so a decoder cannot read bytes outside the selected asset. No URLs, account objects, keys or general file-access callback enter the worker.
 
@@ -20,9 +20,9 @@ Debug instrumentation may pass the exact path of an existing synthetic `media-co
 - Region decoding also caps the power-of-two intermediate at 16,777,216 pixels. Editor planning uses the same calculation before IPC so a budget refusal retains the processing-limit message; the worker still enforces the cap. Requested quality is preserved rather than silently undersampled to evade this limit.
 - Existing GIF/WebP canvas/frame/work admission precedes every still or animated decode. A refused animation cannot bypass admission through its first frame.
 - File media probes: at most 512 MiB, with validated descriptor offsets and lengths; this is not an attachment transfer quota.
-- Image worker watchdog: 6 seconds, with an 8-second host wait. An interrupted dispatched request also asks the worker to retire through its control looper. A worker still alive after timeout/cancellation blocks replacement admission; a system-confirmed death permits a fresh generation.
+- Image worker watchdog: 6 seconds, with an 8-second host wait. Every request retires its worker after one reply; an interrupted dispatched request retires it too. A worker still alive 250 ms after RETIRE is unbound, so Android stops its isolated process. Until that worker's Binder death arrives, no other input is admitted.
 - Platform media: one process-wide operation, admitted before opening/staging inputs. Caller waits are bounded at 8 seconds for probes and 40 seconds for waveforms, plus bounded admission. Audio loops check cancellation and a 30-second decode ceiling. A timed-out native call keeps its slot until it actually terminates; account reset cannot create a parallel replacement thread. Late posters are recycled and retired results are discarded. The app cannot safely force-kill an in-process native call.
-- Failed source revisions have bounded in-memory quarantine. Account teardown retires the image worker, media delivery and pending reply capabilities; host cache-generation checks remain authoritative for UI publication.
+- Failed source revisions have bounded in-memory quarantine. Account teardown retires every image worker generation, clean spares included, as well as media delivery and pending reply capabilities; host cache-generation checks remain authoritative for UI publication.
 
 Native temporary allocations are not bounded solely by output dimensions. Worker isolation and watchdogs contain ordinary faults but cannot force a compromised worker to obey its own watchdog or prevent a kernel/system-service escape. A malicious provider that ignores cancellation can hold one admitted off-main staging operation; new readers must not bypass its gate.
 
@@ -116,10 +116,123 @@ These controlled fixtures do not replace ordinary messenger or actual camera
 corpus qualification, including 200-megapixel and ten-bit HEIF sources. MED-032
 retains the separate manual acceptance.
 
-## Worker-lifetime characterization
+## Per-input worker generations
 
-The test-only [still-worker baseline](media-worker-baseline.md) records current
-binding reuse, request timings and bounded negative probes through the existing
-focused API30/current-API campaign. Production lifetime stays unchanged;
-worker-per-input qualification remains pending. Raw observations and matched-corpus
-performance review precede that implementation.
+Each still-image request — decode, inspection, EXIF, region or SVG, from avatars,
+notification artwork, thumbnails, composer/editor sources and viewers alike —
+runs in its own worker generation (#3373). A generation is one
+`bindIsolatedService` binding with a unique instance name (`images_<n>`). The
+parent links a death recipient to its Binder before sending any descriptor. It
+carries one input; there is no same-source grouping, so inspecting and then
+decoding the same bytes uses two generations.
+
+- The reply capability belongs to that generation and request. It accepts one
+  reply and is revoked before RETIRE; later replies, including those from an
+  abandoned or reset request, are refused by the transaction itself.
+- After the reply the parent sends RETIRE. The worker's own exit normally
+  follows within a few milliseconds. A worker still alive 250 ms later is
+  unbound, and Android stops the isolated process (`isolated not needed`) whether
+  or not the worker cooperates. Unbinding at once was measured to slow the common
+  path; neither step counts as evidence of death.
+- Only the generation's kernel Binder death callback reopens admission. The
+  pixel copy waits for the producing generation's death. The next input also
+  waits for it, even when its request was abandoned, timed out or reset.
+- Up to two clean spares are bound while the current input is served. They
+  have never received input and are retired on account reset or close. Live
+  generations, including retired ones whose death is unconfirmed, never exceed
+  three, plus the application zygote.
+- A refused bind fails that input. A throwing bind, a startup without a
+  connection, a death link that cannot be registered or a worker that never
+  dies keeps its slot; when every slot is held, new input fails closed rather
+  than starting another process. A late connection from a timed-out startup is a
+  clean spare. Nothing falls back to an earlier worker or to app-process decoding.
+
+The worker starts from the app's own application zygote
+(`android:useAppZygote`, `MediaZygotePreload`). That zygote has its own isolated
+UID, receives no descriptors, account state or untrusted bytes, and preloads
+only worker classes with constant static state; it starts no threads. Every
+generation is a fresh fork with its own isolated UID. Forks share the zygote's
+address-space layout for preloaded code. The platform zygote's preloaded
+libraries, including the codecs, were already shared this way across all app
+processes.
+
+Animation sessions keep their separate worker, admission and lifetime rules.
+Platform audio/video keeps its separate adapter.
+
+### Why this granularity
+
+Measured with `MediaWorkerThroughputDeviceTest` on API 30 and API 36 arm64
+emulators (4 vCPUs, 2 GiB, debug build of this change), in ABBA order,
+pooled. Before is the pre-#3373 reusable worker on a build without the
+application zygote, as `master` shipped; after is the default. Values are
+p50/p95 milliseconds; queue wait is the p95 admission wait.
+
+| Scenario | API 30 before | API 30 after | API 36 before | API 36 after |
+| --- | ---: | ---: | ---: | ---: |
+| Cold first thumbnail, new lane | 326/462 | 42/69 | 234/322 | 43/76 |
+| Idle thumbnail, 400 ms apart | 2/4 | 8/12 | 2/4 | 9/13 |
+| Idle 1920×1440 viewer | 15/22 | 21/26 | 12/15 | 20/26 |
+| Six-operation mix, back to back | 1/26 | 12/43 | 1/24 | 18/51 |
+| Burst of 24 (queue wait) | 16/27 (26) | 162/295 (288) | 19/30 (29) | 216/400 (381) |
+| Burst of 48 (queue wait) | 30/52 (51) | 332/622 (612) | 35/83 (81) | 381/736 (718) |
+| Burst of 96 (queue wait) | 57/105 (104) | 619/1181 (1174) | 54/99 (98) | 884/1589 (1580) |
+| Scroll, 8 tiles every 400 ms | 7/13 | 56/99 | 8/13 | 67/128 |
+| No result or admission timeout | 0 | 0 | 0 | 0 |
+| Live image workers, at most | 1 | 3 | 1 | 3 |
+| Idle PSS, workers and zygote (MiB) | 50 | 74 | 65 | 80 |
+
+Caller FD maxima were unchanged. The first image after the application zygote
+starts costs about 0.4 s on API 30, like the old worker's cold start; the
+zygote stays up while a spare is alive and exits five seconds after its last
+child.
+
+Rejected alternatives, on the same emulators:
+
+- A cold isolated process per input took 240–320 ms to connect. Requests took
+  255–335 ms each, and 56 of 96 requests in a 48-request burst hit the
+  eight-second admission deadline.
+- Without the application zygote, even two spares left 96 of 192 (API 30) and
+  64 of 192 (API 36) burst-of-96 requests timed out.
+- With the zygote but no spare, a 48-request burst reached 1.3 s (API 30) and
+  1.8 s (API 36) at p95. One spare reached 1.0 s and 1.4 s, and 2.8 s for 96
+  requests on API 36.
+- Preloading the worker classes cut a fresh worker's first decode from about
+  10 ms to 3 ms. Unbinding together with RETIRE raised the death wait from
+  2.4 ms to 48 ms at p95, so unbinding is only an escalation.
+- Same-source grouping and visible-first priority were not needed to meet the
+  budget and would add admission state.
+
+The adoption budget: no request may fail or miss the admission deadline in any
+scenario; idle thumbnail p95 within 50 ms and viewer p95 within 100 ms of
+before; cold first thumbnail p95 within 150 ms of before; burst p95 within
+0.6 s (24), 1.2 s (48) and 2.5 s (96), under a third of the deadline; scroll
+p95 within 250 ms; at most three live workers plus the zygote; no caller FD
+growth; idle PSS growth within 40 MiB. Two spares meet it on both APIs. One
+spare missed the burst limits on API 36 (0.68 s, 1.4 s and 2.8 s), so the
+default is two. These are emulator debug figures; the budget still needs
+release-build and physical-device confirmation.
+
+### Residual risks
+
+- A request waiting for pixels escalates an uncooperative worker itself. After
+  an abandoned or reset request, a worker that ignores RETIRE stays alive until
+  the next request or close escalates it. It has no capability and receives no
+  input.
+- A cooperative self-exit ends the worker process only. Android's escalation
+  kill covers the process group. A forked descendant of a compromised worker is
+  outside the Binder witness.
+- Heap tagging through the application-zygote launch path is unqualified on
+  MTE hardware; see [native heap memory tagging](native-heap-memory-tagging.md).
+- Forks share the application zygote's layout for preloaded code, so one
+  generation's address-space disclosure applies to later ones.
+- Two idle spares and the application zygote stay resident while the app runs.
+- There is no visible-first priority. Callers cancelled through interruption,
+  such as the image bubble decode, leave the queue; other callers wait within
+  the eight-second admission bound.
+- Timings are emulator debug builds. Release-build, physical-device and
+  GrapheneOS figures are still required.
+
+The test-only [still-worker baseline](media-worker-baseline.md) records the
+historical reuse characterization and the matched throughput harness. The
+[still-image worker lifetime](media-worker-lifetime.md) page records the owner,
+deadline and test boundaries.
