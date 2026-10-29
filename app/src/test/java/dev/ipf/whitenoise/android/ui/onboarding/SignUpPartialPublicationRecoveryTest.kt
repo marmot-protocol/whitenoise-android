@@ -50,6 +50,35 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals(listOf("created"), f.publishedAccounts)
         }
 
+    /** Creation carries the submitted name and about, so the first public profile is never the generated default. */
+    @Test fun creationCarriesTheSubmittedProfileWithoutThePhoto() =
+        runTest {
+            val f = Fixture(this)
+            f.controller.submit(DRAFT.copy(name = "  Alice  ", photo = PHOTO))
+            advanceUntilIdle()
+
+            val initial = f.initialProfiles.single()
+            assertEquals("Alice", initial.name)
+            assertEquals("Alice", initial.displayName)
+            assertEquals("Local about", initial.about)
+            assertEquals(null, initial.picture)
+            assertEquals("https://images.example/avatar.jpg", f.publications.single().picture)
+        }
+
+    /** A retry after failed creation creates with the corrected draft, not the first submission. */
+    @Test fun creationRetryCarriesTheCorrectedProfile() =
+        runTest {
+            val f = Fixture(this)
+            f.createFails = true
+            f.controller.submit(DRAFT)
+            advanceUntilIdle()
+            f.createFails = false
+            f.controller.submit(DRAFT.copy(name = "Corrected"))
+            advanceUntilIdle()
+
+            assertEquals(listOf("Alice", "Corrected"), f.initialProfiles.map { it.name })
+        }
+
     /** A failed photo retry reuses the accepted account, with no metadata publication before upload succeeds. */
     @Test fun failedPhotoRetriesForSameAcceptedIdentity() =
         runTest {
@@ -208,6 +237,7 @@ class SignUpPartialPublicationRecoveryTest {
         var uploadFails = false
         var publishSucceeds = true
         var creations = 0
+        val initialProfiles = mutableListOf<UserProfileMetadataFfi>()
         var qualifications = 0
         var beforeCreateReturn: suspend () -> Unit = {}
         var afterUpload: () -> Unit = {}
@@ -222,9 +252,10 @@ class SignUpPartialPublicationRecoveryTest {
                 scope,
                 { owner },
                 { available },
-                create = { captured ->
+                create = { captured, profile ->
                     identityCoordinator.createOrReuse(captured) {
                         creations++
+                        initialProfiles += profile
                         if (createFails) error("create failed")
                         beforeCreateReturn()
                         AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)

@@ -1,9 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.MarmotClient
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Enables the native worker in a HOST_MANAGED runtime, which starts denied and never discovers attachments
@@ -50,3 +55,39 @@ internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): Accoun
     val relays = MarmotClient.bootstrapRelays
     return createIdentity(MarmotClient.accountRelays, relays, relays)
 }
+
+/**
+ * Creates an identity on the same relays whose first public kind-0 is [profile], so contacts never see the
+ * key-derived default name before the chosen one (mdk#2216). The native call returns at local readiness, so
+ * this waits for the network readiness [createIdentityWithBootstrapRelays] returns at; a retry resumes the
+ * same native setup.
+ */
+internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): AccountSummaryFfi {
+    val relays = MarmotClient.bootstrapRelays
+    val created = createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)
+    awaitAccountNetworkReady(created.account.label) { accountSetupReadiness(it) }
+    return created.account
+}
+
+/**
+ * Polls native setup readiness until relay lists and the initial KeyPackage are published.
+ * Recovery and an expired wait surface as MDK's own typed setup errors.
+ */
+internal suspend fun awaitAccountNetworkReady(
+    accountRef: String,
+    timeoutMillis: Long = ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS,
+    readiness: suspend (String) -> AccountSetupReadinessFfi,
+) {
+    withTimeoutOrNull(timeoutMillis) {
+        while (true) {
+            when (readiness(accountRef)) {
+                AccountSetupReadinessFfi.NETWORK_READY -> return@withTimeoutOrNull
+                AccountSetupReadinessFfi.RECOVERY_REQUIRED -> throw MarmotKitException.AccountSetupRecoveryRequired()
+                else -> delay(ACCOUNT_NETWORK_READY_POLL_MILLIS)
+            }
+        }
+    } ?: throw MarmotKitException.AccountSetupRetryRequired()
+}
+
+private const val ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS = 60_000L
+private const val ACCOUNT_NETWORK_READY_POLL_MILLIS = 250L

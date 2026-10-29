@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpOwner
@@ -37,7 +38,11 @@ internal class AppProfileSignUp(
         return appState.runtimeGeneration == owner.epoch && appState.marmot() === owner.native
     }
 
-    private suspend fun createOwnedIdentity(expectedOwner: SignUpOwner): AccountSummaryFfi {
+    /** Creates under the captured runtime and selection; a form [initialProfile] is the first published profile. */
+    private suspend fun createOwnedIdentity(
+        expectedOwner: SignUpOwner,
+        initialProfile: UserProfileMetadataFfi? = null,
+    ): AccountSummaryFfi {
         val owner = CreatingRuntime(appState.marmot(), appState.runtimeGeneration)
         return appState.withCurrentAccountLifetime {
             val runtimeCurrent = appState.runtimeGeneration == owner.epoch && appState.marmot() === owner.native
@@ -48,7 +53,14 @@ internal class AppProfileSignUp(
             ) {
                 throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
             }
-            appState.marmotIo { createIdentityWithBootstrapRelays() }.also { creatingRuntimes[it] = owner }
+            appState
+                .marmotIo {
+                    if (initialProfile == null) {
+                        createIdentityWithBootstrapRelays()
+                    } else {
+                        createNamedIdentity(initialProfile)
+                    }
+                }.also { creatingRuntimes[it] = owner }
         }
     }
 
@@ -83,10 +95,10 @@ internal class AppProfileSignUp(
                     )
                 },
                 ownerAvailable = ::ownerAvailable,
-                create = { owner ->
+                create = { owner, profile ->
                     profileIdentityCoordinator.createOrReuse(owner) {
                         runCatchingCancellable {
-                            createOwnedIdentity(owner)
+                            createOwnedIdentity(owner, profile)
                         }.onFailure {
                             appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
                         }.getOrThrow()

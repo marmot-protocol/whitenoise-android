@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.functionBody
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -45,8 +47,56 @@ class IdentityCreationFlowTest {
         assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
         // NIP-65 gets the account defaults; the bootstrap route and inbox stay on bootstrapRelays.
         assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
+        val initial = "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)"
+        assertTrue(body.contains(initial))
         assertFalse(body.contains("take(1)"))
     }
+
+    /** Initial-profile creation returns at local readiness, so signup waits until relay publication completes. */
+    @Test
+    fun initialProfileCreationWaitsForNetworkReadiness() =
+        runTest {
+            val states =
+                ArrayDeque(
+                    listOf(
+                        AccountSetupReadinessFfi.LOCAL_READY,
+                        AccountSetupReadinessFfi.PUBLISHING,
+                        AccountSetupReadinessFfi.NETWORK_READY,
+                    ),
+                )
+            val asked = mutableListOf<String>()
+
+            awaitAccountNetworkReady("created") { ref ->
+                asked += ref
+                states.removeFirst()
+            }
+
+            assertEquals(listOf("created", "created", "created"), asked)
+        }
+
+    /** Recovery is MDK's typed setup failure, never a ready account. */
+    @Test
+    fun recoveryRequiredFailsTheWait() =
+        runTest {
+            val failure =
+                runCatching {
+                    awaitAccountNetworkReady("created") { AccountSetupReadinessFfi.RECOVERY_REQUIRED }
+                }.exceptionOrNull()
+
+            assertTrue(failure is MarmotKitException.AccountSetupRecoveryRequired)
+        }
+
+    /** A stalled publication asks for a retry, which resumes the same native setup instead of creating another. */
+    @Test
+    fun stalledPublicationAsksForRetry() =
+        runTest {
+            val failure =
+                runCatching {
+                    awaitAccountNetworkReady("created", timeoutMillis = 1_000) { AccountSetupReadinessFfi.PUBLISHING }
+                }.exceptionOrNull()
+
+            assertTrue(failure is MarmotKitException.AccountSetupRetryRequired)
+        }
 
     @Test
     fun readyStatePrecedesPostCreateWarmup() {
