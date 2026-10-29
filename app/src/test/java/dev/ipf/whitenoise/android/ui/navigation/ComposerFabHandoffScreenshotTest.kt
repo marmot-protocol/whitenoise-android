@@ -69,6 +69,7 @@ class ComposerFabHandoffScreenshotTest {
     private val scheduler = TestCoroutineScheduler()
 
     @get:Rule val rule = createComposeRule(effectContext = StandardTestDispatcher(scheduler))
+
     @get:Rule val visualErrors = ErrorCollector()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -217,11 +218,19 @@ class ComposerFabHandoffScreenshotTest {
             val editor = rule.onNode(hasSetTextAction()).fetchSemanticsNode().config
             assertEquals(PRIVATE_DRAFT, editor[SemanticsProperties.EditableText].text)
             assertEquals(TextRange(4), editor[SemanticsProperties.TextSelectionRange])
-            rule.onNodeWithTag(COMPOSER_TAG).assertIsDisplayed().fetchSemanticsNode().boundsInWindow
+            rule
+                .onNodeWithTag(COMPOSER_TAG)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInWindow
         } else {
             rule.onNodeWithTag(COMPOSER_TAG).assertDoesNotExist()
             rule.onNodeWithText(PRIVATE_DRAFT, substring = true).assertDoesNotExist()
-            fab.assertIsDisplayed().assertHasClickAction().fetchSemanticsNode().boundsInWindow
+            fab
+                .assertIsDisplayed()
+                .assertHasClickAction()
+                .fetchSemanticsNode()
+                .boundsInWindow
         }
     }
 

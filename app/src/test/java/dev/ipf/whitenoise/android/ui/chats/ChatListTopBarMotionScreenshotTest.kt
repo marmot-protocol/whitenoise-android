@@ -48,6 +48,7 @@ class ChatListTopBarMotionScreenshotTest {
     private val scheduler = TestCoroutineScheduler()
 
     @get:Rule val rule = createComposeRule(effectContext = StandardTestDispatcher(scheduler))
+
     @get:Rule val visualErrors = ErrorCollector()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -93,16 +94,17 @@ class ChatListTopBarMotionScreenshotTest {
         val appState = ChatRowPortFixtures.state(context)
         val focusRequester = FocusRequester()
         rule.setContent {
-            SideEffect { committedOpen = open }
             CompositionLocalProvider(
                 LocalCursorBlinkEnabled provides false,
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = largeRtl, fontScale = if (largeRtl) 2f else 1f) {
                     Surface(Modifier.fillMaxWidth().testTag(TAG)) {
+                        val composedOpen = open
+                        SideEffect { committedOpen = composedOpen }
                         ChatListTopBar(
                             appState = appState,
-                            searchOpen = open,
+                            searchOpen = composedOpen,
                             searchQuery = query,
                             searchFocusRequester = focusRequester,
                             onSearchQueryChange = { query = it },
