@@ -36,3 +36,16 @@ ffmpeg -display_rotation:v:0 -90 -i edge-landscape-320x180.mp4 -c copy -movflags
   edge-rotated-320x180-r90.mp4
 for clip in edge-*.mp4; do base64 -i "$clip" -o "$clip.b64"; done
 ```
+
+## Tagged video metadata clips
+
+`video-metadata/*.b64` are original White Noise test clips used by
+`VideoMetadataScrubberDeviceTest` and, as identical copies under
+`app/src/test/resources/video-metadata/`, by the JVM scrubber tests (#3376). Each is
+one second of a 48×32 ffmpeg test pattern with a sine tone, tagged with fake private
+values: `WNPrivate*` strings, made-up coordinates and a fixed 2024 date. They cover an
+MP4 with iTunes tags and a 3GPP location, a QuickTime file with Apple keys and a 90°
+display matrix, an MP4 with a timecode track, a Matroska file with Tags and an
+attachment, and a WebM with an unknown-size Segment.
+`scripts/generate_video_metadata_fixtures.sh` regenerates all of them; encoder versions
+change the bytes, so the tests assert fields and structure rather than digests.

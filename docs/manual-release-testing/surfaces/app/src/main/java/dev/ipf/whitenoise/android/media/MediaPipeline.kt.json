@@ -27,6 +27,14 @@
         "test_ids": [
           "MED-031"
         ]
+      },
+      {
+        "surface": "Outgoing video private metadata removal before probe and upload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
+        "anchor": "VideoMetadataScrubber.scrub(tmp)",
+        "test_ids": [
+          "MED-043"
+        ]
       }
     ]
   },

@@ -1140,6 +1140,7 @@
     <string name="media_open">Abrir</string>
     <string name="media_file_too_large">Arquivo muito grande para anexar</string>
     <string name="media_file_unreadable">Não foi possível ler este arquivo. Selecione-o novamente.</string>
+    <string name="media_file_video_metadata_not_removable">Não foi possível remover os detalhes privados, como a localização, deste arquivo de vídeo, por isso ele não foi anexado.</string>
     <string name="media_file_empty">Arquivos vazios não podem ser enviados.</string>
     <string name="media_album_too_large">Seleção muito grande para enviar</string>
     <string name="group_image_search_title">Imagem do grupo</string>
@@ -1192,7 +1193,7 @@
     <string name="download_enabled">Os downloads automáticos seguem suas regras de rede</string>
     <string name="download_sent_media">Mídia enviada</string>
     <string name="download_quality">Qualidade da mídia</string>
-    <string name="download_quality_help">Aplica-se a novas fotos e mensagens de voz. Vídeos e arquivos de áudio são enviados como estão.</string>
+    <string name="download_quality_help">Aplica-se a novas fotos e mensagens de voz. Vídeos e arquivos de áudio nunca são recodificados.</string>
     <string name="download_done">Concluído</string>
     <string name="download_stop_confirmation">Limpar os downloads automáticos em espera deste perfil? Downloads ativos e os que você iniciou continuarão.</string>
     <string name="media_type_images">Imagens</string>
@@ -1284,6 +1285,7 @@
     <string name="notification_reacted_to_message">reagiu com %1$s a: \"%2$s\"</string>
     <string name="notification_reacted">reagiu com %1$s</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">Não foi possível remover os detalhes privados, como a localização, deste vídeo, por isso ele não foi anexado.</string>
     <string name="profile_picture_hint">URL de imagem HTTPS pública</string>
     <string name="profile_picture_invalid">Apenas URLs de imagem HTTPS públicas são permitidas.</string>
     <string name="profile_picture_edit">Editar foto de perfil</string>
@@ -1429,7 +1431,7 @@
     <string name="media_quality_high_subtitle">Cerca de 1,5 MB por foto — qualidade acima do uso de dados</string>
     <string name="media_quality_original">Sem alterações</string>
     <string name="media_quality_original_subtitle">Resolução completa — arquivos maiores</string>
-    <string name="media_quality_footer">A localização e os detalhes do dispositivo são sempre removidos das fotos, mesmo em Original. Vídeos e áudios importados mantêm seus dados originais. A taxa de bits de áudio vale apenas para as mensagens de voz que você grava.</string>
+    <string name="media_quality_footer">A localização e os detalhes do dispositivo são sempre removidos das fotos, mesmo em Original. Nos arquivos de vídeo, as etiquetas de localização e do dispositivo são removidas, mas legendas e dados dentro do fluxo de vídeo não são alterados. Áudios importados mantêm seus dados originais. A taxa de bits de áudio vale apenas para as mensagens de voz que você grava.</string>
     <string name="profile_is_public">O perfil é público</string>
     <string name="profile_public_description">As informações do seu perfil serão visíveis para todos na rede.</string>
     <string name="shared_media">Mídia compartilhada</string>
