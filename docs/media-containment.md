@@ -146,11 +146,15 @@ decoding the same bytes uses two generations.
   have never received input and are retired on account reset or close. Live
   generations, including retired ones whose death is unconfirmed, never exceed
   three.
-- A refused bind fails that input. A throwing bind, a startup without a
-  connection, a death link that cannot be registered or a worker that never
-  dies keeps its slot; when every slot is held, new input fails closed rather
-  than starting another process. A late connection from a timed-out startup is a
-  clean spare. Nothing falls back to an earlier worker or to app-process decoding.
+- A refused bind fails that input. A binding Android reports dead or null
+  before it ever connects never received input: it is unbound and its slot
+  freed. A throwing bind, a startup that reports nothing, a death link that
+  cannot be registered or a worker that never dies keeps its slot; when every
+  slot is held, new input fails closed rather than starting another process.
+- A claim waits at most one second for a spare that is still starting while a
+  slot is free, then starts a fresh generation. A late connection from a slow
+  start becomes a clean spare. Nothing falls back to an earlier worker or to
+  app-process decoding.
 
 Animation sessions keep their separate worker, admission and lifetime rules.
 Platform audio/video keeps its separate adapter.

@@ -85,6 +85,7 @@ internal class BindingFixture(
     private val failLink: Boolean = false,
     private val beforeBind: () -> Unit = {},
     private val acceptAt: (Int) -> Boolean = { true },
+    private val connectAt: (Int) -> Boolean = { true },
 ) : ContextWrapper(base) {
     @Volatile var acceptBind = true
     val bindings = mutableListOf<Bound>()
@@ -118,7 +119,7 @@ internal class BindingFixture(
                 bindings.size - 1
             }
         val accepted = acceptBind && acceptAt(index)
-        if (accepted && connect) conn.onServiceConnected(component, bound.remote)
+        if (accepted && connect && connectAt(index)) conn.onServiceConnected(component, bound.remote)
         arrivals.put(bound)
         if (!accepted) return false
         if (throwAfterBind) throw IllegalStateException("Binding outcome unknown")

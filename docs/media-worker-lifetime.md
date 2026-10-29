@@ -27,9 +27,12 @@ existing provider-staging phase, separate from the eight-second admission wait.
 The worker keeps its six-second watchdog. RETIRE acknowledgements,
 disconnection callbacks, null bindings, unbind requests and expired deadlines
 never reopen admission. A worker alive 250 ms after RETIRE is unbound so
-Android stops it; that call is an escalation, not a witness. Accepted startup
-without a Binder can hold a slot until app-process restart, and a late
-connection becomes a clean spare. Live generations never exceed one plus two
+Android stops it; that call is an escalation, not a witness. A binding Android
+reports dead or null before it connects is released at once: it never held
+input. An accepted startup that reports nothing keeps its slot; Android's start
+timeout normally reports that binding dead, which releases it, and a late
+connection becomes a clean spare. A claim waits at most one second on a
+starting spare while a slot is free. Live generations never exceed one plus two
 spares.
 
 A session reset captures the generations that predate it, revokes the pending

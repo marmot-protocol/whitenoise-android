@@ -87,7 +87,7 @@ class MediaBindingRecoveryTest {
         }
     }
 
-    /** An accepted bind that never connects holds its slot across reset, a late connection is then retired. */
+    /** An accepted bind that reports nothing holds its slot across reset, and a late connection is then retired. */
     @Test
     fun acceptedStartupWithoutBinderRemainsHeldAcrossResetAndLateConnection() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), connect = false)
@@ -98,7 +98,6 @@ class MediaBindingRecoveryTest {
             transport.invalidateSession()
             transport.activateSession()
             call.interruptAndJoin()
-            first.connection.onNullBinding(context.component)
             assertNull(transport.decode(byteArrayOf(2), 1, false, MediaDecodePolicy.DECODE))
             assertEquals(1, context.bindings.size)
             first.connection.onServiceConnected(context.component, first.remote)

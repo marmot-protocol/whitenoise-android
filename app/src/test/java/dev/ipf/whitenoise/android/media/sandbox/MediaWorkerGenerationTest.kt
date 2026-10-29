@@ -234,6 +234,73 @@ class MediaWorkerGenerationTest {
         }
     }
 
+    /** Bindings Android declares dead before connecting free their slots, so images recover once starts succeed. */
+    @Test
+    fun bindingsThatDieBeforeConnectingReleaseTheirSlots() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), connect = false)
+        val transport = IsolatedMediaTransport(context, "images", spares = 2, deadlineMs = RECOVERY_DEADLINE_MS)
+        val started = System.nanoTime()
+        val call = startDecode(transport, 1)
+        try {
+            // Each start fails before connecting; the claim keeps starting replacements within its budget.
+            val dead =
+                (1..SOURCES).map { attempt ->
+                    context.next().also { bound ->
+                        if (attempt == SOURCES) context.connect = true
+                        if (attempt % 2 == 0) {
+                            bound.connection.onNullBinding(context.component)
+                        } else {
+                            bound.connection.onBindingDied(context.component)
+                        }
+                    }
+                }
+            val recovered = context.next()
+            assertTrue(recovered.remote.retired.await(2, TimeUnit.SECONDS))
+            assertEquals(1, recovered.remote.requests)
+            assertTrue(dead.all { context.isUnbound(it) && it.remote.requests == 0 })
+            assertTrue(transport.liveGenerationsForTest() <= 1 + MediaWorkerPool.MAX_SPARES)
+            recovered.remote.die()
+            call.join()
+            val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            assertTrue("Recovered within ${elapsed}ms, not at the deadline", elapsed < RECOVERY_DEADLINE_MS)
+        } finally {
+            call.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** A spare stuck starting does not gate admission while a slot is free: the input gets a fresh worker. */
+    @Test
+    fun stuckStartingSpareDoesNotBlockAFreshWorkerWhileASlotIsFree() {
+        val context =
+            BindingFixture(ApplicationProvider.getApplicationContext(), connectAt = { index -> index != 1 })
+        val transport = IsolatedMediaTransport(context, "images", spares = 1)
+        var second: DecodeCall? = null
+        try {
+            val firstCall = startDecode(transport, 1)
+            val first = context.next()
+            val stuck = context.next()
+            assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
+            first.remote.die()
+            firstCall.join()
+            val started = System.nanoTime()
+            second = startDecode(transport, 2)
+            val fresh = context.next()
+            assertTrue(fresh.remote.retired.await(2, TimeUnit.SECONDS))
+            val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            assertTrue("Waited ${elapsed}ms on the stuck spare", elapsed < STUCK_SPARE_BOUND_MS)
+            assertEquals(1, fresh.remote.requests)
+            assertEquals(0, stuck.remote.requests)
+            fresh.remote.die()
+            second.join()
+        } finally {
+            second?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
     /** Close during an exchange revokes the reply, stops every generation and leaves the spare without input. */
     @Test
     fun closeDuringAnExchangeRevokesTheReplyAndStopsEveryGeneration() {
@@ -377,5 +444,7 @@ class MediaWorkerGenerationTest {
 
     private companion object {
         const val SOURCES = 3
+        const val RECOVERY_DEADLINE_MS = 2_000L
+        const val STUCK_SPARE_BOUND_MS = 1_800L
     }
 }

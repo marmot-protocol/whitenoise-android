@@ -66,6 +66,7 @@ internal class MediaWorkerPool(
         }
     }
 
+    /** The next admission step for one claim, decided under the lock from the live generations. */
     @Suppress("ReturnCount") // Each lane state has one distinct admission outcome.
     private fun nextStep(current: () -> Boolean): ClaimStep {
         if (closed || !current()) return ClaimStep.Refused
@@ -77,7 +78,15 @@ internal class MediaWorkerPool(
             active = ready
             return ClaimStep.Claimed(ready)
         }
-        generations.firstOrNull(MediaWorker::starting)?.let { return ClaimStep.Await(it.connected) }
+        // A starting spare is speculative: wait for it only briefly while a slot could start a fresh one.
+        generations
+            .filter(MediaWorker::starting)
+            .maxByOrNull { it.reservedAtNanos }
+            ?.let { youngest ->
+                val waited = System.nanoTime() - youngest.reservedAtNanos
+                val young = waited < TimeUnit.MILLISECONDS.toNanos(STARTING_GRACE_MS)
+                if (young || generations.size >= capacity) return ClaimStep.Await(youngest.connected)
+            }
         if (generations.size < capacity) return ClaimStep.Start(reserve())
         // Every slot is held by a generation whose lifetime is unresolved, never exceed the bound.
         return generations.firstOrNull { it.dead.count != 0L }?.let { ClaimStep.AwaitDeath(it) } ?: ClaimStep.Refused
@@ -95,9 +104,11 @@ internal class MediaWorkerPool(
         }
     }
 
+    /** Adds one not-yet-bound generation with a unique instance name, counted against the live bound. */
     private fun reserve(): MediaWorker {
         val generation = bindingSequence.incrementAndGet()
         return MediaWorker(generation, workerInstanceName(instanceName, generation)).also { worker ->
+            worker.reservedAtNanos = System.nanoTime()
             worker.connection = connection(worker)
             worker.deathRecipient = IBinder.DeathRecipient { died(worker) }
             generations += worker
@@ -178,16 +189,22 @@ internal class MediaWorkerPool(
             override fun onNullBinding(name: ComponentName) = disconnected(worker)
         }
 
+    /**
+     * A binding Android declares dead or null before it ever connected never received input: it is unbound
+     * and its slot freed. After a connection, a binding notification is no death receipt, so the generation
+     * is stopped through Android but keeps its slot until its Binder death.
+     */
     private fun disconnected(worker: MediaWorker) {
-        synchronized(lock) {
-            if (worker.disposed) return
-            worker.retiring = true
-            worker.connected.countDown()
-            worker.ready.countDown()
-            ended(worker)
-        }
-        // A binding notification is not a process-death receipt, release it so Android cannot restart it.
-        retire(worker, escalate = true)
+        val neverConnected =
+            synchronized(lock) {
+                if (worker.disposed) return
+                worker.retiring = true
+                worker.connected.countDown()
+                worker.ready.countDown()
+                ended(worker)
+                (worker.binder == null && !worker.carriesInput).also { worker.abandoned = it }
+            }
+        if (neverConnected) dispose(worker) else retire(worker, escalate = true)
     }
 
     private fun died(worker: MediaWorker) {
@@ -272,11 +289,15 @@ internal class MediaWorkerPool(
      */
     fun detachAll(): List<MediaWorker> = synchronized(lock) { generations.toList().onEach { it.retiring = true } }
 
-    /** Releases a generation's binding and death link after its death or a definitive bind refusal. */
+    /**
+     * Releases a generation's binding and death link after its death, a definitive bind refusal or a binding
+     * Android declared dead before it connected.
+     */
     fun dispose(worker: MediaWorker) {
         val unbind =
             synchronized(lock) {
-                if (worker.dead.count != 0L || !worker.bindComplete || worker.disposed) return
+                val gone = worker.dead.count == 0L || worker.abandoned
+                if (!gone || !worker.bindComplete || worker.disposed) return
                 worker.disposed = true
                 generations.remove(worker)
                 if (active === worker) active = null
@@ -349,6 +370,9 @@ internal class MediaWorkerPool(
         /** Cooperative RETIRE normally ends a worker within milliseconds, after this grace Android stops it. */
         const val RETIRE_ESCALATION_MS = 250L
         private const val WAIT_SLICE_MS = 50L
+
+        /** How long a claim waits on a starting spare before using a free slot for a fresh generation. */
+        private const val STARTING_GRACE_MS = 1_000L
         private val bindingSequence = AtomicInteger()
     }
 }
@@ -371,6 +395,8 @@ internal class MediaWorker(
     var disposed = false
     var holdReported = false
     var carriesInput = false
+    var abandoned = false
+    var reservedAtNanos = 0L
     var retiredAtNanos = 0L
     val connected = CountDownLatch(1)
     val dead = CountDownLatch(1)
