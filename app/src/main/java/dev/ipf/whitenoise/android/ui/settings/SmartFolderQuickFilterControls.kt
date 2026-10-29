@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +34,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 
 /** Three-state controls edit the same draft tree as Advanced; neither half selected means unrestricted. */
 @Composable
@@ -74,7 +74,7 @@ internal fun SmartFolderQuickFilterControls(
                     stateLabel,
                 )
             Row(
-                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                Modifier.fillMaxWidth().boundedIntrinsicHeight(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 listOf(positive, negative).forEach { mode ->
@@ -125,19 +125,23 @@ internal fun SmartFolderQuickFilterControls(
 private fun quickFilterLabel(
     field: FolderField,
     mode: FolderMode,
-): Int =
-    when (field) {
-        FolderField.UNREAD ->
-            if (mode == FolderMode.PRESENT) R.string.smart_folder_quick_unread else R.string.smart_folder_no_unread
-        FolderField.MENTIONS ->
-            if (mode == FolderMode.PRESENT) R.string.smart_folder_has_mentions else R.string.smart_folder_no_mentions
-        FolderField.DRAFT ->
-            if (mode == FolderMode.PRESENT) R.string.smart_folder_has_draft else R.string.smart_folder_no_draft
-        FolderField.MUTED ->
-            if (mode == FolderMode.PRESENT) R.string.smart_folder_muted else R.string.smart_folder_quick_not_muted
-        FolderField.PINNED ->
-            if (mode == FolderMode.PRESENT) R.string.smart_folder_pinned else R.string.smart_folder_quick_not_pinned
-        FolderField.ARCHIVED ->
-            if (mode == FolderMode.PRESENT) R.string.smart_folder_archived else R.string.smart_folder_quick_not_archived
-        else -> if (mode == FolderMode.DIRECT) R.string.smart_folder_direct else R.string.smart_folder_chat_group
-    }
+): Int {
+    val labels =
+        when (field) {
+            FolderField.UNREAD -> R.string.smart_folder_quick_unread to R.string.smart_folder_no_unread
+            FolderField.MENTIONS -> R.string.smart_folder_has_mentions to R.string.smart_folder_no_mentions
+            FolderField.DRAFT -> R.string.smart_folder_has_draft to R.string.smart_folder_no_draft
+            FolderField.MUTED -> R.string.smart_folder_muted to R.string.smart_folder_quick_not_muted
+            FolderField.PINNED -> R.string.smart_folder_pinned to R.string.smart_folder_quick_not_pinned
+            FolderField.ARCHIVED -> R.string.smart_folder_archived to R.string.smart_folder_quick_not_archived
+            else -> R.string.smart_folder_direct to R.string.smart_folder_chat_group
+        }
+    val firstMode =
+        when (field) {
+            FolderField.UNREAD, FolderField.MENTIONS, FolderField.DRAFT,
+            FolderField.MUTED, FolderField.PINNED, FolderField.ARCHIVED,
+            -> FolderMode.PRESENT
+            else -> FolderMode.DIRECT
+        }
+    return if (mode == firstMode) labels.first else labels.second
+}

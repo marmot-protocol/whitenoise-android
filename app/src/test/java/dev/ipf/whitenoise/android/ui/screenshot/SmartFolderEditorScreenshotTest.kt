@@ -145,46 +145,7 @@ class SmartFolderEditorScreenshotTest {
         var mentionLabel = ""
         val simpleExpanded = name.startsWith("smart_folder_simple_")
         val manual = name == "smart_folder_manual" || simpleExpanded
-        val conditions =
-            listOf(
-                SmartFolderFilter.Condition(
-                    FolderField.PARTICIPANTS,
-                    FolderMode.ANY_OF,
-                    setOf("a".repeat(64)),
-                ),
-                SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE),
-            )
-        val root =
-            when {
-                quick && mixed ->
-                    defaultSmartFolder().copy(
-                        children =
-                            defaultSmartFolder().children +
-                                listOf(
-                                    SmartFolderFilter.Condition(FolderField.UNREAD),
-                                    SmartFolderFilter.Condition(FolderField.DRAFT, FolderMode.NONE),
-                                    SmartFolderFilter.Condition(FolderField.MUTED),
-                                    SmartFolderFilter.Condition(FolderField.TYPE, FolderMode.GROUP),
-                                ),
-                    )
-                quick -> SmartFolderFilter.Group()
-                empty -> SmartFolderFilter.Group()
-                nested ->
-                    SmartFolderFilter.Group(
-                        children =
-                            conditions +
-                                SmartFolderFilter.Group(
-                                    all = false,
-                                    not = true,
-                                    children =
-                                        listOf(
-                                            SmartFolderFilter.Condition(FolderField.DRAFT),
-                                            SmartFolderFilter.Condition(FolderField.MENTIONS),
-                                        ),
-                                ),
-                    )
-                else -> SmartFolderFilter.Group(children = conditions)
-            }
+        val root = screenshotRules(quick, mixed, empty, nested)
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -260,6 +221,53 @@ class SmartFolderEditorScreenshotTest {
                 else -> composeRule.onRoot()
             }
         target.captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    private fun screenshotRules(
+        quick: Boolean,
+        mixed: Boolean,
+        empty: Boolean,
+        nested: Boolean,
+    ): SmartFolderFilter.Group {
+        val conditions =
+            listOf(
+                SmartFolderFilter.Condition(
+                    FolderField.PARTICIPANTS,
+                    FolderMode.ANY_OF,
+                    setOf("a".repeat(64)),
+                ),
+                SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE),
+            )
+        return when {
+            quick && mixed ->
+                defaultSmartFolder().copy(
+                    children =
+                        defaultSmartFolder().children +
+                            listOf(
+                                SmartFolderFilter.Condition(FolderField.UNREAD),
+                                SmartFolderFilter.Condition(FolderField.DRAFT, FolderMode.NONE),
+                                SmartFolderFilter.Condition(FolderField.MUTED),
+                                SmartFolderFilter.Condition(FolderField.TYPE, FolderMode.GROUP),
+                            ),
+                )
+            quick -> SmartFolderFilter.Group()
+            empty -> SmartFolderFilter.Group()
+            nested ->
+                SmartFolderFilter.Group(
+                    children =
+                        conditions +
+                            SmartFolderFilter.Group(
+                                all = false,
+                                not = true,
+                                children =
+                                    listOf(
+                                        SmartFolderFilter.Condition(FolderField.DRAFT),
+                                        SmartFolderFilter.Condition(FolderField.MENTIONS),
+                                    ),
+                            ),
+                )
+            else -> SmartFolderFilter.Group(children = conditions)
+        }
     }
 
     private fun prepareCapture(

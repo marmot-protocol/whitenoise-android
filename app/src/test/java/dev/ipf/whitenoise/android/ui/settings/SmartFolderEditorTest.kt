@@ -403,10 +403,15 @@ class SmartFolderEditorTest {
             }
         }
         composeRule.onNodeWithTag("folder.quick.UNREAD.NONE").performScrollTo().performClick()
-        val edited = current
+        val defaults = defaultSmartFolder()
+        val edited =
+            defaults.copy(
+                children = defaults.children + SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE),
+            )
+        composeRule.runOnIdle { assertEquals(edited, current) }
         composeRule.onNodeWithTag("folder.quick.advanced").performScrollTo().performClick()
         restoration.emulateSavedInstanceStateRestore()
-        assertEquals(edited, current)
+        composeRule.runOnIdle { assertEquals(edited, current) }
         composeRule.onNodeWithTag("folder.group.").assertExists()
         composeRule.onNodeWithTag("folder.quick.UNREAD.NONE").assertDoesNotExist()
     }

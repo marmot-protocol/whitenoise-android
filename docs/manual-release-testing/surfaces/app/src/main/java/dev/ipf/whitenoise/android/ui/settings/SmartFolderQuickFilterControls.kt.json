@@ -20,6 +20,166 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "smart_folder_archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_archived",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_chat_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_chat_group",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_direct",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_direct",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_empty",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_has_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_has_draft",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_has_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_has_mentions",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_muted",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_no_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_no_draft",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_no_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_no_mentions",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_no_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_no_unread",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_pinned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_pinned",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_accepted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_accepted",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_neutral",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_neutral",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_not_accepted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_not_accepted",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_not_archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_not_archived",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_not_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_not_muted",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_not_pinned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_not_pinned",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_reset",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_state",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_unread",
+        "test_ids": [
+          "FLD-004"
+        ]
       }
     ]
   },

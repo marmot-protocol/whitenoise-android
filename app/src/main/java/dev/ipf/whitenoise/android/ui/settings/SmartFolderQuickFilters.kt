@@ -39,14 +39,13 @@ internal fun SmartFolderFilter.Group.toggleQuickFilter(
     field: FolderField,
     mode: FolderMode,
 ): SmartFolderFilter.Group {
-    if (!supportsQuickFilters() || field !in quickFolderFields) return this
     val modes =
         if (field == FolderField.TYPE) {
             setOf(FolderMode.DIRECT, FolderMode.GROUP)
         } else {
             setOf(FolderMode.PRESENT, FolderMode.NONE)
         }
-    if (mode !in modes) return this
+    if (!supportsQuickFilters() || field !in quickFolderFields || mode !in modes) return this
     val previous = quickMode(field)
     val next = if (previous == mode) null else SmartFolderFilter.Condition(field, mode)
     val updated =

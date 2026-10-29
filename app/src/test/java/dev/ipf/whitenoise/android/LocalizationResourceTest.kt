@@ -1106,6 +1106,8 @@ class LocalizationResourceTest {
             setOf(
                 // Two translated labels joined by locale-independent punctuation.
                 "developer_work_status",
+                // Folder state joins two translated labels with locale-specific punctuation.
+                "smart_folder_quick_state",
                 // "Audio" is the established media label in German, Spanish, French and Italian.
                 "library_audio",
                 // Pure positional-format string ("current/total"); no
