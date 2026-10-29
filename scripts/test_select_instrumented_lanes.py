@@ -110,13 +110,15 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
                                  {'attachment_fixture': True, 'attachment_fixture_scope': 'video-metadata',
                                   'connected': True})
 
-    def test_dispatch_plumbing_beside_video_metadata_inputs_stays_focused(self):
-        """Adding the scenario's own mode, runner and lane selection does not rerun every other scenario."""
-        paths = [WORKFLOW, 'scripts/select_instrumented_lanes.py', 'scripts/run-controlled-attachment-fixture.sh',
-                 'tools/attachment-fixture/README.md', VIDEO_RUNNER, VIDEO_TEST, SCRUBBER]
-        lanes = select('pull_request', paths, TRIGGERS)
-        self.assertEqual('video-metadata', lanes['attachment_fixture_scope'])
-        self.assertTrue(lanes['attachment_fixture'])
+    def test_dispatch_plumbing_beside_video_metadata_inputs_runs_the_whole_campaign(self):
+        """Shared plumbing runs every scenario even beside video files, because no merge-queue run follows the PR."""
+        for plumbing in FIXTURE_DISPATCH:
+            for video in [VIDEO_RUNNER, VIDEO_TEST, CLASSIFIER, SCRUBBER,
+                          'app/src/main/java/dev/ipf/whitenoise/android/media/IsoBoxEditor.kt']:
+                with self.subTest(plumbing=plumbing, video=video):
+                    lanes = select('pull_request', [plumbing, video], TRIGGERS)
+                    self.assertEqual('full', lanes['attachment_fixture_scope'])
+                    self.assertTrue(lanes['attachment_fixture'])
 
     def test_dispatch_plumbing_alone_or_any_other_fixture_input_runs_the_whole_campaign(self):
         """Plumbing on its own, or any input another scenario reads, keeps the whole campaign."""

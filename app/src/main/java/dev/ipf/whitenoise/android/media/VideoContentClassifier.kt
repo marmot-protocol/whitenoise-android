@@ -9,15 +9,17 @@ internal enum class VideoContent {
     VideoContainer,
 
     /**
-     * ISO BMFF or Matroska that content alone does not prove is a video, read to the end without a malformed
-     * structure: no video track (audio-only MP4 or WebM), a still-image brand (a Canon CR3 raw photo, HEIF or AVIF)
-     * or an unrecognised brand, or no movie at all (a HEIF still). Only a reported video type makes it one.
+     * ISO BMFF or Matroska that content alone does not prove is a video: no video track in a complete track list
+     * (audio-only MP4 or WebM, even with a trailer such as an ID3 tag after the movie), a still-image brand (a Canon
+     * CR3 raw photo, HEIF or AVIF) or an unrecognised brand read without a malformed structure, or no movie at all
+     * (a HEIF still). Only a reported video type makes it one.
      */
     UnconfirmedContainer,
 
     /**
      * A recognised ISO BMFF or Matroska file, whose first box or element parsed, that the walk refused as malformed
-     * or before it could read the track list. Its content proves nothing either way, so it is never sent unchanged.
+     * or before it could read the track list, unless it had already read a complete track list without a video track.
+     * Its content proves nothing either way, so it is never sent unchanged.
      */
     UnreadableContainer,
 

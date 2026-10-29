@@ -171,7 +171,9 @@ internal object VideoMetadataScrubber {
      * - A still-image [brand] is a document whatever the walk found, because a well-formed one is sent unchanged too.
      * - A video [brand] whose walk met a video track is a video, even if a later part, such as a trailer, was refused.
      * - A recognised container whose walk was refused as malformed, or before it could read the track list, is
-     *   unreadable, because a failed walk proves nothing about video.
+     *   unreadable, because a failed walk proves nothing about video. The one exception is a refusal after the walk
+     *   read the complete track list and found no video track, such as an ID3 tag after an `.m4a` movie: that file
+     *   is audio-only.
      * - Anything else, such as an audio-only file or a HEIF still without a movie, is unconfirmed.
      */
     private fun containerContent(
@@ -179,7 +181,9 @@ internal object VideoMetadataScrubber {
         brand: IsoBrand,
     ): VideoContent {
         val refusal = walk.refusalOrNull()
-        val unreadable = refusal == VideoScrubResult.Malformed || (refusal != null && walk.trackListHidden)
+        val audioOnly = walk.trackListRead && walk.videoTracks == 0
+        val refused = refusal == VideoScrubResult.Malformed || (refusal != null && walk.trackListHidden)
+        val unreadable = refused && !audioOnly
         return when {
             !walk.structureRecognised -> VideoContent.Other
             brand == IsoBrand.StillImage -> VideoContent.UnconfirmedContainer
@@ -199,6 +203,12 @@ internal interface ContainerWalk {
 
     /** Whether a track list exists that a refusal stopped the walk from reading in full. */
     val trackListHidden: Boolean
+
+    /**
+     * Whether the walk read a complete track list (the ISO BMFF movie box, or the current Matroska Segment's Tracks)
+     * before any refusal, so [videoTracks] counts every track that list declares.
+     */
+    val trackListRead: Boolean
 
     /** Walks and rewrites the whole container, or ends with a [VideoScrubRefusal]. */
     fun scrub(): VideoScrubSummary

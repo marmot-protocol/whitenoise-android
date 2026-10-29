@@ -131,10 +131,10 @@ upload per accepted route, of its ciphertext size, and none of a refused route's
 
 This lane does not drive the system Photo Picker, Files or share sheet UI, and its draft routes are prepared draft
 injection, not a draft saved, force-stopped and restored from MDK. It records no phone or camera. Every report defers
-those, and MED-043 remains their receipt. On a pull request whose fixture inputs are only this scenario's (with or
-without the shared dispatch plumbing), the lane selector sets `attachment_fixture_scope=video-metadata` and the
-fixture job runs only this mode. Any other fixture input, and every master push, runs the whole campaign, which
-includes this mode.
+those, and MED-043 remains their receipt. On a pull request whose fixture inputs are only this scenario's own files, the lane
+selector sets `attachment_fixture_scope=video-metadata` and the fixture job runs only this mode. Any other fixture
+input, including the shared workflow, selector, run script or this README, and every master push, runs the whole
+campaign, which includes this mode.
 
 ```bash
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore ci-api34-x86_64 controller-video-metadata

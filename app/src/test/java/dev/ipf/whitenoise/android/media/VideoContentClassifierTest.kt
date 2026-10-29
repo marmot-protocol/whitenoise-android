@@ -93,18 +93,23 @@ class VideoContentClassifierTest {
 
     /**
      * A recognised container whose walk is refused as malformed, or before it could read the track list, is
-     * unreadable, never "without video": an audio-only movie with a trailer, a WebM refused before its track list
-     * and a compressed QuickTime movie. A HEIC still without a movie and a well-formed audio-only file read to the
-     * end, so they stay unconfirmed, and a still-image brand stays a document even when its walk is refused.
+     * unreadable, never "without video": a video-handler movie of unknown brand with a trailer, a WebM refused before
+     * its track list, a WebM whose second Segment is refused before its tracks and a compressed QuickTime movie. A
+     * refusal after a complete track list without a video track is audio-only, so an audio-only movie with a trailer
+     * or an ID3v1 tag and an audio-only WebM with stray bytes stay unconfirmed, as do a well-formed audio-only file and
+     * a HEIC still without a movie. A still-image brand stays a document even when its walk is refused.
      */
     @Test
-    fun refusedWalksAreUnreadableNotVideoFree() {
+    fun refusedWalksAreUnreadableUnlessACompleteTrackListHadNoVideo() {
         val audioOnly = syntheticMovie(listOf(SyntheticTrack("soun", samples(listOf(8), 0x31)))).bytes
+        val unknownBrandVideo =
+            syntheticMovie(listOf(SyntheticTrack("vide", samples(listOf(8), 0x21))), brands = listOf("wxyz", "isom"))
         val compressed = syntheticMovie(emptyList(), movieExtras = listOf(isoBox("cmov", ByteArray(12)))).bytes
         val unreadable =
             mapOf(
-                "audio-only movie with a trailer" to concat(audioOnly, byteArrayOf(1)),
+                "unknown-brand video movie with a trailer" to concat(unknownBrandVideo.bytes, byteArrayOf(1)),
                 "WebM refused before its tracks" to matroskaRefusedBeforeTracks(),
+                "audio Segment, then a Segment refused before its tracks" to audioSegmentThenRefusedWebm(),
                 "compressed movie" to compressed,
             )
         unreadable.forEach { (name, bytes) ->
@@ -113,12 +118,18 @@ class VideoContentClassifierTest {
         val unconfirmed =
             mapOf(
                 "audio-only movie" to audioOnly,
+                "audio-only movie with a trailer" to concat(audioOnly, byteArrayOf(1)),
+                "m4a with an ID3v1 tag" to m4aWithId3v1Tag(),
                 "audio-only WebM" to audioOnlyWebm(),
+                "audio-only WebM with stray bytes" to audioOnlyWebmWithJunk(),
                 "HEIC still" to heicShapedImage(),
                 "CR3 with a trailer" to concat(cr3ShapedPhoto(), byteArrayOf(1)),
             )
         unconfirmed.forEach { (name, bytes) ->
             assertEquals(name, VideoContent.UnconfirmedContainer, VideoMetadataScrubber.classify(bytes))
+        }
+        listOf(m4aWithId3v1Tag(), audioOnlyWebmWithJunk()).forEach { bytes ->
+            assertEquals(VideoScrubResult.Malformed, VideoMetadataScrubber.scrub(bytes.copyOf()))
         }
     }
 

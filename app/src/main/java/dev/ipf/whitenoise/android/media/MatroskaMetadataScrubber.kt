@@ -32,6 +32,10 @@ internal class MatroskaMetadataScrubber(
     /** Never true: no Matroska refusal other than a malformed structure stops the walk before the track list. */
     override val trackListHidden = false
 
+    /** Whether the current Segment's Tracks element was walked to its end, so every TrackEntry in it was counted. */
+    override var trackListRead = false
+        private set
+
     /** Validates the EBML header, scrubs every Segment and summarizes the rewrite. */
     override fun scrub(): VideoScrubSummary {
         val header = readElement(0L, reader.size)
@@ -69,12 +73,18 @@ internal class MatroskaMetadataScrubber(
 
     /** Scrubs the Segment's children and returns where it really ends, which an unknown size leaves open. */
     private fun walkSegment(segment: EbmlElement): Long {
+        // A later Segment declares its own tracks, so an earlier Segment's complete list says nothing about them.
+        trackListRead = false
         var position = segment.dataStart
         while (position < segment.end && !openSegmentEndsAt(segment, position)) {
             val element = readElement(position, segment.end)
             val child = if (element.unknownSize) withUnknownClusterEnd(element) else element
             when (child.id) {
-                INFO, TRACKS -> walkMaster(child, depth = 2)
+                INFO -> walkMaster(child, depth = 2)
+                TRACKS -> {
+                    walkMaster(child, depth = 2)
+                    trackListRead = true
+                }
                 SEEK_HEAD, CLUSTER, CUES -> Unit
                 VOID -> zeroData(child)
                 // A Segment or EBML header can only follow an open-ended Segment, never sit inside a sized one.

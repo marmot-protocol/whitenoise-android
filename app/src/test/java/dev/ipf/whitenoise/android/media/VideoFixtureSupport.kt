@@ -95,6 +95,45 @@ internal fun matroskaRefusedBeforeTracks(): ByteArray {
     return concat(ebmlHeader("webm"), ebml(0x18538067L, overrun, video))
 }
 
+/**
+ * A 128-byte ID3v1 tag as audio tools append it after an `.m4a` movie: `TAG`, the title, artist, album, year and
+ * comment fields, and a genre byte. It is not a box, so the ISO BMFF walk refuses at it.
+ */
+internal fun id3v1Tag(): ByteArray =
+    concat(
+        ascii("TAG"),
+        ascii("Song".padEnd(30, '\u0000')),
+        ascii("Band".padEnd(30, '\u0000')),
+        ascii("Album".padEnd(30, '\u0000')),
+        ascii("2024"),
+        ByteArray(30),
+        byteArrayOf(-1),
+    )
+
+/** An audio-only `.m4a` movie, with the iTunes audio brand, followed by an ID3v1 tag. */
+internal fun m4aWithId3v1Tag(): ByteArray {
+    val audio = listOf(SyntheticTrack("soun", samples(listOf(8, 8), 0x41)))
+    return concat(syntheticMovie(audio, brands = listOf("M4A ", "M4A ", "isom")).bytes, id3v1Tag())
+}
+
+/** An audio-only WebM followed by stray bytes that are not an EBML element, so its walk refuses after its tracks. */
+internal fun audioOnlyWebmWithJunk(): ByteArray = concat(audioOnlyWebm(), ByteArray(8) { 0x55 })
+
+/**
+ * A WebM whose first Segment is audio-only and complete, and whose second Segment is refused before its video track
+ * list: the first Segment's complete list says nothing about the second's tracks.
+ */
+internal fun audioSegmentThenRefusedWebm(): ByteArray {
+    val audio = ebml(0xAEL, ebml(0xD7L, byteArrayOf(1)), ebml(0x83L, byteArrayOf(2)), ebml(0x86L, ascii("A_OPUS")))
+    val video = ebml(0x1654AE6BL, ebml(0xAEL, ebml(0xD7L, byteArrayOf(1)), ebml(0x83L, byteArrayOf(1))))
+    val overrun = concat(ebmlId(0x1549A966L), ebmlSize(500), ByteArray(4))
+    return concat(
+        ebmlHeader("webm"),
+        ebml(0x18538067L, ebml(0x1654AE6BL, audio)),
+        ebml(0x18538067L, overrun, video),
+    )
+}
+
 /** A DV stream as ffmpeg probes it: a DIF header block, then fake frame data. */
 internal fun dvShapedVideo(): ByteArray = concat(byteArrayOf(0x1F, 0x07, 0x00, 0x3F), ByteArray(476) { 0x62 })
 

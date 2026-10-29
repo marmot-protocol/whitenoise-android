@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.media.SyntheticTrack
 import dev.ipf.whitenoise.android.media.VideoMetadataScrubber
 import dev.ipf.whitenoise.android.media.ascii
 import dev.ipf.whitenoise.android.media.audioOnlyWebm
+import dev.ipf.whitenoise.android.media.audioOnlyWebmWithJunk
 import dev.ipf.whitenoise.android.media.aviVideoBytes
 import dev.ipf.whitenoise.android.media.avifSequenceShaped
 import dev.ipf.whitenoise.android.media.concat
@@ -19,6 +20,7 @@ import dev.ipf.whitenoise.android.media.cr3ShapedPhoto
 import dev.ipf.whitenoise.android.media.dvShapedVideo
 import dev.ipf.whitenoise.android.media.heicShapedImage
 import dev.ipf.whitenoise.android.media.isoBox
+import dev.ipf.whitenoise.android.media.m4aWithId3v1Tag
 import dev.ipf.whitenoise.android.media.matroskaRefusedBeforeTracks
 import dev.ipf.whitenoise.android.media.samples
 import dev.ipf.whitenoise.android.media.syntheticMovie
@@ -283,9 +285,11 @@ class VideoUploadMetadataCoverageTest {
     /**
      * Files picks are routed by content, in memory and staged alike. A video-branded video container is scrubbed
      * whatever its type (even `application/octet-stream`), and refused when it cannot be (a tagged MP4 with a
-     * trailer). An uncleanable video reported as video (AVI, DV) is refused. TypeScript reported as `video/mp2t`, an
-     * Ogg as `audio/ogg`, an audio-only MP4, DV, and a Canon CR3 raw photo, an AVIF sequence and a HEIC image
-     * reported as generic files all arrive byte-for-byte.
+     * trailer), and a video-handler movie of unknown brand with a trailer is refused too. An uncleanable video
+     * reported as video (AVI, DV) is refused. TypeScript reported as `video/mp2t`, an Ogg as `audio/ogg`, an
+     * audio-only MP4, DV, and a Canon CR3 raw photo, an AVIF sequence and a HEIC image reported as generic files all
+     * arrive byte-for-byte. So do audio-only files with trailing bytes after a complete track list (an `.m4a` with a
+     * trailer or an ID3v1 tag, an audio WebM with stray bytes), which are refused only when reported as video.
      */
     @Test
     fun filesPickerRoutesByContent() =
@@ -434,7 +438,8 @@ class VideoUploadMetadataCoverageTest {
 
     /**
      * The Files routing table: what each pick's content and reported type must produce, null meaning refused. The
-     * audio-only MP4 and the Ogg keep their tags, because imported audio keeps its original data.
+     * audio-only MP4 and the Ogg keep their tags, because imported audio keeps its original data, and so do audio-only
+     * files with trailing bytes after a complete track list unless they are reported as video.
      */
     private fun filesCases(): List<FilesCase> {
         val typeScript = ascii("export const greeting: string = 'hello';\n")
@@ -446,11 +451,23 @@ class VideoUploadMetadataCoverageTest {
                 listOf(SyntheticTrack("soun", samples(listOf(8, 8), 0x31))),
                 movieExtras = listOf(isoBox("udta", ascii("WNPrivateSong"))),
             ).bytes
+        val audioWithTrailer = concat(audioOnly, byteArrayOf(1))
+        val unknownBrandVideo = listOf(SyntheticTrack("vide", samples(listOf(8), 0x21)))
+        val unknownBrandVideoWithTrailer =
+            concat(syntheticMovie(unknownBrandVideo, brands = listOf("wxyz", "isom")).bytes, byteArrayOf(1))
         return listOf(
             FilesCase("tagged.mp4", "video/mp4", tagged, clean),
             FilesCase("movie.bin", "application/octet-stream", tagged, clean),
             FilesCase("trailer.bin", "application/octet-stream", taggedWithTrailer, null),
-            FilesCase("song-trailer.m4a", "audio/mp4", concat(audioOnly, byteArrayOf(1)), null),
+            FilesCase("unknown-trailer.bin", "application/octet-stream", unknownBrandVideoWithTrailer, null),
+            // Trailing bytes after a complete audio-only track list leave audio byte-for-byte unless reported as video.
+            FilesCase("song-trailer.m4a", "audio/mp4", audioWithTrailer, audioWithTrailer),
+            FilesCase("song-id3.m4a", "audio/mp4", m4aWithId3v1Tag(), m4aWithId3v1Tag()),
+            FilesCase("song-id3.bin", "application/octet-stream", m4aWithId3v1Tag(), m4aWithId3v1Tag()),
+            FilesCase("song-id3.mp4", "video/mp4", m4aWithId3v1Tag(), null),
+            FilesCase("voice-junk.webm", "audio/webm", audioOnlyWebmWithJunk(), audioOnlyWebmWithJunk()),
+            FilesCase("voice-junk.bin", "application/octet-stream", audioOnlyWebmWithJunk(), audioOnlyWebmWithJunk()),
+            FilesCase("voice-junk-video.webm", "video/webm", audioOnlyWebmWithJunk(), null),
             FilesCase("broken.mka", "audio/x-matroska", matroskaRefusedBeforeTracks(), null),
             FilesCase("broken.bin", "application/octet-stream", matroskaRefusedBeforeTracks(), null),
             FilesCase("index.ts", "video/mp2t", typeScript, typeScript),

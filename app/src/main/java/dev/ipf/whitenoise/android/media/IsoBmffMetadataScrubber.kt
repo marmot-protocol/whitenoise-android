@@ -82,6 +82,9 @@ internal class IsoBmffMetadataScrubber(
     /** Whether a movie box exists whose walk was refused before its track list was read, as in a compressed movie. */
     override val trackListHidden: Boolean get() = movieSeen && !movieRead
 
+    /** Whether the movie box, which holds every track, was walked to its end. */
+    override val trackListRead: Boolean get() = movieRead
+
     /**
      * Validates, rewrites and summarizes the whole file. A refusal in the first pass, such as a non-box trailer, is
      * held until the movie box has been walked, so the video tracks before it are still counted. The second pass

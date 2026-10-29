@@ -4,9 +4,11 @@ The workflow's own PR `paths` list decides whether the instrumented workflow
 starts at all. This narrows it further: fixture-only inputs do not boot the
 connected-test emulator, and changes outside the fixture's inputs do not boot
 the two attachment-fixture emulators. A fixture change confined to the focused
-video-metadata scenario's inputs, with or without the dispatch plumbing every
-scenario shares, runs only that scenario. Every other event, and any diff that
-cannot be read or classified, runs both lanes and the whole fixture campaign.
+video-metadata scenario's own inputs runs only that scenario. A change to the
+dispatch plumbing every scenario shares runs the whole campaign, because the
+workflow has no merge-queue run to catch what a narrower PR run skipped. Every
+other event, and any diff that cannot be read or classified, runs both lanes
+and the whole fixture campaign.
 """
 
 import argparse
@@ -88,9 +90,8 @@ VIDEO_METADATA_SHARED = (
     'app/src/androidTest/assets/video-metadata/**',
 )
 
-# Plumbing that dispatches every fixture scenario. On its own it runs the whole
-# campaign. Beside video-metadata inputs alone it runs only that scenario, and
-# every master push still runs the whole campaign.
+# Plumbing that dispatches every fixture scenario, so a change to it always runs
+# the whole campaign, even beside video-metadata inputs.
 FIXTURE_DISPATCH = (
     '.github/workflows/android-instrumented.yml',
     'scripts/select_instrumented_lanes.py',
@@ -148,10 +149,9 @@ def fixture_scope(paths):
     """The fixture campaign [paths] can affect: the whole campaign, only the video-metadata scenario, or none."""
     video = VIDEO_METADATA_FIXTURE_ONLY + VIDEO_METADATA_SHARED
     focused = any(matches(path, video) for path in paths)
-    dispatch = any(matches(path, FIXTURE_DISPATCH) for path in paths)
-    other = any(matches(path, FIXTURE_ONLY + FIXTURE_SHARED) and not matches(path, video + FIXTURE_DISPATCH)
+    other = any(matches(path, FIXTURE_ONLY + FIXTURE_SHARED + FIXTURE_DISPATCH) and not matches(path, video)
                 for path in paths)
-    if other or (dispatch and not focused):
+    if other:
         return FULL_FIXTURE
     return VIDEO_METADATA_FIXTURE if focused else ''
 

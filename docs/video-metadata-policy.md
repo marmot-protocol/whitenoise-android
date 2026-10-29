@@ -62,8 +62,8 @@ as `video/mp2t`) and some providers report videos as `application/octet-stream`:
 | Content | Reported `video/*` | Reported anything else |
 | --- | --- | --- |
 | A proven video: Matroska or WebM with a video track, or ISO BMFF with a video brand (or no `ftyp`, as old QuickTime) and a video track | Scrubbed, refused if that fails | Scrubbed, refused if that fails |
-| An unreadable container: ISO BMFF or Matroska whose first box or element parsed, refused as malformed (for example by a non-box trailer) or before its track list could be read (a compressed QuickTime movie), with no video track proven | Refused | Refused |
-| Any other ISO BMFF or Matroska, read without a malformed structure: no video track (for example `.m4a` or audio-only WebM), a still-image or unrecognised brand (a Canon CR3 raw photo, HEIF or AVIF), or no movie at all (a HEIF still) | Scrubbed, refused if that fails | Sent byte-for-byte |
+| An unreadable container: ISO BMFF or Matroska whose first box or element parsed, refused as malformed (for example by a non-box trailer) or before its track list could be read (a compressed QuickTime movie), with no video track proven, unless the walk had already read the complete track list and found no video track | Refused | Refused |
+| Any other ISO BMFF or Matroska: a complete track list with no video track (for example `.m4a` or audio-only WebM, including one followed by an ID3 tag or other trailing bytes), a still-image or unrecognised brand read without a malformed structure (a Canon CR3 raw photo, HEIF or AVIF), or no movie at all (a HEIF still) | Scrubbed, refused if that fails | Sent byte-for-byte |
 | A video container the scrubber cannot clean: AVI, MPEG-TS or M2TS, MPEG-PS, ASF, FLV, Ogg, RealMedia, MXF or DV | Refused | Sent byte-for-byte (for example `audio/ogg` or `.wma`) |
 | Anything else, including text whose first box does not parse even though bytes 4 to 7 spell a box type (`let skipped = 0;` in a `.ts` file) | Sent byte-for-byte | Sent byte-for-byte |
 
@@ -81,15 +81,23 @@ walked before a non-box trailer can refuse the file, so a trailer never hides a
 video track: a tagged MP4 with a trailer, reported as a generic file, is a
 proven video whose scrub fails, and is refused rather than sent with its tags.
 A failed walk proves nothing about video, so a recognised container that the
-walk refuses is never sent unchanged, whatever its reported type.
+walk refuses is never sent unchanged, whatever its reported type. The one
+exception is a refusal after the walk has read the complete track list (the
+ISO BMFF movie box, or the Matroska Segment's `Tracks`) and found no video
+track: such a file is audio-only, for example an `.m4a` with an ID3v1 tag
+appended or an audio-only WebM followed by stray bytes. A refusal before or
+while the track list is read stays unreadable, and a file with a video track
+and a trailer stays a proven video, so both are still refused.
 
 A still-image brand is a document whether or not its walk succeeds. Its
 metadata is outside this video policy: a well-formed CR3 or HEIF image sent
 through Files already goes out unchanged, so refusing only the malformed ones
 would add no privacy.
 
-Imported audio keeps its original data, so audio-only containers are cleaned
-only when they are reported as video.
+Imported audio keeps its original data, so audio-only containers, including
+ones with trailing bytes after a complete track list, are sent byte-for-byte
+unless they are reported as video. Reported as video, they are scrubbed, and an
+audio-only file with a trailer is then refused because the scrub fails.
 
 ## Refusals
 
