@@ -99,7 +99,7 @@ internal fun withContactPictureIcon(
     shortcut: ShortcutInfoCompat,
     contact: String,
     bitmap: Bitmap?,
-    initialConversationIcon: androidx.core.graphics.drawable.IconCompat? = null,
+    initialGroupPresentation: InitialGroupShortcutPresentation? = null,
 ): ShortcutInfoCompat {
     if (!shortcutPreviewAllowed(context, shortcut)) return genericNotificationShortcut(context, shortcut)
     val icon = notificationConversationIcon(shortcut.longLabel?.toString().orEmpty(), shortcut.id, bitmap)
@@ -120,7 +120,7 @@ internal fun withContactPictureIcon(
     if (shortcut.extras?.getBoolean(CONTACT_CONVERSATION_ICON) == true) {
         builder.setIcon(icon)
         // A direct conversation names exactly this contact, so its Person is rebuilt from the shortcut's own
-        // label; group shortcuts set no Person here and keep whatever Android already retains for them.
+        // label. Group updates leave retained metadata alone; initial group publication supplies its sender.
         val person =
             androidx.core.app.Person
                 .Builder()
@@ -129,8 +129,10 @@ internal fun withContactPictureIcon(
                 .build()
         builder.setPerson(contactAvatarPerson(person, bitmap))
     } else {
-        // Updates omit the icon to retain it in Android; initial publication supplies its known group icon.
-        initialConversationIcon?.let(builder::setIcon)
+        // Updates omit both fields so Android retains them. Initial notification publication supplies both.
+        initialGroupPresentation?.let { presentation ->
+            builder.setIcon(presentation.icon).setPerson(groupNotificationPerson(presentation.sender))
+        }
     }
     return builder.build()
 }

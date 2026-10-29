@@ -4,6 +4,8 @@ import android.app.Notification
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.Icon
+import android.os.Build
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
@@ -23,6 +25,37 @@ internal fun groupNotificationPerson(person: Person): Person = person.toBuilder(
 
 /** A fresh icon wrapper shares immutable pixels, so one Person cannot retint another Person's icon. */
 internal fun groupSenderIcon(): IconCompat = IconCompat.createWithBitmap(transparentGroupSenderBitmap)
+
+/** Initial group publication supplies both fields that an ordinary icon-only refresh intentionally omits. */
+internal data class InitialGroupShortcutPresentation(
+    val icon: IconCompat,
+    val sender: Person,
+)
+
+/** Private overrides are resolved before this final sender policy enters the public shortcut factory. */
+internal fun notificationShortcutSender(
+    content: LocalNotificationContent,
+    sender: Person,
+): Person =
+    if (content.isGroupConversation) {
+        groupNotificationPerson(sender)
+    } else {
+        sender
+    }
+
+/** Only an initial rich group publication may add a group identity and sender to an icon-only update. */
+internal fun initialGroupShortcutPresentation(
+    content: LocalNotificationContent,
+    title: String,
+    shortcutId: String,
+    groupPicture: Bitmap?,
+    sender: Person,
+): InitialGroupShortcutPresentation? =
+    if (content.isGroupConversation) {
+        InitialGroupShortcutPresentation(notificationConversationIcon(title, shortcutId, groupPicture), sender)
+    } else {
+        null
+    }
 
 /**
  * Final rich-group presentation fence after private overrides and privacy reconciliation. Normalize every retained
@@ -52,10 +85,18 @@ internal fun withoutGroupSenderPictures(
                     copy.addHistoricMessage(copiedMessage(it, it.person?.let(::groupNotificationPerson)))
                 }
             }
-    return NotificationCompat
-        .Builder(context, notification)
-        .setStyle(style)
-        .setGroupAlertBehavior(notification.groupAlertBehavior)
+    val builder =
+        NotificationCompat
+            .Builder(context, notification)
+            .setStyle(style)
+            .setGroupAlertBehavior(notification.groupAlertBehavior)
+    // API 30 recovery cannot reconstruct legacy history once its unsafe structured duplicate was removed.
+    if (Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
+        notification.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.let {
+            builder.setRemoteInputHistory(it)
+        }
+    }
+    return builder
         .build()
         .apply {
             flags = notification.flags
@@ -73,5 +114,5 @@ private fun groupNotificationPeople(notification: Notification): ArrayList<andro
     notification.extras
         .getParcelableArrayList<android.app.Person>(Notification.EXTRA_PEOPLE_LIST)
         ?.mapTo(arrayListOf()) {
-            groupNotificationPerson(Person.fromAndroidPerson(it)).toAndroidPerson()
+            it.toBuilder().setIcon(Icon.createWithBitmap(transparentGroupSenderBitmap)).build()
         }

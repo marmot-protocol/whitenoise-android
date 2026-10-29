@@ -2981,7 +2981,7 @@ class LocalNotificationPresenter(
                     snapshot = snapshot,
                     intent = intent,
                     locusId = locusId,
-                    sender = ownedSender,
+                    sender = notificationShortcutSender(content, ownedSender),
                     conversationAvatarBitmap = ownedConversationAvatar,
                     directShareEligible = shareEligible,
                 )
@@ -2999,28 +2999,23 @@ class LocalNotificationPresenter(
                         stampContactPictureShortcut(built, update.sender.accountIdHex, update.isDm)
                         if (!shortcutPreviewAllowed(context, built)) {
                             genericNotificationShortcut(context, built)
+                        } else if (currentChoice) {
+                            withContactPictureIcon(
+                                context,
+                                built,
+                                update.sender.accountIdHex,
+                                pixels,
+                                initialGroupPresentation =
+                                    initialGroupShortcutPresentation(
+                                        content,
+                                        title,
+                                        shortcutId,
+                                        ownedConversationAvatar,
+                                        ownedSender,
+                                    ),
+                            )
                         } else {
-                            val pictured =
-                                if (currentChoice) {
-                                    withContactPictureIcon(
-                                        context,
-                                        built,
-                                        update.sender.accountIdHex,
-                                        pixels,
-                                        initialConversationIcon =
-                                            notificationConversationIcon(title, shortcutId, ownedConversationAvatar),
-                                    )
-                                } else {
-                                    built
-                                }
-                            if (content.isGroupConversation) {
-                                ShortcutInfoCompat
-                                    .Builder(pictured)
-                                    .setPerson(groupNotificationPerson(ownedSender))
-                                    .build()
-                            } else {
-                                pictured
-                            }
+                            built
                         }
                     }
                     val currentShortcut = finish(shortcut)
