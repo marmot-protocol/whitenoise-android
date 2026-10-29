@@ -121,6 +121,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Quick filter entry and advanced disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_quick_start",
+        "test_ids": [
+          "FLD-004"
+        ]
       }
     ]
   },

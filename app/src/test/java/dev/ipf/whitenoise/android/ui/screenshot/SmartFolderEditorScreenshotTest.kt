@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditFormState
 import dev.ipf.whitenoise.android.ui.settings.LegacyFolderRuleControls
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderPanelState
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderRulePanel
+import dev.ipf.whitenoise.android.ui.settings.defaultSmartFolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -39,6 +40,35 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36], qualifiers = "en-w360dp-h1100dp-mdpi")
 class SmartFolderEditorScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test fun quickNeutral() = capture("smart_folder_quick_neutral", quick = true)
+
+    @Test fun quickMixedLight() = capture("smart_folder_quick_mixed_light", quick = true, mixed = true)
+
+    @Test fun quickMixedDark() = capture("smart_folder_quick_mixed_dark", quick = true, mixed = true, dark = true)
+
+    @Test fun quickMixedAmoled() =
+        capture(
+            "smart_folder_quick_mixed_amoled",
+            quick = true,
+            mixed = true,
+            dark = true,
+            amoled = true,
+        )
+
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
+    fun quickRtlLarge() = capture("smart_folder_quick_rtl_large", quick = true, mixed = true, rtl = true)
+
+    @Test
+    @Config(qualifiers = "en-w640dp-h360dp-mdpi")
+    fun quickLandscapeLarge() =
+        capture(
+            "smart_folder_quick_landscape_large",
+            quick = true,
+            mixed = true,
+            largeText = true,
+        )
 
     @Test fun light() = capture("smart_folder_light")
 
@@ -97,6 +127,8 @@ class SmartFolderEditorScreenshotTest {
     @Suppress("LongMethod") // Render one fixed full form consistently across visual configurations.
     private fun capture(
         name: String,
+        quick: Boolean = false,
+        mixed: Boolean = false,
         dark: Boolean = false,
         amoled: Boolean = false,
         nested: Boolean = false,
@@ -124,6 +156,18 @@ class SmartFolderEditorScreenshotTest {
             )
         val root =
             when {
+                quick && mixed ->
+                    defaultSmartFolder().copy(
+                        children =
+                            defaultSmartFolder().children +
+                                listOf(
+                                    SmartFolderFilter.Condition(FolderField.UNREAD),
+                                    SmartFolderFilter.Condition(FolderField.DRAFT, FolderMode.NONE),
+                                    SmartFolderFilter.Condition(FolderField.MUTED),
+                                    SmartFolderFilter.Condition(FolderField.TYPE, FolderMode.GROUP),
+                                ),
+                    )
+                quick -> SmartFolderFilter.Group()
                 empty -> SmartFolderFilter.Group()
                 nested ->
                     SmartFolderFilter.Group(
@@ -148,7 +192,7 @@ class SmartFolderEditorScreenshotTest {
                     mentionLabel = stringResource(R.string.smart_folder_preset_mentions)
                     ChatFolderEditContent(
                         state =
-                            formState(name, manual, empty),
+                            formState(name, manual, root.children.isEmpty()),
                         onUnreadOnlyChange = {},
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},
@@ -200,6 +244,10 @@ class SmartFolderEditorScreenshotTest {
                     )
                 }
             }
+        }
+        if (quick) {
+            val target = if (largeText) "folder.quick.TYPE.GROUP" else "folder.quick.UNREAD.PRESENT"
+            composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag(target))
         }
         prepareCapture(
             CaptureActions(simpleExpanded, rtl, rules, add, scrollToLastFilter, options, replace, dialog),

@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SmartFolderQuickFilterControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "internal fun SmartFolderQuickFilterControls(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Paired states and accepted scope disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.smart_folder_quick_hint",
+        "test_ids": [
+          "FLD-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

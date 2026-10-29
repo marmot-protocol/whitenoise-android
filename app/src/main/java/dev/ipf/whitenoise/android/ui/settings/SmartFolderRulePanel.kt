@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
@@ -49,6 +51,7 @@ internal fun SmartFolderRulePanel(
 ) {
     val editSimpleRules = rememberSaveable { state.confirmSimpleReplacement }
     var legacyExpanded by rememberSaveable { mutableStateOf(false) }
+    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var pendingPayload by rememberSaveable { mutableStateOf<String?>(null) }
     val requestRules: (SmartFolderFilter.Group) -> Unit = { tree ->
@@ -83,6 +86,10 @@ internal fun SmartFolderRulePanel(
             }
         }
         if (!state.advanced) {
+            TextButton(
+                onClick = { requestRules(defaultSmartFolder()) },
+                modifier = Modifier.testTag("folder.quick.start"),
+            ) { Text(stringResource(R.string.smart_folder_quick_start)) }
             if (!editSimpleRules) {
                 TextButton(onClick = { applyPreset(true) }, modifier = Modifier.testTag("folder.presetRead")) {
                     Text(stringResource(R.string.smart_folder_preset_read))
@@ -113,7 +120,32 @@ internal fun SmartFolderRulePanel(
                     Text(stringResource(R.string.smart_folder_start))
                 }
             } else {
-                SmartFolderEditor(root, people, resolveKey, onChange)
+                val quickCompatible = root.supportsQuickFilters()
+                if (quickCompatible) {
+                    if (!advancedExpanded) SmartFolderQuickFilterControls(root, onChange)
+                    val advancedState =
+                        stringResource(
+                            if (advancedExpanded) {
+                                R.string.smart_folder_quick_expanded
+                            } else {
+                                R.string.smart_folder_quick_collapsed
+                            },
+                        )
+                    TextButton(
+                        onClick = { advancedExpanded = !advancedExpanded },
+                        modifier =
+                            Modifier.testTag("folder.quick.advanced").semantics {
+                                stateDescription = advancedState
+                            },
+                    ) {
+                        FolderButtonLabel(
+                            stringResource(R.string.advanced),
+                            R.drawable.ic_expand_more,
+                            advancedExpanded,
+                        )
+                    }
+                }
+                if (!quickCompatible || advancedExpanded) SmartFolderEditor(root, people, resolveKey, onChange)
             }
         }
     }

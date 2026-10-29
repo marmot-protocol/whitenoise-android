@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilters.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Exact quick-rule eligibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilters.kt",
+        "anchor": "internal fun SmartFolderFilter.Group.supportsQuickFilters()",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "Paired draft edits and reset boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilters.kt",
+        "anchor": "internal fun SmartFolderFilter.Group.toggleQuickFilter(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

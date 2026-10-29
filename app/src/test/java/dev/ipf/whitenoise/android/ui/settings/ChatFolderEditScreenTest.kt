@@ -5,6 +5,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -340,7 +341,7 @@ class ChatFolderEditScreenTest {
     }
 
     @Test
-    fun newFolderEntersAdvancedModeOnlyAfterExplicitChoice() {
+    fun newFolderEntersAutomaticRulesOnlyAfterExplicitChoice() {
         val appState = appState()
         renderEditor(appState, {}, folderId = null)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Advanced")
@@ -348,6 +349,12 @@ class ChatFolderEditScreenTest {
         composeRule.onNodeWithTag("folder.addField.MENTIONS").performClick()
         composeRule.onNodeWithTag("folder.group.").assertDoesNotExist()
         composeRule.onNodeWithTag("folder.conditionDone").performClick()
+        composeRule.onNodeWithTag("folder.quick.MENTIONS.PRESENT").assertIsSelected()
+        composeRule.onNodeWithTag("folder.group.").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+            .performScrollToNode(hasTestTag("folder.quick.advanced"))
+        composeRule.onNodeWithTag("folder.quick.advanced").performClick()
         composeRule.onNodeWithTag("folder.group.").assertExists()
         composeRule.onNodeWithTag("folder.save").performClick()
         val reloaded = ChatFolderPreferences(app)
