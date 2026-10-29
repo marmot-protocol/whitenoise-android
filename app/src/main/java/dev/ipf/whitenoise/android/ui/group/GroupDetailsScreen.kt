@@ -87,6 +87,7 @@ import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -1482,6 +1483,7 @@ internal fun GroupDetailsScreen(
                                         } else {
                                             null
                                         },
+                                    avatarDomain = AvatarImageLoader.publicProfiles(),
                                 )
                             }
                         }
@@ -1583,7 +1585,7 @@ internal fun GroupDetailsScreen(
                                         pictureUrl = groupAvatar.pictureUrl.takeIf { encryptedGroupAvatar == null },
                                         picture = encryptedGroupAvatar,
                                         groupAnimation = groupAvatar.groupAnimation,
-                                        pictureDomain = controller.mediaTrustDomain,
+                                        pictureDomain = groupAvatar.pictureDomain,
                                     )
                                 }
                                 Text(
@@ -1654,8 +1656,8 @@ internal fun GroupDetailsScreen(
                     groupAnimation = groupAvatar.groupAnimation,
                     archived = controller.presentedArchived,
                     readLocalBytes = groupAvatar.readOriginalBytes,
-                    // A group's picture, or a direct chat's peer picture, decodes in this conversation's worker.
-                    pictureDomain = controller.mediaTrustDomain,
+                    // A group's URL picture decodes single-use, a direct chat's peer picture in the public profiles.
+                    pictureDomain = groupAvatar.pictureDomain,
                     onEdit =
                         if (canShowEditAction) {
                             { showEditGroup = true }
@@ -2351,7 +2353,8 @@ internal fun GroupDetailsHeader(
     descriptionCopyValue: String? = null,
     onNameBottom: (Float) -> Unit = {},
     readLocalBytes: (suspend () -> ByteArray?)? = null,
-    pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
+    pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)

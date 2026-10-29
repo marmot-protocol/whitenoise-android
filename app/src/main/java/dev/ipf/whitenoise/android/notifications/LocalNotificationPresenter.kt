@@ -1769,7 +1769,7 @@ class LocalNotificationPresenter(
         isPostStillAllowed: () -> Boolean,
     ) {
         val (conversationAvatarBitmap, senderAvatarBitmap) =
-            resolveMessagingAvatars(messaging, notificationConversationDomain(update))
+            resolveMessagingAvatars(messaging, notificationConversationDomain(update), notificationSenderDomain(update))
         val avatarChanged =
             conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
                 senderAvatarBitmap !== messaging.senderAvatarBitmap
@@ -1796,11 +1796,12 @@ class LocalNotificationPresenter(
 
     /**
      * Resolves the post's picture inputs, fetching only a slot that has a URL and no bitmap. The conversation slot
-     * decodes in [conversationDomain].
+     * decodes in [conversationDomain], the sender slot in [senderDomain].
      */
     private suspend fun resolveMessagingAvatars(
         messaging: MessagingPostContext,
         conversationDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+        senderDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): Pair<Bitmap?, Bitmap?> =
         resolveAvatars(
             NotificationIdentityPictureSources(
@@ -1809,6 +1810,7 @@ class LocalNotificationPresenter(
                 senderBitmap = messaging.senderAvatarBitmap,
                 senderUrl = messaging.senderAvatarUrl,
                 conversationDomain = conversationDomain,
+                senderDomain = senderDomain,
             ),
         )
 
@@ -1834,7 +1836,13 @@ class LocalNotificationPresenter(
                                 }
                             }
                     }
-                val senderAvatar = async { sources.senderBitmap ?: avatarBitmapResolver(sources.senderUrl) }
+                val senderAvatar =
+                    async {
+                        sources.senderBitmap
+                            ?: withContext(MediaTrustScope.element(sources.senderDomain)) {
+                                avatarBitmapResolver(sources.senderUrl)
+                            }
+                    }
                 conversationAvatar.await() to senderAvatar.await()
             }
         }
@@ -3433,19 +3441,25 @@ private val notificationEnrichmentScope =
     )
 
 /**
- * The worker domain of a notification's conversation picture: a direct chat shows its sender's public profile
- * picture, a group its own image, which belongs to that conversation.
+ * The worker domain of a notification's conversation picture URL: a direct chat shows its sender's published
+ * picture. A group's URL picture has bytes its host chooses, never a member, so it decodes single-use; a group's
+ * encrypted image has no URL and comes from the conversation loader, in its conversation.
  */
 internal fun notificationConversationDomain(update: NotificationUpdateFfi): MediaTrustDomain =
     if (update.isDm) {
-        dev.ipf.whitenoise.android.media.MediaTrustDomain
-            .publicProfiles(update.accountRef)
+        notificationSenderDomain(update)
     } else {
-        dev.ipf.whitenoise.android.media.MediaTrustDomain
-            .conversation(update.accountRef, update.groupIdHex)
+        MediaTrustDomain.Unique
     }
 
-/** Resolves a public avatar URL to notification pixels, bounding the optional rich-card fetch. */
+/** The worker domain of a notification's sender picture: a published kind-0 picture of the receiving account. */
+internal fun notificationSenderDomain(update: NotificationUpdateFfi): MediaTrustDomain =
+    MediaTrustDomain.publicProfiles(update.accountRef)
+
+/**
+ * Resolves a picture URL to notification pixels, bounding the optional rich-card fetch. It decodes in the domain the
+ * caller's scope declares for this slot, single-use when none is declared.
+ */
 private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {
     val normalizedUrl = url?.takeUnless(String::isBlank)
     return normalizedUrl?.let { avatarUrl ->
@@ -3453,7 +3467,7 @@ private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {
             ?: withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) {
                 // Enrichment is detached from the first alert. This bound now
                 // limits only the optional rich-card update.
-                AvatarImageLoader.loadBitmap(avatarUrl)
+                AvatarImageLoader.loadBitmap(avatarUrl, MediaTrustScope.declared() ?: MediaTrustDomain.Unique)
             }
     }
 }

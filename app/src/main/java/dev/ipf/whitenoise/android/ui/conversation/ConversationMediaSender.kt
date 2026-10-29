@@ -609,7 +609,7 @@ internal class ConversationMediaSender(
 ) {
     private val attachmentReader =
         ConversationAttachmentReader(appState, context, fileBackedLimits, usableSpace) {
-            controller.localMediaTrustDomain
+            controller.outgoingMediaTrustDomain
         }
 
     /** Captures the reply before contact serialization can suspend. */
@@ -805,7 +805,7 @@ internal class ConversationMediaSender(
             val documents =
                 prepared.documents.copy(
                     attachments =
-                        addMissingThumbhashes(prepared.documents.attachments, controller.localMediaTrustDomain),
+                        addMissingThumbhashes(prepared.documents.attachments, controller.outgoingMediaTrustDomain),
                 )
             prepared.copy(documents = documents)
         } else {

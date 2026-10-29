@@ -74,22 +74,21 @@ internal suspend fun WhiteNoiseAppState.durableAvatar(
 }
 
 /**
- * The worker domain of a chat-list row's avatar: a group-owned picture belongs to its conversation, any other
- * row shows a person's published picture.
+ * The worker domain of a chat-list row's avatar: a group's encrypted picture belongs to its conversation, a group's
+ * URL picture decodes single-use, and any other row shows a person's published picture.
  */
 internal fun chatListAvatarDomain(
     item: ChatListItem,
     accountRef: String?,
 ): dev.ipf.whitenoise.android.media.MediaTrustDomain =
-    if (dev.ipf.whitenoise.android.core.GroupProjector
-            .ownsGroupPicture(item)
-    ) {
-        dev.ipf.whitenoise.android.media.MediaTrustDomain
-            .conversation(accountRef, item.group.groupIdHex)
-    } else {
-        dev.ipf.whitenoise.android.media.MediaTrustDomain
-            .publicProfiles(accountRef)
-    }
+    dev.ipf.whitenoise.android.ui.common.groupAvatarDecodeDomain(
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .ownsGroupPicture(item),
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .pictureIsMemberPinned(item.group),
+        accountRef,
+        item.group.groupIdHex,
+    )
 
 /**
  * The worker domain of a durable [asset] some chat-list row selects, or single-use when no current row selects it,

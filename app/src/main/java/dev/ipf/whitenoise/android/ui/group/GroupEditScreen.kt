@@ -178,7 +178,7 @@ internal fun GroupEditScreen(
         val legacyGroupAvatarAvailable =
             rememberAvatarImageAvailable(
                 groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
-                controller.mediaTrustDomain,
+                groupAvatar.pictureDomain,
             )
         val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
         val hasGroupImage =
@@ -515,7 +515,7 @@ internal fun GroupEditScreen(
                             pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
                             picture = encryptedGroupAvatar,
                             groupAnimation = groupAvatar.groupAnimation,
-                            pictureDomain = controller.mediaTrustDomain,
+                            pictureDomain = groupAvatar.pictureDomain,
                         )
                     }
                     if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())

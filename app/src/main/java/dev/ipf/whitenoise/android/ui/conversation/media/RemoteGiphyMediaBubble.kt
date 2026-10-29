@@ -420,7 +420,8 @@ private suspend fun decodeOwnedGiphyPresentation(
             bytes,
             request.mediaType,
             MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-            domain = controller.mediaTrustDomain,
+            // GIPHY serves these bytes from an allow-listed host with no digest a member pinned, so single-use.
+            domain = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
         )
     if (!controller.ownsRetainedForegroundPresentation) {
         result?.releaseOwnedPresentation()

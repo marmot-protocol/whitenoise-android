@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -175,6 +176,7 @@ internal fun TransferAdminSheet(
                                     seed = member.memberIdHex,
                                     size = 40.dp,
                                     pictureUrl = controller.memberAvatarUrl(member),
+                                    pictureDomain = AvatarImageLoader.publicProfiles(),
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -263,6 +265,7 @@ internal fun SoleAdminDeletePicker(
                             seed = member.memberIdHex,
                             size = 40.dp,
                             pictureUrl = appState.contactAvatarSource(member.memberIdHex),
+                            pictureDomain = AvatarImageLoader.publicProfiles(),
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

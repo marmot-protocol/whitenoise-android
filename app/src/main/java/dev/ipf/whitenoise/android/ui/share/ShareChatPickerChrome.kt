@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -126,6 +127,7 @@ internal fun ChatPickerSendingAccountRow(
                 seed = account.accountIdHex,
                 size = if (compact) 32.dp else 40.dp,
                 pictureUrl = appState.avatarUrl(account.accountIdHex),
+                pictureDomain = AvatarImageLoader.publicProfiles(),
             )
             ShareChatPickerAccountIdentity(
                 appState = appState,

@@ -141,6 +141,14 @@ object GroupProjector {
     ): Boolean = group.pendingConfirmation || (isUnnamed(group.name) && memberCount <= DIRECT_CHAT_MEMBER_COUNT)
 
     /**
+     * Whether a group's own picture is its encrypted image, whose bytes a member pinned by hash, rather than a public
+     * URL whose bytes its host serves (#3373). Only such a picture decodes in its conversation's worker; a group with
+     * both, or with only a URL, decodes single-use.
+     */
+    fun pictureIsMemberPinned(group: AppGroupRecordFfi): Boolean =
+        !group.imageHashHex.isNullOrBlank() && group.avatarUrl.isNullOrBlank()
+
+    /**
      * Whether the conversation presents an image of its own. A peer-sourced selection, or a conversation
      * with no selected asset, avatar URL or image hash, borrows a member's picture instead; only then may a
      * viewer's private contact picture stand in for it. Every surface shares this one rule.

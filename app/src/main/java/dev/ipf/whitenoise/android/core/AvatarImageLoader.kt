@@ -96,13 +96,16 @@ object AvatarImageLoader {
         activeAccount = account
     }
 
-    /** Kind-0 pictures are published, so one account's share a worker domain; nothing else may use it. */
-    private fun publicDomain(): MediaTrustDomain = MediaTrustDomain.publicProfiles(activeAccount())
+    /**
+     * The active account's public-profile domain, which a caller names explicitly for a kind-0 picture or banner.
+     * Kind-0 pictures are published, so one account's share a worker domain; nothing else may use it.
+     */
+    fun publicProfiles(): MediaTrustDomain = MediaTrustDomain.publicProfiles(activeAccount())
 
-    /** The domain an enclosing scope declared for this request, otherwise the public-profile domain. */
-    private fun declaredOrPublic(): MediaTrustDomain =
+    /** The domain an enclosing scope declared for this request, otherwise a single-use worker: the fail-safe. */
+    private fun declaredOrUnique(): MediaTrustDomain =
         dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
-            .declared() ?: publicDomain()
+            .declared() ?: MediaTrustDomain.Unique
 
     /** Test-only lifecycle boundary for the process-global MDK fetch adapter. */
     internal fun resetProfileImageFetcherForTests() {
@@ -113,12 +116,12 @@ object AvatarImageLoader {
 
     /**
      * Intercepts private display handles before the MDK public-profile image acquisition boundary. A decode
-     * this call starts runs in a worker serving only [domain]: a kind-0 picture's public-profile domain by
-     * default, the group's conversation for a group image.
+     * this call starts runs in a worker serving only [domain]: [publicProfiles] for a kind-0 picture, named by
+     * the caller. Without a name or a declared scope it is single-use.
      */
     suspend fun load(
         url: String,
-        domain: MediaTrustDomain = declaredOrPublic(),
+        domain: MediaTrustDomain = declaredOrUnique(),
     ): ImageBitmap? =
         if (PrivateContactAvatarLoader.isPrivate(url)) {
             PrivateContactAvatarLoader.load(url)
@@ -141,7 +144,7 @@ object AvatarImageLoader {
     suspend fun loadBanner(
         url: String,
         targetWidthPx: Int,
-        domain: MediaTrustDomain = declaredOrPublic(),
+        domain: MediaTrustDomain = declaredOrUnique(),
     ): ImageBitmap? =
         load(
             request = bannerRequest(url, targetWidthPx, domain),
@@ -153,7 +156,7 @@ object AvatarImageLoader {
     suspend fun retryBanner(
         url: String,
         targetWidthPx: Int,
-        domain: MediaTrustDomain = declaredOrPublic(),
+        domain: MediaTrustDomain = declaredOrUnique(),
     ): ImageBitmap? {
         synchronized(lock) { failureExpiresAt.remove(bannerRequest(url, targetWidthPx, domain).cacheKey) }
         return loadBanner(url, targetWidthPx, domain)
@@ -202,7 +205,7 @@ object AvatarImageLoader {
      */
     fun preWarm(
         url: String?,
-        domain: MediaTrustDomain = declaredOrPublic(),
+        domain: MediaTrustDomain = declaredOrUnique(),
     ) {
         val key = url?.trim()?.takeIf { it.isNotEmpty() } ?: return
         val scheduledGeneration =
@@ -435,7 +438,7 @@ object AvatarImageLoader {
     /** Android-bitmap view of [load], using capacity reserved for notification icons, decoded in [domain]. */
     suspend fun loadBitmap(
         url: String,
-        domain: MediaTrustDomain = declaredOrPublic(),
+        domain: MediaTrustDomain = declaredOrUnique(),
     ): android.graphics.Bitmap? =
         load(
             request = avatarRequest(url, domain),

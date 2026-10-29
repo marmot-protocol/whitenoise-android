@@ -341,7 +341,7 @@ internal fun ProfileHeroHeader(
         }
     LaunchedEffect(pictureUrl, contentReady) {
         if (contentReady && avatarImage == null && pictureUrl != null) {
-            avatarImage = AvatarImageLoader.load(pictureUrl)
+            avatarImage = AvatarImageLoader.load(pictureUrl, AvatarImageLoader.publicProfiles())
             avatarLoadFinished = true
         }
     }
@@ -624,7 +624,7 @@ internal fun ProfileEditScreen(
     val context = LocalContext.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(picture)
     val safeBannerUrl = ProfileSanitizer.protocolImageUrl(banner)
-    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl, AvatarImageLoader.publicProfiles())
     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
     val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)

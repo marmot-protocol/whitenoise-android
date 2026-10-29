@@ -24,11 +24,10 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
 internal fun NostrLinkedImageDialog(
     url: String,
     onDismiss: () -> Unit,
-    // Event images decode in the conversation on screen, single-use outside one.
-    loadImage: suspend (String, Int) -> ImageBitmap? =
-        dev.ipf.whitenoise.android.ui.conversation.media.LocalConversationMediaDomain.current.let { domain ->
-            { url, width -> AvatarImageLoader.retryBanner(url, width, domain) }
-        },
+    // A Nostr event's image is chosen by its author and host, never by a member, so it decodes single-use.
+    loadImage: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        AvatarImageLoader.retryBanner(url, width, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
+    },
 ) {
     PlaybackDialog(
         onDismissRequest = onDismiss,

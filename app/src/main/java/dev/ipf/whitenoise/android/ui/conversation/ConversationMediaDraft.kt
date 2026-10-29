@@ -108,11 +108,11 @@ internal class ConversationMediaDraftState(
     private val messages: PhotoEditorMessages,
     private val pendingCameraFiles: PendingCameraCaptureFiles? = null,
 ) {
-    private val renderer = PhotoEditorRenderer(domain = { controller.localMediaTrustDomain })
+    private val renderer = PhotoEditorRenderer(domain = { controller.outgoingMediaTrustDomain })
 
-    /** The local domain the conversation's own picks decode in, for previews that hold no controller. */
+    /** The outgoing domain this conversation's own picks decode in, for previews that hold no controller. */
     val pickedMediaDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
-        get() = controller.localMediaTrustDomain
+        get() = controller.outgoingMediaTrustDomain
     private val stager =
         PhotoDraftStager(
             contentResolver = context.contentResolver,
@@ -128,7 +128,7 @@ internal class ConversationMediaDraftState(
             drafts = appState.messageDraftRepository,
         )
     private val attachmentReader =
-        ConversationAttachmentReader(appState, context, domain = { controller.localMediaTrustDomain })
+        ConversationAttachmentReader(appState, context, domain = { controller.outgoingMediaTrustDomain })
 
     private var currentSlots: List<PendingMediaSlot> = emptyList()
     private var currentDocumentUris: List<Uri> = emptyList()

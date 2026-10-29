@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -128,6 +129,7 @@ private fun ShareChatPickerAccountItem(
                 seed = account.accountIdHex,
                 size = 44.dp,
                 pictureUrl = appState.avatarUrl(account.accountIdHex),
+                pictureDomain = AvatarImageLoader.publicProfiles(),
             )
         },
         headlineContent = {

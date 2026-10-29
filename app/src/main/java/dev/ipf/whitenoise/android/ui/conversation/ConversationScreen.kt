@@ -4131,7 +4131,7 @@ internal fun ConversationScreen(
                         {
                             CompositionLocalProvider(
                                 dev.ipf.whitenoise.android.ui.conversation.media.LocalPickedMediaDomain provides
-                                    controller.localMediaTrustDomain,
+                                    controller.outgoingMediaTrustDomain,
                             ) {
                                 dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
                                     mediaSlots = pendingMediaSlots,
@@ -4281,12 +4281,9 @@ internal fun ConversationScreen(
             dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
             LocalPollVotesHost provides pollVotesHost,
             LocalKeptMessages provides keptMessagesController,
-            // Timeline images reached without the controller, such as event-card images, decode in this conversation.
-            dev.ipf.whitenoise.android.ui.conversation.media.LocalConversationMediaDomain provides
-                controller.mediaTrustDomain,
-            // Pending bubbles show the user's own picks, which decode in the account's local domain.
+            // Pending bubbles show the user's own picks, which decode in this conversation's outgoing domain.
             dev.ipf.whitenoise.android.ui.conversation.media.LocalPickedMediaDomain provides
-                controller.localMediaTrustDomain,
+                controller.outgoingMediaTrustDomain,
             // Bubbles mark their own matches while search is open, so a hit is obvious on any
             // bubble colour rather than only on the one the jump happened to land on.
             LocalConversationSearchMarking provides

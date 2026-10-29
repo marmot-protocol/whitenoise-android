@@ -532,33 +532,33 @@ internal class NotificationAvatarCoordinator(
         if (!eligible) return PreWarmedNotificationAvatars(null, null)
 
         val target = notificationAvatarPreWarmTarget(update, appLocked())
-        preWarmIfUnlocked(target.senderAvatarUrl)
+        val published =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(update.accountRef)
+        preWarmIfUnlocked(target.senderAvatarUrl, published)
         val sender =
             if (target.preWarmRemoteImages && target.senderAccountIdHex != null) {
                 bestEffort { senderAvatarUrl(update) }
             } else {
                 null
             }
-        preWarmIfUnlocked(sender)
+        preWarmIfUnlocked(sender, published)
         val group = if (target.resolveGroupAvatar) bestEffort { groupAvatarUrl(update) } else null
-        preWarmIfUnlocked(
-            group,
-            dev.ipf.whitenoise.android.media.MediaTrustDomain
-                .conversation(update.accountRef, update.groupIdHex),
-        )
+        // A group's URL picture has host-chosen bytes, so it decodes single-use, never in the conversation's worker.
+        preWarmIfUnlocked(group, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
         return PreWarmedNotificationAvatars(sender, group)
     }
 
     /**
-     * Prevents decrypted imagery from entering memory while the app lock is visible. A group URL decodes in
-     * its conversation's [domain], a sender's in the public profiles.
+     * Prevents decrypted imagery from entering memory while the app lock is visible. The picture decodes in
+     * [domain]: the public profiles for a sender, single-use for a group's URL.
      */
     private fun preWarmIfUnlocked(
         url: String?,
-        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ) {
         if (appLocked()) return
-        if (domain == null) AvatarImageLoader.preWarm(url) else AvatarImageLoader.preWarm(url, domain)
+        AvatarImageLoader.preWarm(url, domain)
     }
 
     /** Isolates optional avatar lookup failures without swallowing structured cancellation. */

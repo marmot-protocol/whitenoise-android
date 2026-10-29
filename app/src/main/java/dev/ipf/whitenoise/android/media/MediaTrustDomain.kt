@@ -1,15 +1,20 @@
 package dev.ipf.whitenoise.android.media
 
 /**
- * The data-access domain of one untrusted still-image input (#3373): whoever can see one input of a domain
- * can already see all of them. An isolated worker generation serves exactly one domain for its whole life,
- * so a decoder compromised by one input reaches only content its domain's principal could already read.
- * Keys hold account and conversation identifiers, so their text form is redacted.
+ * The data-access domain of one untrusted still-image input (#3373). An isolated worker generation serves exactly
+ * one domain for its whole life, so a decoder compromised by one input reaches only that domain's other inputs.
+ *
+ * The rule every domain keeps: each input's bytes are fixed by a principal who can already read the whole domain,
+ * and whatever the worker returns stays where that principal can already see it. Bytes a URL's host chooses, with
+ * no digest a member pinned, never enter a [Conversation]; anything a caller cannot place under the rule is
+ * [Unique]. Keys hold account and conversation identifiers, so their text form is redacted.
  */
 sealed interface MediaTrustDomain {
     /**
-     * One conversation of one account: its message media, thumbnails and viewers, its notification artwork
-     * and custom emoji, link-preview and event-card images shown inside it, and the group's own image.
+     * One conversation of one account, for bytes a member fixed: its encrypted message media, thumbnails and
+     * viewer, custom emoji received as its message attachments, link-preview JPEGs whose digest the message pins,
+     * and the group's encrypted, hash-pinned image wherever it is drawn. A public URL's picture, a GIPHY frame or a
+     * Nostr event's image is never one of these: its host chooses the bytes.
      */
     data class Conversation(
         val account: String,
@@ -20,8 +25,8 @@ sealed interface MediaTrustDomain {
     }
 
     /**
-     * Kind-0 profile pictures seen by one account. They are published to relays, so anyone can already
-     * fetch all of them; a group's image is never one of these, it belongs to its conversation.
+     * Kind-0 profile pictures and banners seen by one account. They are published to relays, so anyone can already
+     * fetch all of them and anyone may choose their bytes; a group's image is never one of these.
      */
     data class PublicProfiles(
         val account: String,
@@ -30,7 +35,24 @@ sealed interface MediaTrustDomain {
         override fun toString(): String = "PublicProfiles"
     }
 
-    /** Images the account's user picked from this device, before they are sent or published. */
+    /**
+     * Images the account's user picked from the device to send into one conversation: composer picks and previews,
+     * the photo editor, staged drafts, thumbhashes and just-sent thumbnails. The worker's output is sent there, so
+     * it may see only that conversation's picks, never another conversation's.
+     */
+    data class Outgoing(
+        val account: String,
+        val conversation: String,
+    ) : MediaTrustDomain {
+        /** Redacted: the kind only. */
+        override fun toString(): String = "Outgoing"
+    }
+
+    /**
+     * Display-only images from this device for one account: the user's own custom-emoji files and stored private
+     * contact pictures. Their decoded pixels are only drawn on this device, never re-encoded or sent; an emoji is
+     * sent as its stored file.
+     */
     data class Local(
         val account: String,
     ) : MediaTrustDomain {
@@ -59,6 +81,17 @@ sealed interface MediaTrustDomain {
                 Unique
             } else {
                 PublicProfiles(account)
+            }
+
+        /** [Outgoing] for [account]'s picks into [conversation], or [Unique] when either is unknown. */
+        fun outgoing(
+            account: String?,
+            conversation: String?,
+        ): MediaTrustDomain =
+            if (account.isNullOrEmpty() || conversation.isNullOrEmpty()) {
+                Unique
+            } else {
+                Outgoing(account, conversation)
             }
 
         /** [Local] for [account], or [Unique] when no account is known, as before sign-up completes. */

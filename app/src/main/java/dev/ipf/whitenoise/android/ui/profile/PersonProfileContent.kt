@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
@@ -331,7 +332,13 @@ private fun PersonProfileIdentity(
                     onClick = onAvatar,
                 ),
             ) {
-                Avatar(person.title, person.seed, avatarSize, pictureUrl = person.pictureUrl)
+                Avatar(
+                    person.title,
+                    person.seed,
+                    avatarSize,
+                    pictureUrl = person.pictureUrl,
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
+                )
             }
             EmojiLabel(
                 person.title,

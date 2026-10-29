@@ -34,6 +34,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -281,6 +282,7 @@ private fun ReactionParticipantRow(
             seed = participant.sender,
             size = 48.dp,
             pictureUrl = appState.contactAvatarSource(participant.sender),
+            pictureDomain = AvatarImageLoader.publicProfiles(),
         )
     }
     val trailing: @Composable () -> Unit = {

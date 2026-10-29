@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -138,6 +139,7 @@ internal fun SelectedMemberSummary(
                             seed = member.accountIdHex,
                             size = 32.dp,
                             pictureUrl = selectedMemberPicture(member, appState),
+                            pictureDomain = AvatarImageLoader.publicProfiles(),
                         )
                     }
                 }
@@ -268,6 +270,7 @@ internal fun SelectedMembersReviewScreen(
                                 )
                             }
                         },
+                        avatarDomain = AvatarImageLoader.publicProfiles(),
                     )
                     onInitialAdminChange?.let { change ->
                         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {

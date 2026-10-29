@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -54,7 +55,13 @@ internal fun GroupReviewPersonIdentity(
             ?.let(::reviewMemberPublicName)
     val picture = ProfileSanitizer.protocolImageUrl(profile?.picture ?: member.searchProfile?.picture)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Avatar(publicName ?: identifier, member.accountIdHex, 48.dp, pictureUrl = picture)
+        Avatar(
+            publicName ?: identifier,
+            member.accountIdHex,
+            48.dp,
+            pictureUrl = picture,
+            pictureDomain = AvatarImageLoader.publicProfiles(),
+        )
         publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
         nickname?.let { Text(stringResource(R.string.group_action_local_nickname, it)) }
         if (identifier.isNotBlank()) {

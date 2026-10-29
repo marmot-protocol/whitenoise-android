@@ -547,7 +547,7 @@ internal fun ProfileSheet(
     val displayTitle = contactNickname ?: title
     val pictureUrl = hex?.let { appState.contactAvatarSource(it) } ?: profile.pictureUrl
     val bannerUrl = profile.bannerUrl
-    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl, AvatarImageLoader.publicProfiles())
     val about = profile.about
     val nip05 = profile.nip05
     var nip05ResolvedHex by remember(nip05) { mutableStateOf<String?>(null) }

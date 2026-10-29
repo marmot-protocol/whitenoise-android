@@ -67,7 +67,14 @@ internal fun rememberGroupAvatarPresentation(
     // A missing/corrupt local image may still use this account's native public-avatar selection.
     if (privateSource != null && privateImage != null) return GroupAvatarPresentation(privateImage, privateSource)
     val ownedSeed = firstFrameAvatar?.takeIf { it.matchesAvatarPresentationOwner(accountRef) }
-    val durableDomain = groupAvatarDecodeDomain(groupOwnsPicture, accountRef, group.groupIdHex)
+    val durableDomain =
+        groupAvatarDecodeDomain(
+            groupOwnsPicture,
+            dev.ipf.whitenoise.android.core.GroupProjector
+                .pictureIsMemberPinned(group),
+            accountRef,
+            group.groupIdHex,
+        )
     val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef, durableDomain)
     if (durableAvatar != null) {
         val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
@@ -89,8 +96,14 @@ internal fun rememberGroupAvatarPresentation(
     return GroupAvatarPresentation(
         image = seededImage ?: remoteImage ?: encryptedImage,
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
-        // A group may own this picture; a peer's public picture in its conversation's worker exposes nothing.
-        pictureDomain = groupAvatarDecodeDomain(true, accountRef, group.groupIdHex),
+        // A group's URL picture has host-chosen bytes, so single-use; a peer's fallback is a published picture.
+        pictureDomain =
+            if (legacyUrl != null) {
+                dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+            } else {
+                dev.ipf.whitenoise.android.media.MediaTrustDomain
+                    .publicProfiles(accountRef)
+            },
         readOriginalBytes = originalReader,
         groupAnimation =
             originalReader?.takeIf { groupOwnsPicture }?.let {
@@ -106,8 +119,8 @@ internal fun rememberGroupAvatarPresentation(
 }
 
 /**
- * Keeps legacy public acquisition scoped to the same runtime and account as its presentation. The group's
- * image decodes in a worker serving only that conversation.
+ * Keeps legacy public acquisition scoped to the same runtime and account as its presentation. The URL's host
+ * chooses the bytes, not a member, so the image decodes single-use rather than in the conversation's worker.
  */
 @Composable
 private fun rememberLegacyRemoteGroupAvatar(
@@ -121,11 +134,7 @@ private fun rememberLegacyRemoteGroupAvatar(
             initialImage = AvatarImageLoader.peek(legacyUrl),
             enabled = legacyUrl != null,
         ) {
-            AvatarImageLoader.load(
-                checkNotNull(legacyUrl),
-                dev.ipf.whitenoise.android.media.MediaTrustDomain
-                    .conversation(accountRef, groupIdHex),
-            )
+            AvatarImageLoader.load(checkNotNull(legacyUrl), dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
         }
         image
     }

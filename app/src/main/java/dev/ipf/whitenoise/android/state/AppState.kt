@@ -11945,7 +11945,7 @@ class WhiteNoiseAppState private constructor(
                 }
                 avatar
             }
-        AvatarImageLoader.preWarm(cachedAvatar)
+        AvatarImageLoader.preWarm(cachedAvatar, AvatarImageLoader.publicProfiles())
         // Starts an ungated local materialization on a miss and observes its
         // revision; applyProfilePresentation consumes the pending warm above once
         // the URL lands. The relay refresh remains independently cooldown-gated.
@@ -13268,6 +13268,8 @@ class WhiteNoiseAppState private constructor(
                 update.isDm,
                 dev.ipf.whitenoise.android.notifications
                     .notificationConversationDomain(update),
+                dev.ipf.whitenoise.android.notifications
+                    .notificationSenderDomain(update),
             )
         val sources =
             if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
@@ -14286,7 +14288,7 @@ class WhiteNoiseAppState private constructor(
                 changed to shouldPreWarm
             }
         if (shouldPreWarm) {
-            AvatarImageLoader.preWarm(presentation.avatarUrl)
+            AvatarImageLoader.preWarm(presentation.avatarUrl, AvatarImageLoader.publicProfiles())
         }
         if (changed) {
             profileRevision += 1

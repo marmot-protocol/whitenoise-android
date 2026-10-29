@@ -27,6 +27,8 @@ internal fun PreWarmedNotificationAvatars.lateIdentitySources(
     isDm: Boolean,
     conversationDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    senderDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ): NotificationIdentityPictureSources =
     NotificationIdentityPictureSources(
         conversationBitmap = conversationBitmap(isDm),
@@ -34,6 +36,7 @@ internal fun PreWarmedNotificationAvatars.lateIdentitySources(
         senderBitmap = senderAvatarBitmap,
         senderUrl = warmed.senderAvatarUrl,
         conversationDomain = conversationDomain,
+        senderDomain = senderDomain,
     )
 
 /**

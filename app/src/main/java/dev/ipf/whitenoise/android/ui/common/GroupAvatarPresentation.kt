@@ -24,8 +24,12 @@ internal data class GroupAvatarPresentation(
     val readOriginalBytes: (suspend () -> ByteArray?)? = null,
     val animationKey: String? = null,
     val groupAnimation: GroupAvatarAnimation? = null,
-    /** The worker domain for loading [pictureUrl]: the group's conversation for a picture a group may own. */
-    val pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
+    /**
+     * The worker domain for loading [pictureUrl]: single-use for a group's URL picture, whose host chooses its bytes,
+     * and the public profiles for a person's published picture. A private contact handle decodes in its own domain.
+     */
+    val pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 )
 
 /** A durable group selection keeps viewer bytes and thumbnail admission under the same pinned owner. */
@@ -93,16 +97,22 @@ internal fun WhiteNoiseAppState.ownsPrivateAvatarSource(
     accounts.any { it.label == accountRef && !it.signedOut } &&
         PrivateContactAvatarLoader.belongsToAccount(source, accountRef)
 
-/** A group-owned picture decodes in its conversation's worker, a person's in the account's public profiles. */
+/**
+ * A group's member-pinned (encrypted) picture decodes in its conversation's worker, any other picture a group owns
+ * single-use, as its URL's host chooses the bytes, and a person's in the account's public profiles.
+ */
 internal fun groupAvatarDecodeDomain(
     ownsGroupPicture: Boolean,
+    memberPinned: Boolean,
     accountRef: String?,
     groupIdHex: String,
 ): dev.ipf.whitenoise.android.media.MediaTrustDomain =
-    if (ownsGroupPicture) {
-        dev.ipf.whitenoise.android.media.MediaTrustDomain
-            .conversation(accountRef, groupIdHex)
-    } else {
-        dev.ipf.whitenoise.android.media.MediaTrustDomain
-            .publicProfiles(accountRef)
+    when {
+        ownsGroupPicture && memberPinned ->
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .conversation(accountRef, groupIdHex)
+        ownsGroupPicture -> dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+        else ->
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(accountRef)
     }

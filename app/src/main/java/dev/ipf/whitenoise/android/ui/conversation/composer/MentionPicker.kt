@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -86,6 +87,7 @@ private fun MentionPickerRow(
                 seed = candidate.accountIdHex,
                 size = MENTION_ROW_AVATAR,
                 pictureUrl = candidate.avatarUrl,
+                pictureDomain = AvatarImageLoader.publicProfiles(),
             )
         },
         modifier =
