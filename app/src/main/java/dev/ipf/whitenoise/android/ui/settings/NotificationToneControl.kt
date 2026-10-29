@@ -25,7 +25,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationTone
 import dev.ipf.whitenoise.android.notifications.NotificationToneExport
-import dev.ipf.whitenoise.android.notifications.NotificationTonePreview
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -207,27 +206,32 @@ private fun notificationSoundLabel(
     context: Context,
     uri: Uri?,
 ): String {
-    if (uri == null) return context.getString(R.string.notification_tone_silent)
-    if (uri == Settings.System.DEFAULT_NOTIFICATION_URI) return context.getString(R.string.notification_tone_default)
-    NotificationTone.resolve(context, uri)?.let { return context.getString(it.title) }
-    return runCatching {
-        context.contentResolver
-            .query(
-                uri,
-                arrayOf(MediaStore.Audio.Media.TITLE, OpenableColumns.DISPLAY_NAME),
-                null,
-                null,
-                null,
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    listOf(MediaStore.Audio.Media.TITLE, OpenableColumns.DISPLAY_NAME).firstNotNullOfOrNull { column ->
-                        cursor.getColumnIndex(column).takeIf { it >= 0 }?.let { index ->
-                            cursor.getString(index)?.takeIf { it.isNotBlank() }
+    val tone = uri?.let { NotificationTone.resolve(context, it) }
+    return when {
+        uri == null -> context.getString(R.string.notification_tone_silent)
+        uri == Settings.System.DEFAULT_NOTIFICATION_URI -> context.getString(R.string.notification_tone_default)
+        tone != null -> context.getString(tone.title)
+        else ->
+            runCatching {
+                context.contentResolver
+                    .query(
+                        uri,
+                        arrayOf(MediaStore.Audio.Media.TITLE, OpenableColumns.DISPLAY_NAME),
+                        null,
+                        null,
+                        null,
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            listOf(MediaStore.Audio.Media.TITLE, OpenableColumns.DISPLAY_NAME)
+                                .firstNotNullOfOrNull { column ->
+                                    cursor.getColumnIndex(column).takeIf { it >= 0 }?.let { index ->
+                                        cursor.getString(index)?.takeIf { it.isNotBlank() }
+                                    }
+                                }
+                        } else {
+                            null
                         }
                     }
-                } else {
-                    null
-                }
-            }
-    }.getOrNull() ?: context.getString(R.string.notification_tone_android)
+            }.getOrNull() ?: context.getString(R.string.notification_tone_android)
+    }
 }

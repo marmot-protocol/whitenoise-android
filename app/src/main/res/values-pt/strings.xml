@@ -2502,4 +2502,20 @@
     <string name="voice_recording_limit_warning">A gravação será interrompida em 30 segundos ao atingir o limite de cinco minutos.</string>
     <string name="voice_recording_limit_reached">Limite de gravação de cinco minutos atingido. Revise sua mensagem de voz antes de enviar.</string>
     <string name="voice_recording_interrupted">Gravação interrompida. Revise o áudio gravado antes de enviar.</string>
+
+    <string name="notification_tones">Sons do White Noise</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">Toque para ouvir</string>
+    <string name="notification_tone_stop">Toque para parar a prévia</string>
+    <string name="notification_tone_preview_failed">Não foi possível reproduzir a prévia. Tente novamente.</string>
+    <string name="notification_tone_add">Adicionar aos sons do Android</string>
+    <string name="notification_tone_add_detail">Disponibilizar estes tons no seletor de sons do Android.</string>
+    <string name="notification_tone_added">Adicionados. Abra uma categoria abaixo e depois Som para escolher um tom. Alguns dispositivos os mostram em Meus sons.</string>
+    <string name="notification_tone_add_failed">Não foi possível adicionar os sons. Tente novamente ou mantenha o som atual do Android.</string>
+    <string name="notification_tone_scope">Ouvir ou adicionar sons não altera os seus alertas. Escolha um som no Android para cada categoria, conversa ou pessoa. As conversas existentes e as configurações pessoais mantêm os próprios sons. Novas categorias de mensagens usam Ding; categorias silenciosas e personalizadas permanecem inalteradas. As prévias usam o volume das notificações e respeitam o modo silencioso e Não perturbe.</string>
+    <string name="notification_tone_android">Som do Android</string>
+    <string name="notification_tone_silent">Silencioso</string>
+    <string name="notification_tone_off">Desativado</string>
+    <string name="notification_tone_default">Padrão</string>
 </resources>

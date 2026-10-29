@@ -1,7 +1,8 @@
-package dev.ipf.whitenoise.android.notifications
+package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.media.MediaPlayer
+import dev.ipf.whitenoise.android.notifications.NotificationTone
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith

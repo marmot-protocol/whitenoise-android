@@ -2519,4 +2519,20 @@
     <string name="voice_recording_limit_warning">Die Aufnahme endet in 30 Sekunden am Fünf-Minuten-Limit.</string>
     <string name="voice_recording_limit_reached">Das Fünf-Minuten-Limit ist erreicht. Prüfe deine Sprachnachricht vor dem Senden.</string>
     <string name="voice_recording_interrupted">Aufnahme unterbrochen. Prüfe die aufgenommene Audiodatei vor dem Senden.</string>
+
+    <string name="notification_tones">White Noise-Klänge</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">Zum Anhören tippen</string>
+    <string name="notification_tone_stop">Zum Stoppen der Vorschau tippen</string>
+    <string name="notification_tone_preview_failed">Die Vorschau konnte nicht abgespielt werden. Versuche es erneut.</string>
+    <string name="notification_tone_add">Zu Android-Klängen hinzufügen</string>
+    <string name="notification_tone_add_detail">Diese Töne in der Android-Tonauswahl verfügbar machen.</string>
+    <string name="notification_tone_added">Hinzugefügt. Öffne unten eine Kategorie und dann „Ton“, um einen Ton auszuwählen. Auf manchen Geräten findest du sie unter „Meine Töne“.</string>
+    <string name="notification_tone_add_failed">Die Töne konnten nicht hinzugefügt werden. Versuche es erneut oder behalte deinen aktuellen Android-Ton.</string>
+    <string name="notification_tone_scope">Das Anhören oder Hinzufügen von Tönen ändert deine Benachrichtigungen nicht. Wähle in Android für jede Kategorie, Unterhaltung oder Person einen Ton aus. Bestehende Unterhaltungen und persönliche Anpassungen behalten ihre eigenen Töne. Neue Nachrichtenkategorien verwenden Ding; stumme und angepasste Kategorien bleiben unverändert. Vorschauen verwenden die Benachrichtigungslautstärke und beachten den Lautlosmodus und „Nicht stören“.</string>
+    <string name="notification_tone_android">Android-Ton</string>
+    <string name="notification_tone_silent">Lautlos</string>
+    <string name="notification_tone_off">Aus</string>
+    <string name="notification_tone_default">Standard</string>
 </resources>

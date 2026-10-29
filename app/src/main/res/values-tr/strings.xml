@@ -2500,4 +2500,20 @@
     <string name="voice_recording_limit_warning">Kayıt, 30 saniye sonra beş dakikalık sınıra ulaşıldığında duracak.</string>
     <string name="voice_recording_limit_reached">Beş dakikalık kayıt sınırına ulaşıldı. Göndermeden önce sesli mesajınızı gözden geçirin.</string>
     <string name="voice_recording_interrupted">Kayıt kesintiye uğradı. Göndermeden önce kaydedilen sesi gözden geçirin.</string>
+
+    <string name="notification_tones">White Noise sesleri</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">Önizleme için dokunun</string>
+    <string name="notification_tone_stop">Önizlemeyi durdurmak için dokunun</string>
+    <string name="notification_tone_preview_failed">Önizleme çalınamadı. Tekrar deneyin.</string>
+    <string name="notification_tone_add">Android seslerine ekle</string>
+    <string name="notification_tone_add_detail">Bu tonları Android ses seçicisinde kullanılabilir hâle getirin.</string>
+    <string name="notification_tone_added">Eklendi. Bir ton seçmek için aşağıdan bir kategoriyi, ardından Ses seçeneğini açın. Bazı cihazlarda bu tonlar Seslerim altında listelenir.</string>
+    <string name="notification_tone_add_failed">Sesler eklenemedi. Tekrar deneyin veya mevcut Android sesinizi koruyun.</string>
+    <string name="notification_tone_scope">Sesleri önizlemek veya eklemek uyarılarınızı değiştirmez. Android’de her kategori, sohbet veya kişi için bir ses seçin. Mevcut sohbetler ve kişisel ayarlar kendi seslerini korur. Yeni mesaj kategorileri Ding kullanır; sessiz ve özelleştirilmiş kategoriler değişmez. Önizlemeler bildirim ses düzeyini kullanır, Sessiz ve Rahatsız Etmeyin modlarına uyar.</string>
+    <string name="notification_tone_android">Android sesi</string>
+    <string name="notification_tone_silent">Sessiz</string>
+    <string name="notification_tone_off">Kapalı</string>
+    <string name="notification_tone_default">Varsayılan</string>
 </resources>

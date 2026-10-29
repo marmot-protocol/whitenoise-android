@@ -1,7 +1,8 @@
-package dev.ipf.whitenoise.android.notifications
+package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.media.MediaPlayer
+import dev.ipf.whitenoise.android.notifications.NotificationTone
 
 /** Screen-owned audition only. Real notifications are always played by Android's channel policy. */
 internal class NotificationTonePreview(

@@ -11,6 +11,24 @@
           "NTF-045"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_tone_ding",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTone.kt",
+        "anchor": "R.string.notification_tone_ding",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_pulse",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTone.kt",
+        "anchor": "R.string.notification_tone_pulse",
+        "test_ids": [
+          "NTF-045"
+        ]
+      }
     ]
   }
 }

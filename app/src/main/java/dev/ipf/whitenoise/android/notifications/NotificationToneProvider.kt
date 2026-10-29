@@ -19,8 +19,11 @@ class NotificationToneProvider : ContentProvider() {
         uri: Uri,
         mode: String,
     ): AssetFileDescriptor {
-        if (mode != "r") throw FileNotFoundException("Read-only notification tone")
-        val tone = tone(uri) ?: throw FileNotFoundException("Unknown notification tone")
+        val tone =
+            (if (mode == "r") tone(uri) else null)
+                ?: throw FileNotFoundException(
+                    if (mode == "r") "Unknown notification tone" else "Read-only notification tone",
+                )
         return requireNotNull(context).resources.openRawResourceFd(tone.audio)
             ?: throw FileNotFoundException("Unavailable notification tone")
     }
