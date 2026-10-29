@@ -23,16 +23,25 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-/** Starts one decode of a one-byte synthetic source on its own thread. */
+/**
+ * Starts one decode on its own thread, in [domain]. The source is one byte [value], or, with [sized], [value]
+ * bytes long, so an endpoint can tell inputs apart by their declared length.
+ */
 internal fun startDecode(
     transport: MediaDecodeTransport,
     value: Int,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    sized: Boolean = false,
 ): DecodeCall {
     val result = AtomicReference<android.graphics.Bitmap?>()
     val thread =
         Thread {
             try {
-                result.set(transport.decode(byteArrayOf(value.toByte()), 1, false, MediaDecodePolicy.DECODE))
+                val bytes = if (sized) ByteArray(value) { value.toByte() } else byteArrayOf(value.toByte())
+                result.set(
+                    MediaTrustScope.within(domain) { transport.decode(bytes, 1, false, MediaDecodePolicy.DECODE) },
+                )
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             }
@@ -86,6 +95,9 @@ internal class BindingFixture(
     private val beforeBind: () -> Unit = {},
     private val acceptAt: (Int) -> Boolean = { true },
     private val connectAt: (Int) -> Boolean = { true },
+    private val replyAt: (Int) -> Boolean = { reply },
+    private val validReplyAt: (Int) -> Boolean = { false },
+    private val dieOnRetire: Boolean = false,
 ) : ContextWrapper(base) {
     @Volatile var acceptBind = true
     val bindings = mutableListOf<Bound>()
@@ -111,12 +123,13 @@ internal class BindingFixture(
         conn: ServiceConnection,
     ): Boolean {
         beforeBind()
-        val bound = Bound(conn, ReplyingBinder(reply, failLink))
-        val index =
+        val (bound, index) =
             synchronized(bindings) {
+                val index = bindings.size
+                val bound = Bound(conn, ReplyingBinder(replyAt(index), failLink, validReplyAt(index), dieOnRetire))
                 bindings += bound
                 instanceNames += instanceName
-                bindings.size - 1
+                bound to index
             }
         val accepted = acceptBind && acceptAt(index)
         if (accepted && connect && connectAt(index)) conn.onServiceConnected(component, bound.remote)
@@ -133,10 +146,16 @@ internal class BindingFixture(
     }
 }
 
-/** Same-UID replies complete IPC but deliberately fail production isolation attestation. */
+/**
+ * Same-UID replies complete IPC but deliberately fail production isolation attestation; a [validReply]
+ * endpoint answers as an attested worker with a 1×1 frame, and a [dieOnRetire] one exits on RETIRE as a
+ * cooperative worker does. Every input's declared length is recorded.
+ */
 internal class ReplyingBinder(
     private val reply: Boolean,
     private val failLink: Boolean,
+    private val validReply: Boolean = false,
+    private val dieOnRetire: Boolean = false,
 ) : Binder() {
     private val recipients = mutableListOf<IBinder.DeathRecipient>()
 
@@ -146,6 +165,9 @@ internal class ReplyingBinder(
     val decoded = CountDownLatch(1)
 
     @Volatile var requests = 0
+
+    /** The declared length of every input this endpoint received, in order, which domain tests use as its id. */
+    val inputs = java.util.Collections.synchronizedList(mutableListOf<Int>())
 
     @Volatile var linkCount = 0
 
@@ -196,12 +218,20 @@ internal class ReplyingBinder(
             if (message.what == MediaDecodePolicy.RETIRE) {
                 beforeRetire.getAndSet(null)?.invoke()
                 retired.countDown()
+                if (dieOnRetire) die()
             }
             if (message.what == MediaDecodePolicy.DECODE) {
                 requests += 1
+                inputs += message.data.getLong("length").toInt()
                 heldReply = message.replyTo.binder to message.arg1
                 decoded.countDown()
-                if (this.reply) sendMediaDecodeReply(message.replyTo.binder, message.arg1, Bundle())
+                when {
+                    validReply ->
+                        withWorkerIdentity {
+                            sendMediaDecodeReply(message.replyTo.binder, message.arg1, successfulPixelReply())
+                        }
+                    this.reply -> sendMediaDecodeReply(message.replyTo.binder, message.arg1, Bundle())
+                }
             }
         }
         return true

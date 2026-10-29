@@ -17,12 +17,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Still-image worker generations. Each generation is one isolated binding with a unique instance name
- * and its own Binder death recipient, and carries at most one untrusted input. A new input is admitted
- * only after the previous input-bearing generation has a kernel Binder death callback. Clean spares,
- * which never receive input before they are claimed, are started while the current input is served,
- * so a retirement does not add a process start to the next admission. Live generations, including
- * retired ones whose death is still unconfirmed, never exceed one plus the spare limit.
+ * Still-image worker generations (#3373). Each generation is one isolated binding with a unique instance name
+ * and its own Binder death recipient. A claim binds a clean generation to one data-access domain for its whole
+ * life: a reusable domain's generation serves that domain's later inputs and no other, and a single-use claim
+ * gets a generation that carries one input. A domain has at most one live generation, and a retiring one must
+ * die before its domain is served again; single-use inputs also wait for the previous single-use generation's
+ * death. Clean spares, which never receive input before they are claimed, are started while inputs are
+ * served. Live generations, including retired ones whose death is still unconfirmed, never exceed the live
+ * limit: a new domain takes a spare or a free slot, or evicts the least recently used idle domain through the
+ * same death fence.
  */
 @Suppress("TooManyFunctions") // One cohesive owner for generation binding, admission, retirement and disposal.
 internal class MediaWorkerPool(
@@ -30,12 +33,14 @@ internal class MediaWorkerPool(
     private val instanceName: String,
     spares: Int,
     private val lock: Any,
+    liveLimit: Int = 1 + spares.coerceIn(0, MAX_SPARES),
     private val ended: (MediaWorker) -> Unit,
 ) {
-    private val spareLimit = spares.coerceIn(0, MAX_SPARES)
-    private val capacity = 1 + spareLimit
+    private val capacity = liveLimit.coerceIn(1, MAX_LIVE_GENERATIONS)
+    private val spareLimit = spares.coerceIn(0, minOf(MAX_SPARES, capacity - 1))
     private val generations = ArrayList<MediaWorker>(capacity)
-    private var active: MediaWorker? = null
+    private var singleUseFence: MediaWorker? = null
+    private var signal = CountDownLatch(1)
     private var closed = false
     private val callbackThread = lazy { HandlerThread("media-decoder-ipc").apply { start() } }
     private val callbacks by callbackThread
@@ -43,12 +48,15 @@ internal class MediaWorkerPool(
     private val callbackExecutor = Executor { command -> handler.post(command) }
 
     /**
-     * Waits up to [budgetMs] for the previous input-bearing generation's death, then claims a clean
-     * connected generation, starting one when none is live. A refused or unknown bind fails this claim.
-     * Waits are sliced so a session reset or close is observed without spending the whole budget.
+     * Claims a connected generation for [domain] within [budgetMs]: the domain's own idle generation when
+     * [reusable], otherwise a clean one bound to [domain] from now on, starting or evicting as the live limit
+     * allows. A refused or unknown bind fails this claim. Waits are sliced so a session reset or close is
+     * observed without spending the whole budget.
      */
     @Suppress("ReturnCount") // Claimed, expired, refused and failed-start outcomes leave the loop separately.
     fun claim(
+        domain: Any,
+        reusable: Boolean,
         budgetMs: Long,
         current: () -> Boolean,
     ): MediaWorker? {
@@ -56,10 +64,11 @@ internal class MediaWorkerPool(
         while (true) {
             val left = TimeUnit.NANOSECONDS.toMillis(until - System.nanoTime())
             if (left <= 0L) return null
-            when (val step = synchronized(lock) { nextStep(current) }) {
+            when (val step = synchronized(lock) { nextStep(domain, reusable, current) }) {
                 is ClaimStep.Claimed -> return step.worker
                 is ClaimStep.Await -> step.latch.await(minOf(left, WAIT_SLICE_MS), TimeUnit.MILLISECONDS)
                 is ClaimStep.AwaitDeath -> awaitDeath(step.worker, minOf(left, WAIT_SLICE_MS))
+                is ClaimStep.Evict -> retire(step.worker)
                 is ClaimStep.Start -> if (!start(step.worker)) return null
                 ClaimStep.Refused -> return null
             }
@@ -67,15 +76,31 @@ internal class MediaWorkerPool(
     }
 
     /** The next admission step for one claim, decided under the lock from the live generations. */
-    @Suppress("ReturnCount") // Each lane state has one distinct admission outcome.
-    private fun nextStep(current: () -> Boolean): ClaimStep {
+    @Suppress("ReturnCount", "CyclomaticComplexMethod") // Each lane state has one distinct admission outcome.
+    private fun nextStep(
+        domain: Any,
+        reusable: Boolean,
+        current: () -> Boolean,
+    ): ClaimStep {
         if (closed || !current()) return ClaimStep.Refused
-        // The death fence: no input reaches any generation while an earlier input-bearing one may live.
-        active?.let { previous -> if (previous.dead.count != 0L) return ClaimStep.AwaitDeath(previous) }
-        active = null
+        // The single-use fence: no single-use input while the previous single-use generation may live.
+        if (!reusable) {
+            singleUseFence?.let { previous -> if (previous.dead.count != 0L) return ClaimStep.AwaitDeath(previous) }
+            singleUseFence = null
+        }
+        // The domain fence: one live generation per domain, and a retiring one dies before the domain is served.
+        generations.firstOrNull { it.domain == domain && it.dead.count != 0L }?.let { owner ->
+            return when {
+                owner.retiring -> ClaimStep.AwaitDeath(owner)
+                owner.busy -> ClaimStep.Await(signal)
+                else -> ClaimStep.Claimed(owner.also { it.busy = true })
+            }
+        }
         generations.firstOrNull(MediaWorker::clean)?.let { ready ->
-            ready.carriesInput = true
-            active = ready
+            ready.domain = domain
+            ready.reusable = reusable
+            ready.busy = true
+            if (!reusable) singleUseFence = ready
             return ClaimStep.Claimed(ready)
         }
         // A starting spare is speculative: wait for it only briefly while a slot could start a fresh one.
@@ -88,8 +113,50 @@ internal class MediaWorkerPool(
                 if (young || generations.size >= capacity) return ClaimStep.Await(youngest.connected)
             }
         if (generations.size < capacity) return ClaimStep.Start(reserve())
+        // A slot already being freed is awaited, never doubled by a second eviction.
+        generations.firstOrNull { it.retiring && it.dead.count != 0L }?.let { return ClaimStep.AwaitDeath(it) }
+        // Every slot is taken: the least recently used idle domain leaves through the death fence.
+        generations
+            .filter { it.reusable && !it.busy && !it.retiring && it.dead.count != 0L }
+            .minByOrNull { it.lastUsedNanos }
+            ?.let { return ClaimStep.Evict(it) }
+        if (generations.any { it.busy }) return ClaimStep.Await(signal)
         // Every slot is held by a generation whose lifetime is unresolved, never exceed the bound.
         return generations.firstOrNull { it.dead.count != 0L }?.let { ClaimStep.AwaitDeath(it) } ?: ClaimStep.Refused
+    }
+
+    /**
+     * Returns a reusable domain's generation after a valid reply. It serves its domain again until it has
+     * carried [DOMAIN_INPUT_CAP] inputs or stays idle for [DOMAIN_IDLE_MS], then it is retired.
+     */
+    fun release(worker: MediaWorker) {
+        val (spent, stamp) =
+            synchronized(lock) {
+                worker.busy = false
+                worker.inputs++
+                worker.lastUsedNanos = System.nanoTime()
+                signalLocked()
+                (worker.inputs >= DOMAIN_INPUT_CAP) to ++worker.useStamp
+            }
+        if (spent) {
+            retire(worker)
+        } else {
+            handler.postDelayed({ retireIfIdle(worker, stamp) }, DOMAIN_IDLE_MS)
+        }
+    }
+
+    private fun retireIfIdle(
+        worker: MediaWorker,
+        stamp: Int,
+    ) {
+        val idle = synchronized(lock) { !worker.busy && !worker.retiring && worker.useStamp == stamp }
+        if (idle) retire(worker)
+    }
+
+    /** Wakes claims waiting for a busy domain, a released slot or a death. Called under the lock. */
+    private fun signalLocked() {
+        signal.countDown()
+        signal = CountDownLatch(1)
     }
 
     /** Starts clean spares up to the limit, a failed start leaves the next claim to bind cold. */
@@ -97,7 +164,7 @@ internal class MediaWorkerPool(
         while (true) {
             val spare =
                 synchronized(lock) {
-                    val spares = generations.count { !it.carriesInput && !it.retiring }
+                    val spares = generations.count { it.domain == null && !it.retiring }
                     if (closed || spares >= spareLimit || generations.size >= capacity) null else reserve()
                 } ?: return
             if (!start(spare)) return
@@ -176,6 +243,7 @@ internal class MediaWorkerPool(
                     }
                     if (closed) worker.retiring = true
                     worker.connected.countDown()
+                    signalLocked()
                 }
                 // A generation retired before it connected never received input: stop it at once.
                 if (worker.retiring) retire(worker, escalate = true)
@@ -200,9 +268,10 @@ internal class MediaWorkerPool(
                 if (worker.disposed) return
                 worker.retiring = true
                 worker.connected.countDown()
-                worker.ready.countDown()
+                worker.abortExchange()
                 ended(worker)
-                (worker.binder == null && !worker.carriesInput).also { worker.abandoned = it }
+                signalLocked()
+                (worker.binder == null && worker.domain == null).also { worker.abandoned = it }
             }
         if (neverConnected) dispose(worker) else retire(worker, escalate = true)
     }
@@ -212,8 +281,9 @@ internal class MediaWorkerPool(
             worker.retiring = true
             worker.dead.countDown()
             worker.connected.countDown()
-            worker.ready.countDown()
+            worker.abortExchange()
             ended(worker)
+            signalLocked()
         }
         dispose(worker)
     }
@@ -230,6 +300,7 @@ internal class MediaWorkerPool(
         val target =
             synchronized(lock) {
                 worker.retiring = true
+                signalLocked()
                 if (worker.retireSent || worker.dead.count == 0L) {
                     null
                 } else {
@@ -305,7 +376,8 @@ internal class MediaWorkerPool(
                 if (!gone || !worker.bindComplete || worker.disposed) return
                 worker.disposed = true
                 generations.remove(worker)
-                if (active === worker) active = null
+                if (singleUseFence === worker) singleUseFence = null
+                signalLocked()
                 // A definitive false bind still registers a connection that must be released.
                 (!worker.unbound).also { worker.unbound = true }
             }
@@ -358,6 +430,10 @@ internal class MediaWorkerPool(
             val worker: MediaWorker,
         ) : ClaimStep
 
+        class Evict(
+            val worker: MediaWorker,
+        ) : ClaimStep
+
         class Start(
             val worker: MediaWorker,
         ) : ClaimStep
@@ -366,11 +442,23 @@ internal class MediaWorkerPool(
     }
 
     companion object {
-        /** Clean spares beyond the one input-bearing generation, two keep the live-process bound at three. */
+        /** Clean spares kept ready, at most two, so the live-process bound stays at three. */
         const val MAX_SPARES = 2
 
-        /** Default pre-warm depth: in matched emulator runs one spare missed the proposed burst budget, two met it. */
+        /** Single-use pre-warm depth: in matched emulator runs one spare missed the burst budget, two met it. */
         const val DEFAULT_SPARES = 2
+
+        /** The live-process bound for every generation of one lane, held and retiring ones included. */
+        const val MAX_LIVE_GENERATIONS = 3
+
+        /** Domain lane pre-warm depth: one spare keeps a new domain off the process-start path within the bound. */
+        const val DOMAIN_SPARES = 1
+
+        /** A domain's generation is replaced after this many inputs, bounding what any one process accumulates. */
+        const val DOMAIN_INPUT_CAP = 64
+
+        /** A domain's generation idle this long is retired, freeing its memory once its conversation goes quiet. */
+        const val DOMAIN_IDLE_MS = 30_000L
 
         /** Cooperative RETIRE normally ends a worker within milliseconds, after this grace Android stops it. */
         const val RETIRE_ESCALATION_MS = 250L
@@ -382,7 +470,7 @@ internal class MediaWorkerPool(
     }
 }
 
-/** One binding generation. Its reply state is single-use because a generation carries one input. */
+/** One binding generation, bound to at most one domain for its whole life. */
 internal class MediaWorker(
     val generation: Int,
     val instance: String,
@@ -399,20 +487,52 @@ internal class MediaWorker(
     var unbound = false
     var disposed = false
     var holdReported = false
-    var carriesInput = false
     var abandoned = false
+
+    /** The domain this generation serves, set once at its first claim, null while it is a clean spare. */
+    var domain: Any? = null
+
+    /** Whether [domain] may send further inputs here, false for a single-use generation. */
+    var reusable = false
+
+    /** Claimed for an input now in flight. */
+    var busy = false
+    var inputs = 0
+    var useStamp = 0
+    var lastUsedNanos = 0L
     var reservedAtNanos = 0L
     var retiredAtNanos = 0L
     val connected = CountDownLatch(1)
     val dead = CountDownLatch(1)
+
+    /** The one request this generation may answer now, its reply capability is revoked with it. */
+    var exchange: MediaExchange? = null
+
+    /** Connected with a death witness, never bound to a domain and not retiring. */
+    fun clean(): Boolean = linked && !retiring && domain == null && dead.count != 0L
+
+    /** Bound and still waiting for its first connection callback. */
+    fun starting(): Boolean = !retiring && domain == null && connected.count != 0L && dead.count != 0L
+
+    /** Fails the in-flight request without a result, when this generation disconnects or dies. Under the lock. */
+    fun abortExchange() {
+        exchange?.abort()
+    }
+}
+
+/** One request's single-use reply slot, identified by [id] on the wire. */
+internal class MediaExchange(
+    val id: Int,
+) {
     val ready = CountDownLatch(1)
     val completed = AtomicBoolean(false)
 
     @Volatile var result: Bundle? = null
 
-    /** Connected with a death witness, never handed input and not retiring. */
-    fun clean(): Boolean = linked && !retiring && !carriesInput && dead.count != 0L
-
-    /** Bound and still waiting for its first connection callback. */
-    fun starting(): Boolean = !retiring && !carriesInput && connected.count != 0L && dead.count != 0L
+    /** Ends the request with no result, a later reply finds it completed. */
+    fun abort() {
+        completed.set(true)
+        result = null
+        ready.countDown()
+    }
 }
