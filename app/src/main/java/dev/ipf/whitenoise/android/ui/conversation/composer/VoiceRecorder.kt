@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -67,93 +68,95 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
     val lockThresholdPx = with(density) { lockThresholdDp.toPx() }
     val recording = controller.isRecording
     val label = stringResource(if (recording) R.string.voice_recording_stop else R.string.voice_message_record)
-    IconButton(
-        // Accessibility fallback: a tap (TalkBack double-tap, keyboard
-        // Enter, switch access) toggles record-and-lock so users who can't
-        // perform the press-and-hold gesture can still send voice notes.
-        onClick = {
-            if (controller.isRecording) {
-                controller.stop()
-            } else if (controller.start()) {
-                controller.lock()
-            }
-        },
-        modifier =
-            Modifier
-                .width(40.dp)
-                .height(48.dp)
-                .semantics { contentDescription = label }
-                .pointerInput(controller) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val started = controller.start()
-                        if (!started) return@awaitEachGesture
-                        // Consume the down so the FAB's internal clickable
-                        // doesn't ALSO interpret this press as a tap and fire
-                        // its accessibility onClick after our hold gesture
-                        // already handled stop/review/cancel.
-                        down.consume()
-                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        var canceled = false
-                        var locked = false
-                        var terminated = false
-                        try {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id }
-                                if (change == null) {
-                                    // Parent stole the pointer — cancel rather than orphan the recorder.
+    ComposerToolbarTargets {
+        IconButton(
+            // Accessibility fallback: a tap (TalkBack double-tap, keyboard
+            // Enter, switch access) toggles record-and-lock so users who can't
+            // perform the press-and-hold gesture can still send voice notes.
+            onClick = {
+                if (controller.isRecording) {
+                    controller.stop()
+                } else if (controller.start()) {
+                    controller.lock()
+                }
+            },
+            modifier =
+                Modifier
+                    .width(ComposerToolbarSlotWidth)
+                    .height(48.dp)
+                    .semantics { contentDescription = label }
+                    .pointerInput(controller) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val started = controller.start()
+                            if (!started) return@awaitEachGesture
+                            // Consume the down so the FAB's internal clickable
+                            // doesn't ALSO interpret this press as a tap and fire
+                            // its accessibility onClick after our hold gesture
+                            // already handled stop/review/cancel.
+                            down.consume()
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            var canceled = false
+                            var locked = false
+                            var terminated = false
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                    if (change == null) {
+                                        // Parent stole the pointer — cancel rather than orphan the recorder.
+                                        controller.cancel()
+                                        terminated = true
+                                        break
+                                    }
+                                    change.consume()
+                                    val deltaX = change.position.x - down.position.x
+                                    val deltaY = change.position.y - down.position.y
+                                    controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
+                                    if (!locked && -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx) {
+                                        locked = true
+                                        haptics.performHapticFeedback(
+                                            HapticFeedbackType.LongPress,
+                                        )
+                                        controller.lock()
+                                        terminated = true
+                                        return@awaitEachGesture
+                                    }
+                                    if (!canceled && -deltaX > cancelThresholdPx) {
+                                        canceled = true
+                                        haptics.performHapticFeedback(
+                                            HapticFeedbackType.LongPress,
+                                        )
+                                    } else if (canceled && -deltaX <= cancelThresholdPx) {
+                                        canceled = false
+                                    }
+                                    if (change.changedToUp() || !change.pressed) {
+                                        if (canceled) controller.cancel() else controller.stop()
+                                        terminated = true
+                                        break
+                                    }
+                                }
+                            } finally {
+                                // Composable removal / coroutine cancellation while still
+                                // recording-unlocked → cancel cleanly instead of letting
+                                // the recorder tick to the MAX_RECORDING_MS auto-stop.
+                                if (!terminated && controller.isRecording && !controller.locked) {
                                     controller.cancel()
-                                    terminated = true
-                                    break
                                 }
-                                change.consume()
-                                val deltaX = change.position.x - down.position.x
-                                val deltaY = change.position.y - down.position.y
-                                controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
-                                if (!locked && -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx) {
-                                    locked = true
-                                    haptics.performHapticFeedback(
-                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                    )
-                                    controller.lock()
-                                    terminated = true
-                                    return@awaitEachGesture
-                                }
-                                if (!canceled && -deltaX > cancelThresholdPx) {
-                                    canceled = true
-                                    haptics.performHapticFeedback(
-                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                    )
-                                } else if (canceled && -deltaX <= cancelThresholdPx) {
-                                    canceled = false
-                                }
-                                if (change.changedToUp() || !change.pressed) {
-                                    if (canceled) controller.cancel() else controller.stop()
-                                    terminated = true
-                                    break
-                                }
-                            }
-                        } finally {
-                            // Composable removal / coroutine cancellation while still
-                            // recording-unlocked → cancel cleanly instead of letting
-                            // the recorder tick to the MAX_RECORDING_MS auto-stop.
-                            if (!terminated && controller.isRecording && !controller.locked) {
-                                controller.cancel()
                             }
                         }
-                    }
-                },
-    ) {
-        if (recording) {
-            Icon(
-                painter = painterResource(R.drawable.ic_stop),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp),
-            )
-        } else {
-            MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
+        ) {
+            if (recording) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_stop),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

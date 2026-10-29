@@ -67,15 +67,24 @@ class ComposerExpansionTest {
         )
     }
 
-    /** The pill's geometry snaps only for the collapse an accepted send causes; every other change tweens. */
+    /** Accepted send geometry uses the flight duration; ordinary changes retain their own timing. */
     @Test
-    fun onlyTheCollapseAfterAnAcceptedSendSnapsThePillGeometry() {
+    fun acceptedSendCollapseTweensEveryPieceOfPillGeometry() {
         val tweened = composerGeometrySpec<Int>(collapsedBySend = false, durationMillis = 160, easing = LinearEasing)
-        val snapped = composerGeometrySpec<Int>(collapsedBySend = true, durationMillis = 160, easing = LinearEasing)
+        val sendCollapse =
+            composerGeometrySpec<Int>(
+                collapsedBySend = true,
+                animatedSendCollapse = true,
+                durationMillis = 160,
+                easing = LinearEasing,
+            )
 
         assertTrue(tweened is TweenSpec<Int>)
         assertEquals(160, (tweened as TweenSpec<Int>).durationMillis)
+        val snapped = composerGeometrySpec<Int>(collapsedBySend = true, durationMillis = 160, easing = LinearEasing)
         assertTrue(snapped is SnapSpec<Int>)
+        assertTrue(sendCollapse is TweenSpec<Int>)
+        assertEquals(280, (sendCollapse as TweenSpec<Int>).durationMillis)
     }
 
     @Test

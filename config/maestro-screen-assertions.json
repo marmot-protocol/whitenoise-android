@@ -6006,6 +6006,34 @@
       "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+      "symbol": "Overlay",
+      "bindings": [
+        {
+          "case": "presentation-surface-motion-send",
+          "selector": {
+            "id": "conversation.send.motion.active"
+          },
+          "scope": "Tag emitted inside the actual production owner during controlled measured acceptance; mount/dismiss ownership only. No painted-pixel, timing or performance claim."
+        }
+      ],
+      "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+      "symbol": "Modifier.localReactionOverlay",
+      "bindings": [
+        {
+          "case": "presentation-surface-motion-reaction",
+          "selector": {
+            "id": "conversation.reaction.motion.active"
+          },
+          "scope": "Tag emitted inside the actual production owner during controlled measured acceptance; mount/dismiss ownership only. No painted-pixel, timing or performance claim."
+        }
+      ],
+      "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
       "symbol": "AudioTranscriptDialog",
       "bindings": [

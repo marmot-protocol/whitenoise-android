@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -46,8 +48,30 @@ internal class ConversationTailEntrance internal constructor(
     var enteringItemId: String? by mutableStateOf(null)
         internal set
 
+    /** One row claimed by its send flight for this entrance, including early retirement. */
+    internal var claimedEnteringItemId: String? by mutableStateOf(null)
+        private set
+
+    /** Composition owns claims even when the hidden destination skips drawing. */
+    internal fun claimPresentation(presentationId: String?) {
+        if (claimedEnteringItemId != enteringItemId) claimedEnteringItemId = null
+        if (motionEnabled && presentationId != null && presentationId == enteringItemId) {
+            claimedEnteringItemId = presentationId
+        }
+    }
+
     private var startedForItemId: String? = null
     private val shift = Animatable(0f)
+    private var animation: Job? = null
+    var motionEnabled: Boolean = true
+        internal set(value) {
+            field = value
+            if (!value) {
+                animation?.cancel()
+                shiftPx = 0f
+                claimedEnteringItemId = null
+            }
+        }
 
     /** How far below its laid-out slot every row is drawn right now, in pixels. */
     var shiftPx: Float by mutableFloatStateOf(0f)
@@ -58,19 +82,21 @@ internal class ConversationTailEntrance internal constructor(
         itemId: String,
         heightPx: Int,
     ) {
-        if (itemId != enteringItemId || startedForItemId == itemId) return
+        if (!motionEnabled || itemId != enteringItemId || startedForItemId == itemId) return
         startedForItemId = itemId
         // Written during layout and read only while drawing, so the very frame
         // that lays the row out already draws everything shifted, with no jump.
         val startPx = heightPx + rowSpacingPx
         shiftPx = startPx
-        scope.launch {
-            shift.snapTo(startPx)
-            shift.animateTo(0f, tween(CONVERSATION_TAIL_ENTRANCE_MILLIS, easing = FastOutSlowInEasing)) {
-                shiftPx = value
+        animation?.cancel()
+        animation =
+            scope.launch {
+                shift.snapTo(startPx)
+                shift.animateTo(0f, tween(CONVERSATION_TAIL_ENTRANCE_MILLIS, easing = FastOutSlowInEasing)) {
+                    shiftPx = value
+                }
+                shiftPx = 0f
             }
-            shiftPx = 0f
-        }
     }
 }
 
@@ -108,9 +134,12 @@ internal fun rememberConversationTailEntrance(
     followingTail: Boolean,
     initialTimelineAnchored: Boolean,
     rowSpacingPx: Float = with(LocalDensity.current) { CONVERSATION_TIMELINE_ROW_SPACING.toPx() },
+    motionEnabled: Boolean = rememberConversationMotionEnabled(),
+    ownerKey: Any? = null,
 ): ConversationTailEntrance {
     val scope = rememberCoroutineScope()
-    val entrance = remember(scope) { ConversationTailEntrance(scope, rowSpacingPx) }
+    val entrance = remember(scope, ownerKey) { ConversationTailEntrance(scope, rowSpacingPx) }
+    DisposableEffect(entrance) { onDispose { entrance.motionEnabled = false } }
     val candidate =
         latestItemId.takeIf {
             conversationTailEntranceArms(
@@ -121,7 +150,7 @@ internal fun rememberConversationTailEntrance(
                 initialTimelineAnchored = initialTimelineAnchored,
             )
         }
-    var heldItemId by remember { mutableStateOf<String?>(null) }
+    var heldItemId by remember(ownerKey) { mutableStateOf<String?>(null) }
     SideEffect {
         if (candidate != null && heldItemId != candidate) heldItemId = candidate
     }
@@ -130,7 +159,8 @@ internal fun rememberConversationTailEntrance(
         delay(CONVERSATION_TAIL_ENTRANCE_MILLIS + CONVERSATION_TAIL_ENTRANCE_SETTLE_MILLIS)
         heldItemId = null
     }
-    entrance.enteringItemId = candidate ?: heldItemId
+    entrance.motionEnabled = motionEnabled
+    entrance.enteringItemId = (candidate ?: heldItemId).takeIf { motionEnabled }
     return entrance
 }
 
@@ -138,8 +168,23 @@ internal fun rememberConversationTailEntrance(
 internal fun Modifier.conversationTailEntranceMotion(
     entrance: ConversationTailEntrance,
     itemId: String,
+    claimedPresentationId: () -> String? = { null },
 ): Modifier {
-    val shifted = graphicsLayer { translationY = entrance.shiftPx }
+    val shifted =
+        graphicsLayer {
+            val currentClaim = claimedPresentationId()
+            val entering = entrance.enteringItemId
+            // Once visible accepted ink retires, its neighbours must share its final slots too.
+            val claimedEntrance = entering != null && entrance.claimedEnteringItemId == entering
+            val retiredClaim = claimedEntrance && currentClaim != entering
+            val activeEnteringClaim = itemId == entering && claimedEntrance && currentClaim == entering
+            translationY =
+                if (retiredClaim || activeEnteringClaim) {
+                    0f
+                } else {
+                    entrance.shiftPx
+                }
+        }
     return if (entrance.enteringItemId == itemId) {
         // Measured, not size-changed: the row's first measure is the frame that
         // moves everything, and a second pass is harmless once it has started.

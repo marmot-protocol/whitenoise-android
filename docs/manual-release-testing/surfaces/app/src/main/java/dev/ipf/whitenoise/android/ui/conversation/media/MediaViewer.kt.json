@@ -20,7 +20,8 @@
           "MED-015",
           "MED-016",
           "MED-017",
-          "MED-033"
+          "MED-033",
+          "MED-044"
         ]
       },
       {
@@ -30,7 +31,8 @@
         "test_ids": [
           "MED-001",
           "MED-015",
-          "MED-033"
+          "MED-033",
+          "MED-044"
         ]
       },
       {
@@ -40,7 +42,8 @@
         "test_ids": [
           "MED-001",
           "MED-015",
-          "MED-033"
+          "MED-033",
+          "MED-044"
         ]
       },
       {
@@ -64,14 +67,6 @@
       }
     ],
     "source_coverage": [
-      {
-        "surface": "R.string.close",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.close",
-        "test_ids": [
-          "MED-015"
-        ]
-      },
       {
         "surface": "R.string.group_photo_error",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
@@ -166,6 +161,59 @@
         "anchor": "onSetGroupPicture =",
         "test_ids": [
           "GRP-003"
+        ]
+      },
+      {
+        "surface": "Visible thumbnail expansion and selected attachment return continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "fun FullScreenMediaViewer(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Playback source navigation closes the viewer synchronously",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "onSourceDismiss = onDismiss",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Viewer closing disables remaining actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "actionsEnabled: Boolean = true",
+        "test_ids": [
+          "MED-044"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Viewer result media_couldnt_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_couldnt_open",
+        "test_ids": [
+          "MED-001",
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Viewer result media_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_save_failed",
+        "test_ids": [
+          "MED-001",
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Viewer result media_saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_saved",
+        "test_ids": [
+          "MED-001",
+          "MED-044"
         ]
       }
     ]

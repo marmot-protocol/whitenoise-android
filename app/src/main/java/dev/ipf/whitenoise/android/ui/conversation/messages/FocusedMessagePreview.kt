@@ -176,8 +176,8 @@ internal fun FocusedTextMessagePreview(
         senderName?.let { EmojiLabel(it, style = MaterialTheme.typography.labelMedium) }
         BubbleFooterLayout(
             footer = footer,
-            lastLineWidth = lastLineWidth.takeIf { warning == null },
-            lastLineBaseline = lastLineBaseline.takeIf { warning == null },
+            lastLineWidth = { lastLineWidth.takeIf { warning == null } },
+            lastLineBaseline = { lastLineBaseline.takeIf { warning == null } },
         ) {
             Column {
                 MarkdownTimestampText(

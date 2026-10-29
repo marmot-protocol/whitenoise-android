@@ -23,7 +23,10 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "Mounted dictation must dispatch through the ordinary controller path",
             "sendDictationThroughMountedController(liveReply.controller, request)" in body &&
-                "sendConversationText(controller, request.payload, request.onPendingShown)" in mountedControllerBody,
+                Regex(
+                    """sendConversationText\(\s*controller,\s*request.payload,\s*""" +
+                        """onAccepted\s*=\s*request.onPendingShown,?\s*\)""",
+                ).containsMatchIn(mountedControllerBody),
         )
         assertTrue(
             "The ordinary text publisher must record its marmotIo timing section",

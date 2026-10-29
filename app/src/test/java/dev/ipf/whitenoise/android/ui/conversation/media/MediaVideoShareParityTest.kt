@@ -3,16 +3,29 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasStateDescription
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.unit.dp
 import androidx.core.content.IntentCompat
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -37,6 +50,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowView
+import org.robolectric.util.ReflectionHelpers
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
@@ -92,6 +107,182 @@ class MediaVideoShareParityTest {
         assertShareRequest(pagerRequest, targetPage)
         assertSharesheetPayload(fixture.shareContext.choosers.single(), fixture.targetBytes, fixture.neighborBytes)
         assertEquals(directRequest, pagerRequest)
+    }
+
+    /** The real dialog returns from page two toward page two's currently drawn thumbnail. */
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    // Real dialog acquisition, selected-page paint, and matching return share one owned fixture.
+    @Suppress("LongMethod")
+    fun pagedDialogReturnsToItsSelectedThumbnailWithoutAnotherImageRead() {
+        val fixture = fixture()
+        val pages =
+            listOf(imagePage("first-image", 0), imagePage("second-image", 1)).map { page ->
+                page.copy(
+                    reference =
+                        page.reference.copy(
+                            fileName = "${page.messageIdHex}.png",
+                            mediaType = "image/png",
+                            dim = "64x32",
+                        ),
+                )
+            }
+        val registry = MediaViewerThumbnailRegistry()
+        val open = mutableStateOf(false)
+        val selected = mutableStateOf<ConversationMediaViewerAttachmentId?>(null)
+        val reads = java.util.concurrent.CopyOnWriteArrayList<String>()
+        var dismissals = 0
+        val blue = 0xff145bd7.toInt()
+        val red = 0xffd72e14.toInt()
+        val pixels = imageFixturePixels(pages, red, blue)
+        val resolver = context.contentResolver
+        val previousScale =
+            android.provider.Settings.Global
+                .getString(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE)
+        val previousDrawTraversals =
+            ReflectionHelpers.callStaticMethod<Boolean>(ShadowView::class.java, "areRealDrawTraversalsEnabled")
+        // Native PixelCopy uses the supported View.draw adapter without a real device window surface.
+        ShadowView.setUseRealDrawTraversals(false)
+        android.provider.Settings.Global
+            .putFloat(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier
+                            .fillMaxSize(),
+                    ) {
+                        MediaViewerThumbnailHost(registry) {
+                            for ((index, page) in pages.withIndex()) {
+                                androidx.compose.foundation.Canvas(
+                                    androidx.compose.ui.Modifier
+                                        .offset(24.dp, if (index == 0) 150.dp else 600.dp)
+                                        .size(96.dp, 64.dp)
+                                        .mediaViewerThumbnail(page.messageIdHex, page.attachmentIndex, 1uL)
+                                        .testTag("origin.$index")
+                                        .clickable { if (index == 0) open.value = true },
+                                ) {
+                                    drawRect(
+                                        androidx.compose.ui.graphics
+                                            .Color(if (index == 0) red else blue),
+                                    )
+                                }
+                            }
+                        }
+                        if (open.value) {
+                            ConversationMediaViewer(
+                                controller = fixture.controller,
+                                appState = fixture.appState,
+                                conversationVisualPages = pages,
+                                messageIdHex = pages.first().messageIdHex,
+                                attachments = listOf(IndexedValue(0, pages.first().reference)),
+                                tappedAttachmentIndex = 0,
+                                sender = pages.first().sender,
+                                recordedAt = pages.first().recordedAt,
+                                mine = false,
+                                onDismiss = {
+                                    dismissals++
+                                    open.value = false
+                                },
+                                onSelectedAttachmentChange = { selected.value = it },
+                                imageBytes = { page ->
+                                    reads += page.messageIdHex
+                                    pixels.getValue(page.messageIdHex)
+                                },
+                                thumbnails = registry,
+                            )
+                        }
+                    }
+                }
+            }
+            // A real draw makes the owned thumbnail layers eligible; this does not decode or load media.
+            composeRule.onRoot().captureToImage()
+            assertTrue(registry.find(ConversationMediaViewerAttachmentId("first-image", 0)) != null)
+            assertTrue(registry.find(ConversationMediaViewerAttachmentId("second-image", 1)) != null)
+            composeRule.mainClock.autoAdvance = false
+            composeRule.onNodeWithTag("origin.0").performClick()
+            composeRule.submitMediaViewerDialogFrame()
+            composeRule.mainClock.autoAdvance = true
+            composeRule.onNodeWithContentDescription(context.getString(R.string.close)).assertIsDisplayed()
+            val first = context.getString(R.string.media_viewer_page_position, 1, 2)
+            val second = context.getString(R.string.media_viewer_page_position, 2, 2)
+            composeRule.onNode(hasStateDescription(first)).performTouchInput { swipeLeft() }
+            composeRule.waitUntil(5_000) {
+                selected.value == ConversationMediaViewerAttachmentId("second-image", 1) &&
+                    reads.contains("second-image")
+            }
+            composeRule.onNode(hasStateDescription(second)).assertExists()
+            composeRule.waitUntil(5_000) {
+                composeRule.onAllNodesWithContentDescription("second-image.png").fetchSemanticsNodes().any {
+                    it.boundsInRoot.width > 0f && it.boundsInRoot.height > 0f
+                }
+            }
+            composeRule.waitUntil(5_000) {
+                val rendered = composeRule.onNode(isDialog()).captureToImage().toPixelMap()
+                val center = rendered[rendered.width / 2, rendered.height / 2]
+                center.blue > 0.7f && center.red < 0.2f && center.green < 0.5f
+            }
+            val beforeReturn = reads.toList()
+            composeRule.mainClock.autoAdvance = false
+            composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.mainClock.advanceTimeBy(128)
+            assertSelectedBlueReturn(composeRule.onNode(isDialog()).captureToImage())
+            assertEquals("return motion cannot request another image", beforeReturn, reads.toList())
+            composeRule.mainClock.advanceTimeBy(240)
+            composeRule.waitForIdle()
+            assertEquals(1, dismissals)
+            composeRule.onNode(isDialog()).assertDoesNotExist()
+            assertEquals(beforeReturn, reads.toList())
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            ShadowView.setUseRealDrawTraversals(previousDrawTraversals)
+            fixture.controller.onCleared()
+            android.provider.Settings.Global
+                .putString(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, previousScale)
+            resolver.notifyChange(
+                android.provider.Settings.Global
+                    .getUriFor(android.provider.Settings.Global.ANIMATOR_DURATION_SCALE),
+                null,
+            )
+        }
+    }
+
+    private fun imageFixturePixels(
+        pages: List<MediaViewerPage>,
+        red: Int,
+        blue: Int,
+    ): Map<String, ByteArray> =
+        pages.associate { page ->
+            val bitmap = android.graphics.Bitmap.createBitmap(64, 32, android.graphics.Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(if (page === pages.first()) red else blue)
+            val bytes =
+                java.io.ByteArrayOutputStream().use { output ->
+                    check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output))
+                    output.toByteArray()
+                }
+            bitmap.recycle()
+            page.messageIdHex to bytes
+        }
+
+    private fun assertSelectedBlueReturn(image: androidx.compose.ui.graphics.ImageBitmap) {
+        val frame = image.toPixelMap()
+        var top = frame.height
+        var bottom = -1
+        for (y in 0 until frame.height) {
+            for (x in 0 until frame.width) {
+                val color = frame[x, y]
+                if (color.blue > 0.7f && color.red < 0.2f && color.green < 0.5f) {
+                    top = minOf(top, y)
+                    bottom = maxOf(bottom, y)
+                }
+            }
+        }
+        assertTrue("the return must still paint the selected blue source", bottom >= top)
+        assertTrue(
+            "the flight must approach the second thumbnail, not the first or viewer center",
+            (top + bottom) / 2f > frame.height * 0.65f,
+        )
     }
 
     private fun setRouteContent(

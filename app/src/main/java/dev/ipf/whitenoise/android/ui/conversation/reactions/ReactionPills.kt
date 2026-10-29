@@ -70,6 +70,15 @@ internal fun reactionPills(
         )
 }
 
+/** The canonical overflow chip also represents an accepted local emoji beyond the visible four. */
+internal fun ReactionPill.motionEmoji(
+    tallies: List<ReactionTally>,
+    motion: LocalReactionMotion?,
+): String? =
+    emoji ?: motion?.effect?.emoji?.takeIf { accepted ->
+        tallies.drop(MAX_VISIBLE_REACTIONS).any { it.emoji == accepted && it.mine }
+    }
+
 /** Selected pills sit on the primary container; the rest on the high surface container. */
 @Composable
 internal fun reactionPillContainerColor(selected: Boolean): Color {
@@ -87,14 +96,17 @@ internal fun reactionPillBorderColor(selected: Boolean): Color {
 /**
  * The prototype's reaction row under a bubble: 23dp pills, one per emoji, each inside a 48dp touch row.
  * Every tap opens the unfiltered reactor list so the details surface consistently starts on All.
+ * Host clipping is independent of row selection and mutation ownership.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun ReactionPillRow(
     tallies: List<ReactionTally>,
     enabled: Boolean,
     onOpenDetails: (String?) -> Unit,
     modifier: Modifier = Modifier,
+    localMotion: LocalReactionMotion? = null,
+    allowHostClipping: Boolean = false,
 ) {
     val pills = remember(tallies) { reactionPills(tallies) }
     Row(
@@ -103,7 +115,15 @@ internal fun ReactionPillRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         pills.forEachIndexed { index, pill ->
-            ReactionPillItem(pill, index, enabled, onOpenDetails)
+            ReactionPillItem(
+                pill,
+                index,
+                enabled,
+                onOpenDetails,
+                localMotion = localMotion,
+                allowHostClipping = allowHostClipping,
+                motionEmoji = pill.motionEmoji(tallies, localMotion),
+            )
         }
     }
 }
@@ -115,13 +135,22 @@ internal fun ReactionPillFlow(
     tallies: List<ReactionTally>,
     onToggleReaction: ((String) -> Unit)?,
     onOpenDetails: (String?) -> Unit,
+    localMotion: LocalReactionMotion? = null,
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(ReactionPillSpacing, Alignment.CenterHorizontally),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         reactionPills(tallies).forEachIndexed { index, pill ->
-            ReactionPillItem(pill, index, true, onOpenDetails, onToggleReaction)
+            ReactionPillItem(
+                pill,
+                index,
+                true,
+                onOpenDetails,
+                onToggleReaction,
+                localMotion,
+                motionEmoji = pill.motionEmoji(tallies, localMotion),
+            )
         }
     }
 }
@@ -135,6 +164,9 @@ private fun ReactionPillItem(
     enabled: Boolean,
     onOpenDetails: (String?) -> Unit,
     onToggleReaction: ((String) -> Unit)? = null,
+    localMotion: LocalReactionMotion? = null,
+    motionEmoji: String? = pill.emoji,
+    allowHostClipping: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val emoji = pill.emoji
@@ -156,6 +188,7 @@ private fun ReactionPillItem(
             Modifier
                 .heightIn(min = ReactionTouchTargetHeight)
                 .testTag("$REACTION_PILL_TEST_TAG:$index")
+                .localReactionTarget(localMotion, motionEmoji, pill.selected, allowHostClipping)
                 .then(
                     if (enabled) {
                         Modifier.combinedClickable(

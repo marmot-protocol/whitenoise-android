@@ -10,6 +10,24 @@
         "test_ids": [
           "CON-035"
         ]
+      },
+      {
+        "surface": "Compact toolbar target spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+        "anchor": "size = sendingIdentityAvatarSize,",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
+      },
+      {
+        "surface": "ComposerToolbarTargets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+        "anchor": "internal fun ComposerToolbarTargets(",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
       }
     ],
     "string_resources": [

@@ -15,6 +15,8 @@ import android.os.Messenger
 import android.os.Parcel
 import android.os.Process
 import android.os.SharedMemory
+import dev.ipf.whitenoise.android.media.AnimationStartupException
+import dev.ipf.whitenoise.android.media.AnimationTermination
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.CountDownLatch
@@ -28,8 +30,14 @@ internal class IsolatedAnimationSession private constructor(
     private val context: Context,
     private val edge: Int,
     private val admissionLease: AnimationAdmission.Lease,
+    private val inputStaged: () -> Unit = {},
+    private val awaitSignal: (CountDownLatch, Long) -> Boolean = { signal, remaining ->
+        signal.await(remaining, TimeUnit.NANOSECONDS)
+    },
 ) : AnimationSessionControl {
     private val viewerPreemption = MutableStateFlow(false)
+    private val terminalReason = MutableStateFlow<AnimationTermination?>(null)
+    override val termination = terminalReason.asStateFlow()
 
     /** Observers may queue a replacement after viewer takeover, never manufacture worker death. */
     override val preempted = viewerPreemption.asStateFlow()
@@ -44,6 +52,7 @@ internal class IsolatedAnimationSession private constructor(
     private val main = Handler(Looper.getMainLooper())
     private val sources = MediaSourceAccess(context)
     private var bound = false
+    private var bindingAttempted = false
 
     @Volatile private var remote: Messenger? = null
 
@@ -58,6 +67,7 @@ internal class IsolatedAnimationSession private constructor(
     private inner class FrameReceiver : Binder() {
         @Suppress("ReturnCount", "TooGenericExceptionCaught") // Untrusted IPC failures retire only their capability.
         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+            if (code == AnimationFrameProtocol.STATUS_TRANSACTION) return receiveStatus(data, Binder.getCallingUid())
             if (code != IBinder.FIRST_CALL_TRANSACTION || closed || !delivering.compareAndSet(false, true)) return false
             var posted = false
             try {
@@ -80,15 +90,43 @@ internal class IsolatedAnimationSession private constructor(
                 }
                 return true
             } catch (_: Exception) {
-                close()
+                closeWithReason(AnimationTermination.ProtocolRejected)
                 return false
             } catch (_: OutOfMemoryError) {
-                close()
+                closeWithReason(AnimationTermination.OwnerClosed) // Host pixel allocation failure is not worker loss.
                 return false
             } finally {
                 if (!posted) delivering.set(false)
             }
         }
+    }
+
+    /** Rejection authenticates the same session/UID/isolation as frames; it cannot release admission. */
+    private fun receiveStatus(
+        data: Parcel,
+        uid: Int,
+    ): Boolean {
+        val status =
+            try {
+                readAnimationStatus(data)
+            } catch (_: Exception) {
+                return false
+            }
+        val accepted =
+            synchronized(lock) {
+                val owner = !closed && status.session == id
+                val kernelWorker = uid != Process.myUid() && (workerUid == null || workerUid == uid)
+                val isolated = status.isolated && !status.internetGranted && !status.runtimeInitialized
+                if (!owner || !kernelWorker || !isolated) {
+                    false
+                } else {
+                    workerUid = uid
+                    if (terminalReason.value == null) terminalReason.value = AnimationTermination.CodecRejected
+                    true
+                }
+            }
+        if (accepted) closeWithReason(AnimationTermination.CodecRejected)
+        return accepted
     }
 
     private data class Delivery(
@@ -171,52 +209,91 @@ internal class IsolatedAnimationSession private constructor(
 
             override fun onNullBinding(name: ComponentName) {
                 // A null binding cannot have received OPEN or any source capability.
+                // A null callback proves no OPEN reached this binding. It also completes cancellation cleanup.
+                closeWithReason(AnimationTermination.TransportUnavailable)
                 releaseLease()
-                close()
+                retireAndUnbind()
             }
         }
 
-    /** Stages source IO outside the capability lock and returns no drawable when startup is retired. */
+    /** Stages only while the original admission budget and capability are both current. */
     private fun open(bytes: ByteArray): IsolatedAnimationDrawable? {
-        synchronized(lock) {
-            if (closed) {
-                releaseLease() // No binding was started.
-                return null
-            }
-            bound =
-                context.bindIsolatedService(
-                    Intent(context, MediaAnimationService::class.java),
-                    Context.BIND_AUTO_CREATE,
-                    workerInstanceName("animation", id),
-                    { command -> callbackHandler.post(command) },
-                    connection,
-                )
+        val acceptedBinding = bindWorker()
+        if (closed) retireAndUnbind()
+        val available = acceptedBinding && awaitStartup(connected) && startupAvailable()
+        if (!available) {
+            closeWithReason(AnimationTermination.TransportUnavailable)
+            if (!acceptedBinding) releaseLease() // Immutable platform refusal, never mutable unbound state.
+            return null
         }
-        val available =
-            if (bound) {
-                connected.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS) && !closed
+        val sent = stageAndOpen(bytes)
+        val received = sent && awaitStartup(firstFrame) && startupAvailable()
+        if (sent && !received) closeWithReason(AnimationTermination.TransportUnavailable)
+        return synchronized(lock) {
+            if (closed || !received) {
+                null
             } else {
-                releaseLease()
-                false
-            }
-        return if (available) {
-            val sent = sources.withInput(bytes, ::sendOpen) == true
-            val received = sent && firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
-            synchronized(lock) {
-                if (closed || !received) {
-                    null
-                } else {
-                    firstPixels?.let { pixels ->
-                        IsolatedAnimationDrawable(pixels, this).also {
-                            drawable = it
-                            firstPixels = null
-                        }
+                firstPixels?.let { pixels ->
+                    IsolatedAnimationDrawable(pixels, this).also {
+                        drawable = it
+                        firstPixels = null
                     }
                 }
             }
-        } else {
-            null
         }
+    }
+
+    private fun bindWorker(): Boolean =
+        synchronized(lock) {
+            if (closed || !startupAvailable()) return@synchronized false
+            bindingAttempted = true
+            val accepted =
+                try {
+                    context.bindIsolatedService(
+                        Intent(context, MediaAnimationService::class.java),
+                        Context.BIND_AUTO_CREATE,
+                        workerInstanceName("animation", id),
+                        { command -> callbackHandler.post(command) },
+                        connection,
+                    )
+                } catch (refused: SecurityException) {
+                    releaseLease() // Platform rejected the binding before accepting a capability.
+                    throw refused
+                } catch (refused: IllegalArgumentException) {
+                    releaseLease()
+                    throw refused
+                }
+            bound = accepted
+            accepted
+        }
+
+    private fun stageAndOpen(bytes: ByteArray): Boolean =
+        try {
+            if (!startupAvailable()) {
+                false
+            } else {
+                sources.withInput(bytes) { input ->
+                    inputStaged()
+                    sendOpen(input)
+                } == true
+            }
+        } catch (_: android.os.RemoteException) {
+            closeWithReason(AnimationTermination.TransportUnavailable)
+            false
+        }
+
+    /** Expiry retires a bound capability but never fabricates process death. */
+    private fun startupAvailable(): Boolean {
+        if (closed) return false
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("animation owner cancelled")
+        val available = admissionLease.remainingNanos() != 0L
+        if (!available) closeWithReason(AnimationTermination.TransportUnavailable)
+        return available
+    }
+
+    private fun awaitStartup(signal: CountDownLatch): Boolean {
+        if (!startupAvailable()) return false
+        return awaitSignal(signal, admissionLease.remainingNanos())
     }
 
     /**
@@ -225,8 +302,9 @@ internal class IsolatedAnimationSession private constructor(
      */
     private fun sendOpen(input: android.os.ParcelFileDescriptor): Boolean =
         synchronized(lock) {
+            if (!startupAvailable()) return@synchronized false
             val target = remote?.takeUnless { closed } ?: return@synchronized false
-            target.send(
+            val message =
                 Message.obtain().apply {
                     what = AnimationFrameProtocol.OPEN
                     arg1 = id
@@ -241,8 +319,9 @@ internal class IsolatedAnimationSession private constructor(
                                 if (canary.isFile) putString("canaryPath", canary.absolutePath)
                             }
                         }
-                },
-            )
+                }
+            if (!startupAvailable()) return@synchronized false
+            target.send(message)
             true
         }
 
@@ -266,7 +345,7 @@ internal class IsolatedAnimationSession private constructor(
                 },
             )
         } catch (_: android.os.RemoteException) {
-            close()
+            closeWithReason(AnimationTermination.TransportUnavailable)
         }
     }
 
@@ -295,8 +374,9 @@ internal class IsolatedAnimationSession private constructor(
     }
 
     private fun workerDied() {
+        closeWithReason(AnimationTermination.WorkerLostUnknown)
         releaseLease() // Only system/Binder-confirmed death reopens process admission.
-        close()
+        retireAndUnbind() // A dead Binder may never have been assigned to remote.
         main.post { drawable?.stop() }
     }
 
@@ -304,7 +384,7 @@ internal class IsolatedAnimationSession private constructor(
         if (remote?.binder?.isBinderAlive == false) {
             workerDied()
         } else {
-            close() // Unbinding/connection loss alone is not proof of native process death.
+            closeWithReason(AnimationTermination.TransportUnavailable) // Connection loss is not proof of death.
         }
     }
 
@@ -324,8 +404,11 @@ internal class IsolatedAnimationSession private constructor(
         }
     }
 
-    override fun close() {
+    override fun close() = closeWithReason(AnimationTermination.OwnerClosed)
+
+    private fun closeWithReason(reason: AnimationTermination) {
         synchronized(lock) {
+            if (terminalReason.value == null) terminalReason.value = reason
             if (closed) return
             closed = true
             firstPixels?.recycle()
@@ -343,7 +426,7 @@ internal class IsolatedAnimationSession private constructor(
 
     /** Retires this decorative session before allowing its still-visible owner to queue again. */
     private fun yieldToViewer() {
-        close()
+        closeWithReason(AnimationTermination.Preempted)
         viewerPreemption.value = true
     }
 
@@ -355,19 +438,53 @@ internal class IsolatedAnimationSession private constructor(
                 .AtomicReference<IsolatedAnimationSession?>()
         private val callbackHandler by lazy { Handler(HandlerThread("animation-ipc").apply { start() }.looper) }
 
-        /** Opens one admitted worker; waiting group thumbnails remain cancellable before any binding. */
+        /** Ordinary animation callers retain the existing nullable startup contract. */
         fun create(
             context: Context,
             bytes: ByteArray,
             edge: Int,
             decorative: Boolean = false,
             waitForDecorativeAdmission: Boolean = false,
+        ): IsolatedAnimationDrawable? =
+            if (decorative && waitForDecorativeAdmission) {
+                createGroup(context, bytes, edge, null)
+            } else {
+                createAdmitted(context, bytes, edge, decorative, null)
+            }
+
+        /** Only the existing group seam carries a persistent pending ticket. */
+        fun createGroup(
+            context: Context,
+            bytes: ByteArray,
+            edge: Int,
+            demand: AnimationAdmission.GroupDemand?,
         ): IsolatedAnimationDrawable? {
-            val validSource =
+            if (!validSource(bytes, edge)) return null
+            val ownedDemand = if (demand == null) admission.groupDemand() else null
+            return try {
+                createAdmitted(context, bytes, edge, true, demand ?: ownedDemand)
+            } finally {
+                ownedDemand?.close()
+            }
+        }
+
+        private fun validSource(
+            bytes: ByteArray,
+            edge: Int,
+        ): Boolean =
+            Looper.myLooper() != Looper.getMainLooper() &&
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
-                    edge in 1..AnimationFrameProtocol.MAX_EDGE
-            if (Looper.myLooper() == Looper.getMainLooper() || !validSource) return null
-            return admission.decode(decorative, waitForDecorativeAdmission, MediaDecodePolicy.DEADLINE_MS) { lease ->
+                edge in 1..AnimationFrameProtocol.MAX_EDGE
+
+        private fun createAdmitted(
+            context: Context,
+            bytes: ByteArray,
+            edge: Int,
+            decorative: Boolean,
+            demand: AnimationAdmission.GroupDemand?,
+        ): IsolatedAnimationDrawable? {
+            if (!validSource(bytes, edge)) return null
+            return admission.decode(decorative, demand != null, MediaDecodePolicy.DEADLINE_MS, demand) { lease ->
                 openAdmitted(context, bytes, edge, lease)
             }
         }
@@ -386,11 +503,27 @@ internal class IsolatedAnimationSession private constructor(
                 session = created
                 active.set(created)
                 admissionLease.onRetire { created.yieldToViewer() }
-                created.open(bytes).also { delivered = it }
+                created.open(bytes).also {
+                    delivered = it
+                    if (it == null) {
+                        when (val reason = created.terminalReason.value) {
+                            AnimationTermination.TransportUnavailable, AnimationTermination.WorkerLostUnknown ->
+                                throw AnimationStartupException(reason)
+                            else -> Unit
+                        }
+                    }
+                }
             } finally {
                 // The facade handles failure/cancellation; this scope only owns cleanup.
                 if (delivered == null) {
-                    if (session == null) admissionLease.release() else session.close()
+                    if (session == null) {
+                        admissionLease.release()
+                    } else {
+                        session.close()
+                        synchronized(session.lock) {
+                            if (!session.bindingAttempted) session.releaseLease() // Cancelled before bind.
+                        }
+                    }
                 }
             }
         }
@@ -402,6 +535,8 @@ internal class IsolatedAnimationSession private constructor(
             lease.release() // This fixture lease never started a binding or received source bytes.
             return true
         }
+
+        fun groupDemand(): AnimationAdmission.GroupDemand = admission.groupDemand()
 
         fun retireActive() {
             active.get()?.close()

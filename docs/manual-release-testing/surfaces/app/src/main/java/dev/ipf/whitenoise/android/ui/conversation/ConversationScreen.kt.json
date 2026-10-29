@@ -57,6 +57,14 @@
         ]
       },
       {
+        "surface": "Logical destination navigation motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "val detailsRouteMotion =",
+        "test_ids": [
+          "CON-037"
+        ]
+      },
+      {
         "surface": "Foreground voice recording ownership and automatic-stop notices",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "VoiceRecordingLifecycleEffect(voiceRecordingController)",
@@ -283,6 +291,14 @@
         "anchor": "composerAutoFocusConsumed.value = true",
         "test_ids": [
           "CON-013"
+        ]
+      },
+      {
+        "surface": "Media source uses the current clear reading viewport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "readingViewport = { timelineViewport.readingBoundsInWindow }",
+        "test_ids": [
+          "MED-044"
         ]
       }
     ]

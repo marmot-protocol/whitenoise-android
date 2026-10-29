@@ -59,6 +59,9 @@ class ComposerDraftTopSettlementTest {
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        val target = composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals("draft navigation retains the compact target width", 40f, target.width, 1f)
+        assertEquals("draft navigation retains the toolbar height", 48f, target.height, 1f)
         assertEquals("the animation must not send", 0, sends)
     }
 

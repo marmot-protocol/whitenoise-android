@@ -30,6 +30,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerO
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
+import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionMotionRow
+import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactionMotion
+import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import java.util.Locale
 
 /** Renders one projected timeline item and delegates bubble gestures to the conversation owner. */
@@ -84,9 +88,11 @@ internal fun TimelineRow(
     // Reveals a send accepted from a long message's Read more reader (#3268).
     onReaderSendAccepted: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
+    reactionViewport: () -> Rect? = { null },
     modifier: Modifier = Modifier,
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
-    Column(modifier.fillMaxWidth()) {
+    val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)
+    ReactionMotionRow(reactionMotion, modifier, reactionViewport) {
         val daySeparatorLabel =
             remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
                 if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
@@ -281,4 +287,57 @@ internal fun TimelineRow(
             }
         }
     }
+}
+
+/** Decorative ownership follows the same current targets as the row's existing action dispatch. */
+@Composable
+private fun rememberTimelineReactionMotion(
+    item: TimelineMessage,
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    gate: ComposerGate,
+    selectionMode: Boolean,
+): LocalReactionMotion {
+    val runtime = remember(controller) { appState.runtimeGeneration }
+    val targetAvailable =
+        when {
+            MessageProjector.isGroupSystem(item.record) ->
+                currentGroupSystemReactionTarget(
+                    controller,
+                    GroupSystemReactionOwner(
+                        controller.boundAccountRef,
+                        item.record.groupIdHex,
+                        item.record.messageIdHex,
+                    ),
+                ) != null
+            MessageProjector.isPollKind(item.record.kind) ->
+                currentPollActionTarget(
+                    controller,
+                    PollMessageActionOwner(
+                        controller.boundAccountRef,
+                        item.record.groupIdHex,
+                        item.record.messageIdHex,
+                    ),
+                ) != null
+            else ->
+                item.projected?.deleted != true &&
+                    item.projected?.invalidationStatus == null &&
+                    !MessageProjector.isDeleted(item.record.messageIdHex, controller.deletedMessageIds)
+        }
+    val currentOwner =
+        !appState.appLockScreenVisible &&
+            controller.isCurrentGroupMutationOwner(appState, runtime) &&
+            controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
+    val readOnly =
+        if (MessageProjector.isGroupSystem(item.record)) {
+            gate != ComposerGate.COMPOSER
+        } else {
+            controller.group.pendingConfirmation
+        }
+    val canReact = !readOnly && !selectionMode
+    val available = targetAvailable && canReact && currentOwner
+    return rememberLocalReactionMotion(
+        controller to item.presentationId,
+        enabled = rememberConversationMotionEnabled() && available,
+    )
 }

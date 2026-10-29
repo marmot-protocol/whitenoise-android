@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Bounded static press, focus and hover feedback with interaction cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
+        "anchor": "private class MediaPressNode(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MED-015",
+          "MED-044"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "rememberMediaPressIndication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
+        "anchor": "fun rememberMediaPressIndication(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "MediaViewerCloseButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
+        "anchor": "fun MediaViewerCloseButton(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "rememberMediaViewerPressIndication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPressIndication.kt",
+        "anchor": "fun rememberMediaViewerPressIndication(",
+        "test_ids": [
+          "MED-044"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

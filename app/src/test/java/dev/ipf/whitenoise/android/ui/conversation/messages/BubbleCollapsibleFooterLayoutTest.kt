@@ -257,7 +257,7 @@ class BubbleCollapsibleFooterLayoutTest {
                         Modifier
                             .width(140.dp)
                             .onSizeChanged { layoutHeight = it.height },
-                    lastLineWidth = with(composeRule.density) { 16.dp.roundToPx() },
+                    lastLineWidth = { with(composeRule.density) { 16.dp.roundToPx() } },
                 ) {
                     Spacer(
                         Modifier

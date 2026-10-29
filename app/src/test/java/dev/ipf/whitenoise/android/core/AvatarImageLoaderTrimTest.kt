@@ -115,6 +115,37 @@ class AvatarImageLoaderTrimTest {
         }
     }
 
+    /** Pressure eviction removes classification with its pixels without waking active avatar owners. */
+    @Test
+    fun trimKeepsClassificationOnlyForRetainedFramesWithoutPublication() {
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).asImageBitmap()
+        val bytes = bitmap.asAndroidBitmap().byteCount
+        val cache = PartitionedProfileImageCache(bytes * 4, bytes * 4)
+        val banner = profileImageCacheKey("banner", ProfileImageVariant.BANNER, 512)
+        repeat(4) { index ->
+            val key = "avatar-$index"
+            cache.put(key, bitmap)
+            cache.classifyAnimation(key, index % 2 == 0)
+        }
+        cache.put(banner, bitmap)
+        cache.classifyAnimation(banner, true)
+        val revision = AvatarCacheChanges.revision.value
+
+        cache.trimMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.WARM)
+
+        assertSame(revision, AvatarCacheChanges.revision.value)
+        assertNull(cache.isAnimated("avatar-0"))
+        assertNull(cache.isAnimated("avatar-1"))
+        assertEquals(true, cache.isAnimated("avatar-2"))
+        assertEquals(false, cache.isAnimated("avatar-3"))
+        assertEquals(true, cache.isAnimated(banner))
+        cache.trimMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+        assertNull(cache.isAnimated("avatar-2"))
+        assertNull(cache.isAnimated(banner))
+        assertSame(revision, AvatarCacheChanges.revision.value)
+        org.junit.Assert.assertFalse(bitmap.asAndroidBitmap().isRecycled)
+    }
+
     private companion object {
         const val ONE_PIXEL_PNG_BASE64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="

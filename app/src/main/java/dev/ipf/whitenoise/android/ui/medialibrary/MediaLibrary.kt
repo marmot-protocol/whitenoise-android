@@ -93,6 +93,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailur
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberAttachmentOpener
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChromeIconProvider
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
@@ -518,6 +519,7 @@ private fun MediaLibraryContent(
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
     val viewerSelection = remember { SharedMediaViewerSelection() }
+    val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
     val forwardActions = rememberMediaViewerForwardActions(controller, appState)
     val viewerStart = viewerSelection.source
     val visualTiles = tiles.visualsFor(filter)
@@ -533,6 +535,7 @@ private fun MediaLibraryContent(
             pages = viewerPages,
             startIndex = viewerIndex,
             onDismiss = viewerSelection::clear,
+            icons = viewerChromeIcons.value,
             forwardActions = forwardActions,
             onGoToMessage = { page ->
                 viewerSelection.clear()

@@ -36,6 +36,7 @@ data class ChatListAvatarSeed(
     val accountRef: String? = null,
     // staleness-exempt: captured loader lifetime, not an independent counter owner.
     val cacheLifetime: Long? = null,
+    val animationClassification: Boolean? = null,
 )
 
 /** A peer projection stands for a two-person conversation. */

@@ -2,6 +2,8 @@
   "schema": 1,
   "coverage": "Partial assertions only; permanent manual checklist remains unchecked.",
   "cases": {
+    "presentation-surface-motion-send": {"suite": "presentation", "manual_ids": ["MSG-042"], "assertions": "Controlled measured production send acceptance exposes its actual active overlay owner, then dismisses. Owner presence/lifetime only; painted pixels, motion timing, native delivery and physical performance remain separate.", "postcondition": "presentation-checked", "presentation": "surface-motion-send", "presentation_actions": ["motion-started", "dismiss"], "layer": "production-presentation-ui"},
+    "presentation-surface-motion-reaction": {"suite": "presentation", "manual_ids": ["MSG-041"], "assertions": "Controlled measured production reaction acceptance exposes its actual active overlay owner, then dismisses. Owner presence/lifetime only; painted pixels, motion timing, native delivery and physical performance remain separate.", "postcondition": "presentation-checked", "presentation": "surface-motion-reaction", "presentation_actions": ["motion-started", "dismiss"], "layer": "production-presentation-ui"},
     "settings-appearance": {
       "suite": "settings",
       "manual_ids": [

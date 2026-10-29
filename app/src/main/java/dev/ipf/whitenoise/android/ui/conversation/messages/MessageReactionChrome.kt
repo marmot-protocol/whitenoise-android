@@ -90,12 +90,14 @@ internal fun RowScope.MessageSenderAvatarSlot(
 
 /** Reaction summary chips under a bubble. */
 @Composable
+@Suppress("LongParameterList")
 internal fun ColumnScope.MessageReactionSummary(
     tallies: List<ReactionTally>,
     mine: Boolean,
     visibilityState: MutableTransitionState<Boolean>? = null,
     enabled: Boolean = true,
     onClick: (String?) -> Unit,
+    localMotion: dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion? = null,
 ) {
     val reactionChipPadding = reactionChipPadding(mine)
     val targetVisible = tallies.isNotEmpty()
@@ -150,6 +152,8 @@ internal fun ColumnScope.MessageReactionSummary(
                 enabled = enabled,
                 onOpenDetails = onClick,
                 modifier = hostGraphicsModifier,
+                localMotion = localMotion,
+                allowHostClipping = hostAnimating,
             )
         }
     }

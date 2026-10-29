@@ -10,17 +10,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
@@ -29,18 +32,27 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.testGroupMutationResult
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundState
+import dev.ipf.whitenoise.android.ui.share.chatRow
+import dev.ipf.whitenoise.android.ui.share.member
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -53,6 +65,9 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import java.lang.reflect.Proxy
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.coroutines.Continuation
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -95,13 +110,13 @@ class ProfileAddToGroupsFlowTest {
         composeRule
             .onNodeWithText(app.getString(R.string.person_groups_in_common))
             .performScrollTo()
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick) { it() }
         finishContentTransition()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_empty_shared_groups.png")
         composeRule
             .onNodeWithText(app.getString(R.string.person_add_to_group))
             .assertIsDisplayed()
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick) { it() }
         finishContentTransition()
         composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
     }
@@ -433,8 +448,112 @@ class ProfileAddToGroupsFlowTest {
         composeRule.onNodeWithTag("profile.add_groups.action").assertIsDisplayed()
     }
 
-    private fun renderProfile() {
-        val appState = testAppState()
+    /** Both dismissal controls return the nested picker to its captured Groups parent. */
+    @Test
+    fun nestedPickerBackAndCloseReturnToGroups() {
+        renderProfile()
+        val host = latestComponentDialog()
+        openNestedPicker()
+        composeRule.runOnUiThread { host.onBackPressedDispatcher.onBackPressed() }
+        finishContentTransition()
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertDoesNotExist()
+        assertSame(host, latestComponentDialog())
+
+        composeRule.onNodeWithText(app.getString(R.string.person_add_to_group)).performClick()
+        finishContentTransition()
+        composeRule.onNodeWithText(app.getString(R.string.close)).performClick()
+        finishContentTransition()
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertDoesNotExist()
+        assertSame(host, latestComponentDialog())
+    }
+
+    /** Native invite acceptance uses the same parent return as Back, without setting route state in the test. */
+    @Test
+    @Suppress("LongMethod") // One isolated native invite fixture and its real nested modal completion.
+    fun acceptedNestedInviteReturnsToGroups() {
+        val group = groupItem(ConversationTimelineTestIds.GROUP_ID, "Invite destination").group
+        val fixture =
+            NestedInviteRuntimeFixture(
+                group,
+                ACTIVE_ACCOUNT_REF,
+                ACTIVE_ACCOUNT_HEX,
+                TARGET_HEX,
+                THIRD_ACCOUNT_HEX,
+                TARGET_NPROFILE,
+            )
+        val invited = fixture.invited
+        val unexpected = fixture.unexpected
+        val runtime = fixture.runtime
+        val state =
+            WhiteNoiseAppState(
+                context = app,
+                draftStore = DraftStore(EmptyDraftPersistence()),
+                accountIdHexResolver = { ref -> if (ref == TARGET_NPROFILE) TARGET_HEX else null },
+                accounts = listOf(activeAccount()),
+                activeAccountRef = ACTIVE_ACCOUNT_REF,
+                initialMarmotRuntime = AppMarmotRuntime("profile-parent-test", runtime),
+                profileReader = { null },
+            )
+        state.liveSubscriptionOverrides.chatList =
+            dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> error("No live window in retained-profile fixture") },
+                openChats = { _, _ -> error("No live feed in retained-profile fixture") },
+                presentedChatList = { _, _ -> emptyList() },
+            )
+        val chats = ChatsController(state, ACTIVE_ACCOUNT_REF) { _, _ -> emptyList() }
+        try {
+            state.attachChatsController(chats)
+            chats.setChatListVisible(false)
+            chats.applyChatListRow(
+                chatRow(group.groupIdHex).copy(
+                    title = group.name,
+                    groupName = group.name,
+                    conversationKind = ChatConversationKindFfi.GROUP,
+                ),
+            )
+            chats.applyLocalGroupDetails(
+                group,
+                listOf(member(ACTIVE_ACCOUNT_HEX, true), member(THIRD_ACCOUNT_HEX, false)),
+            )
+            renderProfile(state)
+            openNestedPicker()
+            composeRule.onNodeWithText(group.name).performClick()
+            composeRule.onNodeWithTag("profile.add_groups.action").performClick()
+            composeRule.onNodeWithTag("selected_members_confirm").performClick()
+            composeRule.waitUntil(5_000) {
+                assertEquals(
+                    "Every native method must have an explicit fixture",
+                    emptyList<String>(),
+                    unexpected.toList(),
+                )
+                invited.size == 1
+            }
+            composeRule.waitUntil(5_000) {
+                composeRule.onAllNodesWithTag("groups_in_common.list").fetchSemanticsNodes().size == 1
+            }
+            assertEquals(listOf(group.groupIdHex), invited.toList())
+            assertEquals("Every native method must have an explicit fixture", emptyList<String>(), unexpected.toList())
+            composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertDoesNotExist()
+        } finally {
+            composeRule.runOnIdle {
+                state.attachChatsController(null)
+                chats.onCleared()
+            }
+        }
+    }
+
+    /** Opens both production route callbacks; no test-only page setter participates. */
+    private fun openNestedPicker() {
+        composeRule.onNodeWithText(app.getString(R.string.person_groups_in_common)).performScrollTo().performClick()
+        finishContentTransition()
+        composeRule.onNodeWithText(app.getString(R.string.person_add_to_group)).performClick()
+        finishContentTransition()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
+    }
+
+    private fun renderProfile(appState: WhiteNoiseAppState = testAppState()) {
         appState.presentProfile(TARGET_NPROFILE)
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -550,11 +669,141 @@ class ProfileAddToGroupsFlowTest {
     }
 
     private companion object {
+        val THIRD_ACCOUNT_HEX = "c".repeat(64)
         const val ACTIVE_ACCOUNT_REF = "active"
         const val ACTIVE_ACCOUNT_HEX =
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         const val TARGET_HEX =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val TARGET_NPROFILE = "nprofile-test-alice"
+    }
+}
+
+/** Read-only identities and authoritative roster belong to this one native-invite fixture. */
+private class NestedInviteRuntimeFixture(
+    private val group: AppGroupRecordFfi,
+    private val selfRef: String,
+    private val selfHex: String,
+    private val targetHex: String,
+    private val thirdHex: String,
+    targetProfile: String,
+) {
+    val invited = CopyOnWriteArrayList<String>()
+    val unexpected = CopyOnWriteArrayList<String>()
+    private val npubs =
+        mapOf(
+            targetHex to "npub1424242424242424242424242424242424242424242424242424qamrcaj",
+            selfHex to "npub1hwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwasxw04hu",
+            thirdHex to "npub1enxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxqn2pktz",
+        )
+    private val references =
+        npubs.keys.associateWith { it } + npubs.entries.associate { it.value to it.key } +
+            mapOf(selfRef to selfHex, targetProfile to targetHex)
+    private val names = mapOf(selfHex to "Local profile", targetHex to "Alice", thirdHex to "Other member")
+    val runtime =
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { _, method, arguments ->
+            val name = method.name.substringBefore('-')
+            val args = fixtureArguments(name, method.parameterTypes, arguments.orEmpty().toList())
+            when (name) {
+                "recordHostTiming", "recordHostPerformance" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "accountIdHex" -> readIdentity(name, args)
+                "npub" -> npubs.getValue(readIdentity(name, args))
+                "displayName" -> names.getValue(readIdentity(name, args))
+                "isUserBlocked", "isFollowing" -> relationship(name, args)
+                "groupCommitDelivery" -> {
+                    expect(name, args, listOf(selfRef, group.groupIdHex))
+                    null
+                }
+                "groupConversationSnapshot" -> snapshot(name, args)
+                "inviteMembersDetailed" -> invite(name, args)
+                else -> reject("Unexpected native method $name")
+            }
+        } as MarmotInterface
+
+    /** Java proxies receive the compiler's continuation after the native command arguments. */
+    private fun fixtureArguments(
+        name: String,
+        parameterTypes: Array<Class<*>>,
+        arguments: List<Any?>,
+    ): List<Any?> {
+        val semanticTypes =
+            when (name) {
+                "inviteMembersDetailed" -> listOf(String::class.java, String::class.java, List::class.java)
+                "groupCommitDelivery", "groupConversationSnapshot" -> listOf(String::class.java, String::class.java)
+                else -> return arguments
+            }
+        val expectedTypes = semanticTypes + Continuation::class.java
+        if (parameterTypes.toList() != expectedTypes ||
+            arguments.size != expectedTypes.size ||
+            arguments.lastOrNull() !is Continuation<*>
+        ) {
+            reject("Unexpected suspend bridge for $name")
+        }
+        return arguments.dropLast(1)
+    }
+
+    private fun readIdentity(
+        name: String,
+        args: List<Any?>,
+    ): String {
+        if (args.size != 1) reject("Unexpected $name arguments: $args")
+        return identity(args[0])
+    }
+
+    private fun identity(value: Any?): String {
+        val ref = value as? String ?: reject("Unexpected identity $value")
+        return references[ref] ?: reject("Unexpected identity $value")
+    }
+
+    private fun relationship(
+        name: String,
+        args: List<Any?>,
+    ): Boolean {
+        expect(name, args.take(1), listOf(selfRef))
+        if (args.size != 2 || identity(args[1]) != targetHex) reject("Unexpected $name arguments: $args")
+        return false
+    }
+
+    private fun snapshot(
+        name: String,
+        args: List<Any?>,
+    ): dev.ipf.marmotkit.GroupConversationSnapshotFfi {
+        expect(name, args, listOf(selfRef, group.groupIdHex))
+        val members = if (invited.isEmpty()) listOf(selfHex, thirdHex) else listOf(selfHex, targetHex, thirdHex)
+        val result = mutation(members)
+        return dev.ipf.marmotkit.GroupConversationSnapshotFfi(result.details, result.managementState)
+    }
+
+    private fun invite(
+        name: String,
+        args: List<Any?>,
+    ): dev.ipf.marmotkit.GroupMutationResultFfi {
+        expect(name, args, listOf(selfRef, group.groupIdHex, listOf(targetHex)))
+        invited += group.groupIdHex
+        return mutation(listOf(selfHex, targetHex, thirdHex))
+    }
+
+    private fun mutation(members: List<String>) =
+        testGroupMutationResult(
+            members,
+            listOf(selfHex),
+            self = selfHex,
+            selfRef = selfRef,
+        ).let { it.copy(details = it.details.copy(group = group)) }
+
+    private fun expect(
+        name: String,
+        actual: List<Any?>,
+        expected: List<Any?>,
+    ) {
+        if (actual != expected) reject("Unexpected $name arguments: $actual")
+    }
+
+    private fun reject(message: String): Nothing {
+        unexpected += message
+        error(message)
     }
 }

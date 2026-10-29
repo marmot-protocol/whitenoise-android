@@ -21,8 +21,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -125,7 +129,8 @@ internal fun Avatar(
                 IdentityFormatter.initials(title),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium,
+                style =
+                    avatarMonogramStyle(MaterialTheme.typography.titleMedium, fittedFontSize),
                 fontSize = fittedFontSize,
                 maxLines = 1,
             )
@@ -150,6 +155,17 @@ private fun AvatarAnimationLayers(
         AnimatedProfileAvatarOverlay(animatedKey, image, Modifier.fillMaxSize(), maxEdgePx)
     }
 }
+
+private fun avatarMonogramStyle(
+    base: TextStyle,
+    fontSize: TextUnit,
+): TextStyle =
+    base.copy(
+        lineHeight = fontSize,
+        letterSpacing = 0.sp,
+        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+    )
 
 private const val MONOGRAM_DIAMETER_RATIO = 0.48f
 
