@@ -49,16 +49,28 @@ internal object ThroughputVariants {
                     it.admissionObserver = observer
                     ThroughputLane(variant, binding, it, it)
                 }
-            // The pre-#3373 qualification candidate: one cold binding generation per input.
-            "per_input" ->
-                IsolatedMediaTransport(binding, "tp_fresh").let {
-                    it.admissionObserver = observer
-                    ThroughputLane(variant, binding, it, it)
-                }
+            // One cold binding generation per input, with no pre-warmed spare.
+            "per_input" -> fresh(variant, binding, observer, spares = 0)
+            // The production default: one clean spare warmed while the current input is served.
+            "prewarm1" -> fresh(variant, binding, observer, spares = 1)
+            // The pool's upper bound: two clean spares.
+            "prewarm2" -> fresh(variant, binding, observer, spares = 2)
             else -> error("Unknown throughput variant $variant")
         }
     }
 }
+
+/** A per-input lane with [spares] clean spares, observed through the shared admission observer. */
+private fun fresh(
+    variant: String,
+    binding: MediaWorkerBaselineBinding,
+    observer: MediaAdmissionObserver,
+    spares: Int,
+): ThroughputLane =
+    IsolatedMediaTransport(binding, "tp_$variant", spares).let {
+        it.admissionObserver = observer
+        ThroughputLane(variant, binding, it, it)
+    }
 
 /** Synthetic, account-free inputs, distinct bytes per request so no cache can answer. */
 internal class ThroughputCorpus private constructor(

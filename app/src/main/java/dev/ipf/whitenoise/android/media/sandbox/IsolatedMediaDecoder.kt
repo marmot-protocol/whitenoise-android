@@ -32,34 +32,15 @@ internal object IsolatedMediaDecoder {
             )
     }
 
+    /** Installs the per-input image lane, one process-owned owner keeps every death witness across resets. */
     @Synchronized
-    fun install(context: Context) = installSelected(context, lifetimeQualification = false)
-
-    /** Explicit debug qualification only; normal installation keeps the existing reusable worker. */
-    @Synchronized
-    internal fun installForLifetimeQualification(context: Context) {
-        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
-        installSelected(context, lifetimeQualification = true)
-    }
-
-    private fun installSelected(
-        context: Context,
-        lifetimeQualification: Boolean,
-    ) {
+    fun install(context: Context) {
         if (!Process.isIsolated()) {
             clear()
             installedContext = context.applicationContext
-            transport =
-                if (lifetimeQualification) {
-                    val owner =
-                        imageOwner ?: IsolatedMediaTransport(context.applicationContext, "lifetime_images").also {
-                            imageOwner = it
-                        }
-                    owner.activateSession()
-                    owner
-                } else {
-                    ReusableMediaTransport(context.applicationContext, "images")
-                }
+            val owner = imageOwner ?: IsolatedMediaTransport(context.applicationContext).also { imageOwner = it }
+            owner.activateSession()
+            transport = owner
             mediaTransport = PlatformMediaTransport(context.applicationContext)
         }
     }
@@ -77,9 +58,8 @@ internal object IsolatedMediaDecoder {
     internal fun resetForAccount() {
         if (transport is IsolatedMediaTransport || transport is ReusableMediaTransport) {
             val currentContext = installedContext ?: return
-            val lifetimeQualification = transport === imageOwner
             clear()
-            installSelected(currentContext, lifetimeQualification)
+            install(currentContext)
         }
     }
 

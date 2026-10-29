@@ -135,6 +135,12 @@ dev.ipf.whitenoise.android.media.sandbox.MediaWorkerBaselineDeviceTest#character
 # Still-worker death witness: PR smoke and focused containment.
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#eachStillInputWaitsForItsExactBinderDeathBeforeReturningPixels
 
+# #3373: per-input worker generations keep one source's state and descriptor out of the next worker,
+# and a worker ignoring RETIRE holds the next input until Android stops it.
+dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#retainedStateAndDescriptorOfOneSourceNeverReachTheNextSourcesWorker
+dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#noncooperativeRetiringWorkerBlocksTheNextInputUntilAndroidStopsIt
+dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#abandonedNoncooperativeWorkerStillHoldsTheNextInputUntilItsDeath
+
 # Debug-only selected-descriptor A/V capability capture; focused containment and full suites.
 dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityDeviceTest#characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid
 

@@ -26,7 +26,8 @@ class MediaDecodeService : Service() {
     private fun accept(message: Message): Boolean {
         if (!Process.isIsolated()) return true
         if (message.what == MediaDecodePolicy.RETIRE) {
-            Process.killProcess(Process.myPid())
+            // The debug noncooperation fixture ignores this, the host must still wait for system-confirmed death.
+            if (!MediaDecodeDebugFixtures.ignoringRetirement()) Process.killProcess(Process.myPid())
             return true
         }
         if (message.what != MediaDecodePolicy.DECODE) return true
@@ -115,11 +116,11 @@ class MediaDecodeService : Service() {
         response: Bundle,
     ): Bundle {
         val operation = data.getInt("operation")
-        if (dev.ipf.whitenoise.android.BuildConfig.DEBUG && operation == MediaDecodePolicy.DEBUG_HANG) {
-            Thread.sleep(MediaDecodePolicy.DEBUG_HANG_MS)
-            return response
-        }
+        if (MediaDecodeDebugFixtures.hang(operation)) return response
         val bytes = readDecoderInput(input) ?: return response
+        if (MediaDecodeDebugFixtures.canary(operation)) {
+            return MediaDecodeDebugFixtures.retainCanary(bytes, input, operation, response)
+        }
         if (operation == MediaDecodePolicy.EXIF) {
             response.putInt(
                 "orientation",
@@ -205,6 +206,6 @@ class MediaDecodeService : Service() {
         codec.shutdownNow()
         watchdog.shutdownNow()
         super.onDestroy()
-        if (Process.isIsolated()) Process.killProcess(Process.myPid())
+        if (Process.isIsolated() && !MediaDecodeDebugFixtures.ignoringRetirement()) Process.killProcess(Process.myPid())
     }
 }
