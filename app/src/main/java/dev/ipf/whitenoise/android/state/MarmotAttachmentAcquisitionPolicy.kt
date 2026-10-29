@@ -1,9 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.MarmotClient
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Enables the native worker in a HOST_MANAGED runtime, which starts denied and never discovers attachments
@@ -50,3 +55,44 @@ internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): Accoun
     val relays = MarmotClient.bootstrapRelays
     return createIdentity(MarmotClient.accountRelays, relays, relays)
 }
+
+/**
+ * Creates an identity on the same relays whose first public kind-0 is [profile], so contacts never see the
+ * key-derived default name before the chosen one (mdk#2216). Unlike [createIdentityWithBootstrapRelays] it
+ * returns at local readiness, so the caller retains the receipt before [awaitAccountNetworkReady].
+ */
+internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): AccountSummaryFfi {
+    val relays = MarmotClient.bootstrapRelays
+    return createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays).account
+}
+
+/**
+ * Polls native setup readiness until relay lists and the initial KeyPackage are published, while MDK's
+ * background setup continues. Recovery and an expired wait surface as MDK's own typed setup errors.
+ *
+ * MDK stops background setup after a few quick attempts and resumes it only from `start()`. A retry passes
+ * [resume], which runs once, before the timed wait, when the first read still shows local or publishing setup.
+ * Android never calls creation again to resume, because racing a just-finished setup would create a second
+ * account. MDK's own resume re-checks the setup journal and has the same narrow race on its side.
+ */
+internal suspend fun awaitAccountNetworkReady(
+    accountRef: String,
+    timeoutMillis: Long = ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS,
+    resume: (suspend () -> Unit)? = null,
+    readiness: suspend (String) -> AccountSetupReadinessFfi,
+) {
+    if (resume != null && readiness(accountRef) in RESUMABLE_SETUP) resume()
+    withTimeoutOrNull(timeoutMillis) {
+        while (true) {
+            when (readiness(accountRef)) {
+                AccountSetupReadinessFfi.NETWORK_READY -> return@withTimeoutOrNull
+                AccountSetupReadinessFfi.RECOVERY_REQUIRED -> throw MarmotKitException.AccountSetupRecoveryRequired()
+                else -> delay(ACCOUNT_NETWORK_READY_POLL_MILLIS)
+            }
+        }
+    } ?: throw MarmotKitException.AccountSetupRetryRequired()
+}
+
+private val RESUMABLE_SETUP = setOf(AccountSetupReadinessFfi.LOCAL_READY, AccountSetupReadinessFfi.PUBLISHING)
+internal const val ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS = 60_000L
+private const val ACCOUNT_NETWORK_READY_POLL_MILLIS = 250L
