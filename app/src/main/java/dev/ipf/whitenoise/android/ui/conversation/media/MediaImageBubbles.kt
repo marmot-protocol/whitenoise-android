@@ -327,6 +327,7 @@ internal fun MediaImageBubble(
                         bytes = data,
                         mediaType = reference.mediaType,
                         staticMaxEdgePx = requestedMaxEdgePx,
+                        domain = controller.mediaTrustDomain,
                     )
                 }
             if (decoded != null) {
@@ -878,6 +879,7 @@ internal fun MediaImageGridTile(
                         bytes = data,
                         mediaType = reference.mediaType,
                         staticMaxEdgePx = requestedMaxEdgePx,
+                        domain = controller.mediaTrustDomain,
                     )
                 }
             if (decoded != null) {

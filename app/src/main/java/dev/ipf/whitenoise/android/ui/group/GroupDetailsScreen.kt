@@ -1583,6 +1583,7 @@ internal fun GroupDetailsScreen(
                                         pictureUrl = groupAvatar.pictureUrl.takeIf { encryptedGroupAvatar == null },
                                         picture = encryptedGroupAvatar,
                                         groupAnimation = groupAvatar.groupAnimation,
+                                        pictureDomain = controller.mediaTrustDomain,
                                     )
                                 }
                                 Text(

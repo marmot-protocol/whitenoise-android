@@ -512,6 +512,7 @@ internal fun GroupEditScreen(
                             pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
                             picture = encryptedGroupAvatar,
                             groupAnimation = groupAvatar.groupAnimation,
+                            pictureDomain = controller.mediaTrustDomain,
                         )
                     }
                     if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())

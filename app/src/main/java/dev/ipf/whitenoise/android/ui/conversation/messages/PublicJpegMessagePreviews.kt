@@ -88,7 +88,10 @@ internal fun publicJpegPreviewUrls(document: MarkdownDocumentFfi?): List<String>
     return urls.toList()
 }
 
-/** Original Markdown links remain visible and usable whether this optional decoration succeeds or fails. */
+/**
+ * Original Markdown links remain visible and usable whether this optional decoration succeeds or fails. The
+ * linked images decode in a worker serving only [domain], the message's conversation.
+ */
 @Suppress("LongMethod") // One lifecycle-owned acquisition and render pass.
 @Composable
 internal fun PublicJpegMessagePreviews(
@@ -96,6 +99,8 @@ internal fun PublicJpegMessagePreviews(
     accountRef: String?,
     messageId: String,
     document: MarkdownDocumentFfi?,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
     val preferences = appState.publicJpegPreviewPreferences
     val choices by preferences.state.collectAsStateWithLifecycle()
@@ -134,6 +139,7 @@ internal fun PublicJpegMessagePreviews(
                                 owner = "$generation:$accountId",
                                 url = url,
                                 allowed = allowed,
+                                domain = domain,
                                 fetch = { target, maxBytes ->
                                     appState.marmot().downloadProfileImage(target, maxBytes)
                                 },

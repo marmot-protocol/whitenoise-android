@@ -593,7 +593,13 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 persistedFailure = persistedFailure,
             )
         if (!deleted && !persistedFailure && !hasMedia) {
-            PublicJpegMessagePreviews(appState, controller.boundAccountRef, record.messageIdHex, markdownDocument)
+            PublicJpegMessagePreviews(
+                appState,
+                controller.boundAccountRef,
+                record.messageIdHex,
+                markdownDocument,
+                controller.mediaTrustDomain,
+            )
         }
         val renderMarkdownBody = markdownDocument != null
         val eventReferences =

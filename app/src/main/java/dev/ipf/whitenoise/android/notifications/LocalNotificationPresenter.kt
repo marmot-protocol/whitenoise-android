@@ -28,6 +28,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.dismissalTime
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -1767,7 +1769,7 @@ class LocalNotificationPresenter(
         isPostStillAllowed: () -> Boolean,
     ) {
         val (conversationAvatarBitmap, senderAvatarBitmap) =
-            resolveMessagingAvatars(messaging)
+            resolveMessagingAvatars(messaging, notificationConversationDomain(update))
         val avatarChanged =
             conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
                 senderAvatarBitmap !== messaging.senderAvatarBitmap
@@ -1792,14 +1794,21 @@ class LocalNotificationPresenter(
         )
     }
 
-    /** Resolves the post's picture inputs, fetching only a slot that has a URL and no bitmap. */
-    private suspend fun resolveMessagingAvatars(messaging: MessagingPostContext): Pair<Bitmap?, Bitmap?> =
+    /**
+     * Resolves the post's picture inputs, fetching only a slot that has a URL and no bitmap. The conversation slot
+     * decodes in [conversationDomain].
+     */
+    private suspend fun resolveMessagingAvatars(
+        messaging: MessagingPostContext,
+        conversationDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+    ): Pair<Bitmap?, Bitmap?> =
         resolveAvatars(
             NotificationIdentityPictureSources(
                 conversationBitmap = messaging.conversationAvatarBitmap,
                 conversationUrl = messaging.conversationAvatarUrl,
                 senderBitmap = messaging.senderAvatarBitmap,
                 senderUrl = messaging.senderAvatarUrl,
+                conversationDomain = conversationDomain,
             ),
         )
 
@@ -1816,7 +1825,9 @@ class LocalNotificationPresenter(
                 val conversationAvatar =
                     async {
                         sources.conversationBitmap
-                            ?: avatarBitmapResolver(sources.conversationUrl)
+                            ?: withContext(MediaTrustScope.element(sources.conversationDomain)) {
+                                avatarBitmapResolver(sources.conversationUrl)
+                            }
                             ?: sources.conversationLoader?.let { load ->
                                 withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) {
                                     runCatchingCancellable { load() }.getOrNull()
@@ -3420,6 +3431,19 @@ private val notificationEnrichmentScope =
             Dispatchers.Default +
             CoroutineName("notification-card-enrichment"),
     )
+
+/**
+ * The worker domain of a notification's conversation picture: a direct chat shows its sender's public profile
+ * picture, a group its own image, which belongs to that conversation.
+ */
+internal fun notificationConversationDomain(update: NotificationUpdateFfi): MediaTrustDomain =
+    if (update.isDm) {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .publicProfiles(update.accountRef)
+    } else {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .conversation(update.accountRef, update.groupIdHex)
+    }
 
 /** Resolves a public avatar URL to notification pixels, bounding the optional rich-card fetch. */
 private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {

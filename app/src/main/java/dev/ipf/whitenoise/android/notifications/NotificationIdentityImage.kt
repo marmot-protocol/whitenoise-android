@@ -58,6 +58,9 @@ internal data class NotificationIdentityPictureSources(
     val senderBitmap: Bitmap?,
     val senderUrl: String?,
     val conversationLoader: (suspend () -> Bitmap?)? = null,
+    /** The worker domain for [conversationUrl]: the group's conversation, or the public profiles for a direct chat. */
+    val conversationDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
     /** True when the card was drawn without a picture that a URL or the conversation loader may still supply. */
     val hasMissingPicture: Boolean

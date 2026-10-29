@@ -79,7 +79,11 @@ internal object PrivateContactAvatarLoader {
         val current = currentReference(selection.first, accountRef)
         val image =
             current?.let { ref ->
-                AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+                // A private contact picture is the user's own pick, decoded in the account's local domain.
+                val domain =
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain
+                        .local(accountRef ?: activeAccount?.invoke())
+                AvatarImageLoader.loadStored(ref.cacheKey, lifetime, domain) {
                     withContext(Dispatchers.IO) { store?.read(ref) }
                 }
             }

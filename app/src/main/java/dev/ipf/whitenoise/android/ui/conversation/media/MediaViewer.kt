@@ -1091,6 +1091,7 @@ internal fun ViewerPage(
                     animationAllowed = animateCurrent,
                     mediaType = reference.mediaType,
                     staticMaxEdgePx = MediaPipeline.VIEWER_MAX_EDGE_PX,
+                    domain = controller.mediaTrustDomain,
                 )
             if (decoded != null) {
                 presentation = decoded

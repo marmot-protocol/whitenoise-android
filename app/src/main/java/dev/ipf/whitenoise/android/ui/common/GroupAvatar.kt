@@ -67,7 +67,8 @@ internal fun rememberGroupAvatarPresentation(
     // A missing/corrupt local image may still use this account's native public-avatar selection.
     if (privateSource != null && privateImage != null) return GroupAvatarPresentation(privateImage, privateSource)
     val ownedSeed = firstFrameAvatar?.takeIf { it.matchesAvatarPresentationOwner(accountRef) }
-    val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef)
+    val durableDomain = groupAvatarDecodeDomain(groupOwnsPicture, accountRef, group.groupIdHex)
+    val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef, durableDomain)
     if (durableAvatar != null) {
         val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
         // Missing/invalidated assets must not revive a legacy bitmap or launch a second acquisition.
@@ -82,12 +83,14 @@ internal fun rememberGroupAvatarPresentation(
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedKey = encryptedGroupAvatarCacheKey(accountRef, group)
     val encryptedImage = rememberEncryptedGroupAvatar(appState, group, accountRef)
-    val remoteImage = rememberLegacyRemoteGroupAvatar(appState, accountRef, legacyUrl)
+    val remoteImage = rememberLegacyRemoteGroupAvatar(appState, accountRef, legacyUrl, group.groupIdHex)
     val seededImage = ownedSeed?.legacyImageFor(legacyUrl, encryptedKey, encryptedImage, ownedFallback)
     val originalReader = rememberLegacyGroupAvatarBytes(appState, group, accountRef, legacyUrl, encryptedKey)
     return GroupAvatarPresentation(
         image = seededImage ?: remoteImage ?: encryptedImage,
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
+        // A group may own this picture; a peer's public picture in its conversation's worker exposes nothing.
+        pictureDomain = groupAvatarDecodeDomain(true, accountRef, group.groupIdHex),
         readOriginalBytes = originalReader,
         groupAnimation =
             originalReader?.takeIf { groupOwnsPicture }?.let {
@@ -102,18 +105,28 @@ internal fun rememberGroupAvatarPresentation(
     )
 }
 
-/** Keeps legacy public acquisition scoped to the same runtime and account as its presentation. */
+/**
+ * Keeps legacy public acquisition scoped to the same runtime and account as its presentation. The group's
+ * image decodes in a worker serving only that conversation.
+ */
 @Composable
 private fun rememberLegacyRemoteGroupAvatar(
     appState: WhiteNoiseAppState,
     accountRef: String?,
     legacyUrl: String?,
+    groupIdHex: String,
 ): ImageBitmap? =
     key(appState, appState.runtimeGeneration, accountRef, legacyUrl) {
         val image by rememberRecoverableAvatar(
             initialImage = AvatarImageLoader.peek(legacyUrl),
             enabled = legacyUrl != null,
-        ) { AvatarImageLoader.load(checkNotNull(legacyUrl)) }
+        ) {
+            AvatarImageLoader.load(
+                checkNotNull(legacyUrl),
+                dev.ipf.whitenoise.android.media.MediaTrustDomain
+                    .conversation(accountRef, groupIdHex),
+            )
+        }
         image
     }
 
@@ -348,5 +361,6 @@ internal fun GroupAvatar(
         picture = presentation.image,
         animationKey = presentation.animationKey,
         groupAnimation = presentation.groupAnimation,
+        pictureDomain = presentation.pictureDomain,
     )
 }

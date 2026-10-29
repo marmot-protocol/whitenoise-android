@@ -108,7 +108,11 @@ internal class ConversationMediaDraftState(
     private val messages: PhotoEditorMessages,
     private val pendingCameraFiles: PendingCameraCaptureFiles? = null,
 ) {
-    private val renderer = PhotoEditorRenderer()
+    private val renderer = PhotoEditorRenderer(domain = { controller.localMediaTrustDomain })
+
+    /** The local domain the conversation's own picks decode in, for previews that hold no controller. */
+    val pickedMediaDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
+        get() = controller.localMediaTrustDomain
     private val stager =
         PhotoDraftStager(
             contentResolver = context.contentResolver,
@@ -123,7 +127,8 @@ internal class ConversationMediaDraftState(
             renderer = renderer,
             drafts = appState.messageDraftRepository,
         )
-    private val attachmentReader = ConversationAttachmentReader(appState, context)
+    private val attachmentReader =
+        ConversationAttachmentReader(appState, context, domain = { controller.localMediaTrustDomain })
 
     private var currentSlots: List<PendingMediaSlot> = emptyList()
     private var currentDocumentUris: List<Uri> = emptyList()
@@ -861,69 +866,74 @@ internal fun ConversationMediaDraftContent(
                 state.preparedQualities()
             }
         previewStateHolder.SaveableStateProvider(if (onClosePreview == null) chatId else previewKey) {
-            MediaPreviewScreen(
-                mediaSlots = mediaSlots,
-                documentUris = documentUris,
-                chatTitle = chatTitle,
-                initialCaption = seededCaption.text,
-                previewOnly = onClosePreview != null,
-                initialIndex = previewIndex,
-                onDismiss = {
-                    if (onClosePreview != null) {
-                        onClosePreview()
-                    } else {
-                        (state.backedPhotos.keys + state.preparedPhotos.keys).forEach(state::releasePreparedPhoto)
-                        documentUris.forEach(state::releasePreparedDocument)
-                        onMediaSlotsChange(emptyList())
-                        onDocumentUrisChange(emptyList())
-                    }
-                },
-                onSend = { caption, onResult ->
-                    val canSettle = state.captureSendSettlement()
-                    mediaSender.sendStagedAttachments(
-                        mediaSlots,
-                        documentUris,
-                        caption,
-                        preparedImageAttachments = state.preparedAttachments(),
-                        preparedDocumentAttachments = state.preparedDocumentAttachments(),
-                        onSettled = {
-                            if (canSettle()) {
-                                state.forgetAcceptedAttachments(
-                                    mediaSlots.mapTo(linkedSetOf()) { it.id },
-                                    documentUris.toSet(),
-                                )
-                                onMediaSlotsChange(emptyList())
-                                onDocumentUrisChange(emptyList())
-                                onCaptionAccepted(seededCaption)
-                            }
-                        },
-                        onAccepted = { onResult(true) },
-                        onRejected = { onResult(false) },
-                        onAfterSend = onAfterSend,
-                    )
-                },
-                onRemoveAt = { index ->
-                    mediaSlots.getOrNull(index)?.id?.let(state::releasePreparedPhoto)
-                    onMediaSlotsChange(mediaSlots.filterIndexed { itemIndex, _ -> itemIndex != index })
-                },
-                onRemoveDocumentAt = { index ->
-                    documentUris.getOrNull(index)?.let(state::releasePreparedDocument)
-                    onDocumentUrisChange(
-                        documentUris.filterIndexed { itemIndex, _ -> itemIndex != index },
-                    )
-                },
-                onAddPhotos = onAddPhotos,
-                onAddDocuments = onAddDocuments,
-                onEditMediaAt = { index -> mediaSlots.getOrNull(index)?.let(state::openEditor) },
-                onSelectMediaQuality = { slotId, quality ->
-                    mediaSlots.firstOrNull { it.id == slotId }?.let { state.selectQuality(it, quality) }
-                },
-                preparedPhotoPreviews = preparedPreviews,
-                preparedPhotoQualities = preparedQualities,
-                preparingPhotoSlotIds = state.preparingSlotIds,
-                nonEditableMediaSlotIds = state.nonEditableDescriptions.keys,
-                nonEditableMediaDescriptions = state.nonEditableDescriptions,
-            )
+            androidx.compose.runtime.CompositionLocalProvider(
+                dev.ipf.whitenoise.android.ui.conversation.media.LocalPickedMediaDomain provides
+                    state.pickedMediaDomain,
+            ) {
+                MediaPreviewScreen(
+                    mediaSlots = mediaSlots,
+                    documentUris = documentUris,
+                    chatTitle = chatTitle,
+                    initialCaption = seededCaption.text,
+                    previewOnly = onClosePreview != null,
+                    initialIndex = previewIndex,
+                    onDismiss = {
+                        if (onClosePreview != null) {
+                            onClosePreview()
+                        } else {
+                            (state.backedPhotos.keys + state.preparedPhotos.keys).forEach(state::releasePreparedPhoto)
+                            documentUris.forEach(state::releasePreparedDocument)
+                            onMediaSlotsChange(emptyList())
+                            onDocumentUrisChange(emptyList())
+                        }
+                    },
+                    onSend = { caption, onResult ->
+                        val canSettle = state.captureSendSettlement()
+                        mediaSender.sendStagedAttachments(
+                            mediaSlots,
+                            documentUris,
+                            caption,
+                            preparedImageAttachments = state.preparedAttachments(),
+                            preparedDocumentAttachments = state.preparedDocumentAttachments(),
+                            onSettled = {
+                                if (canSettle()) {
+                                    state.forgetAcceptedAttachments(
+                                        mediaSlots.mapTo(linkedSetOf()) { it.id },
+                                        documentUris.toSet(),
+                                    )
+                                    onMediaSlotsChange(emptyList())
+                                    onDocumentUrisChange(emptyList())
+                                    onCaptionAccepted(seededCaption)
+                                }
+                            },
+                            onAccepted = { onResult(true) },
+                            onRejected = { onResult(false) },
+                            onAfterSend = onAfterSend,
+                        )
+                    },
+                    onRemoveAt = { index ->
+                        mediaSlots.getOrNull(index)?.id?.let(state::releasePreparedPhoto)
+                        onMediaSlotsChange(mediaSlots.filterIndexed { itemIndex, _ -> itemIndex != index })
+                    },
+                    onRemoveDocumentAt = { index ->
+                        documentUris.getOrNull(index)?.let(state::releasePreparedDocument)
+                        onDocumentUrisChange(
+                            documentUris.filterIndexed { itemIndex, _ -> itemIndex != index },
+                        )
+                    },
+                    onAddPhotos = onAddPhotos,
+                    onAddDocuments = onAddDocuments,
+                    onEditMediaAt = { index -> mediaSlots.getOrNull(index)?.let(state::openEditor) },
+                    onSelectMediaQuality = { slotId, quality ->
+                        mediaSlots.firstOrNull { it.id == slotId }?.let { state.selectQuality(it, quality) }
+                    },
+                    preparedPhotoPreviews = preparedPreviews,
+                    preparedPhotoQualities = preparedQualities,
+                    preparingPhotoSlotIds = state.preparingSlotIds,
+                    nonEditableMediaSlotIds = state.nonEditableDescriptions.keys,
+                    nonEditableMediaDescriptions = state.nonEditableDescriptions,
+                )
+            }
         }
     }
 

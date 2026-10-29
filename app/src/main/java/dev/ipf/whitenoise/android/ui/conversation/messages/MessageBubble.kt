@@ -1834,6 +1834,9 @@ internal fun MessageBubble(
                                     ?.identities
                                     ?.get(record.sender)
                                     ?.avatarAsset,
+                                domain =
+                                    dev.ipf.whitenoise.android.media.MediaTrustDomain
+                                        .publicProfiles(controller.boundAccountRef),
                             )
                         } else {
                             null

@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeAdmittedAttachmentImage
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewStill
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
@@ -130,6 +131,7 @@ internal fun rememberMediaPreviewImage(
     prepared: PreparedPhotoPreview? = null,
 ): MediaPreviewImage {
     val context = LocalContext.current
+    val domain = LocalPickedMediaDomain.current
     var bitmap by
         remember(uri, isVideo, maxEdgePx, prepared?.revision) {
             mutableStateOf<android.graphics.Bitmap?>(null)
@@ -138,7 +140,7 @@ internal fun rememberMediaPreviewImage(
     LaunchedEffect(uri, isVideo, maxEdgePx, prepared?.revision) {
         var decoded: android.graphics.Bitmap? = null
         try {
-            withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO + MediaTrustScope.element(domain)) {
                 decoded =
                     decodeStagedPreviewBitmap(context, uri, isVideo, maxEdgePx, prepared) { ensureActive() }
             }

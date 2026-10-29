@@ -24,7 +24,11 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
 internal fun NostrLinkedImageDialog(
     url: String,
     onDismiss: () -> Unit,
-    loadImage: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::retryBanner,
+    // Event images decode in the conversation on screen, single-use outside one.
+    loadImage: suspend (String, Int) -> ImageBitmap? =
+        dev.ipf.whitenoise.android.ui.conversation.media.LocalConversationMediaDomain.current.let { domain ->
+            { url, width -> AvatarImageLoader.retryBanner(url, width, domain) }
+        },
 ) {
     PlaybackDialog(
         onDismissRequest = onDismiss,

@@ -124,6 +124,8 @@ internal fun GroupReviewDestinationIdentity(
             pictureUrl = group.pictureUrl,
             picture = group.image,
             groupAnimation = group.groupAnimation,
+            // A group's picture never decodes in the public-profile worker; without its account, single-use.
+            pictureDomain = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
         )
         EmojiLabel(group.name, style = MaterialTheme.typography.titleSmall)
         actionLabel?.let { Text(it) }

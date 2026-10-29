@@ -414,7 +414,13 @@ private suspend fun decodeOwnedGiphyPresentation(
     bytes: ByteArray,
 ): DecodedAttachmentPresentation? {
     if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("GIPHY owner retired")
-    val result = decodeMessageAttachmentImage(bytes, request.mediaType, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+    val result =
+        decodeMessageAttachmentImage(
+            bytes,
+            request.mediaType,
+            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+            domain = controller.mediaTrustDomain,
+        )
     if (!controller.ownsRetainedForegroundPresentation) {
         result?.releaseOwnedPresentation()
         throw CancellationException("GIPHY owner retired during decode")

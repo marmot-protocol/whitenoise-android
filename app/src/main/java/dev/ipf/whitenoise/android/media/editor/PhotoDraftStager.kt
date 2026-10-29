@@ -177,7 +177,7 @@ internal class PhotoDraftStager(
             }
             val sourceInfo = (inspected as PhotoEditorInspectResult.Success).source
             val attachment =
-                originalAttachment(sourceBytes, displayName, attachmentId, quality)
+                originalAttachment(sourceBytes, displayName, attachmentId, quality, accountRef)
                     ?: run {
                         val rendered = renderer.render(sourceBytes, PhotoEditRecipe.Original, quality)
                         if (rendered !is PhotoEditorRenderResult.Success) {
@@ -255,15 +255,22 @@ internal class PhotoDraftStager(
         }
     }
 
+    /** The Original-quality attachment for the user's own pick, inspected in the account's local domain. */
     private fun originalAttachment(
         sourceBytes: ByteArray,
         displayName: String,
         attachmentId: String,
         quality: MediaQuality,
+        accountRef: String,
     ): MessageDraftAttachmentFfi? {
         if (!quality.preservesOriginalImageBytes) return null
         val original =
-            MediaPipeline.prepareOriginalImageForUpload(sourceBytes, displayName)
+            MediaPipeline.prepareOriginalImageForUpload(
+                sourceBytes,
+                displayName,
+                dev.ipf.whitenoise.android.media.MediaTrustDomain
+                    .local(accountRef),
+            )
                 as? MediaPipeline.OriginalImageReadResult.Success
                 ?: return null
         return MessageDraftAttachmentFfi(

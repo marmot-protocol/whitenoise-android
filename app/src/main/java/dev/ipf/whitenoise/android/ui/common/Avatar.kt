@@ -41,7 +41,8 @@ private val AvatarPalette =
 /**
  * Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. A URL
  * picture whose cached bytes are a GIF animates over its first frame under the shared profile policy; a
- * supplied [picture] animates only when the caller names its stored person-picture [animationKey].
+ * supplied [picture] animates only when the caller names its stored person-picture [animationKey]. A URL
+ * this starts decoding runs in [pictureDomain]'s worker; null means a person's published picture.
  */
 @Composable
 internal fun Avatar(
@@ -52,6 +53,7 @@ internal fun Avatar(
     picture: ImageBitmap? = null,
     animationKey: String? = null,
     groupAnimation: GroupAvatarAnimation? = null,
+    pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -68,7 +70,8 @@ internal fun Avatar(
             initialImage = AvatarImageLoader.peek(pictureUrl),
             enabled = pictureUrl != null && (picture == null || privateSource),
         ) {
-            AvatarImageLoader.load(checkNotNull(pictureUrl))
+            val url = checkNotNull(pictureUrl)
+            if (pictureDomain == null) AvatarImageLoader.load(url) else AvatarImageLoader.load(url, pictureDomain)
         }
     }
     val privateOwnerCurrent =

@@ -24,6 +24,8 @@ internal data class GroupAvatarPresentation(
     val readOriginalBytes: (suspend () -> ByteArray?)? = null,
     val animationKey: String? = null,
     val groupAnimation: GroupAvatarAnimation? = null,
+    /** The worker domain for loading [pictureUrl]: the group's conversation for a picture a group may own. */
+    val pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
 )
 
 /** A durable group selection keeps viewer bytes and thumbnail admission under the same pinned owner. */
@@ -90,3 +92,17 @@ internal fun WhiteNoiseAppState.ownsPrivateAvatarSource(
 ): Boolean =
     accounts.any { it.label == accountRef && !it.signedOut } &&
         PrivateContactAvatarLoader.belongsToAccount(source, accountRef)
+
+/** A group-owned picture decodes in its conversation's worker, a person's in the account's public profiles. */
+internal fun groupAvatarDecodeDomain(
+    ownsGroupPicture: Boolean,
+    accountRef: String?,
+    groupIdHex: String,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    if (ownsGroupPicture) {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .conversation(accountRef, groupIdHex)
+    } else {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .publicProfiles(accountRef)
+    }

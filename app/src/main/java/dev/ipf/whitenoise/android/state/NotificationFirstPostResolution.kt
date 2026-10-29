@@ -541,13 +541,24 @@ internal class NotificationAvatarCoordinator(
             }
         preWarmIfUnlocked(sender)
         val group = if (target.resolveGroupAvatar) bestEffort { groupAvatarUrl(update) } else null
-        preWarmIfUnlocked(group)
+        preWarmIfUnlocked(
+            group,
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .conversation(update.accountRef, update.groupIdHex),
+        )
         return PreWarmedNotificationAvatars(sender, group)
     }
 
-    /** Prevents decrypted imagery from entering memory while the app lock is visible. */
-    private fun preWarmIfUnlocked(url: String?) {
-        if (!appLocked()) AvatarImageLoader.preWarm(url)
+    /**
+     * Prevents decrypted imagery from entering memory while the app lock is visible. A group URL decodes in
+     * its conversation's [domain], a sender's in the public profiles.
+     */
+    private fun preWarmIfUnlocked(
+        url: String?,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
+    ) {
+        if (appLocked()) return
+        if (domain == null) AvatarImageLoader.preWarm(url) else AvatarImageLoader.preWarm(url, domain)
     }
 
     /** Isolates optional avatar lookup failures without swallowing structured cancellation. */

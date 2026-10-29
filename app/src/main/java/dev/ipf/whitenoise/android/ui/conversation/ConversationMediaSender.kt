@@ -103,6 +103,10 @@ internal class ConversationAttachmentReader(
     private val context: Context,
     private val fileBackedLimits: () -> FileBackedSendLimits? = ::nativeFileBackedSendLimits,
     private val usableSpace: (java.io.File) -> Long = ::usableSpaceFor,
+    /** The worker domain for the user's own picks, read at each image read; single-use when unset. */
+    private val domain: () -> dev.ipf.whitenoise.android.media.MediaTrustDomain = {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+    },
 ) {
     /**
      * The file-backed budget of one outgoing message, staging under the private upload directory and
@@ -121,7 +125,15 @@ internal class ConversationAttachmentReader(
             )
         }
 
+    /** Reads one image pick at the chosen quality; its inspection and decodes run in the picks' local domain. */
     fun readImageAttachment(
+        uri: android.net.Uri,
+        remainingBytes: Long,
+    ): ImageAttachmentReadOutcome =
+        dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
+            .within(domain()) { readImageAttachmentInScope(uri, remainingBytes) }
+
+    private fun readImageAttachmentInScope(
         uri: android.net.Uri,
         remainingBytes: Long,
     ): ImageAttachmentReadOutcome {
@@ -595,7 +607,10 @@ internal class ConversationMediaSender(
     usableSpace: (java.io.File) -> Long = ::usableSpaceFor,
     private val onRevealSent: () -> Unit,
 ) {
-    private val attachmentReader = ConversationAttachmentReader(appState, context, fileBackedLimits, usableSpace)
+    private val attachmentReader =
+        ConversationAttachmentReader(appState, context, fileBackedLimits, usableSpace) {
+            controller.localMediaTrustDomain
+        }
 
     /** Captures the reply before contact serialization can suspend. */
     fun sendSharedContact(contact: SharedContact) {
@@ -787,7 +802,11 @@ internal class ConversationMediaSender(
             return null
         }
         return if (acceptPreparedAttachments(prepared, imageCount)) {
-            val documents = prepared.documents.copy(attachments = addMissingThumbhashes(prepared.documents.attachments))
+            val documents =
+                prepared.documents.copy(
+                    attachments =
+                        addMissingThumbhashes(prepared.documents.attachments, controller.localMediaTrustDomain),
+                )
             prepared.copy(documents = documents)
         } else {
             null
@@ -1134,8 +1153,14 @@ private fun limitAttachmentsToBudget(
     return BudgetedAttachments(accepted, totalBytes, overflowed)
 }
 
-/** Completes missing image metadata off the UI thread without replacing existing thumbhashes. */
-private suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>): List<PendingAttachment> =
+/**
+ * Completes missing image metadata off the UI thread without replacing existing thumbhashes. The user's own
+ * picks decode in [domain].
+ */
+private suspend fun addMissingThumbhashes(
+    attachments: List<PendingAttachment>,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+): List<PendingAttachment> =
     if (attachments.isEmpty()) {
         emptyList()
     } else {
@@ -1152,6 +1177,7 @@ private suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>):
                         MediaPipeline.decodeSampledBitmap(
                             attachment.plaintextBytes,
                             MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                            domain = domain,
                         )
                     val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
                     bitmap?.recycle()

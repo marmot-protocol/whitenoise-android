@@ -84,14 +84,20 @@ internal class PhotoEditorRenderer(
     private val renderDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val memoryBudgetBytes: () -> Long = ::defaultEditorMemoryBudgetBytes,
     private val onEncode: () -> Unit = {},
+    /** The worker domain of the edited source, read at each call; single-use when unset. */
+    private val domain: () -> dev.ipf.whitenoise.android.media.MediaTrustDomain = {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+    },
 ) {
+    /** Validates [sourceBytes] as an editable still, inspected in the source's domain. */
     suspend fun inspect(sourceBytes: ByteArray): PhotoEditorInspectResult =
-        withContext(renderDispatcher) {
+        withContext(renderContext()) {
             inspectNow(sourceBytes)
         }
 
+    /** A bounded, upright preview of [sourceBytes], decoded in the source's domain, or null. */
     suspend fun decodePreview(sourceBytes: ByteArray): Bitmap? =
-        withContext(renderDispatcher) {
+        withContext(renderContext()) {
             when (inspectNow(sourceBytes)) {
                 is PhotoEditorInspectResult.Failure -> null
                 is PhotoEditorInspectResult.Success -> {
@@ -111,12 +117,13 @@ internal class PhotoEditorRenderer(
             }
         }
 
+    /** Renders [recipe] over [sourceBytes] at [quality]; every inspection and decode runs in the source's domain. */
     suspend fun render(
         sourceBytes: ByteArray,
         recipe: PhotoEditRecipe,
         quality: MediaQuality,
     ): PhotoEditorRenderResult =
-        withContext(renderDispatcher) {
+        withContext(renderContext()) {
             processRenderMutex.withLock {
                 currentCoroutineContext().ensureActive()
                 val inspected = inspectNow(sourceBytes)
@@ -198,6 +205,12 @@ internal class PhotoEditorRenderer(
             effectiveLabel = "$profileName · ${geometry.outputSize.width} × ${geometry.outputSize.height}",
         )
     }
+
+    /** The render dispatcher, declaring the source's worker domain on whichever thread decodes. */
+    private fun renderContext(): kotlin.coroutines.CoroutineContext =
+        renderDispatcher +
+            dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
+                .element(domain())
 
     @Suppress("CyclomaticComplexMethod") // Fail-closed source validation is intentionally centralized.
     private fun inspectNow(sourceBytes: ByteArray): PhotoEditorInspectResult {

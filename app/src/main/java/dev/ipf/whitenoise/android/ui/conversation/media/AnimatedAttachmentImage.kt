@@ -29,15 +29,18 @@ sealed interface DecodedAttachmentPresentation {
  * Decode attachment bytes for in-bubble or viewer rendering. Content-based
  * animation admission picks the decoder: a refused GIF/WebP returns null (the
  * caller's failed placeholder) without reaching either native decoder, and only
- * an admitted animation may fall back to a sampled still.
+ * an admitted animation may fall back to a sampled still. A still decodes in a
+ * worker generation that serves only [domain], the conversation's own.
  */
-@Suppress("UNUSED_PARAMETER") // Callers pass the advertised MIME; admission deliberately trusts content only.
+@Suppress("UNUSED_PARAMETER", "LongParameterList") // MIME is advisory, admission trusts content; one decode request.
 suspend fun decodeMessageAttachmentImage(
     bytes: ByteArray,
     mediaType: String,
     staticMaxEdgePx: Int,
     animatedMaxEdgePx: Int = MediaPipeline.ANIMATED_IMAGE_MAX_EDGE_PX,
     animationAllowed: Boolean = false,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ): DecodedAttachmentPresentation? =
     dev.ipf.whitenoise.android.media.decodeOwnedMedia(decode = {
         val admission =
@@ -54,7 +57,7 @@ suspend fun decodeMessageAttachmentImage(
                 }
             },
             decodeStill = {
-                MediaPipeline.decodeSampledBitmap(bytes, staticMaxEdgePx)?.let {
+                MediaPipeline.decodeSampledBitmap(bytes, staticMaxEdgePx, domain = domain)?.let {
                     DecodedAttachmentPresentation.Static(it, animationDeferred)
                 }
             },

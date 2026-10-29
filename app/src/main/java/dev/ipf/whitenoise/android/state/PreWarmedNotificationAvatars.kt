@@ -25,12 +25,15 @@ internal data class PreWarmedNotificationAvatars(
 internal fun PreWarmedNotificationAvatars.lateIdentitySources(
     warmed: PreWarmedNotificationAvatars,
     isDm: Boolean,
+    conversationDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ): NotificationIdentityPictureSources =
     NotificationIdentityPictureSources(
         conversationBitmap = conversationBitmap(isDm),
         conversationUrl = if (isDm) warmed.senderAvatarUrl else warmed.groupAvatarUrl,
         senderBitmap = senderAvatarBitmap,
         senderUrl = warmed.senderAvatarUrl,
+        conversationDomain = conversationDomain,
     )
 
 /**

@@ -1243,6 +1243,8 @@ class WhiteNoiseAppState private constructor(
             .also {
                 dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
                     .attach(it) { activeAccountRef }
+                dev.ipf.whitenoise.android.core.AvatarImageLoader
+                    .attachActiveAccount { activeAccountRef }
             }
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
@@ -3612,6 +3614,9 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+
+    /** The attached chat list's current rows, read to name the worker domain of a durable avatar. */
+    internal fun chatListItemsForAvatarDomains(): List<ChatListItem> = chatsController?.items.orEmpty()
 
     /** Attaches or permanently detaches the chat-list projection without transferring private row state. */
     fun attachChatsController(controller: ChatsController?) {
@@ -11780,7 +11785,10 @@ class WhiteNoiseAppState private constructor(
         val ref = contactPictureStore.reference(account, contact) ?: return
         val lifetime = AvatarImageLoader.currentCacheLifetime()
         runCatchingCancellable {
-            AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+            val domain =
+                dev.ipf.whitenoise.android.media.MediaTrustDomain
+                    .local(account)
+            AvatarImageLoader.loadStored(ref.cacheKey, lifetime, domain) {
                 withContext(Dispatchers.IO) { contactPictureStore.read(ref) }
             }
         }
@@ -13254,7 +13262,13 @@ class WhiteNoiseAppState private constructor(
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-        val urlSources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        val urlSources =
+            firstPost.avatars.lateIdentitySources(
+                warmed,
+                update.isDm,
+                dev.ipf.whitenoise.android.notifications
+                    .notificationConversationDomain(update),
+            )
         val sources =
             if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
                 urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))

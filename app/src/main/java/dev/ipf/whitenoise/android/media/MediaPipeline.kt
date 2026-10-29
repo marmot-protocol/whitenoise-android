@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.graphics.drawable.Drawable
 import android.media.ExifInterface
 import android.net.Uri
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
@@ -278,15 +279,19 @@ object MediaPipeline {
      * callers use it for received attachment payloads whose senders may already
      * have baked rotation into pixels while leaving a stale Orientation tag.
      * Set [honorExifOrientation] only for trusted local source bytes whose EXIF
-     * metadata should drive the preview.
+     * metadata should drive the preview. The worker generation decoding them
+     * serves only [domain], by default the domain of the enclosing scope.
      */
     fun decodeSampledBitmap(
         bytes: ByteArray,
         maxEdgePx: Int,
         honorExifOrientation: Boolean = false,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
     ): Bitmap? =
-        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-            .decode(bytes, maxEdgePx, honorExifOrientation)
+        MediaTrustScope.within(domain) {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .decode(bytes, maxEdgePx, honorExifOrientation)
+        }
 
     @Suppress("ReturnCount") // Reject invalid bounds and native allocation failure before returning pixels.
     internal fun decodeSampledBitmapInDecoder(
@@ -506,15 +511,19 @@ object MediaPipeline {
      * JPEG EXIF orientation is applied to the returned pixels so the staging
      * sheet shows portrait camera captures upright instead of following the raw
      * sensor buffer. Returns null on any I/O, security, decode, or OOM failure
-     * so the caller can fall back to a placeholder rather than crash.
+     * so the caller can fall back to a placeholder rather than crash. The
+     * worker generation serves only [domain].
      */
     fun decodeSampledFromUri(
         contentResolver: ContentResolver,
         uri: Uri,
         maxEdgePx: Int = THUMBNAIL_MAX_EDGE_PX,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
     ): Bitmap? =
-        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-            .decodeUri(contentResolver, uri, maxEdgePx)
+        MediaTrustScope.within(domain) {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .decodeUri(contentResolver, uri, maxEdgePx)
+        }
 
     private data class OrientedDecodeTarget(
         val rawWidth: Int,
@@ -675,9 +684,15 @@ object MediaPipeline {
         return buffer.toByteArray()
     }
 
-    internal fun readExifOrientation(bytes: ByteArray): Int? =
-        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-            .exif(bytes)
+    /** The source's EXIF orientation, read by a worker generation that serves only [domain]. */
+    internal fun readExifOrientation(
+        bytes: ByteArray,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
+    ): Int? =
+        MediaTrustScope.within(domain) {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .exif(bytes)
+        }
 
     internal fun readExifOrientationInDecoder(bytes: ByteArray): Int =
         try {
@@ -769,6 +784,7 @@ object MediaPipeline {
         contentResolver: ContentResolver,
         uri: Uri,
         maxBytes: Int,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
     ): OriginalImageReadResult {
         if (maxBytes <= 0) return OriginalImageReadResult.TooLarge
         val sourceBytes =
@@ -783,6 +799,7 @@ object MediaPipeline {
         return prepareOriginalImageForUpload(
             sourceBytes = sourceBytes,
             sourceFileName = queryDisplayNameFromResolver(contentResolver, uri),
+            domain = domain,
         )
     }
 
@@ -791,10 +808,19 @@ object MediaPipeline {
      * has already retained the provider bytes, so reopening and rendering the
      * URI would both waste work and introduce generation loss. Keep the
      * encoded pixels intact while applying the exact same metadata policy as
-     * a normal Original-quality send.
+     * a normal Original-quality send. Its worker generations serve only [domain].
      */
-    @Suppress("ReturnCount") // Each unsupported/unsafe container state must fail closed before attachment creation.
     internal fun prepareOriginalImageForUpload(
+        sourceBytes: ByteArray,
+        sourceFileName: String?,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
+    ): OriginalImageReadResult =
+        MediaTrustScope.within(domain) {
+            prepareOriginalImageInScope(sourceBytes, sourceFileName)
+        }
+
+    @Suppress("ReturnCount") // Each unsupported/unsafe container state must fail closed before attachment creation.
+    private fun prepareOriginalImageInScope(
         sourceBytes: ByteArray,
         sourceFileName: String?,
     ): OriginalImageReadResult {
@@ -832,11 +858,17 @@ object MediaPipeline {
     /** Applies the pure container walker selected by the encoded image signature. */
     internal fun stripOriginalImageMetadata(bytes: ByteArray): ByteArray? = stripImageContainerMetadata(bytes)
 
-    /** Strips metadata only when the result remains a positively identified animation. */
+    /**
+     * Strips metadata only when the result remains a positively identified animation. Its EXIF read runs in a
+     * worker generation that serves only [domain].
+     */
     @Suppress("ReturnCount") // Every guard fails closed before provider bytes can become an attachment.
-    internal fun sanitizeAnimatedImageMetadata(bytes: ByteArray): ByteArray? {
+    internal fun sanitizeAnimatedImageMetadata(
+        bytes: ByteArray,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
+    ): ByteArray? {
         if (imageAnimationStatus(bytes) != ImageAnimationStatus.ANIMATED) return null
-        val orientation = readExifOrientation(bytes) ?: return null
+        val orientation = readExifOrientation(bytes, domain) ?: return null
         if (exifOrientationRequiresPixelTransform(orientation)) return null
         val sanitized =
             when (imageContainerKind(bytes)) {
@@ -851,15 +883,16 @@ object MediaPipeline {
      * Decode the image at [uri], downscale so the longer edge ≤ [maxEdgePx],
      * apply JPEG EXIF orientation to the pixels, and re-encode as JPEG at
      * [quality]. Returns null when the source can't be decoded (corrupt file,
-     * unsupported format, unreadable Uri).
+     * unsupported format, unreadable Uri). The decoding worker serves only [domain].
      */
     fun readDownscaledJpeg(
         contentResolver: ContentResolver,
         uri: Uri,
         maxEdgePx: Int = DEFAULT_MAX_EDGE_PX,
         quality: Int = DEFAULT_JPEG_QUALITY,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
     ): DownscaledJpeg? {
-        val bitmap = decodeSampledFromUri(contentResolver, uri, maxEdgePx) ?: return null
+        val bitmap = decodeSampledFromUri(contentResolver, uri, maxEdgePx, domain) ?: return null
         return finishDownscaledJpeg(bitmap, quality)
     }
 
@@ -868,12 +901,14 @@ object MediaPipeline {
      * group/profile image. Re-encoding has two useful properties here: it
      * enforces the same bounded pixel envelope as local media picks and strips
      * metadata from arbitrary web images before MDK encrypts/uploads them.
+     * The decoding worker serves only [domain].
      */
     fun readDownscaledJpeg(
         bytes: ByteArray,
         maxEdgePx: Int = DEFAULT_MAX_EDGE_PX,
         quality: Int = DEFAULT_JPEG_QUALITY,
-    ): DownscaledJpeg? = decodeSampledBitmap(bytes, maxEdgePx, true)?.let { finishDownscaledJpeg(it, quality) }
+        domain: MediaTrustDomain = MediaTrustScope.current(),
+    ): DownscaledJpeg? = decodeSampledBitmap(bytes, maxEdgePx, true, domain)?.let { finishDownscaledJpeg(it, quality) }
 
     /**
      * Flattens alpha before both placeholder hashing and JPEG compression so
@@ -979,10 +1014,15 @@ object MediaPipeline {
      * to the receiver so the bubble lays out before the bytes finish
      * decoding.
      */
-    fun imageDimOrNull(bytes: ByteArray): String? =
-        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-            .inspect(bytes)
-            ?.let { "${it.width}x${it.height}" }
+    fun imageDimOrNull(
+        bytes: ByteArray,
+        domain: MediaTrustDomain = MediaTrustScope.current(),
+    ): String? =
+        MediaTrustScope
+            .within(domain) {
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                    .inspect(bytes)
+            }?.let { "${it.width}x${it.height}" }
 
     /** Maps a positively identified original-image container to its wire MIME. */
     private fun originalImageMediaType(bytes: ByteArray): String? =

@@ -4129,27 +4129,33 @@ internal fun ConversationScreen(
                 attachmentContent =
                     if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
                         {
-                            dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
-                                mediaSlots = pendingMediaSlots,
-                                documentUris = pendingDocumentUris,
-                                enabled = !attachmentSendClaim.isHeld,
-                                prepared = mediaDraftState.preparedPreviews(),
-                                onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
-                                onRemoveMedia = { slot ->
-                                    if (!attachmentSendClaim.isHeld) {
-                                        mediaDraftState.releasePreparedPhoto(slot.id)
-                                        pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
-                                    }
-                                },
-                                onRemoveDocument = { index ->
-                                    if (!attachmentSendClaim.isHeld) {
-                                        pendingDocumentUris
-                                            .getOrNull(index)
-                                            ?.let(mediaDraftState::releasePreparedDocument)
-                                        pendingDocumentUris = pendingDocumentUris.filterIndexed { i, _ -> i != index }
-                                    }
-                                },
-                            )
+                            CompositionLocalProvider(
+                                dev.ipf.whitenoise.android.ui.conversation.media.LocalPickedMediaDomain provides
+                                    controller.localMediaTrustDomain,
+                            ) {
+                                dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
+                                    mediaSlots = pendingMediaSlots,
+                                    documentUris = pendingDocumentUris,
+                                    enabled = !attachmentSendClaim.isHeld,
+                                    prepared = mediaDraftState.preparedPreviews(),
+                                    onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
+                                    onRemoveMedia = { slot ->
+                                        if (!attachmentSendClaim.isHeld) {
+                                            mediaDraftState.releasePreparedPhoto(slot.id)
+                                            pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
+                                        }
+                                    },
+                                    onRemoveDocument = { index ->
+                                        if (!attachmentSendClaim.isHeld) {
+                                            pendingDocumentUris
+                                                .getOrNull(index)
+                                                ?.let(mediaDraftState::releasePreparedDocument)
+                                            pendingDocumentUris =
+                                                pendingDocumentUris.filterIndexed { i, _ -> i != index }
+                                        }
+                                    },
+                                )
+                            }
                         }
                     } else {
                         null
@@ -4275,6 +4281,12 @@ internal fun ConversationScreen(
             dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
             LocalPollVotesHost provides pollVotesHost,
             LocalKeptMessages provides keptMessagesController,
+            // Timeline images reached without the controller, such as event-card images, decode in this conversation.
+            dev.ipf.whitenoise.android.ui.conversation.media.LocalConversationMediaDomain provides
+                controller.mediaTrustDomain,
+            // Pending bubbles show the user's own picks, which decode in the account's local domain.
+            dev.ipf.whitenoise.android.ui.conversation.media.LocalPickedMediaDomain provides
+                controller.localMediaTrustDomain,
             // Bubbles mark their own matches while search is open, so a hit is obvious on any
             // bubble colour rather than only on the one the jump happened to land on.
             LocalConversationSearchMarking provides

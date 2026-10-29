@@ -965,9 +965,13 @@ internal suspend fun removeMediaMemoryCacheKeys(
  *
  * A photo decodes its own bytes. A video has a frame pulled from the same bytes instead, so the
  * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
- * the file to be materialized and read again (#2732).
+ * the file to be materialized and read again (#2732). A photo decodes in [domain]'s worker.
  */
-private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment): android.graphics.Bitmap? {
+private suspend fun decodeMediaThumbnailOffMain(
+    attachment: PendingAttachment,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+): android.graphics.Bitmap? {
     // A file-backed item has no bytes here; its confirmed bubble paints the thumbhash, then MDK's copy.
     val bytes = attachment.inMemoryBytes ?: return null
     return withContext(Dispatchers.Default) {
@@ -977,6 +981,7 @@ private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment): 
             MediaPipeline.decodeSampledBitmap(
                 bytes,
                 MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                domain = domain,
             )
         }
     }
@@ -5556,7 +5561,16 @@ class ChatsController private constructor(
             ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
                 ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl)
         if (item.selectedAvatarAsset == null) {
-            AvatarImageLoader.preWarm(conversationAvatar)
+            // A group-owned picture decodes in its conversation's domain, a direct chat's peer picture in public.
+            val domain =
+                if (GroupProjector.ownsGroupPicture(item)) {
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain
+                        .conversation(appState.activeAccountRef, item.group.groupIdHex)
+                } else {
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain
+                        .publicProfiles(appState.activeAccountRef)
+                }
+            AvatarImageLoader.preWarm(conversationAvatar, domain)
             GroupProjector
                 .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
                 ?.let(appState::preWarmProfileAvatar)
@@ -6461,8 +6475,14 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
-    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? =
-        ::decodeMediaThumbnailOffMain,
+    // The user's own sent pick decodes in the conversation account's local domain.
+    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? = { attachment ->
+        decodeMediaThumbnailOffMain(
+            attachment,
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .local(accountRefOverride ?: appState.activeAccountRef),
+        )
+    },
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
@@ -6854,6 +6874,18 @@ class ConversationController(
     private val conversationRuntimeGeneration = appState.runtimeGeneration
     internal val boundAccountRef: String?
         get() = conversationAccountRef
+
+    /** This conversation's media trust domain: a worker that decodes its images serves no other conversation. */
+    internal val mediaTrustDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
+        get() =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .conversation(conversationAccountRef, group.groupIdHex)
+
+    /** The domain for images this conversation's user picks from the device before sending them. */
+    internal val localMediaTrustDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
+        get() =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .local(conversationAccountRef)
 
     /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
     internal val ownsRetainedForegroundPresentation: Boolean

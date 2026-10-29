@@ -40,4 +40,28 @@ sealed interface MediaTrustDomain {
 
     /** No declared domain: the input gets a fresh worker generation of its own, the fail-safe default. */
     data object Unique : MediaTrustDomain
+
+    companion object {
+        /** [Conversation] for [account] and [conversation], or [Unique] when either is unknown. */
+        fun conversation(
+            account: String?,
+            conversation: String?,
+        ): MediaTrustDomain =
+            if (account.isNullOrEmpty() || conversation.isNullOrEmpty()) {
+                Unique
+            } else {
+                Conversation(account, conversation)
+            }
+
+        /** [PublicProfiles] for [account], or [Unique] when no account is known. */
+        fun publicProfiles(account: String?): MediaTrustDomain =
+            if (account.isNullOrEmpty()) {
+                Unique
+            } else {
+                PublicProfiles(account)
+            }
+
+        /** [Local] for [account], or [Unique] when no account is known, as before sign-up completes. */
+        fun local(account: String?): MediaTrustDomain = if (account.isNullOrEmpty()) Unique else Local(account)
+    }
 }
