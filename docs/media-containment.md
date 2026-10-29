@@ -160,6 +160,31 @@ decoding the same bytes uses two generations.
 Animation sessions keep their separate worker, admission and lifetime rules.
 Platform audio/video keeps its separate adapter.
 
+### Launch path
+
+The still-image service sets `android:useAppZygote` with `MediaZygotePreload`;
+both lanes launch through it. The preload runs before any worker exists,
+receives no descriptors, account state or untrusted bytes, and only initializes
+worker classes with constant static state; it starts no threads. What that
+means for each worker differs by OS:
+
+- Stock Android, including the emulators measured here: Android starts one
+  application zygote for the app, with its own isolated UID, and forks every
+  worker from it. Each fork gets its own isolated UID but shares the zygote's
+  address-space layout for everything loaded before the fork, including the
+  preloaded worker classes. The platform zygote's preloaded libraries, the
+  codecs among them, were already shared this way across all app processes.
+- GrapheneOS with exec spawning, its default: Android
+  [skips application zygotes for isolated services](https://github.com/GrapheneOS/platform_frameworks_base/blob/17/services/core/java/com/android/server/am/ActiveServices.java#L6349-L6363)
+  ("app zygotes are pointless when exec spawning is used"). Each worker is
+  exec-spawned with a fresh layout, and `MediaZygotePreload`
+  [runs inside that worker](https://github.com/GrapheneOS/platform_frameworks_base/blob/17/core/java/com/android/internal/os/ExecSpawning.java#L107-L117),
+  in the isolated_app domain, before its service starts. This was read from
+  the GrapheneOS 17 source on 29 October 2026, not observed on a device. Generations share no layout, and the fork start
+  cost measured on stock Android does not apply there.
+- GrapheneOS with exec spawning turned off for the app behaves like stock
+  Android.
+
 ### Default
 
 Production installation keeps the reusable worker. The per-input lane is
@@ -173,7 +198,14 @@ for that decision and for #3439, which edits the facade's animation type checks.
 - A cooperative self-exit ends the worker process only. Android's escalation
   kill covers the process group. A forked descendant of a compromised worker is
   outside the Binder witness.
-- Two idle spares stay resident while the lane is installed.
+- Two idle spares stay resident while the lane is installed, plus the
+  application zygote on stock Android.
+- On stock Android, forks share the application zygote's layout for preloaded
+  code, so one generation's address-space disclosure applies to later ones.
+- Heap tagging through the application-zygote launch path is unqualified on
+  MTE hardware; see [native heap memory tagging](native-heap-memory-tagging.md).
+- Worker start cost on GrapheneOS, where every worker is exec-spawned, is
+  unmeasured.
 - There is no visible-first priority. Callers cancelled through interruption,
   such as the image bubble decode, leave the queue; other callers wait within
   the eight-second admission bound.

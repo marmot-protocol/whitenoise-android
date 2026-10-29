@@ -23,3 +23,11 @@
 -keepclassmembers class kotlinx.coroutines.** {
     volatile <fields>;
 }
+
+# --- Still-image worker application zygote ---
+# The manifest names this class only through android:zygotePreloadName, so keep its
+# exact name and entry point so the zygote can load it in minified builds.
+-keep class dev.ipf.whitenoise.android.media.sandbox.MediaZygotePreload {
+    public <init>();
+    public void doPreload(android.content.pm.ApplicationInfo);
+}
