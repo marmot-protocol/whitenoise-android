@@ -5,6 +5,9 @@ import android.os.Parcel
 
 internal object AnimationFrameProtocol {
     const val DESCRIPTOR = "dev.ipf.whitenoise.media.animation.v1"
+    const val STATUS_TRANSACTION = IBinder.FIRST_CALL_TRANSACTION + 1
+    const val STATUS_PRIMITIVE_BYTES = 20
+    const val CODEC_REJECTED = 1
     const val OPEN = 100
     const val PLAY = 101
     const val PAUSE = 102
@@ -66,4 +69,48 @@ internal fun readAnimationFrame(parcel: Parcel): AnimationFrameInfo {
     require(sequence > 0 && width in 1..AnimationFrameProtocol.MAX_EDGE && height in 1..AnimationFrameProtocol.MAX_EDGE)
     require(parcel.dataAvail() == 0)
     return AnimationFrameInfo(session, sequence, width, height, flags[0] == 1, flags[1] == 1, flags[2] == 1, canary)
+}
+
+/** Fixed primitive rejection notice; this is never a worker-death acknowledgement. */
+internal data class AnimationStatusInfo(
+    val session: Int,
+    val reason: Int,
+    val isolated: Boolean,
+    val internetGranted: Boolean,
+    val runtimeInitialized: Boolean,
+)
+
+/** Worker side: sends a one-way rejection notice for [AnimationStatusInfo.session] on the status transaction. */
+internal fun writeAnimationStatus(
+    callback: IBinder,
+    status: AnimationStatusInfo,
+) {
+    val parcel = Parcel.obtain()
+    try {
+        parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
+        parcel.writeInt(status.session)
+        parcel.writeInt(status.reason)
+        parcel.writeInt(if (status.isolated) 1 else 0)
+        parcel.writeInt(if (status.internetGranted) 1 else 0)
+        parcel.writeInt(if (status.runtimeInitialized) 1 else 0)
+        check(callback.transact(AnimationFrameProtocol.STATUS_TRANSACTION, parcel, null, IBinder.FLAG_ONEWAY))
+    } finally {
+        parcel.recycle()
+    }
+}
+
+/**
+ * Host side: parses a status reply, rejecting oversized or malformed parcels, any reason other than
+ * [AnimationFrameProtocol.CODEC_REJECTED], non-boolean flags and trailing bytes.
+ */
+internal fun readAnimationStatus(parcel: Parcel): AnimationStatusInfo {
+    require(parcel.dataAvail() <= AnimationFrameProtocol.MAX_REPLY_BYTES)
+    parcel.enforceInterface(AnimationFrameProtocol.DESCRIPTOR)
+    require(parcel.dataAvail() == AnimationFrameProtocol.STATUS_PRIMITIVE_BYTES)
+    val session = parcel.readInt()
+    val reason = parcel.readInt()
+    require(reason == AnimationFrameProtocol.CODEC_REJECTED)
+    val flags = IntArray(3) { parcel.readInt().also { require(it in 0..1) } }
+    require(parcel.dataAvail() == 0)
+    return AnimationStatusInfo(session, reason, flags[0] == 1, flags[1] == 1, flags[2] == 1)
 }

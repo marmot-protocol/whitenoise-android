@@ -36,6 +36,15 @@
         ]
       },
       {
+        "surface": "Compact toolbar target spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
+        "anchor": "internal fun MicHoldButton(",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
+      },
+      {
         "surface": "Voice recording remaining-time countdown",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
         "anchor": "fun RecordingStripLeading(",

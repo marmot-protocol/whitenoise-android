@@ -3,7 +3,9 @@ package dev.ipf.whitenoise.android.ui.group
 import android.content.Context
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
@@ -49,6 +51,7 @@ import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.profile.PROFILE_ADD_TO_GROUPS_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -152,6 +155,93 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("chat_info.add_people").assertDoesNotExist()
         composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.add_member)).assertIsDisplayed()
+    }
+
+    /** Auto-open uses only the parent route; later manual entries keep their own movement and Back owner. */
+    @Test
+    fun autoOpenedAddMembersStartsSettledAndManualReentryStillMoves() {
+        val fixture = controller(group(), verifiedRoster = true)
+        val autoOpen = mutableStateOf(true)
+        var exits = 0
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.setContent {
+                CompositionLocalProvider(LocalConversationMotionEnabled provides true) {
+                    WhiteNoiseTheme {
+                        GroupDetailsScreen(
+                            appState = fixture.appState,
+                            controller = fixture.controller,
+                            onBack = { exits++ },
+                            onLeft = {},
+                            autoOpenAddMember = autoOpen.value,
+                            onAutoOpenAddMemberConsumed = { autoOpen.value = false },
+                        )
+                    }
+                }
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.mainClock.advanceTimeByFrame()
+            val autoFirst = addMembersTitleLeft()
+            composeRule.mainClock.advanceTimeBy(240)
+            assertEquals("Auto-opened picker must start at its settled position", autoFirst, addMembersTitleLeft(), .5f)
+            assertFalse(autoOpen.value)
+
+            // A real role update retires the automatic picker without disposing this details owner.
+            applyGroupStateWhilePaused(fixture.controller, group(admin = false))
+            composeRule.mainClock.advanceTimeBy(240)
+            composeRule.onNodeWithText(context.getString(R.string.add_member)).assertDoesNotExist()
+            composeRule.onNodeWithTag("chat_info.add_people").assertDoesNotExist()
+            applyGroupStateWhilePaused(fixture.controller, group())
+            composeRule.mainClock.advanceTimeBy(240)
+
+            repeat(2) { assertManualAddMembersEntryMovesAndBackReturnsToDetails() }
+            assertEquals("Manual Back must keep the details route mounted", 0, exits)
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            fixture.controller.onCleared()
+        }
+    }
+
+    /**
+     * Applies a canonical group update and publishes it to the recomposer. With the main clock paused, a write made
+     * inside `runOnIdle` is otherwise never announced, so the screen would keep composing the previous role.
+     */
+    private fun applyGroupStateWhilePaused(
+        controller: ConversationController,
+        update: AppGroupRecordFfi,
+    ) {
+        composeRule.runOnIdle {
+            controller.applyGroupStateForTest(update)
+            Snapshot.sendApplyNotifications()
+        }
+    }
+
+    /** Returns the left edge of the add-member title in root coordinates, to detect horizontal picker movement. */
+    private fun addMembersTitleLeft(): Float =
+        composeRule
+            .onNodeWithText(context.getString(R.string.add_member))
+            .fetchSemanticsNode()
+            .boundsInRoot.left
+
+    /**
+     * Reads the real picker layer rather than a separate direction or suppression calculation. The scroll runs with
+     * the clock advancing, because Compose refuses scroll actions on a paused clock, and the clock is paused again
+     * before the click so the entry frames stay observable.
+     */
+    private fun assertManualAddMembersEntryMovesAndBackReturnsToDetails() {
+        composeRule.mainClock.autoAdvance = true
+        composeRule.onNodeWithTag("chat_info.add_people").performScrollTo()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithTag("chat_info.add_people").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeByFrame()
+        val first = addMembersTitleLeft()
+        composeRule.mainClock.advanceTimeBy(240)
+        val settled = addMembersTitleLeft()
+        assertTrue("Manual picker should move in from the forward edge", first > settled + 1f)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.mainClock.advanceTimeBy(240)
+        composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
     /** Overview search keeps the conversation callback and the native mute picker is directly reachable. */

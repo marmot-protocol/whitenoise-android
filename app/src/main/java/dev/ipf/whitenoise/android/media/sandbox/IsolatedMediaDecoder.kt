@@ -147,22 +147,50 @@ internal object IsolatedMediaDecoder {
         edge: Int,
     ): Bitmap? = safely { it.region(bytes, region, edge) }
 
-    /** Preserves interactive priority while bounded group callers may wait for worker retirement. */
+    /** Ordinary callers keep nullable refusal so attachment viewers can use their sampled-still fallback. */
     fun animation(
         bytes: ByteArray,
         edge: Int,
         decorative: Boolean = false,
         waitForDecorativeAdmission: Boolean = false,
+    ): android.graphics.drawable.Drawable? = animationAttempt(bytes, edge, decorative, waitForDecorativeAdmission)
+
+    /** Only the existing group playback owner opts into finite typed fault recovery. */
+    fun groupAnimation(
+        bytes: ByteArray,
+        edge: Int,
+        demand: AnimationAdmission.GroupDemand?,
     ): android.graphics.drawable.Drawable? =
-        safely {
-            if (it is IsolatedMediaTransport || it is ReusableMediaTransport) {
+        safely(preserveStartupFaults = true) { transport ->
+            if (transport is IsolatedMediaTransport || transport is ReusableMediaTransport) {
+                installedContext?.let { context -> IsolatedAnimationSession.createGroup(context, bytes, edge, demand) }
+            } else {
+                transport.animation(bytes, edge)
+            }
+        }
+
+    /**
+     * Routes isolated transports to a fresh [IsolatedAnimationSession] and other transports to their own animation
+     * decode, collapsing typed startup faults to null while admission-busy faults still escape.
+     */
+    private fun animationAttempt(
+        bytes: ByteArray,
+        edge: Int,
+        decorative: Boolean,
+        waitForDecorativeAdmission: Boolean,
+    ): android.graphics.drawable.Drawable? =
+        safely { transport ->
+            if (transport is IsolatedMediaTransport || transport is ReusableMediaTransport) {
                 installedContext?.let { context ->
                     IsolatedAnimationSession.create(context, bytes, edge, decorative, waitForDecorativeAdmission)
                 }
             } else {
-                it.animation(bytes, edge)
+                transport.animation(bytes, edge)
             }
         }
+
+    /** A persistent, already queued FIFO ticket that a mounted group-thumbnail owner passes to [groupAnimation]. */
+    fun groupDemand(): AnimationAdmission.GroupDemand = IsolatedAnimationSession.groupDemand()
 
     fun decodeUri(
         resolver: ContentResolver,
@@ -170,7 +198,15 @@ internal object IsolatedMediaDecoder {
         edge: Int,
     ): Bitmap? = safely { it.decodeUri(resolver, uri, edge) }
 
-    private fun <T> safely(block: (MediaDecodeTransport) -> T?): T? =
+    /**
+     * Runs [block] against the installed transport, refusing isolated ones on the main thread and mapping ordinary
+     * failures to null. Admission-busy faults always escape so owners can park on availability, startup faults only
+     * when [preserveStartupFaults] is set, and an interrupt is restored before returning null.
+     */
+    private fun <T> safely(
+        preserveStartupFaults: Boolean = false,
+        block: (MediaDecodeTransport) -> T?,
+    ): T? =
         try {
             if ((transport is IsolatedMediaTransport || transport is ReusableMediaTransport) &&
                 Looper.myLooper() == Looper.getMainLooper()
@@ -179,6 +215,10 @@ internal object IsolatedMediaDecoder {
             } else {
                 transport?.let(block)
             }
+        } catch (startup: dev.ipf.whitenoise.android.media.AnimationStartupException) {
+            if (preserveStartupFaults) throw startup else null
+        } catch (busy: dev.ipf.whitenoise.android.media.AnimationAdmissionBusyException) {
+            throw busy
         } catch (interrupted: InterruptedException) {
             Thread.currentThread().interrupt()
             null

@@ -232,7 +232,18 @@ internal fun ConversationBottomBar(
                             onCancelReply = { controller.replyingTo = null },
                             onSend = { text, onAccepted ->
                                 appState.launchMutation {
-                                    appState.sendConversationText(controller, text, onAccepted)
+                                    appState.sendConversationText(controller, text, onAccepted = onAccepted)
+                                }
+                            },
+                            onSendWithPresentation = { text, onAccepted ->
+                                appState.launchMutation {
+                                    var acceptedId: String? = null
+                                    appState.sendConversationText(
+                                        controller = controller,
+                                        text = text,
+                                        onPresentationAccepted = { acceptedId = it },
+                                        onAccepted = { onAccepted(acceptedId) },
+                                    )
                                 }
                             },
                             initialDraft = initialDraft,

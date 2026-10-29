@@ -4,7 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -14,10 +14,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.invalidateMeasurement
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -46,8 +54,37 @@ internal class ConversationTailEntrance internal constructor(
     var enteringItemId: String? by mutableStateOf(null)
         internal set
 
+    /** One row claimed by its send flight for this entrance, including early retirement. */
+    internal var claimedEnteringItemId: String? by mutableStateOf(null)
+        private set
+
+    /** Composition owns claims even when the hidden destination skips drawing. */
+    internal fun claimPresentation(presentationId: String?) {
+        if (claimedEnteringItemId != enteringItemId) claimedEnteringItemId = null
+        if (motionEnabled && presentationId != null && presentationId == enteringItemId) {
+            claimedEnteringItemId = presentationId
+        }
+    }
+
+    /** Ends a settled entrance outside composition and drops its send claim, so neighbours keep final slots. */
+    internal fun release(itemId: String) {
+        if (enteringItemId != itemId) return
+        enteringItemId = null
+        if (claimedEnteringItemId == itemId) claimedEnteringItemId = null
+    }
+
     private var startedForItemId: String? = null
     private val shift = Animatable(0f)
+    private var animation: Job? = null
+    var motionEnabled: Boolean = true
+        internal set(value) {
+            field = value
+            if (!value) {
+                animation?.cancel()
+                shiftPx = 0f
+                claimedEnteringItemId = null
+            }
+        }
 
     /** How far below its laid-out slot every row is drawn right now, in pixels. */
     var shiftPx: Float by mutableFloatStateOf(0f)
@@ -58,19 +95,21 @@ internal class ConversationTailEntrance internal constructor(
         itemId: String,
         heightPx: Int,
     ) {
-        if (itemId != enteringItemId || startedForItemId == itemId) return
+        if (!motionEnabled || itemId != enteringItemId || startedForItemId == itemId) return
         startedForItemId = itemId
         // Written during layout and read only while drawing, so the very frame
         // that lays the row out already draws everything shifted, with no jump.
         val startPx = heightPx + rowSpacingPx
         shiftPx = startPx
-        scope.launch {
-            shift.snapTo(startPx)
-            shift.animateTo(0f, tween(CONVERSATION_TAIL_ENTRANCE_MILLIS, easing = FastOutSlowInEasing)) {
-                shiftPx = value
+        animation?.cancel()
+        animation =
+            scope.launch {
+                shift.snapTo(startPx)
+                shift.animateTo(0f, tween(CONVERSATION_TAIL_ENTRANCE_MILLIS, easing = FastOutSlowInEasing)) {
+                    shiftPx = value
+                }
+                shiftPx = 0f
             }
-            shiftPx = 0f
-        }
     }
 }
 
@@ -108,9 +147,12 @@ internal fun rememberConversationTailEntrance(
     followingTail: Boolean,
     initialTimelineAnchored: Boolean,
     rowSpacingPx: Float = with(LocalDensity.current) { CONVERSATION_TIMELINE_ROW_SPACING.toPx() },
+    motionEnabled: Boolean = rememberConversationMotionEnabled(),
+    ownerKey: Any? = null,
 ): ConversationTailEntrance {
     val scope = rememberCoroutineScope()
-    val entrance = remember(scope) { ConversationTailEntrance(scope, rowSpacingPx) }
+    val entrance = remember(scope, ownerKey) { ConversationTailEntrance(scope, rowSpacingPx) }
+    DisposableEffect(entrance) { onDispose { entrance.motionEnabled = false } }
     val candidate =
         latestItemId.takeIf {
             conversationTailEntranceArms(
@@ -121,34 +163,140 @@ internal fun rememberConversationTailEntrance(
                 initialTimelineAnchored = initialTimelineAnchored,
             )
         }
-    var heldItemId by remember { mutableStateOf<String?>(null) }
+    val hold = remember(ownerKey) { TailEntranceHold() }
     SideEffect {
-        if (candidate != null && heldItemId != candidate) heldItemId = candidate
+        if (candidate == null || hold.itemId == candidate) return@SideEffect
+        hold.itemId = candidate
+        hold.release?.cancel()
+        hold.release =
+            scope.launch {
+                delay(CONVERSATION_TAIL_ENTRANCE_MILLIS + CONVERSATION_TAIL_ENTRANCE_SETTLE_MILLIS)
+                hold.itemId = null
+                // Rows read the entering id only while measuring, so releasing it here relayouts them
+                // instead of recomposing the transcript.
+                entrance.release(candidate)
+            }
     }
-    LaunchedEffect(heldItemId) {
-        if (heldItemId == null) return@LaunchedEffect
-        delay(CONVERSATION_TAIL_ENTRANCE_MILLIS + CONVERSATION_TAIL_ENTRANCE_SETTLE_MILLIS)
-        heldItemId = null
-    }
-    entrance.enteringItemId = candidate ?: heldItemId
+    entrance.motionEnabled = motionEnabled
+    entrance.enteringItemId = (candidate ?: hold.itemId).takeIf { motionEnabled }
     return entrance
 }
 
-/** Draws this row shifted by the entrance in flight and, for the entering row itself, starts that entrance. */
+/**
+ * Claims the entering row for its send flight during composition, from this small scope of its own, so a flight
+ * starting or retiring recomposes only this claim and not the transcript that owns the entrance. The scope also
+ * observes the entering row, because a flight accepted before its row publishes must claim it when it arrives.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun TailEntranceSendClaim(
+    entrance: ConversationTailEntrance,
+    claimedPresentationId: () -> String?,
+) {
+    val claimed = claimedPresentationId()
+    val entering = entrance.enteringItemId
+    SideEffect { if (entering == entrance.enteringItemId) entrance.claimPresentation(claimed) }
+}
+
+/** Plain bookkeeping, so holding and releasing an entrance never invalidates the composition that owns it. */
+private class TailEntranceHold {
+    var itemId: String? = null
+    var release: Job? = null
+}
+
+/** The claim source for rows that no send flight can claim. */
+private val NoClaimedPresentation: () -> String? = { null }
+
+/**
+ * Draws this row shifted by the entrance in flight and, for the entering row itself, starts that entrance.
+ *
+ * The element compares equal for the same entrance, row and claim source, so recomposing the transcript does not
+ * re-run unchanged rows. Entrance state is read only while measuring and drawing, never during composition, so an
+ * entrance starting or settling invalidates layout and layers instead of recomposing every visible row. Callers pass
+ * a remembered [claimedPresentationId] for the same reason.
+ */
 internal fun Modifier.conversationTailEntranceMotion(
     entrance: ConversationTailEntrance,
     itemId: String,
-): Modifier {
-    val shifted = graphicsLayer { translationY = entrance.shiftPx }
-    return if (entrance.enteringItemId == itemId) {
-        // Measured, not size-changed: the row's first measure is the frame that
-        // moves everything, and a second pass is harmless once it has started.
-        shifted.layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints)
-            entrance.onEnteringRowMeasured(itemId, placeable.height)
-            layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
-        }
-    } else {
-        shifted
+    claimedPresentationId: () -> String? = NoClaimedPresentation,
+): Modifier = this then ConversationTailEntranceElement(entrance, itemId, claimedPresentationId)
+
+private data class ConversationTailEntranceElement(
+    val entrance: ConversationTailEntrance,
+    val itemId: String,
+    val claimedPresentationId: () -> String?,
+) : ModifierNodeElement<ConversationTailEntranceNode>() {
+    /** Attaches one row's entrance layer. */
+    override fun create() = ConversationTailEntranceNode(entrance, itemId, claimedPresentationId)
+
+    /** Retargets a reused row's measure and layer, so it starts and follows the current entrance. */
+    override fun update(node: ConversationTailEntranceNode) = node.retarget(entrance, itemId, claimedPresentationId)
+
+    /** Names the row and entrance when inspecting the transcript. */
+    override fun InspectorInfo.inspectableProperties() {
+        name = "conversationTailEntranceMotion"
+        properties["itemId"] = itemId
     }
 }
+
+/** Starts the entrance from the entering row's measure and draws every row at the shared shift. */
+private class ConversationTailEntranceNode(
+    private var entrance: ConversationTailEntrance,
+    private var itemId: String,
+    private var claimedPresentationId: () -> String?,
+) : Modifier.Node(),
+    LayoutModifierNode {
+    private var shiftLayer = shiftLayer(entrance, itemId, claimedPresentationId)
+
+    /**
+     * Points this node at new inputs. The layer block is rebuilt because a layer re-runs only for a new block
+     * instance, and the old one would keep observing the previous entrance's shift.
+     */
+    fun retarget(
+        entrance: ConversationTailEntrance,
+        itemId: String,
+        claimedPresentationId: () -> String?,
+    ) {
+        this.entrance = entrance
+        this.itemId = itemId
+        this.claimedPresentationId = claimedPresentationId
+        shiftLayer = shiftLayer(entrance, itemId, claimedPresentationId)
+        invalidateMeasurement()
+    }
+
+    /**
+     * Measured, not size-changed: the entering row's first measure is the frame that moves everything, and a second
+     * pass is harmless once it has started. Reading the entering id here remeasures rows when it changes.
+     */
+    override fun MeasureScope.measure(
+        measurable: Measurable,
+        constraints: Constraints,
+    ): MeasureResult {
+        val placeable = measurable.measure(constraints)
+        if (entrance.enteringItemId == itemId) entrance.onEnteringRowMeasured(itemId, placeable.height)
+        return layout(placeable.width, placeable.height) {
+            placeable.placeRelativeWithLayer(0, 0, layerBlock = shiftLayer)
+        }
+    }
+}
+
+/** Draws one row at the entrance shift, or in its own slot while its send flight claims or has just released it. */
+private fun shiftLayer(
+    entrance: ConversationTailEntrance,
+    itemId: String,
+    claimedPresentationId: () -> String?,
+): GraphicsLayerScope.() -> Unit =
+    {
+        val currentClaim = claimedPresentationId()
+        val entering = entrance.enteringItemId
+        // Once visible accepted ink retires, its neighbours must share its final slots too.
+        val claimedEntrance = entering != null && entrance.claimedEnteringItemId == entering
+        val retiredClaim = claimedEntrance && currentClaim != entering
+        val activeEnteringClaim = itemId == entering && claimedEntrance && currentClaim == entering
+        translationY =
+            if (retiredClaim || activeEnteringClaim) {
+                0f
+            } else {
+                entrance.shiftPx
+            }
+    }

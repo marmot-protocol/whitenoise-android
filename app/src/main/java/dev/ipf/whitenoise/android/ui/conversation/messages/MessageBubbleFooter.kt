@@ -43,8 +43,8 @@ internal fun TextLayoutResult.bubbleFooterLastLineWidth(layoutDirection: LayoutD
 internal fun BubbleFooterLayout(
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    lastLineWidth: Int? = null,
-    lastLineBaseline: Int? = null,
+    lastLineWidth: () -> Int? = { null },
+    lastLineBaseline: () -> Int? = { null },
     allowInline: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -61,8 +61,8 @@ internal fun BubbleFooterLayout(
             constraints = constraints,
             content = contentPlaceable,
             footer = footerPlaceable,
-            lastLineWidth = lastLineWidth,
-            lastLineBaseline = lastLineBaseline,
+            lastLineWidth = lastLineWidth(),
+            lastLineBaseline = lastLineBaseline(),
             gap = BubbleFooterGap.roundToPx(),
             allowInline = allowInline,
         )
@@ -175,8 +175,8 @@ internal fun BubbleCollapsibleFooterLayout(
     readMore: @Composable () -> Unit,
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    lastLineWidth: Int? = null,
-    lastLineBaseline: Int? = null,
+    lastLineWidth: () -> Int? = { null },
+    lastLineBaseline: () -> Int? = { null },
     allowInline: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -220,8 +220,8 @@ internal fun BubbleCollapsibleFooterLayout(
                 constraints = constraints,
                 content = contentPlaceable,
                 footer = footerPlaceable,
-                lastLineWidth = lastLineWidth,
-                lastLineBaseline = lastLineBaseline,
+                lastLineWidth = lastLineWidth(),
+                lastLineBaseline = lastLineBaseline(),
                 gap = gap,
                 allowInline = allowInline,
             )

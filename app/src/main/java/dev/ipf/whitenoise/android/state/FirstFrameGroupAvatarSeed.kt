@@ -66,4 +66,11 @@ private fun avatarSeed(
     source: ChatListAvatarSource,
     key: String,
     image: ImageBitmap,
-) = ChatListAvatarSeed(source, key, image, accountRef, AvatarImageLoader.currentCacheLifetime())
+) = ChatListAvatarSeed(
+    source,
+    key,
+    image,
+    accountRef,
+    AvatarImageLoader.currentCacheLifetime(),
+    AvatarImageLoader.cachedAnimationClassification(key),
+)
