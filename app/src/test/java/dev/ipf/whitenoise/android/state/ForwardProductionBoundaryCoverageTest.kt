@@ -118,7 +118,9 @@ class ForwardProductionBoundaryCoverageTest {
         // A source over the forward's cap is rejected, never swallowed into a download that cannot succeed.
         assertTrue("if (failure is ForwardPayloadTooLargeException) throw failure" in isolated)
         assertTrue("throw ForwardPayloadTooLargeException()" in transportFile)
-        assertTrue("readRetainedForwardPlaintext { openNativeAttachment(request) }" in transportFile)
+        // The open carries the same cap, so an over-cap retained body is refused before it is copied into a lease.
+        val budgetedOpen = "readRetainedForwardPlaintext(maxBytes) { openNativeAttachment(request, maxBytes) }"
+        assertTrue(budgetedOpen in transportFile)
         // The read is bounded and runs off the main dispatcher a forward session starts on.
         assertTrue("open()?.use { lease -> lease.readWithin(maxBytes) }" in transportFile)
         assertTrue("downloadMedia(request.accountRef, request.groupIdHex, reference)" in isolated)
