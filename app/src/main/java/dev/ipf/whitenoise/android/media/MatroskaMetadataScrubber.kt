@@ -29,8 +29,12 @@ internal class MatroskaMetadataScrubber(
     override var structureRecognised = false
         private set
 
-    /** Never true: no Matroska refusal other than a malformed structure stops the walk before the track list. */
-    override val trackListHidden = false
+    /**
+     * Whether a DocType this walk does not understand stopped it before any Segment, so the file's track list was
+     * never read. Only a malformed structure stops the walk earlier in any other way.
+     */
+    override var trackListHidden = false
+        private set
 
     /** Whether the current Segment's Tracks element was walked to its end, so every TrackEntry in it was counted. */
     override var trackListRead = false
@@ -57,16 +61,26 @@ internal class MatroskaMetadataScrubber(
         return VideoScrubSummary(VideoContainer.Matroska, voided, zeroedFields, 0L, videoTracks)
     }
 
-    /** Only Matroska and WebM document types are understood, and a missing DocType means Matroska. */
+    /**
+     * Only Matroska and WebM document types are understood, and a missing DocType means Matroska. Any other DocType is
+     * refused before a Segment is read, so the refusal records that the track list was never read.
+     */
     private fun checkDocType(header: EbmlElement) {
         forEachChild(header, depth = 1) { child ->
             if (child.id == DOC_TYPE) {
                 val length = child.end - child.dataStart
-                if (length > MAX_DOC_TYPE_BYTES) unsupportedVideo()
-                val bytes = ByteArray(length.toInt())
-                reader.store.read(child.dataStart, bytes, 0, bytes.size)
-                val docType = String(bytes, Charsets.US_ASCII).trimEnd('\u0000')
-                if (docType != "matroska" && docType != "webm") unsupportedVideo()
+                val docType =
+                    if (length > MAX_DOC_TYPE_BYTES) {
+                        null
+                    } else {
+                        val bytes = ByteArray(length.toInt())
+                        reader.store.read(child.dataStart, bytes, 0, bytes.size)
+                        String(bytes, Charsets.US_ASCII).trimEnd('\u0000')
+                    }
+                if (docType != "matroska" && docType != "webm") {
+                    trackListHidden = true
+                    unsupportedVideo()
+                }
             }
         }
     }

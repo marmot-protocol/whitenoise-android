@@ -117,13 +117,14 @@ internal object VideoMetadataScrubber {
 
     /**
      * Classifies [file] by content without changing it, by running the scrubber's own walk over a read-only view, so
-     * classification and scrubbing agree. An unreadable file reads as [VideoContent.Other].
+     * classification and scrubbing agree. A file that cannot be opened or read is [VideoContent.UnreadableContainer]:
+     * a staged snapshot whose content went unchecked is refused, never kept and uploaded with its metadata later.
      */
     fun classify(file: File): VideoContent =
         try {
             RandomAccessFile(file, "r").use { classify(FileScrubStore(it)) }
         } catch (_: IOException) {
-            VideoContent.Other
+            VideoContent.UnreadableContainer
         }
 
     /** Classifies [bytes] by content without changing them. */

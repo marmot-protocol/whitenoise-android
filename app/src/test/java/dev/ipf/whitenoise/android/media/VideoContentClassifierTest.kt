@@ -40,7 +40,11 @@ class VideoContentClassifierTest {
         assertEquals(VideoContent.VideoContainer, VideoMetadataScrubber.classify(file))
 
         assertArrayEquals(bytes, file.readBytes())
-        assertEquals(VideoContent.Other, VideoMetadataScrubber.classify(File(temporary.root, "missing.mp4")))
+        // A snapshot that cannot be read was never checked, so it must be refused rather than kept.
+        assertEquals(
+            VideoContent.UnreadableContainer,
+            VideoMetadataScrubber.classify(File(temporary.root, "missing.mp4")),
+        )
     }
 
     /** ISO BMFF is a video container only when a track's media handler is video, even if the scrub would refuse it. */
@@ -111,6 +115,8 @@ class VideoContentClassifierTest {
                 "WebM refused before its tracks" to matroskaRefusedBeforeTracks(),
                 "audio Segment, then a Segment refused before its tracks" to audioSegmentThenRefusedWebm(),
                 "compressed movie" to compressed,
+                "Matroska video with an unknown DocType" to matroskaWithTrackType(1, docType = "matroskax"),
+                "Matroska video with an overlong DocType" to matroskaWithTrackType(1, docType = "w".repeat(33)),
             )
         unreadable.forEach { (name, bytes) ->
             assertEquals(name, VideoContent.UnreadableContainer, VideoMetadataScrubber.classify(bytes))
@@ -376,10 +382,13 @@ class VideoContentClassifierTest {
         assertEquals(Scrub, documentVideoAction(VideoContent.UnconfirmedContainer, "VIDEO/MP4"))
     }
 
-    /** A minimal Matroska file with one TrackEntry of [trackType]. */
-    private fun matroskaWithTrackType(trackType: Int): ByteArray {
+    /** A minimal Matroska file with one TrackEntry of [trackType], declaring [docType]. */
+    private fun matroskaWithTrackType(
+        trackType: Int,
+        docType: String = "webm",
+    ): ByteArray {
         val entry = ebml(0xAEL, ebml(0xD7L, byteArrayOf(1)), ebml(0x83L, byteArrayOf(trackType.toByte())))
-        return concat(ebmlHeader("webm"), ebml(0x18538067L, ebml(0x1654AE6BL, entry)))
+        return concat(ebmlHeader(docType), ebml(0x18538067L, ebml(0x1654AE6BL, entry)))
     }
 
     /** [size] zero bytes with a sync byte at [first] and one and two [packet] lengths later, where they fit. */
