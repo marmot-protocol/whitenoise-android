@@ -70,7 +70,7 @@ class ConversationMediaCacheSelectionTest {
         val conversation = mountScreen(ConversationSurfaceState())
         composeRule.mainClock.autoAdvance = false
         val screenRuns =
-            countScreenCompositions {
+            countCompositions(SCREEN_SOURCE) {
                 repeat(3) { index ->
                     composeRule.runOnIdle {
                         conversation.appState.cacheMediaPlaintext("other|chat|$index|0", byteArrayOf(index.toByte()))
@@ -133,6 +133,24 @@ class ConversationMediaCacheSelectionTest {
         composeRule.waitForIdle()
     }
 
+    /** A kept media card still observes cache changes, so its attachment state refreshes while it is shown. */
+    @Test
+    fun keptMediaCardStillObservesCacheChanges() {
+        val conversation = mountScreen(ConversationSurfaceState())
+        composeRule.onNodeWithTag(messageBubbleRowTestTag(MEDIA_ID)).performTouchInput { longClick() }
+        val keep = ApplicationProvider.getApplicationContext<Context>().getString(R.string.floating_keep)
+        composeRule.onNodeWithText(keep).performClick()
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        val keptRuns =
+            countCompositions(KEPT_ATTACHMENT_SOURCE) {
+                composeRule.runOnIdle { cacheMediaBytes(conversation) }
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.waitForIdle()
+            }
+        assertTrue("the kept card's attachment did not re-run for its own download", keptRuns > 0)
+    }
+
     /** Caches the media message's only attachment, as a completed download would. */
     private fun cacheMediaBytes(conversation: ConversationController) {
         val key =
@@ -192,23 +210,26 @@ class ConversationMediaCacheSelectionTest {
         return conversation
     }
 
-    /** Counts runs of composable bodies and lambdas declared in ConversationScreen.kt during [block]. */
+    /** Counts runs of composable bodies and lambdas whose source location contains [source] during [block]. */
     @OptIn(InternalComposeTracingApi::class)
-    private fun countScreenCompositions(block: () -> Unit): Int {
+    private fun countCompositions(
+        source: String,
+        block: () -> Unit,
+    ): Int {
         var runs = 0
         Composer.setTracer(
             object : CompositionTracer {
                 /** Traces every body while installed. */
                 override fun isTraceInProgress() = true
 
-                /** Counts a body whose source location is the screen file. */
+                /** Counts a body declared in the requested source file. */
                 override fun traceEventStart(
                     key: Int,
                     dirty1: Int,
                     dirty2: Int,
                     info: String,
                 ) {
-                    if (SCREEN_SOURCE in info) runs++
+                    if (source in info) runs++
                 }
 
                 /** Body ends need no bookkeeping for a count. */
@@ -225,6 +246,7 @@ class ConversationMediaCacheSelectionTest {
 
     private companion object {
         const val SCREEN_SOURCE = "(ConversationScreen.kt:"
+        const val KEPT_ATTACHMENT_SOURCE = "(KeptAttachmentPresentations.kt:"
         val MEDIA_ID = "a2".repeat(32)
         val SENDER = "cc".repeat(32)
 
