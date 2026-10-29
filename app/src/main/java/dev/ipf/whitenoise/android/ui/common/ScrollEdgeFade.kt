@@ -80,6 +80,7 @@ private class ScrollEdgeSource(
     val forward: () -> Boolean,
 )
 
+/** Masks only edges with off-screen content, suspending the mask in place while disabled or under the IME. */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun Modifier.scrollEdgeFade(
@@ -90,30 +91,33 @@ private fun Modifier.scrollEdgeFade(
     stableRenderTarget: Boolean = false,
 ): Modifier {
     // Keyboard forms keep ordinary painting and their caller-owned scroll state.
-    // Remove the added layer immediately; hiding the IME restores the same viewport's cues.
-    if (!fadeEnabled || WindowInsets.isImeVisible) return this
-    val top = remember(source.owner, reverseScrolling, fadeEnabled) { Animatable(0.dp, Dp.VectorConverter) }
-    val bottom = remember(source.owner, reverseScrolling, fadeEnabled) { Animatable(0.dp, Dp.VectorConverter) }
-    LaunchedEffect(source.owner, reverseScrolling, fadeEnabled, fadeHeight) {
+    // Clear the mask immediately, and hiding the IME restores the same viewport's cues.
+    // The layer itself stays mounted — removing its outsets from under a clipping parent leaves that parent
+    // clipping the outset width off the left edge, which cut every chat-list avatar under the search keyboard.
+    val masking = fadeEnabled && !WindowInsets.isImeVisible
+    val top = remember(source.owner, reverseScrolling, masking) { Animatable(0.dp, Dp.VectorConverter) }
+    val bottom = remember(source.owner, reverseScrolling, masking) { Animatable(0.dp, Dp.VectorConverter) }
+    LaunchedEffect(source.owner, reverseScrolling, masking, fadeHeight) {
+        if (!masking) return@LaunchedEffect
         snapshotFlow { scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling) }
             .collectLatest { edges ->
                 coroutineScope {
-                    launch { top.updateEdge(edges.top && fadeEnabled, fadeHeight) }
-                    launch { bottom.updateEdge(edges.bottom && fadeEnabled, fadeHeight) }
+                    launch { top.updateEdge(edges.top, fadeHeight) }
+                    launch { bottom.updateEdge(edges.bottom, fadeHeight) }
                 }
             }
     }
     return verticalEdgeFade(
         // Reaching an edge must reveal the resting content immediately, even before the coroutine runs.
         topFade = {
-            if (fadeEnabled && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).top) {
+            if (masking && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).top) {
                 top.value
             } else {
                 0.dp
             }
         },
         bottomFade = {
-            if (fadeEnabled && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).bottom) {
+            if (masking && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).bottom) {
                 bottom.value
             } else {
                 0.dp
