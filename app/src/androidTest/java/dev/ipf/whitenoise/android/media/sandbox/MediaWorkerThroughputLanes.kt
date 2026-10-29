@@ -43,7 +43,7 @@ internal object ThroughputVariants {
     ): ThroughputLane {
         val binding = MediaWorkerBaselineBinding(context)
         return when (variant) {
-            // The pre-#3373 production lane: one reusable worker across inputs.
+            // The production lane: one reusable worker across inputs.
             "reuse" ->
                 ReusableMediaTransport(binding, "tp_reuse").let {
                     it.admissionObserver = observer
@@ -51,9 +51,9 @@ internal object ThroughputVariants {
                 }
             // One cold binding generation per input, with no pre-warmed spare.
             "per_input" -> fresh(variant, binding, observer, spares = 0)
-            // The production default: one clean spare warmed while the current input is served.
+            // One clean spare warmed while the current input is served.
             "prewarm1" -> fresh(variant, binding, observer, spares = 1)
-            // The pool's upper bound: two clean spares.
+            // Two clean spares, the per-input lane's default depth and the pool's upper bound.
             "prewarm2" -> fresh(variant, binding, observer, spares = 2)
             else -> error("Unknown throughput variant $variant")
         }

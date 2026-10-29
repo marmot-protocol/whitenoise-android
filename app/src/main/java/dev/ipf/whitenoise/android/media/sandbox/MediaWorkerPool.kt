@@ -343,7 +343,7 @@ internal class MediaWorkerPool(
         /** Clean spares beyond the one input-bearing generation, two keep the live-process bound at three. */
         const val MAX_SPARES = 2
 
-        /** Production pre-warm depth: one spare missed the measured burst budget, two met it. */
+        /** Default pre-warm depth: in matched emulator runs one spare missed the proposed burst budget, two met it. */
         const val DEFAULT_SPARES = 2
 
         /** Cooperative RETIRE normally ends a worker within milliseconds, after this grace Android stops it. */

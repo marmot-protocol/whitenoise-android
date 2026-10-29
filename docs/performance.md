@@ -382,8 +382,8 @@ timeouts, worker starts, live worker processes and caller FD/RSS. It is an
 opt-in `ManualDeviceFixture`; run it with `am instrument` on a disposable
 emulator or dedicated device, in ABBA order. The procedure and record format are
 in [the still-worker baseline](media-worker-baseline.md#matched-throughput-comparison);
-the #3373 results and regression budget are in
-[media containment](media-containment.md#why-this-granularity). Measure worker
+the #3373 results and proposed budget are recorded with the
+[per-input worker generations](media-containment.md#per-input-worker-generations). Measure worker
 PSS separately with `dumpsys meminfo`; RSS counts shared zygote pages per process.
 
 ### Deterministic Android media regressions

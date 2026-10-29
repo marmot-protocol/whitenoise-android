@@ -2,8 +2,8 @@
 
 This characterization was introduced before worker-per-input retirement, when
 the production transport reused its worker after successful requests. Preserve
-those measurements separately from later lifetime measurements. Production now
-uses per-input worker generations (#3373); the baseline drives that transport.
+those measurements separately from later lifetime measurements. The baseline
+drives the per-input transport (#3373), which production does not install yet.
 The audio/video containment, sender-trust, video-metadata and document-privacy
 work in #3374–#3377 remains pending.
 
@@ -93,8 +93,9 @@ manual IDs and unchecked results are retained.
 The [still-image worker lifetime](media-worker-lifetime.md) documents the
 production owner and its qualification boundaries.
 
-Production installation now uses the per-input transport. Its adoption rests
-on the matched throughput comparison below, not on this sequential corpus.
+Production installation still uses the reusable worker. Adopting the per-input
+transport rests on the matched throughput comparison below and a reviewed
+budget, not on this sequential corpus.
 
 ## Healthy startup timing
 

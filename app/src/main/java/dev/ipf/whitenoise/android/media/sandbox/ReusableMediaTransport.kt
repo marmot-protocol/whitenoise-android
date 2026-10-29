@@ -21,11 +21,7 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * The pre-#3373 lane: one serialized reusable worker. Production no longer installs it, it remains the
- * matched-measurement comparator and a facade type, so this change does not touch animation call sites.
- * A live worker that misses its deadline poisons further admission.
- */
+/** One serialized reusable worker. A live worker that misses its deadline poisons further admission. */
 @Suppress("TooManyFunctions") // Cohesive binding, admission and descriptor lifecycle for one decoder lane.
 internal class ReusableMediaTransport(
     private val context: Context,

@@ -115,38 +115,38 @@ class MediaBindingRecoveryTest {
         }
     }
 
-    /** Production install uses the per-input owner: each input gets its own generation, and reset keeps the owner. */
+    /** Production install keeps the reusable worker; only the qualification seam selects per-input generations. */
     @Test
-    fun defaultFacadeRetiresEachWorkerAndAccountResetKeepsItsOwner() =
+    fun defaultFacadeReusesItsWorkerAndAccountResetKeepsTheDefault() =
         withFacadeFields { context ->
             IsolatedMediaDecoder.install(context)
-            val owner = privateField(IsolatedMediaDecoder, "transport") as IsolatedMediaTransport
-            assertSame(owner, privateField(IsolatedMediaDecoder, "imageOwner"))
-            val firstCall = startDecode(owner, 1)
-            val first = context.next()
-            val spare = context.next() // Warmed while the first input is served.
-            assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
-            assertEquals(0, spare.remote.requests)
-            first.remote.die()
-            firstCall.join()
-            val secondCall = startDecode(owner, 2)
-            assertTrue(spare.remote.retired.await(2, TimeUnit.SECONDS))
-            assertEquals(1, first.remote.requests)
-            assertEquals(1, spare.remote.requests)
-            spare.remote.die()
-            secondCall.join()
-            assertEquals(context.instanceNames.size, context.instanceNames.toSet().size)
-            assertTrue(context.instanceNames.all { it.startsWith("images_") })
+            val owner = privateField(IsolatedMediaDecoder, "transport") as ReusableMediaTransport
+            val imageOwner = IsolatedMediaDecoder::class.java.getDeclaredField("imageOwner")
+            assertNull(imageOwner.apply { isAccessible = true }.get(IsolatedMediaDecoder))
+            startDecode(owner, 1).join()
+            context.next()
+            startDecode(owner, 2).join()
+            assertEquals(1, context.bindings.size)
+            val reused = context.bindings.single().remote
+            assertEquals(2, reused.requests)
+            assertEquals(1L, reused.retired.count)
             IsolatedMediaDecoder.resetForAccount()
-            assertSame(owner, privateField(IsolatedMediaDecoder, "transport"))
-            assertSame(owner, privateField(IsolatedMediaDecoder, "imageOwner"))
-            // The reset retires the spares warmed for the old session.
-            assertTrue(
-                context.bindings
-                    .last()
-                    .remote.retired
-                    .await(2, TimeUnit.SECONDS),
-            )
+            val replacement = privateField(IsolatedMediaDecoder, "transport")
+            assertTrue(replacement is ReusableMediaTransport)
+            assertFalse(owner === replacement)
+            IsolatedMediaDecoder.installForLifetimeQualification(context)
+            val candidate = privateField(IsolatedMediaDecoder, "transport") as IsolatedMediaTransport
+            val call = startDecode(candidate, 4)
+            try {
+                val qualification = context.next()
+                assertTrue(qualification.remote.retired.await(2, TimeUnit.SECONDS))
+                assertTrue(context.instanceNames[1].startsWith("lifetime_images_"))
+                assertFalse(context.instanceNames[0] == context.instanceNames[1])
+                qualification.remote.die()
+                call.join()
+            } finally {
+                call.interruptAndJoin()
+            }
         }
 
     /** Clearing, reinstalling and resetting the facade keeps one owner, so an unconfirmed death still holds input. */
@@ -158,13 +158,13 @@ class MediaBindingRecoveryTest {
                 .getDeclaredField("imageOwner")
                 .apply { isAccessible = true }
                 .set(IsolatedMediaDecoder, owner)
-            IsolatedMediaDecoder.install(context)
+            IsolatedMediaDecoder.installForLifetimeQualification(context)
             val call = startDecode(owner, 1)
             try {
                 val first = context.next()
                 assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
                 IsolatedMediaDecoder.clear()
-                IsolatedMediaDecoder.install(context)
+                IsolatedMediaDecoder.installForLifetimeQualification(context)
                 IsolatedMediaDecoder.resetForAccount()
                 assertSame(owner, privateField(IsolatedMediaDecoder, "imageOwner"))
                 call.interruptAndJoin()

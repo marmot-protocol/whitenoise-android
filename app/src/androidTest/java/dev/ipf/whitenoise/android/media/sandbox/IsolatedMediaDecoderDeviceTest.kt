@@ -464,7 +464,7 @@ class IsolatedMediaDecoderDeviceTest {
         IsolatedMediaDecoder.clear()
         try {
             field.set(IsolatedMediaDecoder, owner)
-            IsolatedMediaDecoder.install(target)
+            IsolatedMediaDecoder.installForLifetimeQualification(target)
             block(context, owner)
         } finally {
             IsolatedMediaDecoder.clear()

@@ -1,8 +1,10 @@
 # Still-image worker lifetime
 
-Production installation uses per-input worker generations (#3373). The facade
-installs one process-owned `IsolatedMediaTransport` and keeps it across clear,
-install and account reset, so a held generation survives facade replacement.
+Production installation keeps the reusable worker. The debug
+`installForLifetimeQualification` seam selects per-input worker generations
+(#3373) until their proposed budget is reviewed. The facade keeps that one
+process-owned `IsolatedMediaTransport` across clear, install and account reset,
+so a held generation survives facade replacement.
 Each session has its own source access, refusal cache and epoch. No in-process
 decoding fallback exists. [Media containment](media-containment.md#per-input-worker-generations)
 states the contract; this page records the owner, deadline and test boundaries.
