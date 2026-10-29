@@ -159,153 +159,123 @@ class AppStateSignUpReentryTest {
     }
 
     /** A teardown during the actual adapter's setup wait stops the form without a profile save or second account. */
-    @Suppress("LongMethod", "CyclomaticComplexMethod") // Single native callback scenario.
     @Test
     fun teardownDuringSetupWaitStopsTheFormWithoutPublishing() {
-        val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
-        val creations = AtomicInteger()
-        val readinessReads = AtomicInteger()
-        val publications = AtomicInteger()
-        val native =
-            Proxy.newProxyInstance(
-                MarmotInterface::class.java.classLoader,
-                arrayOf(MarmotInterface::class.java),
-            ) { proxy, method, args ->
-                when (method.name) {
-                    "createIdentityWithInitialProfile" -> {
-                        creations.incrementAndGet()
-                        IdentityCreationResultFfi(
-                            created,
-                            args!![0] as UserProfileMetadataFfi,
-                            AccountSetupReadinessFfi.LOCAL_READY,
-                        )
-                    }
-                    "accountSetupReadiness" -> {
-                        readinessReads.incrementAndGet()
-                        AccountSetupReadinessFfi.PUBLISHING
-                    }
-                    "publishUserProfile" -> publications.incrementAndGet().let { Unit }
-                    "accountRelayLists" ->
-                        AccountRelayListsFfi(
-                            complete = true,
-                            missing = emptyList(),
-                            defaultRelays = listOf("wss://relay.example"),
-                            bootstrapRelays = emptyList(),
-                            nip65 = RelayListFfi(kind = 10_002uL, relays = listOf("wss://relay.example")),
-                            inbox = RelayListFfi(kind = 10_050uL, relays = listOf("wss://relay.example")),
-                        )
-                    "accountNip65Relays" -> listOf("wss://relay.example")
-                    "listAccounts" -> listOf(created)
-                    "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
-                    "setAttachmentDownloadPolicy" -> Unit
-                    "toString" -> "SetupWaitTestDouble"
-                    "hashCode" -> System.identityHashCode(proxy)
-                    "equals" -> proxy === args?.firstOrNull()
-                    else -> throw UnsupportedOperationException("Unused native test call: ${method.name}")
-                }
-            } as MarmotInterface
-        val app =
-            WhiteNoiseAppState(
-                context,
-                DraftStore.forContext(context),
-                { null },
-                emptyList(),
-                "",
-                initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-wait-test").path, native),
-            )
-        WhiteNoiseAppState::class.java
-            .getDeclaredField("bootstrapCompleted")
-            .apply { isAccessible = true }
-            .setBoolean(app, true)
-        app.beginProfileSignUp()
-        val controller = checkNotNull(app.pendingProfileSignUp)
-        controller.submit(SignUpProfileDraft("Alice", "About"))
-        idleUntil { readinessReads.get() > 0 }
-        app.wipeInProgress = true
-        idleUntil { controller.stage == SignUpStage.OwnerChanged }
-        assertEquals(1, creations.get())
-        assertEquals(0, publications.get())
+        val f = SetupWaitFixture { AccountSetupReadinessFfi.PUBLISHING }
+        f.controller.submit(SignUpProfileDraft("Alice", "About"))
+        idleUntil { f.readinessReads.get() > 0 }
+        f.app.wipeInProgress = true
+        idleUntil { f.controller.stage == SignUpStage.OwnerChanged }
+        assertEquals(1, f.creations.get())
+        assertEquals(0, f.publications.get())
+    }
+
+    /** A teardown that lands while the final readiness read is suspended still blocks the profile save. */
+    @Test
+    fun teardownDuringTheReadyReadBlocksTheProfileSave() {
+        lateinit var f: SetupWaitFixture
+        f =
+            SetupWaitFixture {
+                f.app.wipeInProgress = true
+                AccountSetupReadinessFfi.NETWORK_READY
+            }
+        f.controller.submit(SignUpProfileDraft("Alice", "About"))
+        idleUntil { f.controller.stage == SignUpStage.OwnerChanged }
+        assertEquals(1, f.creations.get())
+        assertEquals(0, f.publications.get())
     }
 
     /** After the actual adapter's setup wait expires, Retry restarts MDK setup through start() for the same account. */
-    @Suppress("LongMethod", "CyclomaticComplexMethod") // Single native callback scenario.
     @Test
     fun expiredSetupWaitRetryResumesThroughStart() {
-        val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+        lateinit var f: SetupWaitFixture
+        // MDK's background attempts stopped; only start() resumes the journaled setup.
+        f =
+            SetupWaitFixture {
+                if (f.starts.get() == 0) AccountSetupReadinessFfi.PUBLISHING else AccountSetupReadinessFfi.NETWORK_READY
+            }
+        f.signUp.setupWaitTimeoutMillis = 1_000
+        f.controller.submit(SignUpProfileDraft("Alice", "About"))
+        idleUntil { f.controller.stage == SignUpStage.PublishFailed }
+        assertEquals(0, f.starts.get())
+        f.controller.retry()
+        idleUntil { f.controller.stage == SignUpStage.Complete }
+        assertEquals(1, f.starts.get())
+        assertEquals(1, f.creations.get())
+        assertEquals(1, f.publications.get())
+    }
+
+    /** The real adapter over a native double whose setup readiness each test scripts. */
+    private inner class SetupWaitFixture(
+        private val readiness: () -> AccountSetupReadinessFfi,
+    ) {
         val creations = AtomicInteger()
+        val readinessReads = AtomicInteger()
         val starts = AtomicInteger()
         val publications = AtomicInteger()
-        val native =
-            Proxy.newProxyInstance(
-                MarmotInterface::class.java.classLoader,
-                arrayOf(MarmotInterface::class.java),
-            ) { proxy, method, args ->
-                when (method.name) {
-                    "createIdentityWithInitialProfile" -> {
-                        creations.incrementAndGet()
-                        IdentityCreationResultFfi(
-                            created,
-                            args!![0] as UserProfileMetadataFfi,
-                            AccountSetupReadinessFfi.LOCAL_READY,
-                        )
-                    }
-                    // MDK's background attempts stopped; only start() resumes the journaled setup.
-                    "accountSetupReadiness" ->
-                        if (starts.get() == 0) {
-                            AccountSetupReadinessFfi.PUBLISHING
-                        } else {
-                            AccountSetupReadinessFfi.NETWORK_READY
+        val app: WhiteNoiseAppState
+        val signUp: AppProfileSignUp
+        val controller: SignUpController
+
+        init {
+            val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+            val native =
+                Proxy.newProxyInstance(
+                    MarmotInterface::class.java.classLoader,
+                    arrayOf(MarmotInterface::class.java),
+                ) { proxy, method, args ->
+                    when (method.name) {
+                        "createIdentityWithInitialProfile" -> {
+                            creations.incrementAndGet()
+                            IdentityCreationResultFfi(
+                                created,
+                                args!![0] as UserProfileMetadataFfi,
+                                AccountSetupReadinessFfi.LOCAL_READY,
+                            )
                         }
-                    "start" -> starts.incrementAndGet().let { Unit }
-                    "publishUserProfile" -> publications.incrementAndGet().let { Unit }
-                    "accountRelayLists" ->
-                        AccountRelayListsFfi(
-                            complete = true,
-                            missing = emptyList(),
-                            defaultRelays = listOf("wss://relay.example"),
-                            bootstrapRelays = emptyList(),
-                            nip65 = RelayListFfi(kind = 10_002uL, relays = listOf("wss://relay.example")),
-                            inbox = RelayListFfi(kind = 10_050uL, relays = listOf("wss://relay.example")),
-                        )
-                    "accountNip65Relays" -> listOf("wss://relay.example")
-                    "listAccounts" -> listOf(created)
-                    "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
-                    "setAttachmentDownloadPolicy" -> Unit
-                    "toString" -> "SetupResumeTestDouble"
-                    "hashCode" -> System.identityHashCode(proxy)
-                    "equals" -> proxy === args?.firstOrNull()
-                    else -> throw UnsupportedOperationException("Unused native test call: ${method.name}")
-                }
-            } as MarmotInterface
-        val app =
-            WhiteNoiseAppState(
-                context,
-                DraftStore.forContext(context),
-                { null },
-                emptyList(),
-                "",
-                initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-resume-test").path, native),
-            )
-        WhiteNoiseAppState::class.java
-            .getDeclaredField("bootstrapCompleted")
-            .apply { isAccessible = true }
-            .setBoolean(app, true)
-        val signUp =
+                        "accountSetupReadiness" -> readinessReads.incrementAndGet().let { readiness() }
+                        "start" -> starts.incrementAndGet().let { Unit }
+                        "publishUserProfile" -> publications.incrementAndGet().let { Unit }
+                        "accountRelayLists" ->
+                            AccountRelayListsFfi(
+                                complete = true,
+                                missing = emptyList(),
+                                defaultRelays = listOf("wss://relay.example"),
+                                bootstrapRelays = emptyList(),
+                                nip65 = RelayListFfi(kind = 10_002uL, relays = listOf("wss://relay.example")),
+                                inbox = RelayListFfi(kind = 10_050uL, relays = listOf("wss://relay.example")),
+                            )
+                        "accountNip65Relays" -> listOf("wss://relay.example")
+                        "listAccounts" -> listOf(created)
+                        "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+                        "setAttachmentDownloadPolicy" -> Unit
+                        "toString" -> "SetupWaitTestDouble"
+                        "hashCode" -> System.identityHashCode(proxy)
+                        "equals" -> proxy === args?.firstOrNull()
+                        else -> throw UnsupportedOperationException("Unused native test call: ${method.name}")
+                    }
+                } as MarmotInterface
+            app =
+                WhiteNoiseAppState(
+                    context,
+                    DraftStore.forContext(context),
+                    { null },
+                    emptyList(),
+                    "",
+                    initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-wait-test").path, native),
+                )
             WhiteNoiseAppState::class.java
-                .getDeclaredField("profileSignUp")
+                .getDeclaredField("bootstrapCompleted")
                 .apply { isAccessible = true }
-                .get(app) as AppProfileSignUp
-        signUp.setupWaitTimeoutMillis = 1_000
-        app.beginProfileSignUp()
-        val controller = checkNotNull(app.pendingProfileSignUp)
-        controller.submit(SignUpProfileDraft("Alice", "About"))
-        idleUntil { controller.stage == SignUpStage.PublishFailed }
-        assertEquals(0, starts.get())
-        controller.retry()
-        idleUntil { controller.stage == SignUpStage.Complete }
-        assertEquals(1, starts.get())
-        assertEquals(1, creations.get())
-        assertEquals(1, publications.get())
+                .setBoolean(app, true)
+            signUp =
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField("profileSignUp")
+                    .apply { isAccessible = true }
+                    .get(app) as AppProfileSignUp
+            app.beginProfileSignUp()
+            controller = checkNotNull(app.pendingProfileSignUp)
+        }
     }
 
     /** The actual adapter's destructive-operation flag rejects creation before accessing native state. */

@@ -124,13 +124,15 @@ internal class AppProfileSignUp(
                     }.getOrThrow()
                 },
                 publish = { account, metadata ->
-                    if (appState.activeAccountRef == account && ownerAvailable()) {
+                    val owned = { appState.activeAccountRef == account && ownerAvailable() }
+                    if (owned()) {
                         runCatchingCancellable {
                             awaitOwnedNetworkReadiness(account)
                         }.onFailure {
                             appState.presentFailure(R.string.toast_couldnt_publish_profile, "ACCOUNT_SETUP_WAIT", it)
                         }.getOrThrow()
-                        appState.publishProfile(metadata)
+                        // The last readiness read can suspend across an account switch or teardown.
+                        owned() && appState.publishProfile(metadata)
                     } else {
                         false
                     }
