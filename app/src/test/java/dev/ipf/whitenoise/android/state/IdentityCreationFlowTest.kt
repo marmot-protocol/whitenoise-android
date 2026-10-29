@@ -49,6 +49,8 @@ class IdentityCreationFlowTest {
         assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
         val initial = "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)"
         assertTrue(body.contains(initial))
+        // Creation returns the receipt at local readiness; the retried qualification stage owns the wait.
+        assertFalse(body.functionBody("MarmotInterface.createNamedIdentity").contains("awaitAccountNetworkReady"))
         assertFalse(body.contains("take(1)"))
     }
 

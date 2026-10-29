@@ -58,20 +58,17 @@ internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): Accoun
 
 /**
  * Creates an identity on the same relays whose first public kind-0 is [profile], so contacts never see the
- * key-derived default name before the chosen one (mdk#2216). The native call returns at local readiness, so
- * this waits for the network readiness [createIdentityWithBootstrapRelays] returns at; a retry resumes the
- * same native setup.
+ * key-derived default name before the chosen one (mdk#2216). Unlike [createIdentityWithBootstrapRelays] it
+ * returns at local readiness, so the caller retains the receipt before [awaitAccountNetworkReady].
  */
 internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): AccountSummaryFfi {
     val relays = MarmotClient.bootstrapRelays
-    val created = createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)
-    awaitAccountNetworkReady(created.account.label) { accountSetupReadiness(it) }
-    return created.account
+    return createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays).account
 }
 
 /**
- * Polls native setup readiness until relay lists and the initial KeyPackage are published.
- * Recovery and an expired wait surface as MDK's own typed setup errors.
+ * Polls native setup readiness until relay lists and the initial KeyPackage are published, while MDK's
+ * background setup continues. Recovery and an expired wait surface as MDK's own typed setup errors.
  */
 internal suspend fun awaitAccountNetworkReady(
     accountRef: String,

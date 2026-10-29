@@ -64,12 +64,19 @@ internal class AppProfileSignUp(
         }
     }
 
+    /**
+     * Contains the retained receipt, then waits for its relay publication. Both repeat for the same receipt
+     * on Retry, so a failed wait never discards it or creates another identity.
+     */
     private suspend fun qualifyOwnedIdentity(summary: AccountSummaryFfi) =
         appState.withAccountLifetime {
             if (!ownsCreatingRuntime(summary)) {
                 throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
             }
-            appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
+            appState.marmotIo {
+                enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label))
+                awaitAccountNetworkReady(summary.label) { accountSetupReadiness(it) }
+            }
         }
 
     /** Accepted native receipt survives recreation; only this adapter can replace it. */

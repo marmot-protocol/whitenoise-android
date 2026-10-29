@@ -28229,6 +28229,14 @@
         ]
       },
       {
+        "surface": "Sign Up waits for the retained identity's relay publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "awaitAccountNetworkReady(summary.label)",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
         "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "class WhiteNoiseAppState",
@@ -31851,6 +31859,15 @@
         "surface": "Generated identity relay-list split",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
         "anchor": "createIdentity(MarmotClient.accountRelays, relays, relays)",
+        "test_ids": [
+          "ONB-003",
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Sign Up name and About as the first public profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)",
         "test_ids": [
           "ONB-003",
           "ONB-026"

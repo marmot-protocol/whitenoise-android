@@ -202,7 +202,10 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals("Corrected", f.publications.single().name)
         }
 
-    /** Policy failure after native creation retries the same receipt and never activates it prematurely. */
+    /**
+     * Policy or readiness failure after native creation retries the same receipt and never activates it
+     * prematurely; an edited resubmission reaches the later profile save, not another creation.
+     */
     @Test fun policyFailureAfterCreationRetriesWithoutCreatingAnotherIdentity() =
         runTest {
             val f = Fixture(this)
@@ -215,12 +218,16 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals(1, f.qualifications)
             assertEquals(null, f.controller.acceptedIdentity)
             assertEquals(null, f.owner.accountRef)
+            // The retained receipt keeps Back from abandoning a created identity.
+            assertFalse(f.controller.discardUnsubmitted())
 
             f.qualificationFails = false
-            f.controller.submit(DRAFT)
+            f.controller.submit(DRAFT.copy(name = "Edited"))
             advanceUntilIdle()
 
             assertEquals(1, f.creations)
+            assertEquals(listOf("Alice"), f.initialProfiles.map { it.name })
+            assertEquals("Edited", f.publications.single().name)
             assertEquals(2, f.qualifications)
             assertEquals("created", f.controller.acceptedIdentity?.label)
             assertEquals(SignUpStage.Complete, f.controller.stage)

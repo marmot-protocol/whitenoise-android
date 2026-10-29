@@ -59,6 +59,7 @@ class AttachmentPolicyStartupOrderingTest {
         assertOrdered(create, "withCurrentAccountLifetime", "createNamedIdentity(initialProfile)")
         val qualify = adapter.functionBody("qualifyOwnedIdentity")
         assertOrdered(qualify, "ownsCreatingRuntime(summary)", "enforceAppOwnedAttachmentAcquisitionPolicy")
+        assertOrdered(qualify, "enforceAppOwnedAttachmentAcquisitionPolicy", "awaitAccountNetworkReady(summary.label)")
         val direct = adapter.functionBody("createIdentityWithoutProfile")
         assertOrdered(direct, "createOwnedIdentity(", "qualifyOwnedIdentity(account)")
         assertOrdered(direct, "qualifyOwnedIdentity(account)", "activateCreatedIdentity(summary)")
