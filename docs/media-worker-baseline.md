@@ -93,9 +93,9 @@ manual IDs and unchecked results are retained.
 The [still-image worker lifetime](media-worker-lifetime.md) documents the
 production owner and its qualification boundaries.
 
-Production installation uses the per-input transport, switched in #3516 pending
-approval of its proposed budget. That budget rests on the matched throughput
-comparison and UI-level checks below, not on this sequential corpus.
+Production installation still uses the reusable worker. Adopting the per-input
+transport rests on the matched throughput comparison below and a reviewed
+budget, not on this sequential corpus.
 
 ## Healthy startup timing
 

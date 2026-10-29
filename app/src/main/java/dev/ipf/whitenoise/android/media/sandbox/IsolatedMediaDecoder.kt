@@ -32,18 +32,34 @@ internal object IsolatedMediaDecoder {
             )
     }
 
-    /** Installs one worker generation per untrusted still input (#3373), owned for the process's lifetime. */
     @Synchronized
-    fun install(context: Context) {
+    fun install(context: Context) = installSelected(context, lifetimeQualification = false)
+
+    /** Explicit debug qualification only; normal installation keeps the existing reusable worker. */
+    @Synchronized
+    internal fun installForLifetimeQualification(context: Context) {
+        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
+        installSelected(context, lifetimeQualification = true)
+    }
+
+    private fun installSelected(
+        context: Context,
+        lifetimeQualification: Boolean,
+    ) {
         if (!Process.isIsolated()) {
             clear()
             installedContext = context.applicationContext
-            val owner =
-                imageOwner ?: IsolatedMediaTransport(context.applicationContext, "images").also {
-                    imageOwner = it
+            transport =
+                if (lifetimeQualification) {
+                    val owner =
+                        imageOwner ?: IsolatedMediaTransport(context.applicationContext, "lifetime_images").also {
+                            imageOwner = it
+                        }
+                    owner.activateSession()
+                    owner
+                } else {
+                    ReusableMediaTransport(context.applicationContext, "images")
                 }
-            owner.activateSession()
-            transport = owner
             mediaTransport = PlatformMediaTransport(context.applicationContext)
         }
     }
@@ -57,13 +73,13 @@ internal object IsolatedMediaDecoder {
         mediaTransport = next
     }
 
-    /** After an account change, puts the production image lane in place of a real image transport; fakes stay. */
     @Synchronized
     internal fun resetForAccount() {
         if (transport is IsolatedMediaTransport || transport is ReusableMediaTransport) {
             val currentContext = installedContext ?: return
+            val lifetimeQualification = transport === imageOwner
             clear()
-            install(currentContext)
+            installSelected(currentContext, lifetimeQualification)
         }
     }
 

@@ -4,7 +4,7 @@
 
 Still-image decode and inspection, EXIF inspection and SVG preparation use a nonexported `android:isolatedProcess` service. The worker has a separate UID and no application permissions. Application startup skips account state, diagnostics, locale preferences, playback, transfers and background scheduling in that process.
 
-Each still-image input runs in its own lazily bound, serialized worker generation; see [Per-input worker generations](#per-input-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
+The app lazily binds one serialized image worker. A per-input lane is implemented but not installed by default; see [Per-input worker generations](#per-input-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
 
 Input bytes are written only after their temporary file is unlinked, then passed by read-only descriptor. Picked images and media use a process-wide staging gate, with provider cancellation and bounded reads. Whole-file seekable videos pass their descriptor without a full-video array copy. Provider subranges are copied into their own unlinked inode, so a decoder cannot read bytes outside the selected asset. No URLs, account objects, keys or general file-access callback enter the worker.
 
@@ -20,9 +20,9 @@ Debug instrumentation may pass the exact path of an existing synthetic `media-co
 - Region decoding also caps the power-of-two intermediate at 16,777,216 pixels. Editor planning uses the same calculation before IPC so a budget refusal retains the processing-limit message; the worker still enforces the cap. Requested quality is preserved rather than silently undersampled to evade this limit.
 - Existing GIF/WebP canvas/frame/work admission precedes every still or animated decode. A refused animation cannot bypass admission through its first frame.
 - File media probes: at most 512 MiB, with validated descriptor offsets and lengths; this is not an attachment transfer quota.
-- Image worker watchdog: 6 seconds, with an 8-second host wait. An interrupted dispatched request also asks its worker to retire through its control looper. A worker still alive after timeout/cancellation blocks the next input; a system-confirmed death permits a fresh generation.
+- Image worker watchdog: 6 seconds, with an 8-second host wait. An interrupted dispatched request also asks the worker to retire through its control looper. A worker still alive after timeout/cancellation blocks replacement admission; a system-confirmed death permits a fresh generation.
 - Platform media: one process-wide operation, admitted before opening/staging inputs. Caller waits are bounded at 8 seconds for probes and 40 seconds for waveforms, plus bounded admission. Audio loops check cancellation and a 30-second decode ceiling. A timed-out native call keeps its slot until it actually terminates; account reset cannot create a parallel replacement thread. Late posters are recycled and retired results are discarded. The app cannot safely force-kill an in-process native call.
-- Failed source revisions have bounded in-memory quarantine. Account teardown retires the image worker generations and their spares, media delivery and pending reply capabilities; host cache-generation checks remain authoritative for UI publication.
+- Failed source revisions have bounded in-memory quarantine. Account teardown retires the image worker, media delivery and pending reply capabilities; host cache-generation checks remain authoritative for UI publication.
 
 Native temporary allocations are not bounded solely by output dimensions. Worker isolation and watchdogs contain ordinary faults but cannot force a compromised worker to obey its own watchdog or prevent a kernel/system-service escape. A malicious provider that ignores cancellation can hold one admitted off-main staging operation; new readers must not bypass its gate.
 
@@ -118,12 +118,12 @@ retains the separate manual acceptance.
 
 ## Per-input worker generations
 
-Each still-image request — decode, inspection, EXIF, region or SVG, from
-avatars, notification artwork, thumbnails, composer/editor sources and viewers
-alike — runs in its own worker generation (#3373). A generation is one
-`bindIsolatedService` binding with a unique instance name. The parent links a
-death recipient to its Binder before sending any descriptor. It carries one
-input; there is no same-source grouping, so inspecting and then
+In the per-input lane, each still-image request — decode, inspection, EXIF,
+region or SVG, from avatars, notification artwork, thumbnails, composer/editor
+sources and viewers alike — runs in its own worker generation (#3373). A
+generation is one `bindIsolatedService` binding with a unique instance name. The
+parent links a death recipient to its Binder before sending any descriptor. It
+carries one input; there is no same-source grouping, so inspecting and then
 decoding the same bytes uses two generations.
 
 - The reply capability belongs to that generation and request. It accepts one
@@ -305,12 +305,12 @@ Rejected alternatives, on the same emulators:
 
 ### Default
 
-Production installation uses per-input generations. The default was switched
-in #3516 pending approval of the [proposed budget](#measurements-and-proposed-budget),
-including its unmet emoji item. `ReusableMediaTransport` is no longer
-installed. It stays in production code as the lane to restore if that budget is
-rejected and as the measurement baseline. Removing it is a follow-up after that
-decision and after #3439, which edits the facade's animation type checks.
+Production installation keeps the reusable worker. The per-input lane is
+selected only through the debug `installForLifetimeQualification` seam until
+its [proposed budget](#measurements-and-proposed-budget), including the unmet
+emoji item, is reviewed.
+`ReusableMediaTransport` therefore stays in production code. Removing it waits
+for that decision and for #3439, which edits the facade's animation type checks.
 
 ### Residual risks
 
