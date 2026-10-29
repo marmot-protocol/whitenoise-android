@@ -2,12 +2,20 @@ package dev.ipf.whitenoise.android.media
 
 import android.os.SystemClock
 import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.permissions
+import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 
+private const val PROCESS_STOP_READY_TIMEOUT_MILLIS = 90_000L
+
 /**
- * Traces the process-stop fixture without querying WorkManager, native state or the network. Observations come
- * from reads the fixture already performs; absent observations remain distinguishable from an observed empty set.
+ * Traces the process-stop fixture's existing waits without adding native or network reads. Observations come from
+ * required WorkManager and ledger reads; absent observations remain distinguishable from an observed empty set.
  * The supplied snapshot reads in-memory host policy and native-approval bookkeeping, not native transfer state.
  */
 internal class BackgroundReceiptProcessStopDiagnostics(
@@ -21,6 +29,24 @@ internal class BackgroundReceiptProcessStopDiagnostics(
     private var ledgerObservations = 0
     private var ledgerObservedAt: Long? = null
     private var ledgerCounts: Map<String, Int> = emptyMap()
+
+    /** Keeps the fixture's original ninety-second RUNNING wait and records only its already-read work states. */
+    suspend fun awaitRunningWork(
+        manager: WorkManager,
+        name: String,
+    ): WorkInfo =
+        trace(BackgroundReceiptProcessStopStage.RunningWork) {
+            withTimeout(PROCESS_STOP_READY_TIMEOUT_MILLIS) {
+                var info: WorkInfo? = null
+                while (info == null) {
+                    val infos = manager.getWorkInfosForUniqueWork(name).get()
+                    observeWork(infos.map { it.state })
+                    info = infos.firstOrNull { it.state == WorkInfo.State.RUNNING }
+                    if (info == null) delay(50L)
+                }
+                info
+            }
+        }
 
     /** Retains only closed states from an existing WorkManager read, never work IDs, tags or input data. */
     fun observeWork(states: List<WorkInfo.State>) {
@@ -88,3 +114,19 @@ internal enum class BackgroundReceiptProcessStopStage {
     RunningWork,
     HeldLedger,
 }
+
+/** Reads only the current in-memory policy and native-approval bookkeeping for the generated receiver. */
+internal fun backgroundReceiptProcessStopDiagnostics(
+    state: WhiteNoiseAppState,
+    account: String,
+): BackgroundReceiptProcessStopDiagnostics =
+    BackgroundReceiptProcessStopDiagnostics(
+        snapshot = {
+            backgroundReceiptPolicySnapshot(
+                state.automaticAttachmentPolicy(account),
+                MediaAutoDownloadType.entries.toSet(),
+                emptySet(),
+                permissions(state).appliedRevision(account) != null,
+            )
+        },
+    )
