@@ -109,12 +109,14 @@ class ConversationAcceptedSendRouteScreenshotTest {
         assertLiveTailFlight("Hydrated during travel", 0)
     }
 
+    /** A row arriving mid-flight moves the accepted row only once it is canonical, and painted rows never overlap. */
     @Test
     fun incomingRowDuringFlightKeepsWholePaintedRowsSeparate() {
         receiveDuringFlight = true
         assertLiveTailFlight("Sending while another row arrives", 0)
     }
 
+    /** Formatted hydration mid-flight retires only the matching flight copy and reveals the canonical styled text. */
     @Test
     fun formattedHydrationRetiresOnlyTheMatchingCopyAndRevealsCanonicalInk() {
         deferMarkdownHydration = true
@@ -122,6 +124,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         assertLiveTailFlight("**Styled send**", 0)
     }
 
+    /** A plain document replacing a retired formatted destination never restarts the flight, and shows raw markdown. */
     @Test
     fun formattedDestinationThenPlainRestorationCannotResurrectTheSameFlight() {
         deferMarkdownHydration = true
@@ -130,6 +133,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         assertLiveTailFlight("**Styled send**", 0)
     }
 
+    /** A trailing keyboard-suggestion space is trimmed from the accepted text without dropping the ink flight. */
     @Test
     fun trailingKeyboardSpaceKeepsTheAcceptedInkFlight() = assertLiveTailFlight("Keyboard suggestion ", 0)
 
@@ -150,6 +154,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
     fun retiredTargetSnapsAnAlreadyPaintedSendAndKeepsTheNextDraft() =
         assertLiveTailFlight("First line\nSecond line\nThird line", 240, retireDuringFlight = true)
 
+    /** Captures the editor viewport bounds inside the composer pill and the colours painted in its top corners. */
     private fun retiredPillInternalGeometry(): Pair<Rect, List<Color>> {
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
         val surfaceBounds = surface.fetchSemanticsNode().boundsInRoot
@@ -174,6 +179,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return editorBounds to corners
     }
 
+    /** Releases the deferred markdown parse at frame 4, once moving ink has painted, and awaits the publish. */
     private fun hydrateDuringFlight(
         index: Int,
         frames: LiveTailFrames,
@@ -184,6 +190,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         awaitConversationCondition { publishCount == 1 }
     }
 
+    /** At frame 8, asserts the formatted ink retired the owner, then replays the row with a plain document. */
     private fun restorePlainDestination(
         index: Int,
         frames: LiveTailFrames,
@@ -217,6 +224,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         }
     }
 
+    /** At frame 6, asserts a painted flight is active, then sets the animator scale to zero and notifies observers. */
     private fun suppressAtFrame(
         index: Int,
         frames: LiveTailFrames,
@@ -234,6 +242,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         }
     }
 
+    /** At frame 6, asserts a flight has painted, then retires its destination with motion still enabled. */
     private fun retireAtFrame(
         index: Int,
         frames: LiveTailFrames,
@@ -247,6 +256,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         assertTrue("this fallback must not depend on disabling motion", frames.motionOwner?.enabled == true)
     }
 
+    /** At frame 10, emits the incoming window mid-flight and waits for the received row to reach the timeline. */
     private fun receiveAtFrame(
         index: Int,
         frames: LiveTailFrames,
@@ -258,6 +268,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
         awaitConversationCondition { checkNotNull(controller).timeline.any { it.record.plaintext == INCOMING_TEXT } }
     }
 
+    /**
+     * Asserts the last three tail rows paint as whole, non-overlapping rows once the landing copy settles, and records
+     * whether the accepted row moved after its first canonical exposure.
+     */
     private fun assertPaintedTailSeparation(
         frames: LiveTailFrames,
         index: Int,
@@ -298,6 +312,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         }
     }
 
+    /** Steps 30 frames, applying each scripted mid-flight event, drawing natively and collecting evidence. */
     private fun advanceLiveTailFrames(
         frames: LiveTailFrames,
         resolver: android.content.ContentResolver,
@@ -331,6 +346,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         }
     }
 
+    /** Asserts the flight painted moving geometry, the send published and hydrated once, and each variant settled. */
     private fun assertLiveTailResult(
         conversation: ConversationController,
         text: String,
@@ -392,6 +408,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
         }
     }
 
+    /**
+     * Mounts the live-tail route with the given draft, freezes frame time, sends it and drives the flight to its end,
+     * restoring the global animator scale and draw traversals afterwards.
+     */
     private fun assertLiveTailFlight(
         text: String,
         keyboardClearanceDp: Int,
@@ -612,6 +632,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return conversation
     }
 
+    /**
+     * Parses text into a one-paragraph markdown document with soft breaks, or a bold run for the styled send when
+     * formatted hydration is on.
+     */
     private fun plainParagraphDocument(text: String): MarkdownDocumentFfi =
         MarkdownDocumentFfi(
             truncated = false,
@@ -695,6 +719,10 @@ class ConversationAcceptedSendRouteScreenshotTest {
 
 private const val INCOMING_TEXT = "A received row while sending"
 
+/**
+ * Returns an action that republishes the timeline window with the accepted row plus a newly received row, then waits
+ * for the subscription to consume it.
+ */
 private fun incomingWindowEmitter(
     conversation: ConversationController,
     timelineSubscription: ScriptedConversationTimelineSubscription,
@@ -774,6 +802,7 @@ private class SendRouteEvidence : ConversationScrollEvidenceSink {
     }
 }
 
+/** Builds a chat-row projection for the test group whose last-read marker points at the newest timeline record. */
 private fun liveTailProjection(conversation: ConversationController): dev.ipf.marmotkit.ChatListRowFfi {
     val group = conversationTimelineTestGroup()
     val latest = conversation.timeline.last().record

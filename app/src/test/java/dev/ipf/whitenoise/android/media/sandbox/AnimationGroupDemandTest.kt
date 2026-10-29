@@ -8,6 +8,7 @@ import org.junit.Test
 
 /** Real admission tickets survive parked waits and respect the physical retirement boundary. */
 class AnimationGroupDemandTest {
+    /** Pending group tickets block inline acquisition after a release, and closing the head hands admission on. */
     @Test
     fun parkedFifoGroupWinsAnInlineRaceAndCancellationWakesItsSuccessor() {
         val admission = AnimationAdmission()
@@ -36,6 +37,7 @@ class AnimationGroupDemandTest {
         checkNotNull(admission.acquire(true, 100)).release()
     }
 
+    /** Group demand retires an inline lease once, but only releasing that lease frees capacity, never a ticket. */
     @Test
     fun groupDemandRetiresInlineExactlyOnceButCannotManufactureDeath() {
         val admission = AnimationAdmission()
@@ -66,6 +68,7 @@ class AnimationGroupDemandTest {
         }
     }
 
+    /** A group in fault backoff yields to a healthy group, then rejoins the FIFO at the tail when backoff ends. */
     @Test
     fun faultBackoffLetsHealthyGroupProceedAndRequeuesAtTheTail() {
         val admission = AnimationAdmission()

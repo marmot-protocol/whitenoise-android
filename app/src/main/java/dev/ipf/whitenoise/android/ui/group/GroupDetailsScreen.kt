@@ -504,6 +504,7 @@ internal fun GroupDetailsScreen(
                 animationsEnabled = rememberConversationMotionEnabled(),
             )
 
+        /** Hosts one details destination in the shared route-motion layer, so early-returning screens slide too. */
         @Composable
         fun detailsRoute(content: @Composable () -> Unit) {
             Box(Modifier.fillMaxSize().then(detailsMotion)) { content() }

@@ -4,6 +4,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 
+/**
+ * Interpolates from the thumbnail's [source] bounds to the largest rect of [aspectRatio] centered in [targetViewport],
+ * with [progress] clamped to the unit range.
+ */
 internal fun mediaViewerMotionBounds(
     source: Rect,
     viewport: Size,

@@ -202,6 +202,10 @@ class GroupMemberIdentitySearchUiTest {
         composeRule.onNodeWithTag("chat_info.member.$MEMBER_HEX").assertDoesNotExist()
     }
 
+    /**
+     * Switching accounts hides the old owner's search and drops its late result, and a replacement owner keeps its own
+     * query.
+     */
     @Test
     fun accountSwitchHidesForeignOwnerAndReplacementKeepsItsOwnQuery() {
         val pending = CompletableDeferred<String?>()

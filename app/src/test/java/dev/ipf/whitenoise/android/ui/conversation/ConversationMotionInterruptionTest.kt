@@ -26,10 +26,12 @@ class ConversationMotionInterruptionTest {
     private val resolver = ApplicationProvider.getApplicationContext<Context>().contentResolver
     private val originalScale = Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
 
+    /** Restores the system animator duration scale the test started with. */
     @After fun restoreScale() {
         setScale(originalScale)
     }
 
+    /** A mounted conversation follows the system animator scale being disabled and then re-enabled. */
     @Test fun mountedConversationObservesSystemMotionDisableAndReenable() {
         setScale(1f)
         var enabled = false
@@ -44,6 +46,10 @@ class ConversationMotionInterruptionTest {
         assertTrue(enabled)
     }
 
+    /**
+     * Twelve mounted rows share one system-motion observer with no fallback registered, and every owner follows a
+     * disable and re-enable.
+     */
     @Test fun mountedRowsShareOneObserverAndDoNotEvaluateAnUnusedDefault() {
         setScale(1f)
         val uri = Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE)
@@ -80,6 +86,7 @@ class ConversationMotionInterruptionTest {
         assertEquals(before + 1, shadowOf(resolver).getContentObservers(uri).size)
     }
 
+    /** Sets the system animator duration scale and notifies its content observers. */
     private fun setScale(scale: Float) {
         Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, scale)
         resolver.notifyChange(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), null)

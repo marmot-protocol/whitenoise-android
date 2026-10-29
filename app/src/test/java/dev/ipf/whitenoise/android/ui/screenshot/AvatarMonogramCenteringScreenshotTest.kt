@@ -39,21 +39,30 @@ class AvatarMonogramCenteringScreenshotTest {
     @get:Rule
     val rule = createComposeRule()
 
+    /** Fallback monogram glyph ink is centered with the system font. */
     @Test
     fun system() = render(AppFont.System)
 
+    /** Fallback monogram glyph ink is centered with the Manrope font. */
     @Test
     fun manrope() = render(AppFont.Manrope)
 
+    /** Fallback monogram glyph ink is centered with the Outfit font. */
     @Test
     fun outfit() = render(AppFont.Outfit)
 
+    /** Fallback monogram glyph ink is centered with the Urbanist font. */
     @Test
     fun urbanist() = render(AppFont.Urbanist)
 
+    /** Fallback monogram glyph ink is centered with the Figtree font. */
     @Test
     fun figtree() = render(AppFont.Figtree)
 
+    /**
+     * Renders S, H and O monograms at three diameters and two font scales in [font], asserting ink centering
+     * and snapshotting each scale.
+     */
     private fun render(font: AppFont) {
         val scale = mutableFloatStateOf(1f)
         rule.setContent {
@@ -88,6 +97,10 @@ class AvatarMonogramCenteringScreenshotTest {
         assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
 
+    /**
+     * Returns failures when a glyph has no white ink or its ink box is off the avatar center by more than
+     * 2.5 percent of the diameter.
+     */
     private fun inkCenterErrors(
         diameter: Int,
         glyph: String,
@@ -113,6 +126,7 @@ class AvatarMonogramCenteringScreenshotTest {
         }
     }
 
+    /** Projects [color] onto the background-to-white axis, returning 0 at the background and 1 at pure white. */
     private fun whiteCoverage(
         color: Color,
         background: Color,

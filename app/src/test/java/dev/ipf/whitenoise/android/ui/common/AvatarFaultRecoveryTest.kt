@@ -23,6 +23,10 @@ import org.robolectric.RobolectricTestRunner
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class AvatarFaultRecoveryTest {
+    /**
+     * Drawables that die right after a valid first frame spend the two-replacement fault budget,
+     * then report unavailable once.
+     */
     @Test
     fun successfulFirstFramesNeverReplenishTwoFaultReplacements() =
         runTest {
@@ -38,6 +42,7 @@ class AvatarFaultRecoveryTest {
             assertTrue(retired.all { it.closed })
         }
 
+    /** A transport startup failure is retried after backoff, while a known codec rejection or null never retries. */
     @Test
     fun transportStartupRecoversButKnownCodecAndNullNeverRetry() =
         runTest {
@@ -58,6 +63,7 @@ class AvatarFaultRecoveryTest {
             assertEquals(1, nullOpens)
         }
 
+    /** Preempted terminations are reopened without spending the fault budget or resetting the faults already spent. */
     @Test
     fun preemptionDoesNotSpendOrResetTheFaultBudget() =
         runTest {
@@ -80,6 +86,7 @@ class AvatarFaultRecoveryTest {
             assertEquals(1250L, testScheduler.currentTime)
         }
 
+    /** Cancelling the owner during fault backoff neither reopens the decoder nor reports the old owner unavailable. */
     @Test
     fun cancellingBackoffNeverReopensOrMarksTheOldOwnerUnavailable() =
         runTest {
@@ -101,6 +108,7 @@ class AvatarFaultRecoveryTest {
             assertEquals(0, unavailable)
         }
 
+    /** A replacement owner for the same source, as after a geometry change, inherits the faults already spent. */
     @Test
     fun replacingDecoderGeometryDoesNotResetTheSourceOwnerFaultAllowance() =
         runTest {
@@ -131,20 +139,27 @@ class AvatarFaultRecoveryTest {
         java.io.Closeable {
         var closed = false
 
+        /** Reports the preset termination reason at once, modelling a drawable that dies after valid first pixels. */
         override suspend fun awaitTermination() = reason
 
+        /** Returns at once, since only [awaitTermination] decides how playback ends in this fixture. */
         override suspend fun awaitPreemption() = Unit
 
+        /** Records that the owner retired this drawable, so tests can assert every opened session was closed. */
         override fun close() {
             closed = true
         }
 
+        /** Draws nothing, since the fixture only models the session lifetime. */
         override fun draw(canvas: Canvas) = Unit
 
+        /** Ignored, since the fixture paints nothing. */
         override fun setAlpha(alpha: Int) = Unit
 
+        /** Ignored, since the fixture paints nothing. */
         override fun setColorFilter(colorFilter: ColorFilter?) = Unit
 
+        /** Reports a translucent format, as the Drawable contract requires an answer. */
         @Deprecated("Deprecated in Java")
         override fun getOpacity() = PixelFormat.TRANSLUCENT
     }

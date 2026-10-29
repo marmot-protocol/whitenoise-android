@@ -175,6 +175,7 @@ class RetainedAttachmentDownloadAdmissionTest {
         override fun edit(): SharedPreferences.Editor {
             val editor = delegate.edit()
             return object : SharedPreferences.Editor by editor {
+                /** Records each interactive-identity set written, then forwards the write unchanged. */
                 override fun putStringSet(
                     key: String?,
                     values: Set<String>?,

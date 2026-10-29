@@ -113,6 +113,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     private val controllers = mutableListOf<ConversationController>()
     private val originalTimeZone = TimeZone.getDefault()
 
+    /** Pins the default time zone to UTC so message timestamps and date buckets are deterministic. */
     @Before
     fun pinMessageTimeZone() {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
@@ -580,12 +581,18 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     @Test
     fun expandedAcceptedSendCollapsesGraduallyAndPreservesTheNextDraft() = acceptedSendTrajectory(expanded = true)
 
+    /** A short accepted send flies upward once and lands exactly on its measured bubble frame. */
     @Test
     fun shortAcceptedSendHasOneUpwardTrajectoryAndAnExactLanding() = acceptedSendTrajectory(expanded = false)
 
+    /** A short right-to-left send at 2x font scale still flies upward once, without reversing. */
     @Test
     fun shortArabicLargeFontAcceptedSendHasOneUpwardTrajectory() = acceptedSendTrajectory(expanded = false, rtl = true)
 
+    /**
+     * Sends a draft through the production route and samples every painted frame of the flight, asserting
+     * upward travel, a stationary landing, an exact handoff and, when [expanded], a gradual composer collapse.
+     */
     @Suppress("LongMethod") // The actual route binds each measured frame to the accepted identity and final row.
     private fun acceptedSendTrajectory(expanded: Boolean, rtl: Boolean = false) {
         val publisherStarted = CompletableDeferred<Unit>()
@@ -862,6 +869,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         )
     }
 
+    /** Picks the draft text for a trajectory case: Arabic when [rtl], two lines when [expanded], else one line. */
     private fun trajectoryDraft(
         expanded: Boolean,
         rtl: Boolean,
@@ -872,6 +880,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             else -> "Ready to fly."
         }
 
+    /** Names a trajectory case for its snapshot and diagnostic files: expanded, short_rtl_large or short. */
     private fun trajectoryCaseName(
         expanded: Boolean,
         rtl: Boolean,
@@ -882,6 +891,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             else -> "short"
         }
 
+    /** Returns [previous] once set, else the destination bounds the first time the native bubble is uncovered. */
     private fun firstVisibleCanonical(
         owner: ComposerSendMotion,
         presentationId: String,
@@ -896,6 +906,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 .boundsInWindow
         }
 
+    /** Writes the current root image to [fileName] under [directory], doing nothing when capture is disabled. */
     private fun captureTrajectoryFrame(
         directory: java.io.File?,
         fileName: String,
@@ -903,6 +914,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         directory?.let { composeRule.onRoot().captureRoboImage(java.io.File(it, fileName).path) }
     }
 
+    /** Asserts the composer heights shrink from expanded to compact through intermediate frames, with no snap. */
     private fun assertExpandedTrajectoryCollapse(
         heights: List<Float>,
         expandedHeight: Float,
@@ -952,6 +964,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         val projection = motion.readViewport?.invoke(presentationId)
         val geometry = motion.lastRenderedGeometry
 
+        /** Formats an optional rect as a JSON array, or `null` when absent. */
         fun rect(value: Rect?): String =
             value?.let {
                 "[${it.left},${it.top},${it.right},${it.bottom}]"
@@ -1027,6 +1040,10 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         frames += geometry
     }
 
+    /**
+     * Returns the window x, just inside the moving bubble's trailing edge, that lies clear of both the
+     * source and destination text layouts.
+     */
     private fun fillSampleWindowX(
         source: ComposerSendSource,
         geometry: ComposerSendFlightGeometry,
@@ -1051,6 +1068,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         return edge
     }
 
+    /** Asserts each edge of [actual] is within one pixel of [expected], reporting [message] on failure. */
     private fun assertMotionRectNear(
         message: String,
         expected: Rect,
@@ -1062,6 +1080,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         assertEquals(message, expected.bottom, actual.bottom, 1f)
     }
 
+    /** Writes the sampled flight geometry as a JSON array under build/ for offline inspection. */
     private fun writeTrajectory(
         name: String,
         frames: List<ComposerSendFlightGeometry>,

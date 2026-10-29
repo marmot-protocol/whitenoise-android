@@ -87,6 +87,10 @@ internal class MediaViewerThumbnailRegistry {
 
     private var overflowed by mutableStateOf(false)
 
+    /**
+     * Adds a drawn thumbnail for [id], keeping duplicates so resolution can refuse ambiguous origins. Reaching the
+     * cap clears and permanently disables this registry, so its owner falls back to the direct presentation.
+     */
     internal fun register(
         id: ConversationMediaViewerAttachmentId,
         thumbnail: Thumbnail,
@@ -102,6 +106,7 @@ internal class MediaViewerThumbnailRegistry {
         thumbnails[id] = thumbnails[id].orEmpty() + thumbnail
     }
 
+    /** Unregisters exactly this [thumbnail] instance, dropping the key once none remain. */
     internal fun remove(
         id: ConversationMediaViewerAttachmentId,
         thumbnail: Thumbnail,
@@ -135,6 +140,7 @@ internal class MediaViewerThumbnailRegistry {
 
 private val LocalMediaThumbnailCanvas = staticCompositionLocalOf<(() -> LayoutCoordinates?)?> { null }
 
+/** Marks a masonry album's outer clip so grid tiles can tell which of their corners are rounded. */
 @Composable
 internal fun MediaThumbnailCanvas(content: @Composable () -> Unit) {
     val canvas = remember { arrayOfNulls<LayoutCoordinates>(1) }
@@ -149,6 +155,10 @@ private val LocalMediaReadingViewport = staticCompositionLocalOf<(() -> Rect?)?>
 /** The current motion-eligible thumbnail host also scopes its controls' press feedback. */
 internal val LocalMediaViewerThumbnails = staticCompositionLocalOf<MediaViewerThumbnailRegistry?> { null }
 
+/**
+ * Publishes [registry] to thumbnails below only while [enabled] and conversation motion is on, so disabled motion
+ * registers nothing. A [readingViewport] further limits sources to those drawn entirely inside it.
+ */
 @Composable
 internal fun MediaViewerThumbnailHost(
     registry: MediaViewerThumbnailRegistry,

@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalReactionMotionTest {
+    /** Identical adds each get a fresh intent sequence, and a removal cancels the pending effect. */
     @Test fun identicalAddsGetDistinctIntentsAndRemovalCancels() {
         val motion = LocalReactionMotion()
         motion.accept("👍", true)
@@ -21,6 +22,7 @@ class LocalReactionMotionTest {
         assertNull(motion.effect)
     }
 
+    /** An origin is consumed only by its selected emoji, and a mismatched take discards it. */
     @Test fun originIsConsumedOnlyByItsSelectedEmoji() {
         val motion = LocalReactionMotion()
         motion.choose("👍", Rect(10f, 20f, 40f, 50f))
@@ -28,6 +30,7 @@ class LocalReactionMotionTest {
         assertNull(motion.takeOrigin("👍"))
     }
 
+    /** A matching origin is returned once and is gone on the second take. */
     @Test fun matchingOriginIsConsumedOnce() {
         val motion = LocalReactionMotion()
         val bounds = Rect(10f, 20f, 40f, 50f)
@@ -36,6 +39,7 @@ class LocalReactionMotionTest {
         assertNull(motion.takeOrigin("👍"))
     }
 
+    /** A disabled owner starts no effects, and a disposed owner starts none and keeps no targets. */
     @Test fun disabledAndDisposedOwnersCannotStartEffects() {
         val motion = LocalReactionMotion()
         motion.enabled = false
@@ -49,12 +53,16 @@ class LocalReactionMotionTest {
         assertEquals(0, motion.targets.size)
     }
 
+    /** A custom emoji reaction carries no origin, so it never starts an extra decode or glyph flight. */
     @Test fun customEmojiNeverStartsAnAdditionalDecodeOrGlyphFlight() {
         val motion = LocalReactionMotion()
         motion.accept(":party:", true, Rect(10f, 20f, 40f, 50f))
         assertNull(motion.effect?.origin)
     }
 
+    /**
+     * A popup origin outside the transcript viewport, or an empty viewport, cannot fly and falls back to chip feedback.
+     */
     @Test fun popupOutsideTranscriptFallsBackToChipFeedback() {
         val motion = LocalReactionMotion()
         motion.viewport = Rect(0f, 80f, 360f, 520f)
@@ -65,6 +73,7 @@ class LocalReactionMotionTest {
         assertFalse(motion.canFly(Rect(30f, 90f, 58f, 118f), chip))
     }
 
+    /** An accepted fifth reaction type targets the existing overflow chip, and its removal clears that target. */
     @Test fun acceptedFifthTypeTargetsTheExistingOverflowChip() {
         val motion = LocalReactionMotion()
         val tallies =

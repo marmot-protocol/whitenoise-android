@@ -56,8 +56,10 @@ class MediaViewerOpeningWorkTest {
         val frames = AtomicInteger()
         Composer.setTracer(
             object : CompositionTracer {
+                /** Reports tracing as active so the compiler delivers every composable entry to this tracer. */
                 override fun isTraceInProgress() = true
 
+                /** Counts each entry into the MediaViewerFrame composable. */
                 override fun traceEventStart(
                     key: Int,
                     dirty1: Int,
@@ -69,6 +71,7 @@ class MediaViewerOpeningWorkTest {
                     }
                 }
 
+                /** Ignores event ends, since only frame entries are counted. */
                 override fun traceEventEnd() = Unit
             },
         )

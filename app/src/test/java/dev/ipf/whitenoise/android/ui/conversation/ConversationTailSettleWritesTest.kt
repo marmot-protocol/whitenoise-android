@@ -8,6 +8,10 @@ import org.junit.Test
 
 /** Exercises the real settle transaction without pretending repeated no-op scrolls are free. */
 class ConversationTailSettleWritesTest {
+    /**
+     * A measured tail that never changes runs every settle frame yet writes only the initial resets, not one scroll per
+     * frame.
+     */
     @Test
     fun unchangedMeasuredTailKeepsInitialResetsWithoutPerFrameWrites() =
         runTest {
@@ -26,6 +30,7 @@ class ConversationTailSettleWritesTest {
             assertEquals(listOf(0, 0), writer.writes)
         }
 
+    /** A tail without a measured key identity cannot be proven stable, so every frame keeps its correction write. */
     @Test
     fun missingIdentityPreservesEveryCorrection() =
         runTest {
@@ -40,6 +45,9 @@ class ConversationTailSettleWritesTest {
             assertEquals(6, writer.writes.size)
         }
 
+    /**
+     * Replacing the tail row with identical geometry but a new key still resets its key anchor with a fresh correction.
+     */
     @Test
     fun replacementWithIdenticalGeometryStillResetsItsKeyAnchor() =
         runTest {
@@ -55,6 +63,7 @@ class ConversationTailSettleWritesTest {
             assertEquals(3, writer.writes.size)
         }
 
+    /** A tail index that changes mid-settle still receives a correction write at the new index. */
     @Test
     fun changedTailIndexStillReceivesACorrection() =
         runTest {
@@ -70,6 +79,9 @@ class ConversationTailSettleWritesTest {
             assertEquals(listOf(0, 0, 1), writer.writes)
         }
 
+    /**
+     * A delayed composer change and a covered tail keep their corrections and hold the settle until the tail is clear.
+     */
     @Test
     fun delayedComposerChangeAndCoveredTailKeepCorrectionsAndSettlementWait() =
         runTest {
@@ -95,6 +107,7 @@ class ConversationTailSettleWritesTest {
             assertEquals(6, writer.writes.size)
         }
 
+    /** A user gesture during an otherwise redundant settle loop still cancels it and ends tail following. */
     @Test
     fun userGestureStillCancelsAnOtherwiseRedundantSettleLoop() =
         runTest {
@@ -119,6 +132,7 @@ class ConversationTailSettleWritesTest {
             assertEquals(listOf(0, 0), writer.writes)
         }
 
+    /** Builds a ready tail layout with a single measured 48 px row and a stable tail key. */
     private fun readyLayout() =
         ConversationTailLayout(
             lastRowHeightPx = 48,
@@ -132,6 +146,7 @@ class ConversationTailSettleWritesTest {
         override val firstVisibleItemIndex = 0
         val writes = mutableListOf<Int>()
 
+        /** Records the target index of an instant scroll. */
         override suspend fun scrollToItem(
             index: Int,
             scrollOffset: Int,
@@ -139,6 +154,7 @@ class ConversationTailSettleWritesTest {
             writes += index
         }
 
+        /** Records the target index of an animated scroll the same way as an instant one. */
         override suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int,

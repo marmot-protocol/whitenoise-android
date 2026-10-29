@@ -80,6 +80,7 @@ internal data class AnimationStatusInfo(
     val runtimeInitialized: Boolean,
 )
 
+/** Worker side: sends a one-way rejection notice for [AnimationStatusInfo.session] on the status transaction. */
 internal fun writeAnimationStatus(
     callback: IBinder,
     status: AnimationStatusInfo,
@@ -98,6 +99,10 @@ internal fun writeAnimationStatus(
     }
 }
 
+/**
+ * Host side: parses a status reply, rejecting oversized or malformed parcels, any reason other than
+ * [AnimationFrameProtocol.CODEC_REJECTED], non-boolean flags and trailing bytes.
+ */
 internal fun readAnimationStatus(parcel: Parcel): AnimationStatusInfo {
     require(parcel.dataAvail() <= AnimationFrameProtocol.MAX_REPLY_BYTES)
     parcel.enforceInterface(AnimationFrameProtocol.DESCRIPTOR)

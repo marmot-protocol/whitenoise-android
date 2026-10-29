@@ -156,6 +156,7 @@ private fun AvatarAnimationLayers(
     }
 }
 
+/** Pins the line box to the glyph and trims font padding, so the monogram sits optically centered in the circle. */
 private fun avatarMonogramStyle(
     base: TextStyle,
     fontSize: TextUnit,

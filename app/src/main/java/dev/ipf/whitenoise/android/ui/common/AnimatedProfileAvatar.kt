@@ -121,6 +121,10 @@ internal suspend fun decodeAnimatedGroupThumbnail(
     maxEdgePx: Int,
 ): Drawable? = decodeAnimatedGroupThumbnail(source, maxEdgePx, null)
 
+/**
+ * Decodes a group thumbnail on IO against [demand]'s FIFO position, surfacing typed startup and admission-busy faults
+ * to the recovery loop, and closes a drawable that lands after the caller was cancelled.
+ */
 internal suspend fun decodeAnimatedGroupThumbnail(
     source: ByteArray,
     maxEdgePx: Int,
@@ -256,6 +260,7 @@ private fun AnimatedAvatarPixels(
 internal class AvatarFaultBudget {
     private var replacements = 0
 
+    /** 250 ms before the first fault replacement, 1 s before the second, then null once the budget is spent. */
     fun nextBackoff(): Long? =
         when (replacements) {
             0 -> 250L.also { replacements++ }

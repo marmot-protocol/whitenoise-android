@@ -22,6 +22,10 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AnimationViewerFallbackTest {
+    /**
+     * A transient animated-startup failure still yields a static sampled image for the viewer,
+     * while the group seam keeps the typed failure.
+     */
     @Test
     fun transientAnimatedStartupStillReachesTheSampledImageConsumer(): Unit =
         runBlocking {
@@ -29,6 +33,7 @@ class AnimationViewerFallbackTest {
             var stills = 0
             val transport =
                 object : MediaDecodeTransport by TestMediaDecodeTransport {
+                    /** Counts the attempt and fails with a transient transport startup error. */
                     override fun animation(
                         bytes: ByteArray,
                         edge: Int,
@@ -37,6 +42,7 @@ class AnimationViewerFallbackTest {
                         throw AnimationStartupException(AnimationTermination.TransportUnavailable)
                     }
 
+                    /** Counts the still decode and returns a small blank bitmap. */
                     override fun decode(
                         bytes: ByteArray,
                         edge: Int,

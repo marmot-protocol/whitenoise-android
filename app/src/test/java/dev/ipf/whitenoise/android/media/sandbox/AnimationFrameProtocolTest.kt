@@ -54,12 +54,14 @@ class AnimationFrameProtocolTest {
         }
     }
 
+    /** A status round-trips as fixed primitives, and unknown codes, flags, missing fields or trailing data fail. */
     @Test
     fun statusContainsOnlyTheFixedKnownPrimitiveShape() {
         val status = AnimationStatusInfo(42, AnimationFrameProtocol.CODEC_REJECTED, true, false, false)
         var received: AnimationStatusInfo? = null
         val receiver =
             object : Binder() {
+                /** Asserts the status transaction code and decodes the status parcel into [received]. */
                 override fun onTransact(
                     code: Int,
                     data: Parcel,

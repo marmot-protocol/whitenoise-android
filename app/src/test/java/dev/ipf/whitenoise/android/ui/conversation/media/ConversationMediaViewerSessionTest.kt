@@ -17,6 +17,7 @@ class ConversationMediaViewerSessionTest {
             runtimeGeneration = 7,
         )
 
+    /** Each owner generation gets its own thumbnail registry, so a replacement never sees the old registrations. */
     @Test
     fun thumbnailRegistrationsCannotCrossOwnerGenerations() {
         val first = ConversationMediaViewerSessionState(owner)

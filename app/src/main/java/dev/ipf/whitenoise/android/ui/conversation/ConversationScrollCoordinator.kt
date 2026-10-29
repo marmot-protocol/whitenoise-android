@@ -656,6 +656,10 @@ internal class ConversationScrollCoordinator(
         }
     }
 
+    /**
+     * Re-issues the tail scroll while the tail is unmeasured or still under the composer inset, or whenever the
+     * layout or tail index changed since the last frame. An identical, already-clear measurement needs none.
+     */
     private fun ConversationTailLayout.needsTailCorrection(
         previous: ConversationTailLayout?,
         tailIndex: Int,

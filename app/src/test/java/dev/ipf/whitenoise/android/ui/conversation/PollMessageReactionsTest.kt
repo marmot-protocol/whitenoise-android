@@ -164,6 +164,10 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         assertQueuedReactionDiscarded(item.record.messageIdHex)
     }
 
+    /**
+     * The local-intent callback fires at optimistic acceptance, once the reaction is mine and before the native
+     * reactToMessage call.
+     */
     @Test fun localIntentCallbackRunsAtOptimisticAcceptanceBeforeNativeMutation() =
         runTest {
             val item = render()

@@ -24,6 +24,7 @@ import org.robolectric.annotation.Config
 class LocalReactionMotionLifecycleTest {
     @get:Rule val rule = createComposeRule()
 
+    /** An owner nested in a row reuses the row's state and never registers the animator-scale content observer. */
     @Test fun inheritedRowOwnerDoesNotEvaluateTheSystemObserverFallback() {
         val resolver = ApplicationProvider.getApplicationContext<Context>().contentResolver
         val uri = Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE)
@@ -39,6 +40,7 @@ class LocalReactionMotionLifecycleTest {
         assertEquals(before, shadowOf(resolver).getContentObservers(uri).size)
     }
 
+    /** A suppressed owner's late accept stays inert after re-enabling, so only the fresh owner shows an effect. */
     @Test fun queuedPreSuppressionCallbackCannotReplaceANewerEffectAfterReenable() {
         var enabled by mutableStateOf(true)
         lateinit var current: LocalReactionMotion
@@ -70,6 +72,7 @@ class LocalReactionMotionLifecycleTest {
         }
     }
 
+    /** Replacing the owner discards the old owner's pending effect, and its later accepts never reach the new one. */
     @Test fun ownerReplacementDropsPendingDecorativeTextBeforeNewAcceptance() {
         var owner by mutableStateOf("first-account")
         lateinit var current: LocalReactionMotion

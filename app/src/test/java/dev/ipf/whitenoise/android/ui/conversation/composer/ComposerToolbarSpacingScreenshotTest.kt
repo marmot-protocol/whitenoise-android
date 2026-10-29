@@ -68,14 +68,19 @@ private typealias ToolbarListener = ConversationDictationRecognitionListener
 class ComposerToolbarSpacingScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** The empty composer at 360dp keeps the compact toolbar rhythm and matches its recorded baseline. */
     @Test fun empty360() = render(ToolbarCase("empty360", 360))
 
+    /** The empty composer at 320dp keeps the compact toolbar rhythm and matches its recorded baseline. */
     @Test fun empty320() = render(ToolbarCase("empty320", 320))
 
+    /** The empty composer at 320dp in RTL with a 2x font scale keeps the compact toolbar rhythm. */
     @Test fun empty320RtlLarge() = render(ToolbarCase("empty320_rtl_large", 320, rtl = true, fontScale = 2f))
 
+    /** A composer holding a draft swaps in the Send slot while keeping the compact rhythm at 360dp. */
     @Test fun draft360() = render(ToolbarCase("draft360", 360, draft = "Ready to send"))
 
+    /** A drafted composer at 320dp in RTL with a 2x font scale keeps the compact rhythm around Send. */
     @Test fun draft320RtlLarge() =
         render(
             ToolbarCase(
@@ -87,10 +92,13 @@ class ComposerToolbarSpacingScreenshotTest {
             ),
         )
 
+    /** With one account the sending-identity slot is absent and the remaining slots stay evenly spaced at 320dp. */
     @Test fun singleAccount320() = render(ToolbarCase("single320", 320, accounts = 1))
 
+    /** A locked voice recording at 360dp shows Cancel and Stop as evenly spaced compact slots. */
     @Test fun lockedVoice360() = render(ToolbarCase("locked360", 360, locked = true))
 
+    /** A locked voice recording at 320dp in RTL with a 2x font scale keeps Cancel and Stop evenly spaced. */
     @Test fun lockedVoice320RtlLarge() =
         render(
             ToolbarCase(
@@ -102,6 +110,7 @@ class ComposerToolbarSpacingScreenshotTest {
             ),
         )
 
+    /** Compact discs keep 48dp touch targets, and clicks at or just past each visual edge reach only that disc. */
     @Test
     fun compactSlotsKeepExpandedTouchTargetsAndRouteAdjacentClicks() {
         val clicks = intArrayOf(0, 0)
@@ -153,6 +162,7 @@ class ComposerToolbarSpacingScreenshotTest {
         val locked: Boolean = false,
     )
 
+    /** Renders the toolbar for the case, asserts its slot geometry and records the Roborazzi baseline. */
     private fun render(case: ToolbarCase) {
         val alice = testAccount("alice", "aa".repeat(32))
         val bob = testAccount("bob", "bb".repeat(32))
@@ -169,6 +179,7 @@ class ComposerToolbarSpacingScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_toolbar_spacing_${case.name}.png")
     }
 
+    /** Builds the voice and dictation controllers, locking the recording when asked, and hosts the toolbar. */
     @Composable
     private fun toolbarContent(
         case: ToolbarCase,
@@ -207,6 +218,7 @@ class ComposerToolbarSpacingScreenshotTest {
         toolbarSurface(case, state, dictation, voice)
     }
 
+    /** Builds a voice controller backed by a no-op recorder session and unconfined dispatchers. */
     private fun createVoice(
         context: Context,
         scope: CoroutineScope,
@@ -220,10 +232,13 @@ class ComposerToolbarSpacingScreenshotTest {
             { throw it },
             recorderFactory = { _, _, _ ->
                 object : VoiceRecordingSession {
+                    /** Pretends recording began without touching the microphone. */
                     override fun start() = Unit
 
+                    /** Yields no recording, since the fake session captures no audio. */
                     override fun stop(): VoiceRecordingResult? = null
 
+                    /** Discards nothing, because the fake session holds no audio. */
                     override fun cancel() = Unit
                 }
             },
@@ -231,6 +246,7 @@ class ComposerToolbarSpacingScreenshotTest {
             recorderDispatcher = Dispatchers.Unconfined,
         )
 
+    /** Hosts the composer bar in a themed, fixed-width surface using the case's font scale and layout direction. */
     @Composable
     private fun toolbarSurface(
         case: ToolbarCase,
@@ -265,6 +281,7 @@ class ComposerToolbarSpacingScreenshotTest {
         }
     }
 
+    /** Asserts the visible toolbar slots are evenly spaced and non-overlapping, and that the editor stays usable. */
     private fun assertToolbarGeometry(case: ToolbarCase) {
         val sign = if (case.rtl) -1f else 1f
         if (case.locked) {
@@ -297,6 +314,7 @@ class ComposerToolbarSpacingScreenshotTest {
         }
     }
 
+    /** Asserts adjacent controls are 40 px apart centre to centre in reading order and each fills a 40 by 48 slot. */
     private fun assertTargets(
         controls: List<androidx.compose.ui.geometry.Rect>,
         sign: Float,
@@ -310,14 +328,18 @@ class ComposerToolbarSpacingScreenshotTest {
         }
     }
 
+    /** Returns the root bounds of the node with the given content description. */
     private fun bounds(description: String): androidx.compose.ui.geometry.Rect =
         composeRule.onNodeWithContentDescription(description).fetchSemanticsNode().boundsInRoot
 
     private object IdlePlatform : ConversationDictationPlatform {
+        /** Reports the microphone permission as granted. */
         override fun hasRecordAudioPermission() = true
 
+        /** Reports speech recognition as available so the dictation slot renders. */
         override fun recognitionAvailable() = true
 
+        /** Fails the test if dictation is ever started, since this host only renders the toolbar. */
         override fun createSession(listener: ToolbarListener): ToolbarSession = error("Unexpected recognition")
     }
 }

@@ -248,6 +248,7 @@ class MediaVideoShareParityTest {
         }
     }
 
+    /** Encodes a solid 64x32 PNG per page, [red] for the first and [blue] for the rest, keyed by message id. */
     private fun imageFixturePixels(
         pages: List<MediaViewerPage>,
         red: Int,
@@ -265,6 +266,7 @@ class MediaVideoShareParityTest {
             page.messageIdHex to bytes
         }
 
+    /** Asserts a mid-return frame still paints the blue source and that it sits near the second thumbnail's origin. */
     private fun assertSelectedBlueReturn(image: androidx.compose.ui.graphics.ImageBitmap) {
         val frame = image.toPixelMap()
         var top = frame.height

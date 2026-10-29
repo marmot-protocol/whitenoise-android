@@ -54,6 +54,7 @@ class ConversationMediaViewerSendMotionTest {
         }
     }
 
+    /** Opening, paging and dismissing media toggle the send guard without recomposing the transcript. */
     @Test
     fun idleMediaOpenPagingAndDismissOnlyRecomposeTheSendGuard() {
         render()
@@ -75,6 +76,7 @@ class ConversationMediaViewerSendMotionTest {
         }
     }
 
+    /** Closing media keeps motion disabled while a separate suppression holds, and re-enables it once both clear. */
     @Test
     fun closingMediaNeverOverridesASeparateMotionSuppression() {
         render()
@@ -126,6 +128,7 @@ class ConversationMediaViewerSendMotionTest {
         }
     }
 
+    /** Mounts the send-motion media gate beside a transcript text and waits until motion is enabled. */
     private fun render() {
         rule.setContent {
             SideEffect { transcriptCompositions++ }
@@ -140,6 +143,7 @@ class ConversationMediaViewerSendMotionTest {
         assertTrue(motion.enabled)
     }
 
+    /** Builds an open request for a self-sent message with one image attachment, tapping that attachment. */
     private fun request() =
         ConversationMediaViewerOpenRequest(
             messageIdHex = "message",

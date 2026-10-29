@@ -36,18 +36,25 @@ import org.robolectric.annotation.GraphicsMode
 class ComposerAcceptedCollapseTest {
     @get:Rule val rule = createComposeRule()
 
+    /** An admitted send flight animates the accepted composer collapse, and the next user edit ends that pairing. */
     @Test fun admittedTextSharesTheFlightClock() = assertAcceptance("admitted", true)
 
+    /** With send motion disabled, acceptance clears the draft but installs no flight, so the collapse snaps. */
     @Test fun disabledMotionSnaps() = assertAcceptance("disabled", false)
 
+    /** A reply send captures no source ink, so the accepted collapse snaps without a flight. */
     @Test fun replyingSnaps() = assertAcceptance("reply", false)
 
+    /** Without a measured source layout, acceptance installs no flight and the collapse snaps. */
     @Test fun missingSourceGeometrySnaps() = assertAcceptance("missing", false)
 
+    /** Cycling motion between capture and acceptance makes the captured source stale, so the collapse snaps. */
     @Test fun ownerRetiredBetweenCaptureAndAcceptanceSnaps() = assertAcceptance("retired", false)
 
+    /** An acceptance without a presentation id installs no flight, so the collapse snaps. */
     @Test fun missingPresentationSnaps() = assertAcceptance("no-presentation", false)
 
+    /** Sends a two-line draft via the real Send button under [scenario] and checks whether the collapse animates. */
     private fun assertAcceptance(
         scenario: String,
         expectedAnimated: Boolean,
@@ -95,6 +102,7 @@ class ComposerAcceptedCollapseTest {
         }
     }
 
+    /** A minimal received message for the composer to reply to. */
     private fun replyRecord() =
         AppMessageRecordFfi(
             messageIdHex = "1".repeat(64),

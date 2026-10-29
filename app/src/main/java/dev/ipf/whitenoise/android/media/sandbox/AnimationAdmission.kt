@@ -24,6 +24,10 @@ internal class AnimationAdmission(
         private var coolingDown = false
         private var queued = false
 
+        /**
+         * Appends the demand to the FIFO tail unless it is closed, cooling down or already queued, and retires an
+         * inline lease outside the lock so group thumbnails pre-empt opportunistic playback.
+         */
         internal fun enqueue() {
             val retire =
                 synchronized(lock) {
@@ -45,6 +49,7 @@ internal class AnimationAdmission(
                 changed()
             }
 
+        /** Ends fault backoff and requeues the demand at the FIFO tail, unless it was closed meanwhile. */
         fun endBackoff() {
             synchronized(lock) {
                 if (closed) return
@@ -53,11 +58,13 @@ internal class AnimationAdmission(
             enqueue()
         }
 
+        /** Drops the demand from the queue without signalling, callers hold the lock and notify as needed. */
         private fun unqueue() {
             pendingGroups.remove(this)
             queued = false
         }
 
+        /** Dequeues the demand only when it is the eligible head, so the caller may turn it into a lease. */
         internal fun takeIfHead(): Boolean {
             if (closed || coolingDown || pendingGroups.firstOrNull() !== this) return false
             unqueue()
@@ -72,8 +79,10 @@ internal class AnimationAdmission(
             }
         }
 
+        /** Whether this open, healthy demand is first in the FIFO queue, callers hold the admission lock. */
         internal fun isHead(): Boolean = !closed && !coolingDown && pendingGroups.firstOrNull() === this
 
+        /** Permanently withdraws the demand and wakes waiters, later enqueue or backoff calls become no-ops. */
         override fun close() =
             synchronized(lock) {
                 if (!closed) {
@@ -84,8 +93,10 @@ internal class AnimationAdmission(
             }
     }
 
+    /** A new ticket already queued at the FIFO tail, its owner must [GroupDemand.close] it when unmounted. */
     fun groupDemand(): GroupDemand = GroupDemand().also { it.enqueue() }
 
+    /** Bumps the availability generation and wakes monitor waiters, callers must hold [lock]. */
     private fun changed() {
         availability.value++
         lock.notifyAll()
@@ -97,6 +108,10 @@ internal class AnimationAdmission(
         timeoutMillis: Long,
     ): Lease? = acquireUntil(decorative, nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis))
 
+    /**
+     * Inline callers succeed only when the permit is free and no interactive or group demand waits. Interactive
+     * callers register as waiters, retire any non-interactive lease, and wait on the fair permit until the deadline.
+     */
     private fun acquireUntil(
         decorative: Boolean,
         deadlineNanos: Long,
@@ -140,6 +155,11 @@ internal class AnimationAdmission(
         }
     }
 
+    /**
+     * Blocks on the admission monitor until [demand] is the FIFO head with no interactive waiter and a free permit,
+     * then grants a group-thumbnail lease. Throws [AnimationAdmissionBusyException] at the absolute deadline so the
+     * owner can suspend on the availability generation rather than keep a thread blocked.
+     */
     private fun awaitDecorativeUntil(
         deadlineNanos: Long,
         demand: GroupDemand,

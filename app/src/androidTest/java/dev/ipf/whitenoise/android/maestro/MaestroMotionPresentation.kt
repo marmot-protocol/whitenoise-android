@@ -45,6 +45,7 @@ internal fun MaestroMotionPresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+/** After Start, accepts 16 real send flights 500 ms apart, from the lower measured text to the upper one. */
 @Composable
 @Suppress("FunctionNaming")
 private fun SendMotionPresentation(fixture: MaestroPresentationFixture) {
@@ -101,6 +102,7 @@ private fun SendMotionPresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+/** After Start, accepts 16 local thumbs-up flights 500 ms apart, from the measured source glyph to the chip. */
 @Composable
 @Suppress("FunctionNaming")
 private fun ReactionMotionPresentation(fixture: MaestroPresentationFixture) {
@@ -148,6 +150,7 @@ private fun ComposerSendMotion.bindMeasuredStaticViewport() {
     }
 }
 
+/** Reports the measured target text as the active flight's destination frame, text and layout once all exist. */
 @Composable
 @Suppress("FunctionNaming")
 private fun BindSendMotionDestination(

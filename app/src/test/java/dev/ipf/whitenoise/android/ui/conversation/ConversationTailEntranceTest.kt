@@ -222,6 +222,7 @@ class ConversationTailEntranceTest {
         assertEquals("the next entering and older row move together", rowHeightPx(), seenTop("m5") - seenTop("m4"), 1f)
     }
 
+    /** While a send claim stays on an older row, an unrelated newer row's entrance shifts the claimed row with it. */
     @Test
     fun anActiveOlderSendClaimSharesAnUnrelatedNewRowShift() {
         val harness = TailHarness()
@@ -252,6 +253,7 @@ class ConversationTailEntranceTest {
         }
     }
 
+    /** Prepends [id] as the newest row, optionally send-claimed, then follows it to the tail over two frames. */
     private fun appendTailRow(
         harness: TailHarness,
         id: String,
@@ -271,6 +273,7 @@ class ConversationTailEntranceTest {
         composeRule.mainClock.advanceTimeByFrame()
     }
 
+    /** Disabling motion mid-entrance settles it at once, and a new owner with motion back on never resumes it. */
     @Test fun liveMotionDisableSettlesAndOwnerReplacementDropsOldEntrance() {
         val harness = TailHarness()
         setTailContent(harness)

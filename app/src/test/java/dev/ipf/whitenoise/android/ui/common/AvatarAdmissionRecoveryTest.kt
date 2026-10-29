@@ -20,6 +20,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AvatarAdmissionRecoveryTest {
+    /** A decode refused for a busy admission group parks and retries only after the ownership generation changes. */
     @Test
     fun busyGroupRecoversOnlyAfterAnOwnershipChange() =
         runBlocking {
@@ -41,6 +42,10 @@ class AvatarAdmissionRecoveryTest {
             assertEquals(2, attempts)
         }
 
+    /**
+     * A source that decodes to null counts as corrupt and returns after one attempt, without entering contention
+     * recovery.
+     */
     @Test
     fun corruptSourceDoesNotEnterContentionRecovery() =
         runBlocking {
@@ -54,6 +59,7 @@ class AvatarAdmissionRecoveryTest {
             assertEquals(1, attempts)
         }
 
+    /** Cancelling a decode parked on a busy group prevents any later decode attempt when ownership changes. */
     @Test
     fun cancellingParkedGroupPreventsLaterDecode() =
         runBlocking {

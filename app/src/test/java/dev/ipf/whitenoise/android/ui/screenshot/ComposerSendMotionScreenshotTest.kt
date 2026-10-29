@@ -69,12 +69,15 @@ class ComposerSendMotionScreenshotTest {
     private var acceptedSends = 0
     private val actualDraws = mutableListOf<dev.ipf.whitenoise.android.ui.conversation.ComposerSendFlightGeometry>()
 
+    /** An accepted text copy shrinks and lifts into its measured bubble, with first, middle and settled baselines. */
     @Test
     fun acceptedTextCopyShrinksIntoMeasuredBubble() = record(suffix = "", rtl = false, text = TEXT)
 
+    /** An accepted right-to-left copy anchors to the right edge in the light theme, with its own baselines. */
     @Test
     fun acceptedArabicTextUsesRightAnchoredLightMotion() = record(suffix = "_light_rtl", rtl = true, text = ARABIC_TEXT)
 
+    /** A flight that reaches its final geometry numerically stays alive until the canvas paints the handoff. */
     @Test
     fun numericalFinalFrameCannotRetireBeforeTheActualCanvasPaints() {
         record("_paint_gate", false, TEXT, lateAdmission = false) { owner ->
@@ -100,6 +103,10 @@ class ComposerSendMotionScreenshotTest {
         }
     }
 
+    /**
+     * A rejected viewport falls back to the native bubble, and restoring it cannot revive the same flight
+     * without another clock frame.
+     */
     @Test
     fun actualNativeFallbackCannotResurrectWithoutAnotherClockFrame() {
         record("_native_fallback", false, TEXT) { owner ->
@@ -120,6 +127,7 @@ class ComposerSendMotionScreenshotTest {
         }
     }
 
+    /** Typing a new draft mid-flight retires the moving copy, keeping both the sent bubble text and the new draft. */
     @Test
     fun nextDraftDuringActualMovingCopyRetiresWithoutLosingEitherText() {
         val nextDraft = "A distinct next draft stays editable."
@@ -136,6 +144,11 @@ class ComposerSendMotionScreenshotTest {
         rule.onNodeWithText(nextDraft).assertIsDisplayed()
     }
 
+    /**
+     * Mounts a composer and destination over one native frame clock, sends [text], and records the first,
+     * middle and settled frames. [lateAdmission] adds a frame before the destination mounts, and [onMiddle]
+     * runs at the midpoint.
+     */
     @Suppress("LongMethod") // One native fixture binds setup and first/middle/settled capture points.
     private fun record(
         suffix: String,
@@ -318,6 +331,7 @@ class ComposerSendMotionScreenshotTest {
         }
     }
 
+    /** Advances 36 frames capturing each, checks the midpoint, then asserts the first drawn frame is on the source. */
     private fun recordFrames(
         owner: ComposerSendMotion,
         suffix: String,
@@ -350,6 +364,7 @@ class ComposerSendMotionScreenshotTest {
         org.junit.Assert.assertEquals(source.editor, initial.bounds)
     }
 
+    /** Asserts the canonical bubble paragraph has visible ink in the native frame, and snapshots it as [phase]. */
     private fun assertNativeDestinationInk(
         text: String,
         phase: String,
@@ -380,6 +395,7 @@ class ComposerSendMotionScreenshotTest {
         org.junit.Assert.assertTrue("Canonical paragraph ink is actually visible without an overlay", visibleInk > 20)
     }
 
+    /** Asserts the accepted source, still withheld from its destination, paints its ink in the native frame. */
     private fun assertPendingSourcePainted(
         owner: ComposerSendMotion,
         expectedText: String,
@@ -410,6 +426,7 @@ class ComposerSendMotionScreenshotTest {
         )
     }
 
+    /** Asserts the midpoint frame paints the moving copy's measured fill at an in-flight progress. */
     private fun assertMovingCopyPainted(owner: ComposerSendMotion) {
         val image = rule.onNodeWithTag("motion-root").captureToImage().asAndroidBitmap()
         val geometry = checkNotNull(owner.lastRenderedGeometry)

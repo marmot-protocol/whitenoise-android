@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AnimationSessionStartupDeadlineTest {
+    /** A null binding unbinds exactly once and never opens, keeping OwnerClosed when the owner cancelled first. */
     @Test
     fun nullBindingUnbindsExactlyOnceIncludingAfterOwnerCancellation() {
         for (cancelFirst in listOf(false, true)) {
@@ -73,6 +74,7 @@ class AnimationSessionStartupDeadlineTest {
         }
     }
 
+    /** The first termination reason is already set when the null binding announces free admission capacity. */
     @Test
     fun nullBindingRetainsFirstReasonBeforePublishingFreeCapacity() =
         runBlocking {
@@ -115,6 +117,7 @@ class AnimationSessionStartupDeadlineTest {
             }
         }
 
+    /** A binder already dead at link time unbinds once without OPEN, and an earlier owner close keeps its reason. */
     @Test
     fun alreadyDeadBinderUnbindsOnceWithoutOpenAndPreservesPriorCancellation() {
         for (cancelFirst in listOf(false, true)) {
@@ -149,6 +152,7 @@ class AnimationSessionStartupDeadlineTest {
         }
     }
 
+    /** Reads the admission's private availability generation flow so a test can observe capacity publication. */
     @Suppress("UNCHECKED_CAST")
     private fun availability(admission: AnimationAdmission): StateFlow<Long> =
         AnimationAdmission::class.java
@@ -156,6 +160,10 @@ class AnimationSessionStartupDeadlineTest {
             .apply { isAccessible = true }
             .get(admission) as StateFlow<Long>
 
+    /**
+     * A seven-second admission wait followed by a connection at nine seconds exhausts the one absolute
+     * eight-second deadline, so no late OPEN is sent and capacity returns only after worker death.
+     */
     @Test
     fun sevenSecondsAdmissionAndTwoSecondsConnectionCannotSendLateOpen() {
         val now = AtomicLong()
@@ -194,6 +202,7 @@ class AnimationSessionStartupDeadlineTest {
         }
     }
 
+    /** A deadline that expires while the input is staged sends no OPEN and keeps the bound worker's capacity held. */
     @Test
     fun expiryDuringStagingNeverSendsOpenOrReleasesTheBoundWorker() {
         val now = AtomicLong()
@@ -221,6 +230,10 @@ class AnimationSessionStartupDeadlineTest {
         }
     }
 
+    /**
+     * The first-frame wait receives only the 250 ms left after staging, and its timeout ends startup
+     * as TransportUnavailable instead of renewing the eight-second budget.
+     */
     @Test
     fun firstFrameWaitReceivesOnlyRemainingBudgetAndCannotRenewEightSeconds() {
         val now = AtomicLong()
@@ -259,6 +272,10 @@ class AnimationSessionStartupDeadlineTest {
         }
     }
 
+    /**
+     * Interrupting the first-frame wait closes the owner and rejects a late frame reply,
+     * and the worker's capacity stays held until it dies.
+     */
     @Test
     fun cancellationDuringFirstFrameWaitRejectsLateReplyAndRetainsCapacityUntilDeath() {
         val admission = AnimationAdmission()
@@ -288,6 +305,7 @@ class AnimationSessionStartupDeadlineTest {
         }
     }
 
+    /** Builds an [IsolatedAnimationSession] through its private constructor with injectable staging and wait hooks. */
     private fun session(
         context: Context,
         lease: AnimationAdmission.Lease,
@@ -306,6 +324,7 @@ class AnimationSessionStartupDeadlineTest {
             ).apply { isAccessible = true }
             .newInstance(context, 2, lease, staged, await) as IsolatedAnimationSession
 
+    /** Runs the session's OPEN on a background thread and always closes the session when startup returns or throws. */
     private fun open(session: IsolatedAnimationSession) =
         Running {
             try {
@@ -315,6 +334,7 @@ class AnimationSessionStartupDeadlineTest {
             }
         }
 
+    /** Reflectively calls the session's private `open` with a two-frame GIF, rethrowing the real cause. */
     private fun invokeOpen(session: IsolatedAnimationSession): IsolatedAnimationDrawable? =
         try {
             IsolatedAnimationSession::class.java
@@ -325,6 +345,7 @@ class AnimationSessionStartupDeadlineTest {
             throw (wrapped.cause ?: wrapped)
         }
 
+    /** Spins until [thread] parks in a timed or untimed wait, failing if it does not block within two seconds. */
     private fun waitForBlocked(thread: Thread) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
         while (
@@ -349,12 +370,14 @@ class AnimationSessionStartupDeadlineTest {
                 }
             }.apply { start() }
 
+        /** Joins the startup thread, asserting it ended with no failure or, when given, with an [expected] one. */
         fun finish(expected: Class<out Throwable>? = null) {
             thread.join(2000)
             assertFalse("startup must finish at the owned callback", thread.isAlive)
             if (expected == null) assertNull(failure.get()) else assertTrue(expected.isInstance(failure.get()))
         }
 
+        /** Interrupts the startup thread and waits briefly for it to exit. */
         fun cancel() {
             thread.interrupt()
             thread.join(2000)
@@ -370,8 +393,10 @@ class AnimationSessionStartupDeadlineTest {
         val unbinds = AtomicInteger()
         private val bindings = LinkedBlockingQueue<ServiceConnection>()
 
+        /** Routes application-context binding back to this fixture so its bind and unbind overrides observe it. */
         override fun getApplicationContext(): Context = this
 
+        /** Records the connection for the test to drive and reports a successful bind without starting a service. */
         override fun bindIsolatedService(
             service: Intent,
             flags: Int,
@@ -383,12 +408,15 @@ class AnimationSessionStartupDeadlineTest {
             return true
         }
 
+        /** Returns the next recorded [ServiceConnection], failing if no bind is attempted within two seconds. */
         fun next(): ServiceConnection = checkNotNull(bindings.poll(2, TimeUnit.SECONDS))
 
+        /** Counts unbind calls so tests can assert the session unbinds exactly once. */
         override fun unbindService(conn: ServiceConnection) {
             unbinds.incrementAndGet()
         }
 
+        /** Kills the recording binder and closes any descriptor and shared memory it received. */
         override fun close() {
             remote.die()
             remote.closeReceivedCapabilities()
@@ -403,6 +431,7 @@ class AnimationSessionStartupDeadlineTest {
         var message: Message? = null
         private val recipients = mutableListOf<IBinder.DeathRecipient>()
 
+        /** Records the death recipient, or throws RemoteException when the fixture simulates an already-dead binder. */
         override fun linkToDeath(
             recipient: IBinder.DeathRecipient,
             flags: Int,
@@ -411,8 +440,10 @@ class AnimationSessionStartupDeadlineTest {
             synchronized(recipients) { recipients += recipient }
         }
 
+        /** Fires every recorded death recipient, simulating the isolated worker process dying. */
         fun die() = synchronized(recipients) { recipients.toList() }.forEach { it.binderDied() }
 
+        /** Accepts Messenger transactions and records each OPEN message so tests can assert whether OPEN was sent. */
         override fun onTransact(
             code: Int,
             data: Parcel,
@@ -432,6 +463,7 @@ class AnimationSessionStartupDeadlineTest {
             return true
         }
 
+        /** Closes the input descriptor and output shared memory carried by the recorded OPEN message, then drops it. */
         @Suppress("DEPRECATION")
         fun closeReceivedCapabilities() {
             message?.data?.getParcelable<ParcelFileDescriptor>("input")?.close()

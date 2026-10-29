@@ -553,6 +553,7 @@ class ProfileAddToGroupsFlowTest {
         composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
     }
 
+    /** Presents the target profile and composes the foreground coordinator over a placeholder chat list shell. */
     private fun renderProfile(appState: WhiteNoiseAppState = testAppState()) {
         appState.presentProfile(TARGET_NPROFILE)
         composeRule.setContent {
@@ -745,6 +746,7 @@ private class NestedInviteRuntimeFixture(
         return arguments.dropLast(1)
     }
 
+    /** Resolves the single identity argument of a lookup call [name], rejecting any other arity. */
     private fun readIdentity(
         name: String,
         args: List<Any?>,
@@ -753,11 +755,13 @@ private class NestedInviteRuntimeFixture(
         return identity(args[0])
     }
 
+    /** Maps a known npub, profile reference or account hex to its account hex, rejecting anything else. */
     private fun identity(value: Any?): String {
         val ref = value as? String ?: reject("Unexpected identity $value")
         return references[ref] ?: reject("Unexpected identity $value")
     }
 
+    /** Answers a block or follow query about the target with false, rejecting any other account or arguments. */
     private fun relationship(
         name: String,
         args: List<Any?>,
@@ -767,6 +771,7 @@ private class NestedInviteRuntimeFixture(
         return false
     }
 
+    /** Returns the group snapshot, adding the target to its roster once an invite has been recorded. */
     private fun snapshot(
         name: String,
         args: List<Any?>,
@@ -777,6 +782,7 @@ private class NestedInviteRuntimeFixture(
         return dev.ipf.marmotkit.GroupConversationSnapshotFfi(result.details, result.managementState)
     }
 
+    /** Records an invite of exactly the target into the group and returns the roster that now includes them. */
     private fun invite(
         name: String,
         args: List<Any?>,
@@ -786,6 +792,7 @@ private class NestedInviteRuntimeFixture(
         return mutation(listOf(selfHex, targetHex, thirdHex))
     }
 
+    /** Builds a mutation result with [members] and the local profile as sole admin, in this fixture's group. */
     private fun mutation(members: List<String>) =
         testGroupMutationResult(
             members,
@@ -794,6 +801,7 @@ private class NestedInviteRuntimeFixture(
             selfRef = selfRef,
         ).let { it.copy(details = it.details.copy(group = group)) }
 
+    /** Rejects the call named [name] unless [actual] equals [expected]. */
     private fun expect(
         name: String,
         actual: List<Any?>,
@@ -802,6 +810,7 @@ private class NestedInviteRuntimeFixture(
         if (actual != expected) reject("Unexpected $name arguments: $actual")
     }
 
+    /** Records [message] as an unexpected native call and fails the test with it. */
     private fun reject(message: String): Nothing {
         unexpected += message
         error(message)

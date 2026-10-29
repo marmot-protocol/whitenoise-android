@@ -64,26 +64,39 @@ class DetailRouteMotionScreenshotTest {
     private var activeController: ConversationController? = null
     private var routeBackground: Int? = null
 
+    /** Releases the conversation controller that the test created, if any. */
     @After fun closeController() {
         activeController?.onCleared()
     }
 
+    /** Profile sheet route motion into its notification scope on the light theme. */
     @Test fun profileLight() = capture("profile_light", profile = true)
 
+    /** Profile sheet route motion into its notification scope on the dark theme. */
     @Test fun profileDark() = capture("profile_dark", profile = true, dark = true)
 
+    /** Profile sheet route motion into its notification scope on the AMOLED theme. */
     @Test fun profileAmoled() = capture("profile_amoled", profile = true, dark = true, amoled = true)
 
+    /** Profile sheet route motion under RTL at double font scale on the AMOLED theme. */
     @Test fun profileLargeRtl() = capture("profile_large_rtl", profile = true, dark = true, amoled = true, rtl = true)
 
+    /** Conversation route motion between details and its notification settings on the light theme. */
     @Test fun conversationLight() = capture("conversation_light")
 
+    /** Conversation route motion between details and its notification settings on the dark theme. */
     @Test fun conversationDark() = capture("conversation_dark", dark = true)
 
+    /** Conversation route motion between details and its notification settings on the AMOLED theme. */
     @Test fun conversationAmoled() = capture("conversation_amoled", dark = true, amoled = true)
 
+    /** Conversation route motion under RTL at double font scale on the AMOLED theme. */
     @Test fun conversationLargeRtl() = capture("conversation_large_rtl", dark = true, amoled = true, rtl = true)
 
+    /**
+     * Drives the real route from its source to the notification destination and back, capturing the first, mid and
+     * settled frames of each transition. It ends by showing the app lock mid-flight and asserting the route goes away.
+     */
     @Suppress("LongMethod") // One native fixture binds setup and first/middle/settled capture points.
     private fun capture(
         name: String,
@@ -189,6 +202,7 @@ class DetailRouteMotionScreenshotTest {
     private fun awaitNotificationCategories(logOffset: Int) {
         val animationOrigin = rule.mainClock.currentTime
 
+        /** Returns the log lines since [logOffset] that mark the end of category preparation. */
         fun terminalRecords() =
             ShadowLog
                 .getLogsForTag("ConversationSettings")
@@ -237,6 +251,10 @@ class DetailRouteMotionScreenshotTest {
         node.captureToImage().asAndroidBitmap().captureRoboImage(File(frames, "source.png").path)
     }
 
+    /**
+     * Steps through 21 frames of the running route transition, checking that the first frame exposes the themed
+     * backplate at the edge the moving page vacates, and saves goldens for frames 0, 6 and 20 (or every frame).
+     */
     private fun captureTransition(
         name: String,
         profile: Boolean,
@@ -268,6 +286,7 @@ class DetailRouteMotionScreenshotTest {
         }
     }
 
+    /** Builds an app state with one local account that resolves and names the given peer profile, if any. */
     private fun appState(
         profileHex: String? = null,
         profile: UserProfileMetadataFfi? = null,
@@ -291,6 +310,7 @@ class DetailRouteMotionScreenshotTest {
             },
         )
 
+    /** Builds the running, locally signing summary of the active account. */
     private fun account() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -301,6 +321,7 @@ class DetailRouteMotionScreenshotTest {
             running = true,
         )
 
+    /** Builds the Weekend hikers group record, administered by the local account or, if not [admin], the peer. */
     private fun group(admin: Boolean) =
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -331,6 +352,7 @@ class DetailRouteMotionScreenshotTest {
             disbandRequest = null,
         )
 
+    /** Lists six members: the local account, the peer profile and four others. */
     private fun groupMembers(): List<AppGroupMemberRecordFfi> =
         listOf(
             member(SELF_HEX, local = true),
@@ -341,6 +363,7 @@ class DetailRouteMotionScreenshotTest {
             member("e".repeat(64)),
         )
 
+    /** Builds a member record for [memberId], bound to the active account when [local]. */
     private fun member(
         memberId: String,
         local: Boolean = false,
@@ -350,6 +373,7 @@ class DetailRouteMotionScreenshotTest {
         local = local,
     )
 
+    /** Builds the required encrypted-media component with a single blossom endpoint. */
     private fun encryptedMedia() =
         AppGroupEncryptedMediaComponentFfi(
             componentId = 0x8008u,
@@ -368,8 +392,10 @@ class DetailRouteMotionScreenshotTest {
         )
 
     private object EmptyDraftPersistence : DraftPersistence {
+        /** Reports no persisted drafts. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards every draft write. */
         override fun write(
             key: String,
             value: String?,

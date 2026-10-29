@@ -121,6 +121,10 @@ class ComposerSendEndpointVisibilityScreenshotTest {
         }
     }
 
+    /**
+     * An endpoint that starts clipped by a draw-layer clip becomes measurable once uncovered, with no new position
+     * callback.
+     */
     @Test
     fun initialClippedTargetRecoversWithoutAnotherPositionCallback() {
         val motion = ComposerSendMotion().apply { enabled = true }
@@ -175,6 +179,10 @@ class ComposerSendEndpointVisibilityScreenshotTest {
         }
     }
 
+    /**
+     * Lays out a source text field and a 48dp target inside a 24dp box whose draw layer clips only while readClip is
+     * true.
+     */
     @Composable
     private fun pendingClipProbe(
         motion: ComposerSendMotion,

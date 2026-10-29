@@ -201,6 +201,7 @@ class GroupDetailsEditNavigationTest {
         }
     }
 
+    /** Returns the left edge of the add-member title in root coordinates, to detect horizontal picker movement. */
     private fun addMembersTitleLeft(): Float =
         composeRule
             .onNodeWithText(context.getString(R.string.add_member))

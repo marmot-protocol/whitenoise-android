@@ -169,6 +169,10 @@ internal object IsolatedMediaDecoder {
             }
         }
 
+    /**
+     * Routes isolated transports to a fresh [IsolatedAnimationSession] and other transports to their own animation
+     * decode, collapsing typed startup faults to null while admission-busy faults still escape.
+     */
     private fun animationAttempt(
         bytes: ByteArray,
         edge: Int,
@@ -185,6 +189,7 @@ internal object IsolatedMediaDecoder {
             }
         }
 
+    /** A persistent, already queued FIFO ticket that a mounted group-thumbnail owner passes to [groupAnimation]. */
     fun groupDemand(): AnimationAdmission.GroupDemand = IsolatedAnimationSession.groupDemand()
 
     fun decodeUri(
@@ -193,6 +198,11 @@ internal object IsolatedMediaDecoder {
         edge: Int,
     ): Bitmap? = safely { it.decodeUri(resolver, uri, edge) }
 
+    /**
+     * Runs [block] against the installed transport, refusing isolated ones on the main thread and mapping ordinary
+     * failures to null. Admission-busy faults always escape so owners can park on availability, startup faults only
+     * when [preserveStartupFaults] is set, and an interrupt is restored before returning null.
+     */
     private fun <T> safely(
         preserveStartupFaults: Boolean = false,
         block: (MediaDecodeTransport) -> T?,

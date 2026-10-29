@@ -175,6 +175,11 @@ internal class ComposerSendMotion {
                 "destinationLayout=${destinationLayout != null} " +
                 "landingMeasured=${landingMeasurement != null} painted=${lastRenderedGeometry != null}"
 
+    /**
+     * Snapshots the measured editor ink for [text] as a flight source tied to the current owner generation. Null
+     * when motion is off, an endpoint is clipped or detached, or the draft is not plain unclipped ink with one
+     * paragraph direction. Every attempt is counted for diagnostics.
+     */
     fun capture(text: String): ComposerSendSource? =
         sourceLayout
             ?.let { layout ->
@@ -229,6 +234,7 @@ internal class ComposerSendMotion {
         }
     }
 
+    /** Retires the flight, its paint record and destination measurements, keeping mounted source bindings. */
     fun clear(reason: String = "external-owner") {
         lastClearReason = reason
         lastClearedActiveFlight = flight != null
@@ -241,6 +247,10 @@ internal class ComposerSendMotion {
         destinationLayout = null
     }
 
+    /**
+     * Host teardown: disables motion, bumps the owner generation so earlier captures can no longer be accepted, and
+     * drops every source binding.
+     */
     fun dispose() {
         enabled = false
         ownerGeneration += 1
@@ -253,6 +263,10 @@ internal class ComposerSendMotion {
         readViewport = null
     }
 
+    /**
+     * Records the bubble frame and paint the flight lands on, ignored for any other presentation. An admitted flight
+     * whose frame becomes clipped or detached is cleared instead of landing on hidden geometry.
+     */
     @Suppress("LongParameterList") // Measured destination paint and geometry travel together.
     fun destinationFrame(
         id: String,
@@ -274,6 +288,7 @@ internal class ComposerSendMotion {
         destinationStrokeWidth = strokeWidth
     }
 
+    /** Records where the destination text sits, with the same identity and visibility guards as [destinationFrame]. */
     fun destinationText(
         id: String,
         coordinates: LayoutCoordinates,
@@ -286,6 +301,10 @@ internal class ComposerSendMotion {
         destinationText = coordinates
     }
 
+    /**
+     * Publishes the destination layout only when it draws the same unclipped text in a specified colour and the
+     * source's paragraph direction, otherwise the flight is cleared rather than morphing into different ink.
+     */
     fun destinationLayout(
         id: String,
         layout: TextLayoutResult,
@@ -349,6 +368,10 @@ internal class ComposerSendMotion {
                 painted.settled && current?.settled == true && motionRectsMatch(painted.bounds, current.canonicalFrame)
             } == true
 
+    /**
+     * Flight-timer gate: true while a measured landing exists, which commits that landing and admits the flight. An
+     * admitted flight that loses its landing is retired and never resumes.
+     */
     private fun canRender(): Boolean {
         val active = flight
         val geometry = active?.let { presentation(it.presentationId).geometry }
@@ -362,6 +385,10 @@ internal class ComposerSendMotion {
         }
     }
 
+    /**
+     * Full-window canvas that draws the active flight and runs its bounded timing keyed to that flight, clearing it
+     * when the timing ends. The active-motion test tag exists only while an enabled flight does.
+     */
     @Composable
     fun Overlay() {
         val ownerObserver = LocalComposerSendOwnerObserver.current
@@ -414,6 +441,7 @@ internal class ComposerSendMotion {
         val source = active.source
         val bounds = geometry.bounds
 
+        /** Interpolates a uniform source radius toward one destination corner at the current progress. */
         fun corner(
             from: Float,
             target: CornerRadius,
@@ -491,6 +519,7 @@ private suspend fun awaitComposerSendLanding(
     }
 }
 
+/** Linear interpolation from [from] to [to] at [progress]. */
 private fun mix(
     from: Float,
     to: Float,
@@ -538,6 +567,7 @@ internal fun composerMotionForeground(
 ): Color {
     val backgroundLuminance = fill.luminance()
 
+    /** WCAG contrast ratio of [foreground], composited over the fill, against that fill. */
     fun contrast(foreground: Color): Float {
         val inkLuminance = foreground.compositeOver(fill).luminance()
         return (maxOf(inkLuminance, backgroundLuminance) + TEXT_CONTRAST_OFFSET) /
@@ -558,7 +588,11 @@ private fun TextLayoutResult.uniformParagraphDirection(): ResolvedTextDirection?
     }
 }
 
-// Leading/line-breaking whitespace, transformed text and clipped layouts keep the direct presentation.
+/**
+ * Accepts non-blank text with no leading whitespace and only spaces trailing, within the character cap, that the
+ * layout shows untransformed, and whose trailing spaces do not wrap onto a line of their own. Leading or
+ * line-breaking whitespace, transformed text and clipped layouts keep the direct presentation.
+ */
 private fun validComposerCaptureText(
     enabled: Boolean,
     text: String,
@@ -576,6 +610,7 @@ private fun validComposerCaptureText(
     return enabled && ordinaryInk && matchingText && sameLastLine
 }
 
+/** Requires an unclipped layout with a specified text colour whose measured size fits the editor within a pixel. */
 private fun validComposerCaptureLayout(
     layout: TextLayoutResult,
     editor: Rect,
@@ -600,6 +635,7 @@ private fun DrawScope.drawPendingSource(
     }
 }
 
+/** Strokes [outline] inset by half the stroke, interpolating width and colour toward the destination at [p]. */
 private fun DrawScope.drawFlightBorder(
     outline: RoundRect,
     source: ComposerSendSource,
@@ -611,6 +647,7 @@ private fun DrawScope.drawFlightBorder(
     if (strokeWidth > 0f) {
         val inset = strokeWidth / 2f
 
+        /** Shrinks a radius by the inset so the deflated stroke stays concentric with the outline. */
         fun insetCorner(corner: CornerRadius) =
             CornerRadius(
                 (corner.x - inset).coerceAtLeast(0f),
@@ -637,6 +674,10 @@ private fun DrawScope.drawFlightBorder(
     }
 }
 
+/**
+ * Moves the text anchor from the editor to [textTarget] — right-anchored for RTL — at constant font size,
+ * crossfading source and destination layouts over the last 35% of progress in whichever ink contrasts more with [fill].
+ */
 private fun DrawScope.drawFlightText(
     source: ComposerSendSource,
     layout: TextLayoutResult,

@@ -76,6 +76,10 @@ internal class ComposerSendLanding(
     private var expectedText: Rect? = null
     private var lastConsumedHeight: Float? = null
 
+    /**
+     * Read-only probe mapping the current measurement and timer progress to a frame, or null while the landing is
+     * unmeasured or ineligible. An installed [observe] receives the prior endpoint history alongside the result.
+     */
     fun resolve(
         measured: ComposerSendLandingMeasurement?,
         timerProgress: Float,
@@ -115,6 +119,10 @@ internal class ComposerSendLanding(
         lastConsumedHeight = geometry.consumedHeight
     }
 
+    /**
+     * Shifts the measured bubble by the composer collapse still to come, accepting it only when it lands at or above
+     * the source pill and matches the first committed endpoint, then interpolates bounds and fill by progress.
+     */
     private fun resolveMeasured(
         container: Rect,
         measured: ComposerSendLandingMeasurement,
@@ -149,6 +157,10 @@ internal class ComposerSendLanding(
         }
     }
 
+    /**
+     * The measurement belongs to this acceptance: same input generation, a positive target no taller than the source
+     * composer, a composer still anchored in place and only shrinking toward that target, and a coherent overlap.
+     */
     private fun eligible(
         container: Rect,
         measured: ComposerSendLandingMeasurement,
@@ -167,6 +179,10 @@ internal class ComposerSendLanding(
         return generationAndHeight && samePhysicalOwner && coherentOverlap(container, measured)
     }
 
+    /**
+     * The overlap comes from the viewport seen at capture, lies between the empty-composer height and its original
+     * value, and never grows between frames.
+     */
     private fun coherentOverlap(
         container: Rect,
         measured: ComposerSendLandingMeasurement,
@@ -198,6 +214,7 @@ internal fun motionRectsMatch(
         abs(expected.right - actual.right) <= MOTION_ROUNDING_PX &&
         abs(expected.bottom - actual.bottom) <= MOTION_ROUNDING_PX
 
+/** Resolves [active]'s landing against [measurement], tagging forwarded diagnostics with [callKind]. */
 internal fun resolveComposerSendLanding(
     active: ComposerSendFlight,
     progress: Float,

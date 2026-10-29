@@ -62,6 +62,10 @@ class MediaPressIndicationTest {
     @get:Rule val composeRule = createComposeRule()
     private lateinit var inputMode: InputModeManager
 
+    /**
+     * Holding a ready image shows a visible press level with no platform ripple, and cancelling restores it without
+     * opening.
+     */
     @Test
     fun heldReadyImagePressIsVisibleAndCancelRemovesItWithoutOpening() {
         var opens = 0
@@ -77,6 +81,7 @@ class MediaPressIndicationTest {
         assertEquals(0, opens)
     }
 
+    /** A ready image keeps click, long press and keyboard Enter working with the press indication attached. */
     @Test
     fun readyImageKeepsClickLongPressAndKeyboardActions() {
         var opens = 0
@@ -93,6 +98,10 @@ class MediaPressIndicationTest {
         composeRule.runOnIdle { assertEquals(2, opens) }
     }
 
+    /**
+     * Releasing a press keeps focus feedback and cancelling keeps hover feedback, each clearing only on its own end
+     * event.
+     */
     @Test
     fun releaseDoesNotClearFocusAndCancelDoesNotClearHover() {
         val source = MutableInteractionSource()
@@ -115,6 +124,7 @@ class MediaPressIndicationTest {
         assertBlueLevel(1f)
     }
 
+    /** Reusing the composition for a different item drops the previous item's focus feedback. */
     @Test
     fun reusedContentDoesNotKeepThePreviousItemsInteraction() {
         val source = MutableInteractionSource()
@@ -141,6 +151,10 @@ class MediaPressIndicationTest {
         assertBlueLevel(1f)
     }
 
+    /**
+     * A disabled close button keeps its 48dp target and ignores taps, then dispatches with circular feedback once
+     * enabled.
+     */
     @Test
     fun disabledCloseKeepsItsTargetAndDoesNotDispatchThenEnabledCloseDoes() {
         var closes = 0
@@ -170,6 +184,7 @@ class MediaPressIndicationTest {
         composeRule.runOnIdle { assertEquals(1, closes) }
     }
 
+    /** Changing the content colour repaints the existing focus feedback in the new tint instead of clearing it. */
     @Test
     fun themeColorChangeKeepsTheExistingFocusState() {
         val source = MutableInteractionSource()
@@ -196,6 +211,10 @@ class MediaPressIndicationTest {
         assertEquals(0.88f, center.blue, 0.02f)
     }
 
+    /**
+     * A pending image or a reduced-motion host keeps the platform default indication instead of the media press
+     * feedback.
+     */
     @Test
     fun pendingAndReducedMotionImagesKeepTheDefaultIndication() {
         composeRule.setContent {
@@ -216,6 +235,10 @@ class MediaPressIndicationTest {
         composeRule.waitForIdle()
     }
 
+    /**
+     * Shows a clickable blue image in the thumbnail host with the media viewer press indication and the given
+     * callbacks.
+     */
     private fun setImage(
         onLongPress: () -> Unit = {},
         onOpen: () -> Unit,
@@ -247,6 +270,7 @@ class MediaPressIndicationTest {
         }
     }
 
+    /** Shows a blue box whose press indication is driven by the given interaction source. */
     private fun setControlledFeedback(source: MutableInteractionSource) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -263,6 +287,7 @@ class MediaPressIndicationTest {
         }
     }
 
+    /** Emits the interaction on the source from the UI thread and waits for the feedback to settle. */
     private fun emit(
         source: MutableInteractionSource,
         interaction: androidx.compose.foundation.interaction.Interaction,
@@ -271,11 +296,13 @@ class MediaPressIndicationTest {
         composeRule.waitForIdle()
     }
 
+    /** Asserts the blue channel at the image centre, which press, focus and hover feedback darken. */
     private fun assertBlueLevel(expected: Float) {
         val pixels = composeRule.onNodeWithTag("image").captureToImage().toPixelMap()
         assertEquals(expected, pixels[pixels.width / 2, pixels.height / 2].blue, 0.02f)
     }
 
+    /** Returns whether the view tree contains a platform ripple host view. */
     private fun containsPlatformRipple(view: View): Boolean =
         view.javaClass.name.endsWith(".RippleHostView") ||
             (view is ViewGroup && (0 until view.childCount).any { containsPlatformRipple(view.getChildAt(it)) })

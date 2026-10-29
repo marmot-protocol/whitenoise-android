@@ -26,6 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 class GroupDetailsBlockedBackTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
+    /** A non-owning controller mounts no reset control, and Back closes details once without reaching the parent. */
     @Test fun rejectedInitialOwnerStillClosesDetailsExactlyOnce() {
         val state =
             conversationTimelineTestAppState(

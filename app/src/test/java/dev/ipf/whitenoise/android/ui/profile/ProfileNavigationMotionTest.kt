@@ -6,6 +6,7 @@ import org.junit.Test
 
 /** The picker has two real entry points; Back must follow its captured parent. */
 class ProfileNavigationMotionTest {
+    /** Opening the picker from Groups advances one level, and Back from it retreats toward Groups, not Profile. */
     @Test fun nestedPickerBackReturnsTowardGroupsInsteadOfAdvancingAgain() {
         val groups = ProfileSheetPage.GROUPS_IN_COMMON
         val picker = ProfileSheetPage.ADD_TO_GROUPS

@@ -24,6 +24,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class MediaViewerEntryFrameTest {
+    /** A hardware-accelerated host enters only after its pre-draw frame commits, not at pre-draw itself. */
     @Test
     fun hardwareEntryDoesNotBeginAtPreDrawOrBeforeCommit() =
         runBlocking {
@@ -45,6 +46,7 @@ class MediaViewerEntryFrameTest {
             job.join()
         }
 
+    /** A software-rendered host proceeds at pre-draw because it has no frame commit to wait for. */
     @Test
     fun softwareHostProceedsAtPreDrawWithoutWaitingForAnUnsupportedCommit() =
         runBlocking {
@@ -63,6 +65,7 @@ class MediaViewerEntryFrameTest {
             job.join()
         }
 
+    /** Cancelling before pre-draw removes the pending admission, so a later pre-draw registers no commit. */
     @Test
     fun cancellationBeforePreDrawRemovesThePendingAdmission() =
         runBlocking {
@@ -80,6 +83,7 @@ class MediaViewerEntryFrameTest {
             assertFalse(entered)
         }
 
+    /** Cancelling after pre-draw unregisters the frame-commit callback so no stale commit remains. */
     @Test
     fun cancellationAfterPreDrawUnregistersTheCommitCallback() =
         runBlocking {
@@ -91,6 +95,7 @@ class MediaViewerEntryFrameTest {
             assertTrue(captureCommits(view).isEmpty())
         }
 
+    /** A commit already captured by the renderer cannot let a cancelled viewer proceed when it later runs. */
     @Test
     fun commitAlreadyCapturedByTheRendererCannotReviveACancelledViewer() =
         runBlocking {
@@ -110,12 +115,18 @@ class MediaViewerEntryFrameTest {
             assertFalse(entered)
         }
 
+    /** Losing the source during window admission unregisters the pending commit and settles without any travel. */
     @Test
     fun sourceLossDuringWindowAdmissionUnregistersCommitAndFallsBackWithoutTravel() = sourceLossDuringAdmission(false)
 
+    /** A commit the renderer already captured cannot start travel once the source thumbnail is lost. */
     @Test
     fun rendererCapturedCommitCannotStartTravelAfterItsSourceWasLost() = sourceLossDuringAdmission(true)
 
+    /**
+     * Drives an entry flight whose thumbnail disappears while waiting for the window frame, optionally after the
+     * renderer captured the commit, and checks it settles once at full progress with no commit callback left behind.
+     */
     private fun sourceLossDuringAdmission(captureBeforeLoss: Boolean) =
         runBlocking {
             val view = hardwareView()
@@ -148,6 +159,7 @@ class MediaViewerEntryFrameTest {
             assertFalse(job.isActive)
         }
 
+    /** Builds a view that reports hardware acceleration, so entry admission waits for a frame commit. */
     private fun hardwareView(): View =
         object : View(ApplicationProvider.getApplicationContext()) {
             override fun isHardwareAccelerated(): Boolean = true

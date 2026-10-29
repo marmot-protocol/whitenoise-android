@@ -37,6 +37,7 @@ import org.robolectric.annotation.GraphicsMode
 class ReactionMotionSurfaceTest {
     @get:Rule val rule = createComposeRule(effectContext = NormalReactionMotionDurationScale)
 
+    /** Viewport changes with no active effect recompose no reaction row and measure no chip target. */
     @Test fun idleViewportChangesDoNotRecomposeRowsOrMeasureTargets() {
         var viewport by mutableStateOf(Rect(0f, 0f, 360f, 640f))
         val compositions = IntArray(6)
@@ -70,6 +71,7 @@ class ReactionMotionSurfaceTest {
         }
     }
 
+    /** The first summary measures its chip target while still entering, and an empty viewport hides the flight. */
     @Test fun firstRealSummaryGetsATargetDuringItsClippedEntranceAndRespectsClearViewport() {
         var tallies by mutableStateOf(emptyList<ReactionTally>())
         var viewport by mutableStateOf<Rect?>(null)
@@ -103,6 +105,7 @@ class ReactionMotionSurfaceTest {
         rule.onNodeWithTag("conversation.reaction.motion.active").assertDoesNotExist()
     }
 
+    /** Steps up to ten frames until the summary is mid-entrance with a measured thumbs-up target, else fails. */
     private fun assertTargetMeasuredDuringEntrance(
         visibility: MutableTransitionState<Boolean>,
         motion: LocalReactionMotion,

@@ -48,16 +48,25 @@ import java.io.File
 class LocalReactionMotionScreenshotTest {
     @get:Rule val rule = createComposeRule()
 
+    /** An accepted add flies from the selected control to its chip on the AMOLED dark theme. */
     @Test fun acceptedAddAmoled() = record("amoled", false, true)
 
+    /** An accepted add flies from the selected control to its chip under RTL on the light theme. */
     @Test fun acceptedAddRtlLight() = record("rtl_light", true, true)
 
+    /** An accepted fifth reaction type, added after four existing chips, lands in the row's overflow. */
     @Test fun acceptedFifthTypeLandsInOverflow() = record("overflow", false, true)
 
+    /** With motion disabled, the accepted chip appears at once and no flight pixels are drawn. */
     @Test fun disabledMotionIsImmediate() = record("disabled", false, false)
 
+    /** Turning motion off mid-flight drops the decorative flight pixels and settles on the chip. */
     @Test fun disablingMidFlightDropsDecorativePixels() = record("interrupted", false, true)
 
+    /**
+     * Renders the reaction fixture, accepts a thumbs-up, and captures its first, mid-flight and settled frames,
+     * optionally dumping every frame when `ANIMATION_CAPTURE_FRAMES` is set.
+     */
     @Suppress("LongMethod") // One native fixture setup with fixed first/mid/settled capture points.
     private fun record(
         name: String,
@@ -158,6 +167,7 @@ class LocalReactionMotionScreenshotTest {
         captureReactionFrame("src/test/snapshots/local_reaction_motion_${name}_settled.png")
     }
 
+    /** Captures the fixture root to the Roborazzi PNG at [path]. */
     private fun captureReactionFrame(path: String) {
         rule.onNodeWithTag("reaction-motion-root").captureRoboImage(path)
     }

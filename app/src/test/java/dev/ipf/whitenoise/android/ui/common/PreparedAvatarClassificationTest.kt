@@ -17,6 +17,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PreparedAvatarClassificationTest {
+    /** An exact asset match returns whichever classification was pinned: static, animated or still unknown. */
     @Test
     fun exactPinsPreserveStaticAnimatedAndUnknownClassification() {
         listOf(false, true, null).forEach { classification ->
@@ -24,6 +25,7 @@ class PreparedAvatarClassificationTest {
         }
     }
 
+    /** A changed revision, reference, target, availability or missing asset never inherits a pinned static verdict. */
     @Test
     fun fallbackRevisionsOtherSelectionsAndRemovedAssetsCannotBorrowStaticClassification() {
         val pins = pins(false)
@@ -35,6 +37,7 @@ class PreparedAvatarClassificationTest {
         assertNull(pins.copy(retained = emptyList()).animationClassificationFor(asset))
     }
 
+    /** Builds pinned group-avatar pixels holding one retained 4x4 image for [asset] with the given classification. */
     private fun pins(classification: Boolean?) =
         PreparedGroupAvatarPixels(
             "account",

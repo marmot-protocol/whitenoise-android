@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 /** A bounded group wait cannot manufacture admission or reset its budget after startup preemption. */
 class AnimationAdmissionDeadlineTest {
+    /** While a worker is held, a bounded decode times out as busy without ever opening a second worker. */
     @Test
     fun heldWorkerExpiresWithoutOpeningAnotherWorker() {
         val admission = AnimationAdmission()
@@ -34,6 +35,7 @@ class AnimationAdmissionDeadlineTest {
         checkNotNull(admission.acquire(true, 100)).release()
     }
 
+    /** A startup preempted after its budget elapsed throws busy instead of retrying, so the budget never resets. */
     @Test
     fun startupPreemptionDoesNotResetExpiredBudget() {
         val admission = AnimationAdmission()
@@ -51,6 +53,7 @@ class AnimationAdmissionDeadlineTest {
         checkNotNull(admission.acquire(true, 100)).release()
     }
 
+    /** A release landing after the busy exception but before the owner waits is still seen via the generation. */
     @Test
     fun releaseBeforeLifecycleObservationCannotBeLost() =
         runBlocking {
@@ -64,6 +67,10 @@ class AnimationAdmissionDeadlineTest {
             next.release()
         }
 
+    /**
+     * A release arriving while an expired wait reacquires the lock still gives the ready FIFO head its
+     * acquisition instead of busy.
+     */
     @Test
     fun releaseBeforeExpiredWaitReacquiresLockCannotBeLost() =
         runBlocking {
@@ -102,6 +109,7 @@ class AnimationAdmissionDeadlineTest {
             }
         }
 
+    /** A free worker may be acquired with a zero wait, but an expired decode budget still forbids every OPEN. */
     @Test
     fun alreadyFreeExpiredAttemptDoesNotParkWithoutAWorker() =
         runBlocking {

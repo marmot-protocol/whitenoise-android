@@ -16,15 +16,19 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ComposerSendMotionDurationScaleTest {
+    /** At 2x duration scale the copy stays until the scaled tween and the painted landing both finish. */
     @Test
     fun twoTimesScaleKeepsTheCopyUntilTheScaledTweenAndLandingFinish() = scaledFlight(2f)
 
+    /** At 5x duration scale the copy stays until the scaled tween and the painted landing both finish. */
     @Test
     fun fiveTimesScaleKeepsTheCopyUntilTheScaledTweenAndLandingFinish() = scaledFlight(5f)
 
+    /** At zero scale progress jumps to its end without an animated flight, inside the 80 ms overhead. */
     @Test
     fun zeroScaleSettlesWithoutAnAnimatedFlight() = scaledFlight(0f)
 
+    /** With no measurable target the flight gives up after 80 ms even at 5x scale, leaving progress at zero. */
     @Test
     fun missingTargetStillExpiresWithin80MillisecondsAtFiveTimesScale() =
         runTest {
@@ -36,6 +40,7 @@ class ComposerSendMotionDurationScaleTest {
             assertEquals(0f, progress.value)
         }
 
+    /** Losing the destination mid-flight cancels the scaled flight with an invalidation rather than extending it. */
     @Test
     fun lostDestinationCancelsTheScaledFlightInsteadOfExtendingItsDeadline() =
         runTest {
@@ -52,6 +57,7 @@ class ComposerSendMotionDurationScaleTest {
             assertTrue(testScheduler.currentTime <= 112L)
         }
 
+    /** Changing the duration scale mid-flight cancels the flight instead of reusing the old scale's deadline. */
     @Test
     fun changedSystemScaleCancelsRatherThanReusingAnObsoleteDeadline() =
         runTest {
@@ -74,6 +80,7 @@ class ComposerSendMotionDurationScaleTest {
             assertTrue(progress.value < 1f)
         }
 
+    /** NaN, infinite, negative and extreme scales skip measuring and animating, and yield no deadline. */
     @Test
     fun nonfiniteNegativeAndExtremeScalesFallBackBeforeAnyFrameOrAnimation() =
         runTest {
@@ -88,6 +95,7 @@ class ComposerSendMotionDurationScaleTest {
             assertEquals(0L, testScheduler.currentTime)
         }
 
+    /** The deadline is the scaled 280 ms tween plus an unscaled 80 ms overhead, rounding fractions up. */
     @Test
     fun deadlinePreservesNormalOverheadAndRoundsFractionalScaledDurationsUp() {
         assertEquals(360L, ComposerSendFlightTiming.timeoutMillis(1f))
@@ -97,6 +105,7 @@ class ComposerSendMotionDurationScaleTest {
         assertEquals(81L, ComposerSendFlightTiming.timeoutMillis(0.001f))
     }
 
+    /** Progress reaching 1 does not end the flight, which holds until the actual painted landing is reported. */
     @Test
     fun numericalCompletionStillWaitsForTheActualPaintedLandingSignal() =
         runTest {
@@ -112,6 +121,10 @@ class ComposerSendMotionDurationScaleTest {
             assertEquals(336L, testScheduler.currentTime)
         }
 
+    /**
+     * Runs a flight under [scale], asserting it ends at full progress within its deadline and, when slowed,
+     * outlasts the unscaled 360 ms timeout.
+     */
     private fun scaledFlight(scale: Float) =
         runTest {
             val progress = Animatable(0f)
@@ -145,6 +158,7 @@ class ComposerSendMotionDurationScaleTest {
     private class FrameClock(
         private val scheduler: TestCoroutineScheduler,
     ) : MonotonicFrameClock {
+        /** Delivers one frame per 16 ms of virtual time, stamped with the scheduler's current time. */
         override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R {
             delay(16L)
             return onFrame(scheduler.currentTime * 1_000_000L)

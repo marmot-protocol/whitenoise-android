@@ -243,6 +243,10 @@ internal class IsolatedAnimationSession private constructor(
         }
     }
 
+    /**
+     * Binds this session's own isolated worker process while startup is still live, returning whether the platform
+     * accepted it. A synchronous platform refusal releases admission, since no capability was ever granted.
+     */
     private fun bindWorker(): Boolean =
         synchronized(lock) {
             if (closed || !startupAvailable()) return@synchronized false
@@ -267,6 +271,10 @@ internal class IsolatedAnimationSession private constructor(
             accepted
         }
 
+    /**
+     * Stages [bytes] as an unlinked read-only descriptor and sends OPEN while the budget lasts, returning whether OPEN
+     * was sent. A Binder failure retires the session as transport loss rather than worker death.
+     */
     private fun stageAndOpen(bytes: ByteArray): Boolean =
         try {
             if (!startupAvailable()) {
@@ -291,6 +299,10 @@ internal class IsolatedAnimationSession private constructor(
         return available
     }
 
+    /**
+     * Waits on a startup latch for at most the lease's remaining budget. Close and lease release also trip the
+     * latches, so callers recheck [startupAvailable] after a true return.
+     */
     private fun awaitStartup(signal: CountDownLatch): Boolean {
         if (!startupAvailable()) return false
         return awaitSignal(signal, admissionLease.remainingNanos())
@@ -404,8 +416,13 @@ internal class IsolatedAnimationSession private constructor(
         }
     }
 
+    /** Owner close retires the worker, admission stays held until its death is confirmed. */
     override fun close() = closeWithReason(AnimationTermination.OwnerClosed)
 
+    /**
+     * Records the first terminal reason, then idempotently frees pending pixels and shared memory, clears the active
+     * slot, trips startup latches and asks the worker to retire. It never releases admission.
+     */
     private fun closeWithReason(reason: AnimationTermination) {
         synchronized(lock) {
             if (terminalReason.value == null) terminalReason.value = reason
@@ -468,6 +485,7 @@ internal class IsolatedAnimationSession private constructor(
             }
         }
 
+        /** Accepts only off-main-thread calls with a non-empty source under the input cap and an edge in range. */
         private fun validSource(
             bytes: ByteArray,
             edge: Int,
@@ -476,6 +494,10 @@ internal class IsolatedAnimationSession private constructor(
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
                 edge in 1..AnimationFrameProtocol.MAX_EDGE
 
+        /**
+         * Runs [openAdmitted] under admission with one total startup deadline. A non-null [demand] marks a waiting
+         * group thumbnail, which admission requeues and retries after preemption.
+         */
         private fun createAdmitted(
             context: Context,
             bytes: ByteArray,
@@ -536,6 +558,7 @@ internal class IsolatedAnimationSession private constructor(
             return true
         }
 
+        /** A persistent, already queued FIFO ticket for a mounted group-thumbnail owner, closed on unmount. */
         fun groupDemand(): AnimationAdmission.GroupDemand = admission.groupDemand()
 
         fun retireActive() {

@@ -16,6 +16,7 @@ class ComposerSendMotionGeometryTest {
     private val finalHeight = 60f
     private val viewport = ComposerSendViewportProjection(Rect(0f, 64f, 360f, 780f), container.height)
 
+    /** Builds the landing measurement of a composer that has contracted to the given progress and input generation. */
     private fun measurement(
         progress: Float,
         generation: Long = 7L,
@@ -31,12 +32,17 @@ class ComposerSendMotionGeometryTest {
         )
     }
 
+    /** Resolves the geometry for a measurement and, when it is accepted, commits it as the timing owner would. */
     private fun committed(
         owner: ComposerSendLanding,
         measured: ComposerSendLandingMeasurement,
         progress: Float,
     ): ComposerSendFlightGeometry? = owner.resolve(measured, progress).also { if (it != null) owner.commit(it) }
 
+    /**
+     * Read-only probes latch neither the endpoint nor the consumed height, but a committed one rejects a later, larger
+     * overlap.
+     */
     @Test fun pureProbesCannotLatchAnEndpointOrConsumedHeight() {
         val owner = ComposerSendLanding(source, container, Color.White, 7L, viewport)
         assertNotNull(owner.resolve(measurement(.2f), .2f))
@@ -45,6 +51,10 @@ class ComposerSendMotionGeometryTest {
         assertNull(owner.resolve(measurement(.1f), .3f))
     }
 
+    /**
+     * A finished timer only counts as settled once the native composer interval is clear and the row sits at its
+     * canonical frame.
+     */
     @Test fun timerCompletionCannotHandOffBeforeTheActualNativeIntervalIsClear() {
         val owner = ComposerSendLanding(source, container, Color.White, 7L, viewport)
         val remaining = checkNotNull(owner.resolve(measurement(.5f), 1f))
@@ -61,6 +71,10 @@ class ComposerSendMotionGeometryTest {
         )
     }
 
+    /**
+     * A flight starting from the cropped editor rect begins at those bounds and keeps the whole pill's upward
+     * eligibility.
+     */
     @Test fun editorCropRetainsTheOriginalWholePillUpwardEligibility() {
         val editor = Rect(20f, 546f, 340f, 580f)
         val owner = ComposerSendLanding(editor, container, Color.White, 7L, viewport, source.bottom)
@@ -70,6 +84,10 @@ class ComposerSendMotionGeometryTest {
         assertNotNull(owner.resolve(measurement(.5f), .25f))
     }
 
+    /**
+     * As the composer contracts the row never reverses and lands exactly on the final frame, where a naive endpoint
+     * lerp overshoots.
+     */
     @Test fun aMovingLiveEndpointNoLongerCreatesAReversalAndTheFinalRowIsExact() {
         val owner = ComposerSendLanding(source, container, Color.White, 7L, viewport)
         val frames =
@@ -91,6 +109,9 @@ class ComposerSendMotionGeometryTest {
         )
     }
 
+    /**
+     * A consumed padding one frame stale still predicts the exact final landing and keeps the visible timer's progress.
+     */
     @Test fun aOneFrameOlderConsumedPaddingStillPredictsTheExactFinalLanding() {
         val owner = ComposerSendLanding(source, container, Color.White, 7L, viewport)
         val first = checkNotNull(committed(owner, measurement(0f), 0f))
@@ -108,6 +129,7 @@ class ComposerSendMotionGeometryTest {
         )
     }
 
+    /** A growing or out-of-range consumed overlap is rejected, so it cannot drive the motion phase. */
     @Test fun anIncreasingOrUnboundConsumedOverlapCannotDriveTheMotionPhase() {
         val owner = ComposerSendLanding(source, container, Color.White, 7L, viewport)
         assertNotNull(committed(owner, measurement(.2f), .1f))
@@ -123,12 +145,19 @@ class ComposerSendMotionGeometryTest {
         assertNull(committed(unbound, measurement(0f), 0f))
     }
 
+    /**
+     * A measurement from an earlier input generation is rejected, while the current generation's measurement is
+     * accepted.
+     */
     @Test fun anOldLayoutCannotBorrowTheNewAcceptedInputGeneration() {
         val owner = ComposerSendLanding(source, container, Color.White, 7L, viewport)
         assertNull(committed(owner, measurement(0f, generation = 6L), 0f))
         assertNotNull(committed(owner, measurement(0f), 0f))
     }
 
+    /**
+     * Frame or composer movement that is not the composer contracting is rejected instead of being read as contraction.
+     */
     @Test fun independentViewportMotionCannotBeMistakenForComposerContraction() {
         val owner = ComposerSendLanding(source, container, Color.White, 7L, viewport)
         assertNotNull(committed(owner, measurement(0f), 0f))
@@ -137,6 +166,10 @@ class ComposerSendMotionGeometryTest {
         assertNull(committed(owner, next.copy(composer = next.composer.translate(Offset(0f, 3f))), .1f))
     }
 
+    /**
+     * A landing that cannot be reached upward, or has a non-finite composer height, falls back to the ordinary
+     * presentation.
+     */
     @Test fun anUnreachableUpwardLandingUsesTheOrdinaryPresentation() {
         val owner = ComposerSendLanding(Rect(16f, 100f, 344f, 140f), container, Color.White, 7L, viewport)
         assertNull(committed(owner, measurement(0f), 0f))

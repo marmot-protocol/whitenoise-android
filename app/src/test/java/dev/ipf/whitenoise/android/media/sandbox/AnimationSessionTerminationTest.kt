@@ -26,12 +26,15 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AnimationSessionTerminationTest {
+    /** A refused isolated bind fails with a typed TransportUnavailable startup error and leaves its lease reusable. */
     @Test
     fun bindRefusalIsTypedAndItsProvedNoBindLeaseCanBeReused() {
         val context =
             object : ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
+                /** Returns the wrapper itself, so the session binds through the overridden `bindIsolatedService`. */
                 override fun getApplicationContext(): Context = this
 
+                /** Refuses every isolated-service bind, simulating a platform that cannot start the worker. */
                 override fun bindIsolatedService(
                     intent: Intent,
                     flags: Int,
@@ -60,6 +63,7 @@ class AnimationSessionTerminationTest {
         }
     }
 
+    /** Only an authenticated status records CodecRejected, and the lease stays held until the worker dies. */
     @Test
     fun authenticatedCodecStatusIsTerminalButCannotReleaseAWorker() {
         val admission = AnimationAdmission()
@@ -85,6 +89,7 @@ class AnimationSessionTerminationTest {
         }
     }
 
+    /** An owner close or viewer preemption keeps its reason when the worker dies later, and then frees the lease. */
     @Test
     fun firstOwnerCloseAndPreemptionReasonsSurviveLaterDeath() {
         for ((first, expected) in listOf(
@@ -101,6 +106,7 @@ class AnimationSessionTerminationTest {
         }
     }
 
+    /** Transport retirement and an unexplained worker loss wake a delivered drawable with their own reason. */
     @Test
     fun unknownDeathAndTransportRetirementWakeTheDeliveredDrawableWithoutInventingDeath() =
         kotlinx.coroutines.runBlocking {
@@ -139,6 +145,7 @@ class AnimationSessionTerminationTest {
             }
         }
 
+    /** Constructs a session over [lease] through its private constructor, bypassing the service bind. */
     private fun session(lease: AnimationAdmission.Lease): IsolatedAnimationSession =
         IsolatedAnimationSession::class.java
             .getDeclaredConstructor(
@@ -158,6 +165,7 @@ class AnimationSessionTerminationTest {
                 },
             )
 
+    /** Reflectively reads the session's private field [name]. */
     private fun field(
         session: IsolatedAnimationSession,
         name: String,
@@ -167,6 +175,7 @@ class AnimationSessionTerminationTest {
             .apply { isAccessible = true }
             .get(session)
 
+    /** Reflectively overwrites the session's private field [name] with [value]. */
     private fun set(
         session: IsolatedAnimationSession,
         name: String,
@@ -178,6 +187,7 @@ class AnimationSessionTerminationTest {
             .set(session, value)
     }
 
+    /** Reflectively calls the session's private no-argument method [name]. */
     private fun invoke(
         session: IsolatedAnimationSession,
         name: String,
@@ -188,6 +198,7 @@ class AnimationSessionTerminationTest {
             .invoke(session)
     }
 
+    /** Delivers a codec-rejected status for session [id] from [uid], returning whether the session accepted it. */
     private fun status(
         session: IsolatedAnimationSession,
         id: Int,

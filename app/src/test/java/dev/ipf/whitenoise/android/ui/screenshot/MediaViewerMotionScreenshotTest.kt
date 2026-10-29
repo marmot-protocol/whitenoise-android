@@ -81,15 +81,23 @@ import kotlin.math.roundToInt
 class MediaViewerMotionScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** The thumbnail expands into the viewer and returns to its current registration on the AMOLED dark theme. */
     @Test fun thumbnailExpandsAndReturnsToItsCurrentRegistration() = render(false, LayoutDirection.Ltr, 1f, "dark")
 
+    /** Thumbnail expansion and return also hold on the light theme under RTL at 1.3x font scale. */
     @Test fun thumbnailMotionSupportsLightRtlAndLargeType() = render(true, LayoutDirection.Rtl, 1.3f, "light_rtl_large")
 
+    /** A viewer whose selected page has no return thumbnail enters normally, then dismisses at once on close. */
     @Test
     fun missingReturnThumbnailFallsBackAfterRealEntry() {
         render(false, LayoutDirection.Ltr, 1f, "missing_return", missingReturn = true)
     }
 
+    /**
+     * Mounts a thumbnail and the real viewer over one synthetic image, asserting the first frame sits at the source and
+     * the settled frame shows the fitted image, and captures entry, settled and return frames. With [missingReturn] the
+     * selection moves to an unregistered page before closing, and hiding the source must clear its registration.
+     */
     @Suppress("LongMethod") // One native viewer lifecycle binds entry, return and source disposal.
     private fun render(
         light: Boolean,
@@ -210,12 +218,14 @@ class MediaViewerMotionScreenshotTest {
         val frames = File("build/media-viewer-motion/$name")
         if (recordFrames) frames.mkdirs()
 
+        /** Saves the current root as the next numbered diagnostic frame when frame recording is enabled. */
         fun frame() {
             if (!recordFrames) return
             val filename = "frame-${(videoFrame++).toString().padStart(3, '0')}.png"
             composeRule.onRoot().captureRoboImage(File(frames, filename).path)
         }
 
+        /** Advances the clock in 16 ms steps for [milliseconds], recording a diagnostic frame after each step. */
         fun advance(milliseconds: Long) {
             repeat((milliseconds / 16).toInt()) {
                 composeRule.mainClock.advanceTimeBy(16)
@@ -257,6 +267,7 @@ class MediaViewerMotionScreenshotTest {
         object : Painter() {
             override val intrinsicSize = Size(144f, 81f)
 
+            /** Paints the shared 16:9 fixture scene into the draw scope. */
             override fun DrawScope.onDraw() = drawSharedFixtureImage()
         }
 
@@ -288,6 +299,7 @@ class MediaViewerMotionScreenshotTest {
         }
     }
 
+    /** Asserts the shared image keeps its alpha and, once [settled], shows its yellow landmark aligned. */
     private fun assertSharedImageLandmarks(settled: Boolean) {
         val body = composeRule.onNodeWithTag(MEDIA_VIEWER_CONTENT_TAG).fetchSemanticsNode().boundsInRoot
         val imageHeight = body.width * 9f / 16f
@@ -342,6 +354,7 @@ class MediaViewerMotionScreenshotTest {
         val factor = ink.width / source.width
         val sceneScale = source.height / 81f * factor
 
+        /** Reads the captured pixel for scene point ([x], [y]), mapped through the moving copy's scale and center. */
         fun scenePixel(
             x: Float,
             y: Float,
@@ -355,6 +368,7 @@ class MediaViewerMotionScreenshotTest {
         assertEquals("the cropped copy stays opaque", 1f, scenePixel(72f, 40.5f).alpha, 0f)
     }
 
+    /** Video motion is disallowed below API 34 to keep the surface fallback, while image motion is always allowed. */
     @Test
     fun videoMotionPreservesThePreAndroid14SurfaceFallback() {
         for (sdk in 30..33) assertTrue(!mediaViewerPlatformMotionAllowed(isVideo = true, sdk = sdk))
@@ -362,15 +376,23 @@ class MediaViewerMotionScreenshotTest {
         for (sdk in 30..36) assertTrue(mediaViewerPlatformMotionAllowed(isVideo = false, sdk = sdk))
     }
 
+    /** A thumbnail registered under a different epoch is not flown from, so the viewer body shows at once. */
     @Test
     fun openingEpochMismatchUsesDirectPresentation() = verifyReturnOwnership(mismatchedEpoch = true)
 
+    /** When the return source is lost without any layout callback, the closing viewer dismisses on the next frame. */
     @Test
     fun aDrawOnlyLostReturnDismissesOnTheNextFrame() = verifyReturnOwnership()
 
+    /** Removing the motion owner mid-return never fires its dismissal, so a replacement viewer is not closed. */
     @Test
     fun removingTheOwnerDuringReturnCannotDismissItsReplacement() = verifyReturnOwnership(disposeOwner = true)
 
+    /**
+     * Mounts a viewer over a registered thumbnail and closes it. [mismatchedEpoch] expects direct presentation,
+     * otherwise losing the source dismisses exactly once, unless [disposeOwner] removes the owner first, which must
+     * never dismiss.
+     */
     private fun verifyReturnOwnership(
         mismatchedEpoch: Boolean = false,
         disposeOwner: Boolean = false,
@@ -462,6 +484,7 @@ class MediaViewerMotionScreenshotTest {
         }
     }
 
+    /** Closing a viewer whose selected thumbnail was never registered dismisses at once, with no return flight. */
     @Test
     fun missingSelectedThumbnailDismissesWithoutWaiting() {
         val registry = MediaViewerThumbnailRegistry()
@@ -488,6 +511,7 @@ class MediaViewerMotionScreenshotTest {
         composeRule.runOnIdle { assertTrue(dismissed == 1) }
     }
 
+    /** With motion disallowed, closing dismisses exactly once without waiting for a frame. */
     @Test
     fun disabledMotionDismissesOnceWithoutAFrameDelay() {
         val id = ConversationMediaViewerAttachmentId("disabled", 0)
@@ -518,6 +542,7 @@ class MediaViewerMotionScreenshotTest {
         composeRule.runOnIdle { assertTrue(dismissed == 1) }
     }
 
+    /** Two visible thumbnails registered under one id leave it unresolved until the duplicate is removed. */
     @Test
     fun duplicateVisibleRegistrationsDoNotChooseAnArbitrarySource() {
         val registry = MediaViewerThumbnailRegistry()
@@ -554,12 +579,15 @@ class MediaViewerMotionScreenshotTest {
         composeRule.runOnIdle { assertNotNull(registry.find(id)) }
     }
 
+    /** In LTR a three-tile album rounds only its outer physical corners, never the interior ones. */
     @Test
     fun threeTileAlbumKeepsOnlyItsPhysicalOuterCornersRounded() = renderAlbum(LayoutDirection.Ltr)
 
+    /** In RTL a three-tile album mirrors its rounded outer corners to the physical left side. */
     @Test
     fun threeTileAlbumMirrorsItsPhysicalOuterCornersInRtl() = renderAlbum(LayoutDirection.Rtl)
 
+    /** Lays out a three-tile masonry album in [direction], asserts which tile corners are rounded, and captures it. */
     private fun renderAlbum(direction: LayoutDirection) {
         val registry = MediaViewerThumbnailRegistry()
         val messageId = "synthetic-album"
@@ -628,6 +656,7 @@ class MediaViewerMotionScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    /** Records the root node as the Roborazzi baseline named [name]. */
     private fun capture(name: String) {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

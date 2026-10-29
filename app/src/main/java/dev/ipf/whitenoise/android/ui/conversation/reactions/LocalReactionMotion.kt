@@ -66,6 +66,7 @@ internal class LocalReactionMotion {
     private var sequence = 0L
     private var choice: Pair<String, Rect>? = null
 
+    /** Remembers the tapped picker cell's screen bounds for [emoji], or clears the choice if retired or unmeasured. */
     fun choose(
         emoji: String,
         bounds: Rect,
@@ -73,8 +74,10 @@ internal class LocalReactionMotion {
         choice = if (mounted && enabled && !bounds.isEmpty) emoji to bounds else null
     }
 
+    /** Consumes the remembered origin, returning it only if it was chosen for [emoji]. */
     fun takeOrigin(emoji: String): Rect? = choice?.takeIf { it.first == emoji }?.second.also { choice = null }
 
+    /** Both endpoints must lie wholly inside the current reading viewport, an unknown viewport allows flight. */
     fun canFly(
         source: Rect,
         target: Rect,
@@ -87,6 +90,10 @@ internal class LocalReactionMotion {
             }
         } ?: true
 
+    /**
+     * Starts a new effect for an accepted local add of a bounded glyph, otherwise clears it. Shortcode custom emoji
+     * carry no origin, so their chip pulses without a flight.
+     */
     fun accept(
         emoji: String,
         added: Boolean,
@@ -101,11 +108,13 @@ internal class LocalReactionMotion {
             }
     }
 
+    /** Ends [expected] only if it is still current, so a late completion never clears a newer effect. */
     fun settle(expected: LocalReactionEffect? = effect) {
         if (effect == expected) effect = null
         choice = null
     }
 
+    /** Retires the owner for good: later choices and accepts are ignored and measured targets are dropped. */
     fun dispose() {
         mounted = false
         readViewport = null
@@ -114,6 +123,10 @@ internal class LocalReactionMotion {
     }
 }
 
+/**
+ * Reuses the enclosing row's motion when one is provided, otherwise remembers one per [owner] and motion eligibility.
+ * Each new effect animates progress from 0 to 1 once and then settles, disabled motion snaps it settled.
+ */
 @Composable
 internal fun rememberLocalReactionMotion(
     owner: Any?,
@@ -271,6 +284,7 @@ internal class ReactionWindowCoordinates(
     var offset by mutableStateOf(Offset.Zero)
         private set
 
+    /** Re-reads the window's on-screen position from the host view, the offset that maps window bounds to screen. */
     fun update() {
         view.getLocationOnScreen(screen)
         view.getLocationInWindow(window)
@@ -280,6 +294,7 @@ internal class ReactionWindowCoordinates(
 
 internal val LocalReactionWindowCoordinates = compositionLocalOf<ReactionWindowCoordinates?> { null }
 
+/** One window-to-screen converter for the current host view, which the caller provides and refreshes on layout. */
 @Composable
 internal fun rememberReactionWindowCoordinates(): ReactionWindowCoordinates {
     val view = LocalView.current
