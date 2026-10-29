@@ -54,14 +54,16 @@ internal class AppProfileSignUp(
             ) {
                 throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
             }
-            appState
-                .marmotIo {
+            val knownAccounts = appState.accounts.mapTo(HashSet(), AccountSummaryFfi::label)
+            val created =
+                appState.marmotIo {
                     if (initialProfile == null) {
                         createIdentityWithBootstrapRelays()
                     } else {
                         createNamedIdentity(initialProfile)
                     }
-                }.also { creatingRuntimes[it] = owner }
+                }
+            created.requireNewAccount(knownAccounts).also { creatingRuntimes[it] = owner }
         }
     }
 
@@ -170,12 +172,16 @@ internal class AppProfileSignUp(
     /** The account whose last setup wait expired; its next wait first resumes MDK's stalled setup. */
     private var stalledSetupAccount: String? = null
 
+    /** How long the profile stage waits for relay setup before offering Retry; tests shorten it. */
+    internal var setupWaitTimeoutMillis = ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS
+
     /**
      * The profile creation call returns at local readiness while MDK publishes relay lists and the KeyPackage in
      * the background. Wait for that before the profile save, without holding the account lifetime, and recheck
      * the form's owner on every read. A failure is a retryable publication stage that keeps the accepted account,
      * and Continue without profile still leaves the form. After an expired wait, Retry restarts MDK's setup
-     * through `start()`, as the iOS client does.
+     * through `start()`, as the iOS client does. That restart also replaces MDK's product worker and records one
+     * more AppStart telemetry sample, which is not a cold start.
      */
     private suspend fun awaitOwnedNetworkReadiness(account: String) {
         val resume: (suspend () -> Unit)? =
@@ -185,7 +191,7 @@ internal class AppProfileSignUp(
                 null
             }
         try {
-            awaitAccountNetworkReady(account, resume = resume) { ref ->
+            awaitAccountNetworkReady(account, setupWaitTimeoutMillis, resume) { ref ->
                 if (appState.activeAccountRef != ref || !ownerAvailable()) {
                     throw kotlinx.coroutines.CancellationException("Sign-up owner changed")
                 }
@@ -278,4 +284,13 @@ internal class AppProfileSignUp(
             )
         }
     }
+}
+
+/**
+ * MDK coalesces generated creation onto any account whose setup is still unfinished. Never adopt, activate
+ * or rename an account this app already lists as though it were new; iOS guards the same way.
+ */
+private fun AccountSummaryFfi.requireNewAccount(knownAccounts: Set<String>): AccountSummaryFfi {
+    if (label in knownAccounts) throw MarmotKitException.AccountSetupRetryRequired()
+    return this
 }
