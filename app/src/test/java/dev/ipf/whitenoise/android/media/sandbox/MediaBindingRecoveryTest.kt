@@ -452,9 +452,9 @@ class MediaBindingRecoveryTest {
         }
     }
 
-    /** A death that misses the deadline after an accepted reply returns nothing and quarantines nothing. */
+    /** A death that misses the deadline after an accepted reply returns nothing and quarantines only that source. */
     @Test
-    fun deathDeadlineAfterReplyDoesNotQuarantineTheSource() {
+    fun deathDeadlineAfterReplyQuarantinesTheSource() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
         val transport = singleLane(context)
         val firstCall = startDecode(transport, 8)
@@ -471,9 +471,12 @@ class MediaBindingRecoveryTest {
             firstCall.join()
             assertNull(firstCall.result.get())
             val session = privateField(transport, "session")
-            assertTrue((privateField(session, "refusals") as Map<*, *>).isEmpty())
+            assertEquals(1, (privateField(session, "refusals") as Map<*, *>).size)
             first.remote.die()
-            next = startDecode(transport, 8)
+            // The same bytes are refused without another worker; other bytes still reach one.
+            assertNull(transport.decode(byteArrayOf(8), 1, false, MediaDecodePolicy.DECODE))
+            assertEquals(1, context.bindings.size)
+            next = startDecode(transport, 18)
             val second = context.next()
             assertTrue(second.remote.decoded.await(2, TimeUnit.SECONDS))
             assertEquals(2, context.bindings.size)
@@ -485,9 +488,9 @@ class MediaBindingRecoveryTest {
         }
     }
 
-    /** A same-UID terminal reply is not an isolation attestation, so it never quarantines the source. */
+    /** A same-UID terminal reply is no valid result, so its source is quarantined like any failed dispatch. */
     @Test
-    fun unattestedTerminalReplyDoesNotQuarantineTheSource() {
+    fun unattestedTerminalReplyQuarantinesTheSource() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext())
         val transport = singleLane(context)
         val firstCall = startDecode(transport, 9)
@@ -498,8 +501,10 @@ class MediaBindingRecoveryTest {
             first.remote.die()
             firstCall.join()
             val session = privateField(transport, "session")
-            assertTrue((privateField(session, "refusals") as Map<*, *>).isEmpty())
-            next = startDecode(transport, 9)
+            assertEquals(1, (privateField(session, "refusals") as Map<*, *>).size)
+            assertNull(transport.decode(byteArrayOf(9), 1, false, MediaDecodePolicy.DECODE))
+            assertEquals(1, context.bindings.size)
+            next = startDecode(transport, 19)
             val second = context.next()
             assertTrue(second.remote.decoded.await(2, TimeUnit.SECONDS))
             second.remote.die()

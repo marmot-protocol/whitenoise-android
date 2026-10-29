@@ -18,7 +18,9 @@ connected spare or binds one. The parent registers its exact death recipient
 before admitting input and output descriptors. After dispatch it warms the next
 spare. A terminal reply revokes the reply capability, the parent sends RETIRE,
 and it waits for that Binder death before reading shared pixels. A revoked or
-failed reply skips that wait; the next claim still enforces it.
+failed reply skips that wait; the next claim still enforces it. A dispatched
+request without a valid result quarantines its source bytes for the existing
+60-second cooldown, unless the caller was interrupted or the session was reset.
 
 Binding, reply and death share one eight-second host deadline after the
 existing provider-staging phase, separate from the eight-second admission wait.

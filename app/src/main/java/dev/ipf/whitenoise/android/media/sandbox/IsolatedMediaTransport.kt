@@ -296,6 +296,7 @@ internal class IsolatedMediaTransport(
         ticket: Operation,
     ): Boolean = latch.await(remaining(ticket), TimeUnit.MILLISECONDS)
 
+    /** Runs one byte-sourced request under the session's refusal cooldown and records new failures. */
     @Suppress("ReturnCount") // Reject resource and cooldown failures before binding.
     private fun request(
         ticket: Operation,
@@ -316,7 +317,9 @@ internal class IsolatedMediaTransport(
             ticket.session.sources.withInput(bytes) { input ->
                 exchange(ticket, input, output, spec)
             }
-        if (ticket.workerRefused && current(ticket)) {
+        // Any dispatched request without a valid result (crash, watchdog kill, deadline miss or refusal)
+        // quarantines these bytes, as the reusable lane does. Interruption and reset never reach here.
+        if (result == null && ticket.dispatched && current(ticket)) {
             recordRefusal(ticket.session, key, android.os.SystemClock.elapsedRealtime())
         }
         return result
@@ -350,7 +353,6 @@ internal class IsolatedMediaTransport(
             val result = selected.result ?: return null
             // The death barrier precedes the pixel copy, a worker ignoring RETIRE is stopped by Android.
             if (!pool.awaitDeath(selected, remaining(ticket)) || !current(ticket)) return null
-            ticket.workerRefused = validIsolation(result) && !result.getBoolean("success")
             return result.takeIf(::validResult)
         } finally {
             synchronized(bindingLock) { if (pending === selected) revokePending() }
@@ -359,6 +361,7 @@ internal class IsolatedMediaTransport(
         }
     }
 
+    /** The live target for [selected], or null, marking the ticket dispatched once descriptors may leave. */
     private fun admittedTarget(
         selected: MediaWorker,
         ticket: Operation,
@@ -370,6 +373,7 @@ internal class IsolatedMediaTransport(
             } else {
                 // Descriptor admission linearizes before a concurrent reset.
                 requestDispatched = true
+                ticket.dispatched = true
                 pending = selected
                 selected.remote
             }
@@ -482,7 +486,7 @@ internal class IsolatedMediaTransport(
     private data class Operation(
         val session: Session,
         val deadline: Long,
-        var workerRefused: Boolean = false,
+        var dispatched: Boolean = false,
     )
 }
 

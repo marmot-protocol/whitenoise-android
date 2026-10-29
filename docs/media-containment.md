@@ -137,6 +137,11 @@ decoding the same bytes uses two generations.
 - Only the generation's kernel Binder death callback reopens admission. The
   pixel copy waits for the producing generation's death. The next input also
   waits for it, even when its request was abandoned, timed out or reset.
+- A dispatched request that ends without a valid result — a worker crash, a
+  watchdog kill, a deadline miss or a refusal — quarantines its source bytes
+  for 60 seconds, as the reusable lane does, so one hostile source cannot fork
+  a worker or hold the lane on every request. Caller interruption and account
+  reset are not evidence about the source and record nothing.
 - Up to two clean spares are bound while the current input is served. They
   have never received input and are retired on account reset or close. Live
   generations, including retired ones whose death is unconfirmed, never exceed

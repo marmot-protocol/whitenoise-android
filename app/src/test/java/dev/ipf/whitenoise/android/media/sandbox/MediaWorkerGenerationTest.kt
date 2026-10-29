@@ -45,15 +45,19 @@ class MediaWorkerGenerationTest {
     /** There is no same-source grouping: identical bytes requested twice still use two generations. */
     @Test
     fun identicalBytesRequestedTwiceStillUseTwoGenerations() {
-        val context = BindingFixture(ApplicationProvider.getApplicationContext())
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
         val transport = singleLane(context)
         try {
             repeat(2) {
                 val call = startDecode(transport, 1)
                 val worker = context.next()
+                assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
+                // A valid attested result, so the bytes are not quarantined between the two requests.
+                assertTrue(withWorkerIdentity { worker.remote.deliverHeldReply(successfulPixelReply()) })
                 assertTrue(worker.remote.retired.await(2, TimeUnit.SECONDS))
                 worker.remote.die()
                 call.join()
+                call.result.get()?.recycle()
             }
             assertEquals(2, context.bindings.size)
             assertTrue(context.bindings.all { it.remote.requests == 1 })
@@ -109,11 +113,74 @@ class MediaWorkerGenerationTest {
             assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
             assertFalse(withWorkerIdentity { first.remote.deliverHeldReply(successfulPixelReply()) })
             assertNull(call.result.get())
+            // Caller interruption is not evidence about the source, so nothing is quarantined.
+            assertTrue(refusals(transport).isEmpty())
         } finally {
             call.interruptAndJoin()
             context.dieAll()
             transport.close()
         }
+    }
+
+    /** A worker that dies without replying quarantines those bytes: they are refused without another worker. */
+    @Test
+    fun workerCrashWithoutAReplyQuarantinesTheSameBytes() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = singleLane(context)
+        var next: DecodeCall? = null
+        try {
+            val crashing = startDecode(transport, 5)
+            val first = context.next()
+            assertTrue(first.remote.decoded.await(2, TimeUnit.SECONDS))
+            first.remote.die()
+            crashing.join()
+            assertNull(crashing.result.get())
+            assertEquals(1, refusals(transport).size)
+            assertNull(transport.decode(byteArrayOf(5), 1, false, MediaDecodePolicy.DECODE))
+            assertEquals(1, context.bindings.size)
+            assertEquals(1, first.remote.requests)
+            next = startDecode(transport, 6)
+            val second = context.next()
+            assertTrue(second.remote.decoded.await(2, TimeUnit.SECONDS))
+            second.remote.die()
+            next.join()
+        } finally {
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** A worker that misses the deadline, as a watchdog hang does, quarantines those bytes for the cooldown. */
+    @Test
+    fun deadlineMissQuarantinesTheSameBytes() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = singleLane(context, deadlineMs = HELD_DEADLINE_MS)
+        var next: DecodeCall? = null
+        try {
+            assertNull(transport.decode(byteArrayOf(5), 1, false, MediaDecodePolicy.DECODE))
+            val hung = context.next()
+            assertEquals(1, hung.remote.requests)
+            assertEquals(1, refusals(transport).size)
+            hung.remote.die()
+            assertNull(transport.decode(byteArrayOf(5), 1, false, MediaDecodePolicy.DECODE))
+            assertEquals(1, context.bindings.size)
+            next = startDecode(transport, 6)
+            val second = context.next()
+            assertTrue(second.remote.decoded.await(2, TimeUnit.SECONDS))
+            second.remote.die()
+            next.join()
+        } finally {
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** The current session's source quarantine, keyed by operation, edge, option and digest. */
+    private fun refusals(transport: IsolatedMediaTransport): Map<*, *> {
+        val session = privateField(transport, "session")
+        return privateField(session, "refusals") as Map<*, *>
     }
 
     /** When a replacement cannot bind, the input fails closed and the previous worker never receives it. */
