@@ -316,6 +316,60 @@ class ChatListContinuityAndroidTest {
         }
     }
 
+    /** Archive replacement retains an eligible bottom band while its fresh viewport exposes the resting top. */
+    @Test
+    fun actualArchivedFolderSwitchRetainsEligibleFadePixels() {
+        prepareArchivedFadeRows()
+        val originalImeFlag =
+            rule.runOnIdle {
+                rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+            }
+        rule.runOnUiThread { rule.activity.window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) }
+        try {
+            render(fadeProbe = true)
+            val probe = ChatFolderFadeFrameProbe(rule)
+            probe.assertEdges("archive-active-initial", top = false, bottom = true)
+            rule.mainClock.autoAdvance = false
+            publishFadeChange { selectedFolder = ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID }
+            rule.onNodeWithTag("chat.row.$firstRow").assertDoesNotExist()
+            probe.assertEdges("archive-first", top = false, bottom = true)
+            rule.mainClock.advanceTimeBy(60)
+            probe.assertEdges("archive-middle", top = false, bottom = true)
+            publishFadeChange { selectedFolder = null }
+            rule.onNodeWithTag("chat.row.$firstRow").assertExists()
+            probe.assertEdges("active-reversal-first", top = false, bottom = true)
+            rule.mainClock.advanceTimeBy(60)
+            probe.assertEdges("active-reversal-middle", top = false, bottom = true)
+            rule.mainClock.advanceTimeBy(240)
+            probe.assertEdges("active-reversal-settled", top = false, bottom = true)
+            publishFadeChange { selectedFolder = ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID }
+            rule.onNodeWithTag("chat.row.$firstRow").assertDoesNotExist()
+            probe.assertEdges("archive-return-first", top = false, bottom = true)
+            rule.mainClock.advanceTimeBy(60)
+            probe.assertEdges("archive-return-middle", top = false, bottom = true)
+            rule.mainClock.advanceTimeBy(240)
+            probe.assertEdges("archive-return-settled", top = false, bottom = true)
+        } finally {
+            rule.mainClock.autoAdvance = true
+            rule.runOnUiThread {
+                rule.activity.window.setFlags(originalImeFlag, WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+            }
+        }
+    }
+
+    /** Materializes separate overflowing active and archived projections without sharing their scroll state. */
+    private fun prepareArchivedFadeRows() {
+        rule.runOnUiThread {
+            (3..34).forEach { index ->
+                val activeId = index.toString(16).padStart(64, '0')
+                val archivedId = (index + 64).toString(16).padStart(64, '0')
+                controller.applyChatListRow(chatRow(activeId, "Active fade $index", 1uL))
+                controller.applyChatListRow(chatRow(archivedId, "Archived fade $index", 1uL).copy(archived = true))
+            }
+        }
+        rule.waitUntil(5_000) { controller.items.size == 34 && controller.archivedItems.size == 32 }
+    }
+
     /** Uses identical authoritative rows in the long folders so membership cannot change edge eligibility. */
     private fun prepareFadeFolders(): List<String> {
         val rows = (3..34).map { it.toString(16).padStart(64, '0') }

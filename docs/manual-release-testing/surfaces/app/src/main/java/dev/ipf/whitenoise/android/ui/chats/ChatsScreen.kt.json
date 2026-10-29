@@ -38,6 +38,7 @@
         "anchor": "fun ChatsScreen(",
         "test_ids": [
           "CHL-001",
+          "CHL-002",
           "SEC-012",
           "CHL-018",
           "CHL-021",

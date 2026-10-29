@@ -792,7 +792,8 @@ internal fun ChatsScreen(
             showArchived = showArchived,
         )
     val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
-    val edgeFadeMotion = rememberScrollEdgeFadeMotion(viewportOwner)
+    // Active/archived viewports keep separate scrolling; only decorative fades share the account lifetime.
+    val edgeFadeMotion = rememberScrollEdgeFadeMotion(appState.activeAccountRef to appState.runtimeGeneration)
     val folderArrival =
         rememberChatFolderArrival(appState.activeAccountRef to appState.runtimeGeneration, selectedFolderId)
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
