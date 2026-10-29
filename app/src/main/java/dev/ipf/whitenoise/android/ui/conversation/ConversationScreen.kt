@@ -1939,6 +1939,12 @@ internal fun ConversationScreen(
         exitConversationRoute()
     }
 
+    // Row callbacks read the latest projections through stable holders. Capturing them directly makes every
+    // visible row's callback new whenever the timeline changes, so one send would re-run every unchanged row.
+    val currentSelectableMessages by rememberUpdatedState(selectableMessages)
+    val currentExitConversation by rememberUpdatedState(exitConversation)
+    val rowExitConversation: () -> Unit = remember { { currentExitConversation() } }
+
     /** Restores and persists the imported-share shelf and stages newly shared items into this chat's draft. */
     @Composable
     fun importedShareEffects() {
@@ -3286,6 +3292,9 @@ internal fun ConversationScreen(
     // row is entering; the follow effect below only runs after that frame.
     val sendMotionRuntime = remember(controller) { appState.runtimeGeneration }
     val composerSendMotion = remember(controller, chat.id) { ComposerSendMotion() }
+    // One claim source per owner keeps every row's entrance modifier equal across transcript recompositions.
+    val claimedSendPresentation: () -> String? =
+        remember(composerSendMotion) { { composerSendMotion.activePresentationId } }
     composerSendMotion.readViewport = { presentationId ->
         timelineViewport.composerSendProjection(timelinePublication, presentationId)
     }
@@ -3311,8 +3320,7 @@ internal fun ConversationScreen(
             motionEnabled = conversationMotionEnabled,
             ownerKey = controller,
         )
-    val claimedTailPresentationId = composerSendMotion.activePresentationId
-    SideEffect { tailEntrance.claimPresentation(claimedTailPresentationId) }
+    TailEntranceSendClaim(tailEntrance, claimedSendPresentation)
 
     /**
      * Follows the tail for membership activity and new rows, keeps viewport structure current and lands route focus
@@ -4582,7 +4590,7 @@ internal fun ConversationScreen(
                                                         .conversationTailEntranceMotion(
                                                             tailEntrance,
                                                             item.presentationId,
-                                                            { composerSendMotion.activePresentationId },
+                                                            claimedSendPresentation,
                                                         ).then(membershipFrameModifier),
                                                 item = item,
                                                 reactionViewport = reactionViewport,
@@ -4642,7 +4650,7 @@ internal fun ConversationScreen(
                                                         if (selectedMessages.containsKey(messageId)) {
                                                             selectedMessages.remove(messageId)
                                                         } else {
-                                                            selectableMessages[messageId]?.let { selectable ->
+                                                            currentSelectableMessages[messageId]?.let { selectable ->
                                                                 selectedMessages[messageId] = selectable
                                                             }
                                                         }
@@ -4666,7 +4674,7 @@ internal fun ConversationScreen(
                                                 },
                                                 onDragSelection = { pointerWindowY ->
                                                     dragPointerWindowY = pointerWindowY
-                                                    updateMessageDragSelection(pointerWindowY)
+                                                    currentMessageDragSelectionUpdater(pointerWindowY)
                                                 },
                                                 onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
                                                 onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
@@ -4711,7 +4719,7 @@ internal fun ConversationScreen(
                                                     acceptedSendRevealedTranscript = true
                                                     revealSentMessage()
                                                 },
-                                                onBack = exitConversation,
+                                                onBack = rowExitConversation,
                                                 mentionCandidates = mentionPicker.candidates,
                                                 mentionPickerEnabled = mentionPicker.enabled,
                                                 onBeforeBodyCollapse = {
