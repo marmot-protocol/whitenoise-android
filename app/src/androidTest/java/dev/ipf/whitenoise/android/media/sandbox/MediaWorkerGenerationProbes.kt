@@ -51,6 +51,25 @@ internal object MediaWorkerGenerationProbes {
         }
     }
 
+    /**
+     * Waits for Android's exit record, written at or after [since] (wall clock), of the worker process bound
+     * under [instance], found by process name.
+     */
+    fun awaitExitRecordFor(
+        instance: String,
+        since: Long,
+    ): android.app.ApplicationExitInfo {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val manager = context.getSystemService(android.app.ActivityManager::class.java)
+        val deadline = SystemClock.elapsedRealtime() + WAIT_MS
+        while (true) {
+            val exits = manager.getHistoricalProcessExitReasons(context.packageName, 0, 0)
+            exits.firstOrNull { it.timestamp >= since && it.processName.endsWith(":$instance") }?.let { return it }
+            check(SystemClock.elapsedRealtime() < deadline) { "Android recorded no exit for worker $instance" }
+            SystemClock.sleep(POLL_MS)
+        }
+    }
+
     /** Waits up to five seconds for the [generation]th binding attempt's kernel Binder death record. */
     fun awaitDeathRecord(
         context: MediaWorkerBaselineBinding,

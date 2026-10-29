@@ -27,7 +27,8 @@ existing provider-staging phase, separate from the eight-second admission wait.
 The worker keeps its six-second watchdog. RETIRE acknowledgements,
 disconnection callbacks, null bindings, unbind requests and expired deadlines
 never reopen admission. A worker alive 250 ms after RETIRE is unbound so
-Android stops it; that call is an escalation, not a witness. A binding Android
+Android stops it, on the pool's own timer when no request is waiting; that call
+is an escalation, not a witness. A binding Android
 reports dead or null before it connects is released at once: it never held
 input. An accepted startup that reports nothing keeps its slot; Android's start
 timeout normally reports that binding dead, which releases it, and a late
@@ -71,7 +72,9 @@ duplicated descriptor are absent from source B's worker, and A's process is
 gone (`ps`). Each input's DECODE is sent only after its predecessor's Binder
 death, recorded by an independent witness. Debug fixtures that ignore RETIRE,
 after a reply or while abandoned mid-request, hold the next input until Android
-stops them. Android records that exit as `isolated not needed`, not a self-exit.
+stops them, and an abandoned one is stopped well before its own watchdog even
+when no request follows. Android records those exits as `isolated not needed`,
+not as a self-exit.
 These cases ran on API 30 and API 36 emulators and run in the hosted API 34
 pull-request lane. MED-031 and MED-032 keep their image, account-switching and
 format checks.

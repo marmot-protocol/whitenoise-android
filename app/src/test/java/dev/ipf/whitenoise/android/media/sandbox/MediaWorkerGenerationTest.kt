@@ -122,6 +122,31 @@ class MediaWorkerGenerationTest {
         }
     }
 
+    /** An abandoned request's worker that ignores RETIRE is stopped through Android without another request. */
+    @Test
+    fun abandonedRetiringWorkerIsStoppedWithoutAnotherRequest() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = singleLane(context)
+        val call = startDecode(transport, 1)
+        try {
+            val abandoned = context.next()
+            assertTrue(abandoned.remote.decoded.await(2, TimeUnit.SECONDS))
+            call.interruptAndJoin()
+            assertTrue(abandoned.remote.retired.await(2, TimeUnit.SECONDS))
+            assertFalse("No escalation before the grace", context.isUnbound(abandoned))
+            org.robolectric.shadows.ShadowSystemClock
+                .advanceBy(java.time.Duration.ofMillis(MediaWorkerPool.RETIRE_ESCALATION_MS + 1))
+            val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (!context.isUnbound(abandoned) && System.nanoTime() < until) Thread.sleep(5)
+            assertTrue("Android was asked to stop the abandoned worker", context.isUnbound(abandoned))
+            assertEquals(1, context.bindings.size)
+        } finally {
+            call.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
     /** A worker that dies without replying quarantines those bytes: they are refused without another worker. */
     @Test
     fun workerCrashWithoutAReplyQuarantinesTheSameBytes() {

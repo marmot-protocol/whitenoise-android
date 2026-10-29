@@ -241,7 +241,12 @@ internal class MediaWorkerPool(
             }
         // Unbinding at once races Android's service teardown with the worker's own exit and slows death.
         runCatching { target?.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
-        if (escalate) escalate(worker)
+        if (escalate) {
+            escalate(worker)
+        } else if (target != null) {
+            // Nobody may wait for this death, as after an abandoned request, so escalate on our own clock too.
+            handler.postDelayed({ if (worker.dead.count != 0L) escalate(worker) }, RETIRE_ESCALATION_MS)
+        }
     }
 
     /** Waits up to [budgetMs] for [worker]'s Binder death, escalating to a system-enforced stop after the grace. */

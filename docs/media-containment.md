@@ -131,8 +131,9 @@ decoding the same bytes uses two generations.
   abandoned or reset request, are refused by the transaction itself.
 - After the reply the parent sends RETIRE. The worker's own exit normally
   follows within a few milliseconds. A worker still alive 250 ms later is
-  unbound, and Android stops the isolated process (`isolated not needed`) whether
-  or not the worker cooperates. Unbinding at once was measured to slow the common
+  unbound on the parent's own timer, even when no request is waiting, and
+  Android stops the isolated process (`isolated not needed`) whether or not the
+  worker cooperates. Unbinding at once was measured to slow the common
   path; neither step counts as evidence of death.
 - Only the generation's kernel Binder death callback reopens admission. The
   pixel copy waits for the producing generation's death. The next input also
@@ -169,10 +170,6 @@ for that decision and for #3439, which edits the facade's animation type checks.
 
 ### Residual risks
 
-- A request waiting for pixels escalates an uncooperative worker itself. After
-  an abandoned or reset request, a worker that ignores RETIRE stays alive until
-  the next request or close escalates it. It has no capability and receives no
-  input.
 - A cooperative self-exit ends the worker process only. Android's escalation
   kill covers the process group. A forked descendant of a compromised worker is
   outside the Binder witness.

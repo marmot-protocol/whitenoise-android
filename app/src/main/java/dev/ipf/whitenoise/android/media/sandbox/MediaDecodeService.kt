@@ -34,6 +34,8 @@ class MediaDecodeService : Service() {
         val reply = message.replyTo ?: return true
         val data = message.data
         val requestId = message.arg1
+        // Arm a stubborn fixture on this looper, so a RETIRE queued behind its DECODE is already ignored.
+        MediaDecodeDebugFixtures.arm(data.getInt("operation"))
         codec.execute {
             val killer =
                 watchdog.schedule(

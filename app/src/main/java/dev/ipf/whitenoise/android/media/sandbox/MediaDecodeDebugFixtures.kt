@@ -21,13 +21,19 @@ internal object MediaDecodeDebugFixtures {
     /** Whether this worker was told to ignore RETIRE and its own teardown, as a compromised worker could. */
     fun ignoringRetirement(): Boolean = dev.ipf.whitenoise.android.BuildConfig.DEBUG && ignoreRetirement
 
-    /** Runs a hang fixture and returns true, the stubborn variant also ignores RETIRE. */
+    /** Makes the stubborn hang ignore RETIRE from the moment its DECODE is accepted, before any later message. */
+    fun arm(operation: Int) {
+        if (dev.ipf.whitenoise.android.BuildConfig.DEBUG && operation == MediaDecodePolicy.DEBUG_STUBBORN_HANG) {
+            ignoreRetirement = true
+        }
+    }
+
+    /** Runs a hang fixture and returns true, the stubborn variant having been armed to ignore RETIRE. */
     fun hang(operation: Int): Boolean {
         val stubborn = operation == MediaDecodePolicy.DEBUG_STUBBORN_HANG
         if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG || (operation != MediaDecodePolicy.DEBUG_HANG && !stubborn)) {
             return false
         }
-        if (stubborn) ignoreRetirement = true
         Thread.sleep(MediaDecodePolicy.DEBUG_HANG_MS)
         return true
     }

@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerGenerationProbes.asse
 import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerGenerationProbes.awaitDeathRecord
 import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerGenerationProbes.awaitDecodeSent
 import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerGenerationProbes.awaitExitRecord
+import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerGenerationProbes.awaitExitRecordFor
 import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerGenerationProbes.awaitRetireSent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -414,6 +415,7 @@ class IsolatedMediaDecoderDeviceTest {
     /** An abandoned request whose worker ignores RETIRE still holds the next input until Android stops it. */
     @Test
     fun abandonedNoncooperativeWorkerStillHoldsTheNextInputUntilItsDeath() {
+        val since = System.currentTimeMillis()
         val context = MediaWorkerBaselineBinding(InstrumentationRegistry.getInstrumentation().targetContext)
         val transport = IsolatedMediaTransport(context, "abandoned_images")
         val executor =
@@ -444,9 +446,55 @@ class IsolatedMediaDecoderDeviceTest {
                 java.util.concurrent.TimeUnit.MILLISECONDS
                     .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
             assertTrue("The worker ignored RETIRE and outlived the escalation grace", died - retired >= grace)
+            // Its own watchdog would end it after six seconds; the escalation must stop it far sooner.
+            val watchdog =
+                java.util.concurrent.TimeUnit.MILLISECONDS
+                    .toNanos(MediaDecodePolicy.WATCHDOG_MS)
+            assertTrue("Android stopped it before the watchdog", died - retired < watchdog / 2)
             assertTrue("The next input was requested while the abandoned worker lived", queued < died)
             // Only the admission fence separates these: the abandoned exchange never waited for the death.
             assertDeathPrecedesEachNextInput(inputs)
+            val exit = awaitExitRecordFor(abandoned.getString("instance"), since)
+            assertEquals(exit.description, android.app.ApplicationExitInfo.REASON_OTHER, exit.reason)
+        } finally {
+            executor.shutdownNow()
+            transport.close()
+            context.closeObservers()
+        }
+    }
+
+    /** An abandoned worker that ignores RETIRE is stopped by Android on the parent's clock, with no further request. */
+    @Test
+    fun abandonedNoncooperativeWorkerIsStoppedWithoutAnotherRequest() {
+        val since = System.currentTimeMillis()
+        val context = MediaWorkerBaselineBinding(InstrumentationRegistry.getInstrumentation().targetContext)
+        val transport = IsolatedMediaTransport(context, "abandoned_idle_images")
+        val executor =
+            java.util.concurrent.Executors
+                .newSingleThreadExecutor()
+        try {
+            val stubborn =
+                executor.submit {
+                    transport.decode(byteArrayOf(2), 1, false, MediaDecodePolicy.DEBUG_STUBBORN_HANG)
+                }
+            awaitDecodeSent(context)
+            stubborn.cancel(true)
+            val held = awaitRetireSent(context)
+            val endpoint = awaitDeathRecord(context, held)
+            assertFalse("No request is waiting, yet the worker must die", endpoint.isNull("death_observed_elapsed_ns"))
+            val retired = endpoint.getLong("retire_elapsed_ns")
+            val died = endpoint.getLong("death_observed_elapsed_ns")
+            val grace =
+                java.util.concurrent.TimeUnit.MILLISECONDS
+                    .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
+            val watchdog =
+                java.util.concurrent.TimeUnit.MILLISECONDS
+                    .toNanos(MediaDecodePolicy.WATCHDOG_MS)
+            assertTrue("The worker ignored RETIRE", died - retired >= grace)
+            assertTrue("Android stopped it before the watchdog", died - retired < watchdog / 2)
+            assertEquals(1, context.inputEndpoints().size)
+            val exit = awaitExitRecordFor(endpoint.getString("instance"), since)
+            assertEquals(exit.description, android.app.ApplicationExitInfo.REASON_OTHER, exit.reason)
         } finally {
             executor.shutdownNow()
             transport.close()
