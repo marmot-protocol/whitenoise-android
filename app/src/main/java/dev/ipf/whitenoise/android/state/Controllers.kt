@@ -6,6 +6,7 @@ import android.view.Choreographer
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -6570,6 +6571,15 @@ class ConversationController(
         private set
 
     /**
+     * The engine's conversation kind alone. The row above changes with every last message, unread count and read
+     * marker, so the DM classification and title read this instead: their readers, every visible bubble among
+     * them, recompose only when the kind itself changes.
+     */
+    private val latestConversationKind: ChatConversationKindFfi? by derivedStateOf {
+        latestChatListRow?.conversationKind
+    }
+
+    /**
      * An encrypted image upload may succeed before clearing a legacy URL
      * avatar fails. MDK gives URL avatars precedence, so retain this transient
      * retry latch and avoid uploading the same bytes again on the next tap.
@@ -7110,7 +7120,7 @@ class ConversationController(
             memberCount = identity.memberCount,
             memberTitle = { appState.chatMemberTitle(it) },
             copy = copy,
-            conversationKind = latestChatListRow?.conversationKind,
+            conversationKind = latestConversationKind,
             soleSelfMember = GroupProjector.isSelfSoleMember(members, conversationAccountIdHex),
         )
     }
@@ -7161,11 +7171,11 @@ class ConversationController(
     val memberCount: Int get() = GroupProjector.uniqueMemberCount(members)
     val isDm: Boolean
         get() =
-            GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name) ||
+            GroupProjector.isDm(latestConversationKind, memberCount, group.name) ||
                 (
                     initialIsDm &&
                         !membersVerified &&
-                        latestChatListRow?.conversationKind != ChatConversationKindFfi.GROUP
+                        latestConversationKind != ChatConversationKindFfi.GROUP
                 )
 
     val subtitle: String
@@ -7197,7 +7207,7 @@ class ConversationController(
      * moderation capability is granted from an unverified roster.
      */
     val isDirectConversation: Boolean
-        get() = GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name)
+        get() = GroupProjector.isDm(latestConversationKind, memberCount, group.name)
 
     /**
      * The authoritative deletion capability for [message], shared by the

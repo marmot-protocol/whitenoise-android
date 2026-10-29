@@ -311,23 +311,34 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /**
+     * DM classification prefers the engine's projected kind, read through a derived kind so classification readers
+     * do not recompose on every chat-list row update.
+     */
     @Test
     fun conversationClassificationPrefersProjectedKind() {
         val source = controllersSource().readText()
+        val derivedKind =
+            Regex(
+                """val\s+latestConversationKind:\s*ChatConversationKindFfi\?\s*by\s*derivedStateOf\s*\{\s*""" +
+                    """latestChatListRow\?\.conversationKind\s*}""",
+            )
         val projectedIsDm =
             Regex(
                 """val\s+isDm:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
-                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+                    """GroupProjector\.isDm\(latestConversationKind,\s*memberCount,\s*group\.name\)""",
             )
         val projectedIsDirect =
             Regex(
                 """val\s+isDirectConversation:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
-                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+                    """GroupProjector\.isDm\(latestConversationKind,\s*memberCount,\s*group\.name\)""",
             )
 
         assertTrue(
             "conversation-screen DM classification must prefer the engine's projected kind, heuristic only as fallback",
-            projectedIsDm.containsMatchIn(source) && projectedIsDirect.containsMatchIn(source),
+            derivedKind.containsMatchIn(source) &&
+                projectedIsDm.containsMatchIn(source) &&
+                projectedIsDirect.containsMatchIn(source),
         )
     }
 

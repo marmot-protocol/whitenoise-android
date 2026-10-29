@@ -116,6 +116,43 @@ class ConversationSendRecompositionTest {
         assertTrue("bubbles re-run: $counts", counts.of("messages.MessageBubble") <= 2)
     }
 
+    /**
+     * Chat-list row updates that keep the conversation kind, several per send on device as the last message, unread
+     * count and read marker move, recompose neither the screen nor any row or bubble. Bubbles classify the chat
+     * through the controller, which must not hand them the whole row.
+     */
+    @Test
+    fun chatListRowUpdatesWithTheSameKindRecomposeNoRowOrBubble() {
+        mountAtLiveTail()
+        val conversation = checkNotNull(controller)
+        val groupIdHex = conversationTimelineTestGroup().groupIdHex
+
+        /** Applies a same-kind native row whose unread count and activity advance with [revision]. */
+        fun applyRow(revision: Int) =
+            composeRule.runOnIdle {
+                conversation.applyAuthoritativeChatListRow(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    chatRow(groupIdHex).copy(
+                        unreadCount = revision.toULong(),
+                        activitySortAt = revision.toULong() + 1uL,
+                        updatedAt = revision.toULong() + 1uL,
+                    ),
+                )
+            }
+        applyRow(0)
+        settle(10)
+        val counts =
+            countCompositions {
+                repeat(3) { revision ->
+                    applyRow(revision + 1)
+                    settle(5)
+                }
+            }
+        assertEquals("screen re-run: $counts", 0, counts.exactly(CONVERSATION_SCREEN))
+        assertEquals("rows re-run: $counts", 0, counts.of("TimelineRow"))
+        assertEquals("bubbles re-run: $counts", 0, counts.of("messages.MessageBubble"))
+    }
+
     /** The entrance modifier compares equal for the same entrance, row and claim source, so unchanged rows skip. */
     @Test
     fun tailEntranceModifierComparesEqualForTheSameRowAndClaim() {
