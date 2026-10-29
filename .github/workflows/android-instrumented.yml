@@ -148,6 +148,8 @@ on:
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowSelectionStrip.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatUnreadBadgeMotion.kt'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/java/dev/ipf/whitenoise/android/share/OutboundShare.kt'
