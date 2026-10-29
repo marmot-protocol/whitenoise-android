@@ -28229,9 +28229,9 @@
         ]
       },
       {
-        "surface": "Sign Up waits for the retained identity's relay publication",
+        "surface": "Sign Up waits for relay setup before the profile save",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
-        "anchor": "awaitAccountNetworkReady(summary.label)",
+        "anchor": "awaitOwnedNetworkReadiness(account)",
         "test_ids": [
           "ONB-003"
         ]

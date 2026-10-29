@@ -171,6 +171,23 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals(listOf("created"), f.finished)
         }
 
+    /** A stalled relay setup fails only publication: the accepted account stays and the form can still exit. */
+    @Test fun setupWaitFailureKeepsAcceptedAccountAndAllowsContinue() =
+        runTest {
+            val f = Fixture(this)
+            f.publishError = IllegalStateException("setup readiness timed out")
+            f.controller.submit(DRAFT)
+            advanceUntilIdle()
+
+            assertEquals(SignUpStage.PublishFailed, f.controller.stage)
+            assertEquals("created", f.controller.acceptedIdentity?.label)
+            f.controller.continueWithoutProfile()
+            assertEquals(SignUpStage.Complete, f.controller.stage)
+            assertEquals(1, f.creations)
+            assertEquals(emptyList<UserProfileMetadataFfi>(), f.publications)
+            assertEquals(listOf("created"), f.finished)
+        }
+
     /** A sign-out gate prevents retries and Continue from publishing or activating any account. */
     @Test fun signOutBlocksPartialRetryAndContinue() =
         runTest {
@@ -243,6 +260,7 @@ class SignUpPartialPublicationRecoveryTest {
         var qualificationFails = false
         var uploadFails = false
         var publishSucceeds = true
+        var publishError: Exception? = null
         var creations = 0
         val initialProfiles = mutableListOf<UserProfileMetadataFfi>()
         var qualifications = 0
@@ -290,6 +308,7 @@ class SignUpPartialPublicationRecoveryTest {
                     "https://images.example/avatar.jpg"
                 },
                 publish = { account, metadata ->
+                    publishError?.let { throw it }
                     publishedAccounts += account
                     publications += metadata
                     afterPublish()

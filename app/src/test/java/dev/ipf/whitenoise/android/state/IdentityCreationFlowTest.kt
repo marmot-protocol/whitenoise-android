@@ -49,9 +49,21 @@ class IdentityCreationFlowTest {
         assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
         val initial = "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)"
         assertTrue(body.contains(initial))
-        // Creation returns the receipt at local readiness; the retried qualification stage owns the wait.
+        // Creation returns the receipt at local readiness; the publication stage owns the wait.
         assertFalse(body.functionBody("MarmotInterface.createNamedIdentity").contains("awaitAccountNetworkReady"))
         assertFalse(body.contains("take(1)"))
+    }
+
+    /** The profile save waits for relay setup outside the account lifetime, rechecking the form owner on each read. */
+    @Test
+    fun profileSaveWaitsForReadinessWithoutHoldingTheAccountLifetime() {
+        val adapter = appStateSource("AppProfileSignUp.kt").readText()
+        val publish = adapter.substringAfter("publish = { account, metadata ->").substringBefore("finish =")
+        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf("publishProfile("))
+        val wait = adapter.functionBody("awaitOwnedNetworkReadiness")
+        assertFalse(wait.contains("withAccountLifetime"))
+        assertTrue(wait.contains("ownerAvailable()"))
+        assertFalse(adapter.functionBody("qualifyOwnedIdentity").contains("awaitAccountNetworkReady"))
     }
 
     /** Initial-profile creation returns at local readiness, so signup waits until relay publication completes. */

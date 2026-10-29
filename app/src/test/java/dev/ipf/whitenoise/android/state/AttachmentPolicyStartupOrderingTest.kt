@@ -59,7 +59,6 @@ class AttachmentPolicyStartupOrderingTest {
         assertOrdered(create, "withCurrentAccountLifetime", "createNamedIdentity(initialProfile)")
         val qualify = adapter.functionBody("qualifyOwnedIdentity")
         assertOrdered(qualify, "ownsCreatingRuntime(summary)", "enforceAppOwnedAttachmentAcquisitionPolicy")
-        assertOrdered(qualify, "enforceAppOwnedAttachmentAcquisitionPolicy", "awaitAccountNetworkReady(summary.label)")
         val direct = adapter.functionBody("createIdentityWithoutProfile")
         assertOrdered(direct, "createOwnedIdentity(", "qualifyOwnedIdentity(account)")
         assertOrdered(direct, "qualifyOwnedIdentity(account)", "activateCreatedIdentity(summary)")
@@ -68,8 +67,8 @@ class AttachmentPolicyStartupOrderingTest {
         assertTrue(profileSignUp.contains("createOwnedIdentity("))
         assertTrue(profileSignUp.contains("qualify ="))
         val qualification = profileSignUp.substringAfter("qualify =").substringBefore("accept =")
-        assertOrdered(qualification, "runCatchingCancellable", "qualifyOwnedIdentity(account, awaitPublication = true)")
-        assertOrdered(qualification, "qualifyOwnedIdentity(account, awaitPublication = true)", "presentFailure")
+        assertOrdered(qualification, "runCatchingCancellable", "qualifyOwnedIdentity(account)")
+        assertOrdered(qualification, "qualifyOwnedIdentity(account)", "presentFailure")
         assertOrdered(qualification, "presentFailure", "getOrThrow()")
     }
 

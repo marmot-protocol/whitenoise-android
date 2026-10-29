@@ -64,22 +64,13 @@ internal class AppProfileSignUp(
         }
     }
 
-    /**
-     * Contains the retained receipt and, for a local-ready profile receipt, waits for its relay publication.
-     * Both repeat for the same receipt on Retry, so a failed wait never discards it or creates another identity.
-     */
-    private suspend fun qualifyOwnedIdentity(
-        summary: AccountSummaryFfi,
-        awaitPublication: Boolean = false,
-    ) = appState.withAccountLifetime {
-        if (!ownsCreatingRuntime(summary)) {
-            throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
+    private suspend fun qualifyOwnedIdentity(summary: AccountSummaryFfi) =
+        appState.withAccountLifetime {
+            if (!ownsCreatingRuntime(summary)) {
+                throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
+            }
+            appState.marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
         }
-        appState.marmotIo {
-            enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label))
-            if (awaitPublication) awaitAccountNetworkReady(summary.label) { accountSetupReadiness(it) }
-        }
-    }
 
     /** Accepted native receipt survives recreation; only this adapter can replace it. */
     var pending by mutableStateOf<SignUpController?>(null)
@@ -116,7 +107,7 @@ internal class AppProfileSignUp(
                 hasPendingIdentityReceipt = profileIdentityCoordinator::hasPendingReceipt,
                 qualify = { account ->
                     runCatchingCancellable {
-                        qualifyOwnedIdentity(account, awaitPublication = true)
+                        qualifyOwnedIdentity(account)
                     }.onFailure {
                         appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
                     }.getOrThrow()
@@ -131,6 +122,7 @@ internal class AppProfileSignUp(
                 },
                 publish = { account, metadata ->
                     if (appState.activeAccountRef == account && ownerAvailable()) {
+                        awaitOwnedNetworkReadiness(account)
                         appState.publishProfile(metadata)
                     } else {
                         false
@@ -169,6 +161,20 @@ internal class AppProfileSignUp(
             appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", error)
         }
     }
+
+    /**
+     * The profile creation call returns at local readiness while MDK publishes relay lists and the KeyPackage in
+     * the background. Wait for that before the profile save, without holding the account lifetime, and recheck
+     * the form's owner on every read. A failure is a retryable publication stage that keeps the accepted account,
+     * and Continue without profile still leaves the form.
+     */
+    private suspend fun awaitOwnedNetworkReadiness(account: String) =
+        awaitAccountNetworkReady(account) { ref ->
+            if (appState.activeAccountRef != ref || !ownerAvailable()) {
+                throw kotlinx.coroutines.CancellationException("Sign-up owner changed")
+            }
+            appState.marmotIo { accountSetupReadiness(ref) }
+        }
 
     /** Teardown and retained-account reactivation cannot acquire the profile form's ownership. */
     private fun ownerAvailable(): Boolean {
