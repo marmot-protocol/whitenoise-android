@@ -76,11 +76,17 @@ internal class MediaWorkerThroughputSampler : java.io.Closeable {
         private const val SAMPLE_INTERVAL_MS = 100L
         private const val SAMPLE_JOIN_MS = 5_000L
 
-        /** RSS (kB) of every live still-image worker process in one `ps -A -o RSS,NAME` listing. */
-        fun decoderProcesses(listing: String): List<Long> =
+        /**
+         * RSS (kB) of every live still-image worker of the measured package in one `ps -A -o RSS,NAME` listing.
+         * Another installed build's workers, such as a user's own app on a physical device, are not counted.
+         */
+        fun decoderProcesses(
+            listing: String,
+            packageName: String = measuredPackage(),
+        ): List<Long> =
             listing
                 .lineSequence()
-                .filter { it.contains(":media_decoder") }
+                .filter { it.contains("$packageName:media_decoder") }
                 .mapNotNull { line ->
                     line
                         .trim()
@@ -89,11 +95,17 @@ internal class MediaWorkerThroughputSampler : java.io.Closeable {
                         ?.toLongOrNull()
                 }.toList()
 
-        /** Number of live application-zygote processes owned by this package in one `ps` listing. */
-        fun appZygoteCount(listing: String): Int =
+        /** Number of live application-zygote processes owned by the measured package in one `ps` listing. */
+        fun appZygoteCount(
+            listing: String,
+            packageName: String = measuredPackage(),
+        ): Int =
             listing
                 .lineSequence()
-                .count { it.contains("whitenoise") && it.trim().endsWith("_zygote") }
+                .count { it.trim().endsWith("${packageName}_zygote") }
+
+        /** The package under measurement: the instrumentation's target, whatever identity it was built with. */
+        fun measuredPackage(): String = InstrumentationRegistry.getInstrumentation().targetContext.packageName
 
         /** System-wide MemAvailable in kB, the drop across a scenario includes worker memory the app cannot read. */
         fun memAvailableKb(): Long? =
