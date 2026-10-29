@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
-import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
@@ -22,15 +21,11 @@ internal data class WorkerCanary(
         }
 
         /** Whether `ps`, run as the shell UID, lists [pid] — isolated workers' /proc is hidden from the app. */
-        fun processAlive(pid: Int): Boolean {
-            val descriptor =
-                InstrumentationRegistry
-                    .getInstrumentation()
-                    .uiAutomation
-                    .executeShellCommand("ps -A -o PID")
-            val listing = ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes().decodeToString() }
-            return listing.lineSequence().any { it.trim() == pid.toString() }
-        }
+        fun processAlive(pid: Int): Boolean =
+            MediaWorkerThroughputSampler
+                .shell("ps -A -o PID")
+                .lineSequence()
+                .any { it.trim() == pid.toString() }
     }
 }
 

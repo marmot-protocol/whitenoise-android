@@ -122,15 +122,22 @@ internal class MediaWorkerThroughputSampler : java.io.Closeable {
                     ?.toLongOrNull()
             }.getOrNull()
 
-        /** Runs one read-only shell command through UiAutomation and returns its standard output. */
-        fun shell(command: String): String {
-            val descriptor =
-                InstrumentationRegistry
-                    .getInstrumentation()
-                    .uiAutomation
-                    .executeShellCommand(command)
-            return ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes().decodeToString() }
-        }
+        private val shellLock = Any()
+
+        /**
+         * Runs one read-only shell command through UiAutomation and returns its standard output, one caller at a
+         * time — `Instrumentation.getUiAutomation` is not thread-safe, and on API 36 a sampler call racing the test
+         * thread's first call fails with "Already connected" or leaves a connect pending when the runner finishes.
+         */
+        fun shell(command: String): String =
+            synchronized(shellLock) {
+                val descriptor =
+                    InstrumentationRegistry
+                        .getInstrumentation()
+                        .uiAutomation
+                        .executeShellCommand(command)
+                ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes().decodeToString() }
+            }
     }
 }
 
