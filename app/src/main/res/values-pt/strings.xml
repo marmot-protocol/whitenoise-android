@@ -2496,6 +2496,13 @@
     <string name="chat_batch_order_unconfirmed">Não foi possível confirmar a ordem das conversas fixadas. Confira a lista antes de mover conversas novamente.</string>
     <string name="public_jpeg_preview_image">Prévia de JPEG vinculado</string>
     <string name="public_jpeg_preview_save_failed">Não foi possível salvar a configuração de prévia de imagens. Tente novamente.</string>
+    <string name="appearance_accessibility_preview">Pré-visualização da legibilidade</string>
+    <string name="appearance_preview_rtl">Pré-visualizar disposição da direita para a esquerda</string>
+    <string name="appearance_preview_large_text">Pré-visualizar texto maior</string>
+    <string name="appearance_preview_reset">Repor pré-visualização</string>
+    <string name="appearance_preview_limits">Mostra o aspeto das mensagens com o tema, o tipo de letra e o tamanho do texto atuais. Estes interruptores alteram apenas esta pré-visualização. Os leitores de ecrã e a ampliação não podem ser pré-visualizados aqui; experimente-os nas definições de Acessibilidade do dispositivo.</string>
+    <string name="appearance_preview_motion_on">As animações do dispositivo estão ativadas.</string>
+    <string name="appearance_preview_motion_off">As animações do dispositivo estão desativadas, por isso as alterações aparecem sem movimento.</string>
 
     <string name="voice_recording_save_failed">A gravação parou, mas não foi possível salvar o áudio. Grave novamente.</string>
     <string name="voice_recording_stops_in">Termina em %1$s</string>

@@ -39,11 +39,13 @@ FIXTURE_ONLY = (
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MatrixAttachmentProbe.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/IncomingAttachmentBackgroundDownloadAndroidTest.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptFixtureSupport.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptNetworkDiagnostics.kt',
 )
 
 # Production and build inputs the fixture exercises alongside other device tests.
 FIXTURE_SHARED = (
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnostics.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptProcessStopDiagnostics.kt',
     '.github/workflows/android-instrumented.yml',
     'scripts/select_instrumented_lanes.py',
     'app/build.gradle.kts',

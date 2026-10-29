@@ -27,7 +27,8 @@
     "conversation/nostr": "Loaded/error and long Nostr event detail content, expandable blocks and links.",
     "conversation/reactions": "Reaction configuration/participant lists, chosen emoji, loading/empty and own-reaction actions.",
     "TtsSentenceAccessibility.kt": "Read-aloud sentence chooser, active sentence and overflowing labels.",
-    "conversation/ConversationTopBar.kt": "Timer explanation popup, compact windows and large text overflow."
+    "conversation/ConversationTopBar.kt": "Timer explanation popup, compact windows and large text overflow.",
+    "navigation": "Persistent shell chrome: dictation capsule and registered fixed action footers, including wrapped actions, constrained height and real IME insets."
   },
   "exclusions": [
     {
@@ -53,6 +54,10 @@
     {
       "surface": "AddRelaySheet IME form",
       "reason": "Retain ordinary scrolling until this sheet has real-keyboard geometry coverage. The relay confirmation test uses the profile editor and cannot validate this sheet with an offscreen mask."
+    },
+    {
+      "surface": "Floating dictation capsule and fixed footer actions",
+      "reason": "Footer actions are fixed chrome, not scrolling screen content. In constrained height they share one scroll offset with a reserved capsule slot; the actual capsule is a sibling overlay clipped to the same viewport. Keep both unmasked so action targets and the capsule have consistent treatment."
     }
   ],
   "surfaces": [
@@ -1781,6 +1786,20 @@
       "test_ids": [
         "SET-006",
         "SET-007"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingDictationAnchor.kt",
+      "calls": {
+        "verticalScroll": 1
+      },
+      "family": "navigation",
+      "policy": "Fixed action chrome and sibling dictation capsule share a clipped short-height viewport without an alpha mask; preserve one scroll owner and real IME clearance.",
+      "test_ids": [
+        "DIC-002",
+        "AXY-001",
+        "SET-004",
+        "SET-005"
       ]
     }
   ],

@@ -1,0 +1,117 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+  "legacy_sha256": "27bf064f2bb449cc60674d9dd700c58780a811760b2b30e7d7f98bfc134fee4d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SettingsBottomAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsBottomAction(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "SettingsCallout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsCallout(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsExplainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsExplainer(",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "SettingsGroupPanel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsGroupPanel(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "SettingsList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsList(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsPanel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsPanel(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "SettingsScaffold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsScaffold(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsSection(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsValue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsValue(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "SettingsVersionFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "fun SettingsVersionFooter(",
+        "test_ids": [
+          "SET-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:settings_version_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "R.string.settings_version_label",
+        "test_ids": [
+          "SET-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: SettingsLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

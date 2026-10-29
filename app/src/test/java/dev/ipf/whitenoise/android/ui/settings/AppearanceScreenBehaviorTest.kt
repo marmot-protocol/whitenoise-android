@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -13,6 +15,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontFamily
@@ -160,8 +164,10 @@ class AppearanceScreenBehaviorTest {
         fun sampleFamily(): FontFamily? {
             val layouts = mutableListOf<TextLayoutResult>()
             composeRule
-                .onNodeWithText(sampleText, useUnmergedTree = true)
-                .performScrollTo()
+                .onNode(
+                    hasText(sampleText) and hasAnyAncestor(hasTestTag("font_family.preview")),
+                    useUnmergedTree = true,
+                ).performScrollTo()
                 .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             return layouts
                 .single()
@@ -211,6 +217,65 @@ class AppearanceScreenBehaviorTest {
         composeRule.onNodeWithText("Language").performClick()
         composeRule.onNodeWithText("Deutsch").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(1, languageCount) }
+    }
+
+    /** Sample switches and reset affect only the inline sample, never the persistent appearance owner. */
+    @Test
+    fun accessibilityPreviewResetsWithoutWritingAppearancePreferences() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val rtl = context.getString(R.string.appearance_preview_rtl)
+        val large = context.getString(R.string.appearance_preview_large_text)
+        val reset = context.getString(R.string.appearance_preview_reset)
+        val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+        val before = preferences.all.toMap()
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasText(rtl))
+        composeRule
+            .onNodeWithText(rtl)
+            .performScrollTo()
+            .assertIsOff()
+            .performClick()
+        composeRule.onNodeWithText(rtl).assertIsOn()
+        composeRule
+            .onNodeWithText(large)
+            .performScrollTo()
+            .assertIsOff()
+            .performClick()
+        composeRule.onNodeWithText(large).assertIsOn()
+        composeRule.onNodeWithText(reset).performScrollTo().performClick()
+        composeRule.onNodeWithText(rtl).performScrollTo().assertIsOff()
+        composeRule.onNodeWithText(large).performScrollTo().assertIsOff()
+        composeRule.runOnIdle {
+            assertEquals(before, preferences.all)
+            assertEquals(AppFont.System, appState.appFont)
+            assertEquals(AppFontScale.Default, appState.fontScale)
+            assertEquals(AppThemeMode.System, appState.themeMode)
+        }
+    }
+
+    /** Lazy disposal must not reset sample-only switches while the Appearance route stays open. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h640dp-mdpi")
+    fun previewSwitchesSurviveScrollingAwayAndBack() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val preview = hasTestTag("appearance.accessibility.preview")
+        val rtl = context.getString(R.string.appearance_preview_rtl)
+        val large = context.getString(R.string.appearance_preview_large_text)
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(preview)
+        composeRule
+            .onNodeWithText(rtl)
+            .performScrollTo()
+            .performClick()
+            .assertIsOn()
+        composeRule
+            .onNodeWithText(large)
+            .performScrollTo()
+            .performClick()
+            .assertIsOn()
+        composeRule.onNodeWithTag("settings.list").performScrollToIndex(0)
+        composeRule.onNode(preview).assertDoesNotExist()
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(preview)
+        composeRule.onNodeWithText(rtl).performScrollTo().assertIsOn()
+        composeRule.onNodeWithText(large).performScrollTo().assertIsOn()
     }
 
     /** A theme row is the node with that label inside the theme group, not the language value. */

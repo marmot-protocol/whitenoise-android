@@ -86,6 +86,16 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
         self.assertEqual(select('pull_request', [contract], TRIGGERS),
                          {'attachment_fixture': False, 'attachment_fixture_scope': '', 'connected': True})
 
+    def test_receipt_diagnostics_alone_run_the_controlled_fixture(self):
+        """Network diagnostics run only the fixture; process-stop diagnostics also run their connected contract."""
+        network = MEDIA_TEST + 'BackgroundReceiptNetworkDiagnostics.kt'
+        process_stop = MEDIA_TEST + 'BackgroundReceiptProcessStopDiagnostics.kt'
+        self.assertTrue(matches(network, TRIGGERS))
+        self.assertTrue(matches(process_stop, TRIGGERS))
+        self.assertEqual(select('pull_request', [network], TRIGGERS),
+                         {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': False})
+        self.assertEqual(select('pull_request', [process_stop], TRIGGERS), FULL)
+
     def test_unrelated_files_beside_fixture_inputs_do_not_start_connected(self):
         """The fixture run script on its own runs the whole campaign, and unrelated files start nothing more."""
         lanes = select('pull_request', ['README.md', 'app/src/main/java/Other.kt',

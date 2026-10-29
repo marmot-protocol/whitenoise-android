@@ -70,16 +70,19 @@ internal object BackgroundReceiptFixtureSupport {
             listOf(Stage.RESUMED, Stage.STARTED, Stage.PAUSED).sumOf { monitor.getActivitiesInStage(it).size }
         }
 
-    /** Waits for a ledger event with a bound that covers a slow emulator, unlike the shared five-second helper. */
+    /** Waits with the existing bound; [observe] may retain closed summaries of these already-required reads. */
     suspend fun awaitLedger(
         blobPort: Int,
+        observe: (List<JSONObject>) -> Unit = {},
         done: (List<JSONObject>) -> Boolean,
     ): List<JSONObject> =
         withTimeout(LEDGER_TIMEOUT_MILLIS) {
             var events = HeldAttachmentCancellationProbe.ledger(blobPort)
+            observe(events)
             while (!done(events)) {
                 delay(25L)
                 events = HeldAttachmentCancellationProbe.ledger(blobPort)
+                observe(events)
             }
             events
         }

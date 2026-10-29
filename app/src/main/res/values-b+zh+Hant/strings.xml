@@ -2461,6 +2461,13 @@
     <string name="chat_batch_order_unconfirmed">無法確認置頂聊天的順序。再次移動聊天前，請檢查聊天清單。</string>
     <string name="public_jpeg_preview_image">連結的 JPEG 預覽</string>
     <string name="public_jpeg_preview_save_failed">無法儲存圖片預覽設定，請重試。</string>
+    <string name="appearance_accessibility_preview">可讀性預覽</string>
+    <string name="appearance_preview_rtl">預覽由右至左的版面配置</string>
+    <string name="appearance_preview_large_text">預覽更大文字</string>
+    <string name="appearance_preview_reset">重設預覽</string>
+    <string name="appearance_preview_limits">顯示訊息在目前主題、字型和文字大小下的樣子。這些開關只會變更此預覽。螢幕閱讀器和放大功能無法在此預覽，請在裝置的無障礙設定中試用。</string>
+    <string name="appearance_preview_motion_on">裝置動畫已開啟。</string>
+    <string name="appearance_preview_motion_off">裝置動畫已關閉，因此變更會直接顯示，沒有動畫。</string>
 
     <string name="voice_recording_save_failed">錄音已停止，但無法儲存音訊。請重新錄製。</string>
     <string name="voice_recording_stops_in">將在 %1$s 後停止</string>
