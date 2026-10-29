@@ -22,6 +22,7 @@ class MediaDecodeService : Service() {
 
     override fun onBind(intent: Intent) = messenger.binder
 
+    /** Handles one control message: RETIRE ends this process, a DECODE runs on the codec thread under the watchdog. */
     @Suppress("ReturnCount") // Invalid control messages never enter the codec queue.
     private fun accept(message: Message): Boolean {
         if (!Process.isIsolated()) return true
@@ -34,8 +35,9 @@ class MediaDecodeService : Service() {
         val reply = message.replyTo ?: return true
         val data = message.data
         val requestId = message.arg1
-        // Arm a stubborn fixture on this looper, so a RETIRE queued behind its DECODE is already ignored.
-        MediaDecodeDebugFixtures.arm(data.getInt("operation"))
+        // Arm a stubborn fixture on this looper, so a RETIRE queued behind its DECODE is already ignored. The guard
+        // keeps release builds from unparcelling the request, descriptors included, on the control looper.
+        if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) MediaDecodeDebugFixtures.arm(data.getInt("operation"))
         codec.execute {
             val killer =
                 watchdog.schedule(
