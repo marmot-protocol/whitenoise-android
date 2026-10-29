@@ -24,18 +24,33 @@ internal enum class VideoContent {
     UnreadableContainer,
 
     /**
-     * A video container the scrubber cannot clean: AVI, MPEG-TS or M2TS, MPEG-PS, ASF, FLV, Ogg, RealMedia, MXF or
-     * DV.
+     * A container the scrubber cannot clean whose content proves video: AVI, DV, MPEG-TS or M2TS, MPEG-PS and MXF by
+     * their signature alone, and FLV, Ogg, ASF or RealMedia whose headers declare a video stream. Never sent.
      */
-    UnsupportedContainer,
+    UnsupportedVideo,
+
+    /**
+     * A container the scrubber cannot clean whose headers prove audio only: Ogg Vorbis, Opus, FLAC, Speex or CELT, ASF
+     * (WMA) with audio streams only, FLV flagged audio-only with no video tag, or RealMedia with audio streams only.
+     * It is an ordinary document unless it is reported as video.
+     */
+    UnsupportedAudio,
+
+    /**
+     * An FLV, Ogg, ASF or RealMedia file whose streams the bounded header read cannot establish: a truncated or
+     * broken header, an unknown codec or stream type, or no declared stream. It might hide video, so it is never sent.
+     */
+    UnsupportedUndetermined,
 
     /** Anything else, such as text or an archive. */
     Other,
 }
 
 /**
- * Leading signatures of the video containers the scrubber recognises but cannot clean. Each check needs every byte
- * it compares, so a shorter input never matches.
+ * Leading signatures of the containers the scrubber recognises but cannot clean, and what each one carries. AVI, DV,
+ * MPEG-TS, M2TS, MPEG-PS and MXF are video containers by their signature. FLV, Ogg, ASF and RealMedia also carry audio
+ * alone, so their stream headers decide, within a bounded read. Each signature check needs every byte it compares, so
+ * a shorter input never matches.
  */
 internal object VideoContainerSignatures {
     private const val TS_PACKET = 188L
@@ -57,16 +72,32 @@ internal object VideoContainerSignatures {
     private val OGG = ascii("OggS")
     private val REAL_MEDIA = ascii(".RMF")
     private val MXF = bytes(0x06, 0x0E, 0x2B, 0x34)
-    private val LEADING = listOf(PROGRAM_STREAM, ASF, FLV, OGG, REAL_MEDIA, MXF)
 
     // The DV DIF header block, probed the way ffmpeg does: the first word with its one variable bit masked off.
     private const val DV_MASK = 0xFFFFFF7FL
     private const val DV_HEADER = 0x1F07003FL
 
-    /** Whether [reader] starts like one of the recognised video containers the scrubber cannot clean. */
-    fun matches(reader: ScrubReader): Boolean {
-        val leading = LEADING.any { reader.startsWith(0L, it) } || reader.isAvi() || reader.isDigitalVideo()
-        return leading || reader.hasTransportSync(0L, TS_PACKET) || reader.hasTransportSync(M2TS_PREFIX, M2TS_PACKET)
+    /**
+     * What [reader] carries when it starts like a container the scrubber cannot clean, or null when it does not. A
+     * read past the end of a short input while probing stream headers leaves the streams undetermined.
+     */
+    fun classify(reader: ScrubReader): VideoContent? {
+        val streams =
+            when {
+                reader.isDefiniteVideo() -> CarriedStreams.Video
+                reader.startsWith(0L, FLV) -> probeStreams { FlvStreams.probe(reader) }
+                reader.startsWith(0L, OGG) -> probeStreams { OggStreams.probe(reader) }
+                reader.startsWith(0L, ASF) -> probeStreams { AsfStreams.probe(reader) }
+                reader.startsWith(0L, REAL_MEDIA) -> probeStreams { RealMediaStreams.probe(reader) }
+                else -> null
+            }
+        return streams?.content
+    }
+
+    /** Whether this starts like a container that only ever holds video: AVI, DV, MPEG-PS, MXF, MPEG-TS or M2TS. */
+    private fun ScrubReader.isDefiniteVideo(): Boolean {
+        val leading = isAvi() || isDigitalVideo() || startsWith(0L, PROGRAM_STREAM) || startsWith(0L, MXF)
+        return leading || hasTransportSync(0L, TS_PACKET) || hasTransportSync(M2TS_PREFIX, M2TS_PACKET)
     }
 
     /** Whether this is a RIFF file of the AVI form. */

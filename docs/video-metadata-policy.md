@@ -64,10 +64,22 @@ as `video/mp2t`) and some providers report videos as `application/octet-stream`:
 | A proven video: Matroska or WebM with a video track, or ISO BMFF with a video brand (or no `ftyp`, as old QuickTime) and a video track | Scrubbed, refused if that fails | Scrubbed, refused if that fails |
 | An unreadable container: ISO BMFF or Matroska whose first box or element parsed, refused as malformed (for example by a non-box trailer) or before its track list could be read (a compressed QuickTime movie), with no video track proven, unless the walk had already read the complete track list and found no video track | Refused | Refused |
 | Any other ISO BMFF or Matroska: a complete track list with no video track (for example `.m4a` or audio-only WebM, including one followed by an ID3 tag or other trailing bytes), a still-image or unrecognised brand read without a malformed structure (a Canon CR3 raw photo, HEIF or AVIF), or no movie at all (a HEIF still) | Scrubbed, refused if that fails | Sent byte-for-byte |
-| A video container the scrubber cannot clean: AVI, MPEG-TS or M2TS, MPEG-PS, ASF, FLV, Ogg, RealMedia, MXF or DV | Refused | Sent byte-for-byte (for example `audio/ogg` or `.wma`) |
+| A container the scrubber cannot clean whose content proves video: AVI (RIFF form `AVI `, while RIFF `WAVE` is ordinary audio), DV, MPEG-TS or M2TS, MPEG-PS and MXF by their signature, FLV whose header flags video or whose first tags hold a video tag, Ogg whose beginning-of-stream pages name Theora, Daala, Dirac or OGM video, ASF with a video Stream Properties Object (in the header or its extension), and RealMedia with a video stream | Refused | Refused |
+| A container the scrubber cannot clean whose streams cannot be determined within the bounded header read: a truncated or broken header, an unknown codec or stream type, or no declared stream (for example a bare Ogg Skeleton or an FLV with no stream flag) | Refused | Refused |
+| A container the scrubber cannot clean whose headers prove audio only: Ogg whose only beginning-of-stream pages are Vorbis, Opus, FLAC, Speex or CELT (a Skeleton may accompany them), ASF (WMA) whose streams are all audio (script commands may accompany them), FLV flagged audio-only whose first tags hold no video tag, and RealMedia with audio streams only | Refused | Sent byte-for-byte |
 | Anything else, including text whose first box does not parse even though bytes 4 to 7 spell a box type (`let skipped = 0;` in a `.ts` file) | Sent byte-for-byte | Sent byte-for-byte |
 
-Content overrides a non-video reported type only for a proven video. ISO BMFF
+The uncleanable containers are probed with fixed, small reads: Ogg looks at up
+to 64 beginning-of-stream pages, FLV at up to 64 tag headers, ASF at the
+headers of up to 256 header objects and a Header Extension Object of at most
+64 KiB, and RealMedia at up to 64 chunks before its Data chunk. Nothing is
+allocated in proportion to a size the file declares. Only what precedes the
+media data is read, so a chained Ogg file whose later link adds a video stream
+is judged by its first link.
+
+Content overrides a non-video reported type only for a proven video, for an
+uncleanable container that proves or might hide video, and for an unreadable
+ISO BMFF or Matroska container. ISO BMFF
 counts as one only when its `ftyp` major brand is a known video brand (`isom`,
 `iso2` to `iso9`, `mp41`, `mp42`, `mp71`, `avc1`, `M4V `, `M4VH`, `M4VP`,
 `qt  `, `MSNV`, `dash`, `f4v `, `mmp4`, `dby1`, the `3gp`, `3g2` and `3gs`

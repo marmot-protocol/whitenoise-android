@@ -140,8 +140,7 @@ internal object VideoMetadataScrubber {
             isEbml(reader) -> containerContent(MatroskaMetadataScrubber(reader), IsoBrand.Video)
             IsoBmffMetadataScrubber.looksLikeIsoBmff(reader) ->
                 containerContent(IsoBmffMetadataScrubber(reader), IsoBrands.classify(reader))
-            VideoContainerSignatures.matches(reader) -> VideoContent.UnsupportedContainer
-            else -> VideoContent.Other
+            else -> VideoContainerSignatures.classify(reader) ?: VideoContent.Other
         }
     }
 

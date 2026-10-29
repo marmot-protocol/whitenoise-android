@@ -53,7 +53,8 @@ import java.util.UUID
  * the shipping resolver. Every received plaintext must equal the scrubbed source byte for byte, carry none of the
  * source's private strings, location, platform version key or recording date, and keep its size, duration, rotation,
  * dimensions, first frame and every audio and video sample. Videos the scrubber cannot clean must be refused with the
- * existing notice, never uploaded, never received and leave no staged copy behind. The host checker also reads the
+ * existing notice, never uploaded, never received and leave no staged copy behind, including a recognised AVI that
+ * its provider reports as `application/octet-stream`. The host checker also reads the
  * fixture's own upload ledger, so an upload the device did not report still fails the run.
  *
  * Route boundaries, stated so no report claims more than this lane proves:
@@ -222,6 +223,13 @@ class VideoMetadataFixtureDeviceTest {
                     VideoRouteEntry.FILES,
                     "vm-refused-files.avi",
                     VideoSource(GeneratedVideoDocuments.AVI_SOURCE, "video/x-msvideo"),
+                    VideoExpectation(notice = R.string.media_file_video_metadata_not_removable),
+                ),
+                VideoRoute(
+                    "refused-files-content-uri-avi-octet",
+                    VideoRouteEntry.FILES,
+                    "vm-refused-avi.bin",
+                    VideoSource(GeneratedVideoDocuments.AVI_SOURCE, OCTET_STREAM),
                     VideoExpectation(notice = R.string.media_file_video_metadata_not_removable),
                 ),
                 VideoRoute(

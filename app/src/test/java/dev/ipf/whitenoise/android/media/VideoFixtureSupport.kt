@@ -470,3 +470,133 @@ internal fun minimalMp4Header(size: Long): ByteArray {
 /** A RIFF/AVI header: a real video container the scrubber does not handle, so its metadata cannot be removed. */
 internal fun aviVideoBytes(size: Int = 512): ByteArray =
     concat(ascii("RIFF"), beBytes(size - 8L, 4).reversedArray(), ascii("AVI LIST"), ByteArray(size - 16) { 0x33 })
+
+/** Little-endian bytes of [value] in [width] bytes. */
+internal fun leBytes(
+    value: Long,
+    width: Int,
+): ByteArray = beBytes(value, width).reversedArray()
+
+/** [values] as bytes. */
+internal fun byteValues(vararg values: Int): ByteArray = ByteArray(values.size) { values[it].toByte() }
+
+/**
+ * One Ogg page: the capture pattern, version 0, the beginning-of-stream flag when [beginsStream], a zero granule
+ * position, [serial], a zero sequence number and checksum, then the lacing table for [payload] and the payload.
+ */
+internal fun oggPage(
+    payload: ByteArray,
+    beginsStream: Boolean,
+    serial: Int = 1,
+): ByteArray {
+    val lacing = List(payload.size / 255) { 255.toByte() } + (payload.size % 255).toByte()
+    return concat(
+        ascii("OggS"),
+        byteValues(0, if (beginsStream) 0x02 else 0),
+        ByteArray(8),
+        leBytes(serial.toLong(), 4),
+        ByteArray(8),
+        byteValues(lacing.size),
+        lacing.toByteArray(),
+        payload,
+    )
+}
+
+/** An Ogg file whose streams start with [firstPackets], one beginning-of-stream page each, then one data page. */
+internal fun oggFile(vararg firstPackets: ByteArray): ByteArray {
+    val beginnings =
+        firstPackets.mapIndexed { index, packet -> oggPage(packet, beginsStream = true, serial = index + 1) }
+    return concat(*beginnings.toTypedArray(), oggPage(ByteArray(40) { 0x11 }, beginsStream = false))
+}
+
+/** The first header packets that name an Ogg stream's codec. */
+internal object OggPackets {
+    val vorbis = concat(byteValues(1), ascii("vorbis"), ByteArray(23))
+    val opus = concat(ascii("OpusHead"), byteValues(1, 2), ByteArray(9))
+    val flac = concat(byteValues(0x7F), ascii("FLAC"), byteValues(1, 0), ByteArray(40))
+    val speex = concat(ascii("Speex   "), ByteArray(72))
+    val theora = concat(byteValues(0x80), ascii("theora"), ByteArray(35))
+    val skeleton = concat(ascii("fishead"), ByteArray(57))
+    val unknown = concat(ascii("XYZcodec"), ByteArray(16))
+}
+
+/** ASF GUIDs as ASF stores them on disk, with their first three fields little-endian. */
+internal object AsfGuids {
+    val header =
+        byteValues(0x30, 0x26, 0xB2, 0x75, 0x8E, 0x66, 0xCF, 0x11, 0xA6, 0xD9, 0x00, 0xAA, 0x00, 0x62, 0xCE, 0x6C)
+    val streamProperties =
+        byteValues(0x91, 0x07, 0xDC, 0xB7, 0xB7, 0xA9, 0xCF, 0x11, 0x8E, 0xE6, 0x00, 0xC0, 0x0C, 0x20, 0x53, 0x65)
+    val headerExtension =
+        byteValues(0xB5, 0x03, 0xBF, 0x5F, 0x2E, 0xA9, 0xCF, 0x11, 0x8E, 0xE3, 0x00, 0xC0, 0x0C, 0x20, 0x53, 0x65)
+    val audioMedia =
+        byteValues(0x40, 0x9E, 0x69, 0xF8, 0x4D, 0x5B, 0xCF, 0x11, 0xA8, 0xFD, 0x00, 0x80, 0x5F, 0x5C, 0x44, 0x2B)
+    val videoMedia =
+        byteValues(0xC0, 0xEF, 0x19, 0xBC, 0x4D, 0x5B, 0xCF, 0x11, 0xA8, 0xFD, 0x00, 0x80, 0x5F, 0x5C, 0x44, 0x2B)
+    val contentDescription =
+        byteValues(0x33, 0x26, 0xB2, 0x75, 0x8E, 0x66, 0xCF, 0x11, 0xA6, 0xD9, 0x00, 0xAA, 0x00, 0x62, 0xCE, 0x6C)
+}
+
+/** One ASF object: its GUID, its little-endian size including this 24-byte header, and [data]. */
+internal fun asfObject(
+    guid: ByteArray,
+    data: ByteArray,
+): ByteArray = concat(guid, leBytes(24L + data.size, 8), data)
+
+/** A Stream Properties Object for one stream of [type], with empty error correction and type-specific data. */
+internal fun asfStream(type: ByteArray): ByteArray = asfObject(AsfGuids.streamProperties, concat(type, ByteArray(38)))
+
+/** A Header Extension Object holding [embedded] objects, such as an Extended Stream Properties Object. */
+internal fun asfExtension(vararg embedded: ByteArray): ByteArray {
+    val data = concat(*embedded)
+    val fields = concat(ByteArray(16), byteValues(6, 0), leBytes(data.size.toLong(), 4))
+    return asfObject(AsfGuids.headerExtension, concat(fields, data))
+}
+
+/** An ASF file whose Header Object holds [objects], followed by a stand-in for its Data Object. */
+internal fun asfFile(vararg objects: ByteArray): ByteArray {
+    val body = concat(*objects)
+    val count = leBytes(objects.size.toLong(), 4)
+    val header = concat(AsfGuids.header, leBytes(30L + body.size, 8), count, byteValues(1, 2))
+    return concat(header, body, ByteArray(64) { 0x22 })
+}
+
+/**
+ * An FLV file: its header with [flags] (0x01 video, 0x04 audio), the first previous-tag size, then one 16-byte tag
+ * of each of [tagTypes] (8 audio, 9 video, 18 script data), each followed by its own size.
+ */
+internal fun flvFile(
+    flags: Int,
+    vararg tagTypes: Int,
+): ByteArray {
+    val tags =
+        tagTypes.map { type ->
+            concat(byteValues(type), beBytes(16, 3), ByteArray(7), ByteArray(16) { 0x44 }, beBytes(27, 4))
+        }
+    return concat(ascii("FLV"), byteValues(1, flags), beBytes(9, 4), ByteArray(4), *tags.toTypedArray())
+}
+
+/** One RealMedia chunk: [id], its size including this 10-byte header, a zero version and [body]. */
+internal fun realMediaChunk(
+    id: String,
+    body: ByteArray,
+): ByteArray = concat(ascii(id), beBytes(10L + body.size, 4), ByteArray(2), body)
+
+/**
+ * A RealMedia file with one Media Properties chunk per [mimes] entry, each with [typeData] as its type-specific data,
+ * then the Data chunk unless [withData] is false.
+ */
+internal fun realMediaFile(
+    mimes: List<String>,
+    typeData: ByteArray = ByteArray(8),
+    withData: Boolean = true,
+): ByteArray {
+    val media =
+        mimes.mapIndexed { index, mime ->
+            val fixed = concat(beBytes(index.toLong(), 2), ByteArray(28))
+            val described = concat(fixed, byteValues(0, mime.length), ascii(mime), beBytes(typeData.size.toLong(), 4))
+            realMediaChunk("MDPR", concat(described, typeData))
+        }
+    val header = realMediaChunk(".RMF", concat(beBytes(0, 4), beBytes(mimes.size + 2L, 4)))
+    val data = if (withData) realMediaChunk("DATA", ByteArray(8)) else ByteArray(0)
+    return concat(header, realMediaChunk("PROP", ByteArray(40)), *media.toTypedArray(), data)
+}

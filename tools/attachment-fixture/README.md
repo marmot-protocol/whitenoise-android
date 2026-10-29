@@ -124,8 +124,8 @@ Every send really uploads through MDK, and the generated receiver downloads it t
 received plaintext must equal the production scrubber's output for its source (both SHA-256 digests are reported
 with the source's), carry none of its private strings, location, `com.android.version` key or recording date, and keep
 its size, duration, rotation, dimensions, a decoded first frame and every audio and video sample. An AVI reported as
-`video/x-msvideo` (visual and Files) and the tagged MP4 with one appended byte reported as `application/octet-stream`
-(in memory and staged) must be refused with the existing notice, publish nothing, reach no receiver and leave no
+`video/x-msvideo` (visual and Files) or as `application/octet-stream` (Files), and the tagged MP4 with one appended
+byte reported as `application/octet-stream` (in memory and staged) must be refused with the existing notice, publish nothing, reach no receiver and leave no
 staged or temporary copy. `video_metadata_checker.py` also requires the fixture ledger to hold exactly one complete
 upload per accepted route, of its ciphertext size, and none of a refused route's.
 

@@ -227,6 +227,7 @@ on:
       - 'app/src/androidTest/assets/video-metadata/**'
       # The focused attachment-fixture scenario sends tagged videos through the sender and receives them (#3376).
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/VideoContentClassifier.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/UncleanableContainerStreams.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataRemoval.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataFixtureDeviceTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataFixtureEvidence.kt'

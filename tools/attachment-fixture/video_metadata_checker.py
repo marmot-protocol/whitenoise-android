@@ -23,6 +23,7 @@ ACCEPTED = {
 REFUSED = {
     "refused-visual-content-uri-avi": ("visual-content-uri", "toast_video_metadata_not_removable"),
     "refused-files-content-uri-avi": ("files-content-uri", "media_file_video_metadata_not_removable"),
+    "refused-files-content-uri-avi-octet": ("files-content-uri", "media_file_video_metadata_not_removable"),
     "refused-files-content-uri-trailer-in-memory": ("files-content-uri", "media_file_video_metadata_not_removable"),
     "refused-files-content-uri-trailer-file-backed": ("files-content-uri", "media_file_video_metadata_not_removable"),
 }

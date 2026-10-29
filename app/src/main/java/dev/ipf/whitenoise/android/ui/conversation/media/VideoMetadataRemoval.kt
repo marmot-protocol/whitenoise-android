@@ -35,8 +35,10 @@ internal enum class DocumentVideoAction {
  *   reported type, because its content proves nothing about video.
  * - Any other ISO BMFF or Matroska file, such as an `.m4a`, a Canon CR3 raw photo or a HEIF image, is scrubbed only
  *   when reported as video.
- * - An uncleanable video container (for example AVI or DV) is refused only when reported as video, so `audio/ogg` or
- *   `.wma` still send unchanged.
+ * - A container the scrubber cannot clean is refused whatever its reported type when its content proves video (AVI,
+ *   DV, MPEG-TS or an Ogg Theora stream, even reported as `application/octet-stream`) or when its stream headers
+ *   cannot be read, and refused only when reported as video when its headers prove audio only, so an Ogg Vorbis or
+ *   Opus file or a `.wma` still sends unchanged.
  * - Anything else, such as a TypeScript file that Android's MIME table reports as `video/mp2t`, is an ordinary
  *   document.
  */
@@ -48,9 +50,12 @@ internal fun documentVideoAction(
         VideoContent.VideoContainer -> DocumentVideoAction.Scrub
         VideoContent.UnconfirmedContainer ->
             if (isVideoMediaType(reportedMime)) DocumentVideoAction.Scrub else DocumentVideoAction.Keep
-        VideoContent.UnsupportedContainer ->
+        VideoContent.UnsupportedAudio ->
             if (isVideoMediaType(reportedMime)) DocumentVideoAction.Refuse else DocumentVideoAction.Keep
-        VideoContent.UnreadableContainer -> DocumentVideoAction.Refuse
+        VideoContent.UnsupportedVideo,
+        VideoContent.UnsupportedUndetermined,
+        VideoContent.UnreadableContainer,
+        -> DocumentVideoAction.Refuse
         VideoContent.Other -> DocumentVideoAction.Keep
     }
 

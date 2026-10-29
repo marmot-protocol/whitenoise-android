@@ -19,6 +19,7 @@ SIZES = {
 REFUSED_SIZES = {
     "refused-visual-content-uri-avi": 512,
     "refused-files-content-uri-avi": 512,
+    "refused-files-content-uri-avi-octet": 512,
     "refused-files-content-uri-trailer-in-memory": 5_302,
     "refused-files-content-uri-trailer-file-backed": 34 * MIB + 1,
 }

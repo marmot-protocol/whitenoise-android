@@ -75,6 +75,7 @@ VIDEO_METADATA_FIXTURE_ONLY = (
     'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/GeneratedDocumentProvider.java',
     # Routing that only the video-metadata send exercises on a device.
     'app/src/main/java/dev/ipf/whitenoise/android/media/VideoContentClassifier.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/media/UncleanableContainerStreams.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataRemoval.kt',
 )
 
