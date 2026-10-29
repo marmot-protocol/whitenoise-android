@@ -1140,6 +1140,7 @@
     <string name="media_open">Apri</string>
     <string name="media_file_too_large">File troppo grande da allegare</string>
     <string name="media_file_unreadable">Impossibile leggere questo file. Selezionalo di nuovo.</string>
+    <string name="media_file_video_metadata_not_removable">Impossibile rimuovere i dettagli privati, come la posizione, da questo file video, quindi non è stato allegato.</string>
     <string name="media_file_empty">I file vuoti non possono essere inviati.</string>
     <string name="media_album_too_large">Selezione troppo grande per essere inviata</string>
     <string name="group_image_search_title">Immagine del gruppo</string>
@@ -1192,7 +1193,7 @@
     <string name="download_enabled">I download automatici seguono le tue regole di rete</string>
     <string name="download_sent_media">Contenuti inviati</string>
     <string name="download_quality">Qualità dei contenuti</string>
-    <string name="download_quality_help">Vale per le nuove foto e i messaggi vocali. Video e file audio vengono inviati così come sono.</string>
+    <string name="download_quality_help">Vale per le nuove foto e i messaggi vocali. Video e file audio non vengono mai ricodificati.</string>
     <string name="download_done">Fine</string>
     <string name="download_stop_confirmation">Cancellare i download automatici in attesa per questo profilo? I download attivi e quelli avviati da te continueranno.</string>
     <string name="media_type_images">Immagini</string>
@@ -1297,6 +1298,7 @@
     <string name="notification_reacted_to_message">ha reagito con %1$s a: \"%2$s\"</string>
     <string name="notification_reacted">ha reagito con %1$s</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">Impossibile rimuovere i dettagli privati, come la posizione, da questo video, quindi non è stato allegato.</string>
     <string name="profile_picture_hint">URL immagine HTTPS pubblico</string>
     <string name="profile_picture_invalid">Sono consentiti solo URL immagine HTTPS pubblici.</string>
     <string name="profile_picture_edit">Modifica immagine del profilo</string>
@@ -1442,7 +1444,7 @@
     <string name="media_quality_high_subtitle">Circa 1,5 MB per foto — qualità prima del consumo dati</string>
     <string name="media_quality_original">Originale</string>
     <string name="media_quality_original_subtitle">Risoluzione completa — file più grandi</string>
-    <string name="media_quality_footer">Dalle foto vengono sempre rimossi la posizione e i dettagli del dispositivo, anche con Originale. I video e l’audio importato mantengono i dati originali. Il bitrate audio vale solo per i messaggi vocali che registri.</string>
+    <string name="media_quality_footer">Dalle foto vengono sempre rimossi la posizione e i dettagli del dispositivo, anche con Originale. Dai file video vengono rimossi i tag di posizione e del dispositivo, ma i sottotitoli e i dati all’interno del flusso video non vengono modificati. L’audio importato mantiene i dati originali. Il bitrate audio vale solo per i messaggi vocali che registri.</string>
     <string name="profile_is_public">Il profilo è pubblico</string>
     <string name="profile_public_description">Le informazioni del tuo profilo saranno visibili a tutti sulla rete.</string>
     <string name="shared_media">Media condivisi</string>
@@ -2486,6 +2488,18 @@
     <string name="setup_finding_outcome_failure">Verifica non riuscita</string>
     <string name="public_jpeg_previews_title">Anteprime delle immagini in chat</string>
     <string name="public_jpeg_previews_privacy">Disattivate per impostazione predefinita. I link diretti a JPEG su Blossom possono rivelare il tuo indirizzo IP al server delle immagini. Le anteprime usano Wi-Fi senza limiti di dati e le tue regole di download delle foto. I normali link restano disponibili quando sono disattivate.</string>
+    <string name="chat_batch_progress">Elaborate %1$d conversazioni su %2$d</string>
+    <string name="chat_batch_result">Modificate: %1$d\nStato richiesto già raggiunto: %2$d\nIgnorate (non disponibili): %3$d\nNon riuscite: %4$d\nNon avviate: %5$d\nNon confermate: %6$d</string>
+    <string name="chat_batch_order_failed">L’ordine delle conversazioni fissate non è disponibile o è cambiato. Controlla l’elenco attuale prima di spostarle di nuovo.</string>
+    <string name="chat_batch_order_unchanged">Le conversazioni fissate selezionate non possono essere spostate ulteriormente. Ogni gruppo di conversazioni selezionate consecutive si sposta di una posizione mantenendo il proprio ordine.</string>
+    <string name="chat_batch_check_results">Controlla i risultati</string>
+    <string name="chat_batch_order_unconfirmed">Impossibile confermare l’ordine delle conversazioni fissate. Controlla l’elenco prima di spostare nuovamente le conversazioni.</string>
     <string name="public_jpeg_preview_image">Anteprima del JPEG collegato</string>
     <string name="public_jpeg_preview_save_failed">Impossibile salvare la preferenza delle anteprime. Riprova.</string>
+
+    <string name="voice_recording_save_failed">La registrazione si è interrotta, ma non è stato possibile salvare l’audio. Registra di nuovo.</string>
+    <string name="voice_recording_stops_in">Termina tra %1$s</string>
+    <string name="voice_recording_limit_warning">La registrazione terminerà tra 30 secondi al limite di cinque minuti.</string>
+    <string name="voice_recording_limit_reached">Raggiunto il limite di registrazione di cinque minuti. Riascolta il messaggio vocale prima di inviarlo.</string>
+    <string name="voice_recording_interrupted">Registrazione interrotta. Controlla l’audio registrato prima di inviarlo.</string>
 </resources>

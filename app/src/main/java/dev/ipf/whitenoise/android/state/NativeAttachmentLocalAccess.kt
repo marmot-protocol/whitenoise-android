@@ -55,10 +55,20 @@ internal class NativeAttachmentLocalAccess(
         require(readChunkBytes in 1..NATIVE_ATTACHMENT_READ_CHUNK_BYTES) { "native read exceeds the 1 MiB API bound" }
     }
 
-    /** Returns one result for every target, preserving target order and duplicates. */
+    /**
+     * Returns one result for every target, preserving target order and duplicates.
+     *
+     * [maxBytes] is the budget of a byte-returning read. An asset that declares more comes back as
+     * [AttachmentPlaintext.Oversized] before any lease file is created or any chunk is read, so refusing it costs no
+     * disk copy. Without a budget every retained asset is materialized whole for file-backed consumers.
+     */
     @Suppress("TooGenericExceptionCaught") // Dispatcher cancellation must also release acquired leases.
-    suspend fun open(targets: List<NativeAttachmentTarget>): List<AttachmentPlaintext?> {
+    suspend fun open(
+        targets: List<NativeAttachmentTarget>,
+        maxBytes: Long? = null,
+    ): List<AttachmentPlaintext?> {
         require(targets.size <= NATIVE_ATTACHMENT_TARGET_LIMIT) { "native attachment target batch exceeds 64" }
+        require(maxBytes == null || maxBytes >= 0) { "native read budget must not be negative" }
         if (targets.isEmpty()) return emptyList()
         val acquired = mutableListOf<AttachmentPlaintext?>()
         try {
@@ -66,7 +76,7 @@ internal class NativeAttachmentLocalAccess(
                 prepareLeaseDirectory()
                 val assets = queryAssets(targets.map(NativeAttachmentTarget::toFfi))
                 check(assets.size == targets.size) { "native local asset response changed target cardinality" }
-                assets.forEach { asset -> acquired += materialize(asset) }
+                assets.forEach { asset -> acquired += materialize(asset, maxBytes) }
                 acquired.toList()
             }
         } catch (failure: Throwable) {
@@ -86,11 +96,20 @@ internal class NativeAttachmentLocalAccess(
         }
     }
 
-    /** Streams one verified native asset without allocating its full plaintext on the heap. */
+    /**
+     * Streams one verified native asset without allocating its full plaintext on the heap, unless its declared size
+     * already exceeds [maxBytes], when it is refused from that declaration without touching the disk. A source that
+     * declares less and then streams more is still refused chunk by chunk.
+     */
     @Suppress("ReturnCount") // Unavailable chunks invalidate and delete the partial lease immediately.
-    private suspend fun materialize(asset: AttachmentLocalAssetFfi): AttachmentPlaintext? {
+    private suspend fun materialize(
+        asset: AttachmentLocalAssetFfi,
+        maxBytes: Long?,
+    ): AttachmentPlaintext? {
         val reference = asset.reference ?: return null
         require(asset.byteCount <= Long.MAX_VALUE.toULong()) { "native attachment is too large for Android file APIs" }
+        val declared = asset.byteCount.toLong()
+        if (maxBytes != null && declared > maxBytes) return AttachmentPlaintext.Oversized(declared, maxBytes)
         val directory = File(cacheRoot, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES)
         check(directory.isDirectory) { "native attachment lease directory is unavailable" }
         val file = File(directory, "lease-${nativeAttachmentLeaseCounter.incrementAndGet()}.tmp")
@@ -126,8 +145,16 @@ internal class NativeAttachmentLocalAccess(
 /** Test-only access to the ephemeral file without widening the production lease API. */
 internal fun AttachmentPlaintext.leaseFileForTesting(): File? = (this as? AttachmentPlaintext.Lease)?.file
 
-/** Reads one native-retained asset without making its opaque locator durable. */
-internal suspend fun WhiteNoiseAppState.openNativeAttachment(request: AttachmentTransferRequest): AttachmentPlaintext? {
+/**
+ * Reads one native-retained asset without making its opaque locator durable.
+ *
+ * A byte-returning caller passes its [maxBytes] budget so an asset declaring more is refused as
+ * [AttachmentPlaintext.Oversized] without first copying it into a lease. File-backed callers omit it.
+ */
+internal suspend fun WhiteNoiseAppState.openNativeAttachment(
+    request: AttachmentTransferRequest,
+    maxBytes: Long? = null,
+): AttachmentPlaintext? {
     val target = resolveNativeAttachmentTarget(request) ?: return null
     return NativeAttachmentLocalAccess(
         cacheRoot = diskMediaCache.siblingCacheRoot(),
@@ -137,7 +164,7 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachment(request: Attachment
         readAsset = { reference, offset, limit ->
             marmotIo { readAttachmentAsset(request.accountRef, reference, offset, limit) }
         },
-    ).open(listOf(target)).single()
+    ).open(listOf(target), maxBytes).single()
 }
 
 /** Returns whether MarmotKit currently owns verified readable plaintext for this exact target. */

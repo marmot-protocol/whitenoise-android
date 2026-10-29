@@ -1325,6 +1325,7 @@ class OptimisticSentPreviewMetadataTest {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class LocalDeletedGroupProjectionTest {
+    /** A restart keeps a locally deleted group absent until MDK publishes a newer authoritative row. */
     @Test
     fun restartSnapshotKeepsDeletedGroupAbsentUntilMdkRepublishesThatRow() {
         val deleted = row("deleted-group", "Deleted", 10uL)
@@ -1341,7 +1342,7 @@ class LocalDeletedGroupProjectionTest {
         // group's row again; Android folds it back without reviving any other
         // absent group as a side effect.
         restarted.setChatListVisible(false)
-        replaceRows(restarted, listOf(untouched, deleted.copy(activitySortAt = 30uL, updatedAt = 30uL)))
+        restarted.applyChatListRow(deleted.copy(activitySortAt = 30uL, updatedAt = 30uL))
         restarted.setChatListVisible(true)
 
         assertEquals(listOf("deleted-group", "untouched-group"), restarted.items.map { it.id })

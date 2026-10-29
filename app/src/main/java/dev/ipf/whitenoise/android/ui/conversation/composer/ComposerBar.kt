@@ -1364,6 +1364,34 @@ internal fun ComposerBar(
                                     )
                                 }
                             },
+                        recordingContent =
+                            activeRecordingController?.let { recordingController ->
+                                {
+                                    RecordingStripLeading(
+                                        controller = recordingController,
+                                        modifier =
+                                            Modifier
+                                                .matchParentSize()
+                                                .padding(
+                                                    end =
+                                                        if (expandedControlLayout) {
+                                                            if (recordingController.locked) 84.dp else 44.dp
+                                                        } else if (recordingController.locked) {
+                                                            92.dp
+                                                        } else {
+                                                            52.dp
+                                                        },
+                                                ).pointerInput(recordingController) {
+                                                    awaitPointerEventScope {
+                                                        while (true) {
+                                                            val event = awaitPointerEvent()
+                                                            event.changes.forEach { it.consume() }
+                                                        }
+                                                    }
+                                                },
+                                    )
+                                }
+                            },
                         textFieldValue = textFieldValue,
                         readAcceptedValue = { textState.valueState.value },
                         composerFocus = composerFocus,
@@ -1616,31 +1644,6 @@ internal fun ComposerBar(
                                 icon = R.drawable.ic_arrow_upward,
                             )
                         }
-                    }
-                    if (activeRecordingController != null) {
-                        RecordingStripLeading(
-                            controller = activeRecordingController,
-                            modifier =
-                                Modifier
-                                    .matchParentSize()
-                                    .padding(
-                                        end =
-                                            if (expandedControlLayout) {
-                                                if (voiceRecordingController.locked) 84.dp else 44.dp
-                                            } else if (voiceRecordingController.locked) {
-                                                92.dp
-                                            } else {
-                                                52.dp
-                                            },
-                                    ).pointerInput(activeRecordingController) {
-                                        awaitPointerEventScope {
-                                            while (true) {
-                                                val event = awaitPointerEvent()
-                                                event.changes.forEach { it.consume() }
-                                            }
-                                        }
-                                    },
-                        )
                     }
                 }
             }

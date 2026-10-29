@@ -1122,6 +1122,7 @@
     <string name="media_open">打开</string>
     <string name="media_file_too_large">文件过大,无法附加</string>
     <string name="media_file_unreadable">无法读取此文件。请重新选择。</string>
+    <string name="media_file_video_metadata_not_removable">无法从此视频文件中移除位置等隐私信息，因此未添加该文件。</string>
     <string name="media_file_empty">无法发送空文件。</string>
     <string name="media_album_too_large">所选内容过大,无法发送</string>
     <string name="group_image_search_title">群组头像</string>
@@ -1174,7 +1175,7 @@
     <string name="download_enabled">自动下载遵循你的网络规则</string>
     <string name="download_sent_media">已发送的媒体</string>
     <string name="download_quality">媒体质量</string>
-    <string name="download_quality_help">适用于新的照片和语音消息。视频和音频文件按原样发送。</string>
+    <string name="download_quality_help">适用于新的照片和语音消息。视频和音频文件从不重新编码。</string>
     <string name="download_done">完成</string>
     <string name="download_stop_confirmation">清除此个人资料等待中的自动下载？进行中的下载和你自行开始的下载将继续。</string>
     <string name="media_type_images">图片</string>
@@ -1275,6 +1276,7 @@
     <string name="notification_reacted_to_message">用 %1$s 回应了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回应</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">无法从此视频中移除位置等隐私信息，因此未添加该视频。</string>
     <string name="profile_picture_hint">公开的 HTTPS 图片网址</string>
     <string name="profile_picture_invalid">仅允许公开的 HTTPS 图片网址。</string>
     <string name="profile_picture_edit">编辑头像</string>
@@ -1417,7 +1419,7 @@
     <string name="media_quality_high_subtitle">每张照片约 1.5 MB — 优先保证质量</string>
     <string name="media_quality_original">原始</string>
     <string name="media_quality_original_subtitle">完整分辨率 — 文件最大</string>
-    <string name="media_quality_footer">照片中的位置和设备信息始终会被移除，即使选择“原始”也一样。视频和导入的音频保留原始数据。音频码率仅适用于你录制的语音消息。</string>
+    <string name="media_quality_footer">照片中的位置和设备信息始终会被移除，即使选择“原始”也一样。视频文件中的位置和设备标签会被移除，但字幕和视频流内部的数据不会改变。导入的音频保留原始数据。音频码率仅适用于你录制的语音消息。</string>
     <string name="profile_is_public">个人资料是公开的</string>
     <string name="profile_public_description">您的个人资料信息将对网络上的所有人可见。</string>
     <string name="shared_media">共享媒体</string>
@@ -2451,6 +2453,18 @@
     <string name="setup_finding_outcome_failure">检查失败</string>
     <string name="public_jpeg_previews_title">聊天内图片预览</string>
     <string name="public_jpeg_previews_privacy">默认关闭。直接访问 Blossom JPEG 链接可能会向图片服务器透露你的 IP 地址。预览仅使用不按流量计费的 Wi-Fi，并遵循你的照片下载规则。关闭后仍可打开普通链接。</string>
+    <string name="chat_batch_progress">已处理 %1$d 个聊天，共 %2$d 个</string>
+    <string name="chat_batch_result">已更改：%1$d\n已处于目标状态：%2$d\n已跳过（不可用）：%3$d\n失败：%4$d\n未开始：%5$d\n未确认：%6$d</string>
+    <string name="chat_batch_order_failed">置顶聊天的顺序不可用或已更改。再次移动前，请检查当前聊天列表。</string>
+    <string name="chat_batch_order_unchanged">所选置顶聊天无法继续移动。每组连续选中的聊天会移动一个位置，并保持组内顺序。</string>
+    <string name="chat_batch_check_results">检查结果</string>
+    <string name="chat_batch_order_unconfirmed">无法确认置顶聊天的顺序。再次移动聊天前，请检查聊天列表。</string>
     <string name="public_jpeg_preview_image">链接的 JPEG 预览</string>
     <string name="public_jpeg_preview_save_failed">无法保存图片预览设置，请重试。</string>
+
+    <string name="voice_recording_save_failed">录音已停止，但无法保存音频。请重新录制。</string>
+    <string name="voice_recording_stops_in">将在 %1$s 后停止</string>
+    <string name="voice_recording_limit_warning">录音将在 30 秒后达到五分钟上限并停止。</string>
+    <string name="voice_recording_limit_reached">已达到五分钟录音上限。发送前请检查语音消息。</string>
+    <string name="voice_recording_interrupted">录音已中断。发送前请检查已录制的音频。</string>
 </resources>

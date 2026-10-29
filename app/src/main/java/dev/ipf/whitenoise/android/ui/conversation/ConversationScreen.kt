@@ -362,6 +362,8 @@ private fun presentVoiceRecordingFailure(
     voiceTooShortMessage: String,
 ) {
     when {
+        throwable is dev.ipf.whitenoise.android.audio.VoiceRecordingSaveException ->
+            appState.present(R.string.voice_recording_save_failed)
         throwable is IllegalStateException && throwable.message == "voice recording too short" ->
             appState.present(voiceTooShortMessage)
         throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
@@ -2156,6 +2158,17 @@ internal fun ConversationScreen(
         onDispose { voiceReview.release() }
     }
 
+    val voiceRecordingCompletedClip =
+        remember(voiceReview) {
+            mutableStateOf<dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewClip?>(null)
+        }
+    val voiceRecordingStopNotice =
+        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceRecordingStopNotice(
+            voiceReview,
+            appState,
+            conversationAccountRef,
+            controller.group.groupIdHex,
+        )
     val voiceRecordingController =
         // Re-key on every captured dependency: chat.id (basic), controller
         // (avoids dispatching through a stale ConversationController when
@@ -2177,7 +2190,10 @@ internal fun ConversationScreen(
                     }
                     granted
                 },
-                onRecordingComplete = { file, durationMs -> voiceReview.offer(file, durationMs) },
+                onRecordingComplete = { file, durationMs ->
+                    voiceRecordingCompletedClip.value =
+                        if (voiceReview.offer(file, durationMs)) voiceReview.clip else null
+                },
                 onError = { throwable ->
                     presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
                 },
@@ -2186,10 +2202,18 @@ internal fun ConversationScreen(
                 // quality state) so a setting change applies to the next clip.
                 bitrateProvider = { appState.mediaQuality.audioBitrateBps },
                 microphoneCaptures = appState.microphoneCaptureCoordinator,
+                onAutomaticStop = { reason ->
+                    val completedClip = voiceRecordingCompletedClip.value
+                    voiceRecordingCompletedClip.value = null
+                    voiceRecordingStopNotice(reason, completedClip)
+                },
             )
         }
+    dev.ipf.whitenoise.android.ui.conversation.composer
+        .VoiceRecordingLifecycleEffect(voiceRecordingController)
     LaunchedEffect(voiceRecordingController.isRecording, voiceReview.clip) {
         if (voiceRecordingController.isRecording) {
+            voiceRecordingCompletedClip.value = null
             voiceReview.discardForNewRecording()
             voiceReviewRecovery.updatePresence(false)
         }

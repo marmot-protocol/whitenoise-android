@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentLocalAssetFfi
 import dev.ipf.marmotkit.AttachmentLocalBytesFfi
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
+import dev.ipf.whitenoise.android.media.toByteArrayWithin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
@@ -11,10 +13,12 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.Executors
 
 class NativeAttachmentLocalAccessTest {
@@ -181,6 +185,91 @@ class NativeAttachmentLocalAccessTest {
             }
         }
 
+    /** An asset declaring more than the read budget is refused from its declaration, with no chunk read or file. */
+    @Test
+    fun `asset declaring more than the budget is refused without a read or lease file`() =
+        runTest {
+            val root = temporaryRoot()
+            var reads = 0
+            try {
+                val source =
+                    NativeAttachmentLocalAccess(
+                        cacheRoot = root,
+                        queryAssets = { listOf(AttachmentLocalAssetFfi("opaque", BUDGET_BYTES.toULong() + 1u)) },
+                        readAsset = { _, _, limit ->
+                            reads++
+                            AttachmentLocalBytesFfi(true, ByteArray(limit.toInt()))
+                        },
+                    ).open(listOf(target()), maxBytes = BUDGET_BYTES).single()
+
+                assertEquals(0, reads)
+                assertTrue(File(root, "native_attachment_leases").listFiles().orEmpty().isEmpty())
+                requireNotNull(source)
+                assertNull(source.leaseFileForTesting())
+                assertEquals(BUDGET_BYTES + 1, source.size)
+                val failure =
+                    assertThrows(AttachmentTooLargeToPresentException::class.java) {
+                        source.toByteArrayWithin(BUDGET_BYTES)
+                    }
+                assertEquals(BUDGET_BYTES, failure.limitBytes)
+                assertEquals(BUDGET_BYTES + 1, failure.declaredBytes)
+                assertThrows(AttachmentTooLargeToPresentException::class.java) {
+                    source.copyTo(ByteArrayOutputStream())
+                }
+                source.close()
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
+    /** The budget is inclusive: an asset declaring exactly the budget is materialized whole into a lease. */
+    @Test
+    fun `asset declaring exactly the budget is materialized`() =
+        runTest {
+            val root = temporaryRoot()
+            val bytes = ByteArray(BUDGET_BYTES.toInt()) { (it % 97).toByte() }
+            try {
+                val source =
+                    NativeAttachmentLocalAccess(
+                        cacheRoot = root,
+                        queryAssets = { listOf(AttachmentLocalAssetFfi("opaque", bytes.size.toULong())) },
+                        readAsset = { _, offset, limit ->
+                            val start = offset.toInt()
+                            AttachmentLocalBytesFfi(true, bytes.copyOfRange(start, start + limit.toInt()))
+                        },
+                    ).open(listOf(target()), maxBytes = BUDGET_BYTES).single()
+
+                requireNotNull(source)
+                assertTrue(checkNotNull(source.leaseFileForTesting()).isFile)
+                assertArrayEquals(bytes, source.toByteArrayWithin(BUDGET_BYTES))
+                source.close()
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
+    /** A budget never relaxes the streaming check, so a source that streams past its declaration is still refused. */
+    @Test
+    fun `asset streaming past a declaration within the budget is still refused`() =
+        runTest {
+            val root = temporaryRoot()
+            try {
+                val failure =
+                    runCatching {
+                        NativeAttachmentLocalAccess(
+                            cacheRoot = root,
+                            queryAssets = { listOf(AttachmentLocalAssetFfi("opaque", 4u)) },
+                            readAsset = { _, _, _ -> AttachmentLocalBytesFfi(true, ByteArray(8)) },
+                        ).open(listOf(target()), maxBytes = BUDGET_BYTES)
+                    }.exceptionOrNull()
+
+                assertTrue("expected a streaming refusal, got $failure", failure is IOException)
+                assertTrue(File(root, "native_attachment_leases").listFiles().orEmpty().isEmpty())
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
     /** Native local-access batches enforce the MarmotKit request bound. */
     @Test(expected = IllegalArgumentException::class)
     fun `query batches are capped at sixty four`() =
@@ -205,5 +294,6 @@ class NativeAttachmentLocalAccessTest {
     private companion object {
         val DISPLAY_ID = "11".repeat(32)
         val SOURCE_ID = "22".repeat(32)
+        const val BUDGET_BYTES = 4096L
     }
 }

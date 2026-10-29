@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.AttachmentTransferCancelledByUserException
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -31,6 +32,17 @@ internal fun shouldMaterializeAttachmentAutomatically(
         hasMaterializedFile ||
         hasRetainedPlaintext ||
         (!automaticDownloadsPaused && (mediaAutoDownloadAllowed || mine))
+
+/**
+ * Whether an own file card that would offer Download is held instead because its send is committed but not yet
+ * delivered. No native target exists until delivery, so a fetch, a cancel or a tap could only end in Retry. A held
+ * card shows preparing and does nothing until delivery turns it back to downloadable, when its automatic fetch asks
+ * once. Delivery, not the epoch, is the signal: a solo group's delivered send can still carry epoch 0.
+ */
+internal fun ownFileHeldUntilDelivered(
+    transferState: AttachmentTransferState,
+    awaitingDelivery: Boolean,
+): Boolean = awaitingDelivery && transferState == AttachmentTransferState.Remote
 
 /**
  * The one decision that lets a materialization reach the network (#2699).

@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.awaitingDelivery
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
@@ -365,6 +366,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 showStatus = isFooterOwner && showStatus,
                 status = item.status,
                 footerWarningText = fileFooterWarning.takeIf { isFooterOwner },
+                awaitingDelivery = mine && controller.awaitingDelivery(item),
             )
         }
     }

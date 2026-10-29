@@ -112,6 +112,34 @@ physical devices.
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-media
 ```
 
+The `controller-video-metadata` mode qualifies outgoing video metadata removal end to end
+([#3376](https://github.com/marmot-protocol/whitenoise-android/issues/3376)). `VideoMetadataFixtureDeviceTest` hands
+tagged videos to `ConversationMediaSender.sendStagedAttachments` through its production content-URI preparation entry
+points: `content://` documents from the test APK's `GeneratedDocumentProvider` as a visual pick (`video/mp4`, in memory
+and above the 32 MiB in-memory limit), as a Files pick reported as `application/octet-stream` (in memory and above the
+limit), through `ShareFileImporter` and `ShareInboundStager` as an imported share, and as a prepared draft injection of
+a native draft attachment holding unsanitized bytes, visual and Files. The location-positive source is written on the
+emulator by Android's own `MediaMuxer` with `setLocation`, and the others are the committed tagged ffmpeg fixtures.
+Every send really uploads through MDK, and the generated receiver downloads it through the shipping resolver. Each
+received plaintext must equal the production scrubber's output for its source (both SHA-256 digests are reported
+with the source's), carry none of its private strings, location, `com.android.version` key or recording date, and keep
+its size, duration, rotation, dimensions, a decoded first frame and every audio and video sample. An AVI reported as
+`video/x-msvideo` (visual and Files) or as `application/octet-stream` (Files), and the tagged MP4 with one appended
+byte reported as `application/octet-stream` (in memory and staged) must be refused with the existing notice, publish nothing, reach no receiver and leave no
+staged or temporary copy. `video_metadata_checker.py` also requires the fixture ledger to hold exactly one complete
+upload per accepted route, of its ciphertext size, and none of a refused route's.
+
+This lane does not drive the system Photo Picker, Files or share sheet UI, and its draft routes are prepared draft
+injection, not a draft saved, force-stopped and restored from MDK. It records no phone or camera. Every report defers
+those, and MED-043 remains their receipt. On a pull request whose fixture inputs are only this scenario's own files, the lane
+selector sets `attachment_fixture_scope=video-metadata` and the fixture job runs only this mode. Any other fixture
+input, including the shared workflow, selector, run script or this README, and every master push, runs the whole
+campaign, which includes this mode.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore ci-api34-x86_64 controller-video-metadata
+```
+
 The `controller-apk` mode qualifies the received-APK boundary on a disposable emulator. The prepare stage sends five
 generated files through the shipping controller, receives each genuinely, and requires exact bytes: a valid signed
 package (this fixture's own APK), the same bytes labelled `application/octet-stream`, the same bytes labelled

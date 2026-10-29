@@ -345,6 +345,38 @@ class ChatsControllerOptimisticArchiveTest {
             controller.onCleared()
         }
 
+    /** The production controller keeps backing reads warm while only visible list publication pauses. */
+    @Test
+    fun hiddenRowChangesStayLiveAndReturningPublishesThemSynchronously() {
+        val appState = testAppState()
+        val controller =
+            ChatsController(
+                appState = appState,
+                initialAccountRef = ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        try {
+            seed(controller, GROUP_A)
+            val previous = controller.items.single()
+            controller.setChatListVisible(false)
+            controller.applyChatListRow(row(GROUP_A).copy(hasUnread = true, unreadCount = 4uL, updatedAt = 2uL))
+            controller.onDraftSortOrderChanged()
+            assertEquals(previous, controller.items.single())
+            assertEquals(4uL, controller.chatItemForGroup(GROUP_A)?.projection?.unreadCount)
+            assertEquals(4uL, appState.unreadCountForAccount(ACCOUNT_REF))
+            controller.setChatListVisible(true)
+            assertEquals(
+                4uL,
+                controller.items
+                    .single()
+                    .projection
+                    ?.unreadCount,
+            )
+        } finally {
+            controller.onCleared()
+        }
+    }
+
     /** Seeds the real controller projection without starting profile enrichment for each row. */
     private fun seed(
         controller: ChatsController,

@@ -2482,13 +2482,6 @@ class ChatsController private constructor(
             },
         )
 
-    // Whether the chat list is on screen. While a conversation is foregrounded
-    // the subscription stays warm (updates keep folding into the maps above),
-    // but the recompute is deferred so list projection doesn't compete with the
-    // conversation on the heaviest nav path. See #6.
-    private var chatListVisible = true
-    private var pendingRecompute = false
-
     // Lifecycle-scoped member snapshots for the current chat rows. Initial
     // bind seeds identifier-only rows in bounded `groupMemberIdsPage` calls;
     // later group invalidations and a failed initial page fall back to the
@@ -2668,6 +2661,7 @@ class ChatsController private constructor(
             resetBackingState()
         }
         bindLifetime.advance()
+        presentationLifetime.reset()
         val epoch = bindEpoch
         initialLoadWatchdog?.cancel()
         if (isLoading) {
@@ -3702,34 +3696,34 @@ class ChatsController private constructor(
                 ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
     }
 
-    private fun awaitingSendPreview(groupIdHex: String): Boolean {
-        val key = chatRowKey(groupIdHex)
-        return optimisticChatListPreviewByGroup[key]?.awaitingSendPreview() == true
+    /** Resolves the bound account identity, falling back to the active account before binding completes. */
+    private fun projectionAccountIdHex(): String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+
+    /** Projects the existing backing rows without retaining another presentation snapshot. */
+    private fun currentProjectedItems(activeAccountIdHex: String? = projectionAccountIdHex()): List<ChatListItem> {
+        val projector = rowProjector(activeAccountIdHex)
+        return chatRows.map(projector::retained)
     }
 
-    /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
-    private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
-        chatRows.map { authoritativeRow ->
-            val row = archiveActions.projectRow(authoritativeRow)
-            chatListItemFromProjection(
-                row = row,
-                selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
-                selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
-                selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
-                actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
-                group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
-                activeAccountIdHex = activeAccountIdHex,
-                members = memberCacheByGroup[row.groupIdHex],
-                presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-                previewTokens = chatRowPreviewTokens(row, previewTokensByText),
-                resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
-                removed = row.groupIdHex in removedGroupIds,
-                activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
-                awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
-                hasOptimisticSendPreview =
-                    optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
-            )
-        }
+    /** Creates a synchronous projector over the current controller-owned inputs for the selected account. */
+    private fun rowProjector(activeAccountIdHex: String?): ChatListRowProjector =
+        ChatListRowProjector(
+            activeAccountIdHex = activeAccountIdHex,
+            groups = groupRecordsById,
+            members = memberCacheByGroup,
+            presentationMembers = { lastKnownPresentation(it, activeAccountIdHex) },
+            tokens = previewTokensByText,
+            mediaFallbacks = mediaPreviewFallbackByMessageId,
+            removed = removedGroupIds,
+            activitySequences = activitySequenceByGroup,
+            optimisticPreviews = optimisticChatListPreviewByGroup,
+            archiveActions = archiveActions,
+            localGroupNames = localGroupNames,
+            presentations = selectedPresentationsByGroup,
+            avatars = selectedAvatarAssetsByGroup,
+            previews = selectedPreviewsByGroup,
+            actions = selectedActionsByGroup,
+        )
 
     internal fun boundAccountIdHex(): String? {
         val ref = accountRef ?: return null
@@ -3740,54 +3734,13 @@ class ChatsController private constructor(
     internal fun projectChatRow(
         authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
-    ): ChatListItem {
-        val row = archiveActions.projectRow(authoritativeRow)
-        return chatListItemFromProjection(
-            row = row,
-            selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
-            selectedAvatarAsset = selectedAvatarAssetsByGroup[chatRowKey(row.groupIdHex)],
-            selectedPreview = selectedPreviewsByGroup[chatRowKey(row.groupIdHex)],
-            actions = selectedActionsByGroup[chatRowKey(row.groupIdHex)],
-            group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
-            activeAccountIdHex = activeAccountIdHex,
-            members = memberCacheByGroup[row.groupIdHex],
-            presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-            previewTokens = chatRowPreviewTokens(row, previewTokensByText),
-            resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
-            removed = row.groupIdHex in removedGroupIds,
-            activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
-            awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
-            hasOptimisticSendPreview =
-                optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
-        )
-    }
+    ): ChatListItem = rowProjector(activeAccountIdHex).retained(authoritativeRow)
 
-    /**
-     * Projects a row MDK presented outside the retained window (#2618), with the presentation, preview,
-     * actions and avatar that row carries and whatever group, roster and preview caches this controller
-     * already holds for it. Retained rows must keep using [projectChatRow], which reads the live window.
-     */
+    /** Projects an off-window MDK row without materializing it into the retained window. */
     internal fun projectPresentedRow(
         presented: PresentedChatRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
-    ): ChatListItem {
-        val row = archiveActions.projectRow(presented.row)
-        return chatListItemFromProjection(
-            row = row,
-            selectedPresentation = localGroupNames.reconciledPresentation(presented.row, presented.presentation),
-            selectedAvatarAsset = presented.avatarAsset,
-            selectedPreview = presented.preview,
-            actions = presented.actions,
-            group = archiveActions.projectGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
-            activeAccountIdHex = activeAccountIdHex,
-            members = memberCacheByGroup[row.groupIdHex],
-            presentationMembers = lastKnownPresentation(row.groupIdHex, activeAccountIdHex),
-            previewTokens = chatRowPreviewTokens(row, previewTokensByText),
-            resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
-            removed = row.groupIdHex in removedGroupIds,
-            activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
-        )
-    }
+    ): ChatListItem = rowProjector(activeAccountIdHex).presented(presented)
 
     /** Keeps source picture identity separate from MDK-selected display URL/hash rewrites. */
     internal fun currentGroupAvatarItem(groupIdHex: String): ChatListItem? {
@@ -4492,9 +4445,10 @@ class ChatsController private constructor(
         intent: OptimisticArchiveIntent,
     ): Boolean =
         appState.withGroupCommitLock(account, groupIdHex) {
+            currentCoroutineContext().ensureActive()
             if (!archiveActions.ownsIntent(groupIdHex, intent)) return@withGroupCommitLock false
             val updated = groupArchivedUpdater(account, groupIdHex, archived)
-            if (archiveActions.ownsCompletion(groupIdHex, intent)) {
+            if (currentCoroutineContext().isActive && archiveActions.ownsCompletion(groupIdHex, intent)) {
                 applyLocalGroupUpdate(updated)
                 true
             } else {
@@ -4826,6 +4780,7 @@ class ChatsController private constructor(
         wording: LocalRemovalWording = LocalRemovalWording.Delete,
         observer: LocalChatDeleteObserver = LocalChatDeleteObserver(),
         forgetProtocol: Boolean = false,
+        requireNativeEligibility: Boolean = false,
     ): Boolean =
         accountRef?.let { account ->
             val epoch = bindEpoch
@@ -4838,13 +4793,12 @@ class ChatsController private constructor(
             var nativeCommitted = false
             val wipe =
                 runCatching {
+                    requireLocalDeleteEligibility(account, groupIdHex, requireNativeEligibility, isCurrent)
                     appState.deleteChatGroupLocalWithRecovery(
                         LocalGroupRemovalRequest(account, groupIdHex, forgetProtocol),
                         isCurrent,
                         observer.readinessBudget,
-                        onAdmitted = {
-                            removedSnapshot = removeChatRowOptimistically(groupIdHex)
-                        },
+                        onAdmitted = { removedSnapshot = removeChatRowOptimistically(groupIdHex) },
                     ) {
                         nativeCommitted = true
                         if (isCurrent()) observer.onNativeCommitted()
@@ -4874,6 +4828,7 @@ class ChatsController private constructor(
                                     groupIdHex,
                                     wording = wording,
                                     forgetProtocol = forgetProtocol,
+                                    requireNativeEligibility = requireNativeEligibility,
                                 )
                             },
                     )
@@ -4888,6 +4843,26 @@ class ChatsController private constructor(
                 false
             }
         } ?: false
+
+    /** Recheck the captured native capability before the row can be hidden or local deletion admitted. */
+    private suspend fun requireLocalDeleteEligibility(
+        account: String,
+        groupIdHex: String,
+        required: Boolean,
+        isCurrent: () -> Boolean,
+    ) {
+        if (!required) return
+        val row =
+            kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
+                liveSubscriptions.presentedRowByGroup?.invoke(account, groupIdHex)
+            }
+        if (!isCurrent()) throw CancellationException("Account replaced")
+        check(
+            row != null &&
+                row.row.groupIdHex.equals(groupIdHex, ignoreCase = true) &&
+                row.actions.canDeleteLocal,
+        ) { "Native local deletion is unavailable" }
+    }
 
     /** Settles a committed removal, confirming it with [success] only once its Android cleanup also finished. */
     private fun completeChatLocalRemoval(
@@ -5023,6 +4998,324 @@ class ChatsController private constructor(
         }
         removedGroupIds = removedGroupIds + groupIdHex
         recompute()
+    }
+
+    internal var chatListBatchInProgress by mutableStateOf(false)
+        private set
+
+    /**
+     * The immutable captured ids survive filter removal; no source projection is cached here.
+     * Admission/finally own one batch; both pre-read and post-read owner fences must stop the loop.
+     */
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount", "LoopWithTooManyJumpStatements")
+    internal suspend fun runChatListBatch(
+        ids: Collection<String>,
+        command: ChatListBatchCommand,
+        owner: ChatListActionOwner,
+        folderId: String? = null,
+        onProgress: (Int, Int) -> Unit = { _, _ -> },
+    ): ChatListBatchResult? {
+        if (chatListBatchInProgress || !chatListActionIsCurrent(owner)) return null
+        chatListBatchInProgress = true
+        val targets = ids.map { it.lowercase(java.util.Locale.ROOT) }.distinct()
+        val outcomes = targets.associateWith { ChatListBatchOutcome.NOT_STARTED }.toMutableMap()
+        val attemptedIds = mutableSetOf<String>()
+        try {
+            if (command == ChatListBatchCommand.ARCHIVE || command == ChatListBatchCommand.RESTORE) {
+                return runChatListArchiveBatch(targets, command, owner, onProgress)
+            }
+            for ((index, id) in targets.withIndex()) {
+                if (!chatListActionIsCurrent(owner)) break
+                onProgress(index, targets.size)
+                val result =
+                    runCatchingCancellable {
+                        kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
+                            val row = liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id)
+                            if (!chatListActionIsCurrent(owner)) return@withTimeoutOrNull null
+                            if (row == null) return@withTimeoutOrNull ChatListBatchOutcome.SKIPPED
+                            check(row.row.groupIdHex.equals(id, ignoreCase = true))
+                            if (command == ChatListBatchCommand.EXCLUDE_FOLDER) {
+                                return@withTimeoutOrNull excludeChatListBatchTarget(id, folderId, owner)
+                            }
+                            chatListBatchDisposition(row, command) ?: run {
+                                val item = projectPresentedRow(row, appState.activeAccount?.accountIdHex)
+                                attemptedIds += id
+                                outcomes[id] = ChatListBatchOutcome.UNCONFIRMED
+                                val applied = applyChatListBatchCommand(item, command, owner)
+                                if (!chatListActionIsCurrent(owner)) return@withTimeoutOrNull null
+                                val pinCommand =
+                                    command == ChatListBatchCommand.PIN || command == ChatListBatchCommand.UNPIN
+                                if (!applied && pinCommand && !reconcileNativePinState(owner)) {
+                                    return@withTimeoutOrNull ChatListBatchOutcome.UNCONFIRMED
+                                }
+                                val committed = liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id)
+                                if (committed == null) {
+                                    ChatListBatchOutcome.UNCONFIRMED
+                                } else {
+                                    check(committed.row.groupIdHex.equals(id, ignoreCase = true))
+                                    val disposition = chatListBatchDisposition(committed, command)
+                                    if (disposition == ChatListBatchOutcome.SATISFIED) {
+                                        if (chatListActionIsCurrent(owner)) applyChatListActionRow(committed.row)
+                                        ChatListBatchOutcome.CHANGED
+                                    } else {
+                                        ChatListBatchOutcome.FAILED
+                                    }
+                                }
+                            }
+                        } ?: outcomes.getValue(id).takeIf { it == ChatListBatchOutcome.UNCONFIRMED }
+                            ?: ChatListBatchOutcome.FAILED
+                    }.getOrElse {
+                        outcomes.getValue(id).takeIf { it == ChatListBatchOutcome.UNCONFIRMED }
+                            ?: ChatListBatchOutcome.FAILED
+                    }
+                if (!chatListActionIsCurrent(owner)) break
+                outcomes[id] = result
+                onProgress(index + 1, targets.size)
+            }
+            return ChatListBatchResult(outcomes.toMap(), attemptedIds.toSet())
+        } finally {
+            chatListBatchInProgress = false
+        }
+    }
+
+    /**
+     * Shares the existing whole-selection overlay owner rather than introducing a second archive flow.
+     * Classify the complete scope before its shared overlay; fence ownership before and after native reads.
+     */
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "LoopWithTooManyJumpStatements")
+    private suspend fun runChatListArchiveBatch(
+        targets: List<String>,
+        command: ChatListBatchCommand,
+        owner: ChatListActionOwner,
+        onProgress: (Int, Int) -> Unit,
+    ): ChatListBatchResult {
+        val outcomes = targets.associateWith { ChatListBatchOutcome.NOT_STARTED }.toMutableMap()
+        val attemptedIds = mutableSetOf<String>()
+        val timedOutIds = mutableSetOf<String>()
+        val rows = mutableListOf<ChatListRowFfi>()
+        for (id in targets) {
+            if (!chatListActionIsCurrent(owner)) break
+            val read =
+                runCatchingCancellable {
+                    val loaded =
+                        kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
+                            listOf(liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id))
+                        } ?: error("Native chat lookup timed out")
+                    loaded.single()?.also { row ->
+                        check(row.row.groupIdHex.equals(id, ignoreCase = true))
+                    }
+                }
+            if (!chatListActionIsCurrent(owner)) break
+            val row = read.getOrNull()
+            if (read.isFailure) {
+                outcomes[id] = ChatListBatchOutcome.FAILED
+            } else if (row == null) {
+                outcomes[id] = ChatListBatchOutcome.SKIPPED
+            } else {
+                val disposition = chatListBatchDisposition(row, command)
+                if (disposition == null) rows += row.row else outcomes[id] = disposition
+            }
+        }
+        if (chatListActionIsCurrent(owner)) {
+            val commitContext = currentCoroutineContext()
+            val commitIsCurrent = { commitContext.isActive && chatListActionIsCurrent(owner) }
+            archiveActions.setArchivedRows(
+                owner.accountRef,
+                owner.bindEpoch,
+                ResolvedArchiveRows(rows, commitIsCurrent),
+                command == ChatListBatchCommand.ARCHIVE,
+                false,
+                onAttempted = { id ->
+                    val key = id.lowercase(java.util.Locale.ROOT)
+                    attemptedIds += key
+                    outcomes[key] = ChatListBatchOutcome.UNCONFIRMED
+                },
+                onSettled = { id, changed ->
+                    if (commitIsCurrent()) {
+                        outcomes[id.lowercase(java.util.Locale.ROOT)] =
+                            if (changed) ChatListBatchOutcome.CHANGED else ChatListBatchOutcome.UNCONFIRMED
+                        onProgress(outcomes.values.count { it != ChatListBatchOutcome.NOT_STARTED }, targets.size)
+                    }
+                },
+                stepTimeoutMillis = CHAT_LIST_BATCH_STEP_TIMEOUT_MS,
+                onTimedOut = { id -> timedOutIds += id.lowercase(java.util.Locale.ROOT) },
+                notifyFailures = false,
+            )
+        }
+        for (id in targets) {
+            if (!chatListActionIsCurrent(owner)) break
+            // A timed-out native attempt stays uncertain until an explicit read-only Check results.
+            if (id in attemptedIds && id !in timedOutIds) {
+                val confirmed = reconcileChatListBatchTarget(id, command, owner)
+                outcomes[id] =
+                    if (confirmed == ChatListBatchOutcome.SATISFIED) ChatListBatchOutcome.CHANGED else confirmed
+            }
+        }
+        return ChatListBatchResult(outcomes.toMap(), attemptedIds.toSet())
+    }
+
+    /** Read-only recovery never replays an operation whose completion is unknown. */
+    internal suspend fun reconcileChatListBatch(
+        previous: ChatListBatchResult,
+        command: ChatListBatchCommand,
+        owner: ChatListActionOwner,
+    ): ChatListBatchResult? {
+        if (chatListBatchInProgress || !chatListActionIsCurrent(owner)) return null
+        chatListBatchInProgress = true
+        val targets = previous.outcomes.filterValues { it == ChatListBatchOutcome.UNCONFIRMED }.keys
+        val outcomes = targets.associateWith { ChatListBatchOutcome.UNCONFIRMED }.toMutableMap()
+        try {
+            for (id in targets) {
+                if (!chatListActionIsCurrent(owner)) break
+                val confirmed = reconcileChatListBatchTarget(id, command, owner)
+                outcomes[id] =
+                    if (confirmed == ChatListBatchOutcome.SATISFIED && id in previous.attemptedIds) {
+                        ChatListBatchOutcome.CHANGED
+                    } else {
+                        confirmed
+                    }
+            }
+            return ChatListBatchResult(outcomes.toMap(), previous.attemptedIds.intersect(targets))
+        } finally {
+            chatListBatchInProgress = false
+        }
+    }
+
+    /** Read the captured target again without replaying its native mutation. */
+    private suspend fun reconcileChatListBatchTarget(
+        id: String,
+        command: ChatListBatchCommand,
+        owner: ChatListActionOwner,
+    ): ChatListBatchOutcome =
+        runCatchingCancellable {
+            kotlinx.coroutines.withTimeoutOrNull(CHAT_LIST_BATCH_STEP_TIMEOUT_MS) {
+                if (
+                    (
+                        command == ChatListBatchCommand.PIN ||
+                            command == ChatListBatchCommand.UNPIN
+                    ) &&
+                    !reconcileNativePinState(owner)
+                ) {
+                    return@withTimeoutOrNull ChatListBatchOutcome.UNCONFIRMED
+                }
+                val row = liveSubscriptions.presentedRowByGroup?.invoke(owner.accountRef, id)
+                if (!chatListActionIsCurrent(owner)) return@withTimeoutOrNull ChatListBatchOutcome.UNCONFIRMED
+                if (row == null) return@withTimeoutOrNull ChatListBatchOutcome.UNCONFIRMED
+                check(row.row.groupIdHex.equals(id, ignoreCase = true))
+                val disposition = chatListBatchDisposition(row, command)
+                if (disposition == ChatListBatchOutcome.SATISFIED) applyChatListActionRow(row.row)
+                disposition ?: ChatListBatchOutcome.FAILED
+            } ?: ChatListBatchOutcome.UNCONFIRMED
+        }.getOrDefault(ChatListBatchOutcome.UNCONFIRMED)
+
+    /** A pin may commit before native row hydration fails; recover all neighbouring positions too. */
+    @Suppress("ReturnCount") // Reject stale or unavailable complete pin state before applying a projection.
+    private suspend fun reconcileNativePinState(owner: ChatListActionOwner): Boolean {
+        val order = authoritativePinOrder(owner) ?: return false
+        if (!chatListActionIsCurrent(owner)) return false
+        applyPinState(ChatPinStateFfi(order))
+        return true
+    }
+
+    /** Read the current native pin universe before applying any complete-order projection. */
+    @Suppress("ReturnCount") // Refuse retired or unavailable whole-list pin reads before they can alter a projection.
+    private suspend fun authoritativePinOrder(owner: ChatListActionOwner): List<String>? {
+        if (!chatListActionIsCurrent(owner)) return null
+        val rows = liveSubscriptions.presentedChatList?.invoke(owner.accountRef, false) ?: return null
+        if (!chatListActionIsCurrent(owner)) return null
+        val order =
+            rows
+                .map { it.row }
+                .filter { it.pinned }
+                .sortedBy { it.pinnedPosition }
+                .map { it.groupIdHex }
+        check(order.distinctBy { it.lowercase(java.util.Locale.ROOT) }.size == order.size)
+        return order
+    }
+
+    /** Apply direct state commands after archive and folder requests have selected their dedicated owners. */
+    private suspend fun applyChatListBatchCommand(
+        item: ChatListItem,
+        command: ChatListBatchCommand,
+        owner: ChatListActionOwner,
+    ): Boolean =
+        when (command) {
+            ChatListBatchCommand.READ -> markAllRead(item, owner)
+            ChatListBatchCommand.UNREAD -> markUnread(item, owner)
+            ChatListBatchCommand.PIN -> setPinned(item, true, owner)
+            ChatListBatchCommand.UNPIN -> setPinned(item, false, owner)
+            ChatListBatchCommand.MUTE, ChatListBatchCommand.UNMUTE ->
+                appState.setConversationMutedAwaited(
+                    owner.accountRef,
+                    item.group.groupIdHex,
+                    command == ChatListBatchCommand.MUTE,
+                ) { chatListActionIsCurrent(owner) }
+            else -> error("Command $command must use its dedicated batch owner")
+        }
+
+    /** Exclude the captured ID only from the still-current captured folder preference owner. */
+    @Suppress("ReturnCount") // Guard missing folders and satisfied exclusions before the existing preference mutation.
+    private fun excludeChatListBatchTarget(
+        id: String,
+        folderId: String?,
+        owner: ChatListActionOwner,
+    ): ChatListBatchOutcome {
+        val preferences = appState.chatFolderPreferences
+        if (folderId == null || preferences.foldersFor(owner.accountRef).none { it.id == folderId }) {
+            return ChatListBatchOutcome.SKIPPED
+        }
+        if (id in preferences.excludedChats(owner.accountRef, folderId)) return ChatListBatchOutcome.SATISFIED
+        if (!chatListActionIsCurrent(owner)) return ChatListBatchOutcome.NOT_STARTED
+        return if (preferences.excludeChat(owner.accountRef, folderId, id)) {
+            ChatListBatchOutcome.CHANGED
+        } else {
+            ChatListBatchOutcome.FAILED
+        }
+    }
+
+    /** Reads MDK's complete pin universe, not the retained list window, and submits one exact permutation. */
+    @Suppress("ReturnCount") // Reject stale native permutations before any write.
+    internal suspend fun movePinnedSelection(
+        ids: Set<String>,
+        delta: Int,
+        owner: ChatListActionOwner,
+    ): ChatListPinMoveResult {
+        if (chatListBatchInProgress || !chatListActionIsCurrent(owner)) return ChatListPinMoveResult.UNAVAILABLE
+        chatListBatchInProgress = true
+        try {
+            val order = authoritativePinOrder(owner) ?: return ChatListPinMoveResult.UNAVAILABLE
+            val keys = order.map { it.lowercase(java.util.Locale.ROOT) }.toSet()
+            if (!ids.all { it.lowercase(java.util.Locale.ROOT) in keys }) return ChatListPinMoveResult.UNAVAILABLE
+            val next = moveSelectedPinnedChats(order, ids, delta)
+            if (next == order) return ChatListPinMoveResult.UNCHANGED
+            var dispatched = false
+            val state =
+                runCatchingCancellable {
+                    appState.marmotIo {
+                        if (chatListActionIsCurrent(owner)) {
+                            dispatched = true
+                            setPinnedChatOrder(owner.accountRef, next)
+                        } else {
+                            null
+                        }
+                    }
+                }.getOrNull()
+            if (!dispatched) return ChatListPinMoveResult.UNAVAILABLE
+            if (!chatListActionIsCurrent(owner)) return ChatListPinMoveResult.UNCONFIRMED
+            val confirmed =
+                state?.orderedGroupIds ?: runCatchingCancellable { authoritativePinOrder(owner) }.getOrNull()
+            if (confirmed == null || !chatListActionIsCurrent(owner)) return ChatListPinMoveResult.UNCONFIRMED
+            applyPinState(ChatPinStateFfi(confirmed))
+            val confirmedKeys = confirmed.map { it.lowercase(java.util.Locale.ROOT) }
+            val requestedKeys = next.map { it.lowercase(java.util.Locale.ROOT) }
+            return if (confirmedKeys == requestedKeys) {
+                ChatListPinMoveResult.MOVED
+            } else {
+                ChatListPinMoveResult.UNAVAILABLE
+            }
+        } finally {
+            chatListBatchInProgress = false
+        }
     }
 
     /** Pins the controller binding, active account and runtime together with the caller's view lifetime. */
@@ -5282,17 +5575,7 @@ class ChatsController private constructor(
      * way — returning shows the current list with no reload — only the
      * recompute is paused while hidden and flushed once on return. See #6.
      */
-    fun setChatListVisible(visible: Boolean) {
-        if (isCleared) return
-        if (visible == chatListVisible) return
-        chatListVisible = visible
-        // Flush any folded backing updates synchronously on return so the shell's
-        // one-shot head snapshot compares against the current projection, not a
-        // stale list left over while scheduleRecompute's debounce was pending (#1313).
-        if (visible && (pendingRecompute || recomputeScheduled)) {
-            recompute()
-        }
-    }
+    fun setChatListVisible(visible: Boolean) = presentationLifetime.setVisible(visible)
 
     /**
      * A draft started, cleared, or received a newer coalesced MDK updatedAtMs,
@@ -5304,27 +5587,11 @@ class ChatsController private constructor(
         recompute()
     }
 
-    private var recomputeScheduled = false
     private val recomputeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val presentationLifetime = ChatListPresentationLifetime(recomputeScope) { recompute() }
 
-    // Coalesce the per-fold recompute. The chat-list stream emits a flurry of Row
-    // updates during a sync burst (open / reconnect catch-up); running the full
-    // O(n log n) sort + member/preview/invite fan-out on each one janks the main
-    // thread. Fold updates land in the backing maps synchronously; this defers the
-    // projection rebuild one frame so a burst collapses into a single recompute,
-    // mirroring the conversation timeline's coalescing.
-    private fun scheduleRecompute() {
-        if (isCleared || recomputeScheduled) return
-        recomputeScheduled = true
-        recomputeScope.launch {
-            try {
-                delay(CHAT_LIST_RECOMPUTE_DEBOUNCE_MS)
-            } finally {
-                recomputeScheduled = false
-            }
-            recompute()
-        }
-    }
+    /** Keeps folded native updates synchronous while coalescing only their visible publication. */
+    private fun scheduleRecompute() = presentationLifetime.schedule()
 
     /**
      * Dispose every reference this controller owns. The chat-list screen calls
@@ -5354,8 +5621,7 @@ class ChatsController private constructor(
         hasLoadedLocalSnapshot = false
         isLoading = false
         error = null
-        pendingRecompute = false
-        recomputeScheduled = false
+        presentationLifetime.clear()
         pendingRecoveryProjectionGeneration.clear()
         recoveryProjectionGeneration = 0L
         recomputeScope.cancel()
@@ -5395,6 +5661,7 @@ class ChatsController private constructor(
         return !isCleared && bindLifetime.isCurrent(epoch) && bound
     }
 
+    /** Refreshes account unread state and publishes the visible projection when its presentation lifetime permits. */
     private fun recompute(scheduleBackgroundEnrichment: Boolean = true) {
         if (isCleared) return
         // currentProjectedItems() reads backing maps that remain warm while the
@@ -5420,11 +5687,7 @@ class ChatsController private constructor(
         // Hidden behind an open conversation: keep folding updates into the
         // backing maps (done by the caller) but defer the projection rebuild +
         // member/preview fan-out until the list returns, then run once. See #6.
-        if (!chatListVisible) {
-            pendingRecompute = true
-            return
-        }
-        pendingRecompute = false
+        if (!presentationLifetime.beginVisiblePublication()) return
         val all =
             sortChatListItems(projected) { item ->
                 accountRef?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
@@ -6022,9 +6285,6 @@ internal fun conversationSearchPageDirection(
 // loadOlder() must re-fetch.
 private const val LIVE_TIMELINE_WINDOW_CAP = 200
 
-// One frame: long enough to collapse a chat-list sync burst into a single
-// recompute, short enough to stay imperceptible.
-private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
 private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
 private const val CHAT_LIST_AVATAR_WARM_ROWS = 24
 

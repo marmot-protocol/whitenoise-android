@@ -23,6 +23,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Exercises the actual controller, platform journal and privacy-safe notice boundary. */
 @RunWith(RobolectricTestRunner::class)
@@ -35,6 +36,71 @@ class LocalGroupDeleteControllerTest {
     fun closeControllers() {
         controllers.forEach(ChatsController::onCleared)
     }
+
+    @Test
+    fun capturedNativeEligibilityIsRecheckedBeforeAnyLocalCleanupOrDelete() =
+        runTest {
+            val eligible = AtomicBoolean(true)
+            val fixture = localGroupDeleteFixture(controllers, localDeleteEligible = eligible::get)
+            val request =
+                PendingLocalChatDelete.capture(
+                    listOf(
+                        chatListItemFromProjection(chatRow(GROUP)).copy(
+                            actions = noChatRowActions().copy(canDeleteLocal = true),
+                        ),
+                    ),
+                    fixture.controller,
+                    fixture.state,
+                    requireNativeEligibility = true,
+                )
+            eligible.set(false)
+            assertFalse(
+                fixture.controller.deleteGroupLocalFromChatList(
+                    request.groupIds.single(),
+                    requireNativeEligibility = request.requireNativeEligibility,
+                ),
+            )
+            assertEquals(1, fixture.calls.count { it == "presentedChatListRow" })
+            assertEquals(0, fixture.calls.count { it == "listMedia" })
+            assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
+            assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+            assertTrue(fixture.controller.items.any { it.id == GROUP })
+        }
+
+    @Test
+    fun capturedBatchRetryRechecksEligibilityAndCannotExpandTargets() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = localGroupDeleteFixture(controllers, localDeleteEligible = { false })
+                val notice =
+                    fixture.state.localDeleteBatchRetryNotice(
+                        fixture.controller,
+                        listOf(GROUP),
+                        isCurrent = { true },
+                        requireNativeEligibility = true,
+                    )
+                requireNotNull(notice.retry).invoke(setOf(GROUP, "unconfirmed-group"))
+                fixture.state.mutationsScope.coroutineContext[Job]
+                    ?.children
+                    ?.toList()
+                    ?.forEach { it.join() }
+                assertEquals(1, fixture.calls.count { it == "presentedChatListRow" })
+                assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun nativeEligibleDeletionUsesTheExistingLocalCommitAndCleanup() =
+        runTest {
+            val fixture = localGroupDeleteFixture(controllers)
+            assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP, requireNativeEligibility = true))
+            assertEquals(1, fixture.calls.count { it == "presentedChatListRow" })
+            assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
+        }
 
     @Test
     fun healthyDeletionReportsSuccessWithoutRecoveryOrDeferredCleanup() =
@@ -233,9 +299,11 @@ class LocalGroupDeleteControllerTest {
                 // MainShell retains the controller and hides its projection when Chats leaves composition.
                 fixture.controller.setChatListVisible(false)
                 val notice =
-                    fixture.state.localDeleteBatchRetryNotice(fixture.controller, request.groupIds) {
-                        request.isCurrent(fixture.state, fixture.controller)
-                    }
+                    fixture.state.localDeleteBatchRetryNotice(
+                        fixture.controller,
+                        request.groupIds,
+                        isCurrent = { request.isCurrent(fixture.state, fixture.controller) },
+                    )
                 fixture.state.presentLocalDeleteFailure(R.string.toast_couldnt_delete_chat, null, notice = notice)
                 requireNotNull(notice.retry).invoke(setOf(GROUP.uppercase(), "unconfirmed-group"))
                 fixture.state.mutationsScope.coroutineContext[Job]
@@ -264,9 +332,11 @@ class LocalGroupDeleteControllerTest {
                     )
                 val request = captured.remaining(1)
                 val notice =
-                    fixture.state.localDeleteBatchRetryNotice(fixture.controller, request.groupIds) {
-                        request.isCurrent(fixture.state, fixture.controller)
-                    }
+                    fixture.state.localDeleteBatchRetryNotice(
+                        fixture.controller,
+                        request.groupIds,
+                        isCurrent = { request.isCurrent(fixture.state, fixture.controller) },
+                    )
                 fixture.state.presentLocalDeleteFailure(R.string.chat_list_delete_stopped, null, notice = notice)
                 val oldWarning = requireNotNull(fixture.state.toast)
                 finishLocalDeleteSnackbar(fixture.state, oldWarning, SnackbarResult.ActionPerformed)
