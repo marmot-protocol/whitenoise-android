@@ -2513,6 +2513,13 @@
     <string name="chat_batch_order_unconfirmed">Die Reihenfolge der angehefteten Unterhaltungen konnte nicht bestätigt werden. Prüfe die Unterhaltungsliste, bevor du Unterhaltungen erneut verschiebst.</string>
     <string name="public_jpeg_preview_image">Vorschau eines verlinkten JPEG-Bildes</string>
     <string name="public_jpeg_preview_save_failed">Die Einstellung für Bildvorschauen konnte nicht gespeichert werden. Bitte versuche es erneut.</string>
+    <string name="appearance_accessibility_preview">Lesbarkeitsvorschau</string>
+    <string name="appearance_preview_rtl">Layout von rechts nach links anzeigen</string>
+    <string name="appearance_preview_large_text">Größeren Text anzeigen</string>
+    <string name="appearance_preview_reset">Vorschau zurücksetzen</string>
+    <string name="appearance_preview_limits">Zeigt, wie Nachrichten mit deinem aktuellen Design, deiner Schriftart und Textgröße aussehen. Diese Schalter ändern nur diese Vorschau. Screenreader und Vergrößerung sind hier nicht in der Vorschau verfügbar; probiere sie in den Bedienungshilfen deines Geräts aus.</string>
+    <string name="appearance_preview_motion_on">Geräteanimationen sind an.</string>
+    <string name="appearance_preview_motion_off">Geräteanimationen sind aus, daher erscheinen Änderungen ohne Bewegung.</string>
 
     <string name="voice_recording_save_failed">Aufnahme wurde beendet, aber die Audiodatei konnte nicht gespeichert werden. Nimm erneut auf.</string>
     <string name="voice_recording_stops_in">Endet in %1$s</string>

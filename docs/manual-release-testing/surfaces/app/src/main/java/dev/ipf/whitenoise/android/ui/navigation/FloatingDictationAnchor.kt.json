@@ -18,6 +18,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Modifier.floatingDictationFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingDictationAnchor.kt",
+        "anchor": "fun Modifier.floatingDictationFooter(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

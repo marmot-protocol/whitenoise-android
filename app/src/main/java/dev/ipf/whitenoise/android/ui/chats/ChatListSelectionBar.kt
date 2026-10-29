@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Selection title and Close remain separate from the prototype's pinned bulk controls. */
@@ -115,6 +116,7 @@ internal fun ChatListSelectionControls(
     // Icon actions wrap as whole 48 dp targets at narrow widths.
     FlowRow(
         Modifier
+            .floatingDictationFooter()
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)

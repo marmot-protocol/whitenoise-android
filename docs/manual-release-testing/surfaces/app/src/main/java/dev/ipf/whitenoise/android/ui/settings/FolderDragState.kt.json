@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
+  "legacy_sha256": "e0dc964f91fca8b68e990296f3ce7bfa7987e0bfe7a102728795c41cfea90264",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "folderDragRowModifier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
+        "anchor": "internal fun folderDragRowModifier(",
+        "test_ids": [
+          "FLD-002",
+          "FLD-006"
+        ]
+      },
+      {
+        "surface": "rememberFolderDrag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
+        "anchor": "internal fun rememberFolderDrag(",
+        "test_ids": [
+          "FLD-002",
+          "FLD-006"
+        ]
+      },
+      {
+        "surface": "Modifier.folderDragHandle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
+        "anchor": "internal fun Modifier.folderDragHandle(",
+        "test_ids": [
+          "FLD-002",
+          "FLD-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

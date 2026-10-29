@@ -1762,6 +1762,19 @@ internal fun MainShell(
         },
         persistentTopContentConsumesStatusBars = forwardOperationVisible || playbackInShell,
         playbackHost = shellPlaybackHost,
+        handoffOwner = appState.activeAccountRef to appState.runtimeGeneration,
+        handoffDestination =
+            when {
+                !navAccountStable ||
+                    appState.appLockScreenVisible ||
+                    routingNotification ||
+                    routingShare ||
+                    routingAppUpdate ||
+                    pendingTtsDestinationNavigation != null -> null
+                selectedChat != null -> ComposerFabEndpoint.Composer
+                section == MainSection.Chats -> ComposerFabEndpoint.NewMessage
+                else -> null
+            },
     ) { dictationControlOwner ->
         if (!navAccountStable && !quickSwitchOwnsTargetFrame) {
             // Account invalidation is a privacy boundary, not an ordinary Back
