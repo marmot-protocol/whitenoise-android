@@ -8,10 +8,13 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
+import dev.ipf.marmotkit.IdentityCreationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.RelayListFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -57,10 +60,15 @@ class AppStateSignUpReentryTest {
                 arrayOf(MarmotInterface::class.java),
             ) { proxy, method, args ->
                 when (method.name) {
-                    "createIdentity" -> {
+                    "createIdentityWithInitialProfile" -> {
                         creations.incrementAndGet()
-                        created
+                        IdentityCreationResultFfi(
+                            created,
+                            args!![0] as UserProfileMetadataFfi,
+                            AccountSetupReadinessFfi.LOCAL_READY,
+                        )
                     }
+                    "accountSetupReadiness" -> AccountSetupReadinessFfi.NETWORK_READY
                     "uploadProfileImage" -> {
                         assertEquals("created", args!![0])
                         uploads.incrementAndGet()

@@ -14,8 +14,10 @@ import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
+import dev.ipf.marmotkit.IdentityCreationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -331,12 +333,17 @@ class AddProfileSignUpEntryTest {
                 arrayOf(MarmotInterface::class.java),
             ) { proxy, method, args ->
                 when (method.name) {
-                    "createIdentity" -> {
+                    "createIdentityWithInitialProfile" -> {
                         creates.incrementAndGet()
                         if (holdCreate) check(createRelease.await(10, TimeUnit.SECONDS))
                         if (failCreate) error("Controlled unaccepted create failure")
-                        bob
+                        IdentityCreationResultFfi(
+                            bob,
+                            args!![0] as UserProfileMetadataFfi,
+                            AccountSetupReadinessFfi.LOCAL_READY,
+                        )
                     }
+                    "accountSetupReadiness" -> AccountSetupReadinessFfi.NETWORK_READY
                     "accountRelayLists" ->
                         AccountRelayListsFfi(
                             complete = true,

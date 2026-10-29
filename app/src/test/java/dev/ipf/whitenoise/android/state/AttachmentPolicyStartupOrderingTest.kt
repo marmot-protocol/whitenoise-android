@@ -68,8 +68,8 @@ class AttachmentPolicyStartupOrderingTest {
         assertTrue(profileSignUp.contains("createOwnedIdentity("))
         assertTrue(profileSignUp.contains("qualify ="))
         val qualification = profileSignUp.substringAfter("qualify =").substringBefore("accept =")
-        assertOrdered(qualification, "runCatchingCancellable", "qualifyOwnedIdentity(account)")
-        assertOrdered(qualification, "qualifyOwnedIdentity(account)", "presentFailure")
+        assertOrdered(qualification, "runCatchingCancellable", "qualifyOwnedIdentity(account, awaitPublication = true)")
+        assertOrdered(qualification, "qualifyOwnedIdentity(account, awaitPublication = true)", "presentFailure")
         assertOrdered(qualification, "presentFailure", "getOrThrow()")
     }
 
