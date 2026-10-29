@@ -70,7 +70,11 @@ internal val LocalSystemAnimationsEnabled = compositionLocalOf<Boolean?> { null 
 
 /** Tracks [systemAnimationsEnabled] live, so a mounted avatar stops the moment motion is turned off. */
 @Composable
-internal fun rememberSystemAnimationsEnabled(): Boolean = LocalSystemAnimationsEnabled.current ?: observeSystemAnimationsEnabled()
+internal fun rememberSystemAnimationsEnabled(): Boolean =
+    when (val provided = LocalSystemAnimationsEnabled.current) {
+        null -> observeSystemAnimationsEnabled()
+        else -> provided
+    }
 
 /** Registers one settings observer for this call site; the theme provides its result to every descendant. */
 @Composable
