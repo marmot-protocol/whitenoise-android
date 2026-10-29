@@ -749,6 +749,7 @@ internal fun ShareTargetRow(
         avatarImage = avatar.image,
         avatarAnimationKey = avatar.animationKey,
         groupAnimation = avatar.groupAnimation,
+        avatarDomain = avatar.pictureDomain,
         modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(groupId) },
         trailing = { SelectionIndicator(selected = selected) },

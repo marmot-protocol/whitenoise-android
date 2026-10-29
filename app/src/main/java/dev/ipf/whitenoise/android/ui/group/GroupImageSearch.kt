@@ -185,6 +185,7 @@ internal fun ImageSearchPreview(
                     seed = seed,
                     size = 64.dp,
                     pictureUrl = previewUrl,
+                    pictureDomain = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

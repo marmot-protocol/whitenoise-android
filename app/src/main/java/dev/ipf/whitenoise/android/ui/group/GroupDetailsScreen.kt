@@ -1654,6 +1654,8 @@ internal fun GroupDetailsScreen(
                     groupAnimation = groupAvatar.groupAnimation,
                     archived = controller.presentedArchived,
                     readLocalBytes = groupAvatar.readOriginalBytes,
+                    // A group's picture, or a direct chat's peer picture, decodes in this conversation's worker.
+                    pictureDomain = controller.mediaTrustDomain,
                     onEdit =
                         if (canShowEditAction) {
                             { showEditGroup = true }
@@ -2349,10 +2351,11 @@ internal fun GroupDetailsHeader(
     descriptionCopyValue: String? = null,
     onNameBottom: (Float) -> Unit = {},
     readLocalBytes: (suspend () -> ByteArray?)? = null,
+    pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
-    val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl.takeIf { picture == null })
+    val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl.takeIf { picture == null }, pictureDomain)
     val avatarImageAvailable = picture != null || remoteImageAvailable
     var viewerOpen by remember(safePictureUrl, picture) { mutableStateOf(false) }
     var copied by remember(descriptionCopyValue) { mutableStateOf(false) }
@@ -2387,6 +2390,7 @@ internal fun GroupDetailsHeader(
                     pictureUrl = safePictureUrl?.takeIf { picture == null },
                     picture = picture,
                     groupAnimation = groupAnimation,
+                    pictureDomain = pictureDomain,
                 )
             }
             if (onEdit == null) {

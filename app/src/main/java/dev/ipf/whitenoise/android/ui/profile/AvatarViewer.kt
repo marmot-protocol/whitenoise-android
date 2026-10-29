@@ -99,13 +99,24 @@ import java.util.Locale
 
 private const val AVATAR_VIEWER_MAX_BYTES = 8 * 1024 * 1024
 
+/**
+ * Whether [pictureUrl] has a viewable image, loading it on a cache miss. That decode runs in [domain]'s worker,
+ * a group's conversation for a group picture, null for a person's published picture.
+ */
 @Composable
-internal fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
+internal fun rememberAvatarImageAvailable(
+    pictureUrl: String?,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
+): Boolean {
     val available by produceState(
         initialValue = pictureUrl?.let { AvatarImageLoader.peek(it) != null } == true,
         key1 = pictureUrl,
+        key2 = domain,
     ) {
-        value = pictureUrl?.let { AvatarImageLoader.load(it) != null } == true
+        value =
+            pictureUrl?.let { url ->
+                (if (domain == null) AvatarImageLoader.load(url) else AvatarImageLoader.load(url, domain)) != null
+            } == true
     }
     return available
 }

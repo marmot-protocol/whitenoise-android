@@ -1488,6 +1488,7 @@ internal fun ProfileAddToGroupsContent(
                         avatarUrl = avatar.pictureUrl,
                         avatarImage = avatar.image,
                         groupAnimation = avatar.groupAnimation,
+                        avatarDomain = avatar.pictureDomain,
                         enabled = !busy,
                         onClick = {
                             if (isSelected) selected.remove(groupId) else selected.add(groupId)
@@ -1663,6 +1664,7 @@ internal fun ProfileMakeAdminContent(
                             avatarUrl = avatar.pictureUrl,
                             avatarImage = avatar.image,
                             groupAnimation = avatar.groupAnimation,
+                            avatarDomain = avatar.pictureDomain,
                             enabled = !busy,
                             onClick = { selectedGroupId = item.group.groupIdHex },
                             trailing = { SelectionIndicator(selected = selected) },
