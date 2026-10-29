@@ -3453,8 +3453,10 @@ internal fun notificationConversationDomain(update: NotificationUpdateFfi): Medi
     }
 
 /** The worker domain of a notification's sender picture: a published kind-0 picture of the receiving account. */
-internal fun notificationSenderDomain(update: NotificationUpdateFfi): MediaTrustDomain =
-    MediaTrustDomain.publicProfiles(update.accountRef)
+internal fun notificationSenderDomain(update: NotificationUpdateFfi): MediaTrustDomain {
+    val receiver = update.accountRef
+    return MediaTrustDomain.publicProfiles(receiver)
+}
 
 /**
  * Resolves a picture URL to notification pixels, bounding the optional rich-card fetch. It decodes in the domain the

@@ -47,7 +47,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -134,12 +134,11 @@ internal fun SelectedMemberSummary(
             Box(modifier = Modifier.width(avatarStackWidth)) {
                 members.take(SUMMARY_AVATAR_COUNT).forEachIndexed { index, member ->
                     Box(modifier = Modifier.padding(start = (index * SUMMARY_AVATAR_OVERLAP_DP).dp)) {
-                        Avatar(
+                        PersonAvatar(
                             title = selectedMemberDisplayName(member, appState),
                             seed = member.accountIdHex,
                             size = 32.dp,
                             pictureUrl = selectedMemberPicture(member, appState),
-                            pictureDomain = AvatarImageLoader.publicProfiles(),
                         )
                     }
                 }

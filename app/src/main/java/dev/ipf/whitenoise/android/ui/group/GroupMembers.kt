@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Search
@@ -260,12 +261,11 @@ internal fun SoleAdminDeletePicker(
                                 .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Avatar(
+                        PersonAvatar(
                             title = appState.displayName(member.memberIdHex),
                             seed = member.memberIdHex,
                             size = 40.dp,
                             pictureUrl = appState.contactAvatarSource(member.memberIdHex),
-                            pictureDomain = AvatarImageLoader.publicProfiles(),
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

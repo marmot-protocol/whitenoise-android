@@ -67,14 +67,7 @@ internal fun rememberGroupAvatarPresentation(
     // A missing/corrupt local image may still use this account's native public-avatar selection.
     if (privateSource != null && privateImage != null) return GroupAvatarPresentation(privateImage, privateSource)
     val ownedSeed = firstFrameAvatar?.takeIf { it.matchesAvatarPresentationOwner(accountRef) }
-    val durableDomain =
-        groupAvatarDecodeDomain(
-            groupOwnsPicture,
-            dev.ipf.whitenoise.android.core.GroupProjector
-                .pictureIsMemberPinned(group),
-            accountRef,
-            group.groupIdHex,
-        )
+    val durableDomain = durableGroupPictureDomain(group, groupOwnsPicture, accountRef)
     val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef, durableDomain)
     if (durableAvatar != null) {
         val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
@@ -90,20 +83,13 @@ internal fun rememberGroupAvatarPresentation(
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedKey = encryptedGroupAvatarCacheKey(accountRef, group)
     val encryptedImage = rememberEncryptedGroupAvatar(appState, group, accountRef)
-    val remoteImage = rememberLegacyRemoteGroupAvatar(appState, accountRef, legacyUrl, group.groupIdHex)
+    val remoteImage = rememberLegacyRemoteGroupAvatar(appState, accountRef, legacyUrl)
     val seededImage = ownedSeed?.legacyImageFor(legacyUrl, encryptedKey, encryptedImage, ownedFallback)
     val originalReader = rememberLegacyGroupAvatarBytes(appState, group, accountRef, legacyUrl, encryptedKey)
     return GroupAvatarPresentation(
         image = seededImage ?: remoteImage ?: encryptedImage,
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
-        // A group's URL picture has host-chosen bytes, so single-use; a peer's fallback is a published picture.
-        pictureDomain =
-            if (legacyUrl != null) {
-                dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
-            } else {
-                dev.ipf.whitenoise.android.media.MediaTrustDomain
-                    .publicProfiles(accountRef)
-            },
+        pictureDomain = legacyGroupPictureDomain(legacyUrl, accountRef),
         readOriginalBytes = originalReader,
         groupAnimation =
             originalReader?.takeIf { groupOwnsPicture }?.let {
@@ -127,7 +113,6 @@ private fun rememberLegacyRemoteGroupAvatar(
     appState: WhiteNoiseAppState,
     accountRef: String?,
     legacyUrl: String?,
-    groupIdHex: String,
 ): ImageBitmap? =
     key(appState, appState.runtimeGeneration, accountRef, legacyUrl) {
         val image by rememberRecoverableAvatar(

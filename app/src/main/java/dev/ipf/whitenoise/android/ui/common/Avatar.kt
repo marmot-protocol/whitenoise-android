@@ -138,6 +138,22 @@ internal fun Avatar(
     }
 }
 
+/**
+ * [Avatar] for a person's published picture, which decodes in the active account's public profiles; a private
+ * contact handle still decodes in its own local domain. It names that domain so a person row cannot fall back to
+ * a single-use worker by omission.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun PersonAvatar(
+    title: String,
+    seed: String,
+    size: Dp,
+    pictureUrl: String?,
+) {
+    Avatar(title, seed, size, pictureUrl, pictureDomain = AvatarImageLoader.publicProfiles())
+}
+
 /** Keeps group admission and person-picture intent separate while sharing the avatar's pixels. */
 @Composable
 @Suppress("FunctionNaming")

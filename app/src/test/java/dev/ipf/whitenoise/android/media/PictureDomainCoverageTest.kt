@@ -92,27 +92,22 @@ class PictureDomainCoverageTest {
     ): List<Argument> {
         val parts = mutableListOf<String>()
         var depth = 0
-        var inString = false
         var partStart = start
         var index = start
-        while (index < text.length) {
+        var closed = false
+        while (index < text.length && !closed) {
+            val skipped = literalEnd(text, index)
             val char = text[index]
             when {
-                inString && char == '\\' -> index++
-                char == '"' -> inString = !inString
-                inString -> Unit
-                text.startsWith("//", index) || text.startsWith("/*", index) -> index = commentEnd(text, index)
-                char == '(' || char == '[' || char == '{' -> depth++
-                (char == ')' || char == ']' || char == '}') && depth > 0 -> depth--
-                char == ')' -> {
-                    parts += text.substring(partStart, index)
-                    break
-                }
+                skipped > index -> index = skipped - 1
+                char == ')' && depth == 0 -> closed = true
                 char == ',' && depth == 0 -> {
                     parts += text.substring(partStart, index)
                     partStart = index + 1
                 }
+                else -> depth += depthChange(char)
             }
+            if (closed) parts += text.substring(partStart, index)
             index++
         }
         val comments = Regex("""//[^\n]*|/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL)
@@ -122,16 +117,35 @@ class PictureDomainCoverageTest {
         }
     }
 
-    /** The last index of the line or block comment that starts at [index]. */
-    private fun commentEnd(
+    /** One for an opening bracket, minus one for a closing one, otherwise zero. */
+    private fun depthChange(char: Char): Int =
+        when (char) {
+            '(', '[', '{' -> 1
+            ')', ']', '}' -> -1
+            else -> 0
+        }
+
+    /** The index just past a string literal or comment that starts at [index], or [index] when none does. */
+    private fun literalEnd(
         text: String,
         index: Int,
     ): Int =
-        if (text.startsWith("//", index)) {
-            text.indexOf('\n', index).let { if (it < 0) text.length else it }
-        } else {
-            text.indexOf("*/", index).let { if (it < 0) text.length else it + 1 }
+        when {
+            text.startsWith("//", index) -> text.indexOf('\n', index).let { if (it < 0) text.length else it }
+            text.startsWith("/*", index) -> text.indexOf("*/", index).let { if (it < 0) text.length else it + 2 }
+            text[index] == '"' -> stringEnd(text, index)
+            else -> index
         }
+
+    /** The index just past the string literal whose opening quote is at [index], honouring escapes. */
+    private fun stringEnd(
+        text: String,
+        index: Int,
+    ): Int {
+        var at = index + 1
+        while (at < text.length && text[at] != '"') at += if (text[at] == '\\') 2 else 1
+        return minOf(at + 1, text.length)
+    }
 
     /** The app's main sources, from either the module or the repository root. */
     private fun mainSources(): List<File> {

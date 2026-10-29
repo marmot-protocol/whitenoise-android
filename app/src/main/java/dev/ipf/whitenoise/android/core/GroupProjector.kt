@@ -145,8 +145,10 @@ object GroupProjector {
      * URL whose bytes its host serves (#3373). Only such a picture decodes in its conversation's worker; a group with
      * both, or with only a URL, decodes single-use.
      */
-    fun pictureIsMemberPinned(group: AppGroupRecordFfi): Boolean =
-        !group.imageHashHex.isNullOrBlank() && group.avatarUrl.isNullOrBlank()
+    fun pictureIsMemberPinned(group: AppGroupRecordFfi): Boolean {
+        val hashPinned = !group.imageHashHex.isNullOrBlank()
+        return hashPinned && group.avatarUrl.isNullOrBlank()
+    }
 
     /**
      * Whether the conversation presents an image of its own. A peer-sourced selection, or a conversation

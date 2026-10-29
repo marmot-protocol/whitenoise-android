@@ -97,6 +97,35 @@ internal fun WhiteNoiseAppState.ownsPrivateAvatarSource(
     accounts.any { it.label == accountRef && !it.signedOut } &&
         PrivateContactAvatarLoader.belongsToAccount(source, accountRef)
 
+/** [groupAvatarDecodeDomain] for [group]'s durable selection, member-pinned only when it is the encrypted image. */
+internal fun durableGroupPictureDomain(
+    group: AppGroupRecordFfi,
+    ownsGroupPicture: Boolean,
+    accountRef: String?,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    groupAvatarDecodeDomain(
+        ownsGroupPicture,
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .pictureIsMemberPinned(group),
+        accountRef,
+        group.groupIdHex,
+    )
+
+/**
+ * The worker domain of a legacy presentation's URL: a group's URL picture has host-chosen bytes, so it decodes
+ * single-use, and otherwise the URL is a person's published fallback.
+ */
+internal fun legacyGroupPictureDomain(
+    legacyUrl: String?,
+    accountRef: String?,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    if (legacyUrl != null) {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+    } else {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .publicProfiles(accountRef)
+    }
+
 /**
  * A group's member-pinned (encrypted) picture decodes in its conversation's worker, any other picture a group owns
  * single-use, as its URL's host chooses the bytes, and a person's in the account's public profiles.
