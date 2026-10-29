@@ -11,6 +11,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Collections
 import java.util.concurrent.TimeUnit
 
 /**
@@ -278,7 +279,7 @@ class MediaWorkerDomainTest {
             finish(decodeIn(transport, 1, A))
             val failed = context.bindings[0]
             assertTrue(failed.remote.retired.await(2, TimeUnit.SECONDS))
-            assertEquals(1, refusals(transport).size)
+            assertEquals(1, refusalCount(transport))
             finish(decodeIn(transport, 1, A))
             assertEquals("Quarantined bytes start no worker", 1, context.bindings.size)
             next = decodeIn(transport, 2, A)
@@ -297,6 +298,68 @@ class MediaWorkerDomainTest {
             context.dieAll()
             transport.close()
         }
+    }
+
+    /**
+     * Failing requests in four domains at once quarantine every source without a ledger failure, quarantined
+     * sources start no worker, and the bound holds once more sources fail than it keeps.
+     */
+    @Test
+    fun parallelFailuresAcrossDomainsQuarantineEverySource() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), dieOnRetire = true)
+        val transport = domainLane(context)
+        val domains = listOf(A, B, C, D)
+        try {
+            val firstFailures = failInParallel(transport, domains, firstId = 1, count = FAILING_INPUTS)
+            assertEquals(emptyList<Throwable>(), firstFailures)
+            val failed = domains.size * FAILING_INPUTS
+            assertEquals(failed, refusalCount(transport))
+            val bindings = context.bindings.size
+            domains.forEachIndexed { index, domain ->
+                repeat(FAILING_INPUTS) { finish(decodeIn(transport, 1 + index * FAILING_INPUTS + it, domain)) }
+            }
+            assertEquals("Quarantined sources start no worker", bindings, context.bindings.size)
+            assertEquals(
+                emptyList<Throwable>(),
+                failInParallel(transport, domains, firstId = failed + 1, count = OVERFLOW_INPUTS),
+            )
+            assertEquals(MediaDecodePolicy.MAX_REFUSALS, refusalCount(transport))
+        } finally {
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** Runs [count] failing decodes per domain, the domains in parallel, and returns what callers threw. */
+    private fun failInParallel(
+        transport: IsolatedMediaTransport,
+        domains: List<MediaTrustDomain>,
+        firstId: Int,
+        count: Int,
+    ): List<Throwable> {
+        val failures = Collections.synchronizedList(mutableListOf<Throwable>())
+        val callers =
+            domains.mapIndexed { index, domain ->
+                Thread {
+                    try {
+                        repeat(count) {
+                            val id = firstId + index * count + it
+                            val bytes = ByteArray(id) { id.toByte() }
+                            MediaTrustScope
+                                .within(domain) { transport.decode(bytes, 1, false, MediaDecodePolicy.DECODE) }
+                                ?.let { pixels ->
+                                    pixels.recycle()
+                                    failures += AssertionError("Source $id decoded")
+                                }
+                        }
+                    } catch (failure: Throwable) {
+                        failures += failure
+                    }
+                }.apply { start() }
+            }
+        callers.forEach { it.join(TimeUnit.SECONDS.toMillis(PARALLEL_FAILURE_SECONDS)) }
+        if (callers.any(Thread::isAlive)) failures += AssertionError("A failing caller is stuck")
+        return failures.toList()
     }
 
     /** A request without a declared domain, or declared Unique, still gets a single-use generation. */
@@ -405,10 +468,10 @@ class MediaWorkerDomainTest {
         call.result.get()?.recycle()
     }
 
-    /** The session's quarantined source keys. */
-    private fun refusals(transport: IsolatedMediaTransport): Map<*, *> {
+    /** How many source keys the session's refusal ledger holds. */
+    private fun refusalCount(transport: IsolatedMediaTransport): Int {
         val session = privateField(transport, "session")
-        return privateField(session, "refusals") as Map<*, *>
+        return (privateField(session, "refusals") as MediaRefusalLedger).size()
     }
 
     private companion object {
@@ -422,5 +485,8 @@ class MediaWorkerDomainTest {
         const val EVICTION_RACE_ROUNDS = 40
         const val POLL_MS = 5L
         const val RECOVERY_DEADLINE_MS = 3_000L
+        const val FAILING_INPUTS = 12
+        const val OVERFLOW_INPUTS = 20
+        const val PARALLEL_FAILURE_SECONDS = 60L
     }
 }

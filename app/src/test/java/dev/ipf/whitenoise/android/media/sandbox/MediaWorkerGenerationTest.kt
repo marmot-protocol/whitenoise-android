@@ -114,7 +114,7 @@ class MediaWorkerGenerationTest {
             assertFalse(withWorkerIdentity { first.remote.deliverHeldReply(successfulPixelReply()) })
             assertNull(call.result.get())
             // Caller interruption is not evidence about the source, so nothing is quarantined.
-            assertTrue(refusals(transport).isEmpty())
+            assertEquals(0, refusalCount(transport))
         } finally {
             call.interruptAndJoin()
             context.dieAll()
@@ -160,7 +160,7 @@ class MediaWorkerGenerationTest {
             first.remote.die()
             crashing.join()
             assertNull(crashing.result.get())
-            assertEquals(1, refusals(transport).size)
+            assertEquals(1, refusalCount(transport))
             assertNull(transport.decode(byteArrayOf(5), 1, false, MediaDecodePolicy.DECODE))
             assertEquals(1, context.bindings.size)
             assertEquals(1, first.remote.requests)
@@ -186,7 +186,7 @@ class MediaWorkerGenerationTest {
             assertNull(transport.decode(byteArrayOf(5), 1, false, MediaDecodePolicy.DECODE))
             val hung = context.next()
             assertEquals(1, hung.remote.requests)
-            assertEquals(1, refusals(transport).size)
+            assertEquals(1, refusalCount(transport))
             hung.remote.die()
             assertNull(transport.decode(byteArrayOf(5), 1, false, MediaDecodePolicy.DECODE))
             assertEquals(1, context.bindings.size)
@@ -202,10 +202,10 @@ class MediaWorkerGenerationTest {
         }
     }
 
-    /** The current session's source quarantine, keyed by operation, edge, option and digest. */
-    private fun refusals(transport: IsolatedMediaTransport): Map<*, *> {
+    /** How many keys the current session's source quarantine holds, keyed by operation, edge, option and digest. */
+    private fun refusalCount(transport: IsolatedMediaTransport): Int {
         val session = privateField(transport, "session")
-        return privateField(session, "refusals") as Map<*, *>
+        return (privateField(session, "refusals") as MediaRefusalLedger).size()
     }
 
     /** When a replacement cannot bind, the input fails closed and the previous worker never receives it. */

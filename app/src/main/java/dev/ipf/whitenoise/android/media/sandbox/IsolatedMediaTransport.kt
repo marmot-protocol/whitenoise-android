@@ -396,7 +396,7 @@ internal class IsolatedMediaTransport(
                 .digest(bytes)
         val key = "${spec.operation}:${spec.edge}:${spec.option}:" + digest.joinToString("") { "%02x".format(it) }
         val now = android.os.SystemClock.elapsedRealtime()
-        if ((ticket.session.refusals[key] ?: 0L) > now) return null
+        if (ticket.session.refusals.refused(key, now)) return null
         if (!claimWorker(ticket)) return null
         return withOutput(outputName, capacity) { output ->
             val result =
@@ -535,16 +535,12 @@ internal class IsolatedMediaTransport(
             putParcelable("output", output)
         }
 
+    /** Quarantines [key] in [selected] for the refusal period from [now]; the ledger holds its own lock. */
     private fun recordRefusal(
         selected: Session,
         key: String,
         now: Long,
-    ) {
-        selected.refusals[key] = now + MediaDecodePolicy.REFUSAL_TTL_MS
-        while (selected.refusals.size > MediaDecodePolicy.MAX_REFUSALS) {
-            selected.refusals.remove(selected.refusals.keys.first())
-        }
-    }
+    ) = selected.refusals.refuse(key, now + MediaDecodePolicy.REFUSAL_TTL_MS)
 
     // Failed copies recycle their allocation before propagation.
     @Suppress("ReturnCount", "TooGenericExceptionCaught")
@@ -591,7 +587,8 @@ internal class IsolatedMediaTransport(
         val epoch: Long,
         val sources: MediaSourceAccess,
     ) {
-        val refusals = LinkedHashMap<String, Long>()
+        // Shared by every domain lane of the session, so it is a locked ledger rather than a bare map.
+        val refusals = MediaRefusalLedger()
     }
 
     private data class Operation(
