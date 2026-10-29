@@ -100,7 +100,7 @@ class IdentityCreationFlowTest {
             assertTrue(failure is MarmotKitException.AccountSetupRecoveryRequired)
         }
 
-    /** A stalled publication asks for a retry, which resumes the same native setup instead of creating another. */
+    /** A stalled publication fails with MDK's typed retry error rather than reporting a ready account. */
     @Test
     fun stalledPublicationAsksForRetry() =
         runTest {
@@ -111,6 +111,42 @@ class IdentityCreationFlowTest {
 
             assertTrue(failure is MarmotKitException.AccountSetupRetryRequired)
         }
+
+    /** A retry resumes MDK's stopped setup once, only while the first read still shows local or publishing setup. */
+    @Test
+    fun retryResumesStalledSetupOnceBeforePolling() =
+        runTest {
+            val states = ArrayDeque(listOf(AccountSetupReadinessFfi.PUBLISHING, AccountSetupReadinessFfi.NETWORK_READY))
+            var resumes = 0
+
+            awaitAccountNetworkReady("created", resume = { resumes++ }) { states.removeFirst() }
+
+            assertEquals(1, resumes)
+        }
+
+    /** A setup that is already ready, or still initializing, is never restarted. */
+    @Test
+    fun retryDoesNotResumeReadyOrInitializingSetup() =
+        runTest {
+            var resumes = 0
+            awaitAccountNetworkReady("created", resume = { resumes++ }) { AccountSetupReadinessFfi.NETWORK_READY }
+            val initializing =
+                ArrayDeque(listOf(AccountSetupReadinessFfi.INITIALIZING, AccountSetupReadinessFfi.NETWORK_READY))
+            awaitAccountNetworkReady("created", resume = { resumes++ }) { initializing.removeFirst() }
+
+            assertEquals(0, resumes)
+        }
+
+    /** The adapter resumes only after an expired wait, and only through start(), never another creation. */
+    @Test
+    fun adapterResumesThroughStartAfterAnExpiredWait() {
+        val wait = appStateSource("AppProfileSignUp.kt").readText().functionBody("awaitOwnedNetworkReadiness")
+        assertTrue(wait.contains("stalledSetupAccount == account"))
+        assertTrue(wait.contains("start()"))
+        assertTrue(wait.contains("catch (expired: MarmotKitException.AccountSetupRetryRequired)"))
+        assertFalse(wait.contains("createIdentity"))
+        assertFalse(wait.contains("createNamedIdentity"))
+    }
 
     @Test
     fun readyStatePrecedesPostCreateWarmup() {

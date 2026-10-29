@@ -69,15 +69,24 @@ internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMet
 /**
  * Polls native setup readiness until relay lists and the initial KeyPackage are published, while MDK's
  * background setup continues. Recovery and an expired wait surface as MDK's own typed setup errors.
+ *
+ * MDK stops background setup after a few quick attempts and resumes it only from `start()`. A retry passes
+ * [resume], which runs once when the first read still shows local or publishing setup. Creation is never called
+ * again to resume, because racing a just-finished setup would create a second account.
  */
 internal suspend fun awaitAccountNetworkReady(
     accountRef: String,
     timeoutMillis: Long = ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS,
+    resume: (suspend () -> Unit)? = null,
     readiness: suspend (String) -> AccountSetupReadinessFfi,
 ) {
+    var resumePending = resume != null
     withTimeoutOrNull(timeoutMillis) {
         while (true) {
-            when (readiness(accountRef)) {
+            val state = readiness(accountRef)
+            if (resumePending && state in RESUMABLE_SETUP) checkNotNull(resume).invoke()
+            resumePending = false
+            when (state) {
                 AccountSetupReadinessFfi.NETWORK_READY -> return@withTimeoutOrNull
                 AccountSetupReadinessFfi.RECOVERY_REQUIRED -> throw MarmotKitException.AccountSetupRecoveryRequired()
                 else -> delay(ACCOUNT_NETWORK_READY_POLL_MILLIS)
@@ -86,5 +95,6 @@ internal suspend fun awaitAccountNetworkReady(
     } ?: throw MarmotKitException.AccountSetupRetryRequired()
 }
 
+private val RESUMABLE_SETUP = setOf(AccountSetupReadinessFfi.LOCAL_READY, AccountSetupReadinessFfi.PUBLISHING)
 private const val ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS = 60_000L
 private const val ACCOUNT_NETWORK_READY_POLL_MILLIS = 250L

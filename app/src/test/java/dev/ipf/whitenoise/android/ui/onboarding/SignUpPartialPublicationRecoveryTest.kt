@@ -220,7 +220,7 @@ class SignUpPartialPublicationRecoveryTest {
         }
 
     /**
-     * Policy or readiness failure after native creation retries the same receipt and never activates it
+     * Policy failure after native creation retries the same receipt and never activates it
      * prematurely; an edited resubmission reaches the later profile save, not another creation.
      */
     @Test fun policyFailureAfterCreationRetriesWithoutCreatingAnotherIdentity() =

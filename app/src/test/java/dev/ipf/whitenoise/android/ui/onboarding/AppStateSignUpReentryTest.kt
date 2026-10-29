@@ -157,6 +157,75 @@ class AppStateSignUpReentryTest {
         }
     }
 
+    /** A teardown during the actual adapter's setup wait stops the form without a profile save or second account. */
+    @Suppress("LongMethod", "CyclomaticComplexMethod") // Single native callback scenario.
+    @Test
+    fun teardownDuringSetupWaitStopsTheFormWithoutPublishing() {
+        val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+        val creations = AtomicInteger()
+        val readinessReads = AtomicInteger()
+        val publications = AtomicInteger()
+        val native =
+            Proxy.newProxyInstance(
+                MarmotInterface::class.java.classLoader,
+                arrayOf(MarmotInterface::class.java),
+            ) { proxy, method, args ->
+                when (method.name) {
+                    "createIdentityWithInitialProfile" -> {
+                        creations.incrementAndGet()
+                        IdentityCreationResultFfi(
+                            created,
+                            args!![0] as UserProfileMetadataFfi,
+                            AccountSetupReadinessFfi.LOCAL_READY,
+                        )
+                    }
+                    "accountSetupReadiness" -> {
+                        readinessReads.incrementAndGet()
+                        AccountSetupReadinessFfi.PUBLISHING
+                    }
+                    "publishUserProfile" -> publications.incrementAndGet().let { Unit }
+                    "accountRelayLists" ->
+                        AccountRelayListsFfi(
+                            complete = true,
+                            missing = emptyList(),
+                            defaultRelays = listOf("wss://relay.example"),
+                            bootstrapRelays = emptyList(),
+                            nip65 = RelayListFfi(kind = 10_002uL, relays = listOf("wss://relay.example")),
+                            inbox = RelayListFfi(kind = 10_050uL, relays = listOf("wss://relay.example")),
+                        )
+                    "accountNip65Relays" -> listOf("wss://relay.example")
+                    "listAccounts" -> listOf(created)
+                    "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+                    "setAttachmentDownloadPolicy" -> Unit
+                    "toString" -> "SetupWaitTestDouble"
+                    "hashCode" -> System.identityHashCode(proxy)
+                    "equals" -> proxy === args?.firstOrNull()
+                    else -> throw UnsupportedOperationException("Unused native test call: ${method.name}")
+                }
+            } as MarmotInterface
+        val app =
+            WhiteNoiseAppState(
+                context,
+                DraftStore.forContext(context),
+                { null },
+                emptyList(),
+                "",
+                initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-wait-test").path, native),
+            )
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("bootstrapCompleted")
+            .apply { isAccessible = true }
+            .setBoolean(app, true)
+        app.beginProfileSignUp()
+        val controller = checkNotNull(app.pendingProfileSignUp)
+        controller.submit(SignUpProfileDraft("Alice", "About"))
+        idleUntil { readinessReads.get() > 0 }
+        app.wipeInProgress = true
+        idleUntil { controller.stage == SignUpStage.OwnerChanged }
+        assertEquals(1, creations.get())
+        assertEquals(0, publications.get())
+    }
+
     /** The actual adapter's destructive-operation flag rejects creation before accessing native state. */
     @Test fun wipeInProgressBlocksActualCreationAdapter() {
         var nativeAccess = 0
@@ -183,6 +252,16 @@ class AppStateSignUpReentryTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle { visible.value = true }
         composeRule.waitForIdle()
+    }
+
+    /** Advances the paused main looper, so the wait's poll delays fire, while IO-side adapter work completes. */
+    private fun idleUntil(condition: () -> Boolean) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (!condition()) {
+            check(System.nanoTime() < deadline) { "condition not reached" }
+            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(50))
+            Thread.sleep(10)
+        }
     }
 
     /** Native adapters run on IO while their owner completions return to the real main looper. */

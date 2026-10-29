@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
@@ -122,7 +123,11 @@ internal class AppProfileSignUp(
                 },
                 publish = { account, metadata ->
                     if (appState.activeAccountRef == account && ownerAvailable()) {
-                        awaitOwnedNetworkReadiness(account)
+                        runCatchingCancellable {
+                            awaitOwnedNetworkReadiness(account)
+                        }.onFailure {
+                            appState.presentFailure(R.string.toast_couldnt_publish_profile, "ACCOUNT_SETUP_WAIT", it)
+                        }.getOrThrow()
                         appState.publishProfile(metadata)
                     } else {
                         false
@@ -162,19 +167,36 @@ internal class AppProfileSignUp(
         }
     }
 
+    /** The account whose last setup wait expired; its next wait first resumes MDK's stalled setup. */
+    private var stalledSetupAccount: String? = null
+
     /**
      * The profile creation call returns at local readiness while MDK publishes relay lists and the KeyPackage in
      * the background. Wait for that before the profile save, without holding the account lifetime, and recheck
      * the form's owner on every read. A failure is a retryable publication stage that keeps the accepted account,
-     * and Continue without profile still leaves the form.
+     * and Continue without profile still leaves the form. After an expired wait, Retry restarts MDK's setup
+     * through `start()`, as the iOS client does.
      */
-    private suspend fun awaitOwnedNetworkReadiness(account: String) =
-        awaitAccountNetworkReady(account) { ref ->
-            if (appState.activeAccountRef != ref || !ownerAvailable()) {
-                throw kotlinx.coroutines.CancellationException("Sign-up owner changed")
+    private suspend fun awaitOwnedNetworkReadiness(account: String) {
+        val resume: (suspend () -> Unit)? =
+            if (stalledSetupAccount == account) {
+                { appState.marmotIo { start() } }
+            } else {
+                null
             }
-            appState.marmotIo { accountSetupReadiness(ref) }
+        try {
+            awaitAccountNetworkReady(account, resume = resume) { ref ->
+                if (appState.activeAccountRef != ref || !ownerAvailable()) {
+                    throw kotlinx.coroutines.CancellationException("Sign-up owner changed")
+                }
+                appState.marmotIo { accountSetupReadiness(ref) }
+            }
+            stalledSetupAccount = null
+        } catch (expired: MarmotKitException.AccountSetupRetryRequired) {
+            stalledSetupAccount = account
+            throw expired
         }
+    }
 
     /** Teardown and retained-account reactivation cannot acquire the profile form's ownership. */
     private fun ownerAvailable(): Boolean {
