@@ -46,6 +46,26 @@ internal interface AttachmentPlaintext : Closeable {
         /** Releases the lease and deletes its temporary plaintext file. */
         override fun close() = lease.close()
     }
+
+    /**
+     * A retained source whose declared [size] already exceeds [limitBytes], the budget of the byte-returning read that
+     * opened it, so none of its plaintext was copied. A bounded read refuses it from [size] alone, exactly as it would
+     * refuse the full source, and it holds nothing to release.
+     */
+    class Oversized internal constructor(
+        override val size: Long,
+        val limitBytes: Long,
+    ) : AttachmentPlaintext {
+        init {
+            require(limitBytes >= 0 && size > limitBytes) { "an oversized source must declare more than its budget" }
+        }
+
+        /** Refuses the copy, because nothing was materialized for a reader that can hold at most [limitBytes]. */
+        override fun copyTo(output: OutputStream): Unit = throw AttachmentTooLargeToPresentException(limitBytes, size)
+
+        /** Nothing was materialized, so there is nothing to release. */
+        override fun close() = Unit
+    }
 }
 
 /**

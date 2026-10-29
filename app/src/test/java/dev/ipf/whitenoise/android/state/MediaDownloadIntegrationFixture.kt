@@ -60,6 +60,9 @@ internal class MediaDownloadIntegrationFixture(
     val explicitDemands = AtomicInteger()
     val retryDemands = AtomicInteger()
 
+    /** Chunk reads of retained plaintext, each of which the host writes into a lease file. */
+    val nativeAssetReads = AtomicInteger()
+
     /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
     val automaticPolicyBlocks = AtomicInteger()
 
@@ -167,6 +170,7 @@ internal class MediaDownloadIntegrationFixture(
                             ?: AttachmentLocalAssetFfi(null, 0u)
                     }
                 "readAttachmentAsset" -> {
+                    nativeAssetReads.incrementAndGet()
                     val bytes = jobs[args!![1] as String]?.bytes
                     val offset = (args[2] as Number).toLong().toULong()
                     val limit = (args[3] as Number).toInt().toUInt()
