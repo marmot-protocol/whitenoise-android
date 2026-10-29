@@ -230,6 +230,44 @@ class MediaWorkerDomainTest {
         }
     }
 
+    /**
+     * A domain's own request racing an eviction never lands on the worker being evicted: the victim is marked
+     * retiring under the same lock that chose it, so the domain waits for a fresh worker instead of failing.
+     */
+    @Test
+    fun domainRequestRacingItsEvictionStillSucceeds() {
+        repeat(EVICTION_RACE_ROUNDS) { round ->
+            val context =
+                BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true }, dieOnRetire = true)
+            val transport = domainLane(context, liveLimit = 2)
+            try {
+                finish(decodeIn(transport, 1, A))
+                finish(decodeIn(transport, 2, B))
+                val start = java.util.concurrent.CountDownLatch(1)
+                val results = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+                val racers =
+                    listOf("evicting" to C, "evicted" to A).map { (name, domain) ->
+                        Thread {
+                            start.await()
+                            val bytes = ByteArray(3) { 3 }
+                            val image =
+                                MediaTrustScope.within(domain) {
+                                    transport.decode(bytes, 1, false, MediaDecodePolicy.DECODE)
+                                }
+                            results[name] = image != null
+                            image?.recycle()
+                        }.apply { start() }
+                    }
+                start.countDown()
+                racers.forEach { it.join(TimeUnit.SECONDS.toMillis(5)) }
+                assertEquals("round $round: $results", mapOf("evicting" to true, "evicted" to true), results.toMap())
+            } finally {
+                context.dieAll()
+                transport.close()
+            }
+        }
+    }
+
     /** A failed reply retires the domain's worker, quarantines its source, and the domain waits for that death. */
     @Test
     fun failedReplyRetiresTheDomainWorkerAndQuarantinesItsSource() {
@@ -381,6 +419,7 @@ class MediaWorkerDomainTest {
         const val INPUTS_PER_DOMAIN = 6
         const val FENCE_OBSERVATION_MS = 300L
         const val SERVE_SECONDS = 5L
+        const val EVICTION_RACE_ROUNDS = 40
         const val POLL_MS = 5L
         const val RECOVERY_DEADLINE_MS = 3_000L
     }

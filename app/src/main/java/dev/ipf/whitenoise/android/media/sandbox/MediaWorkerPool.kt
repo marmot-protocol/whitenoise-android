@@ -119,7 +119,11 @@ internal class MediaWorkerPool(
         generations
             .filter { it.reusable && !it.busy && !it.retiring && it.dead.count != 0L }
             .minByOrNull { it.lastUsedNanos }
-            ?.let { return ClaimStep.Evict(it) }
+            ?.let { victim ->
+                // Marked here, under the lock, so no claim for the victim's domain takes it before RETIRE.
+                victim.retiring = true
+                return ClaimStep.Evict(victim)
+            }
         if (generations.any { it.busy }) return ClaimStep.Await(signal)
         // Every slot is held by a generation whose lifetime is unresolved, never exceed the bound.
         generations.firstOrNull { it.dead.count != 0L }?.let { return ClaimStep.AwaitDeath(it) }
@@ -137,8 +141,11 @@ internal class MediaWorkerPool(
                 worker.busy = false
                 worker.inputs++
                 worker.lastUsedNanos = System.nanoTime()
+                val spent = worker.inputs >= DOMAIN_INPUT_CAP
+                // Retiring under the same lock, so no claim can take a spent generation before RETIRE is sent.
+                if (spent) worker.retiring = true
                 signalLocked()
-                (worker.inputs >= DOMAIN_INPUT_CAP) to ++worker.useStamp
+                spent to ++worker.useStamp
             }
         if (spent) {
             retire(worker)
@@ -167,7 +174,10 @@ internal class MediaWorkerPool(
         worker: MediaWorker,
         stamp: Int,
     ) {
-        val idle = synchronized(lock) { !worker.busy && !worker.retiring && worker.useStamp == stamp }
+        val idle =
+            synchronized(lock) {
+                (!worker.busy && !worker.retiring && worker.useStamp == stamp).also { if (it) worker.retiring = true }
+            }
         if (idle) retire(worker)
     }
 
